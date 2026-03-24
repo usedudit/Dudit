@@ -1,0 +1,94 @@
+"use client"
+
+import React, { useState } from "react"
+import { Button } from "./Button"
+import Dropdown, { DropdownItem } from "../reusable/Dropdown"
+import {
+  ChevronDownIcon,
+  ThreeDotsIcon,
+  EditIcon,
+  DuplicateIcon,
+  TrashIcon
+} from "@/lib/icons"
+
+interface AccordionProps {
+  title: string
+  children: React.ReactNode
+  defaultOpen?: boolean
+  triggerClass?: string
+  titleClass?: string
+}
+
+export const Accordion: React.FC<AccordionProps> = ({
+  title,
+  children,
+  defaultOpen = false,
+  triggerClass,
+  titleClass
+}) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen)
+
+  const buttonStyles = triggerClass
+    ? `flex items-center justify-between w-full transition-colors ${triggerClass}`
+    : "flex items-center justify-between w-full py-4 text-sm font-semibold text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border/30 px-2 rounded-lg transition-colors"
+
+  return (
+    <div className={`last:border-0 ${!triggerClass ? "border-b border-brand-border dark:border-dark-border" : ""}`}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={buttonStyles}
+      >
+        <span className={titleClass || ""}>{title}</span>
+        <ChevronDownIcon
+          // Adicionei duration-500 aqui também para a seta girar na mesma velocidade do conteúdo
+          className={`w-4 h-4 text-brand-dark dark:text-dark-heading transition-transform duration-500 ease-in-out ${isOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {/* TÉCNICA DO GRID PARA ANIMAÇÃO SUAVE */}
+      <div
+        className={`grid transition-[grid-template-rows] duration-500 ease-in-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+          }`}
+      >
+        <div className="overflow-hidden">
+          {/* O conteúdo interno precisa estar aqui dentro para o Grid funcionar */}
+          <div
+            className={`transition-opacity duration-500 ${isOpen ? "opacity-100" : "opacity-0"} ${!triggerClass ? "px-2 pt-2 pb-2 space-y-2" : "pt-0"}`}
+          >
+            {children}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ... ActionsDropdown permanece igual ...
+interface ActionsDropdownProps {
+  onEdit: () => void
+  onDuplicate: () => void
+  onDelete: () => void
+}
+
+export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({ onEdit, onDuplicate, onDelete }) => (
+  <Dropdown
+    trigger={
+      <Button variant="outline" className="w-[40px] h-[40px] p-0 flex items-center justify-center">
+        <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
+      </Button>
+    }
+    align="right"
+    showChevron={false}
+  >
+    <DropdownItem onClick={onEdit}>
+      <EditIcon className="w-4 h-4" /> Editar
+    </DropdownItem>
+    <DropdownItem onClick={onDuplicate}>
+      <DuplicateIcon className="w-4 h-4" /> Duplicar
+    </DropdownItem>
+    <DropdownItem onClick={onDelete} className="text-brand-red">
+      <TrashIcon className="w-4 h-4" /> Excluir
+    </DropdownItem>
+  </Dropdown>
+)

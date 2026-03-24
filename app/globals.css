@@ -1,0 +1,752 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap");
+
+@import "tailwindcss";
+/* Removed @import "tw-animate-css" that was causing empty utility errors */
+
+/* Using exact brand colors from design system instead of shadcn defaults */
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Light mode - using exact brand colors */
+  --background: #fff;
+  --foreground: #102a56;
+  --card: #ffffff;
+  --card-foreground: #102a56;
+  --popover: #ffffff;
+  --popover-foreground: #102a56;
+  --primary: #0d5e49;
+  --primary-foreground: #102a56;
+  --secondary: #ebebeb;
+  --secondary-foreground: #102a56;
+  --muted: #f0f2f5;
+  --muted-foreground: #6b7280;
+  --accent: #0d5e49;
+  --accent-foreground: #102a56;
+  --destructive: #e53e3e;
+  --destructive-foreground: #ffffff;
+  --border: #ebebeb;
+  --input: #ebebeb;
+  --ring: #0d5e49;
+  --chart-1: #0d5e49;
+  --chart-2: #bcf49d;
+  --chart-3: #fff085;
+  --chart-4: #ffa2a2;
+  --chart-5: #d9f0fc;
+  --radius: 0.625rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #102a56;
+  --sidebar-primary: #0d5e49;
+  --sidebar-primary-foreground: #102a56;
+  --sidebar-accent: #ebebeb;
+  --sidebar-accent-foreground: #102a56;
+  --sidebar-border: #ebebeb;
+  --sidebar-ring: #0d5e49;
+
+  /* Brand colors from design system */
+  --brand-page-bg: #fff;
+  --brand-sidebar-bg: #ffffff;
+  --brand-component-bg: #ffffff;
+  --brand-dark: #003d32;
+  --brand-inactive-text: #6b7280;
+  --brand-gray: #F9FAFB;
+  --brand-slate: #f3f5f9;
+  --brand-border: #ebebeb;
+  --brand-green: #059669;
+  --brand-green-light: #dcfae6;
+  --brand-green-medium: #0fa96b;
+  --brand-green-secondary: #dcfce7;
+  --brand-green-secondary-dark: #079455;
+  --brand-green-secondary-light: #dcfae6;
+  --brand-red: #f04438;
+  --brand-red-dark: #d92d20;
+  --brand-red-light: #fee4e2;
+  --brand-orange: #ffa503;
+  --brand-orange-light: #fff085;
+  --brand-active-link-bg: #0d5e49;
+  --brand-active-link-text: #102a56;
+  --brand-get-pro-bg: #102a56;
+  --brand-get-pro-button-bg: #0d5e49;
+  --brand-get-pro-button-text: #102a56;
+  --brand-search-bg: #ffffff;
+  --brand-notification-red: #f55555;
+  --brand-completed-bg: #102a56;
+  --brand-completed-text: #ffffff;
+  --brand-pending-bg: #0d5e49;
+  --brand-pending-text: #102a56;
+  --brand-overdue-bg: #ffebeb;
+  --brand-overdue-text: #e53e3e;
+  --brand-unpaid-bg: #f0f2f5;
+  --brand-unpaid-text: #6b7280;
+
+  --dark-background: #18181b;
+  --dark-surface: #18181b;
+  --dark-border: #24252b;
+  --dark-heading: #f0f0f0;
+  --dark-body: #a1a1aa;
+}
+
+.dark {
+  /* Dark mode - using exact brand colors */
+  --background: #18181b;
+  --foreground: #f0f0f0;
+  --card: #18181b;
+  --card-foreground: #f0f0f0;
+  --popover: #18181b;
+  --popover-foreground: #f0f0f0;
+  --primary: #0d5e49;
+  --primary-foreground: #102a56;
+  --secondary: #24252b;
+  --secondary-foreground: #f0f0f0;
+  --muted: #24252b;
+  --muted-foreground: #a1a1aa;
+  --accent: #0d5e49;
+  --accent-foreground: #102a56;
+  --destructive: #e53e3e;
+  --destructive-foreground: #ffffff;
+  --border: #24252b;
+  --input: #24252b;
+  --ring: #0d5e49;
+  --chart-1: #0d5e49;
+  --chart-2: #bcf49d;
+  --chart-3: #fff085;
+  --chart-4: #ffa2a2;
+  --chart-5: #d9f0fc;
+  --sidebar: #18181b;
+  --sidebar-foreground: #f0f0f0;
+  --sidebar-primary: #0d5e49;
+  --sidebar-primary-foreground: #102a56;
+  --sidebar-accent: #24252b;
+  --sidebar-accent-foreground: #f0f0f0;
+  --sidebar-border: #24252b;
+  --sidebar-ring: #0d5e49;
+
+  /* Dark mode brand colors with dark-background and dark-surface */
+  --brand-page-bg: #18181b;
+  --brand-sidebar-bg: #18181b;
+  --brand-component-bg: #18181b;
+  --brand-border: #24252b;
+  --brand-inactive-text: #a1a1aa;
+  --brand-get-pro-bg: #102a56;
+  --brand-get-pro-button-bg: #0d5e49;
+  --brand-get-pro-button-text: #102a56;
+  --brand-search-bg: #18181b;
+  --brand-green-medium: #0fa96b;
+}
+
+@theme inline {
+  /* Added Inter font family */
+  --font-sans: "Inter", sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  /* Tailwind color mappings for brand colors */
+  /* Updated color mappings to reflect new naming */
+  --color-brand-page-bg: var(--brand-page-bg);
+  --color-brand-sidebar-bg: var(--brand-sidebar-bg);
+  --color-brand-component-bg: var(--brand-component-bg);
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-inactive-text: var(--brand-inactive-text);
+  --color-brand-gray: var(--brand-gray);
+  --color-brand-slate: var(--brand-slate);
+  --color-brand-border: var(--brand-border);
+  --color-brand-green: var(--brand-green);
+  --color-brand-green-light: var(--brand-green-light);
+  --color-brand-green-medium: var(--brand-green-medium);
+  --color-brand-green-secondary: var(--brand-green-secondary);
+  --color-brand-green-secondary-light: var(--brand-green-secondary-light);
+  --color-brand-green-secondary-dark: var(--brand-green-secondary-dark);
+  --color-brand-red: var(--brand-red);
+  --color-brand-red-dark: var(--brand-red-dark);
+  --color-brand-red-light: var(--brand-red-light);
+  --color-brand-orange: var(--brand-orange);
+  --color-brand-orange-light: var(--brand-orange-light);
+  --color-brand-active-link-bg: var(--brand-active-link-bg);
+  --color-brand-active-link-text: var(--brand-active-link-text);
+  --color-brand-get-pro-bg: var(--brand-get-pro-bg);
+  --color-brand-get-pro-button-bg: var(--brand-get-pro-button-bg);
+  --color-brand-get-pro-button-text: var(--brand-get-pro-button-text);
+  --color-brand-search-bg: var(--brand-search-bg);
+  --color-brand-notification-red: var(--brand-notification-red);
+  --color-brand-completed-bg: var(--brand-completed-bg);
+  --color-brand-completed-text: var(--brand-completed-text);
+  --color-brand-pending-bg: var(--brand-pending-bg);
+  --color-brand-pending-text: var(--brand-pending-text);
+  --color-brand-overdue-bg: var(--brand-overdue-bg);
+  --color-brand-overdue-text: var(--brand-overdue-text);
+  --color-brand-unpaid-bg: var(--brand-unpaid-bg);
+  --color-brand-unpaid-text: var(--brand-unpaid-text);
+
+  /* Added dark mode specific colors */
+  --color-dark-background: var(--dark-background);
+  --color-dark-surface: var(--dark-surface);
+  --color-dark-border: var(--dark-border);
+  --color-dark-heading: var(--dark-heading);
+  --color-dark-body: var(--dark-body);
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* View Transition for Theme Change */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* During the transition, the old view is kept in the background. */
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+/* The new view is placed on top and its clip-path is animated to reveal it. */
+::view-transition-new(root) {
+  z-index: 999;
+}
+
+tbody tr {
+  transition-property: background-color, opacity;
+  transition-duration: 100ms;
+  transition-timing-function: ease-in-out;
+}
+
+/* Custom animations from design system */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.page-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.tab-content-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.row-fade-in {
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+/* Added auth page animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out forwards;
+}
+
+.animate-fade-in-delay-1 {
+  animation: fade-in 0.4s ease-out 0.08s forwards;
+  opacity: 0;
+}
+
+.animate-fade-in-delay-2 {
+  animation: fade-in 0.4s ease-out 0.16s forwards;
+  opacity: 0;
+}
+
+.animate-fade-in-delay-3 {
+  animation: fade-in 0.4s ease-out 0.24s forwards;
+  opacity: 0;
+}
+
+.animate-fade-in-delay-4 {
+  animation: fade-in 0.4s ease-out 0.32s forwards;
+  opacity: 0;
+}
+
+/* Removed .animate-slide-up class */
+
+@keyframes variant-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.variant-fade-in {
+  animation: variant-fade-in 0.3s ease-out forwards;
+}
+
+@keyframes slide-up-fade {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up-fade {
+  animation: slide-up-fade 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@keyframes cart-item-enter-anim {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.cart-item-enter {
+  animation: cart-item-enter-anim 0.3s ease-out forwards;
+}
+
+@keyframes cart-item-exit-anim {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+.cart-item-exit {
+  animation: cart-item-exit-anim 0.3s ease-out forwards;
+}
+
+/* Custom checkbox styling */
+.custom-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 1.25rem;
+  width: 1.25rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  display: inline-block;
+  position: relative;
+  vertical-align: middle;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.custom-checkbox:checked {
+  background-color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+/* Changed :focus to :focus-visible for keyboard-only focus indication */
+.custom-checkbox:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px #fff, 0 0 0 2px var(--brand-green);
+}
+
+.custom-checkbox:checked::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 3px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  animation: checkmark-fade-in 0.2s ease-in-out forwards;
+}
+
+.custom-checkbox:indeterminate {
+  background-color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+.custom-checkbox:indeterminate::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 8px;
+  width: 10px;
+  height: 2px;
+  background-color: white;
+  transform: none;
+  animation: none;
+}
+
+@keyframes checkmark-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.dark .custom-checkbox {
+  border-color: #3f3f46;
+}
+
+.dark .custom-checkbox:checked {
+  background-color: #0d5e49;
+  border-color: #0d5e49;
+}
+
+.dark .custom-checkbox:indeterminate {
+  background-color: #0d5e49;
+  border-color: #0d5e49;
+}
+
+.dark .custom-checkbox:focus-visible {
+  box-shadow: 0 0 0 2px #18181b, 0 0 0 4px #0d5e49;
+}
+
+.dark .custom-checkbox:checked::after {
+  border-color: white;
+}
+
+/* Radio button animations */
+.radio-dot {
+  transform-origin: center;
+  transform: scale(0);
+  opacity: 0;
+}
+
+.radio-dot.is-checked-statically {
+  transform: scale(1);
+  opacity: 1;
+}
+
+@keyframes radio-pop-in-anim {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+
+  60% {
+    transform: scale(1.2);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes radio-pop-out-anim {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0);
+  }
+}
+
+.radio-dot.is-animating-in {
+  animation: radio-pop-in-anim 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.radio-dot.is-animating-out {
+  animation: radio-pop-out-anim 0.2s ease-out forwards;
+}
+
+/* Table column transitions */
+.table-col {
+  transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease-in-out, background-color 0.1s ease-in-out;
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 400px;
+}
+
+/* Corrigido para não remover o background quando a coluna é escondida */
+.col-hidden {
+  max-width: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  opacity: 0;
+  border-width: 0 !important;
+  overflow: hidden;
+  /* Removido background-color: transparent para manter o background da célula */
+}
+
+/* Garantir que o background das células sempre seja aplicado */
+tbody td.table-col {
+  background-color: inherit;
+}
+
+tbody tr {
+  transition-property: background-color, opacity;
+  transition-duration: 100ms;
+  transition-timing-function: ease-in-out;
+}
+
+/* Promo container animations */
+.promo-container {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s ease-in-out, margin-top 0.3s ease-in-out;
+  margin-top: 0;
+}
+
+.promo-container.open {
+  grid-template-rows: 1fr;
+  margin-top: 1.25rem;
+}
+
+.promo-container-inner {
+  overflow: hidden;
+}
+
+.promo-content {
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.promo-container.open .promo-content {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Sidebar tooltip */
+.sidebar-tooltip {
+  position: relative;
+}
+
+.sidebar-tooltip::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  transform: translateY(-50%);
+  border-width: 7px;
+  border-style: solid;
+  border-color: transparent #102a56 transparent transparent;
+}
+
+.dark .sidebar-tooltip::before {
+  border-right-color: white;
+}
+
+/* Custom selection colors */
+::selection {
+  background: #059669;
+  color: #fff;
+}
+
+::-moz-selection {
+  background: #059669;
+  color: #fff;
+}
+
+/* Custom Scrollbar - RESTORED TO DEFAULT per user request */
+/* Removing custom ::-webkit-scrollbar styles */
+
+/* Mobile scrollbar hide - UNIVERSAL */
+@media (pointer: coarse), (max-width: 1024px) {
+  * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Hide number input arrows */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+
+  to {
+    height: 0;
+  }
+}
+
+@keyframes slide-in-from-left {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-out-to-left {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes slide-in-from-right {
+  from {
+    transform: translateX(100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-out-to-right {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Added missing slide-in-from-bottom and slide-out-to-bottom animations */
+@keyframes slide-in-from-bottom {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-out-to-bottom {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(100%);
+  }
+}
+
+/* Removidas animações slide-*-52 não utilizadas que causavam erro de sintaxe */
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+
+    /* Stack de fontes otimizado */
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+    /* Renderização suave de fontes */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+
+    /* Corrigido font-feature-settings com aspas corretas */
+    font-feature-settings: "liga" 1, "calt" 1, "kern" 1;
+
+    /* Melhora adicional para fontes variáveis */
+    font-optical-sizing: auto;
+  }
+}
+
+html {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+@media (-webkit-min-device-pixel-ratio: 2),
+(min-resolution: 192dpi) {
+  body {
+    -webkit-font-smoothing: subpixel-antialiased;
+  }
+}

@@ -1,0 +1,10 @@
+ALTER TABLE orders DROP COLUMN IF EXISTS quantity;
+ALTER TABLE orders DROP COLUMN IF EXISTS internal_notes;
+ALTER TABLE orders DROP COLUMN IF EXISTS mp_merchant_order_id;
+ALTER TABLE orders DROP COLUMN IF EXISTS mp_payment_status_detail;
+ALTER TABLE orders DROP COLUMN IF EXISTS mp_payment_type_id;
+ALTER TABLE orders DROP COLUMN IF EXISTS mp_payment_method_id;
+ALTER TABLE orders DROP COLUMN IF EXISTS mp_date_approved;
+ALTER TABLE orders DROP COLUMN IF EXISTS mp_date_created;
+ALTER TABLE orders DROP COLUMN IF EXISTS mp_transaction_amount;
+ALTER TABLE orders DROP COLUMN IF EXISTS mp_currency_id;

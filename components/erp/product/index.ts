@@ -1,0 +1,4 @@
+export { ProductGeneralTab } from "./ProductGeneralTab"
+export { ProductFiscalTab } from "./ProductFiscalTab"
+export { default as ProductImagesSection } from "./ProductImagesSection"
+export { ProductVariationsTab } from "./ProductVariationsTab"

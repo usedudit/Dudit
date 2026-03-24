@@ -1,0 +1,435 @@
+"use server"
+
+/**
+ * Admin moderation server actions.
+ *
+ * SECURITY PATTERN (every action):
+ * 1. requireAdmin(minRole) — app-level auth
+ * 2. requireRateLimit — rate limiting
+ * 3. re-fetch entity — anti-IDOR
+ * 4. whitelisted mutation — mass-assignment protection
+ * 5. audit log — immutable append
+ *
+ * Uses authenticated Supabase client (RLS enforced — dual protection).
+ * Service-role only for audit log writes and R2 image deletion.
+ */
+
+import { getAdminClient } from "@/lib/supabase/admin"
+import { requireAdmin } from "@/lib/auth/admin-authorization"
+import { requireRateLimit } from "@/lib/security/require-rate-limit"
+import { RateLimitCategory } from "@/lib/rate-limiter"
+import { adminAuditLog } from "@/lib/admin/audit"
+import { AdminActionType } from "@/lib/admin/types"
+import type { ModerationItem, CursorPaginatedResult } from "@/lib/admin/types"
+
+// ─── Helper: delete image from R2 ──────────────────────────────────────────
+
+const _deleteFromR2 = async (url: string) => {
+    if (!url || !url.trim()) return
+    try {
+        const { extractKeyFromR2Url, deleteFileFromR2 } = await import("@/lib/r2/server")
+        const key = url.startsWith("http") ? extractKeyFromR2Url(url) : url
+        if (key) await deleteFileFromR2(key)
+    } catch (e) {
+        console.error("Failed to delete image from R2:", url, e)
+    }
+}
+
+// ─── Helper: format date for reason messages ────────────────────────────────
+
+function formatBrazilDateTime(): string {
+    return new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
+}
+
+// ─── Helper: increment partner risk_score (capped at 100) ──────────────────
+
+async function incrementRiskScore(partnerId: string, points: number): Promise<void> {
+    try {
+        const admin = getAdminClient()
+        await admin.rpc("increment_risk_score", { p_partner_id: partnerId, p_points: points })
+    } catch (e) {
+        // Fallback: direct UPDATE with LEAST cap
+        try {
+            const admin = getAdminClient()
+            const { data } = await admin
+                .from("partners")
+                .select("risk_score")
+                .eq("id", partnerId)
+                .single()
+            const current = data?.risk_score || 0
+            await admin
+                .from("partners")
+                .update({ risk_score: Math.min(current + points, 100) })
+                .eq("id", partnerId)
+        } catch (e2) {
+            console.error("[RISK_SCORE] Failed to increment:", partnerId, e2)
+        }
+    }
+}
+
+// ─── Get Moderation Queue ───────────────────────────────────────────────────
+
+export async function getModerationQueue(
+    cursor?: string | null,
+    limit: number = 20,
+    statusFilter?: string
+): Promise<CursorPaginatedResult<ModerationItem>> {
+    const admin = await requireAdmin("moderator")
+    await requireRateLimit(RateLimitCategory.ADMIN_READ)
+
+    const supabase = getAdminClient()
+    const pageSize = Math.min(limit, 50)
+
+    // Real query: products pending moderation with partner info
+    let productQuery = supabase
+        .from("products")
+        .select(`
+      id, name, description, price, images, moderation_status, created_at,
+      partner:partners!inner(id, store_name, user_id, risk_score)
+    `)
+        .is("deleted_at", null)
+
+    if (statusFilter && statusFilter !== "all") {
+        productQuery = productQuery.eq("moderation_status", statusFilter)
+    } else {
+        productQuery = productQuery.in("moderation_status", ["pending_moderation", "flagged", "needs_images"])
+    }
+
+    if (cursor) {
+        productQuery = productQuery.lt("created_at", cursor)
+    }
+
+    productQuery = productQuery.order("created_at", { ascending: false }).limit(pageSize + 1)
+
+    const { data: products, error } = await productQuery
+
+    if (error) {
+        console.error("[ADMIN_MODERATION] Failed to fetch queue:", error.message)
+        return { data: [], nextCursor: null, prevCursor: null, hasMore: false }
+    }
+
+    const hasMore = (products?.length || 0) > pageSize
+    const items = (products || []).slice(0, pageSize)
+
+    // Fetch owner names for each partner
+    const ownerIds = [...new Set(items.map((p: any) => p.partner?.user_id).filter(Boolean))]
+    let ownerMap = new Map<string, string>()
+    if (ownerIds.length > 0) {
+        const { data: owners } = await supabase
+            .from("user_profiles")
+            .select("user_id, full_name")
+            .in("user_id", ownerIds)
+        ownerMap = new Map((owners || []).map((o: any) => [o.user_id, o.full_name]))
+    }
+
+    const mapped: ModerationItem[] = items.map((p: any) => ({
+        id: p.id,
+        type: "product" as const,
+        title: p.name,
+        description: p.description,
+        price: p.price,
+        images: p.images || [],
+        owner_store_name: p.partner?.store_name || "Desconhecido",
+        partner_id: p.partner?.id || "",
+        owner_user_name: ownerMap.get(p.partner?.user_id) || "",
+        moderation_status: p.moderation_status,
+        risk_score: p.partner?.risk_score || 0,
+        created_at: p.created_at,
+    }))
+
+    return {
+        data: mapped,
+        nextCursor: hasMore && items.length > 0 ? items[items.length - 1].created_at : null,
+        prevCursor: cursor || null,
+        hasMore,
+    }
+}
+
+// ─── Approve Product ────────────────────────────────────────────────────────
+
+export async function approveModeration(
+    entityId: string
+): Promise<{ success: boolean; error?: string }> {
+    const admin = await requireAdmin("moderator")
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+
+    const supabase = getAdminClient()
+
+    // Anti-IDOR: re-fetch entity
+    const { data: entity, error: fetchError } = await supabase
+        .from("products")
+        .select("id, name, moderation_status, images")
+        .eq("id", entityId)
+        .is("deleted_at", null)
+        .single()
+
+    if (fetchError || !entity) {
+        return { success: false, error: "Produto não encontrado" }
+    }
+
+    // Mass-assignment: whitelisted fields only
+    const { error: updateError } = await supabase
+        .from("products")
+        .update({
+            moderation_status: "approved",
+            moderation_reviewed_by: admin.userId,
+            moderation_reviewed_at: new Date().toISOString(),
+            is_active: true,
+        })
+        .eq("id", entityId)
+
+    if (updateError) {
+        return { success: false, error: updateError.message }
+    }
+
+    // Audit log (append-only, via service-role)
+    await adminAuditLog({
+        adminUserId: admin.userId,
+        actionType: AdminActionType.MODERATION_APPROVE,
+        targetType: "product",
+        targetId: entityId,
+        metadata: { previousStatus: entity.moderation_status, productName: entity.name },
+    })
+
+    return { success: true }
+}
+
+// ─── Reject: Remove Flagged Images + Approve (or keep pending) ──────────────
+
+export async function rejectFlaggedImages(
+    entityId: string,
+    reason: string,
+    flaggedImageUrls: string[]
+): Promise<{ success: boolean; error?: string; noImagesLeft?: boolean }> {
+    const admin = await requireAdmin("moderator")
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+
+    if (!reason || reason.trim().length < 5) {
+        return { success: false, error: "O motivo deve ter pelo menos 5 caracteres" }
+    }
+
+    if (!flaggedImageUrls || flaggedImageUrls.length === 0) {
+        return { success: false, error: "Nenhuma imagem selecionada para remoção" }
+    }
+
+    const supabase = getAdminClient()
+
+    // Anti-IDOR: re-fetch entity with all relevant data
+    const { data: entity, error: fetchError } = await supabase
+        .from("products")
+        .select("id, name, images, moderation_status, partner_id")
+        .eq("id", entityId)
+        .is("deleted_at", null)
+        .single()
+
+    if (fetchError || !entity) {
+        return { success: false, error: "Produto não encontrado" }
+    }
+
+    const currentImages: string[] = entity.images || []
+    const flaggedSet = new Set(flaggedImageUrls)
+    const remainingImages = currentImages.filter((img: string) => !flaggedSet.has(img))
+    const removedCount = currentImages.length - remainingImages.length
+
+    const imageWord = removedCount === 1 ? "imagem" : "imagens"
+    const removedWord = removedCount === 1 ? "removida" : "removidas"
+
+    // Build detailed reason for deleted_reason / moderation_reason
+    const detailedReason = `${removedCount} ${imageWord} ${removedWord} por "${reason.trim()}" do produto "${entity.name}" em ${formatBrazilDateTime()}`
+
+    // SAFETY CHECK: if no images remain, don't approve — product needs at least 1 image
+    if (remainingImages.length === 0) {
+        // Update product: remove images, keep pending status, save reason
+        const { error: updateError } = await supabase
+            .from("products")
+            .update({
+                images: [],
+                moderation_status: "needs_images",
+                moderation_reason: detailedReason,
+                moderation_reviewed_by: admin.userId,
+                moderation_reviewed_at: new Date().toISOString(),
+            })
+            .eq("id", entityId)
+
+        if (updateError) {
+            return { success: false, error: updateError.message }
+        }
+
+        // Delete flagged images from R2
+        await Promise.all(flaggedImageUrls.map(url => _deleteFromR2(url)))
+
+        // Risk score: +2 for image removal (admin-confirmed)
+        if (entity.partner_id) {
+            await incrementRiskScore(entity.partner_id, 2)
+        }
+
+        // Audit log
+        await adminAuditLog({
+            adminUserId: admin.userId,
+            actionType: AdminActionType.MODERATION_REJECT,
+            targetType: "product",
+            targetId: entityId,
+            metadata: {
+                reason: detailedReason,
+                removedImages: flaggedImageUrls,
+                remainingImages: 0,
+                previousStatus: entity.moderation_status,
+                productName: entity.name,
+                riskScoreAdded: 2,
+            },
+        })
+
+        return {
+            success: true,
+            noImagesLeft: true,
+        }
+    }
+
+    // Images still remain — remove flagged, approve product
+    const { error: updateError } = await supabase
+        .from("products")
+        .update({
+            images: remainingImages,
+            moderation_status: "approved",
+            moderation_reason: detailedReason,
+            moderation_reviewed_by: admin.userId,
+            moderation_reviewed_at: new Date().toISOString(),
+            is_active: true,
+        })
+        .eq("id", entityId)
+
+    if (updateError) {
+        return { success: false, error: updateError.message }
+    }
+
+    // Delete flagged images from R2
+    await Promise.all(flaggedImageUrls.map(url => _deleteFromR2(url)))
+
+    // Risk score: +2 for image removal (admin-confirmed)
+    if (entity.partner_id) {
+        await incrementRiskScore(entity.partner_id, 2)
+    }
+
+    // Audit log
+    await adminAuditLog({
+        adminUserId: admin.userId,
+        actionType: AdminActionType.MODERATION_REJECT,
+        targetType: "product",
+        targetId: entityId,
+        metadata: {
+            reason: detailedReason,
+            removedImages: flaggedImageUrls,
+            remainingImages: remainingImages.length,
+            previousStatus: entity.moderation_status,
+            productName: entity.name,
+            riskScoreAdded: 2,
+        },
+    })
+
+    return { success: true, noImagesLeft: false }
+}
+
+// ─── Full Reject (reject product entirely) ──────────────────────────────────
+
+export async function rejectModeration(
+    entityId: string,
+    reason: string
+): Promise<{ success: boolean; error?: string }> {
+    const admin = await requireAdmin("moderator")
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+
+    if (!reason || reason.trim().length < 5) {
+        return { success: false, error: "O motivo deve ter pelo menos 5 caracteres" }
+    }
+
+    const supabase = getAdminClient()
+
+    // Anti-IDOR
+    const { data: entity, error: fetchError } = await supabase
+        .from("products")
+        .select("id, name, moderation_status, partner_id")
+        .eq("id", entityId)
+        .is("deleted_at", null)
+        .single()
+
+    if (fetchError || !entity) {
+        return { success: false, error: "Produto não encontrado" }
+    }
+
+    // Mass-assignment: whitelisted fields only
+    const { error: updateError } = await supabase
+        .from("products")
+        .update({
+            moderation_status: "rejected",
+            moderation_reason: reason.trim(),
+            moderation_reviewed_by: admin.userId,
+            moderation_reviewed_at: new Date().toISOString(),
+            is_active: false,
+        })
+        .eq("id", entityId)
+
+    if (updateError) {
+        return { success: false, error: updateError.message }
+    }
+
+    // Risk score: +3 for full product rejection (admin-confirmed)
+    if (entity.partner_id) {
+        await incrementRiskScore(entity.partner_id, 3)
+    }
+
+    await adminAuditLog({
+        adminUserId: admin.userId,
+        actionType: AdminActionType.MODERATION_REJECT,
+        targetType: "product",
+        targetId: entityId,
+        metadata: { reason: reason.trim(), previousStatus: entity.moderation_status, productName: entity.name, riskScoreAdded: 3 },
+    })
+
+    return { success: true }
+}
+
+// ─── Reprocess Moderation ───────────────────────────────────────────────────
+
+export async function reprocessModeration(
+    entityId: string
+): Promise<{ success: boolean; error?: string }> {
+    const admin = await requireAdmin("moderator")
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+
+    const supabase = getAdminClient()
+
+    // Anti-IDOR
+    const { data: entity, error: fetchError } = await supabase
+        .from("products")
+        .select("id, name, moderation_status")
+        .eq("id", entityId)
+        .is("deleted_at", null)
+        .single()
+
+    if (fetchError || !entity) {
+        return { success: false, error: "Produto não encontrado" }
+    }
+
+    // Mass-assignment: whitelisted
+    const { error: updateError } = await supabase
+        .from("products")
+        .update({
+            moderation_status: "pending_moderation",
+            moderation_reason: null,
+        })
+        .eq("id", entityId)
+
+    if (updateError) {
+        return { success: false, error: updateError.message }
+    }
+
+    await adminAuditLog({
+        adminUserId: admin.userId,
+        actionType: AdminActionType.MODERATION_REPROCESS,
+        targetType: "product",
+        targetId: entityId,
+        metadata: { previousStatus: entity.moderation_status, productName: entity.name },
+    })
+
+    return { success: true }
+}

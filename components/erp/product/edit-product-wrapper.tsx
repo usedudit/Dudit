@@ -1,0 +1,157 @@
+"use client"
+
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import AddProductPage from "./AddProductPage"
+import type { Product } from "@/lib/types/product"
+import { updateProductAction, deleteProductAction, checkProductInOrdersAction } from "@/app/actions/erp/products"
+import { UNITS } from "@/lib/constants/product-constants"
+import { toast } from "sonner"
+import AlertModal from "@/components/reusable/AlertModal"
+import { TrashIcon } from "@/lib/icons"
+
+interface EditProductWrapperProps {
+    product: Product & {
+        costPrice: number
+        description: string
+        subcategory: string
+        brand: string
+        promotionTypeId: string | null
+        condicao: string
+        gtin: string
+        unidade: string
+        localizacao: string
+        images: string[]
+        productType: string
+    }
+    suppliers: Array<{ id: string; name: string; email: string | null; phone: string | null }>
+    partnerId: string
+    onDuplicate?: (product: any) => void
+}
+
+export function EditProductWrapper({ product, suppliers, partnerId, onDuplicate }: EditProductWrapperProps) {
+    const router = useRouter()
+    const [mode, setMode] = useState<"add" | "details" | "edit" | "duplicate">("details")
+    const [isSaving, setIsSaving] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
+    const [showDeleteModal, setShowDeleteModal] = useState(false)
+    const [pendingOrdersCount, setPendingOrdersCount] = useState(0)
+    const [unidadesMedida] = useState(() => UNITS.map((unit) => ({ codigo: unit, descricao: unit })))
+
+    const handleBack = () => {
+        router.push("/erp/products")
+    }
+    const handleSaveProduct = async (productData: any) => {
+        console.log("Updating product with data:", productData)
+        setIsSaving(true)
+
+        try {
+            const result = await updateProductAction({
+                productId: product.id,
+                name: productData.name,
+                description: productData.description,
+                category: productData.category,
+                subcategory: productData.subcategory,
+                brand: productData.brand,
+                sku: productData.sku,
+                gtin: productData.gtin,
+                unit: productData.unidade,
+                product_type: productData.productType,
+                condition: productData.condicao,
+                cost_price: productData.costPrice,
+                price: productData.price,
+                stock_quantity: productData.stock,
+                min_stock: 10,
+                location: productData.localizacao,
+                images: productData.images || [],
+                is_active: productData.status === "Active",
+            })
+
+            if (result.success) {
+                toast.success("Produto atualizado com sucesso!")
+                setMode("details")
+            } else {
+                toast.error(result.error || "Erro ao atualizar produto")
+            }
+        } catch (error) {
+            console.error("Error updating product:", error)
+            toast.error("Erro ao atualizar produto")
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
+    const handleDeleteClick = async () => {
+        const result = await checkProductInOrdersAction(product.id)
+        if (result.count > 0) {
+            setPendingOrdersCount(result.count)
+        }
+        setShowDeleteModal(true)
+    }
+
+    const handleConfirmDelete = async () => {
+        setIsDeleting(true)
+        try {
+            const result = await deleteProductAction(product.id)
+            if (result.success) {
+                toast.success("Produto excluído com sucesso!")
+                router.push("/erp/products")
+            } else {
+                toast.error(result.error || "Erro ao excluir produto")
+            }
+        } catch (error) {
+            console.error("Error deleting product:", error)
+            toast.error("Erro ao excluir produto")
+        } finally {
+            setIsDeleting(false)
+            setShowDeleteModal(false)
+        }
+    }
+
+    const handleDuplicate = () => {
+        console.log("EditProductWrapper handleDuplicate called")
+        if (onDuplicate) {
+            console.log("Calling onDuplicate callback from edit page")
+            onDuplicate(product)
+            // Navigate back to products page where duplication will be handled
+            router.push("/erp/products")
+        } else {
+            console.log("ERROR: No onDuplicate callback provided")
+        }
+    }
+
+    return (
+        <>
+            <AddProductPage
+                onBack={handleBack}
+                product={product}
+                mode={mode}
+                setMode={setMode}
+                onSave={handleSaveProduct}
+                onDelete={handleDeleteClick}
+                onDuplicate={handleDuplicate}
+                suppliers={suppliers}
+                isSaving={isSaving}
+                unidadesMedida={unidadesMedida}
+                partnerId={partnerId}
+            />
+
+            {showDeleteModal && (
+                <AlertModal
+                    onClose={() => setShowDeleteModal(false)}
+                    onConfirm={handleConfirmDelete}
+                    title="Excluir produto?"
+                    message={
+                        pendingOrdersCount > 0
+                            ? `Atenção: Este produto está em ${pendingOrdersCount} ${pendingOrdersCount === 1 ? "pedido pendente" : "pedidos pendentes"}. Tem certeza que deseja excluir?`
+                            : "Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita."
+                    }
+                    confirmText={isDeleting ? "Excluindo..." : "Excluir"}
+                    icon={<TrashIcon />}
+                    isDestructive
+                    disabled={isDeleting}
+                />
+            )}
+        </>
+    )
+}

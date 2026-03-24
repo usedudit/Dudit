@@ -1,0 +1,88 @@
+"use client"
+
+import { createContext, useContext, useMemo } from "react"
+import type { PartnerRole, PartnerRoutePermissions, RouteKey } from "@/lib/permissions/types"
+import {
+    canAccessRoute,
+    canPerformAction,
+    hasSpecificPermission,
+    canAccessPath,
+    permissionDeniedMessage,
+} from "@/lib/permissions/route-permissions"
+
+// ─── Context Types ──────────────────────────────────────────────────────────
+
+interface PermissionContextValue {
+    role: PartnerRole
+    routePermissions: PartnerRoutePermissions | null
+    partnerId: string
+    businessInfo: any // Added for feature flags
+
+    // Convenience helpers
+    canAccess: (routeKey: RouteKey) => boolean
+    canCreate: (routeKey: RouteKey) => boolean
+    canEdit: (routeKey: RouteKey) => boolean
+    canDelete: (routeKey: RouteKey) => boolean
+    hasSpecific: (routeKey: RouteKey, permKey: string) => boolean
+    canAccessPath: (pathname: string) => boolean
+    getDeniedMessage: (routeKey: RouteKey, action: string) => string
+}
+
+const PermissionContext = createContext<PermissionContextValue | null>(null)
+
+// ─── Provider ───────────────────────────────────────────────────────────────
+
+interface PermissionProviderProps {
+    children: React.ReactNode
+    role: PartnerRole
+    routePermissions: PartnerRoutePermissions | null
+    partnerId: string
+    businessInfo: any
+}
+
+export function PermissionProvider({ children, role, routePermissions, partnerId, businessInfo }: PermissionProviderProps) {
+    const value = useMemo<PermissionContextValue>(() => ({
+        role,
+        routePermissions,
+        partnerId,
+        businessInfo,
+        canAccess: (routeKey: RouteKey) => canAccessRoute(routePermissions, routeKey),
+        canCreate: (routeKey: RouteKey) => canPerformAction(routePermissions, routeKey, "create"),
+        canEdit: (routeKey: RouteKey) => canPerformAction(routePermissions, routeKey, "edit"),
+        canDelete: (routeKey: RouteKey) => canPerformAction(routePermissions, routeKey, "delete"),
+        hasSpecific: (routeKey: RouteKey, permKey: string) => hasSpecificPermission(routePermissions, routeKey, permKey),
+        canAccessPath: (pathname: string) => canAccessPath(routePermissions, pathname),
+        getDeniedMessage: (routeKey: RouteKey, action: string) => permissionDeniedMessage(routeKey, action),
+    }), [role, routePermissions, partnerId, businessInfo])
+
+    return (
+        <PermissionContext.Provider value={value}>
+            {children}
+        </PermissionContext.Provider>
+    )
+}
+
+// ─── Hook ───────────────────────────────────────────────────────────────────
+
+export function usePermissions(): PermissionContextValue {
+    const ctx = useContext(PermissionContext)
+    if (!ctx) {
+        // SECURITY: Return a RESTRICTIVE context when outside provider.
+        // Previously this returned OWNER permissions, which silently granted
+        // full admin access to any component outside the PermissionProvider.
+        return {
+            role: "VIEWER" as PartnerRole,
+            routePermissions: null,
+            partnerId: "",
+            businessInfo: { sells: ["products"], channels: ["online"] },
+            canAccess: () => false,
+            canCreate: () => false,
+            canEdit: () => false,
+            canDelete: () => false,
+            hasSpecific: () => false,
+            canAccessPath: () => false,
+            getDeniedMessage: () => "Sem permissão",
+        }
+    }
+    return ctx
+}

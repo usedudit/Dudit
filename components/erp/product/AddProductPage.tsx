@@ -1,0 +1,750 @@
+"use client"
+
+import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } from "react"
+import { Tabs, TabsList, TabsTrigger, Button, Badge, Tooltip } from "@/components/reusable"
+import { ChevronLeftIcon, TrashIcon, ThreeDotsIcon, DuplicateIcon, EditIcon, SaveIcon, ShareIcon } from "@/lib/icons"
+import type { Product } from "@/lib/types/product"
+import { useToast } from "@/components/ui/use-toast"
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import { useStore } from "@/lib/store-context"
+import { useSidebar } from "@/lib/sidebar-context"
+import { createProductComprehensiveAction, updateProductComprehensiveAction, deleteProductAction, createProductVariantsBatchAction } from "@/app/actions/erp/products"
+import { detectMonophasicByNcm } from "@/lib/fiscal-utils"
+import { mapProductToFormData } from "@/lib/utils/product-mappers"
+import { useNotification } from "@/hooks/use-notification"
+import { usePermissions } from "@/lib/permission-context"
+import { fetchJSONWithCSRF, fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
+import { FadeIn } from "@/components/animations/FadeIn"
+import { Spinner } from "@/components/reusable/Spinner"
+
+import Dropdown from "@/components/reusable/Dropdown"
+import DefaultModal from "@/components/reusable/DefaultModal"
+import AlertModal from "@/components/reusable/AlertModal"
+import ImageCropperModal from "@/components/ImageCropperModal"
+import NcmSelectionModal from "./NcmSelectionModal"
+import { ProductGeneralTab } from "./ProductGeneralTab"
+import { ProductVariationsTab } from "./ProductVariationsTab"
+import { ProductSuppliersTab } from "./ProductSuppliersTab"
+import { ProductMarketplaceTab } from "./ProductMarketplaceTab"
+
+const NUMERIC_FIELDS = new Set([
+    "price", "costPrice", "stock", "minStock", "maxStock", "promotional_price",
+    "origin", "weight_gross", "weight_net", "width", "height", "length",
+    "preparation_days", "warranty_value", "availability_value",
+])
+
+const BOOLEAN_FIELDS = new Set(["is_active", "allow_sell_without_stock", "show_in_marketplace", "is_highlighted"])
+
+const REQUIRED_FIELDS = [
+    { field: "name", tab: "general", validate: (v: any) => !!v?.trim(), message: "Nome é obrigatório" },
+    { field: "price", tab: "general", validate: (v: any) => v > 0, message: "Preço inválido" },
+]
+
+const getEmptyProduct = () => ({
+    id: "", name: "", category: "", productId: "", sku: "", description: "", subcategory: "", brand: "", gtin: "",
+    price: 0, costPrice: 0, stock: 0, minStock: 0, maxStock: 0, promotional_price: null, promotionTypeId: null,
+    condicao: "Novo", unidade: "UN", localizacao: "", productType: "Físico",
+    images: [], primary_image_index: 0, video_url: "",
+    is_active: true, show_in_marketplace: true, allow_sell_without_stock: false, is_highlighted: false,
+    marketplace_category_id: null, availability_value: 0, availability_unit: "Dias",
+    warranty_value: 0, warranty_period: "Meses",
+    attributes: [], related_products: [],
+    ncm: "", cest: "", origin: 0, item_type: "00", fci_code: null,
+    cfop_internal: "5102", cfop_external: "6102", csosn: "102", tax_percentage: 0,
+    pis_cst: "99", pis_rate: 0, cofins_cst: "99", cofins_rate: 0, ipi_cst: "99", ipi_code: null,
+    product_situation: "revenda", c_benef: null, inf_ad_prod: null,
+    weight_gross: 0, weight_net: 0, width: 0, height: 0, length: 0, packaging_type: "package", preparation_days: 0,
+    tags: [], pending_variants: [],
+})
+
+const StyledDropdownItem: FC<{ onClick: () => void; children: React.ReactNode; className?: string }> = ({ onClick, children, className }) => (
+    <div
+        className={`flex items-center gap-2 px-3 py-2 text-sm font-medium cursor-pointer rounded-md hover:bg-gray-100 dark:hover:bg-dark-border transition-colors ${className}`}
+        onClick={(e) => { e.stopPropagation(); onClick() }}
+    >
+        {children}
+    </div>
+)
+
+interface AddProductPageProps {
+    onBack: () => void
+    product?: Product | null
+    mode: "add" | "details" | "edit" | "duplicate"
+    setMode: (mode: "add" | "details" | "edit" | "duplicate") => void
+    suppliers?: Array<{ id: string; name: string; email: string | null; phone: string | null }>
+    isSaving?: boolean
+    productId?: string
+    initialData?: Product | null
+    onClose?: () => void
+    unidadesMedida?: Array<{ codigo: string; descricao: string }>
+    partnerId?: string
+    storeId?: string
+    isLoadingDetails?: boolean
+    onSave?: (data: any, isDraft?: boolean) => Promise<void>
+    onDuplicate?: (product: Product) => void
+    onDelete?: () => void
+}
+
+const AddProductPage: FC<AddProductPageProps> = ({
+    onBack, product: initialProduct, mode: initialModeProp, setMode,
+    isSaving = false, productId, initialData, onClose, unidadesMedida = [],
+    partnerId: propPartnerId, storeId: propStoreId, isLoadingDetails = false,
+}) => {
+    const [internalMode, setInternalMode] = useState(initialModeProp)
+    useEffect(() => { setInternalMode(initialModeProp) }, [initialModeProp])
+
+    const isEditing = useMemo(() => ["add", "edit", "duplicate"].includes(internalMode), [internalMode])
+
+    const { toast } = useToast()
+    const { success: notifySuccess, error: notifyError } = useNotification()
+    const { selectedStore } = useStore()
+    const { setHeaderOverride } = useSidebar()
+    const { businessInfo: contextBusinessInfo } = usePermissions()
+
+    const businessInfo = useMemo(() => {
+        let info = contextBusinessInfo
+        if (typeof info === "string") {
+            try {
+                info = JSON.parse(info)
+            } catch (e) {
+                console.error("Error parsing business_info in AddProductPage:", e)
+                info = null
+            }
+        }
+        return info || { sells: ["products"], channels: ["online"] }
+    }, [contextBusinessInfo])
+
+    const sellsOnline = businessInfo?.channels?.includes("online") ?? true
+
+    const partnerId = propPartnerId || selectedStore?.partner_id || ""
+    const storeId = propStoreId || selectedStore?.id || ""
+
+    // Sidebar hiding logic removed per user plan (using specific mobile header)
+
+    const [isScrolled, setIsScrolled] = useState(false)
+    const scrollContainerRef = useRef<HTMLDivElement>(null)
+    const handleScroll = useCallback(() => {
+        if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
+    }, [])
+
+    const initialProductState = useMemo(() => {
+        const base = getEmptyProduct()
+        // @ts-ignore
+        const mapped = mapProductToFormData(initialProduct || initialData)
+        if (!mapped) return base
+        if (internalMode === "duplicate") {
+            return { ...base, ...mapped, id: "", productId: "", sku: "", name: `${mapped.name} (Cópia)`, images: mapped.images || [] }
+        }
+        // @ts-ignore
+        const realImages = (mapped.images || []).filter((img: string | File) => typeof img === "string" && !img.startsWith("data:"))
+        return { ...base, ...mapped, images: realImages.length > 0 ? realImages : base.images }
+    }, [initialProduct, initialData, internalMode])
+
+    const [productData, setProductData] = useState<any>(initialProductState)
+    const [originalProductData, setOriginalProductData] = useState(initialProductState)
+    const [originalNameForDuplicate, setOriginalNameForDuplicate] = useState("")
+
+    const lastNcmSearchRef = useRef<string>("")
+    const csrfTokenCache = useRef<{ token: string; timestamp: number } | null>(null)
+
+    const isDirty = useMemo(() => {
+        for (const key in productData) {
+            // @ts-ignore
+            if (productData[key] !== originalProductData[key]) return true
+        }
+        return false
+    }, [productData, originalProductData])
+
+    const { showConfirmDialog: unsavedChangesDialogOpen, confirmNavigation: handleUnsavedChangesConfirm, cancelNavigation: handleUnsavedChangesDialogClose } = useUnsavedChanges(isEditing && isDirty)
+
+    const [showAlertModal, setShowAlertModal] = useState(false)
+    const [nextAction, setNextAction] = useState<(() => void) | null>(null)
+
+    const handleAttemptNav = useCallback((action: () => void) => {
+        if (isEditing && isDirty) { setNextAction(() => action); setShowAlertModal(true) }
+        else action()
+    }, [isEditing, isDirty])
+
+    const handleBack = useCallback(() => handleAttemptNav(onBack), [handleAttemptNav, onBack])
+
+    const handleCancelEdit = useCallback(() => {
+        handleAttemptNav(() => {
+            setProductData(initialProductState)
+            setOriginalProductData(initialProductState)
+            setPendingImages([])
+            onBack()
+        })
+    }, [handleAttemptNav, initialProductState, onBack])
+
+    const confirmNavigation = useCallback(() => {
+        nextAction?.()
+        setShowAlertModal(false)
+    }, [nextAction])
+
+    const [activeTab, setActiveTab] = useState("general")
+
+    const [categories] = useState(["Roupas Masculinas", "Roupas Femininas", "Roupas Infantis", "Electronics", "Apparel", "Groceries"])
+    const [subCategories] = useState(["Tops e Camisetas Masculinas", "Calças Masculinas", "Acessórios Masculinos"])
+    const [brands] = useState(["Adidas", "Nike", "Puma"])
+    const [locations] = useState(["Depósito Principal", "Loja Física"])
+
+    const handleNcmChange = useCallback((ncm: string) =>
+        setProductData((prev: any) => ({ ...prev, ncm, is_monophasic: ncm.length === 8 && detectMonophasicByNcm(ncm) }))
+        , [])
+
+    const handleInputChange = useCallback((e: any) => {
+        const { name, value } = e.target
+        setProductData((prev: any) => {
+            if (BOOLEAN_FIELDS.has(name)) return { ...prev, [name]: value === true || value === "true" }
+            if (NUMERIC_FIELDS.has(name)) return { ...prev, [name]: value === "" || value === null ? prev[name] : Number(value) }
+            if (name === "ncm") queueMicrotask(() => handleNcmChange(String(value)))
+            return { ...prev, [name]: value }
+        })
+    }, [handleNcmChange])
+
+    const [showValidationModal, setShowValidationModal] = useState(false)
+    const [validationErrors, setValidationErrors] = useState<Array<{ field: string; message: string; tab: string }>>([])
+    const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set())
+
+    const validateProductData = useCallback(() =>
+        REQUIRED_FIELDS
+            // @ts-ignore
+            .filter((r) => !r.validate(productData[r.field]))
+            .map((r) => ({ field: r.field, tab: r.tab, message: r.message })),
+        [productData]
+    )
+
+    const handleFieldChange = useCallback((field: string) => {
+        setFieldErrors((prev) => { const next = new Set(prev); next.delete(field); return next })
+    }, [])
+
+    const getTabErrorCount = useCallback((tab: string) => {
+        const fields = tab === "general" ? ["name", "price", "stock"] : tab === "fiscal" ? ["origin", "cest"] : []
+        return fields.filter((f) => fieldErrors.has(f)).length
+    }, [fieldErrors])
+
+    const [showNcmModal, setShowNcmModal] = useState(false)
+    const [ncmSuggestions, setNcmSuggestions] = useState<any[]>([])
+    const [isLoadingNcmSuggestion, setIsLoadingNcmSuggestion] = useState(false)
+
+    const handleNcmSelect = useCallback((s: { ncm: string }) => { setShowNcmModal(false); handleNcmChange(s.ncm) }, [handleNcmChange])
+
+    const handleSuggestNcm = useCallback(async () => {
+        const productName = productData.name?.trim()
+        if (!productName) return toast({ title: "Atenção", description: "Digite o nome do produto primeiro" })
+        if (lastNcmSearchRef.current === productName && ncmSuggestions.length > 0) { setShowNcmModal(true); return }
+        setIsLoadingNcmSuggestion(true)
+        try {
+            const data = await fetchJSONWithCSRF<{ suggestions: any[]; error?: string }>("/api/ai/suggest-ncm", {
+                method: "POST", body: { productName },
+            })
+            if (data.error) throw new Error(data.error)
+            setNcmSuggestions(data.suggestions)
+            lastNcmSearchRef.current = productName
+            setShowNcmModal(true)
+        } catch { toast({ title: "Erro", description: "Erro ao conectar com o servidor.", variant: "destructive" }) }
+        finally { setIsLoadingNcmSuggestion(false) }
+    }, [productData.name, toast, ncmSuggestions.length])
+
+    const fileInputRef = useRef<HTMLInputElement>(null)
+    const [showImageCropper, setShowImageCropper] = useState(false)
+    const [selectedImageForCrop, setSelectedImageForCrop] = useState<File | null>(null)
+    const [uploadingImages, setUploadingImages] = useState<Set<number>>(new Set())
+    const [showDeleteImageModal, setShowDeleteImageModal] = useState(false)
+    const [imageToDelete, setImageToDelete] = useState<number | null>(null)
+    const [pendingImages, setPendingImages] = useState<Array<{ base64: string; file: File }>>([])
+    const [blockedImages, setBlockedImages] = useState<Set<number>>(new Set())
+
+    const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files?.[0]) { setSelectedImageForCrop(e.target.files[0]); setShowImageCropper(true) }
+    }, [])
+
+    const handleImageCropComplete = useCallback(async (croppedImageDataUrl: string) => {
+        const blob = await (await fetch(croppedImageDataUrl)).blob()
+        const extension = blob.type === "image/png" ? "png" : "jpg"
+        const file = new File([blob], `product-image.${extension}`, { type: blob.type })
+        setProductData((prev: any) => ({ ...prev, images: [...(prev.images || []), file] }))
+        if (fileInputRef.current) fileInputRef.current.value = ""
+        setShowImageCropper(false)
+        setSelectedImageForCrop(null)
+    }, [])
+
+    const handleRemoveImage = useCallback((indexToDelete: number) => {
+        setProductData((prev: any) => ({ ...prev, images: prev.images?.filter((_: any, i: number) => i !== indexToDelete) || [] }))
+        setBlockedImages((prev) => {
+            const newBlocked = new Set<number>()
+            let newIdx = 0
+            for (let i = 0; i < (productData.images?.length || 0); i++) {
+                if (i !== indexToDelete && prev.has(i)) newBlocked.add(newIdx)
+                if (i !== indexToDelete) newIdx++
+            }
+            return newBlocked
+        })
+    }, [productData.images?.length])
+
+    const handleSetPrimaryImage = useCallback((index: number) => {
+        if (!productData.images?.length) return
+        const images = [...productData.images]
+        const [primary] = images.splice(index, 1)
+        images.unshift(primary)
+        setProductData((prev: any) => ({ ...prev, images, primary_image_index: 0 }))
+    }, [productData.images])
+
+    const [showDeleteModal, setShowDeleteModal] = useState(false)
+    const [isSavingProduct, setIsSavingProduct] = useState(false)
+
+    const handleDeleteProduct = useCallback(async () => {
+        if (!initialProduct?.id && !productId) return
+        try {
+            const result = await deleteProductAction(initialProduct?.id || productId!)
+            if (result.success) { toast({ title: "Sucesso", description: "Produto excluído" }); setTimeout(() => onBack(), 300) }
+            else toast({ title: "Erro", description: result.error, variant: "destructive" })
+        } catch { toast({ title: "Erro", variant: "destructive" }) }
+        finally { setShowDeleteModal(false) }
+    }, [initialProduct, productId, onBack, toast])
+
+    const handleSaveProduct = useCallback(async () => {
+        const errors = validateProductData()
+        if (errors.length > 0) {
+            setValidationErrors(errors); setFieldErrors(new Set(errors.map((e) => e.field))); setShowValidationModal(true); return
+        }
+        if (blockedImages.size > 0) { notifyError("Remova as imagens bloqueadas antes de salvar"); return }
+
+        setIsSavingProduct(true)
+        let cleanedFinalImages: string[] = []
+
+        try {
+            const currentImages = productData.images || []
+            const finalImages: string[] = []
+            const filesToUpload: { file: File; index: number }[] = []
+
+            currentImages.forEach((img: string | File, idx: number) => {
+                if (img instanceof File) filesToUpload.push({ file: img, index: idx })
+                else finalImages[idx] = img
+            })
+
+            let signedUploads: { file: File; uploadUrl: string; key: string }[] = []
+            let needsManualModeration = false
+
+            if (filesToUpload.length > 0) {
+                setUploadingImages(new Set(filesToUpload.map((f) => f.index)))
+
+                const signedResults = await Promise.all(
+                    filesToUpload.map(async ({ file, index }) => {
+                        const formData = new FormData()
+                        const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg"
+                        formData.append("file", file, `product-image.${extension}`)
+                        const response = await fetchWithCSRF("/api/upload-image", { method: "POST", body: formData })
+                        const result = await response.json()
+                        return { result, file, index }
+                    })
+                )
+
+                const newBlocked = new Set<number>()
+                let hasErrors = false
+                let errorMessage = "Falha na validação de algumas imagens. Tente novamente."
+
+                signedResults.forEach(({ result, file, index }) => {
+                    if (result.success && result.key) {
+                        finalImages[index] = result.key
+                        if (result.blocked || (result.moderation?.status && result.moderation.status !== "APPROVED")) {
+                            needsManualModeration = true
+                        }
+                    } else {
+                        hasErrors = true
+                        if (result.error) errorMessage = result.error
+                    }
+                })
+
+                if (hasErrors) {
+                    if (newBlocked.size > 0) {
+                        setBlockedImages(newBlocked)
+                        notifyError(`${newBlocked.size} imagem(ns) foi(ram) bloqueada(s). Remova-as antes de salvar.`)
+                    } else {
+                        notifyError(errorMessage)
+                    }
+                    setUploadingImages(new Set())
+                    setIsSavingProduct(false)
+                    return
+                }
+
+                setUploadingImages(new Set())
+            }
+
+            cleanedFinalImages = finalImages.filter(Boolean)
+
+            const now = Date.now()
+            let csrfToken = csrfTokenCache.current?.token
+            if (!csrfToken || !csrfTokenCache.current || now - csrfTokenCache.current.timestamp > 5 * 60 * 1000) {
+                const { token } = await (await fetchWithCSRF("/api/csrf-token", { method: "GET" })).json()
+                csrfToken = token
+                csrfTokenCache.current = { token, timestamp: now }
+            }
+
+            const d = productData
+            const warranty = d.warranty_value > 0 ? `${d.warranty_value} ${d.warranty_period}` : undefined
+            const availabilityStr = d.availability_value > 0 ? `${d.availability_value} ${d.availability_unit}` : "in_stock"
+
+            const payload = {
+                partnerId, storeId, csrf_token: csrfToken,
+                name: d.name, description: d.description, sku: d.sku, gtin: d.gtin, brand: d.brand,
+                category: d.category, subcategory: d.subcategory, condition: d.condicao, unit: d.unidade,
+                productType: d.productType, location: d.localizacao, deliveryFormat: d.digital_format,
+                costPrice: Number(d.costPrice) || 0, price: Number(d.price),
+                promotionalPrice: d.promotional_price ? Number(d.promotional_price) : null,
+                minStock: Number(d.minStock) || 0, maxStock: Number(d.maxStock) || 0, stockQuantity: Number(d.stock),
+                isActive: d.is_active, isOnPromotion: !!d.promotional_price, showPriceInStore: true,
+                showInMarketplace: d.show_in_marketplace !== false,
+                requiresManualModeration: needsManualModeration,
+                images: cleanedFinalImages, primaryImageIndex: 0,
+                ncm: d.ncm?.trim() || "00000000", cest: d.cest, origin: d.origin, item_type: d.item_type,
+                cfop_internal: d.cfop_internal, cfop_external: d.cfop_external, csosn: d.csosn,
+                tax_percentage: Number(d.tax_percentage) || undefined,
+                pis_cst: d.pis_cst, pis_rate: Number(d.pis_rate) || 0,
+                cofins_cst: d.cofins_cst, cofins_rate: Number(d.cofins_rate) || 0,
+                ipi_cst: d.ipi_cst, ipi_code: d.ipi_code, product_situation: d.product_situation,
+                c_benef: d.c_benef, inf_ad_prod: d.inf_ad_prod,
+                weight_gross: Number(d.weight_gross) || 0, weight_net: Number(d.weight_net) || 0,
+                width: Number(d.width) || 0, height: Number(d.height) || 0, length: Number(d.length) || 0,
+                fciCode: d.fci_code, packagingType: d.packaging_type, preparationDays: Number(d.preparation_days) || 0,
+                allow_sell_without_stock: d.allow_sell_without_stock || false,
+                featured: d.is_highlighted, videoUrl: d.video_url,
+                technicalSpecs: d.attributes, warranty,
+                subcategoryId: d.marketplace_category_id,
+                availability: availabilityStr,
+                tags: d.tags || [],
+            }
+
+            const dbPromise = internalMode === "edit" && (initialProduct?.id || productId)
+                ? updateProductComprehensiveAction(initialProduct?.id || productId!, payload)
+                : createProductComprehensiveAction(payload)
+
+            const [result] = await Promise.all([dbPromise])
+
+            if (result.success) {
+                const createdProductId = internalMode === "add" && result.data?.id ? result.data.id : null
+
+                if (createdProductId && productData.pending_variants?.length > 0) {
+                    try {
+                        await createProductVariantsBatchAction({
+                            productId: createdProductId,
+                            variants: productData.pending_variants,
+                            csrf_token: csrfToken,
+                            deletedImages: [],
+                        })
+                    } catch (variantErr) {
+                        console.error("Error saving pending variants:", variantErr)
+                        notifyError("Produto criado, mas erro ao salvar variáveis.")
+                    }
+                }
+
+                notifySuccess(internalMode === "edit" ? "Produto atualizado!" : "Produto criado!")
+                setPendingImages([])
+                onClose?.()
+            } else {
+                notifyError(result.error || "Erro ao salvar")
+            }
+        } catch (err) { console.error(err); notifyError("Erro ao salvar produto") }
+        finally { setIsSavingProduct(false) }
+    }, [validateProductData, productData, partnerId, storeId, internalMode, initialProduct, productId, notifySuccess, notifyError, onClose, blockedImages])
+
+    const handleSavePendingVariants = useCallback((variantsToSave: any[]) => {
+        setProductData((prev: any) => ({ ...prev, pending_variants: variantsToSave }))
+    }, [])
+
+    const handleDuplicateProduct = useCallback(() => {
+        setOriginalNameForDuplicate(productData.name)
+        setProductData({ ...productData, id: "", productId: "", sku: "", name: `${productData.name} (Cópia)`, images: [...(productData.images || [])] })
+        setInternalMode("duplicate"); setMode("add")
+        toast({ title: "Duplicando produto", description: "Edite e salve o novo produto." })
+    }, [productData, setMode, toast])
+
+    const handleShareProduct = useCallback(() => {
+        navigator.clipboard.writeText(`${window.location.origin}/produto/${productData.sku || initialProduct?.sku || ""}`)
+        toast({ title: "Link copiado!" })
+    }, [productData.sku, initialProduct?.sku, toast])
+    const dateCreated = productData.created_at
+        ? new Date(productData.created_at).toLocaleDateString("pt-BR")
+        : "N/A"
+
+    const enterEditMode = useCallback(() => { setInternalMode("edit"); setMode("edit") }, [setMode])
+
+    const pageTitle = internalMode === "add" ? "Adicionar Novo Produto"
+        : internalMode === "duplicate" ? "Duplicar Produto"
+            : productData.name
+
+    useEffect(() => {
+        setHeaderOverride({
+            title: pageTitle,
+            onBack: handleCancelEdit,
+            isSubPage: true
+        })
+        return () => setHeaderOverride(null)
+    }, [pageTitle, handleCancelEdit, setHeaderOverride])
+
+    return (
+        <FadeIn>
+            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
+
+                        {/* Sticky Header - Desktop Only title and tabs */}
+                        <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
+
+                                {/* Back button — desktop only */}
+                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                    <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                    </Button>
+                                </div>
+
+                                {/* Title row */}
+                                <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
+                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                        <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                            {/* Title hidden on mobile, shown on md+ */}
+                                            <span className="hidden md:inline truncate">{pageTitle}</span>
+                                            {internalMode === "edit" && (
+                                                <Badge variant="gray" className="text-sm font-normal h-fit whitespace-nowrap px-2 py-0.5 hidden md:inline-flex">
+                                                    Editando
+                                                </Badge>
+                                            )}
+                                            {productData.moderation_status === 'pending_moderation' && (
+                                                <Tooltip text="Aguardando aprovação para exibição pública.">
+                                                    <Badge variant="orange" className="flex-shrink-0 hidden md:inline-flex" />
+                                                </Tooltip>
+                                            )}
+                                        </h1>
+
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                            {internalMode === "add" && "Preencha as informações do novo produto"}
+                                            {internalMode === "duplicate" && <>Original: <span className="font-medium">{originalNameForDuplicate}</span></>}
+                                            {(internalMode === "details" || internalMode === "edit") && <>SKU {productData.sku || "N/A"} • Criado em {dateCreated}</>}
+                                        </div>
+                                    </div>
+
+                                    {/* Desktop action buttons only */}
+                                    <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
+                                        {isEditing ? (
+                                            <>
+                                                <Button variant="outline" onClick={handleCancelEdit} disabled={isSavingProduct || isLoadingDetails}>
+                                                    Cancelar
+                                                </Button>
+                                                <Button onClick={handleSaveProduct} disabled={isSavingProduct || isLoadingDetails}>
+                                                    <SaveIcon className="w-5 h-5 mr-2" />
+                                                    {isSavingProduct ? "Salvando..." : "Salvar"}
+                                                </Button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Dropdown
+                                                    align="right"
+                                                    showChevron={false}
+                                                    trigger={
+                                                        <Button variant="outline" className="w-10 h-10 p-0 flex items-center justify-center bg-transparent" disabled={isLoadingDetails}>
+                                                            <ThreeDotsIcon className="w-5 h-5" />
+                                                        </Button>
+                                                    }
+                                                >
+                                                    <StyledDropdownItem onClick={handleDuplicateProduct}><DuplicateIcon className="w-[18px] h-[18px]" /> Duplicar</StyledDropdownItem>
+                                                    <StyledDropdownItem onClick={handleShareProduct}><ShareIcon className="w-[18px] h-[18px]" /> Compartilhar</StyledDropdownItem>
+                                                    <StyledDropdownItem onClick={() => setShowDeleteModal(true)} className="text-brand-red"><TrashIcon className="w-[18px] h-[18px]" /> Excluir</StyledDropdownItem>
+                                                </Dropdown>
+                                                <Button onClick={enterEditMode} className="whitespace-nowrap" disabled={isLoadingDetails}>
+                                                    <EditIcon className="w-[18px] h-[18px] mr-2" />
+                                                    Editar produto
+                                                </Button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Tabs */}
+                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                        <TabsTrigger value="general">
+                                            Dados gerais
+                                            {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                        </TabsTrigger>
+                                        <TabsTrigger value="variations" disabled={isLoadingDetails}>Variações</TabsTrigger>
+                                        <TabsTrigger value="suppliers" disabled={isLoadingDetails}>Fornecedores</TabsTrigger>
+                                        {productData.show_in_marketplace && <TabsTrigger value="marketplace" disabled={isLoadingDetails}>Marketplace</TabsTrigger>}
+                                    </TabsList>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Tab Content */}
+                        <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                            {isLoadingDetails ? (
+                                <div className="flex flex-col items-center justify-center pt-24 pb-32">
+                                    <Spinner size={36} className="text-brand-primary" />
+                                    <p className="mt-4 text-[15px] text-brand-dark dark:text-dark-heading font-medium">Carregando detalhes do produto...</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className={activeTab === "general" ? "block" : "hidden"}>
+                                        <FadeIn key="general" className="block">
+                                            <ProductGeneralTab
+                                                productData={productData} handleInputChange={handleInputChange}
+                                                categories={categories} subCategories={subCategories} brands={brands} locations={locations}
+                                                unidadesMedida={unidadesMedida} isEditing={isEditing && !isSavingProduct}
+                                                images={productData.images || []} onImageUpload={handleImageUpload}
+                                                onRemoveImage={handleRemoveImage} onSetPrimaryImage={handleSetPrimaryImage}
+                                                fieldErrors={fieldErrors} onFieldChange={handleFieldChange}
+                                                uploadingImages={uploadingImages} mode={internalMode === "duplicate" ? "add" : internalMode}
+                                                blockedImages={blockedImages} isSaving={isSavingProduct}
+                                                sellsOnline={sellsOnline}
+                                                generateRandomCode={() => { }}
+                                                openAddItemModal={() => { }}
+                                            />
+                                        </FadeIn>
+                                    </div>
+                                    <div className={activeTab === "variations" ? "block" : "hidden"}>
+                                        <FadeIn key="variations" className="block">
+                                            <ProductVariationsTab isEditing={isEditing} productData={productData} onSavePendingVariants={handleSavePendingVariants} />
+                                        </FadeIn>
+                                    </div>
+                                    <div className={activeTab === "suppliers" ? "block" : "hidden"}>
+                                        <FadeIn key="suppliers" className="block">
+                                            <ProductSuppliersTab isEditing={isEditing} productData={productData} />
+                                        </FadeIn>
+                                    </div>
+                                    {productData.show_in_marketplace && (
+                                        <div className={activeTab === "marketplace" ? "block" : "hidden"}>
+                                            <FadeIn key="marketplace" className="block">
+                                                <ProductMarketplaceTab productData={productData} handleInputChange={handleInputChange} isEditing={isEditing} />
+                                            </FadeIn>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Mobile Bottom Action Bar */}
+                    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
+                        {isEditing ? (
+                            <>
+                                <Button
+                                    variant="outline"
+                                    onClick={handleCancelEdit}
+                                    disabled={isSavingProduct || isLoadingDetails}
+                                    className="flex-1"
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    onClick={handleSaveProduct}
+                                    disabled={isSavingProduct || isLoadingDetails}
+                                    className="flex-1"
+                                >
+                                    <SaveIcon className="w-4 h-4 mr-2" />
+                                    {isSavingProduct ? "Salvando..." : "Salvar"}
+                                </Button>
+                            </>
+                        ) : (
+                            <>
+                                <Dropdown
+                                    showChevron={false}
+                                    trigger={
+                                        <Button
+                                            variant="outline"
+                                            className="flex-1"
+                                            disabled={isLoadingDetails}
+                                        >
+                                            <ThreeDotsIcon className="w-4 h-4 mr-2" />
+                                            Opções
+                                        </Button>
+                                    }
+                                >
+                                    <StyledDropdownItem onClick={handleDuplicateProduct}><DuplicateIcon className="w-[18px] h-[18px]" /> Duplicar</StyledDropdownItem>
+                                    <StyledDropdownItem onClick={handleShareProduct}><ShareIcon className="w-[18px] h-[18px]" /> Compartilhar</StyledDropdownItem>
+                                    <StyledDropdownItem onClick={() => setShowDeleteModal(true)} className="text-brand-red"><TrashIcon className="w-[18px] h-[18px]" /> Excluir</StyledDropdownItem>
+                                </Dropdown>
+                                <Button
+                                    onClick={enterEditMode}
+                                    className="flex-1 whitespace-nowrap"
+                                    disabled={isLoadingDetails}
+                                >
+                                    <EditIcon className="w-4 h-4 mr-2" />
+                                    Editar produto
+                                </Button>
+                            </>
+                        )}
+                    </div>
+                </Tabs>
+
+                {/* Modals */}
+                {unsavedChangesDialogOpen && (
+                    <AlertModal
+                        isOpen={unsavedChangesDialogOpen}
+                        onClose={handleUnsavedChangesDialogClose}
+                        onConfirm={handleUnsavedChangesConfirm}
+                        title="Descartar alterações?"
+                        description="Você tem alterações não salvas. Se sair agora, perderá todo o progresso."
+                        confirmText="Sair sem salvar"
+                        variant="warning"
+                    />
+                )}
+                {showDeleteModal && (
+                    <AlertModal
+                        isOpen
+                        onClose={() => setShowDeleteModal(false)}
+                        onConfirm={handleDeleteProduct}
+                        title="Excluir produto?"
+                        description="Esta ação é irreversível. O produto será removido permanentemente."
+                        confirmText="Excluir"
+                    />
+                )}
+                {showValidationModal && (
+                    <AlertModal
+                        isOpen
+                        onClose={() => setShowValidationModal(false)}
+                        title="Campos obrigatórios"
+                        description="Existem campos pendentes. Verifique os erros abaixo antes de salvar."
+                        message={<ul className="list-disc list-inside">{validationErrors.map((e, i) => <li key={i}>{e.message}</li>)}</ul>}
+                        variant="warning"
+                    />
+                )}
+                {showAlertModal && (
+                    <AlertModal
+                        isOpen
+                        onClose={() => setShowAlertModal(false)}
+                        onConfirm={confirmNavigation}
+                        title="Descartar alterações?"
+                        description="Você tem dados não salvos. Tem certeza que deseja sair?"
+                        confirmText="Sair sem salvar"
+                        variant="warning"
+                    />
+                )}
+                {showImageCropper && selectedImageForCrop && (
+                    <ImageCropperModal
+                        isOpen
+                        imageFile={selectedImageForCrop}
+                        onClose={() => setShowImageCropper(false)}
+                        onCropComplete={handleImageCropComplete}
+                    />
+                )}
+                <NcmSelectionModal
+                    isOpen={showNcmModal}
+                    onClose={() => setShowNcmModal(false)}
+                    suggestions={ncmSuggestions}
+                    onSelect={handleNcmSelect}
+                    isLoading={isLoadingNcmSuggestion}
+                />
+                <DefaultModal isOpen={isSavingProduct} onClose={() => { }} title="" maxWidth="sm" hideHeader>
+                    <div className="flex flex-col items-center justify-center p-6 gap-6 h-full mt-4">
+                        <img src="https://img.dudit.com.br/static/mascots/Aguarde.png" alt="Aguarde" className="w-36 h-36 object-contain" />
+                        <p className="text-lg font-semibold text-brand-dark dark:text-dark-heading text-center leading-tight">
+                            {internalMode === "add" ? "Criando produto..." : "Salvando alterações..."}
+                        </p>
+                    </div>
+                </DefaultModal>
+            </div>
+        </FadeIn>
+    )
+}
+
+export default AddProductPage

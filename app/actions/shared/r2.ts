@@ -1,0 +1,184 @@
+'use server'
+
+import { deleteFileFromR2, validateKeyOwnership, extractKeyFromR2Url } from '@/lib/r2/server'
+import { requireUser } from '@/lib/auth/authorization'
+import { requireRateLimit } from '@/lib/security/require-rate-limit'
+import { RateLimitCategory } from '@/lib/rate-limiter'
+
+/**
+ * Server action para deletar imagem do R2.
+ *
+ * SECURITY:
+ * - Requires authentication via requireUser()
+ * - Multi-tenant isolation: only allows deleting files under users/{userId}/
+ *
+ * @param imageKey - Chave da imagem no R2 (ex: "users/{id}/products/12345.jpg") OU URL completa
+ * @returns { success: boolean, error?: string }
+ */
+export async function deleteImageFromR2Action(imageKey: string) {
+  try {
+    await requireRateLimit(RateLimitCategory.UPLOAD)
+
+    // 1. STRICT AUTH
+    const user = await requireUser()
+
+    if (!imageKey) {
+      return {
+        success: false,
+        error: 'Chave de imagem inválida',
+      }
+    }
+
+    // 2. Extract key from URL if needed
+    let key = imageKey
+    if (imageKey.includes('http://') || imageKey.includes('https://')) {
+      try {
+        key = extractKeyFromR2Url(imageKey)
+      } catch (err) {
+        console.error('Error extracting key from URL:', err)
+        return {
+          success: false,
+          error: 'URL de imagem inválida',
+        }
+      }
+    }
+
+    // 3. MULTI-TENANT ISOLATION — only allow deleting own files
+    if (!validateKeyOwnership(key, user.id)) {
+      console.warn(
+        `[SECURITY] User ${user.id} attempted to delete file outside their scope: ${key}`
+      )
+      return {
+        success: false,
+        error: 'Acesso negado. Você só pode deletar seus próprios arquivos.',
+      }
+    }
+
+    // 4. DELETE
+    await deleteFileFromR2(key)
+
+    console.log('Image deleted from R2:', key)
+    return {
+      success: true,
+    }
+  } catch (error: any) {
+    console.error('Error deleting R2 file:', error)
+    return {
+      success: false,
+      error: error.message || 'Erro ao deletar imagem',
+    }
+  }
+}
+
+/**
+ * Server action para upload de imagem ao R2 via o endpoint /api/upload-image.
+ *
+ * IMPORTANT: This server action delegates to the upload-image API route
+ * which handles all validation, moderation, and user-scoped key generation.
+ * The base URL must be provided or this must be called from a context where
+ * the app URL is available.
+ *
+ * @param base64OrUrl - String em base64 ou URL da imagem
+ * @param folder - Prefixo/pasta no R2
+ * @returns { success: boolean, publicId?: string, error?: string }
+ */
+/**
+ * @deprecated SECURITY WARNING: This action bypasses the image moderation
+ * and magic-byte validation present in /api/upload-image.
+ * Use /api/upload-image endpoint for all new uploads.
+ * BLOCKED in production to prevent abuse vectors.
+ */
+export async function uploadImageToR2Action(
+  base64OrUrl: string,
+  folder: string = 'products',
+) {
+  // SECURITY FIX (HIGH-02): Hard-block in production to prevent moderation bypass
+  if (process.env.NODE_ENV === 'production') {
+    return {
+      success: false,
+      error: 'uploadImageToR2Action is deprecated. Use /api/upload-image instead.',
+    }
+  }
+
+  try {
+    await requireRateLimit(RateLimitCategory.UPLOAD)
+
+    // 1. STRICT AUTH
+    const user = await requireUser()
+
+    // If it's already a full URL, return directly (already stored)
+    if (base64OrUrl.startsWith('http://') || base64OrUrl.startsWith('https://')) {
+      return {
+        success: true,
+        publicId: base64OrUrl,
+      }
+    }
+
+    // If it's base64, validate format before processing
+    if (base64OrUrl.startsWith('data:')) {
+      // Validate MIME type from data URI
+      const mimeMatch = base64OrUrl.match(/^data:(image\/[a-z+]+);base64,/)
+      if (!mimeMatch) {
+        return {
+          success: false,
+          error: 'Formato de imagem base64 inválido',
+        }
+      }
+
+      const mimeType = mimeMatch[1]
+      const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif']
+      if (!allowedMimes.includes(mimeType)) {
+        return {
+          success: false,
+          error: `Tipo de imagem não permitido: ${mimeType}`,
+        }
+      }
+
+      // SECURITY FIX (MED-06): Direct upload instead of internal HTTP fetch
+      // The internal fetch lacked auth cookies and could bypass authentication
+      const { generateSignedUploadUrl } = await import('@/lib/r2/server')
+
+      const ext = mimeType.split('/')[1] || 'jpg'
+      const fileName = `upload_${Date.now()}.${ext}`
+
+      const base64Data = base64OrUrl.split(",")[1] || base64OrUrl
+      const rawBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))
+
+      const result = await generateSignedUploadUrl({
+        fileName,
+        fileType: mimeType,
+        userId: user.id,
+      })
+
+      // Upload to R2 using signed URL
+      const uploadResponse = await fetch(result.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': mimeType },
+        body: rawBuffer,
+      })
+
+      if (!uploadResponse.ok) {
+        return {
+          success: false,
+          error: 'Erro ao fazer upload para R2',
+        }
+      }
+
+      return {
+        success: true,
+        publicId: result.publicUrl,
+      }
+    }
+
+    return {
+      success: false,
+      error: 'Formato de imagem inválido',
+    }
+  } catch (error: any) {
+    console.error('Error uploading image to R2:', error)
+    return {
+      success: false,
+      error: error.message || 'Erro ao fazer upload da imagem',
+    }
+  }
+}

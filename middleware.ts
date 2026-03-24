@@ -1,0 +1,23 @@
+import { type NextRequest } from "next/server"
+import { middleware as supabaseMiddleware } from "@/lib/supabase/middleware"
+
+/**
+ * Root middleware for the Dudit application.
+ * delegates to the unified Supabase middleware in lib/supabase/middleware.ts.
+ */
+export async function middleware(request: NextRequest) {
+  return await supabaseMiddleware(request)
+}
+
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public assets (svg, png, jpg, jpeg, gif, webp)
+     */
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2)$).*)",
+  ],
+}
