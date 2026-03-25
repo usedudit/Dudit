@@ -17,11 +17,7 @@ import {
     MoreHorizontalIcon,
     Users as UsersIcon,
     CheckCircleIcon,
-    BlockedIcon,
-    ChevronDownIcon,
-    ChevronLeftIcon,
-    ChevronRightIcon,
-    StoreIcon
+    BlockedIcon
 } from '@/lib/icons';
 
 import { Button, Checkbox, IconPlaceholder } from '@/components/reusable';

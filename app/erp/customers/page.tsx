@@ -1,4 +1,4 @@
-import { CustomersPage } from "@/components/erp/clientes/CustomersPage"
+import CustomersPage from "@/components/erp/clientes/CustomersPage"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { AccessDenied } from "@/components/erp/access-denied"
