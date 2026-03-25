@@ -4,7 +4,7 @@ import * as React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
 import { CancelIcon, UnfoldMoreIcon, CheckCircleIcon } from "@/lib/icons"
 import { cn } from "@/lib/utils"
-import Portal from "../Portal"
+import Portal from "@/components/Portal"
 import { useMediaQuery } from "@/components/erp/hooks"
 import BottomSheet from "@/components/BottomSheet"
 

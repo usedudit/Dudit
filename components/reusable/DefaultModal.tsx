@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, type ReactNode } from "react"
-import Portal from "../Portal"
+import Portal from "@/components/Portal"
 import { CloseIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import BottomSheet from "@/components/BottomSheet"

@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import Portal from "../Portal"
+import Portal from "@/components/Portal"
 import { CloseIcon, AlertCircleIcon, CheckCircleIcon, AlertTriangleIcon, InfoIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import BottomSheet from "@/components/BottomSheet"

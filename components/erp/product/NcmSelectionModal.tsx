@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import Portal from "../Portal"
+import Portal from "@/components/Portal"
 import { CloseIcon, SparklesIcon, CheckIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import BottomSheet from "@/components/BottomSheet"
