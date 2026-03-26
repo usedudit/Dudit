@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } from "react"
-import { 
-    Tabs, 
-    TabsList, 
-    TabsTrigger, 
-    TabsContent, 
-    Button, 
-    Badge, 
+import {
+    Tabs,
+    TabsList,
+    TabsTrigger,
+    TabsContent,
+    Button,
+    Badge,
     AlertModal,
     FormDropdown,
     RadioButton,
     Input as FormInput,
     Checkbox as FormCheckbox
 } from "@/components/reusable"
+import { CepInput } from "@/components/reusable/Inputs/CepInput"
+import { CpfCnpjInput } from "@/components/reusable/Inputs/CpfCnpjInput"
 import { ChevronLeftIcon, SaveIcon, EditIcon, ChevronDownIcon } from "@/lib/icons"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useNotification } from "@/hooks/use-notification"
@@ -236,7 +238,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                 <div className="col-span-12 lg:col-span-8">
                                     <AnimatePresence mode="wait">
                                         <TabsContent value="general" className="mt-0">
-                                            <motion.div key="general" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-10">
+                                            <motion.div key="general" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-10">
                                                 {/* Identificação */}
                                                 <section>
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Identificação</h3>
@@ -293,7 +295,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                         {personType === "Pessoa Jurídica" ? (
                                                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
                                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                                                    <FormInput label="CNPJ" placeholder="00.000.000/0000-00" value={cnpj} onChange={(e) => setCnpj(e.target.value)} />
+                                                                    <CpfCnpjInput label="CNPJ" placeholder="00.000.000/0000-00" value={cnpj} onChange={(e) => setCnpj(e.target.value)} name="cnpj" />
                                                                     <FormInput label="Inscrição Estadual" placeholder="Isento ou número da IE" value={ie} onChange={(e) => setIe(e.target.value)} />
                                                                 </div>
                                                                 <FormInput label="Nome Fantasia" placeholder="Nome comercial" value={fantasia} onChange={(e) => setFantasia(e.target.value)} />
@@ -310,7 +312,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                             </motion.div>
                                                         ) : (
                                                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                                                <FormInput label="CPF" placeholder="000.000.000-00" value={cpf} onChange={(e) => setCpf(e.target.value)} />
+                                                                <CpfCnpjInput label="CPF" placeholder="000.000.000-00" value={cpf} onChange={(e) => setCpf(e.target.value)} name="cpf" />
                                                                 <FormInput label="RG" placeholder="00.000.000-0" value={rg} onChange={(e) => setRg(e.target.value)} />
                                                             </motion.div>
                                                         )}
@@ -333,13 +335,25 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                         </TabsContent>
 
                                         <TabsContent value="address" className="mt-0">
-                                            <motion.div key="address" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-10">
+                                            <motion.div key="address" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-10">
                                                 <section>
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Endereço principal</h3>
                                                     <div className="space-y-5">
                                                         <div className="grid grid-cols-12 gap-5">
                                                             <div className="col-span-12 md:col-span-4">
-                                                                <FormInput label="CEP" placeholder="00000-000" value={cep} onChange={e => setCep(e.target.value)} />
+                                                                <CepInput
+                                                                    label="CEP"
+                                                                    placeholder="00000-000"
+                                                                    value={cep}
+                                                                    onChange={setCep}
+                                                                    name="cep"
+                                                                    onAddressFetched={(data) => {
+                                                                        setStreet(data.street)
+                                                                        setNeighborhood(data.neighborhood)
+                                                                        setCity(data.city)
+                                                                        setUf(data.state)
+                                                                    }}
+                                                                />
                                                             </div>
                                                             <div className="col-span-12 md:col-span-8">
                                                                 <FormInput label="Logradouro" placeholder="Rua, Avenida, etc." value={street} onChange={e => setStreet(e.target.value)} />
@@ -394,7 +408,19 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Endereço de cobrança</h3>
                                                             <div className="grid grid-cols-12 gap-5">
                                                                 <div className="col-span-12 md:col-span-4">
-                                                                    <FormInput label="CEP" placeholder="00000-000" value={billingCep} onChange={e => setBillingCep(e.target.value)} />
+                                                                    <CepInput
+                                                                        label="CEP"
+                                                                        placeholder="00000-000"
+                                                                        value={billingCep}
+                                                                        onChange={setBillingCep}
+                                                                        name="billingCep"
+                                                                        onAddressFetched={(data) => {
+                                                                            setBillingStreet(data.street)
+                                                                            setBillingNeighborhood(data.neighborhood)
+                                                                            setBillingCity(data.city)
+                                                                            setBillingUf(data.state)
+                                                                        }}
+                                                                    />
                                                                 </div>
                                                                 <div className="col-span-12 md:col-span-8">
                                                                     <FormInput label="Logradouro" placeholder="Rua, Avenida, etc." value={billingStreet} onChange={e => setBillingStreet(e.target.value)} />
@@ -439,7 +465,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                         </TabsContent>
 
                                         <TabsContent value="notes" className="mt-0">
-                                            <motion.div key="notes" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}>
+                                            <motion.div key="notes" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                                                 <section>
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Observações</h3>
                                                     <div className="bg-gray-50 dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-5 h-[400px]">
