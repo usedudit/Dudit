@@ -171,13 +171,10 @@ export async function middleware(request: NextRequest) {
   // Public marketplace pages: edge-cacheable with stale-while-revalidate
   // Private/auth pages: never cached
   const PRIVATE_PREFIXES = ["/erp", "/account", "/auth", "/cart", "/profile", "/my-orders", "/api", "/dashboard", "/payment", "/ddt-admin"]
-  const PUBLIC_CACHEABLE_PATTERNS = ["/", "/explorar", "/services", "/partners", "/produto"]
+  const PUBLIC_CACHEABLE_PATTERNS = ["/services", "/partners", "/produto"]
 
   const isPrivatePage = PRIVATE_PREFIXES.some(prefix => pathname.startsWith(prefix))
-  const isPublicCacheable = !isPrivatePage && (
-    pathname === "/" ||
-    PUBLIC_CACHEABLE_PATTERNS.some(pattern => pattern !== "/" && pathname.startsWith(pattern))
-  )
+  const isPublicCacheable = !isPrivatePage && PUBLIC_CACHEABLE_PATTERNS.some(pattern => pathname.startsWith(pattern))
 
   if (isPrivatePage) {
     response.headers.set("Cache-Control", "private, no-store")
@@ -255,7 +252,7 @@ export async function middleware(request: NextRequest) {
         const authBlockedPaths = ["/auth/login"]
         const hasNextParam = request.nextUrl.searchParams.has("next")
         const hasModePartner = request.nextUrl.searchParams.get("mode") === "partner"
-        
+
         if (user && !hasNextParam && !hasModePartner && authBlockedPaths.some(p => pathname === p || pathname.startsWith(p + "/"))) {
           const url = request.nextUrl.clone()
           url.pathname = "/"
