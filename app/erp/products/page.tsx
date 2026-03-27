@@ -15,16 +15,18 @@ export default async function ProductsPageServer() {
 
     const partnerId = data.partnerId
 
+    const userProfile = {
+        fullName: user.email?.split("@")[0] || "Usuário",
+        email: user.email || "",
+        initials: (user.email?.[0] || "U").toUpperCase(),
+        avatarColor: "bg-brand-primary"
+    }
+
     return (
         <>
             <ERPHeader
                 pageTitle="Produtos"
-                userProfile={{
-                    fullName: user.email?.split("@")[0] || "Usuário",
-                    email: user.email || "",
-                    initials: (user.email?.[0] || "U").toUpperCase(),
-                    avatarColor: "bg-brand-primary"
-                }}
+                userProfile={userProfile}
             />
             <FadeIn className="p-4">
                 <Suspense fallback={<div className='p-4'>Carregando produtos...</div>}>

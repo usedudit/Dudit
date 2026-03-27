@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Input, FormDropdown, RichTextEditor, TagsInput, Button, Accordion, IconPlaceholder } from "@/components/reusable"
 import { TrashIcon, PlusIcon, Package, ArrowUpDownIcon, EditIcon, CheckCircleIcon } from "@/lib/icons"
 import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
-import { getCategoryPathAction } from "@/app/actions/erp/products"
+import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
 
 interface ProductMarketplaceTabProps {
   productData: any
@@ -26,7 +26,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
   useEffect(() => {
     const fetchPath = async () => {
       if (productData?.marketplace_category_id) {
-        const path = await getCategoryPathAction(productData.marketplace_category_id)
+        const path = await getCategoryPathClient(productData.marketplace_category_id)
         if (path) setCategoryPath(path)
       }
     }

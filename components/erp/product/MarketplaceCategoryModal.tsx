@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import DefaultModal from "@/components/reusable/DefaultModal"
-import { getMarketplaceCategoriesAction } from "@/app/actions/erp/products"
+import { getMarketplaceCategoriesClient } from "@/lib/data/marketplace-categories-client"
 import { Input } from "@/components/reusable"
 import { Spinner } from "@/components/reusable/Spinner"
 import { ChevronRight, ChevronLeft, Search, Package } from "lucide-react"
@@ -42,7 +42,7 @@ export default function MarketplaceCategoryModal({
   const loadCategories = async (parentId: string | null) => {
     setLoading(true)
     try {
-      const data = await getMarketplaceCategoriesAction(parentId)
+      const data = await getMarketplaceCategoriesClient(parentId)
       if (data && data.length > 0) {
         setCategories(data)
       } else if (parentId) {
@@ -57,7 +57,7 @@ export default function MarketplaceCategoryModal({
 
   const handleCategoryClick = async (category: Category) => {
     setLoading(true)
-    const children = await getMarketplaceCategoriesAction(category.id)
+    const children = await getMarketplaceCategoriesClient(category.id)
     setLoading(false)
 
     if (children && children.length > 0) {

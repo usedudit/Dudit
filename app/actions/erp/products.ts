@@ -1315,18 +1315,36 @@ export const getERPProductsPageData = cache(async () => {
     const partnerId = context.partnerId
     const supabase = await getSupabaseServerClient()
 
-    const productsRes = await supabase.from("products").select("*").eq("partner_id", partnerId)
+    // 1. Fetch products first (we need IDs for variants)
+    const { data: products, error: prodError } = await supabase
+        .from("products")
+        .select("*")
+        .eq("partner_id", partnerId)
+        .order("created_at", { ascending: false })
 
-    const productIds = productsRes.data?.map((p: any) => p.id) || []
+    if (prodError) {
+        console.error("Error fetching ERP products:", prodError)
+        return null
+    }
 
-    const variantsRes = productIds.length > 0
-        ? await supabase.from("product_variants").select("*").in("product_id", productIds)
-        : { data: [] }
+    const productIds = products?.map((p: any) => p.id) || []
+
+    // 2. Fetch variants for these products
+    const { data: variants, error: varError } = productIds.length > 0
+        ? await supabase
+            .from("product_variants")
+            .select("*")
+            .in("product_id", productIds)
+        : { data: [], error: null }
+
+    if (varError) {
+        console.error("Error fetching ERP variants:", varError)
+    }
 
     return {
-        products: productsRes.data || [],
+        products: products || [],
         partnerId: partnerId,
-        variants: variantsRes.data || []
+        variants: variants || []
     }
 })
 
