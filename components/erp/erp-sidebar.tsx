@@ -23,7 +23,6 @@ import {
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import { motion, AnimatePresence } from "framer-motion"
 import { usePermissions } from "@/lib/permission-context"
-import { useStore } from "@/lib/store-context"
 import { useSidebar } from "@/lib/sidebar-context"
 import { Drawer } from "vaul"
 
@@ -522,7 +521,7 @@ export function ERPSidebar() {
                         )}
                       >
                         {item.href && !hasSubmenu && (
-                          <Link href={item.href} className="absolute inset-0" onClick={() => setIsMobileOpen(false)} />
+                          <Link href={item.href} prefetch={false} className="absolute inset-0" onClick={() => setIsMobileOpen(false)} />
                         )}
                         <Icon size={20} className={isActive ? "text-brand-green" : ""} />
                         <span className="text-[15px] font-medium flex-1 text-left">{item.label}</span>
@@ -537,6 +536,7 @@ export function ERPSidebar() {
                             <Link
                               key={sub.href}
                               href={sub.href}
+                              prefetch={false}
                               onClick={() => setIsMobileOpen(false)}
                               className={cn(
                                 "py-2 px-3 rounded-lg text-sm transition-colors",

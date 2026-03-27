@@ -19,6 +19,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
+import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { checkLimit, canUseFeature, increment_usage_counter } from "@/lib/services/subscription.service"
 
 const _deleteFromR2 = async (url: string) => {
@@ -154,8 +155,7 @@ export async function deleteProductAction(productId: string) {
         }
 
         // Synchronous revalidation and Redis sync to prevent stale data
-        revalidateProducts(product.partner_id, productId)
-        await removeFromExploreRedis(productId, "produto")
+        await invalidateProductCache(productId, product.partner_id, 'delete')
 
         console.log(`[PERF] deleteProduct took ${Math.round(performance.now() - actionStart)}ms`)
         return { success: true }
@@ -419,8 +419,7 @@ export async function createProductComprehensiveAction(data: {
         ).catch(console.error)
 
         // Synchronous revalidation and Redis sync to prevent stale data
-        revalidateProducts(finalPartnerId)
-        await syncToExploreRedis({ id: insertedProduct.id, type: "produto", data: {} })
+        await invalidateProductCache(insertedProduct.id, finalPartnerId, 'create')
 
         // Increment usage counters
         increment_usage_counter(finalPartnerId, "products_count").catch(console.error)
@@ -638,8 +637,7 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         }
 
         // Synchronous revalidation and Redis sync to prevent stale data
-        revalidateProducts(product.partner_id, productId)
-        await syncToExploreRedis({ id: productId, type: "produto", data: {} })
+        await invalidateProductCache(productId, product.partner_id, 'update')
 
         console.log(`[PERF] updateProduct took ${Math.round(performance.now() - actionStart)}ms`)
         return successResponse({ ...updatedProduct, ...fiscalPayload, ...logisticsPayload })
@@ -686,8 +684,7 @@ export async function createProductVariantAction(data: {
 
         if (error) return { error: error.message }
 
-        revalidateProducts(product.partner_id, data.productId)
-        await syncToExploreRedis({ id: data.productId, type: "produto", data: {} })
+        await invalidateProductCache(data.productId, product.partner_id, 'update')
         return { success: true, variantSku }
     } catch (error: any) {
         return { error: error.message }
@@ -773,8 +770,7 @@ export async function createProductVariantsBatchAction(data: {
             Promise.all(imagesToCleanup.map(img => _deleteFromR2(img))).catch(console.error)
         }
 
-        revalidateProducts(product.partner_id, data.productId)
-        await syncToExploreRedis({ id: data.productId, type: "produto", data: {} })
+        await invalidateProductCache(data.productId, product.partner_id, 'update')
         return successResponse(inserted)
     } catch (error: any) {
         return errorResponse(error.message)

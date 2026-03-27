@@ -50,10 +50,53 @@ export const searchMarketplace = async (
     return _searchMarketplaceCore(query, type, limits)
 }
 
-/**
- * CORE interno — lógica pura de busca. Sem rate limiting.
- */
+import { getCacheVersion } from "@/lib/cache/invalidation"
+
+const serializeSearchKey = (query: string, type: string, limits: any) => {
+    return [query, type, limits.vitrines, limits.produtos, limits.servicos, limits.geral, limits.cursor, limits.lastId].map(String).join(":")
+}
+
 async function _searchMarketplaceCore(
+    query: string,
+    type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' = 'tudo',
+    limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string } = {}
+) {
+    const version = await getCacheVersion()
+    const queryHash = serializeSearchKey(query, type, limits)
+    
+    const { redis } = await import('@/lib/redis')
+    const safeHash = Buffer.from(queryHash).toString('base64').replace(/=/g, '')
+    const cacheKey = `mp:cache:v${version}:search:${safeHash}`
+    
+    try {
+        const cached = await redis.get(cacheKey)
+        if (cached) {
+            console.log(`[REDIS] HIT ${cacheKey}`)
+            return cached
+        }
+        console.log(`[REDIS] MISS ${cacheKey}`)
+    } catch (err) {
+        console.error("[REDIS] Error reading query cache", err)
+    }
+
+    const result = await _searchMarketplaceInternal(query, type, limits)
+    
+    if (result && result.length > 0) {
+        try {
+            await redis.set(cacheKey, JSON.stringify(result), { ex: 60 * 60 * 24 }) // 24h caching, wiped by version bump
+            console.log(`[REDIS] SET ${cacheKey}`)
+        } catch (err) {
+            console.error("[REDIS] Error setting query cache", err)
+        }
+    }
+    
+    return result
+}
+
+/**
+ * CORE interno — lógica pura de busca original. Sem rate limiting.
+ */
+async function _searchMarketplaceInternal(
     query: string,
     type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' = 'tudo',
     limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string } = {}
