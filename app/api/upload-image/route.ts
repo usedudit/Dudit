@@ -38,20 +38,20 @@ async function handleUpload(request: NextRequest) {
     }
 
     // =============================
+    // Auth — STRICT (guarantees user or redirects)
+    // =============================
+    const user = await requireUser()
+
+    // =============================
     // Rate limit (UPLOAD category: 20 req/hour per user)
     // =============================
-    const rateLimit = await checkRateLimitForAPI(RateLimitCategory.UPLOAD)
+    const rateLimit = await checkRateLimitForAPI(RateLimitCategory.UPLOAD, undefined, user.id)
     if (rateLimit.limited) {
       return NextResponse.json(
         rateLimit.body || { error: "Muitas requisições. Tente novamente mais tarde." },
         { status: rateLimit.status || 429 }
       )
     }
-
-    // =============================
-    // Auth — STRICT (throws on failure)
-    // =============================
-    const user = await requireUser()
 
     // =============================
     // Parse request - suporta FormData ou JSON

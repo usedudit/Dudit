@@ -51,7 +51,7 @@ const verifyAuth = async () => {
     return user
 }
 
-const fetchProductAndVerifyOwnership = async (productId: string, requiredAction?: "view" | "create" | "edit" | "delete", selectColumns = "id, partner_id, images, sku, name") => {
+const fetchProductAndVerifyOwnership = async (productId: string, requiredAction?: "view" | "create" | "edit" | "delete", selectColumns = "id, partner_id, images, sku, name", providedUserId?: string) => {
     const admin = getAdminClient()
 
     const { data: product, error } = await admin
@@ -60,7 +60,7 @@ const fetchProductAndVerifyOwnership = async (productId: string, requiredAction?
         .eq("id", productId)
         .single()
 
-    if (error || !product) throw new Error("Produto nÃ£o encontrado")
+    if (error || !product) throw new Error("Produto não encontrado")
 
     if (requiredAction) {
         await requirePartnerAccessWithPermission(product.partner_id, "products", requiredAction)
@@ -237,14 +237,15 @@ export async function createProductComprehensiveAction(data: {
     const actionStart = performance.now()
     try {
         // 1. GATEKEEPER â€” isolado (bloqueia abuso sem consumir recursos)
-        await requireRateLimit(RateLimitCategory.PRODUCT_CREATE)
+        // 1. Auth check (resolve user once)
+        const user = await requireUser()
 
-        // 2. CSRF + Auth em paralelo (independentes entre si)
-        const [csrf, _user] = await Promise.all([
-            validateCSRF(data as Record<string, unknown>),
-            verifyAuth(),
-        ])
-        if (!csrf.valid) return errorResponse(csrf.error || "CSRF invÃ¡lido")
+        // 2. Rate limit (using pre-resolved userId)
+        await requireRateLimit(RateLimitCategory.PRODUCT_CREATE, undefined, user.id)
+
+        // 3. CSRF Protection
+        const csrf = await validateCSRF(data as Record<string, unknown>)
+        if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
 
         // â”€â”€ SERVER-SIDE CONTEXT FALLBACK â”€â”€
         let finalPartnerId = data.partnerId
@@ -519,15 +520,19 @@ interface UpdateProductData {
 
 export async function updateProductComprehensiveAction(productId: string, data: UpdateProductData): Promise<ActionResponse<any>> {
     const actionStart = performance.now()
-    // 1. GATEKEEPER â€” isolado
-    await requireRateLimit(RateLimitCategory.PRODUCT_UPDATE)
+    // 1. Auth check (resolve user once)
+    const user = await requireUser()
+
+    // 2. Rate limit (using pre-resolved userId)
+    await requireRateLimit(RateLimitCategory.PRODUCT_UPDATE, undefined, user.id)
+
     try {
-        // 2. CSRF + ownership em paralelo (independentes)
+        // 3. CSRF + ownership em paralelo (independentes)
         const [csrf, product] = await Promise.all([
             validateCSRF(data as Record<string, unknown>),
-            fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, images, sku, name, description, moderation_status"),
+            fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, images, sku, name, description, moderation_status", user.id),
         ])
-        if (!csrf.valid) return errorResponse(csrf.error || "CSRF invÃ¡lido")
+        if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
 
         const supabase = await getSupabaseServerClient()
         const payload: any = { updated_at: getBrasiliaTime() }

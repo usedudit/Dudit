@@ -111,9 +111,16 @@ async function checkPartnerAccess(
   partnerId: string,
   userId: string
 ): Promise<{ role: string; permissions: any } | null> {
+  // 1. Try to get from cached context first (standard ERP flow)
+  const { getCurrentPartnerContext } = await import("@/lib/auth/partner-context")
+  const context = await getCurrentPartnerContext()
+  if (context && context.partnerId === partnerId && context.userId === userId) {
+      return { role: context.role, permissions: context.permissions }
+  }
+
   const admin = getAdminClient()
 
-  // 1. Check partner_users first (invited users + owners who have records)
+  // 2. Check partner_users (invited users + owners who have records)
   const { data: puAccess } = await admin
     .from("partner_users")
     .select("role, permissions")
@@ -125,7 +132,7 @@ async function checkPartnerAccess(
     return { role: puAccess.role, permissions: puAccess.permissions }
   }
 
-  // 2. Fallback: check if user is the legacy owner via partners.user_id
+  // 3. Fallback: check if user is the legacy owner via partners.user_id
   const { data: partner } = await admin
     .from("partners")
     .select("user_id")
@@ -134,15 +141,10 @@ async function checkPartnerAccess(
 
   if (partner && partner.user_id === userId) {
     // Owner — return full OWNER permissions
+    const { PERMISSION_PRESETS } = await import("@/lib/permissions/partner-roles")
     return {
       role: "OWNER",
-      permissions: {
-        products: { view: true, create: true, edit: true, delete: true },
-        services: { view: true, create: true, edit: true, delete: true },
-        orders: { view: true, create: true, edit: true, delete: true },
-        financial: { view: true, create: true, edit: true, delete: true },
-        customers: { view: true, create: true, edit: true, delete: true },
-      }
+      permissions: PERMISSION_PRESETS.OWNER
     }
   }
 
@@ -422,6 +424,7 @@ export async function requirePartnerAccessWithPermission(
 }> {
   const user = await requireUser()
 
+  // checkPartnerAccess now internally uses cached context if available
   const access = await checkPartnerAccess(partnerId, user.id)
   if (!access) {
     throw new ForbiddenError("Você não tem acesso a este ERP")
