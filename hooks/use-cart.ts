@@ -1,6 +1,8 @@
 "use client"
 
-import { useUserSession, invalidateUserSessionCache } from "@/hooks/use-user-session"
+import useSWR, { mutate as globalMutate } from "swr"
+import { useSupabase } from "@/providers/supabase-provider"
+import { getCartItemCountAction } from "@/app/actions/marketplace/cart"
 
 interface CartHookResult {
   cartCount: number
@@ -8,14 +10,32 @@ interface CartHookResult {
   mutate: any
 }
 
+const cartFetcher = () => getCartItemCountAction()
+
 export function useCart(fallbackData?: number): CartHookResult {
-  const { data, isLoading, mutate } = useUserSession()
+  const { user, isLoading: isAuthLoading, sessionData } = useSupabase()
+
+  // Use sessionData from context if available as higher priority fallback
+  const contextCartCount = sessionData?.cart?.length ?? null
+  const effectiveFallback = fallbackData !== undefined ? fallbackData : contextCartCount
+
+  const { data, isLoading: isDataLoading, mutate } = useSWR(
+    user ? ["cart", user.id] : null,
+    cartFetcher,
+    {
+      fallbackData: effectiveFallback as number,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      // Only revalidate on mount if we have absolutely no data (neither prop nor context)
+      revalidateOnMount: effectiveFallback === null,
+      dedupingInterval: 60000,
+      keepPreviousData: true,
+    }
+  )
 
   return {
-    // If a specific component provided fallbackData (e.g., from server props), use it
-    // otherwise rely on the unified session cache
-    cartCount: fallbackData !== undefined ? fallbackData : (data?.cartCount ?? 0),
-    isLoading,
+    cartCount: typeof data === "number" ? data : 0,
+    isLoading: isAuthLoading || isDataLoading,
     mutate
   }
 }
@@ -25,5 +45,5 @@ export function useCart(fallbackData?: number): CartHookResult {
  * E.g., after addToCartAction, removeFromCartAction, updateCartQuantityAction
  */
 export function invalidateCartCache() {
-  return invalidateUserSessionCache()
+  return globalMutate((key: any) => Array.isArray(key) && key[0] === "cart")
 }

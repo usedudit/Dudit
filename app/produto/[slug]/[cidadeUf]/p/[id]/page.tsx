@@ -15,8 +15,7 @@ import { getUserSessionData } from "@/lib/data/user"
 import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
-// RESTORED: required because generateStaticParams crashes when RootLayout reads cookies()
-export const dynamic = "force-dynamic"
+// Removed force-dynamic — getCurrentUser() calls cookies() which already makes this dynamic
 export const dynamicParams = true
 
 export async function generateStaticParams() {

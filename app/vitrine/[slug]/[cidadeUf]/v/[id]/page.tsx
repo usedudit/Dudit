@@ -16,8 +16,7 @@ import {
   getCachedPartnerProfile,
 } from "@/app/actions/marketplace/partners"
 
-// RESTORED: required because RootLayout reads cookies()
-export const dynamic = "force-dynamic"
+// Removed force-dynamic — getCurrentUser() calls cookies() which already makes this dynamic
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }): Promise<Metadata> {
   const { id } = await params

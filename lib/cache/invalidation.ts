@@ -48,14 +48,7 @@ export async function invalidateProductCache(productId: string, partnerId: strin
   // invalidated by revalidateExploreSearch() called inside syncToExploreRedis()
   try {
     const { revalidateTag } = await import('next/cache')
-    const safeRevalidateTag = (tag: string) => {
-      try {
-        // @ts-expect-error: Local TS definitions incorrectly expect 2 arguments for Next.js 16+
-        revalidateTag(tag)
-      } catch (e) {
-        console.warn(`[CACHE] Failed to revalidate tag: ${tag}`, e)
-      }
-    }
+    const safeRevalidateTag = (tag: string) => (revalidateTag as any)(tag, 'max')
 
     safeRevalidateTag(`product-${productId}`)
     safeRevalidateTag(`partner-${partnerId}`)
