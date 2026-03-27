@@ -37,37 +37,40 @@ export async function POST(req: Request) {
     const processWebhook = async () => {
       const startTime = performance.now()
       try {
+        const id = record?.id || old_record?.id
+        const partnerId = record?.partner_id || old_record?.partner_id
+
         if (table === 'products') {
           if (type === 'DELETE' || (type === 'UPDATE' && record.show_in_marketplace === false) || (type === 'UPDATE' && record.is_active === false)) {
-            await removeFromExploreRedis(old_record?.id || record.id, 'produto')
+            await removeFromExploreRedis(id, 'produto')
           } else if (type === 'INSERT' || type === 'UPDATE') {
-            await syncToExploreRedis({ id: record.id, type: 'produto', data: {} })
+            await syncToExploreRedis({ id, type: 'produto', data: {} })
           }
         }
         else if (table === 'services') {
           if (type === 'DELETE' || (type === 'UPDATE' && record.is_active === false)) {
-            await removeFromExploreRedis(old_record?.id || record.id, 'servico')
+            await removeFromExploreRedis(id, 'servico')
           } else if (type === 'INSERT' || type === 'UPDATE') {
-            await syncToExploreRedis({ id: record.id, type: 'servico', data: {} })
+            await syncToExploreRedis({ id, type: 'servico', data: {} })
           }
         }
         else if (table === 'partners') {
           if (type === 'DELETE' || (type === 'UPDATE' && record.is_active === false)) {
-            await removeFromExploreRedis(old_record?.id || record.id, 'loja')
+            await removeFromExploreRedis(id, 'loja')
           } else if (type === 'INSERT' || type === 'UPDATE') {
-            await syncToExploreRedis({ id: record.id, type: 'loja', data: {} })
+            await syncToExploreRedis({ id: id, type: 'loja', data: {} })
           }
         }
 
         // Invalidate INDIVIDUAL page tags (product detail / partner profile)
-        if (table === 'products' && record?.id) {
-          await revalidateProducts(record.partner_id || '', record.id)
+        if (table === 'products' && id) {
+          await revalidateProducts(partnerId || '', id)
         }
-        if (table === 'services' && record?.partner_id) {
-          await revalidatePartnerProfile(record.partner_id)
+        if (table === 'services' && partnerId) {
+          await revalidatePartnerProfile(partnerId)
         }
-        if (table === 'partners' && record?.id) {
-          await revalidatePartnerProfile(record.id)
+        if (table === 'partners' && id) {
+          await revalidatePartnerProfile(id)
         }
 
         // Debounced: coalesce multiple rapid updates into single explore/home revalidation

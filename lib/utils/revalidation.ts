@@ -2,6 +2,9 @@
 
 import { revalidateTag } from "next/cache"
 import { TAGS } from "./revalidation-tags"
+import { redis } from "@/lib/redis"
+
+const GLOBAL_VERSION_KEY = "marketplace:global_cache_version"
 
 // Helper interno para evitar repetição do "max"
 function safeRevalidateTag(tag: string) {
@@ -94,6 +97,14 @@ export async function revalidatePartnerStatus() {
  * Revalida o Cache O(1) do Redis/Explore/Home no Next.js App Router
  */
 export async function revalidateExploreSearch() {
+  // 1. Increment global Redis version to invalidate all cached query results (O(1) invalidation)
+  try {
+    await redis.incr(GLOBAL_VERSION_KEY)
+  } catch (err) {
+    console.error("[Redis] Failed to incr cache version:", err)
+  }
+
+  // 2. Clear Next.js cache tags for lists
   safeRevalidateTag('marketplace-search')
   safeRevalidateTag('home-products')
   safeRevalidateTag('explore-products')
