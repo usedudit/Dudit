@@ -197,7 +197,10 @@ async function _searchMarketplaceInternal(
                         id, name, description, price, promotional_price, images, rating, category, created_at,
                         partners(id, store_name, store_image_url, addresses(city, state)),
                         product_variants(variant_options, price_adjustment, is_active)
-                    `).in("id", produtosIds)
+                    `)
+                    .in("id", produtosIds)
+                    .eq("is_active", true)
+                    .eq("show_in_marketplace", true)
                 )
             }
             if (servicosIds.length > 0) {
@@ -205,7 +208,9 @@ async function _searchMarketplaceInternal(
                     supabase.from("services").select(`
                         id, name, description, price, images, rating, category, created_at,
                         partners(id, store_name, store_image_url, addresses(city, state))
-                    `).in("id", servicosIds)
+                    `)
+                    .in("id", servicosIds)
+                    .eq("is_active", true)
                 )
             }
             if (lojasIds.length > 0) {

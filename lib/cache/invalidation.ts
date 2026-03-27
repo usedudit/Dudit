@@ -26,8 +26,13 @@ export async function incrementCacheVersion(): Promise<number> {
   }
 }
 
-export async function invalidateProductCache(productId: string, partnerId: string, action: 'create' | 'update' | 'delete' = 'update') {
-  console.log(`[CACHE] INVALIDATING product:${productId} (partner:${partnerId}) action:${action}`)
+export async function invalidateProductCache(
+  productId: string, 
+  partnerId: string, 
+  action: 'create' | 'update' | 'delete' = 'update',
+  options?: { silent?: boolean }
+) {
+  console.log(`[CACHE] INVALIDATING product:${productId} (partner:${partnerId}) action:${action} silent:${!!options?.silent}`)
   
   // 1. Increment Global Redis Version (Orphans all dynamic query lists)
   await incrementCacheVersion()
@@ -44,20 +49,20 @@ export async function invalidateProductCache(productId: string, partnerId: strin
   }
 
   // 3. Purge Next.js Cache Layers
-  // NOTE: 'explore-products', 'home-products', 'marketplace-search' are already
-  // invalidated by revalidateExploreSearch() called inside syncToExploreRedis()
   try {
     const { revalidateTag } = await import('next/cache')
     const safeRevalidateTag = (tag: string) => (revalidateTag as any)(tag, 'max')
 
+    // Always revalidate the specific product tag (for vitrine consistency)
     safeRevalidateTag(`product-${productId}`)
-    safeRevalidateTag(`partner-${partnerId}`)
-    safeRevalidateTag(TAGS.products(partnerId))
-    safeRevalidateTag('products')
-    // Removed duplicates: partnerId, explore-products, home-products,
-    // marketplace-search, TAGS.marketplace — handled by syncToExploreRedis
-    // Removed revalidatePath('/', 'page') and revalidatePath('/explorar', 'page')
-    // — tag-based invalidation is sufficient and less aggressive
+
+    // Only revalidate list tags if NOT in silent mode
+    // Silent mode avoids background re-renders of the current active page (like ERP list)
+    if (!options?.silent) {
+      safeRevalidateTag(`partner-${partnerId}`)
+      safeRevalidateTag(TAGS.products(partnerId))
+      safeRevalidateTag('products')
+    }
   } catch (error) {
     console.error(`[CACHE] Erro ao revalidar Next.js cache layers:`, error)
   }

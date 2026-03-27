@@ -155,7 +155,7 @@ export async function deleteProductAction(productId: string) {
         }
 
         // Synchronous revalidation and Redis sync to prevent stale data
-        await invalidateProductCache(productId, product.partner_id, 'delete')
+        await invalidateProductCache(productId, product.partner_id, 'delete', { silent: true })
 
         console.log(`[PERF] deleteProduct took ${Math.round(performance.now() - actionStart)}ms`)
         return { success: true }
@@ -419,7 +419,7 @@ export async function createProductComprehensiveAction(data: {
         ).catch(console.error)
 
         // Synchronous revalidation and Redis sync to prevent stale data
-        await invalidateProductCache(insertedProduct.id, finalPartnerId, 'create')
+        await invalidateProductCache(insertedProduct.id, finalPartnerId, 'create', { silent: true })
 
         // Increment usage counters
         increment_usage_counter(finalPartnerId, "products_count").catch(console.error)
@@ -637,7 +637,7 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         }
 
         // Synchronous revalidation and Redis sync to prevent stale data
-        await invalidateProductCache(productId, product.partner_id, 'update')
+        await invalidateProductCache(productId, product.partner_id, 'update', { silent: true })
 
         console.log(`[PERF] updateProduct took ${Math.round(performance.now() - actionStart)}ms`)
         return successResponse({ ...updatedProduct, ...fiscalPayload, ...logisticsPayload })
@@ -684,7 +684,8 @@ export async function createProductVariantAction(data: {
 
         if (error) return { error: error.message }
 
-        await invalidateProductCache(data.productId, product.partner_id, 'update')
+        // Silent mode prevents redundant ERP list re-render
+        await invalidateProductCache(data.productId, product.partner_id, 'update', { silent: true })
         return { success: true, variantSku }
     } catch (error: any) {
         return { error: error.message }
@@ -709,12 +710,12 @@ export async function createProductVariantsBatchAction(data: {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
     if (data.variants && data.variants.length > 50) {
-        return errorResponse("Limite mÃ¡ximo de 50 variantes por vez excedido.")
+        return errorResponse("Limite máximo de 50 variantes por vez excedido.")
     }
 
     try {
         const csrf = await validateCSRF(data as Record<string, unknown>)
-        if (!csrf.valid) return errorResponse(csrf.error || "CSRF invÃ¡lido")
+        if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
 
         const product = await fetchProductAndVerifyOwnership(data.productId, "edit")
         
@@ -731,8 +732,6 @@ export async function createProductVariantsBatchAction(data: {
             .select("*")
             .eq("product_id", data.productId)
 
-        const existingMap = new Map(existingVariants?.map((v: any) => [v.sku, v]) || [])
-
         // 2. Preparar dados para upsert
         const variantsToInsert = data.variants.map(v => ({
             product_id: data.productId,
@@ -746,12 +745,12 @@ export async function createProductVariantsBatchAction(data: {
             is_active: v.isActive,
         }))
 
-        // 3. Fazer upsert ao invÃ©s de delete + insert
+        // 3. Fazer upsert ao invés de delete + insert
         const { data: inserted, error } = await supabase
             .from("product_variants")
             .upsert(
                 variantsToInsert,
-                { onConflict: 'sku' } // Usa SKU como identificador Ãºnico
+                { onConflict: 'sku' } // Usa SKU como identificador único
             )
             .select()
 
@@ -770,7 +769,8 @@ export async function createProductVariantsBatchAction(data: {
             Promise.all(imagesToCleanup.map(img => _deleteFromR2(img))).catch(console.error)
         }
 
-        await invalidateProductCache(data.productId, product.partner_id, 'update')
+        // Silent mode prevents redundant ERP list re-render
+        await invalidateProductCache(data.productId, product.partner_id, 'update', { silent: true })
         return successResponse(inserted)
     } catch (error: any) {
         return errorResponse(error.message)
@@ -921,8 +921,9 @@ export async function batchDeleteVariantsAction(variantIds: string[]): Promise<A
             Promise.all(imagesToDelete.map((img: string) => _deleteFromR2(img))).catch(() => null)
         }
 
-        // @ts-ignore
-        Promise.resolve().then(() => revalidateProducts(variants[0].products.partner_id, variants[0].product_id)).catch(console.error)
+        if (variants[0]?.products?.partner_id) {
+            await invalidateProductCache(variants[0].product_id, variants[0].products.partner_id, 'update', { silent: true })
+        }
         return successResponse({ deletedCount: variantIds.length })
     } catch (error: any) {
         return errorResponse(error.message)
@@ -980,8 +981,9 @@ export async function batchUpdateVariantsAction(updates: Array<{ id: string; pri
             return supabase.from("product_variants").update(payload).eq("id", update.id)
         }))
 
-        // @ts-ignore
-        Promise.resolve().then(() => revalidateProducts(variants[0].products.partner_id, variants[0].product_id)).catch(console.error)
+        if (variants[0]?.products?.partner_id) {
+            await invalidateProductCache(variants[0].product_id, variants[0].products.partner_id, 'update', { silent: true })
+        }
         return successResponse({ updatedCount: updates.length })
     } catch (error: any) {
         return errorResponse(error.message)
@@ -1054,7 +1056,12 @@ export async function toggleProductStatusAction(productIds: string[], isActive: 
         const { error } = await admin.from("products").update({ is_active: isActive }).in("id", sanitized)
         if (error) return { error: error.message }
 
-        if (partnerId) revalidateProducts(partnerId)
+        if (partnerId) {
+            // Revalidate each product to ensure Redis marketplace index is updated
+            Promise.all(sanitized.map(id => 
+                invalidateProductCache(id, partnerId, 'update', { silent: true })
+            )).catch(console.error)
+        }
         return { success: true, count: sanitized.length }
     } catch (error: any) {
         return { error: error.message }
@@ -1077,7 +1084,12 @@ export async function deleteProductsInBatchAction(productIds: string[]) {
             Promise.all(allImages.map((img: string) => _deleteFromR2(img))).catch(() => null)
         }
 
-        if (partnerId) revalidateProducts(partnerId)
+        if (partnerId) {
+            // Revalidate each product to ensure Redis marketplace index is updated
+            Promise.all(sanitized.map(id => 
+                invalidateProductCache(id, partnerId, 'delete', { silent: true })
+            )).catch(console.error)
+        }
         return { success: true, deletedCount: sanitized.length }
     } catch (error: any) {
         return { error: error.message }
@@ -1105,7 +1117,12 @@ export async function batchUpdateProductsAction(updates: Array<{ id: string;[key
         const firstError = results.find(r => r.error)
         if (firstError) return { error: firstError.error?.message }
 
-        if (partnerId) revalidateProducts(partnerId)
+        if (partnerId) {
+            // Revalidate each product to ensure Redis marketplace index is updated
+            Promise.all(sanitized.map(id => 
+                invalidateProductCache(id, partnerId, 'update', { silent: true })
+            )).catch(console.error)
+        }
         return { success: true, count: updates.length }
     } catch (error: any) {
         return { error: error.message }

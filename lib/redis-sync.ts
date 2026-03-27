@@ -70,50 +70,67 @@ export async function syncToExploreRedis({
         const { data: dbData } = await admin
           .from("products")
           .select(`
-            id, name, price, promotional_price, images, rating, category, created_at, updated_at,
+            id, name, price, promotional_price, images, rating, category, created_at, updated_at, is_active, show_in_marketplace,
             partners(id, store_name, store_image_url, addresses(city, state)),
             product_variants(variant_options, price_adjustment, is_active)
           `)
           .eq("id", id)
           .single()
         
-        if (dbData) {
-          // Normalização básica idêntica ao que o marketplace espera
-          const rawPartner = Array.isArray(dbData.partners) ? dbData.partners[0] : dbData.partners
-          const partner = rawPartner ? {
-            ...rawPartner,
-            store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-            city: rawPartner.addresses?.[0]?.city || null,
-            state: rawPartner.addresses?.[0]?.state || null
-          } : null
-
-          const variantFallback = extractFirstVariantFallback(dbData.product_variants, Number(dbData.price))
-
-          finalData = { ...dbData, partners: partner, ...variantFallback }
-          delete finalData.product_variants // Não cacheamos variantes no objeto principal
+        if (!dbData) {
+          console.warn(`[RedisSync] Produto ${id} não encontrado no DB. Removendo do Redis.`)
+          return await removeFromExploreRedis(id, type)
         }
+
+        // Verifica se o produto pode ser público no marketplace
+        const isPublic = dbData.is_active && dbData.show_in_marketplace !== false
+        if (!isPublic) {
+          console.log(`[RedisSync] Produto ${id} inativo ou oculto. Removendo do Redis.`)
+          return await removeFromExploreRedis(id, type)
+        }
+
+        // Normalização básica idêntica ao que o marketplace espera
+        const rawPartner = Array.isArray(dbData.partners) ? dbData.partners[0] : dbData.partners
+        const partner = rawPartner ? {
+          ...rawPartner,
+          store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+          city: rawPartner.addresses?.[0]?.city || null,
+          state: rawPartner.addresses?.[0]?.state || null
+        } : null
+
+        const variantFallback = extractFirstVariantFallback(dbData.product_variants, Number(dbData.price))
+
+        finalData = { ...dbData, partners: partner, ...variantFallback }
+        delete finalData.product_variants // Não cacheamos variantes no objeto principal
       } else if (type === 'servico') {
-         // Lógica similar para serviços se necessário
+         // Lógica similar para serviços
          const { data: dbData } = await admin
           .from("services")
           .select(`
-            id, name, price, promotional_price, images, rating, category, created_at, updated_at,
+            id, name, price, promotional_price, images, rating, category, created_at, updated_at, is_active,
             partners(id, store_name, store_image_url, addresses(city, state))
           `)
           .eq("id", id)
           .single()
         
-        if (dbData) {
-          const rawPartner = Array.isArray(dbData.partners) ? dbData.partners[0] : dbData.partners
-          const partner = rawPartner ? {
-            ...rawPartner,
-            store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-            city: rawPartner.addresses?.[0]?.city || null,
-            state: rawPartner.addresses?.[0]?.state || null
-          } : null
-          finalData = { ...dbData, partners: partner }
+        if (!dbData) {
+          return await removeFromExploreRedis(id, type)
         }
-      } else if (type === 'loja') {
+
+        if (dbData.is_active === false) {
+          return await removeFromExploreRedis(id, type)
+        }
+
+        const rawPartner = Array.isArray(dbData.partners) ? dbData.partners[0] : dbData.partners
+        const partner = rawPartner ? {
+          ...rawPartner,
+          store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+          city: rawPartner.addresses?.[0]?.city || null,
+          state: rawPartner.addresses?.[0]?.state || null
+        } : null
+        finalData = { ...dbData, partners: partner }
+      }
+ else if (type === 'loja') {
         const { data: dbData } = await admin
           .from("partners")
           .select(`

@@ -6,9 +6,6 @@ import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 import { Suspense } from "react"
 
-
-
-
 async function ProductFeedWrapper({ productsPromise, user, userProfile, cartCount }: any) {
   const t0 = performance.now()
 
