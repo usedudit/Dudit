@@ -22,9 +22,8 @@ export const getCachedHomeProducts = async () => {
 // Used by force-dynamic pages for strict consistency
 // =============================================
 
-async function _getMarketplaceProduct(id: string) {
+async function _getMarketplaceProductBase(id: string) {
   const supabase = getAdminClient()
-  const user = await getCurrentUser()
 
   const { data, error } = await supabase
     .from("products")
@@ -32,7 +31,7 @@ async function _getMarketplaceProduct(id: string) {
       id, name, description, price, promotional_price, stock_quantity, 
       is_active, moderation_status,
       category, images, rating, partner_id, sku, 
-      condition, brand, show_in_marketplace, technical_specs,
+      condition, brand, show_in_marketplace, technical_specs, created_at,
       product_logistics(weight_gross, length, width, height, preparation_days),
       partners(
         id, store_name, store_description, rating, user_id, 
@@ -49,14 +48,7 @@ async function _getMarketplaceProduct(id: string) {
     return null
   }
 
-  const partner = Array.isArray(data.partners) ? data.partners[0] : data.partners
-  const isOwner = user && partner?.user_id === user.id
-  const isPubliclyVisible = data.is_active && data.moderation_status === 'approved' && data.show_in_marketplace !== false
-
-  if (!isPubliclyVisible && !isOwner) {
-    return null
-  }
-
+  // Normalização básica (independente de usuário)
   if (data) {
     let p: any = data.partners
     if (Array.isArray(p)) p = p[0]
@@ -74,6 +66,23 @@ async function _getMarketplaceProduct(id: string) {
     if (Array.isArray(logistics)) logistics = logistics[0]
     if (logistics) Object.assign(data, logistics)
     delete data.product_logistics
+  }
+
+  return data
+}
+
+async function _getMarketplaceProduct(id: string) {
+  const data = await _getMarketplaceProductBase(id)
+  if (!data) return null
+
+  const user = await getCurrentUser()
+  const partnerId = data.partners?.id
+  const partnerUserId = data.partners?.user_id
+  const isOwner = user && partnerUserId === user.id
+  const isPubliclyVisible = data.is_active && data.moderation_status === 'approved' && data.show_in_marketplace !== false
+
+  if (!isPubliclyVisible && !isOwner) {
+    return null
   }
 
   return data
@@ -116,12 +125,15 @@ export const getProductReviews = cache(_getProductReviews)
 // CACHED FUNCTIONS (kept for home/explore pages)
 // =============================================
 
-// --- 2. DETALHES DO PRODUTO (CACHED — for generateMetadata/generateStaticParams only) ---
-/** @deprecated Use getMarketplaceProduct for detail pages */
+// --- 2. DETALHES DO PRODUTO (CACHED — for detail pages & SEO) ---
+/**
+ * Fetches product data with Next.js tags for invalidation.
+ * The product detail page uses this to ensure real-time updates via Supabase Webhooks.
+ */
 export const getCachedMarketplaceProduct = async (id: string) => {
   const fn = unstable_cache(
-    async () => getMarketplaceProduct(id),
-    [`marketplace-product-details-${id}-v12`],
+    async () => _getMarketplaceProductBase(id),
+    [`product-details-${id}-v13`],
     { tags: ["marketplace-product", `product-${id}`] }
   )
   return fn()
