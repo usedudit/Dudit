@@ -16,12 +16,11 @@ import {
   getCachedPartnerProfile,
 } from "@/app/actions/marketplace/partners"
 
-// STRICT CONSISTENCY: always fresh data
-export const dynamic = "force-dynamic"
+// Removed force-dynamic — getCurrentUser() calls cookies() which already makes this dynamic
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }): Promise<Metadata> {
   const { id } = await params
-  const partner = await getCachedPartnerProfile(id)
+  const partner = await getPartnerProfile(id)
 
   if (!partner) {
     return {
@@ -63,16 +62,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function VendorPage({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }) {
   const { id, slug: currentSlug, cidadeUf: currentCidadeUf } = await params
 
-  // 1. PERFORMANCE: Busca todos os dados em PARALELO (DIRECT, no cache)
-  const user = await getCurrentUser()
-  const [partner, products, services, reviews, statsBase, sessionData] = await Promise.all([
+  // PERFORMANCE: Busca TUDO em paralelo — incluindo auth
+  const [user, partner, products, services, reviews, statsBase] = await Promise.all([
+    getCurrentUser(),
     getPartnerProfile(id),
     getPartnerProducts(id),
     getPartnerServices(id),
     getPartnerReviews(id),
     getPartnerStats(id),
-    user ? getUserSessionData(user.id) : Promise.resolve(null),
   ])
+  const sessionData = user ? await getUserSessionData(user.id) : null
 
   const userProfile = sessionData?.profile ? { full_name: sessionData.profile.full_name, address: sessionData.profile.city ? `${sessionData.profile.city} - ${sessionData.profile.state}` : null } : null
   const cartCount = sessionData?.cartCount || 0

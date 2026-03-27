@@ -13,8 +13,8 @@ import type { User } from "@supabase/supabase-js"
 import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
 import { useSupabase } from "@/providers/supabase-provider"
 
-export const dynamic = "force-dynamic"
-// Noindex handled in layout/head or equivalent server component
+
+// force-dynamic removed — has no effect in client components
 
 export default function AccountSettingsPage() {
   const { user: authUser, supabase: supabaseClient } = useSupabase()

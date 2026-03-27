@@ -149,15 +149,6 @@ export async function middleware(request: NextRequest) {
   // Aplica CSP na resposta imediatamente
   response.headers.set('Content-Security-Policy', contentSecurityPolicyHeaderValue)
 
-  // 3a. SECURE HEADERS FOR ADMIN ROUTES
-  if (pathname.startsWith('/ddt-admin')) {
-    response.headers.set('X-Frame-Options', 'DENY')
-    response.headers.set('X-Content-Type-Options', 'nosniff')
-    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
-    response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload')
-    response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
-    response.headers.set('X-Permitted-Cross-Domain-Policies', 'none')
-  }
 
   // Headers extras de segurança (Do seu proxy.js)
   response.headers.set("X-Content-Type-Options", "nosniff")
@@ -166,6 +157,7 @@ export async function middleware(request: NextRequest) {
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
   response.headers.set("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=()")
   response.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
+  response.headers.set("X-Permitted-Cross-Domain-Policies", "none")
 
 
   // 4. CACHE-CONTROL HEADERS (Route-aware) — Must be set BEFORE auth block

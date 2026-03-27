@@ -3,6 +3,7 @@
 import { getAdminClient } from "@/lib/supabase/admin"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
+import { redis } from "@/lib/redis"
 
 // Funções Helpers
 import { cache } from "react"
@@ -50,7 +51,9 @@ export const searchMarketplace = async (
     return _searchMarketplaceCore(query, type, limits)
 }
 
-import { getCacheVersion } from "@/lib/cache/invalidation"
+
+
+const GLOBAL_VERSION_KEY = "marketplace:global_cache_version"
 
 const serializeSearchKey = (query: string, type: string, limits: any) => {
     return [query, type, limits.vitrines, limits.produtos, limits.servicos, limits.geral, limits.cursor, limits.lastId].map(String).join(":")
@@ -61,10 +64,11 @@ async function _searchMarketplaceCore(
     type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' = 'tudo',
     limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string } = {}
 ): Promise<any[]> {
-    const version = await getCacheVersion()
-    const queryHash = serializeSearchKey(query, type, limits)
+    // Inline version read — avoids separate getCacheVersion function call
+    let version: number = 1
+    try { version = (await redis.get<number>(GLOBAL_VERSION_KEY)) || 1 } catch {}
     
-    const { redis } = await import('@/lib/redis')
+    const queryHash = serializeSearchKey(query, type, limits)
     const safeHash = Buffer.from(queryHash).toString('base64').replace(/=/g, '')
     const cacheKey = `mp:cache:v${version}:search:${safeHash}`
     
@@ -116,7 +120,6 @@ async function _searchMarketplaceInternal(
     }
 
     try {
-        const { redis } = await import('@/lib/redis')
         const limitCount = type === 'tudo' ? geral : (type === 'vitrines' ? vitLimit : (type === 'produtos' ? prodLimit : servLimit))
         const indexKey = type === 'tudo' ? 'explore:index:all' : `explore:index:${type}`
 

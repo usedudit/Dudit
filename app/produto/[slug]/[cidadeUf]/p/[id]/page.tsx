@@ -15,8 +15,7 @@ import { getUserSessionData } from "@/lib/data/user"
 import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
-// STRICT CONSISTENCY: always fresh data, no ISR/static cache
-export const dynamic = "force-dynamic"
+// Removed force-dynamic — getCurrentUser() calls cookies() which already makes this dynamic
 export const dynamicParams = true
 
 export async function generateStaticParams() {
@@ -40,7 +39,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }): Promise<Metadata> {
   const { id } = await params
-  const product = await getCachedMarketplaceProduct(id)
+  const product = await getMarketplaceProduct(id)
 
   if (!product) {
     return { title: 'Produto não encontrado | Dudit' }
@@ -100,8 +99,11 @@ export default async function ProductDetailsPage({
   const { id, slug: currentSlug, cidadeUf: currentCidadeUf } = await params
   const t0 = performance.now()
 
-  // 1. Fetch user + session data for Header (Parallel with product if possible, but let's keep it simple)
-  const user = await getCurrentUser()
+  // Parallelize ALL independent data fetching
+  const [user, product] = await Promise.all([
+    getCurrentUser(),
+    getMarketplaceProduct(id),
+  ])
   const sessionData = user ? await getUserSessionData(user.id) : null
 
   const userProfile = sessionData?.profile ? {
@@ -109,9 +111,6 @@ export default async function ProductDetailsPage({
     address: sessionData.profile.city ? `${sessionData.profile.city} - ${sessionData.profile.state}` : null
   } : null
   const cartCount = sessionData?.cartCount || 0
-
-  // 2. Fetch product DIRECT (no cache) for strict consistency
-  const product = await getMarketplaceProduct(id)
 
   if (!product) {
     redirect("/")
