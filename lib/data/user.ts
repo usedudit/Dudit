@@ -2,6 +2,7 @@ import { cache } from "react"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 
 export const getUserSessionData = cache(async (userId: string) => {
+    console.log(`[SUPABASE CALL] getUserSessionData(${userId})`)
     const supabase = await getSupabaseServerClient()
 
     const [profileRes, addressRes, cartRes, partnerRes, partnerUserRes] = await Promise.all([

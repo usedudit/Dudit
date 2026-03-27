@@ -16,7 +16,8 @@ export const metadata: Metadata = {
     },
 }
 
-export const dynamic = "force-dynamic"
+
+
 
 async function ExploreResultsWrapper({ productsPromise, query, type, userProfile, cartCount }: any) {
     const t0 = performance.now()

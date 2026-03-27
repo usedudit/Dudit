@@ -1,6 +1,5 @@
 import "server-only"
 import { redis } from "@/lib/redis"
-import { revalidatePath } from "next/cache"
 import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 
@@ -45,6 +44,8 @@ export async function invalidateProductCache(productId: string, partnerId: strin
   }
 
   // 3. Purge Next.js Cache Layers
+  // NOTE: 'explore-products', 'home-products', 'marketplace-search' are already
+  // invalidated by revalidateExploreSearch() called inside syncToExploreRedis()
   try {
     const { revalidateTag } = await import('next/cache')
     const safeRevalidateTag = (tag: string) => (revalidateTag as any)(tag, 'max')
@@ -52,16 +53,11 @@ export async function invalidateProductCache(productId: string, partnerId: strin
     safeRevalidateTag(`product-${productId}`)
     safeRevalidateTag(`partner-${partnerId}`)
     safeRevalidateTag(TAGS.products(partnerId))
-    safeRevalidateTag(partnerId)
-    safeRevalidateTag('explore-products')
-    safeRevalidateTag('home-products')
     safeRevalidateTag('products')
-    safeRevalidateTag('marketplace-search')
-    safeRevalidateTag(TAGS.marketplace)
-
-    // Optionally revalidate routes directly
-    revalidatePath('/explorar', 'page')
-    revalidatePath('/', 'page')
+    // Removed duplicates: partnerId, explore-products, home-products,
+    // marketplace-search, TAGS.marketplace — handled by syncToExploreRedis
+    // Removed revalidatePath('/', 'page') and revalidatePath('/explorar', 'page')
+    // — tag-based invalidation is sufficient and less aggressive
   } catch (error) {
     console.error(`[CACHE] Erro ao revalidar Next.js cache layers:`, error)
   }

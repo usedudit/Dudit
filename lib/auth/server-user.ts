@@ -8,6 +8,7 @@ import type { User } from "@supabase/supabase-js"
  * Ensures `auth.getUser()` is called EXACTLY ONCE per server request.
  */
 export const getCurrentUser = cache(async (): Promise<User | null> => {
+    console.log(`[SUPABASE CALL] auth.getUser()`)
     const supabase = await getSupabaseServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     return user

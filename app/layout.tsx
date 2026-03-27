@@ -23,16 +23,12 @@ export const metadata: Metadata = {
 }
 
 import { SupabaseProvider } from "@/providers/supabase-provider"
-import { getCurrentUser } from "@/lib/auth/authorization"
-import { getUserSessionData } from "@/lib/data/user"
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const user = await getCurrentUser()
-  const sessionData = user ? await getUserSessionData(user.id) : null
 
   return (
     <html lang="pt-BR" className={inter.variable}>
@@ -82,7 +78,7 @@ export default async function RootLayout({
         />
       </head>
       <body className="font-sans">
-        <SupabaseProvider initialUser={user} initialSessionData={sessionData}>
+        <SupabaseProvider initialUser={null} initialSessionData={null}>
           <PreventSamePageNavigation />
           <NotificationProvider>
             {children}

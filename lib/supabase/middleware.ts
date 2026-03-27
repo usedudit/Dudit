@@ -27,6 +27,7 @@ function isPublicPath(pathname: string): boolean {
 // ============================================================================
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
+  console.log(`[MIDDLEWARE] ${request.method} ${pathname}`)
   const forwarded = request.headers.get("x-forwarded-for")
   const ip = forwarded ? forwarded.split(",")[0].trim() : request.headers.get("x-real-ip") || "unknown"
 
@@ -234,8 +235,27 @@ export async function middleware(request: NextRequest) {
         // Checks on all pages EXCEPT auth pages and the banned page itself
         if (user && !pathname.startsWith("/auth") && !pathname.startsWith("/banned")) {
           try {
-            const { checkAndClearExpiredBan } = await import("@/lib/auth/ban-check")
-            const isBanned = await checkAndClearExpiredBan(user.id)
+            // Inline ban check — reuses the middleware's existing supabase client
+            // instead of importing a separate module that creates its own client
+            const { data: banProfile } = await supabase
+              .from("user_profiles")
+              .select("banned_at, banned_until")
+              .eq("user_id", user.id)
+              .maybeSingle()
+
+            let isBanned = false
+            if (banProfile?.banned_at) {
+              if (banProfile.banned_until && new Date(banProfile.banned_until) < new Date()) {
+                // Auto-clear expired ban
+                await supabase
+                  .from("user_profiles")
+                  .update({ banned_at: null, banned_until: null, banned_reason: null, banned_by: null })
+                  .eq("user_id", user.id)
+              } else {
+                isBanned = true
+              }
+            }
+
             if (isBanned && !pathname.startsWith("/banned")) {
               const url = request.nextUrl.clone()
               url.pathname = "/banned"

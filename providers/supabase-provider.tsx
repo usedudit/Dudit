@@ -31,11 +31,14 @@ export function SupabaseProvider({
     const [isSessionLoading, setIsSessionLoading] = useState(false)
 
     useEffect(() => {
+        // Hydrate user from existing session on mount (compensates for no SSR prefetch)
+        supabase.auth.getUser().then(({ data }: any) => {
+          if (data?.user) setUser(data.user)
+        })
+
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
-            // Se o auth-state mudar no client, atualizamos o state,
-            // (a sessão Síncrona SSR inicial nos livra do getUser() no mount)
             setUser(session?.user ?? null)
         })
 

@@ -87,7 +87,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
       const token = await getCsrfToken()
       await updateCartQuantityAction(cartItemId, newQty, token)
       invalidateCartCache()
-      router.refresh()
+      // Removed router.refresh() — optimistic state update handles UI
     } catch {
       setOptimisticItems(prev => ({ ...prev, [cartItemId]: { ...prev[cartItemId], quantity: currentQty } }))
     } finally { setLoading(null) }
@@ -100,7 +100,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
       const token = await getCsrfToken()
       await removeFromCartAction(cartItemId, token)
       invalidateCartCache()
-      router.refresh()
+      // Removed router.refresh() — item removal is handled by server action revalidation
     } finally {
       setLoading(null)
       setDeleteModal({ open: false, cartItemId: null })
@@ -115,7 +115,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
       const token = await getCsrfToken()
       await toggleCartSelectionAction(cartItemId, token)
       invalidateCartCache()
-      router.refresh()
+      // Removed router.refresh() — optimistic state update handles UI
     } catch {
       setOptimisticItems(prev => ({ ...prev, [cartItemId]: { ...prev[cartItemId], selected: currentSelected } }))
     } finally { setLoading(null) }
@@ -137,7 +137,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
       const token = await getCsrfToken()
       await toggleCartPartnerSelectionAction(partnerId, newState, token)
       invalidateCartCache()
-      router.refresh()
+      // Removed router.refresh() — optimistic state update handles UI
     } catch {
       // Revert items to original state
       const revert: Record<string, { selected: boolean }> = {}

@@ -60,7 +60,7 @@ async function _searchMarketplaceCore(
     query: string,
     type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' = 'tudo',
     limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string } = {}
-) {
+): Promise<any[]> {
     const version = await getCacheVersion()
     const queryHash = serializeSearchKey(query, type, limits)
     
@@ -69,8 +69,8 @@ async function _searchMarketplaceCore(
     const cacheKey = `mp:cache:v${version}:search:${safeHash}`
     
     try {
-        const cached = await redis.get(cacheKey)
-        if (cached) {
+        const cached = await redis.get<any[]>(cacheKey)
+        if (cached && Array.isArray(cached)) {
             console.log(`[REDIS] HIT ${cacheKey}`)
             return cached
         }
@@ -100,7 +100,7 @@ async function _searchMarketplaceInternal(
     query: string,
     type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' = 'tudo',
     limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string } = {}
-) {
+): Promise<any[]> {
     const t0 = performance.now()
     const { vitrines: vitLimit = 4, produtos: prodLimit = 20, servicos: servLimit = 20, geral = 40, cursor, lastId } = limits
 
