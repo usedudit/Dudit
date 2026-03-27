@@ -46,6 +46,8 @@ export async function invalidateProductCache(productId: string, partnerId: strin
   // 3. Purge Next.js Cache Layers
   // NOTE: 'explore-products', 'home-products', 'marketplace-search' are already
   // invalidated by revalidateExploreSearch() called inside syncToExploreRedis()
+  try {
+    const { revalidateTag } = await import('next/cache')
     const safeRevalidateTag = (tag: string) => {
       try {
         // @ts-expect-error: Local TS definitions incorrectly expect 2 arguments for Next.js 16+
