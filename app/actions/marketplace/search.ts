@@ -64,28 +64,36 @@ async function _searchMarketplaceCore(
     type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' = 'tudo',
     limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string } = {}
 ): Promise<any[]> {
+    const isPagination = limits.cursor !== undefined || limits.lastId !== undefined
+    
     // Inline version read — avoids separate getCacheVersion function call
     let version: number = 1
-    try { version = (await redis.get<number>(GLOBAL_VERSION_KEY)) || 1 } catch {}
+    if (!isPagination) {
+        try { version = (await redis.get<number>(GLOBAL_VERSION_KEY)) || 1 } catch {}
+    }
     
     const queryHash = serializeSearchKey(query, type, limits)
     const safeHash = Buffer.from(queryHash).toString('base64').replace(/=/g, '')
     const cacheKey = `mp:cache:v${version}:search:${safeHash}`
     
-    try {
-        const cached = await redis.get<any[]>(cacheKey)
-        if (cached && Array.isArray(cached)) {
-            console.log(`[REDIS] HIT ${cacheKey}`)
-            return cached
+    // Only READ from cache if it's the first page
+    if (!isPagination) {
+        try {
+            const cached = await redis.get<any[]>(cacheKey)
+            if (cached && Array.isArray(cached)) {
+                console.log(`[REDIS] HIT ${cacheKey}`)
+                return cached
+            }
+            console.log(`[REDIS] MISS ${cacheKey}`)
+        } catch (err) {
+            console.error("[REDIS] Error reading query cache", err)
         }
-        console.log(`[REDIS] MISS ${cacheKey}`)
-    } catch (err) {
-        console.error("[REDIS] Error reading query cache", err)
     }
 
     const result = await _searchMarketplaceInternal(query, type, limits)
     
-    if (result && result.length > 0) {
+    // Only WRITE to cache if it's the first page
+    if (!isPagination && result && result.length > 0) {
         try {
             await redis.set(cacheKey, JSON.stringify(result), { ex: 60 * 60 * 24 }) // 24h caching, wiped by version bump
             console.log(`[REDIS] SET ${cacheKey}`)

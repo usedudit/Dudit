@@ -928,7 +928,7 @@ export default function ProductsPage({
                 onClose={() => setModals((p) => ({ ...p, import: false }))}
                 partnerId={partnerId}
                 storeId={selectedStore?.id || ""}
-                onImportSuccess={() => router.refresh()}
+                onImportSuccess={() => {}}
             />
             <DefaultModal
                 isOpen={modals.export}

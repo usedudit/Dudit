@@ -205,7 +205,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 description: "Seu pedido foi cancelado com sucesso."
             });
 
-            router.refresh(); // atualiza a tela no servidor para refletir o status de cancelado
             onBack(); // fecha o modal de detalhes do pedido
         } catch (err: any) {
             toast({

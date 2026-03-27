@@ -195,7 +195,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
         return (
             <CreateStockMovement
                 onBack={() => setIsCreating(false)}
-                onSuccess={() => { setIsCreating(false); router.refresh(); }}
+                onSuccess={() => { setIsCreating(false); }}
             />
         );
     }

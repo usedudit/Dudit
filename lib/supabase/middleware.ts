@@ -213,49 +213,27 @@ export async function middleware(request: NextRequest) {
 
       // Verifica usuário apenas para proteger rotas ERP
       try {
+        const protectedPrefixes = ["/erp", "/account", "/profile", "/my-orders", "/select-erp", "/ddt-admin"]
+        const isProtected = protectedPrefixes.some(prefix => pathname.startsWith(prefix))
+        
+        // FAST-FAIL: If it's a protected route and there are NO supabase cookies at all, 
+        // don't even waste time calling auth.getUser()
+        if (isProtected) {
+          const hasAuthCookie = request.cookies.getAll().some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
+          if (!hasAuthCookie) {
+            const url = request.nextUrl.clone()
+            url.pathname = "/auth/login"
+            return NextResponse.redirect(url)
+          }
+        }
+
         const { data: { user } } = await supabase.auth.getUser()
 
         // Se não estiver logado e tentar acessar rotas protegidas -> Manda pro Login
-        const protectedPrefixes = ["/erp", "/account", "/profile", "/my-orders", "/select-erp", "/ddt-admin"]
-        if (!user && protectedPrefixes.some(prefix => pathname.startsWith(prefix))) {
+        if (!user && isProtected) {
           const url = request.nextUrl.clone()
           url.pathname = "/auth/login"
           return NextResponse.redirect(url)
-        }
-
-        // BAN CHECK: auto-expire temporal bans and redirect banned users
-        // Checks on all pages EXCEPT auth pages and the banned page itself
-        if (user && !pathname.startsWith("/auth") && !pathname.startsWith("/banned")) {
-          try {
-            // Inline ban check — reuses the middleware's existing supabase client
-            // instead of importing a separate module that creates its own client
-            const { data: banProfile } = await supabase
-              .from("user_profiles")
-              .select("banned_at, banned_until")
-              .eq("user_id", user.id)
-              .maybeSingle()
-
-            let isBanned = false
-            if (banProfile?.banned_at) {
-              if (banProfile.banned_until && new Date(banProfile.banned_until) < new Date()) {
-                // Auto-clear expired ban
-                await supabase
-                  .from("user_profiles")
-                  .update({ banned_at: null, banned_until: null, banned_reason: null, banned_by: null })
-                  .eq("user_id", user.id)
-              } else {
-                isBanned = true
-              }
-            }
-
-            if (isBanned && !pathname.startsWith("/banned")) {
-              const url = request.nextUrl.clone()
-              url.pathname = "/banned"
-              return NextResponse.redirect(url)
-            }
-          } catch {
-            // Fail open: if ban check fails, allow access
-          }
         }
 
         // SECURITY: If already logged in and trying to access auth pages -> redirect to home
