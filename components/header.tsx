@@ -14,8 +14,7 @@ import Link from "next/link"
 import { useEffect, useState, useRef } from "react"
 import type { User } from "@supabase/supabase-js"
 import { ShoppingCart } from "@/lib/icons"
-import { useUserProfile } from "@/hooks/use-user-profile"
-import { useCart } from "@/hooks/use-cart"
+import { useUserSession } from "@/hooks/use-user-session"
 import { useSupabase } from "@/providers/supabase-provider"
 import { createClient } from "@/lib/supabase/client"
 
@@ -25,8 +24,7 @@ export function Header() {
     const [userName, setUserName] = useState<string>("")
     const [theme, setTheme] = useState<"light" | "dark">("light")
   
-    const { profile } = useUserProfile()
-    const { cartCount } = useCart()
+    const { profile, cartCount } = useUserSession()
 
     const isPartner = !!sessionData?.isPartner
 

@@ -1,8 +1,8 @@
 "use client"
 
 import useSWR, { mutate as globalMutate } from "swr"
+import { useCallback } from "react"
 import { useSupabase } from "@/providers/supabase-provider"
-import { getCartItemCountAction } from "@/app/actions/marketplace/cart"
 
 interface CartHookResult {
   cartCount: number
@@ -10,28 +10,43 @@ interface CartHookResult {
   mutate: any
 }
 
-const cartFetcher = () => getCartItemCountAction()
-
 export function useCart(fallbackData?: number): CartHookResult {
-  const { user, isLoading: isAuthLoading, sessionData } = useSupabase()
+  const { user, supabase, isLoading: isAuthLoading, sessionData } = useSupabase()
 
   // Use sessionData from context if available as higher priority fallback
   const contextCartCount = sessionData?.cart?.length ?? null
   const effectiveFallback = fallbackData !== undefined ? fallbackData : contextCartCount
 
+  const fetcher = useCallback(async () => {
+    if (!user) return 0
+    const { data: cartRes } = await supabase.from("cart_items").select("quantity").eq("user_id", user.id)
+    const cartItems = cartRes || []
+    return cartItems.reduce((acc: number, item: any) => acc + (item.quantity || 1), 0)
+  }, [user, supabase])
+
+  const key = user ? `cart-${user.id}` : null
+  const shouldSkipFetch = effectiveFallback !== null && effectiveFallback !== undefined
+
   const { data, isLoading: isDataLoading, mutate } = useSWR(
-    user ? ["cart", user.id] : null,
-    cartFetcher,
+    shouldSkipFetch ? null : key,
+    fetcher,
     {
       fallbackData: effectiveFallback as number,
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
-      // Only revalidate on mount if we have absolutely no data (neither prop nor context)
-      revalidateOnMount: effectiveFallback === null,
+      revalidateOnMount: false,
       dedupingInterval: 60000,
       keepPreviousData: true,
     }
   )
+
+  if (shouldSkipFetch) {
+    return {
+      cartCount: effectiveFallback,
+      isLoading: false,
+      mutate
+    }
+  }
 
   return {
     cartCount: typeof data === "number" ? data : 0,

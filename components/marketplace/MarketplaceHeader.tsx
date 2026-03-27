@@ -19,8 +19,7 @@ import { Button } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import { getUserInitials, getAvatarColor } from "@/lib/utils/user-profile-image"
 import { getSearchSuggestionsBucket } from "@/app/actions/marketplace/suggestions"
-import { useUserProfile } from "@/hooks/use-user-profile"
-import { useCart } from "@/hooks/use-cart"
+import { useUserSession } from "@/hooks/use-user-session"
 
 interface HeaderProps {
   setView?: (
@@ -42,9 +41,19 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serverUserProfile, cartCount: serverCartCount }) => {
   const { user, supabase, isLoading: isSupabaseLoading } = useSupabase()
-  const { profile, isLoading: isProfileLoading } = useUserProfile(serverUserProfile)
-  const { cartCount, isLoading: isCartLoading } = useCart(serverCartCount)
-  const isLoading = isSupabaseLoading || isProfileLoading || isCartLoading
+  
+  const serverSessionData = useMemo(() => {
+    if (serverUserProfile !== undefined || serverCartCount !== undefined) {
+      return {
+        profile: serverUserProfile || null,
+        cartCount: serverCartCount || 0,
+      }
+    }
+    return undefined
+  }, [serverUserProfile, serverCartCount])
+
+  const { profile, cartCount, isLoading: isSessionLoading } = useUserSession(serverSessionData)
+  const isLoading = isSupabaseLoading || isSessionLoading
   const router = useRouter()
 
   const [searchValue, setSearchValue] = useState("")
