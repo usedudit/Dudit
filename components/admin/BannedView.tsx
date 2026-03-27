@@ -39,7 +39,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <main className="flex-grow relative flex flex-col items-center">
                 <div className="w-full bg-[#003d32] h-[250px] absolute top-0 left-0 z-0 overflow-hidden">
                     <CityBackground />
-                    <div className="absolute inset-0 bg-[url('/noise.png')] opacity-5 pointer-events-none" />
+                    <div className="absolute inset-0 opacity-5 pointer-events-none" />
                 </div>
 
                 <div className="w-full flex flex-col items-center pt-[60px] pb-12 z-10 px-4">

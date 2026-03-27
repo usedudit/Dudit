@@ -71,7 +71,7 @@ function AuthContent() {
   // Layout especÃ­fico do Modo Parceiro (VISUAL ORIGINAL MANTIDO)
   const PartnerLayout = () => (
     <div className="flex h-screen w-full bg-[#022C2B] p-4 md:p-6 items-stretch overflow-hidden font-sans relative">
-      <div className="absolute inset-0 bg-[url('/noise.png')] opacity-5 pointer-events-none" />
+      <div className="absolute inset-0 opacity-5 pointer-events-none" />
 
       {/* Esquerda: FormulÃ¡rio / Wizard */}
       <div className="w-full lg:w-[45%] xl:w-[40%] bg-white rounded-2xl flex flex-col p-6 overflow-hidden z-20 shadow-2xl relative">

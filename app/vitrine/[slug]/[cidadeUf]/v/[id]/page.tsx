@@ -13,7 +13,6 @@ import {
   getPartnerServices,
   getPartnerReviews,
   getPartnerStats,
-  getCachedPartnerProfile,
 } from "@/app/actions/marketplace/partners"
 
 // Removed force-dynamic — getCurrentUser() calls cookies() which already makes this dynamic

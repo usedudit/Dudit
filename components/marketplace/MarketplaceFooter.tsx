@@ -16,7 +16,7 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
 
           {/* Logo + Descrição */}
           <div className="md:w-1/3">
-            <Link href="/" className="inline-block mb-6">
+            <Link href="/" prefetch={false} className="inline-block mb-6">
               <img
                 src="https://img.dudit.com.br/static/Logo.png"
                 alt="Dudit"

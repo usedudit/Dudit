@@ -262,7 +262,7 @@ export const OrderDetailsClient = ({ order }: { order: any }) => {
                                     variant="default"
                                     className="bg-brand-green/10 hover:bg-brand-green/20 text-brand-green font-bold rounded-[10px] shadow-none border-none py-2 px-6 h-auto"
                                 >
-                                    <Link href="/">Comprar novamente no Marketplace</Link>
+                                    <Link href="/" prefetch={false}>Comprar novamente no Marketplace</Link>
                                 </Button>
                             </div>
                         </div>
