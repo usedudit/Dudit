@@ -7,7 +7,7 @@ import { redis } from "@/lib/redis"
 const GLOBAL_VERSION_KEY = "marketplace:global_cache_version"
 
 // Helper interno para evitar repetição do "max"
-export function safeRevalidateTag(tag: string) {
+export async function safeRevalidateTag(tag: string) {
   try {
     console.log(`[Revalidation] Triggering tag: ${tag}`)
     // @ts-ignore - The project environment requires a second profile argument "max"
@@ -23,18 +23,18 @@ export function safeRevalidateTag(tag: string) {
 export async function revalidateProducts(partnerId: string, productId?: string) {
   // Limpa a lista de produtos desse parceiro
   if (partnerId) {
-    safeRevalidateTag(TAGS.products(partnerId))
-    safeRevalidateTag(partnerId) // Tag genérica do parceiro
-    safeRevalidateTag(`partner-${partnerId}`) // Just in case, explicit call as requested by user
+    await safeRevalidateTag(TAGS.products(partnerId))
+    await safeRevalidateTag(partnerId) // Tag genérica do parceiro
+    await safeRevalidateTag(`partner-${partnerId}`) // Just in case, explicit call as requested by user
   }
 
   // Limpa o cache do produto específico (detalhes)
   if (productId) {
-    safeRevalidateTag(TAGS.product(productId))
+    await safeRevalidateTag(TAGS.product(productId))
   }
 
   // Limpa a lista geral
-  safeRevalidateTag("products")
+  await safeRevalidateTag("products")
 }
 
 /**
@@ -42,18 +42,18 @@ export async function revalidateProducts(partnerId: string, productId?: string) 
  */
 export async function revalidateOrders(partnerId: string) {
   if (partnerId) {
-    safeRevalidateTag(TAGS.orders(partnerId))
-    safeRevalidateTag(partnerId)
+    await safeRevalidateTag(TAGS.orders(partnerId))
+    await safeRevalidateTag(partnerId)
   }
-  safeRevalidateTag("orders")
+  await safeRevalidateTag("orders")
 }
 
 /**
  * Revalida dados de MARKETPLACE e CATEGORIAS
  */
 export async function revalidateMarketplace() {
-  safeRevalidateTag(TAGS.marketplace)
-  safeRevalidateTag(TAGS.categories)
+  await safeRevalidateTag(TAGS.marketplace)
+  await safeRevalidateTag(TAGS.categories)
 }
 
 /**
@@ -61,9 +61,9 @@ export async function revalidateMarketplace() {
  */
 export async function revalidateSuppliers(partnerId: string) {
   if (partnerId) {
-    safeRevalidateTag(TAGS.suppliers(partnerId))
+    await safeRevalidateTag(TAGS.suppliers(partnerId))
   }
-  safeRevalidateTag("suppliers")
+  await safeRevalidateTag("suppliers")
 }
 
 /**
@@ -71,31 +71,31 @@ export async function revalidateSuppliers(partnerId: string) {
  */
 export async function revalidateCart(userId?: string) {
   if (userId) {
-    safeRevalidateTag(TAGS.cart(userId))
+    await safeRevalidateTag(TAGS.cart(userId))
   }
-  safeRevalidateTag(TAGS.cart()) // tag global "cart"
+  await safeRevalidateTag(TAGS.cart()) // tag global "cart"
 }
 
 /**
  * Revalida dados de ENDEREÇOS
  */
 export async function revalidateAddresses(entityType: string, entityId: string) {
-  safeRevalidateTag(TAGS.addresses(entityType, entityId))
+  await safeRevalidateTag(TAGS.addresses(entityType, entityId))
 }
 
 /**
  * Revalida PERFIL do parceiro
  */
 export async function revalidatePartnerProfile(partnerId: string) {
-  safeRevalidateTag(TAGS.partnerProfile(partnerId))
-  safeRevalidateTag(TAGS.partner(partnerId))
+  await safeRevalidateTag(TAGS.partnerProfile(partnerId))
+  await safeRevalidateTag(TAGS.partner(partnerId))
 }
 
 /**
  * Revalida STATUS do parceiro (usado no onboarding)
  */
 export async function revalidatePartnerStatus() {
-  safeRevalidateTag(TAGS.partnerStatus)
+  await safeRevalidateTag(TAGS.partnerStatus)
 }
 
 /**
@@ -110,7 +110,7 @@ export async function revalidateExploreSearch() {
   }
 
   // 2. Clear Next.js cache tags for lists
-  safeRevalidateTag('marketplace-search')
-  safeRevalidateTag('home-products')
-  safeRevalidateTag('explore-products')
+  await safeRevalidateTag('marketplace-search')
+  await safeRevalidateTag('home-products')
+  await safeRevalidateTag('explore-products')
 }
