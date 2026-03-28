@@ -1,21 +1,14 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
-import { Button, InfoCard } from "@/components/reusable"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { Button, InfoCard, DefaultModal } from "@/components/reusable"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { createReviewAction } from "@/app/actions/marketplace/reviews"
-import { useRouter } from "next/navigation"
+import { StarIcon } from "@/lib/icons"
+import { useCSRFToken } from "@/hooks/use-csrf-token"
+import { useNotification } from "@/hooks/use-notification"
 
 interface ReviewButtonProps {
   orderId: string
@@ -34,12 +27,14 @@ export function ReviewButton({
   userId,
   itemName,
 }: ReviewButtonProps) {
-  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rating, setRating] = useState(5)
   const [comment, setComment] = useState("")
+
+  const csrfToken = useCSRFToken()
+  const { success, error: notifyError } = useNotification()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,67 +49,96 @@ export function ReviewButton({
         serviceId: serviceId || null,
         rating,
         comment,
+        csrf_token: csrfToken || undefined,
       })
 
       if (result.error) {
         setError(result.error)
+        notifyError("Erro ao enviar avaliação", result.error)
       } else {
         setOpen(false)
-        alert("Avaliação enviada com sucesso!")
-        // No router.refresh() needed - revalidation will update
+        success("Avaliação enviada", "Sua avaliação foi enviada com sucesso!")
+        // Reset form
+        setRating(5)
+        setComment("")
       }
     } catch (err) {
       setError("Erro ao enviar avaliação")
+      notifyError("Erro inesperado", "Ocorreu um erro ao tentar processar sua avaliação.")
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">Avaliar</Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Avaliar pedido</DialogTitle>
-          <DialogDescription>{itemName}</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid gap-2">
-            <Label>Nota (1 a 5 estrelas)</Label>
+    <>
+      <Button size="sm" onClick={() => setOpen(true)}>
+        Avaliar
+      </Button>
+
+      <DefaultModal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        title="Avaliar pedido"
+        description={itemName}
+        maxWidth="md"
+      >
+        <form onSubmit={handleSubmit} className="space-y-6 py-2">
+          <div className="flex flex-col items-center justify-center gap-3">
+            <Label className="text-base font-semibold">Sua nota para este item</Label>
             <div className="flex gap-2">
               {[1, 2, 3, 4, 5].map((star) => (
-                <Button
+                <button
                   key={star}
-                  variant="ghost"
+                  type="button"
                   onClick={() => setRating(star)}
-                  className="text-3xl p-0 h-auto hover:bg-transparent"
+                  className="transition-transform hover:scale-110 focus:outline-none"
                 >
-                  {star <= rating ? "⭐" : "☆"}
-                </Button>
+                  <StarIcon
+                    size={42}
+                    color={star <= rating ? "#FACC15" : "#E5E7EB"}
+                    className={star <= rating ? "fill-[#FACC15]" : ""}
+                  />
+                </button>
               ))}
             </div>
+            <span className="text-sm font-medium text-brand-inactive-text">
+              {rating === 5 ? "Excelente!" : rating === 4 ? "Muito bom" : rating === 3 ? "Bom" : rating === 2 ? "Regular" : "Ruim"}
+            </span>
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="comment">Comentário (opcional)</Label>
+            <Label htmlFor="comment" className="font-semibold">
+              Conte mais (opcional)
+            </Label>
             <Textarea
               id="comment"
               rows={4}
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder="Conte sobre sua experiência..."
+              placeholder="Sua opinião ajuda outros compradores..."
+              className="resize-none rounded-xl border-brand-border focus:ring-brand-green/20"
             />
           </div>
 
           {error && <InfoCard message={error} color="red" />}
 
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Enviando..." : "Enviar avaliação"}
-          </Button>
+          <div className="flex gap-3 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => setOpen(false)}
+              disabled={isLoading}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" className="flex-[2]" isLoading={isLoading}>
+              Enviar avaliação
+            </Button>
+          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </DefaultModal>
+    </>
   )
 }

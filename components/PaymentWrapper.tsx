@@ -228,7 +228,7 @@ export function PaymentWrapper({
                             },
                         },
                         texts: {
-                            formTitle: "Selecione a forma de pagamento",
+                            formTitle: "",
                             formSubmit: "Pagar",
                         },
                         hidePaymentButton: false,
@@ -451,13 +451,9 @@ export function PaymentWrapper({
 
                                 <div className="flex flex-col gap-4">
                                     <Separator />
-                                    <button
-                                        onClick={handleClose}
-                                        disabled={isProcessingBrick}
-                                        className="w-full text-brand-inactive-text font-semibold hover:text-brand-dark transition-colors disabled:opacity-50"
-                                    >
+                                    <Button variant="link" onClick={handleClose} disabled={isProcessingBrick}>
                                         Cancelar e voltar
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                         </motion.div>

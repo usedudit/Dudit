@@ -225,6 +225,13 @@ export async function middleware(request: NextRequest) {
             url.pathname = "/auth/login"
             return NextResponse.redirect(url)
           }
+
+          // OPTIMIZATION (PERF-01): Skip the expensive auth.getUser() call for POST requests
+          // on protected routes. Server Actions (POST) handle their own authentication 
+          // via requireUser(), so this avoids a redundant network call to Supabase Auth.
+          if (request.method === "POST") {
+            return response
+          }
         }
 
         const { data: { user } } = await supabase.auth.getUser()
