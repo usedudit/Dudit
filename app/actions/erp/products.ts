@@ -51,7 +51,7 @@ const verifyAuth = async () => {
     return user
 }
 
-const fetchProductAndVerifyOwnership = async (productId: string, requiredAction?: "view" | "create" | "edit" | "delete", selectColumns = "id, partner_id, images, sku, name") => {
+const fetchProductAndVerifyOwnership = async (productId: string, requiredAction?: "view" | "create" | "edit" | "delete", selectColumns = "id, partner_id, images, sku, name", providedUserId?: string) => {
     const admin = getAdminClient()
 
     const { data: product, error } = await admin
@@ -60,7 +60,7 @@ const fetchProductAndVerifyOwnership = async (productId: string, requiredAction?
         .eq("id", productId)
         .single()
 
-    if (error || !product) throw new Error("Produto nÃ£o encontrado")
+    if (error || !product) throw new Error("Produto não encontrado")
 
     if (requiredAction) {
         await requirePartnerAccessWithPermission(product.partner_id, "products", requiredAction)
@@ -237,14 +237,15 @@ export async function createProductComprehensiveAction(data: {
     const actionStart = performance.now()
     try {
         // 1. GATEKEEPER â€” isolado (bloqueia abuso sem consumir recursos)
-        await requireRateLimit(RateLimitCategory.PRODUCT_CREATE)
+        // 1. Auth check (resolve user once)
+        const user = await requireUser()
 
-        // 2. CSRF + Auth em paralelo (independentes entre si)
-        const [csrf, _user] = await Promise.all([
-            validateCSRF(data as Record<string, unknown>),
-            verifyAuth(),
-        ])
-        if (!csrf.valid) return errorResponse(csrf.error || "CSRF invÃ¡lido")
+        // 2. Rate limit (using pre-resolved userId)
+        await requireRateLimit(RateLimitCategory.PRODUCT_CREATE, undefined, user.id)
+
+        // 3. CSRF Protection
+        const csrf = await validateCSRF(data as Record<string, unknown>)
+        if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
 
         // â”€â”€ SERVER-SIDE CONTEXT FALLBACK â”€â”€
         let finalPartnerId = data.partnerId
@@ -285,9 +286,23 @@ export async function createProductComprehensiveAction(data: {
         }
 
         const adminForBusinessInfo = getAdminClient()
-        const { data: partnerData } = await adminForBusinessInfo.from('partners').select('business_info').eq('id', finalPartnerId).single()
+        const { data: partnerData } = await adminForBusinessInfo
+            .from('partners')
+            .select('id, store_name, store_image_url, business_info, addresses(city, state)')
+            .eq('id', finalPartnerId)
+            .single()
+
         const businessInfo = partnerData?.business_info || { sells: ["products"], channels: ["online"] }
         const sellsOnline = businessInfo.channels?.includes("online") ?? true
+
+        // Prepare partner object for Redis sync to avoid extra DB hits
+        const partnerSyncData = partnerData ? {
+            id: partnerData.id,
+            store_name: partnerData.store_name,
+            store_avatar: partnerData.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+            city: partnerData.addresses?.[0]?.city || null,
+            state: partnerData.addresses?.[0]?.state || null
+        } : null
 
         // If not selling online, enforce marketplace options off
         if (!sellsOnline) {
@@ -408,26 +423,30 @@ export async function createProductComprehensiveAction(data: {
 
         if (transactionError) return errorResponse(transactionError.message, transactionError)
 
-        // Criar moderation job (cron processa)
-        const admin = getAdminClient()
-        Promise.resolve(
-            admin.from('moderation_jobs').insert({
+        // Fire-and-forget: background tasks that don't need to block the response
+        const adminClient = getAdminClient()
+        Promise.all([
+            // 1. Criar moderation job (cron processa)
+            adminClient.from('moderation_jobs').insert({
                 product_id: insertedProduct.id,
                 type: 'product',
                 status: 'pending',
-            })
-        ).catch(console.error)
+            }),
+            // 2. Increment usage counters
+            increment_usage_counter(finalPartnerId, "products_count"),
+            ...(data.images && data.images.length > 0 
+                ? [increment_usage_counter(finalPartnerId, "images_count", data.images.length)] 
+                : [])
+        ]).catch(err => console.error("[ERP] Background task error:", err))
 
-        // Synchronous revalidation and Redis sync to prevent stale data
-        await invalidateProductCache(insertedProduct.id, finalPartnerId, 'create', { silent: true })
+        // Revalidation is still awaited to ensure consistency, but now it's much faster
+        // because we pass the data it needs to skip DB queries.
+        await invalidateProductCache(insertedProduct.id, finalPartnerId, 'create', { 
+            silent: true,
+            data: { ...insertedProduct, partners: partnerSyncData }
+        })
 
-        // Increment usage counters
-        increment_usage_counter(finalPartnerId, "products_count").catch(console.error)
-        if (data.images && data.images.length > 0) {
-            increment_usage_counter(finalPartnerId, "images_count", data.images.length).catch(console.error)
-        }
-
-        console.log(`[PERF] createProduct took ${Math.round(performance.now() - actionStart)}ms`)
+        console.log(`[PERF] createProduct SUCCESS in ${Math.round(performance.now() - actionStart)}ms`)
         return successResponse({ ...insertedProduct, ...fiscalData, ...logisticsData })
     } catch (error: any) {
         return errorResponse(error.message)
@@ -501,15 +520,19 @@ interface UpdateProductData {
 
 export async function updateProductComprehensiveAction(productId: string, data: UpdateProductData): Promise<ActionResponse<any>> {
     const actionStart = performance.now()
-    // 1. GATEKEEPER â€” isolado
-    await requireRateLimit(RateLimitCategory.PRODUCT_UPDATE)
+    // 1. Auth check (resolve user once)
+    const user = await requireUser()
+
+    // 2. Rate limit (using pre-resolved userId)
+    await requireRateLimit(RateLimitCategory.PRODUCT_UPDATE, undefined, user.id)
+
     try {
-        // 2. CSRF + ownership em paralelo (independentes)
+        // 3. CSRF + ownership em paralelo (independentes)
         const [csrf, product] = await Promise.all([
             validateCSRF(data as Record<string, unknown>),
-            fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, images, sku, name, description, moderation_status"),
+            fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, images, sku, name, description, moderation_status", user.id),
         ])
-        if (!csrf.valid) return errorResponse(csrf.error || "CSRF invÃ¡lido")
+        if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
 
         const supabase = await getSupabaseServerClient()
         const payload: any = { updated_at: getBrasiliaTime() }
@@ -609,37 +632,44 @@ export async function updateProductComprehensiveAction(productId: string, data: 
 
         if (transactionError) return errorResponse(transactionError.message, transactionError)
 
-        // FIX: A funÃ§Ã£o RPC no Supabase ignora o campo moderation_status. Fazemos o update direto aqui.
-        const admin = getAdminClient()
-        await admin.from('products').update({ moderation_status: payload.moderation_status }).eq('id', productId)
-
-        // Criar moderation job se necessÃ¡rio (cron processa)
-        if (needsTextRemoderation) {
-            const admin = getAdminClient()
-            Promise.resolve(
-                admin.from('moderation_jobs').insert({
+        // Fire-and-forget background tasks
+        const adminClient = getAdminClient()
+        Promise.all([
+            // 0. Manual moderation status update (if RPC doesn't handle it)
+            adminClient.from('products').update({ moderation_status: payload.moderation_status }).eq('id', productId),
+            // 1. Text remoderation if needed
+            ...(needsTextRemoderation ? [
+                adminClient.from('moderation_jobs').insert({
                     product_id: productId,
                     type: 'product',
                     status: 'pending',
                 })
-            ).catch(console.error)
-        }
+            ] : []),
+            // 2. R2 image cleanup for removed images
+            ...(product.images && Array.isArray(product.images) ? (() => {
+                const oldImages = product.images.filter((img: any) => typeof img === 'string' && img.trim());
+                const newImages = payload.images || [];
+                const deletedImages = oldImages.filter((img: string) => !newImages.includes(img));
+                return deletedImages.length > 0 ? deletedImages.map((img: string) => _deleteFromR2(img)) : [];
+            })() : [])
+        ]).catch(err => console.error("[ERP] Background update task error:", err))
 
-        // Fire-and-forget: R2 image cleanup para imagens removidas
-        if (product.images && Array.isArray(product.images)) {
-            const oldImages = product.images.filter((img: any) => typeof img === 'string' && img.trim());
-            const newImages = payload.images || [];
-            const deletedImages = oldImages.filter((img: string) => !newImages.includes(img));
+        // Synchronous revalidation stays for consistency but optimized with local data
+        const { data: partnerSyncResult } = await adminClient.from('partners').select('id, store_name, store_image_url, addresses(city, state)').eq('id', product.partner_id).single()
+        const partnerSyncData = partnerSyncResult ? {
+            id: partnerSyncResult.id,
+            store_name: partnerSyncResult.store_name,
+            store_avatar: partnerSyncResult.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+            city: partnerSyncResult.addresses?.[0]?.city || null,
+            state: partnerSyncResult.addresses?.[0]?.state || null
+        } : null
 
-            if (deletedImages.length > 0) {
-                Promise.all(deletedImages.map((img: string) => _deleteFromR2(img))).catch(console.error)
-            }
-        }
+        await invalidateProductCache(productId, product.partner_id, 'update', { 
+            silent: true,
+            data: { ...updatedProduct, partners: partnerSyncData }
+        })
 
-        // Synchronous revalidation and Redis sync to prevent stale data
-        await invalidateProductCache(productId, product.partner_id, 'update', { silent: true })
-
-        console.log(`[PERF] updateProduct took ${Math.round(performance.now() - actionStart)}ms`)
+        console.log(`[PERF] updateProduct SUCCESS in ${Math.round(performance.now() - actionStart)}ms`)
         return successResponse({ ...updatedProduct, ...fiscalPayload, ...logisticsPayload })
     } catch (error: any) {
         return errorResponse(error.message)
@@ -1325,19 +1355,44 @@ export const getCategoryPathAction = async (categoryId: string) => {
     )()
 }
 
-export const getERPProductsPageData = cache(async () => {
+export const getERPProductsPageData = cache(async (options?: { 
+    limit?: number; 
+    offset?: number;
+    search?: string;
+    category?: string;
+    status?: string;
+}) => {
+    const limit = options?.limit || 100 // Cache larger batch for smoother client experience
+    const offset = options?.offset || 0
+    const search = options?.search?.trim()
+
     const context = await getCurrentPartnerContext()
     if (!context) return null
 
     const partnerId = context.partnerId
     const supabase = await getSupabaseServerClient()
 
-    // 1. Fetch products first (we need IDs for variants)
-    const { data: products, error: prodError } = await supabase
+    // 1. Build Query
+    let query = supabase
         .from("products")
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("partner_id", partnerId)
         .order("created_at", { ascending: false })
+
+    // Optional Search
+    if (search) {
+        query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%,gtin.ilike.%${search}%`)
+    }
+
+    // Optional Filter by Category
+    if (options?.category) {
+        query = query.eq("category", options.category)
+    }
+
+    // Pagination
+    query = query.range(offset, offset + limit - 1)
+
+    const { data: products, count, error: prodError } = await query
 
     if (prodError) {
         console.error("Error fetching ERP products:", prodError)
@@ -1346,7 +1401,7 @@ export const getERPProductsPageData = cache(async () => {
 
     const productIds = products?.map((p: any) => p.id) || []
 
-    // 2. Fetch variants for these products
+    // 2. Fetch variants for these specific products ONLY
     const { data: variants, error: varError } = productIds.length > 0
         ? await supabase
             .from("product_variants")
@@ -1360,6 +1415,7 @@ export const getERPProductsPageData = cache(async () => {
 
     return {
         products: products || [],
+        totalCount: count || 0,
         partnerId: partnerId,
         variants: variants || []
     }

@@ -7,9 +7,14 @@ import { redis } from "@/lib/redis"
 const GLOBAL_VERSION_KEY = "marketplace:global_cache_version"
 
 // Helper interno para evitar repetição do "max"
-function safeRevalidateTag(tag: string) {
-  // @ts-ignore - Ignora erro se a tipagem local mudar, mas garante o envio do 'max'
-  revalidateTag(tag, "max")
+export function safeRevalidateTag(tag: string) {
+  try {
+    console.log(`[Revalidation] Triggering tag: ${tag}`)
+    // @ts-ignore - The project environment requires a second profile argument "max"
+    revalidateTag(tag, "max")
+  } catch (err) {
+    console.error(`[Revalidation] Failed to trigger tag: ${tag}`, err)
+  }
 }
 
 /**

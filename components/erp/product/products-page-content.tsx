@@ -11,7 +11,6 @@ import { motion, AnimatePresence } from "framer-motion"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { UNITS } from "@/lib/constants/product-constants"
 
-// Actions
 import {
     createProductComprehensiveAction,
     updateProductAction,
@@ -20,6 +19,7 @@ import {
     toggleProductsStatusAction,
     getProductWithDetailsAction,
     batchUpdateProductsAction,
+    getERPProductsPageData,
 } from "@/app/actions/erp/products"
 
 // Components
@@ -173,25 +173,37 @@ EmptyState.displayName = "EmptyState"
 
 export default function ProductsPage({
     products: initialProducts,
+    totalCount: initialTotalCount,
     partnerId,
     suppliers,
-}: { products: Product[]; partnerId: string; suppliers: any[] }) {
+}: { products: Product[]; totalCount: number; partnerId: string; suppliers: any[] }) {
     const router = useRouter()
     const { toast } = useToast()
     const { selectedStore } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
 
     // State
-    const [data, setData] = useState({ products: initialProducts, search: "", debouncedSearch: "", page: 1 })
+    const [data, setData] = useState({ 
+        products: initialProducts, 
+        totalCount: initialTotalCount || 0,
+        search: "", 
+        debouncedSearch: "", 
+        page: 1,
+        isLoading: false
+    })
 
     // Update state when initialProducts changes (e.g. after server action revalidation)
     const prevProductsRef = useRef(initialProducts)
     useEffect(() => {
         if (prevProductsRef.current !== initialProducts) {
-            setData(prev => ({ ...prev, products: initialProducts }))
+            setData(prev => ({ 
+                ...prev, 
+                products: initialProducts, 
+                totalCount: initialTotalCount 
+            }))
             prevProductsRef.current = initialProducts
         }
-    }, [initialProducts])
+    }, [initialProducts, initialTotalCount])
 
     const [selection, setSelection] = useState({ ids: new Set<string>(), product: null as Product | null, delete: null as Product | null, duplicate: null as Partial<Product> | null, loadingDetails: false })
     const [actionModal, setActionModal] = useState<{ open: boolean; text: string }>({ open: false, text: "" })
@@ -254,9 +266,42 @@ export default function ProductsPage({
     }, [checkScroll, effectiveViewMode, data.products])
 
     useEffect(() => {
-        const t = setTimeout(() => setData((p) => ({ ...p, debouncedSearch: p.search })), 500)
+        const t = setTimeout(async () => {
+            if (data.search !== data.debouncedSearch) {
+                setData((prev) => ({ ...prev, debouncedSearch: data.search }))
+                
+                if (data.search.length > 2) {
+                    setData(prev => ({ ...prev, isLoading: true }))
+                    const res = await getERPProductsPageData({ search: data.search, limit: 100 })
+                    if (res) {
+                        setData(prev => ({ 
+                            ...prev, 
+                            products: res.products, 
+                            totalCount: res.totalCount, 
+                            isLoading: false,
+                            page: 1 
+                        }))
+                    } else {
+                        setData(prev => ({ ...prev, isLoading: false }))
+                    }
+                } else if (data.search.length === 0) {
+                    // Reset to initial data if search is cleared
+                    setData(prev => ({ ...prev, isLoading: true }))
+                    const res = await getERPProductsPageData({ limit: 100 })
+                    if (res) {
+                        setData(prev => ({ 
+                            ...prev, 
+                            products: res.products, 
+                            totalCount: res.totalCount, 
+                            isLoading: false,
+                            page: 1 
+                        }))
+                    }
+                }
+            }
+        }, 500)
         return () => clearTimeout(t)
-    }, [data.search])
+    }, [data.search, data.debouncedSearch])
 
     // Data Logic for Filter Sections
     const filterSections = useMemo<FilterSectionConfig[]>(() => {
@@ -322,7 +367,7 @@ export default function ProductsPage({
         })
     }, [filteredProducts, ui.sort])
 
-    const totalPages = Math.ceil(sortedProducts.length / itemsPerPage)
+    const totalPages = Math.ceil((isFiltered ? filteredProducts.length : data.totalCount) / itemsPerPage)
     const paginated = sortedProducts.slice((data.page - 1) * itemsPerPage, data.page * itemsPerPage)
 
     // --- Handlers ---

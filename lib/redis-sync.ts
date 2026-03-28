@@ -63,7 +63,9 @@ export async function syncToExploreRedis({
 
     // Se a data estiver vazia e não for remoção, tentamos buscar o objeto completo
     // para garantir que o Redis tenha todos os joins (parceiro, endereço, etc)
-    if (!removeFromRedis && (Object.keys(data).length <= 1 || !data.partners)) {
+    const hasSufficientData = !removeFromRedis && (Object.keys(data).length > 2 && (data.name || data.store_name) && data.partners)
+
+    if (!removeFromRedis && !hasSufficientData) {
       const admin = getAdminClient()
       
       if (type === 'produto') {
