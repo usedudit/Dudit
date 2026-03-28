@@ -27,14 +27,14 @@ export async function incrementCacheVersion(): Promise<number> {
 }
 
 export async function invalidateProductCache(
-  productId: string,
-  partnerId: string,
+  productId: string, 
+  partnerId: string, 
   action: 'create' | 'update' | 'delete' = 'update',
   options?: { silent?: boolean; data?: any }
 ) {
   const startTime = performance.now()
   console.log(`[CACHE] START INVALIDATION product:${productId} action:${action}`)
-
+  
   const tasks: Promise<any>[] = []
 
   // 1. Synchronize individual product cache (ZSETs and object cache) for direct requests/FTS
@@ -61,10 +61,7 @@ export async function invalidateProductCache(
     try {
       const { revalidateTag } = await import('next/cache')
       // @ts-ignore
-      const safeRevalidateTag = (tag: string) => {
-        console.log(`[Cache Invalidation] Triggering tag: ${tag}`)
-        return revalidateTag(tag, 'max')
-      }
+      const safeRevalidateTag = (tag: string) => revalidateTag(tag, 'max')
 
       // Always revalidate the specific product tag (for vitrine consistency)
       safeRevalidateTag(`product-${productId}`)
@@ -82,6 +79,6 @@ export async function invalidateProductCache(
 
   // Wait for all non-blocking-but-important tasks to finish
   await Promise.all(tasks)
-
+  
   console.log(`[CACHE] COMPLETE in ${Math.round(performance.now() - startTime)}ms for product:${productId}`)
 }
