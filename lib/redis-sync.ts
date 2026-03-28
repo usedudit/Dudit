@@ -37,7 +37,7 @@ export async function syncToExploreRedis({
   data,
   score,
   removeFromRedis = false
-}: SyncItemOptions): Promise<void> {
+}: SyncItemOptions) {
   const typeIndexKey = `explore:index:${type === 'produto' ? 'produtos' : type === 'servico' ? 'servicos' : 'vitrines'}`
   const globalIndexKey = `explore:index:all`
   const dataKey = `data:${type}:${id}`
@@ -63,9 +63,7 @@ export async function syncToExploreRedis({
 
     // Se a data estiver vazia e não for remoção, tentamos buscar o objeto completo
     // para garantir que o Redis tenha todos os joins (parceiro, endereço, etc)
-    const hasSufficientData = !removeFromRedis && (Object.keys(data).length > 2 && (data.name || data.store_name) && data.partners)
-
-    if (!removeFromRedis && !hasSufficientData) {
+    if (!removeFromRedis && (Object.keys(data).length <= 1 || !data.partners)) {
       const admin = getAdminClient()
       
       if (type === 'produto') {
@@ -184,6 +182,6 @@ export async function syncToExploreRedis({
 /**
  * Helper para remover item do Redis (ex: deleção de produto)
  */
-export async function removeFromExploreRedis(id: string, type: ItemType): Promise<void> {
+export async function removeFromExploreRedis(id: string, type: ItemType) {
   return syncToExploreRedis({ id, type, data: {}, removeFromRedis: true })
 }
