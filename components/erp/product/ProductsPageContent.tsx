@@ -626,7 +626,6 @@ export default function ProductsPage({
             transition={{ duration: 0.2 }}
             className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
         >
-            {/* ... STYLE tag omitida para brevidade, mas deve ser mantida ... */}
             <style>{`
         .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
@@ -928,7 +927,7 @@ export default function ProductsPage({
                 onClose={() => setModals((p) => ({ ...p, import: false }))}
                 partnerId={partnerId}
                 storeId={selectedStore?.id || ""}
-                onImportSuccess={() => {}}
+                onImportSuccess={() => { }}
             />
             <DefaultModal
                 isOpen={modals.export}

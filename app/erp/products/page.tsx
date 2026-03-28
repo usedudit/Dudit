@@ -1,6 +1,6 @@
 import { Suspense } from "react"
 import { ERPHeader } from "@/components/erp/erp-header"
-import ProductsPage from "@/components/erp/product/products-page-content"
+import ProductsPage from "@/components/erp/product/ProductsPageContent"
 import { getERPProductsPageData } from "@/app/actions/erp/products"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getCurrentUser } from "@/lib/auth/authorization"

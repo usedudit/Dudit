@@ -51,8 +51,6 @@ export async function createStockMovementAction(data: {
     quantity: number
     reason: string
     notes: string
-    movementDate: string
-    responsible: string
 }) {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
@@ -68,16 +66,13 @@ export async function createStockMovementAction(data: {
 
         const supabase = await getSupabaseServerClient()
 
-        // Combine notes with responsible/date info if needed
-        const fullNotes = `Responsável: ${data.responsible}\nData de Referência: ${data.movementDate}\n${data.notes}`
-
         const { data: movementRecord, error } = await supabase.rpc('create_manual_stock_movement', {
             p_partner_id: partnerId,
             p_product_id: data.productId,
             p_movement_type: data.type,
             p_quantity: data.quantity,
             p_reason: data.reason,
-            p_notes: fullNotes,
+            p_notes: data.notes,
             p_created_by: userEmail,
             p_variant_id: data.variantId || null
         })

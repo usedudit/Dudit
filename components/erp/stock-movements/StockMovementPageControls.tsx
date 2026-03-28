@@ -85,29 +85,6 @@ const StockMovementPageControls: React.FC<StockMovementPageControlsProps> = ({
 
   return (
     <>
-      {/* --- HEADER --- */}
-      <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
-        <div className="flex flex-col gap-2 pt-1">
-          <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-            Movimentação de Estoque
-          </h1>
-          <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-            Gerencie as entradas e saídas de produtos do seu inventário.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={onExport}>
-            <FileIcon className="w-[18px] h-[18px]" /> Exportar
-          </Button>
-
-          <Button onClick={onAddMovement}>
-            <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
-            Nova Movimentação
-          </Button>
-        </div>
-      </div>
-
       {/* --- TABS --- */}
       <div className="mb-6 px-4 md:px-8">
         <Tabs

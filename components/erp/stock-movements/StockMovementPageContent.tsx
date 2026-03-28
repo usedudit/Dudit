@@ -250,13 +250,35 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
             `}</style>
 
             <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                    <div className="flex flex-col gap-2 pt-1">
+                        <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                            Movimentação de Estoque
+                        </h1>
+                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                            Gerencie as entradas e saídas de produtos do seu inventário.
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <Button variant="outline" onClick={() => { }}>
+                            <FileIcon className="w-[18px] h-[18px]" /> Exportar
+                        </Button>
+
+                        <Button onClick={() => setIsCreating(true)}>
+                            <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
+                            Nova Movimentação
+                        </Button>
+                    </div>
+                </div>
+
                 <StockMovementPageControls
                     activeTab={activeTab}
                     setActiveTab={handleTabChange}
                     search={searchTerm}
                     onSearchChange={setSearchTerm}
                     onOpenFilter={() => setModals({ filter: true })}
-                    onExport={() => {}}
+                    onExport={() => { }}
                     onAddMovement={() => setIsCreating(true)}
                     filters={filters}
                     setFilters={setFilters as any}
@@ -298,6 +320,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.2 }}
+                                className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
                             >
                                 {isMobile ? (
                                     <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
@@ -377,7 +400,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                                         <span className="text-[10px] font-bold text-brand-inactive-text dark:text-dark-body uppercase">{mov.date.split(',')[0]}</span>
                                                         <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">{mov.date.split(',')[1]}</span>
                                                     </div>
-                                                    
+
                                                     <Dropdown
                                                         trigger={
                                                             <Button variant="outline" size="icon" className="w-[38px] h-[38px] rounded-full border-brand-border hover:bg-gray-50" onClick={(e) => e.stopPropagation()}>
@@ -424,9 +447,9 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                                 </thead>
                                                 <tbody>
                                                     {paginatedMovements.map((mov) => (
-                                                        <tr 
-                                                            key={mov.id} 
-                                                            className="group hover:bg-gray-50/80 dark:hover:bg-dark-border/5 transition-colors cursor-pointer" 
+                                                        <tr
+                                                            key={mov.id}
+                                                            className="group hover:bg-gray-50/80 dark:hover:bg-dark-border/5 transition-colors cursor-pointer"
                                                             onClick={() => handleViewDetails(mov.id)}
                                                         >
                                                             <td className="py-4 px-2 pl-6 border-b border-brand-border dark:border-dark-border" onClick={(e) => e.stopPropagation()}>

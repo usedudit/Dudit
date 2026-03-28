@@ -21,7 +21,8 @@ import {
     Badge,
     FormDropdown,
     AlertModal,
-    Separator
+    Separator,
+    Spinner
 } from '@/components/reusable';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import { searchProductsForMovement, createStockMovementAction } from '@/app/actions/erp/stock-movements';
@@ -55,8 +56,6 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
 
     // Form State
     const [type, setType] = useState<'in' | 'out'>('in');
-    const [responsible, setResponsible] = useState('Usuário do Sistema');
-    const [movementDate, setMovementDate] = useState(new Date().toISOString().split('T')[0]);
     const [notes, setNotes] = useState('');
     const [quantity, setQuantity] = useState<number | ''>('');
     const [reason, setReason] = useState('Selecione um motivo...');
@@ -126,8 +125,6 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                 quantity: Number(quantity),
                 reason,
                 notes,
-                movementDate,
-                responsible
             });
 
             if (!res || !res.success) {
@@ -168,11 +165,6 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                         <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-300 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                             <span className="truncate">{pageTitle}</span>
-                                            {type === 'in' ? (
-                                                <Badge variant="green" className="text-[10px] uppercase tracking-wider h-fit px-2 py-0.5">Entrada</Badge>
-                                            ) : (
-                                                <Badge variant="red" className="text-[10px] uppercase tracking-wider h-fit px-2 py-0.5">Saída</Badge>
-                                            )}
                                         </h1>
 
                                         <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
@@ -192,16 +184,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                     </div>
                                 </div>
 
-                                {/* Mobile Title Row */}
-                                <div className="md:hidden flex items-center gap-3 py-4">
-                                    <button onClick={handleBack} className="p-2 -ml-2 text-brand-inactive-text">
-                                        <ChevronLeftIcon size={24} />
-                                    </button>
-                                    <div className="flex flex-col min-w-0">
-                                        <h1 className="text-xl font-bold text-brand-dark dark:text-dark-heading truncate">{pageTitle}</h1>
-                                        <span className={`text-[10px] font-bold uppercase tracking-tight ${type === 'in' ? 'text-brand-green' : 'text-red-500'}`}>{type === 'in' ? 'Entrada' : 'Saída'}</span>
-                                    </div>
-                                </div>
+                                {/* Tabs container - ensured alignment */}
 
                                 {/* Tabs */}
                                 <div className={`w-full transition-all duration-300 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
@@ -255,21 +238,21 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                             whileTap={{ scale: 0.99 }}
                                                             onClick={() => { setType('out'); setReason('Selecione um motivo...'); }}
                                                             className={`flex-1 flex items-center justify-between p-5 rounded-2xl transition-all border ${type === 'out'
-                                                                ? 'bg-red-50/50 dark:bg-red-900/10 border-red-500'
+                                                                ? 'bg-red-50/50 dark:bg-red-900/10 border-brand-red'
                                                                 : 'bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border border-brand-border dark:border-dark-border'
                                                                 }`}
                                                         >
                                                             <div className="flex items-center gap-4">
-                                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${type === 'out' ? 'bg-red-500 text-white' : 'bg-brand-gray dark:bg-gray-800 text-brand-inactive-text'
+                                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${type === 'out' ? 'bg-brand-red text-white' : 'bg-brand-gray dark:bg-gray-800 text-brand-inactive-text'
                                                                     }`}>
                                                                     <ChevronUpIcon size={22} strokeWidth={2.5} />
                                                                 </div>
                                                                 <div className="flex flex-col items-start text-left">
-                                                                    <span className={`font-bold text-[15px] ${type === 'out' ? 'text-red-500' : 'text-brand-dark dark:text-dark-heading'}`}>Saída</span>
+                                                                    <span className={`font-bold text-[15px] ${type === 'out' ? 'text-brand-red' : 'text-brand-dark dark:text-dark-heading'}`}>Saída</span>
                                                                     <span className="text-xs text-brand-inactive-text mt-0.5 font-medium">Remover itens do estoque</span>
                                                                 </div>
                                                             </div>
-                                                            {type === 'out' && <div className="w-2.5 h-2.5 rounded-full bg-red-500" />}
+                                                            {type === 'out' && <div className="w-2.5 h-2.5 rounded-full bg-brand-red" />}
                                                         </motion.button>
                                                     </div>
                                                 </section>
@@ -282,16 +265,15 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                     <div className="space-y-6">
 
                                                         <div className="relative">
-                                                            <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Produto <span className="text-red-500">*</span></label>
-
                                                             {!selectedProduct ? (
                                                                 <div className="relative">
                                                                     <div className="relative flex items-center w-full h-[45px] px-4 bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-xl focus-within:ring-2 focus-within:ring-brand-green/20 focus-within:border-brand-green transition-all">
                                                                         <SearchIcon size={18} className="text-brand-inactive-text mr-3 flex-shrink-0" />
-                                                                        <input
+                                                                        <Input
                                                                             type="text"
                                                                             placeholder="Buscar por nome ou SKU..."
-                                                                            className="w-full h-full bg-transparent text-sm text-brand-dark dark:text-dark-body focus:outline-none placeholder:text-brand-inactive-text"
+                                                                            required
+                                                                            className="w-full h-full"
                                                                             value={searchQuery}
                                                                             onChange={(e) => setSearchQuery(e.target.value)}
                                                                         />
@@ -305,7 +287,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                         >
                                                                             {isSearching ? (
                                                                                 <div className="p-8 text-center text-sm text-brand-inactive-text flex flex-col items-center gap-2">
-                                                                                    <div className="w-5 h-5 border-2 border-brand-green border-t-transparent rounded-full animate-spin" />
+                                                                                    <Spinner size={16} />
                                                                                     Carregando produtos...
                                                                                 </div>
                                                                             ) : searchResults.length > 0 ? (
@@ -319,7 +301,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                                         }}
                                                                                     >
                                                                                         <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-gray-800 overflow-hidden flex-shrink-0 border border-brand-border dark:border-dark-border">
-                                                                                            <img src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={product.name} className="w-full h-full object-cover mix-blend-multiply dark:mix-blend-normal" />
+                                                                                            <img src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={product.name} className="w-full h-full object-cover rounded-full mix-blend-multiply dark:mix-blend-normal" />
                                                                                         </div>
                                                                                         <div className="flex-1 min-w-0">
                                                                                             <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
@@ -340,8 +322,8 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                 </div>
                                                             ) : (
                                                                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/30 flex items-center gap-4 relative group">
-                                                                    <div className="w-12 h-12 rounded-lg bg-white dark:bg-gray-800 border border-brand-border dark:border-dark-border flex-shrink-0 overflow-hidden">
-                                                                        <img src={getR2ImageUrl(selectedProduct.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={selectedProduct.name} className="w-full h-full object-cover mix-blend-multiply dark:mix-blend-normal" />
+                                                                    <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 border border-brand-border dark:border-dark-border flex-shrink-0 overflow-hidden">
+                                                                        <img src={getR2ImageUrl(selectedProduct.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={selectedProduct.name} className="w-full h-full object-cover rounded-full mix-blend-multiply dark:mix-blend-normal" />
                                                                     </div>
                                                                     <div className="flex-1 min-w-0 pr-8">
                                                                         <div className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate mb-0.5">{selectedProduct.name}</div>
@@ -352,7 +334,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                         </div>
                                                                     </div>
                                                                     <button
-                                                                        className="absolute top-1/2 -translate-y-1/2 right-4 p-2 text-brand-inactive-text hover:text-red-500 transition-all rounded-full"
+                                                                        className="absolute top-1/2 -translate-y-1/2 right-4 p-2 text-brand-inactive-text hover:text-brand-red transition-all rounded-full"
                                                                         onClick={() => { setSelectedProduct(null); setSearchQuery(''); }}
                                                                     >
                                                                         <PlusIcon size={18} className="rotate-45" />
@@ -369,7 +351,6 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                 placeholder="Ex: 10"
                                                                 value={quantity}
                                                                 onChange={(e) => setQuantity(e.target.value === '' ? '' : Number(e.target.value))}
-                                                                className="h-[45px] font-bold"
                                                             />
 
                                                             <FormDropdown
@@ -385,7 +366,6 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                     { value: 'Ajuste de Estoque', label: 'Ajuste de Estoque' },
                                                                     { value: 'Uso Interno', label: 'Uso Interno' }
                                                                 ]}
-                                                                className="mt-[1px]"
                                                             />
                                                         </div>
 
@@ -433,44 +413,6 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
 
                                 {/* Sidebar Column */}
                                 <div className="hidden lg:block col-span-12 lg:col-span-4 border-l border-brand-border dark:border-dark-border pl-12 space-y-8">
-
-                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
-                                        <div className={`absolute top-0 left-0 w-full h-1 transition-colors duration-500 ${type === 'in' ? 'bg-brand-green' : 'bg-red-500'}`}></div>
-
-                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-1">Status da Operação</h3>
-
-                                        <div className="space-y-5">
-                                            <FormDropdown
-                                                label="Responsável"
-                                                value={responsible}
-                                                setValue={setResponsible}
-                                                options={[
-                                                    { value: 'Usuário do Sistema', label: 'Usuário do Sistema' },
-                                                    { value: 'Gerente de Operações', label: 'Gerente de Operações' },
-                                                    { value: 'Administrador', label: 'Administrador' }
-                                                ]}
-                                            />
-
-                                            <div className="flex flex-col gap-2">
-                                                <Input
-                                                    label="Data da Operação"
-                                                    name="movementDate"
-                                                    type="date"
-                                                    value={movementDate}
-                                                    onChange={(e) => setMovementDate(e.target.value)}
-                                                />
-                                            </div>
-
-                                            <Separator className="my-2" />
-
-                                            <div className="pt-2">
-                                                <p className="text-[11px] text-brand-inactive-text italic leading-relaxed">
-                                                    * Todas as movimentações são registradas com log de auditoria do usuário logado.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-
                                     <AnimatePresence>
                                         {selectedProduct && (
                                             <motion.div
@@ -479,22 +421,19 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                 exit={{ opacity: 0, scale: 0.95 }}
                                                 className="p-6 rounded-2xl bg-brand-gray dark:bg-dark-border/20 border border-brand-border dark:border-dark-border"
                                             >
-                                                <h4 className="text-xs font-bold text-brand-dark dark:text-dark-heading uppercase tracking-widest mb-4 flex items-center gap-2">
-                                                    <div className={`w-2 h-2 rounded-full ${type === 'in' ? 'bg-brand-green' : 'bg-red-500'}`} />
-                                                    Projeção de Estoque
-                                                </h4>
-                                                
-                                                <div className="space-y-3">
+                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Projeção de Estoque</h3>
+
+                                                <div className="space-y-4">
                                                     <div className="flex items-center justify-between">
                                                         <span className="text-[13px] text-brand-inactive-text font-medium">Estoque Atual:</span>
                                                         <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
                                                             {selectedProduct.stock} <span className="text-[11px] font-medium opacity-60">un</span>
                                                         </span>
                                                     </div>
-                                                    
-                                                    <div className="flex items-center justify-between pt-3 border-t border-brand-border/40 dark:border-dark-border/40">
+
+                                                    <div className="flex items-center justify-between pt-4 border-t border-brand-border/40 dark:border-dark-border/40">
                                                         <span className="text-[13px] text-brand-inactive-text font-medium">Novo Estoque:</span>
-                                                        <span className={`text-lg font-black ${type === 'in' ? 'text-brand-green' : 'text-red-500'}`}>
+                                                        <span className={`text-lg font-black ${type === 'in' ? 'text-brand-green' : 'text-brand-red'}`}>
                                                             {type === 'in'
                                                                 ? (selectedProduct.stock + (Number(quantity) || 0))
                                                                 : (selectedProduct.stock - (Number(quantity) || 0))}
@@ -523,7 +462,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                         <Button
                             onClick={handleSave}
                             disabled={isSaving}
-                            className={`flex-1 h-[48px] font-bold ${type === 'in' ? 'bg-brand-green hover:bg-brand-green/90' : 'bg-red-500 hover:bg-red-600'}`}
+                            className={`flex-1 h-[48px] font-bold ${type === 'in' ? 'bg-brand-green hover:bg-brand-green/90' : 'bg-brand-red hover:bg-red-600'}`}
                         >
                             <SaveIcon className="w-4 h-4 mr-2" />
                             {isSaving ? "Salvando..." : "Salvar"}
