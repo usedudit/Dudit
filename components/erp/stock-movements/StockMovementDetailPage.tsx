@@ -26,6 +26,7 @@ import { Button } from '@/components/reusable';
 import { Badge } from '@/components/reusable/Badge';
 import Dropdown, { DropdownItem } from '@/components/reusable/Dropdown';
 import { useNotification } from '@/hooks/use-notification';
+import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 
 // Sub-components
 const StyledDropdownItem: React.FC<{ onClick?: () => void; children: React.ReactNode; className?: string }> = ({ onClick, children, className }) => (
@@ -219,8 +220,12 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                             <div className="bg-white dark:bg-dark-surface p-6">
                                 <div className="flex flex-col md:flex-row md:items-center gap-6">
                                     <div className="flex items-start gap-4 flex-1">
-                                        <div className="w-20 h-20 rounded-xl border border-brand-border dark:border-dark-border overflow-hidden flex-shrink-0 bg-white dark:bg-gray-800 shadow-sm">
-                                            <img src={data.product.image} className="w-full h-full object-cover mix-blend-multiply dark:mix-blend-normal" alt={data.product.name} />
+                                        <div className="w-20 h-20 rounded-full border border-brand-border dark:border-dark-border overflow-hidden flex-shrink-0 bg-brand-gray dark:bg-dark-border/20 shadow-sm">
+                                            <img 
+                                                src={getR2ImageUrl(data.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} 
+                                                className="w-full h-full object-cover rounded-full mix-blend-multiply dark:mix-blend-normal" 
+                                                alt={data.product.name} 
+                                            />
                                         </div>
                                         
                                         <div className="flex-1 min-w-0">

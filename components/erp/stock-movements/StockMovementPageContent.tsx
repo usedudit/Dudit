@@ -1,35 +1,33 @@
 "use client"
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-    SearchIcon,
     ChevronDownIcon,
     PlusIcon,
-    ArrowUpDownIcon,
     MoreHorizontalIcon,
-    ChevronLeftIcon,
-    ChevronRightIcon,
-    DashboardIcon,
     ChevronUpIcon,
     FileIcon,
     FilterIcon,
     ListIcon,
     BoxIcon,
-    ArrowDownIcon,
-    ArrowUpIcon,
     TrendUpIcon,
     TrendDownIcon,
-    TransferIcon
+    TransferIcon,
+    EyeIcon,
+    TrashIcon
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, Checkbox as FormCheckbox, IconPlaceholder, Input } from '@/components/reusable';
+import { Button, Checkbox, IconPlaceholder, Input } from '@/components/reusable';
 import { Badge } from '@/components/reusable/Badge';
-import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs";
+import Dropdown from '@/components/reusable/Dropdown';
+import { DropdownItem } from '@/components/reusable/Dropdown';
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet";
 import Pagination from "@/components/reusable/Pagination";
 import CreateStockMovement from './CreateStockMovement';
 import StockMovementDetailPage from './StockMovementDetailPage';
+import StockMovementPageControls from './StockMovementPageControls';
+import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import { getStockMovementDetails } from '@/app/actions/erp/stock-movements';
 import { useNotification } from '@/hooks/use-notification';
 import { useMediaQuery } from '@/components/erp/hooks';
@@ -44,7 +42,7 @@ type TabType = 'all' | 'in' | 'out';
 type SortKey = 'product' | 'quantity' | 'date' | 'displayId';
 type SortDirection = 'asc' | 'desc';
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 8;
 
 const MOVEMENT_TYPE_LABELS: Record<string, string> = {
     'sale': 'Venda',
@@ -55,23 +53,13 @@ const MOVEMENT_TYPE_LABELS: Record<string, string> = {
     'lost': 'Perda',
 };
 
-const MovementTypeBadge = ({ type }: { type: 'in' | 'out' }) =>
-    type === 'in' ? (
-        <Badge variant="green" className="flex items-center gap-1 w-max">
-            <ChevronDownIcon size={12} /> Entrada
-        </Badge>
-    ) : (
-        <Badge variant="red" className="flex items-center gap-1 w-max">
-            <ChevronUpIcon size={12} /> Saída
-        </Badge>
-    );
-
 const StockMovementPageContent = ({ partnerId, movements: initialMovements }: StockMovementPageProps) => {
     const router = useRouter();
     const { error: notifyError } = useNotification();
     const { selectedStore } = useStoreData(partnerId);
     const isMobile = useMediaQuery("(max-width: 768px)");
 
+    // State
     const [isCreating, setIsCreating] = useState(false);
     const [selectedMovementId, setSelectedMovementId] = useState<string | null>(null);
     const [selectedMovementDetails, setSelectedMovementDetails] = useState<any | null>(null);
@@ -88,6 +76,25 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
         filter: false,
     });
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
+    const [selection, setSelection] = useState<Set<string>>(new Set());
+
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+    const [scrollState, setScrollState] = useState({ left: false, right: false });
+
+    const checkScroll = useCallback(() => {
+        if (!tableContainerRef.current) return;
+        const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current;
+        setScrollState({
+            left: scrollLeft > 0,
+            right: scrollLeft < scrollWidth - clientWidth - 2,
+        });
+    }, []);
+
+    useEffect(() => {
+        checkScroll();
+        window.addEventListener("resize", checkScroll);
+        return () => window.removeEventListener("resize", checkScroll);
+    }, [checkScroll, viewMode, initialMovements]);
 
     const filterSections: FilterSectionConfig[] = [
         {
@@ -98,7 +105,8 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
         },
     ];
 
-    const isFiltered = searchTerm !== "" || filters.movement_type.length > 0;
+    const hasActiveFilters = filters.movement_type.length > 0;
+    const isFiltered = searchTerm !== "" || hasActiveFilters;
 
     const handleViewDetails = async (id: string) => {
         setSelectedMovementId(id);
@@ -136,15 +144,15 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                 product: {
                     name: mov.products?.name || 'Produto Excluído',
                     sku: mov.products?.sku || 'N/A',
-                    image: mov.products?.images?.length > 0
-                        ? mov.products.images[0]
-                        : 'https://img.dudit.com.br/static/mascots/MovimentacaoEstoque.png',
+                    image: (mov.products?.images && mov.products.images.length > 0)
+                        ? getR2ImageUrl(mov.products.images[0], "thumbnail")
+                        : 'https://img.dudit.com.br/static/Placeholder.png',
                     currentStock: mov.new_quantity,
                 },
                 type: (mov.quantity > 0 ? 'in' : 'out') as 'in' | 'out',
                 quantity: Math.abs(mov.quantity),
                 reason,
-                user: mov.created_by ? mov.created_by.slice(0, 8) : 'Sistema',
+                user: mov.created_by ? mov.created_by.split('@')[0] : 'Sistema',
             };
         });
     }, [initialMovements]);
@@ -191,6 +199,25 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
         page * ITEMS_PER_PAGE
     );
 
+    const handleSelectRow = (id: string) => {
+        setSelection(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const handleSelectAll = (checked: boolean) => {
+        if (checked) setSelection(new Set(paginatedMovements.map(m => m.id)));
+        else setSelection(new Set());
+    };
+
+    const handleClearFilters = () => {
+        setSearchTerm("");
+        setFilters({ movement_type: [] });
+    };
+
     if (isCreating) {
         return (
             <CreateStockMovement
@@ -212,313 +239,259 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
 
     return (
         <div className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden transition-colors duration-300">
-            {/* Header */}
-            <div className="flex-none pt-6 mb-6">
-                <div className="px-4 md:px-8 flex items-center justify-between mb-6">
-                    <div className="flex flex-col">
-                        <h1 className="text-2xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3">
-                            <BoxIcon className="w-8 h-8 text-brand-dark dark:text-dark-heading" />
-                            Movimentação de Estoque
-                        </h1>
-                        <p className="text-brand-inactive-text dark:text-dark-body text-sm mt-1">
-                            {selectedStore ? `Gerencie o estoque da loja ${selectedStore.name}.` : 'Gerencie as movimentações de entrada e saída.'}
-                        </p>
-                    </div>
+            <style>{`
+                .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
+                .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
+                .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .hide-scrollbar::-webkit-scrollbar { display: none; }
+                .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
 
-                    <div className="flex items-center gap-3">
-                        <Button
-                            variant="outline"
-                            className="hidden md:flex items-center gap-2"
-                        >
-                            <FileIcon size={16} /> Exportar
-                        </Button>
-                        <Button
-                            className="hidden md:flex items-center gap-2 bg-brand-green hover:bg-brand-green/90 text-white shadow-sm shadow-brand-green/20"
-                            onClick={() => setIsCreating(true)}
-                        >
-                            <PlusIcon className="w-4 h-4" strokeWidth={3} />
-                            Nova Movimentação
-                        </Button>
-                        <Button
-                            variant="outline"
-                            className="md:hidden w-10 h-10 p-0 flex items-center justify-center rounded-full bg-brand-green text-white border-none"
-                            onClick={() => setIsCreating(true)}
-                        >
-                            <PlusIcon className="w-5 h-5" strokeWidth={3} />
-                        </Button>
-                    </div>
-                </div>
+            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                <StockMovementPageControls
+                    activeTab={activeTab}
+                    setActiveTab={handleTabChange}
+                    search={searchTerm}
+                    onSearchChange={setSearchTerm}
+                    onOpenFilter={() => setModals({ filter: true })}
+                    onExport={() => {}}
+                    onAddMovement={() => setIsCreating(true)}
+                    filters={filters}
+                    setFilters={setFilters as any}
+                    viewMode={viewMode}
+                    onViewModeChange={setViewModeState}
+                    hasActiveFilters={hasActiveFilters}
+                />
 
-                {/* Tabs */}
-                <div className="mb-6 px-4 md:px-8">
-                    <Tabs
-                        value={activeTab}
-                        onValueChange={(val) => handleTabChange(val as any)}
-                    >
-                        <TabsList className="px-0">
-                            <TabsTrigger value="all" icon={TransferIcon}>
-                                Todas
-                            </TabsTrigger>
-                            <TabsTrigger value="in" icon={TrendUpIcon}>
-                                Entradas
-                            </TabsTrigger>
-                            <TabsTrigger value="out" icon={TrendDownIcon}>
-                                Saídas
-                            </TabsTrigger>
-                        </TabsList>
-                    </Tabs>
-                </div>
-
-                {/* Controls Bar */}
-                <div className="flex flex-col md:flex-row items-center justify-between gap-4 flex-none px-4 md:px-8">
-                    {/* Desktop Controls */}
-                    <div className="hidden md:flex items-center w-full gap-4">
-                        <div className="w-80">
-                            <Input
-                                name="search"
-                                placeholder="Buscar movimentações..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="h-[42px]"
-                                variant="full-rounded"
-                                label=""
-                            />
-                        </div>
-                        <Button
-                            variant="outline"
-                            onClick={() => setModals({ filter: true })}
-                            leftIcon={<FilterIcon className="h-[18px] w-[18px]" />}
-                        >
-                            Filtros
-                        </Button>
-
-                        <div className="flex-1"></div>
-
-                        <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] flex-shrink-0">
-                            <button
-                                onClick={() => setViewModeState("list")}
-                                className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
+                <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-8 px-4 md:px-8">
+                    <AnimatePresence mode="wait">
+                        {paginatedMovements.length === 0 ? (
+                            <motion.div
+                                key="empty"
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                className="flex-1 flex items-center justify-center h-[500px]"
                             >
-                                <ListIcon className="w-[18px] h-[18px]" />
-                            </button>
-                            <button
-                                onClick={() => setViewModeState("grid")}
-                                className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
+                                <IconPlaceholder
+                                    placeholderType="image"
+                                    imageSrc={isFiltered ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png" : "https://img.dudit.com.br/static/mascots/MovimentacaoEstoque.png"}
+                                    imageAlt="Sem movimentações"
+                                    title={isFiltered ? "Nenhuma movimentação encontrada" : "Sem movimentações"}
+                                    subtitle={isFiltered ? "Tente ajustar seus filtros ou termos de busca." : "Ainda não houve entradas ou saídas de estoque."}
+                                    itemButton={!isFiltered ? {
+                                        text: "Nova Movimentação",
+                                        action: () => setIsCreating(true),
+                                    } : {
+                                        text: "Limpar Filtros",
+                                        action: handleClearFilters,
+                                        variant: "outline"
+                                    }}
+                                />
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                key={viewMode}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.2 }}
                             >
-                                <DashboardIcon className="w-[18px] h-[18px]" />
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Mobile Controls */}
-                    <div className="md:hidden flex items-center gap-2 w-full">
-                        <div className="flex-1">
-                            <Input
-                                name="search"
-                                placeholder="Buscar..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="h-[42px] w-full"
-                                variant="full-rounded"
-                                label=""
-                            />
-                        </div>
-                        <Button variant="outline" onClick={() => setModals({ filter: true })} className="w-[42px] h-[42px] p-0">
-                            <FilterIcon className="w-4 h-4" />
-                        </Button>
-                    </div>
-                </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-8 px-4 md:px-8">
-                {/* Empty State / No Results */}
-                {paginatedMovements.length === 0 && (
-                    <div className="flex-1 flex items-center justify-center p-8">
-                        <IconPlaceholder
-                            placeholderType="image"
-                            imageSrc={isFiltered ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png" : "https://img.dudit.com.br/static/mascots/MovimentacaoEstoque.png"}
-                            imageAlt="Sem movimentações"
-                            title={isFiltered ? "Nenhuma movimentação encontrada" : "Sem movimentações"}
-                            subtitle={isFiltered ? "Tente ajustar seus filtros ou termos de busca." : "Ainda não houve entradas ou saídas de estoque."}
-                            itemButton={!isFiltered ? {
-                                text: "Nova Movimentação",
-                                action: () => setIsCreating(true),
-                            } : {
-                                text: "Limpar Filtros",
-                                action: () => { setSearchTerm(""); setFilters({ movement_type: [] }) },
-                                variant: "outline"
-                            }}
-                        />
-                    </div>
-                )}
-
-                {paginatedMovements.length > 0 && isMobile && (
-                    <div className="flex flex-col divide-y divide-gray-100 dark:divide-gray-800 border-b border-brand-border dark:border-dark-border">
-                        {paginatedMovements.map((mov) => (
-                            <div
-                                key={mov.id}
-                                className="py-5 flex items-start gap-4 cursor-pointer"
-                                onClick={() => handleViewDetails(mov.id)}
-                            >
-                                <div className="w-12 h-12 rounded-full bg-[#F3F4F6] dark:bg-gray-800 flex-shrink-0 overflow-hidden border border-brand-border dark:border-dark-border">
-                                    <img src={mov.product.image} alt="" className="w-full h-full object-cover" />
-                                </div>
-
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex justify-between items-start mb-0.5">
-                                        <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate pr-2">{mov.product.name}</h3>
-                                        <Badge variant={mov.type === 'in' ? 'green' : 'red'}>
-                                            {mov.type === 'in' ? 'Entrada' : 'Saída'}
-                                        </Badge>
-                                    </div>
-                                    <div className="text-sm text-brand-inactive-text dark:text-dark-body font-medium mb-3">ID: {mov.displayId}</div>
-                                    <div className="flex items-center gap-1.5 text-[14px]">
-                                        <span className={`font-bold ${mov.type === 'in' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                            {mov.type === 'in' ? '+' : '-'}{mov.quantity}
-                                        </span>
-                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">• {mov.date.split(',')[0]}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {paginatedMovements.length > 0 && !isMobile && (
-                    <div className="w-full">
-                        <AnimatePresence mode="wait">
-                            {viewMode === 'grid' ? (
-                                <motion.div
-                                    key="grid"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    transition={{ duration: 0.2 }}
-                                    className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
-                                >
-                                    {paginatedMovements.map((mov) => (
-                                        <div
-                                            key={mov.id}
-                                            className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 transition-all duration-300 hover:shadow-md cursor-pointer group flex flex-col h-full min-h-[240px]"
-                                            onClick={() => handleViewDetails(mov.id)}
-                                        >
-                                            <div className="flex gap-4 mb-5">
-                                                <div className="w-24 h-24 rounded-2xl bg-[#F3F4F6] dark:bg-gray-800 border border-brand-border dark:border-dark-border flex-shrink-0 overflow-hidden">
-                                                    <img src={mov.product.image} alt="" className="w-full h-full object-cover" />
+                                {isMobile ? (
+                                    <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
+                                        {paginatedMovements.map((mov) => (
+                                            <div
+                                                key={mov.id}
+                                                className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none"
+                                                onClick={() => handleViewDetails(mov.id)}
+                                            >
+                                                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/20 flex-shrink-0 overflow-hidden border border-brand-border dark:border-dark-border">
+                                                    <img src={mov.product.image} alt="" className="w-full h-full object-cover rounded-full" />
                                                 </div>
 
-                                                <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
-                                                    <div className="flex justify-between items-start gap-1">
-                                                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">{mov.product.name}</h3>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-start mb-0.5">
+                                                        <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate pr-2">{mov.product.name}</h3>
+                                                        <Badge variant={mov.type === 'in' ? 'green' : 'red'}>
+                                                            {mov.type === 'in' ? 'Entrada' : 'Saída'}
+                                                        </Badge>
                                                     </div>
-
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">{mov.product.sku}</span>
+                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium mb-2">ID: {mov.displayId}</div>
+                                                    <div className="flex items-center gap-2 text-[14px]">
+                                                        <span className={`font-bold ${mov.type === 'in' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                                            {mov.type === 'in' ? '+' : '-'}{mov.quantity}
+                                                        </span>
+                                                        <span className="text-gray-300 dark:text-gray-600">•</span>
+                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">{mov.date.split(',')[0]}</span>
                                                     </div>
-                                                    <Badge variant={mov.type === 'in' ? 'green' : 'red'} className="w-max">
-                                                        {mov.type === 'in' ? 'Entrada' : 'Saída'}
-                                                    </Badge>
                                                 </div>
                                             </div>
+                                        ))}
+                                    </div>
+                                ) : viewMode === 'grid' ? (
+                                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                        {paginatedMovements.map((mov) => (
+                                            <div
+                                                key={mov.id}
+                                                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[20px] p-5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group relative flex flex-col h-full"
+                                                onClick={() => handleViewDetails(mov.id)}
+                                            >
+                                                <div className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                                    <Checkbox
+                                                        checked={selection.has(mov.id)}
+                                                        onChange={() => handleSelectRow(mov.id)}
+                                                    />
+                                                </div>
 
-                                            <div className="grid grid-cols-2 gap-2 mb-5 pt-2 border-t border-brand-border dark:border-dark-border mt-auto">
-                                                <div>
-                                                    <span className="block text-[10px] text-brand-inactive-text dark:text-dark-body font-medium mb-1">Quantidade</span>
-                                                    <div className="flex items-center gap-1">
-                                                        <span className={`text-[12px] font-bold ${mov.type === 'in' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                                <div className="flex gap-4 mb-5">
+                                                    <div className="w-20 h-20 rounded-full bg-brand-gray dark:bg-dark-border/20 border border-brand-border dark:border-dark-border flex-shrink-0 overflow-hidden">
+                                                        <img src={mov.product.image} alt="" className="w-full h-full object-cover rounded-full" />
+                                                    </div>
+
+                                                    <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+                                                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">{mov.product.name}</h3>
+                                                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">{mov.product.sku}</span>
+                                                        <Badge variant={mov.type === 'in' ? 'green' : 'red'} className="w-max mt-1 px-2 py-0.5 text-[10px]">
+                                                            {mov.type === 'in' ? 'Entrada' : 'Saída'}
+                                                        </Badge>
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-4 mb-5 pt-4 border-t border-brand-border dark:border-dark-border mt-auto">
+                                                    <div>
+                                                        <span className="block text-[10px] text-brand-inactive-text dark:text-dark-body font-bold uppercase tracking-wider mb-1">Quantidade</span>
+                                                        <span className={`text-[14px] font-bold ${mov.type === 'in' ? 'text-green-600' : 'text-red-600'}`}>
                                                             {mov.type === 'in' ? '+' : '-'}{mov.quantity}
                                                         </span>
                                                     </div>
+                                                    <div>
+                                                        <span className="block text-[10px] text-brand-inactive-text dark:text-dark-body font-bold uppercase tracking-wider mb-1">Estoque Final</span>
+                                                        <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{mov.product.currentStock}</span>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <span className="block text-[10px] text-brand-inactive-text dark:text-dark-body font-medium mb-1">Estoque Pós</span>
-                                                    <span className="text-[12px] font-bold text-brand-dark dark:text-dark-heading block">{mov.product.currentStock}</span>
-                                                </div>
-                                            </div>
 
-                                            <div className="flex items-end justify-between">
-                                                <div className="flex flex-col">
-                                                    <span className="text-[10px] font-medium text-brand-inactive-text dark:text-dark-body">{mov.date.split(',')[0]}</span>
-                                                    <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">{mov.date.split(',')[1]}</span>
-                                                </div>
-                                                <Button variant="outline" size="icon" className="w-[38px] h-[38px] rounded-xl" onClick={(e) => e.stopPropagation()}>
-                                                    <MoreHorizontalIcon size={18} />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </motion.div>
-                            ) : (
-                                <motion.div
-                                    key="list"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    transition={{ duration: 0.2 }}
-                                    className="w-full overflow-hidden rounded-xl mb-6 shadow-sm border border-brand-border dark:border-dark-border"
-                                >
-                                    <div className="overflow-x-auto pb-4 custom-scrollbar bg-white dark:bg-dark-surface">
-                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
-                                            <thead>
-                                                <tr className="bg-brand-gray dark:bg-dark-border/50 transition-colors">
-                                                    <th className="py-3 px-4 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body border-b border-brand-border dark:border-dark-border pl-6">ID</th>
-                                                    <th className="py-3 px-4 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body border-b border-brand-border dark:border-dark-border">Produto</th>
-                                                    <th className="py-3 px-4 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body border-b border-brand-border dark:border-dark-border">Tipo</th>
-                                                    <th className="py-3 px-4 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body border-b border-brand-border dark:border-dark-border text-right">Qtd</th>
-                                                    <th className="py-3 px-4 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body border-b border-brand-border dark:border-dark-border text-right">Estoque</th>
-                                                    <th className="py-3 px-4 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body border-b border-brand-border dark:border-dark-border">Motivo</th>
-                                                    <th className="py-3 px-4 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body border-b border-brand-border dark:border-dark-border">Data</th>
-                                                    <th className="py-3 px-4 w-16 text-center text-[13px] font-medium text-brand-inactive-text dark:text-dark-body border-b border-brand-border dark:border-dark-border">Ações</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {paginatedMovements.map((mov) => (
-                                                    <tr key={mov.id} className="group hover:bg-gray-50 dark:hover:bg-dark-border/10 transition-colors cursor-pointer" onClick={() => handleViewDetails(mov.id)}>
-                                                        <td className="p-4 pl-6 border-b border-brand-border dark:border-dark-border">
-                                                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{mov.displayId}</span>
-                                                        </td>
-                                                        <td className="p-4 border-b border-brand-border dark:border-dark-border">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="w-10 h-10 rounded-lg bg-[#F3F4F6] dark:bg-gray-800 p-1 border border-brand-border dark:border-dark-border flex-shrink-0 overflow-hidden">
-                                                                    <img src={mov.product.image} alt="" className="w-full h-full object-cover" />
-                                                                </div>
-                                                                <div className="flex flex-col">
-                                                                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading leading-none mb-1.5">{mov.product.name}</span>
-                                                                    <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium leading-none">{mov.product.sku}</span>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-4 border-b border-brand-border dark:border-dark-border">
-                                                            <Badge variant={mov.type === 'in' ? 'green' : 'red'}>{mov.type === 'in' ? 'Entrada' : 'Saída'}</Badge>
-                                                        </td>
-                                                        <td className={`p-4 text-[13px] font-bold border-b border-brand-border dark:border-dark-border text-right ${mov.type === 'in' ? 'text-green-600' : 'text-red-600'}`}>
-                                                            {mov.type === 'in' ? '+' : '-'}{mov.quantity}
-                                                        </td>
-                                                        <td className="p-4 text-[13px] font-medium text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border text-right">{mov.product.currentStock}</td>
-                                                        <td className="p-4 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body border-b border-brand-border dark:border-dark-border">{mov.reason}</td>
-                                                        <td className="p-4 text-[13px] border-b border-brand-border dark:border-dark-border">
-                                                            <div className="flex flex-col">
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{mov.date.split(',')[0]}</span>
-                                                                <span className="text-[11px] text-brand-inactive-text dark:text-dark-body">{mov.date.split(',')[1]}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-4 text-center border-b border-brand-border dark:border-dark-border" onClick={(e) => e.stopPropagation()}>
-                                                            <Button variant="outline" size="icon" className="w-8 h-8 rounded-lg">
-                                                                <MoreHorizontalIcon size={16} />
+                                                <div className="flex items-center justify-between pt-2">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] font-bold text-brand-inactive-text dark:text-dark-body uppercase">{mov.date.split(',')[0]}</span>
+                                                        <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">{mov.date.split(',')[1]}</span>
+                                                    </div>
+                                                    
+                                                    <Dropdown
+                                                        trigger={
+                                                            <Button variant="outline" size="icon" className="w-[38px] h-[38px] rounded-full border-brand-border hover:bg-gray-50" onClick={(e) => e.stopPropagation()}>
+                                                                <MoreHorizontalIcon size={18} />
                                                             </Button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                                        }
+                                                        align="right"
+                                                        showChevron={false}
+                                                        fullWidth={false}
+                                                    >
+                                                        <DropdownItem onClick={() => handleViewDetails(mov.id)}>
+                                                            <EyeIcon size={16} /> Ver Detalhes
+                                                        </DropdownItem>
+                                                    </Dropdown>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
-                )}
+                                ) : (
+                                    <div className="w-full overflow-hidden rounded-xl relative">
+                                        <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                        <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
 
-                {paginatedMovements.length > 0 && (
+                                        <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
+                                                <thead>
+                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                        <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
+                                                            <Checkbox
+                                                                checked={selection.size === paginatedMovements.length && paginatedMovements.length > 0}
+                                                                onChange={handleSelectAll}
+                                                                className="bg-white dark:bg-dark-background"
+                                                            />
+                                                        </th>
+                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">ID</th>
+                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Produto</th>
+                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Tipo</th>
+                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-right">Quantidade</th>
+                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-right">Estoque Final</th>
+                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Motivo</th>
+                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Data</th>
+                                                        <th className="py-3 px-4 w-[70px] text-center text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-r-lg bg-brand-gray dark:bg-dark-border/50">Ações</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {paginatedMovements.map((mov) => (
+                                                        <tr 
+                                                            key={mov.id} 
+                                                            className="group hover:bg-gray-50/80 dark:hover:bg-dark-border/5 transition-colors cursor-pointer" 
+                                                            onClick={() => handleViewDetails(mov.id)}
+                                                        >
+                                                            <td className="py-4 px-2 pl-6 border-b border-brand-border dark:border-dark-border" onClick={(e) => e.stopPropagation()}>
+                                                                <Checkbox
+                                                                    checked={selection.has(mov.id)}
+                                                                    onChange={() => handleSelectRow(mov.id)}
+                                                                />
+                                                            </td>
+                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{mov.displayId}</span>
+                                                            </td>
+                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border/20 border border-brand-border dark:border-dark-border flex-shrink-0 overflow-hidden">
+                                                                        <img src={mov.product.image} alt="" className="w-full h-full object-cover rounded-full" />
+                                                                    </div>
+                                                                    <div className="flex flex-col min-w-0">
+                                                                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading leading-tight truncate max-w-[200px] mb-1">{mov.product.name}</span>
+                                                                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium">{mov.product.sku}</span>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                                <Badge variant={mov.type === 'in' ? 'green' : 'red'}>{mov.type === 'in' ? 'Entrada' : 'Saída'}</Badge>
+                                                            </td>
+                                                            <td className={`py-4 px-4 text-[13px] font-bold border-b border-brand-border dark:border-dark-border text-right ${mov.type === 'in' ? 'text-green-600' : 'text-red-600'}`}>
+                                                                {mov.type === 'in' ? '+' : '-'}{mov.quantity}
+                                                            </td>
+                                                            <td className="py-4 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border text-right">{mov.product.currentStock}</td>
+                                                            <td className="py-4 px-4 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body border-b border-brand-border dark:border-dark-border max-w-[200px] truncate">{mov.reason}</td>
+                                                            <td className="py-4 px-4 text-[13px] border-b border-brand-border dark:border-dark-border">
+                                                                <div className="flex flex-col">
+                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{mov.date.split(',')[0]}</span>
+                                                                    <span className="text-[11px] text-brand-inactive-text dark:text-dark-body">{mov.date.split(',')[1]}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-4 px-4 text-center border-b border-brand-border dark:border-dark-border" onClick={(e) => e.stopPropagation()}>
+                                                                <Dropdown
+                                                                    trigger={
+                                                                        <Button variant="outline" size="icon" className="w-[34px] h-[34px] rounded-full border-brand-border hover:bg-white" onClick={(e) => e.stopPropagation()}>
+                                                                            <MoreHorizontalIcon size={16} />
+                                                                        </Button>
+                                                                    }
+                                                                    align="right"
+                                                                    showChevron={false}
+                                                                    fullWidth={false}
+                                                                >
+                                                                    <DropdownItem onClick={() => handleViewDetails(mov.id)}>
+                                                                        <EyeIcon size={14} /> Ver Detalhes
+                                                                    </DropdownItem>
+                                                                </Dropdown>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                {filteredMovements.length > ITEMS_PER_PAGE && (
                     <div className="flex justify-center mb-8 mt-4">
                         <Pagination
                             currentPage={page}

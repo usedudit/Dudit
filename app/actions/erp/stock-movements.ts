@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireUser } from "@/lib/auth/authorization"
+import { requireUser, requirePartner } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { revalidatePath } from "next/cache"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -57,11 +57,10 @@ export async function createStockMovementAction(data: {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
     try {
-        const user = await requireUser()
-        if (!user) return errorResponse("Não autenticado")
-
-        const ctx = await getCurrentPartnerContext()
-        if (!ctx?.partnerId) return errorResponse("Parceiro não encontrado")
+        // Otimização: requirePartner resolve tanto o usuário quanto o parceiro em uma única árvore de cache
+        const partner = await requirePartner()
+        const partnerId = partner.id
+        const userEmail = (await requireUser()).email
 
         if (!data.productId) return errorResponse("Produto inválido")
         if (data.quantity <= 0) return errorResponse("Quantidade deve ser maior que zero")
@@ -73,13 +72,13 @@ export async function createStockMovementAction(data: {
         const fullNotes = `Responsável: ${data.responsible}\nData de Referência: ${data.movementDate}\n${data.notes}`
 
         const { data: movementRecord, error } = await supabase.rpc('create_manual_stock_movement', {
-            p_partner_id: ctx.partnerId,
+            p_partner_id: partnerId,
             p_product_id: data.productId,
             p_movement_type: data.type,
             p_quantity: data.quantity,
             p_reason: data.reason,
             p_notes: fullNotes,
-            p_created_by: user.email,
+            p_created_by: userEmail,
             p_variant_id: data.variantId || null
         })
 
@@ -121,7 +120,7 @@ export async function getStockMovementDetails(id: string) {
                     name,
                     sku,
                     images,
-                    categories ( name )
+                    category
                 )
             `)
             .eq("id", id)
@@ -152,7 +151,7 @@ export async function getStockMovementDetails(id: string) {
                 name: data.products?.name || 'Produto Excluído',
                 sku: data.products?.sku || 'N/A',
                 image: (data.products?.images && data.products.images.length > 0) ? data.products.images[0] : 'https://img.dudit.com.br/static/mascots/Box.png',
-                category: data.products?.categories?.name || 'Sem Categoria',
+                category: data.products?.category || 'Sem Categoria',
                 previousStock: data.previous_quantity || 0,
                 currentStock: data.new_quantity || 0,
             },

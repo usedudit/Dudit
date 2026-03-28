@@ -12,7 +12,10 @@ async function checkFraudulentReview(
   userId: string,
   partnerId: string,
   productId: string | null,
+  serviceId: string | null = null,
 ): Promise<{ isSuspicious: boolean; reason?: string }> {
+  console.log(`[REVIEW CHECK] User: ${userId}, Partner: ${partnerId}, Product: ${productId}, Service: ${serviceId}`)
+
   // 1. Verificar se o usuário é o próprio dono do parceiro
   const { data: partner } = await supabase.from("partners").select("user_id").eq("id", partnerId).single()
 
@@ -20,13 +23,29 @@ async function checkFraudulentReview(
     return { isSuspicious: true, reason: "Você não pode avaliar seus próprios produtos" }
   }
 
-  // 2. Verificar se o usuário tem algum pedido pago deste produto/parceiro
-  const { data: orders } = await supabase
+  // 2. Verificar se o usuário tem algum pedido pago DESTE produto/serviço
+  // Selecionamos com !inner join em order_items para garantir que o item específico exista no pedido
+  let query = supabase
     .from("orders")
-    .select("id")
+    .select("id, order_items!inner(product_id, service_id)")
     .eq("buyer_id", userId)
     .eq("partner_id", partnerId)
     .eq("situation", "paid")
+
+  if (productId) {
+    query = query.eq("order_items.product_id", productId)
+  } else if (serviceId) {
+    query = query.eq("order_items.service_id", serviceId)
+  }
+
+  const { data: orders, error: ordersError } = await query
+
+  if (ordersError) {
+    console.error(`[REVIEW CHECK] Database error querying orders: ${ordersError.message}`)
+    return { isSuspicious: true, reason: "Erro ao verificar histórico de compras" }
+  }
+
+  console.log(`[REVIEW CHECK] Found ${orders?.length || 0} matching paid orders`)
 
   if (!orders || orders.length === 0) {
     return { isSuspicious: true, reason: "Você precisa comprar este produto antes de avaliá-lo" }
@@ -161,7 +180,7 @@ export async function createReviewAction(data: {
   const currentUser = await requireUser()
   const userId = currentUser.id
 
-  const fraudCheck = await checkFraudulentReview(supabase, userId, data.partnerId, data.productId)
+  const fraudCheck = await checkFraudulentReview(supabase, userId, data.partnerId, data.productId, data.serviceId)
 
   if (fraudCheck.isSuspicious) {
     return { error: fraudCheck.reason || "Não foi possível criar a avaliação" }
