@@ -1,27 +1,29 @@
-import "server-only"
-import { cache } from "react"
-import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import type { User } from "@supabase/supabase-js"
+import { NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 
 /**
- * Single request-scoped auth resolver.
- * Ensures `auth.getUser()` is called EXACTLY ONCE per server request.
+ * Supabase Auth PKCE Callback Route.
+ * This route is called by Supabase after a user clicks on an email confirmation
+ * link or completes an OAuth login. It exchanges the "code" parameter for a session.
  */
-export const getCurrentUser = cache(async (): Promise<User | null> => {
-  const timestamp = new Date().toISOString()
-  console.log(`[SUPABASE CALL] auth.getUser() at ${timestamp}`)
-  const supabase = await getSupabaseServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  return user
-})
+export async function GET(request: Request) {
+  const { searchParams, origin } = new URL(request.url)
+  const code = searchParams.get("code")
+  
+  // if "next" is in the search params, use it as the redirection URL (e.g. for inviting users)
+  const next = searchParams.get("next") ?? "/"
 
-/**
- * Fast session-only auth resolver.
- * Reads user from cookies without server-side verification.
- * Use for initial UI state, not for security-critical actions.
- */
-export const getCurrentSession = cache(async (): Promise<User | null> => {
-  const supabase = await getSupabaseServerClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  return session?.user || null
-})
+  if (code) {
+    const supabase = await createClient()
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    
+    if (!error) {
+      // If we have a next URL (from searchParams), redirect there
+      return NextResponse.redirect(`${origin}${next}`)
+    }
+  }
+
+  // Fallback: Redirect to home or an error page
+  // You can customize this if you have a specific error page
+  return NextResponse.redirect(`${origin}/`)
+}

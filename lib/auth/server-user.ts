@@ -14,3 +14,14 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
     const { data: { user } } = await supabase.auth.getUser()
     return user
 })
+
+/**
+ * Fast session-only auth resolver.
+ * Reads user from cookies without server-side verification.
+ * Use for initial UI state, not for security-critical actions.
+ */
+export const getCurrentSession = cache(async (): Promise<User | null> => {
+    const supabase = await getSupabaseServerClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.user || null
+})
