@@ -1355,19 +1355,44 @@ export const getCategoryPathAction = async (categoryId: string) => {
     )()
 }
 
-export const getERPProductsPageData = cache(async () => {
+export const getERPProductsPageData = cache(async (options?: { 
+    limit?: number; 
+    offset?: number;
+    search?: string;
+    category?: string;
+    status?: string;
+}) => {
+    const limit = options?.limit || 100 // Cache larger batch for smoother client experience
+    const offset = options?.offset || 0
+    const search = options?.search?.trim()
+
     const context = await getCurrentPartnerContext()
     if (!context) return null
 
     const partnerId = context.partnerId
     const supabase = await getSupabaseServerClient()
 
-    // 1. Fetch products first (we need IDs for variants)
-    const { data: products, error: prodError } = await supabase
+    // 1. Build Query
+    let query = supabase
         .from("products")
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("partner_id", partnerId)
         .order("created_at", { ascending: false })
+
+    // Optional Search
+    if (search) {
+        query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%,gtin.ilike.%${search}%`)
+    }
+
+    // Optional Filter by Category
+    if (options?.category) {
+        query = query.eq("category", options.category)
+    }
+
+    // Pagination
+    query = query.range(offset, offset + limit - 1)
+
+    const { data: products, count, error: prodError } = await query
 
     if (prodError) {
         console.error("Error fetching ERP products:", prodError)
@@ -1376,7 +1401,7 @@ export const getERPProductsPageData = cache(async () => {
 
     const productIds = products?.map((p: any) => p.id) || []
 
-    // 2. Fetch variants for these products
+    // 2. Fetch variants for these specific products ONLY
     const { data: variants, error: varError } = productIds.length > 0
         ? await supabase
             .from("product_variants")
@@ -1390,6 +1415,7 @@ export const getERPProductsPageData = cache(async () => {
 
     return {
         products: products || [],
+        totalCount: count || 0,
         partnerId: partnerId,
         variants: variants || []
     }

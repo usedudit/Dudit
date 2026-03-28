@@ -7,10 +7,7 @@ import { redis } from "@/lib/redis"
 const GLOBAL_VERSION_KEY = "marketplace:global_cache_version"
 
 // Helper interno para evitar repetição do "max"
-function safeRevalidateTag(tag: string) {
-  // @ts-ignore - Ignora erro se a tipagem local mudar, mas garante o envio do 'max'
-  revalidateTag(tag, "max")
-}
+export const safeRevalidateTag = (tag: string) => revalidateTag(tag)
 
 /**
  * Revalida dados de PRODUTOS

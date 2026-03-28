@@ -61,7 +61,7 @@ export async function invalidateProductCache(
     try {
       const { revalidateTag } = await import('next/cache')
       // @ts-ignore
-      const safeRevalidateTag = (tag: string) => revalidateTag(tag, 'max')
+      const safeRevalidateTag = (tag: string) => revalidateTag(tag)
 
       // Always revalidate the specific product tag (for vitrine consistency)
       safeRevalidateTag(`product-${productId}`)
