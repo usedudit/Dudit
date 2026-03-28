@@ -3,10 +3,9 @@ import type { Metadata } from 'next'
 import { ProductDetailsPageClient } from "@/components/marketplace/ProductDetailsPage"
 import {
   getCachedHomeProducts,
-  getCachedMarketplaceProduct,
   getMarketplaceProduct,
-  getCachedVariants,
-  getCachedReviews,
+  getProductVariants,
+  getProductReviews,
 } from "@/app/actions/marketplace/products"
 import { createSlug } from "@/lib/utils/slugify"
 import { getProductUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
@@ -102,7 +101,7 @@ export default async function ProductDetailsPage({
   // Parallelize ALL independent data fetching
   const [user, product] = await Promise.all([
     getCurrentUser(),
-    getCachedMarketplaceProduct(id),
+    getMarketplaceProduct(id),
   ])
   const sessionData = user ? await getUserSessionData(user.id) : null
 
@@ -116,16 +115,6 @@ export default async function ProductDetailsPage({
     redirect("/")
   }
 
-  // --- VISIBILITY CHECK (Dynamic) ---
-  const partnerUserId = product.partners?.user_id
-  const isOwner = user && partnerUserId === user.id
-  const isPubliclyVisible = product.is_active && product.moderation_status === 'approved' && product.show_in_marketplace !== false
-
-  if (!isPubliclyVisible && !isOwner) {
-    redirect("/")
-  }
-  // ----------------------------------
-
   // --- MÁGICA DE SEO (Canonical Redirect) ---
   const correctUrl = getProductUrl(product)
   const currentPath = `/produto/${currentSlug}/${currentCidadeUf}/p/${id}`
@@ -134,10 +123,11 @@ export default async function ProductDetailsPage({
   }
   // ------------------------------------------
 
-  // 2. Fetch variants + reviews in parallel (CACHED)
+
+  // 2. Fetch variants + reviews in parallel (Deduplicated but fresh)
   const [variants, reviews] = await Promise.all([
-    getCachedVariants(id),
-    getCachedReviews(id)
+    getProductVariants(id),
+    getProductReviews(id)
   ])
 
   // Lógica de Preço Mínimo para Variante
