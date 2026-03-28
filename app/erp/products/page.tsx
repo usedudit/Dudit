@@ -32,7 +32,6 @@ export default async function ProductsPageServer() {
                 <Suspense fallback={<div className='p-4'>Carregando produtos...</div>}>
                     <ProductsPage
                         products={data.products}
-                        totalCount={data.totalCount}
                         partnerId={partnerId}
                         suppliers={[]}
                     />

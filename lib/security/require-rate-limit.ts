@@ -67,8 +67,7 @@ async function getCurrentUserId(): Promise<string | null> {
  */
 async function buildIdentifier(
     identifierType: IdentifierType,
-    endpointName?: string,
-    providedUserId?: string
+    endpointName?: string
 ): Promise<string> {
     switch (identifierType) {
         case IdentifierType.IP: {
@@ -77,7 +76,7 @@ async function buildIdentifier(
         }
 
         case IdentifierType.USER: {
-            const userId = providedUserId || await getCurrentUserId()
+            const userId = await getCurrentUserId()
             if (userId) return `user:${userId}`
             // Fallback to IP if user is not authenticated
             const ip = await getClientIP()
@@ -86,7 +85,7 @@ async function buildIdentifier(
 
         case IdentifierType.USER_PLUS_IP: {
             const [userId, ip] = await Promise.all([
-                providedUserId || getCurrentUserId(),
+                getCurrentUserId(),
                 getClientIP(),
             ])
             if (userId) return `user:${userId}:ip:${ip}`
@@ -118,14 +117,16 @@ async function buildIdentifier(
  *
  *   await requireRateLimit(RateLimitCategory.UPLOAD)
  *
- * @param category - The rate limit category to apply
- * @param endpointName - Optional: specific endpoint name (for webhooks)
- * @param userId - Optional: pre-resolved user ID to avoid redundant auth calls
+ * For webhooks, pass the endpoint name:
+ *
+ *   await requireRateLimit(RateLimitCategory.WEBHOOK, "mercadopago-webhook")
+ *
+ * @throws {RateLimitError} if the rate limit is exceeded AND the category has failClosed=true
+ * @returns {{ success: true }} if allowed, or {{ success: false, error: string }} if exceeded (for non-failClosed)
  */
 export async function requireRateLimit(
     category: RateLimitCategory,
-    endpointName?: string,
-    userId?: string
+    endpointName?: string
 ): Promise<{ success: boolean; error?: string }> {
     const config = RATE_LIMIT_CONFIGS[category]
     const limiter = getLimiter(category)
@@ -133,8 +134,7 @@ export async function requireRateLimit(
     try {
         const identifier = await buildIdentifier(
             config.identifierType,
-            endpointName,
-            userId
+            endpointName
         )
 
         const { success, reset } = await limiter.limit(identifier)
@@ -178,22 +178,17 @@ export async function requireRateLimit(
 /**
  * Check rate limit and return an error response for API routes.
  * Returns null if the request is allowed, or a formatted error if rate-limited.
- *
- * @param category - Rate limit category
- * @param endpointName - Optional endpoint name
- * @param userId - Optional: pre-resolved user ID to skip extra auth hits
  */
 export async function checkRateLimitForAPI(
     category: RateLimitCategory,
-    endpointName?: string,
-    userId?: string
+    endpointName?: string
 ): Promise<{
     limited: boolean
     status?: number
     body?: { error: string; retryAfter?: number }
 }> {
     try {
-        const result = await requireRateLimit(category, endpointName, userId)
+        const result = await requireRateLimit(category, endpointName)
         if (!result.success) {
             return {
                 limited: true,

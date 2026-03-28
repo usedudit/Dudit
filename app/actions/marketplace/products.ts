@@ -134,7 +134,7 @@ export const getCachedMarketplaceProduct = async (id: string) => {
   const fn = unstable_cache(
     async () => _getMarketplaceProductBase(id),
     [`product-details-${id}-v13`],
-    { tags: ["marketplace-product", `product-${id}`], revalidate: 3600 }
+    { tags: ["marketplace-product", `product-${id}`] }
   )
   return fn()
 }
@@ -153,7 +153,7 @@ export const getCachedVariants = async (productId: string) => {
       return data || []
     },
     [`marketplace-variants-${productId}`],
-    { tags: ["marketplace-variants", `product-${productId}`], revalidate: 3600 }
+    { tags: ["marketplace-variants", `product-${productId}`] }
   )
   return fn()
 }
@@ -175,7 +175,7 @@ export const getCachedReviews = async (productId: string) => {
       return data || []
     },
     [`marketplace-reviews-${productId}`],
-    { tags: ["marketplace-reviews", `product-${productId}`], revalidate: 3600 }
+    { tags: ["marketplace-reviews", `product-${productId}`] }
   )
   return fn()
 }
