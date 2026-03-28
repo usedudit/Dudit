@@ -11,24 +11,26 @@ export default async function StockMovementsPage() {
   const partner = await getCurrentPartner()
 
   if (!partner) {
-    redirect("/dashboard")
+    redirect("")
   }
 
   const movements = await getStockMovementsCached(partner.id)
+
+  const userProfile = {
+    fullName: user.email?.split("@")[0] || "Usuário",
+    email: user.email || "",
+    initials: (user.email?.[0] || "U").toUpperCase(),
+    avatarColor: "bg-brand-primary"
+  }
 
   return (
     <>
       <ERPHeader
         pageTitle="Movimentação de Estoque"
-        userProfile={{
-          fullName: user.email?.split("@")[0] || "Usuário",
-          email: user.email || "",
-          initials: (user.email?.[0] || "U").toUpperCase(),
-          avatarColor: "bg-brand-primary"
-        }}
+        userProfile={userProfile}
       />
-      <FadeIn className="flex-1 overflow-y-auto">
-        <Suspense fallback={<div className='p-8 flex justify-center text-brand-inactive-text'>Carregando movimentações...</div>}>
+      <FadeIn className="p-4">
+        <Suspense fallback={<div className='p-4'>Carregando movimentações...</div>}>
           <StockMovementPageContent
             partnerId={partner.id}
             movements={movements || []}

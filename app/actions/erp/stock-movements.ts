@@ -162,3 +162,33 @@ export async function getStockMovementDetails(id: string) {
         return errorResponse("Erro interno ao buscar detalhes")
     }
 }
+
+export async function deleteStockMovementAction(id: string) {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+
+    try {
+        const ctx = await getCurrentPartnerContext()
+        if (!ctx?.partnerId) return errorResponse("Parceiro não encontrado")
+
+        const supabase = await getSupabaseServerClient()
+
+        const { error } = await supabase
+            .from("stock_movements")
+            .delete()
+            .eq("id", id)
+            .eq("partner_id", ctx.partnerId)
+
+        if (error) {
+            console.error("deleteStockMovementAction error:", error)
+            return errorResponse(error.message)
+        }
+
+        revalidatePath('/erp/stock-movements')
+        revalidatePath('/erp/products')
+
+        return successResponse({ id })
+    } catch (err: any) {
+        console.error("deleteStockMovementAction error:", err)
+        return errorResponse("Erro interno ao deletar movimentação")
+    }
+}

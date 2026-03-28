@@ -14,9 +14,9 @@ import {
   PlusIcon,
   FileIcon,
   Settings2Icon,
-  TransferIcon,
-  TrendUpIcon,
-  TrendDownIcon,
+  ArrowUpDownIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
 } from "@/lib/icons"
 
 interface FilterState {
@@ -92,13 +92,13 @@ const StockMovementPageControls: React.FC<StockMovementPageControlsProps> = ({
           onValueChange={(val) => setActiveTab(val as "all" | "in" | "out")}
         >
           <TabsList className="px-0">
-            <TabsTrigger value="all" icon={TransferIcon}>
+            <TabsTrigger value="all" icon={ArrowUpDownIcon}>
               Todas
             </TabsTrigger>
-            <TabsTrigger value="in" icon={TrendUpIcon}>
+            <TabsTrigger value="in" icon={ArrowUpIcon}>
               Entradas
             </TabsTrigger>
-            <TabsTrigger value="out" icon={TrendDownIcon}>
+            <TabsTrigger value="out" icon={ArrowDownIcon}>
               Saídas
             </TabsTrigger>
           </TabsList>

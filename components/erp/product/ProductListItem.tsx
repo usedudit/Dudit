@@ -149,7 +149,7 @@ const ProductListItem = React.memo(
                 trigger={
                   <Button
                     variant="outline"
-                    className="w-[40px] h-[40px] p-0 flex items-center justify-center bg-transparent"
+                    className="w-[40px] h-[40px] p-0 flex items-center justify-center"
                   >
                     <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
                   </Button>

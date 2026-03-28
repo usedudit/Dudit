@@ -10,7 +10,7 @@ import { Button } from "@/components/reusable/Button"
 // Tipos de variantes para mudar a cor do ícone/botão
 type AlertVariant = "danger" | "success" | "warning" | "info"
 
-interface AlertModalProps {
+export interface AlertModalProps {
   title: string
   message?: string | React.ReactElement
   description?: string
@@ -23,6 +23,7 @@ interface AlertModalProps {
   variant?: AlertVariant
   isDestructive?: boolean
   disabled?: boolean
+  isLoading?: boolean
 }
 
 // Configuração de cores baseada na variante
@@ -99,7 +100,8 @@ const AlertModal: React.FC<AlertModalProps> = ({
   icon,
   variant,
   isDestructive,
-  disabled
+  disabled,
+  isLoading
 }) => {
   const [isAnimating, setIsAnimating] = useState(false)
   const isMobile = useMediaQuery("(max-width: 768px)")
@@ -153,6 +155,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
         onClick={() => handleButtonClick(handleConfirm)}
         className="transition-all duration-200"
         disabled={disabled}
+        isLoading={isLoading}
       >
         {confirmText}
       </Button>
@@ -196,7 +199,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
           <div className="z-10 w-full flex flex-col gap-3 pt-4">
             {isConfirmation ? (
               <>
-                <Button variant={styles.button} onClick={() => handleButtonClick(handleConfirm)} className="w-full">
+                <Button variant={styles.button} onClick={() => handleButtonClick(handleConfirm)} className="w-full" isLoading={isLoading}>
                   {confirmText}
                 </Button>
                 <Button variant="outline" onClick={() => handleButtonClick(handleClose)} className="w-full bg-transparent">

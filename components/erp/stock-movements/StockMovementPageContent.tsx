@@ -3,35 +3,23 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-    ChevronDownIcon,
     PlusIcon,
-    MoreHorizontalIcon,
-    ChevronUpIcon,
     FileIcon,
-    FilterIcon,
-    ListIcon,
-    BoxIcon,
-    TrendUpIcon,
-    TrendDownIcon,
-    TransferIcon,
-    EyeIcon,
-    TrashIcon
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, Checkbox, IconPlaceholder, Input } from '@/components/reusable';
-import { Badge } from '@/components/reusable/Badge';
-import Dropdown from '@/components/reusable/Dropdown';
-import { DropdownItem } from '@/components/reusable/Dropdown';
+import { Button, Checkbox, IconPlaceholder, Input, Badge, AlertModal } from '@/components/reusable';
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet";
 import Pagination from "@/components/reusable/Pagination";
 import CreateStockMovement from './CreateStockMovement';
 import StockMovementDetailPage from './StockMovementDetailPage';
 import StockMovementPageControls from './StockMovementPageControls';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
-import { getStockMovementDetails } from '@/app/actions/erp/stock-movements';
+import { getStockMovementDetails, deleteStockMovementAction } from '@/app/actions/erp/stock-movements';
 import { useNotification } from '@/hooks/use-notification';
 import { useMediaQuery } from '@/components/erp/hooks';
 import { useStoreData } from "@/lib/use-store-data";
+import StockMovementListItem from './StockMovementListItem';
+import StockMovementGridCard from './StockMovementGridCard';
 
 interface StockMovementPageProps {
     partnerId: string;
@@ -55,7 +43,7 @@ const MOVEMENT_TYPE_LABELS: Record<string, string> = {
 
 const StockMovementPageContent = ({ partnerId, movements: initialMovements }: StockMovementPageProps) => {
     const router = useRouter();
-    const { error: notifyError } = useNotification();
+    const { error: notifyError, success: notifySuccess } = useNotification();
     const { selectedStore } = useStoreData(partnerId);
     const isMobile = useMediaQuery("(max-width: 768px)");
 
@@ -74,7 +62,10 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
     });
     const [modals, setModals] = useState({
         filter: false,
+        delete: false,
     });
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
     const [selection, setSelection] = useState<Set<string>>(new Set());
 
@@ -115,10 +106,39 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
         if (res.success) {
             setSelectedMovementDetails(res.data);
         } else {
-            notifyError('Erro', res.error || 'Erro ao carregar os detalhes.');
+            notifyError('Erro ao carregar detalhes.');
             setSelectedMovementId(null);
         }
         setIsLoadingDetails(false);
+    };
+
+    const handleDeleteClick = (id: string) => {
+        setDeletingId(id);
+        setModals(prev => ({ ...prev, delete: true }));
+    };
+
+    const confirmDelete = async () => {
+        if (!deletingId) return;
+        setIsDeleting(true);
+        try {
+            const res = await deleteStockMovementAction(deletingId);
+            if (res.success) {
+                notifySuccess('Movimentação excluída com sucesso.');
+                setSelection(prev => {
+                    const next = new Set(prev);
+                    next.delete(deletingId);
+                    return next;
+                });
+            } else {
+                notifyError(res.error || 'Erro ao deletar.');
+            }
+        } catch (err) {
+            notifyError('Erro de conexão.');
+        } finally {
+            setIsDeleting(false);
+            setModals(prev => ({ ...prev, delete: false }));
+            setDeletingId(null);
+        }
     };
 
     const handleTabChange = (tab: TabType) => {
@@ -153,6 +173,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                 quantity: Math.abs(mov.quantity),
                 reason,
                 user: mov.created_by ? mov.created_by.split('@')[0] : 'Sistema',
+                reference: mov.reference_type || "-",
             };
         });
     }, [initialMovements]);
@@ -218,6 +239,17 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
         setFilters({ movement_type: [] });
     };
 
+    const columns = [
+        { id: "product", label: "Produto", align: "left" as const },
+        { id: "type", label: "Tipo", align: "left" as const, width: "120px" },
+        { id: "quantity", label: "Quantidade", align: "right" as const, width: "120px" },
+        { id: "currentStock", label: "Estoque Final", align: "right" as const, width: "120px" },
+        { id: "reason", label: "Motivo", align: "left" as const },
+        { id: "reference", label: "Referência", align: "left" as const },
+        { id: "date", label: "Data", align: "left" as const, width: "160px" },
+        { id: "actions", label: "Ações", align: "center" as const, width: "80px" },
+    ];
+
     if (isCreating) {
         return (
             <CreateStockMovement
@@ -238,16 +270,21 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
     }
 
     return (
-        <div className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden transition-colors duration-300">
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
+            className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
+        >
             <style>{`
-                .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
-                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
-                .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
-                .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-                .hide-scrollbar::-webkit-scrollbar { display: none; }
-                .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-            `}</style>
+               .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
+               .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+               .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
+               .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
+               .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+               .hide-scrollbar::-webkit-scrollbar { display: none; }
+               .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+             `}</style>
 
             <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
                 <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
@@ -256,7 +293,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                             Movimentação de Estoque
                         </h1>
                         <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                            Gerencie as entradas e saídas de produtos do seu inventário.
+                            Gerencie as entradas e saídas do seu inventário.
                         </p>
                     </div>
 
@@ -277,11 +314,11 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                     setActiveTab={handleTabChange}
                     search={searchTerm}
                     onSearchChange={setSearchTerm}
-                    onOpenFilter={() => setModals({ filter: true })}
+                    onOpenFilter={() => setModals(prev => ({ ...prev, filter: true }))}
                     onExport={() => { }}
                     onAddMovement={() => setIsCreating(true)}
                     filters={filters}
-                    setFilters={setFilters as any}
+                    setFilters={setFilters}
                     viewMode={viewMode}
                     onViewModeChange={setViewModeState}
                     hasActiveFilters={hasActiveFilters}
@@ -302,7 +339,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                     imageSrc={isFiltered ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png" : "https://img.dudit.com.br/static/mascots/MovimentacaoEstoque.png"}
                                     imageAlt="Sem movimentações"
                                     title={isFiltered ? "Nenhuma movimentação encontrada" : "Sem movimentações"}
-                                    subtitle={isFiltered ? "Tente ajustar seus filtros ou termos de busca." : "Ainda não houve entradas ou saídas de estoque."}
+                                    subtitle={isFiltered ? "Tente ajustar seus filtros ou termos de busca." : "Sua história de movimentações aparecerá aqui."}
                                     itemButton={!isFiltered ? {
                                         text: "Nova Movimentação",
                                         action: () => setIsCreating(true),
@@ -356,67 +393,14 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                 ) : viewMode === 'grid' ? (
                                     <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                         {paginatedMovements.map((mov) => (
-                                            <div
+                                            <StockMovementGridCard
                                                 key={mov.id}
-                                                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[20px] p-5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group relative flex flex-col h-full"
-                                                onClick={() => handleViewDetails(mov.id)}
-                                            >
-                                                <div className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                                                    <Checkbox
-                                                        checked={selection.has(mov.id)}
-                                                        onChange={() => handleSelectRow(mov.id)}
-                                                    />
-                                                </div>
-
-                                                <div className="flex gap-4 mb-5">
-                                                    <div className="w-20 h-20 rounded-full bg-brand-gray dark:bg-dark-border/20 border border-brand-border dark:border-dark-border flex-shrink-0 overflow-hidden">
-                                                        <img src={mov.product.image} alt="" className="w-full h-full object-cover rounded-full" />
-                                                    </div>
-
-                                                    <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-                                                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">{mov.product.name}</h3>
-                                                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">{mov.product.sku}</span>
-                                                        <Badge variant={mov.type === 'in' ? 'green' : 'red'} className="w-max mt-1 px-2 py-0.5 text-[10px]">
-                                                            {mov.type === 'in' ? 'Entrada' : 'Saída'}
-                                                        </Badge>
-                                                    </div>
-                                                </div>
-
-                                                <div className="grid grid-cols-2 gap-4 mb-5 pt-4 border-t border-brand-border dark:border-dark-border mt-auto">
-                                                    <div>
-                                                        <span className="block text-[10px] text-brand-inactive-text dark:text-dark-body font-bold uppercase tracking-wider mb-1">Quantidade</span>
-                                                        <span className={`text-[14px] font-bold ${mov.type === 'in' ? 'text-green-600' : 'text-red-600'}`}>
-                                                            {mov.type === 'in' ? '+' : '-'}{mov.quantity}
-                                                        </span>
-                                                    </div>
-                                                    <div>
-                                                        <span className="block text-[10px] text-brand-inactive-text dark:text-dark-body font-bold uppercase tracking-wider mb-1">Estoque Final</span>
-                                                        <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{mov.product.currentStock}</span>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex items-center justify-between pt-2">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[10px] font-bold text-brand-inactive-text dark:text-dark-body uppercase">{mov.date.split(',')[0]}</span>
-                                                        <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">{mov.date.split(',')[1]}</span>
-                                                    </div>
-
-                                                    <Dropdown
-                                                        trigger={
-                                                            <Button variant="outline" size="icon" className="w-[38px] h-[38px] rounded-full border-brand-border hover:bg-gray-50" onClick={(e) => e.stopPropagation()}>
-                                                                <MoreHorizontalIcon size={18} />
-                                                            </Button>
-                                                        }
-                                                        align="right"
-                                                        showChevron={false}
-                                                        fullWidth={false}
-                                                    >
-                                                        <DropdownItem onClick={() => handleViewDetails(mov.id)}>
-                                                            <EyeIcon size={16} /> Ver Detalhes
-                                                        </DropdownItem>
-                                                    </Dropdown>
-                                                </div>
-                                            </div>
+                                                movement={mov}
+                                                selected={selection.has(mov.id)}
+                                                onSelect={() => handleSelectRow(mov.id)}
+                                                onDelete={handleDeleteClick}
+                                                onDetails={handleViewDetails}
+                                            />
                                         ))}
                                     </div>
                                 ) : (
@@ -435,74 +419,28 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                                                 className="bg-white dark:bg-dark-background"
                                                             />
                                                         </th>
-                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">ID</th>
-                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Produto</th>
-                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Tipo</th>
-                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-right">Quantidade</th>
-                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-right">Estoque Final</th>
-                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Motivo</th>
-                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Data</th>
-                                                        <th className="py-3 px-4 w-[70px] text-center text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-r-lg bg-brand-gray dark:bg-dark-border/50">Ações</th>
+                                                        {columns.map(col => (
+                                                            <th
+                                                                key={col.id}
+                                                                className={`py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}
+                                                                style={{ width: col.width }}
+                                                            >
+                                                                {col.label}
+                                                            </th>
+                                                        ))}
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     {paginatedMovements.map((mov) => (
-                                                        <tr
+                                                        <StockMovementListItem
                                                             key={mov.id}
-                                                            className="group hover:bg-gray-50/80 dark:hover:bg-dark-border/5 transition-colors cursor-pointer"
-                                                            onClick={() => handleViewDetails(mov.id)}
-                                                        >
-                                                            <td className="py-4 px-2 pl-6 border-b border-brand-border dark:border-dark-border" onClick={(e) => e.stopPropagation()}>
-                                                                <Checkbox
-                                                                    checked={selection.has(mov.id)}
-                                                                    onChange={() => handleSelectRow(mov.id)}
-                                                                />
-                                                            </td>
-                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{mov.displayId}</span>
-                                                            </td>
-                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                                <div className="flex items-center gap-3">
-                                                                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border/20 border border-brand-border dark:border-dark-border flex-shrink-0 overflow-hidden">
-                                                                        <img src={mov.product.image} alt="" className="w-full h-full object-cover rounded-full" />
-                                                                    </div>
-                                                                    <div className="flex flex-col min-w-0">
-                                                                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading leading-tight truncate max-w-[200px] mb-1">{mov.product.name}</span>
-                                                                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium">{mov.product.sku}</span>
-                                                                    </div>
-                                                                </div>
-                                                            </td>
-                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                                <Badge variant={mov.type === 'in' ? 'green' : 'red'}>{mov.type === 'in' ? 'Entrada' : 'Saída'}</Badge>
-                                                            </td>
-                                                            <td className={`py-4 px-4 text-[13px] font-bold border-b border-brand-border dark:border-dark-border text-right ${mov.type === 'in' ? 'text-green-600' : 'text-red-600'}`}>
-                                                                {mov.type === 'in' ? '+' : '-'}{mov.quantity}
-                                                            </td>
-                                                            <td className="py-4 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border text-right">{mov.product.currentStock}</td>
-                                                            <td className="py-4 px-4 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body border-b border-brand-border dark:border-dark-border max-w-[200px] truncate">{mov.reason}</td>
-                                                            <td className="py-4 px-4 text-[13px] border-b border-brand-border dark:border-dark-border">
-                                                                <div className="flex flex-col">
-                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{mov.date.split(',')[0]}</span>
-                                                                    <span className="text-[11px] text-brand-inactive-text dark:text-dark-body">{mov.date.split(',')[1]}</span>
-                                                                </div>
-                                                            </td>
-                                                            <td className="py-4 px-4 text-center border-b border-brand-border dark:border-dark-border" onClick={(e) => e.stopPropagation()}>
-                                                                <Dropdown
-                                                                    trigger={
-                                                                        <Button variant="outline" size="icon" className="w-[34px] h-[34px] rounded-full border-brand-border hover:bg-white" onClick={(e) => e.stopPropagation()}>
-                                                                            <MoreHorizontalIcon size={16} />
-                                                                        </Button>
-                                                                    }
-                                                                    align="right"
-                                                                    showChevron={false}
-                                                                    fullWidth={false}
-                                                                >
-                                                                    <DropdownItem onClick={() => handleViewDetails(mov.id)}>
-                                                                        <EyeIcon size={14} /> Ver Detalhes
-                                                                    </DropdownItem>
-                                                                </Dropdown>
-                                                            </td>
-                                                        </tr>
+                                                            movement={mov}
+                                                            columns={columns}
+                                                            selected={selection.has(mov.id)}
+                                                            onSelect={handleSelectRow}
+                                                            onDelete={handleDeleteClick}
+                                                            onDetails={handleViewDetails}
+                                                        />
                                                     ))}
                                                 </tbody>
                                             </table>
@@ -527,13 +465,24 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
 
             <FilterSheet
                 isOpen={modals.filter}
-                onClose={() => setModals({ filter: false })}
+                onClose={() => setModals(prev => ({ ...prev, filter: false }))}
                 sections={filterSections}
                 filters={filters}
                 setFilters={setFilters as any}
                 onClear={() => setFilters({ movement_type: [] })}
             />
-        </div>
+
+            <AlertModal
+                isOpen={modals.delete}
+                onClose={() => setModals(prev => ({ ...prev, delete: false }))}
+                onConfirm={confirmDelete}
+                title="Excluir movimentação?"
+                description="Esta ação removerá permanentemente o histórico desta movimentação. Esta ação não pode ser desfeita."
+                confirmText={isDeleting ? "Excluindo..." : "Excluir"}
+                variant="danger"
+                isLoading={isDeleting}
+            />
+        </motion.div >
     );
 };
 

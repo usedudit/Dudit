@@ -42,8 +42,6 @@ import {
   ArrowDown01Icon,
   ArrowUp01Icon,
   ArrowLeft01Icon,
-  ArrowUp02Icon,
-  ArrowDown02Icon,
   ArrowRight01Icon,
   ArrowRight02Icon,
   ArrowLeft02Icon,
@@ -54,7 +52,6 @@ import {
   Facebook02Icon,
   TelegramIcon as TelegramIcon01,
   Linkedin02Icon,
-  DiceFaces03Icon,
   Delete02Icon,
   AlertCircleIcon as AlertCircleIcon01,
   Alert02Icon,
@@ -66,7 +63,6 @@ import {
   Copy01Icon,
   PencilEdit02Icon,
   Share01Icon,
-  LinkSquare01Icon,
   InformationCircleIcon,
   SparklesIcon as CoreSparklesIcon,
   Cancel01Icon,
@@ -301,9 +297,6 @@ export const TelegramIcon = createIcon(TelegramIcon01)
 export const LinkedinIcon = createIcon(Linkedin02Icon)
 
 export const WrenchIcon = createIcon(Wrench01Icon)
-export const TrendUpIcon = createIcon(ArrowUp02Icon)
-export const TrendDownIcon = createIcon(ArrowDown02Icon)
-export const TransferIcon = createIcon(ArrowUpDown)
 
 // ============================
 // BUSINESS / APP
