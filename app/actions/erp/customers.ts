@@ -30,6 +30,7 @@ export async function createComprehensiveCustomerAction(data: {
   city: string
   state: string
   municipioCodigoIbge?: string | null
+  store_credit?: number
   csrf_token?: string
 }) {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -65,6 +66,7 @@ export async function createComprehensiveCustomerAction(data: {
     inscricao_estadual: data.inscricaoEstadual || null,
     regime_tributario: data.regimeTributario || null,
     contribuinte_icms: data.contribuinteIcms || null,
+    store_credit: data.store_credit ?? 0,
   }).select().single()
 
   if (error) {
@@ -231,6 +233,7 @@ export async function updateComprehensiveCustomerAction(data: {
   city: string
   state: string
   municipioCodigoIbge?: string | null
+  store_credit?: number
   csrf_token?: string
 }) {
   // Validate CSRF token
@@ -276,6 +279,7 @@ export async function updateComprehensiveCustomerAction(data: {
       city: data.city || null,
       state: data.state || null,
       municipio_codigo_ibge: data.municipioCodigoIbge || null,
+      store_credit: data.store_credit,
     })
     .eq("id", data.customerId)
     .eq("partner_id", data.partnerId) // Defense in depth

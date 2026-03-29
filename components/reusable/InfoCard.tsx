@@ -23,10 +23,10 @@ const colorMap: Record<InfoCardColor, { bg: string; text: string; bar: string; b
     border: "border-brand-green"
   },
   gray: {
-    bg: "bg-brand-gray",
-    text: "text-brand-gray",
-    bar: "bg-brand-border",
-    border: "border-brand-border"
+    bg: "bg-brand-gray dark:bg-brand-gray/50",
+    text: "text-brand-dark dark:text-dark-heading",
+    bar: "bg-brand-border dark:bg-brand-gray/50",
+    border: "border-brand-border/50 dark:border-dark-border/50"
   },
   red: {
     bg: "bg-brand-red/10",

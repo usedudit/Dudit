@@ -1,3 +1,5 @@
+"use client"
+
 import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } from "react"
 import {
     Tabs,
@@ -14,12 +16,14 @@ import {
 } from "@/components/reusable"
 import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { CpfCnpjInput } from "@/components/reusable/Inputs/CpfCnpjInput"
-import { ChevronLeftIcon, SaveIcon, EditIcon, ChevronDownIcon } from "@/lib/icons"
+import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
+import { ChevronLeftIcon, SaveIcon, EditIcon, SearchIcon } from "@/lib/icons"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useNotification } from "@/hooks/use-notification"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
 import { createComprehensiveCustomerAction } from "@/app/actions/erp/customers"
+import { consultarCNPJ } from "@/lib/nuvem-fiscal"
 
 const ESTADOS_BRASIL = [
     { value: "AC", label: "AC" }, { value: "AL", label: "AL" }, { value: "AP", label: "AP" }, { value: "AM", label: "AM" },
@@ -57,7 +61,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
     // Form State
     const [personType, setPersonType] = useState("Pessoa Jurídica")
     const [customerName, setCustomerName] = useState("")
-    const [storeCredit, setStoreCredit] = useState("")
+    const [storeCredit, setStoreCredit] = useState(0)
     const [fantasia, setFantasia] = useState("")
     const [cnpj, setCnpj] = useState("")
     const [ie, setIe] = useState("")
@@ -93,6 +97,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
     const [billingAddressType, setBillingAddressType] = useState("Casa")
 
     const [isSaving, setIsSaving] = useState(false)
+    const [isSearchingCnpj, setIsSearchingCnpj] = useState(false)
 
     const isDirty = useMemo(() => {
         return customerName !== "" || fantasia !== "" || cnpj !== "" || ie !== "" || cpf !== "" || rg !== "" ||
@@ -116,6 +121,36 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
         nextAction?.()
         setShowAlertModal(false)
     }, [nextAction])
+
+    const handleCnpjBlur = useCallback(async () => {
+        const cleanCnpj = cnpj.replace(/\D/g, "")
+        if (cleanCnpj.length === 14) {
+            setIsSearchingCnpj(true)
+            try {
+                const data = await consultarCNPJ(cleanCnpj)
+                if (data && !data.error) {
+                    if (data.razao_social) setCustomerName(data.razao_social)
+                    if (data.nome_fantasia) setFantasia(data.nome_fantasia)
+                    if (data.email) setEmail(data.email)
+                    if (data.telefone) setMobile(data.telefone)
+                    if (data.cep) setCep(data.cep)
+                    if (data.logradouro) setStreet(data.logradouro)
+                    if (data.numero) setNumber(data.numero)
+                    if (data.complemento) setComplement(data.complemento)
+                    if (data.bairro) setNeighborhood(data.bairro)
+                    if (data.municipio) setCity(data.municipio)
+                    if (data.uf) setUf(data.uf)
+                    notifySuccess("Dados da empresa importados com sucesso!")
+                } else if (data?.error) {
+                    notifyError("CNPJ não encontrado ou erro na consulta.")
+                }
+            } catch (error) {
+                console.error("Erro ao consultar CNPJ:", error)
+            } finally {
+                setIsSearchingCnpj(false)
+            }
+        }
+    }, [cnpj, notifySuccess, notifyError])
 
     const getCsrfToken = async (): Promise<string> => {
         const { token } = await (await fetch("/api/csrf-token")).json()
@@ -152,6 +187,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                 city: city,
                 state: uf,
                 csrf_token: token,
+                store_credit: storeCredit
             })
 
             if (res.error) {
@@ -181,8 +217,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                             <div className="max-w-[1400px] mx-auto relative px-4 md:px-8 md:pt-6">
 
                                 {/* Back button — desktop only */}
-                                <div className={`absolute -left-12 top-8 h-full hidden xl:flex justify-center transition-all duration-300 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                    <Button variant="ghost" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-dark-border">
+                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-300 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                    <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
                                 </div>
@@ -209,14 +245,6 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                             {isSaving ? "Salvando..." : "Salvar Cliente"}
                                         </Button>
                                     </div>
-                                </div>
-
-                                {/* Mobile Title Row */}
-                                <div className="md:hidden flex items-center gap-3 py-4">
-                                    <button onClick={handleBack} className="p-2 -ml-2 text-brand-inactive-text">
-                                        <ChevronLeftIcon size={24} />
-                                    </button>
-                                    <h1 className="text-xl font-bold text-brand-dark dark:text-dark-heading truncate">{pageTitle}</h1>
                                 </div>
 
                                 {/* Tabs */}
@@ -255,7 +283,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                             <FormDropdown
                                                                 label="Status"
                                                                 value={status}
-                                                                setValue={setStatus}
+                                                                setValue={(val) => setStatus(val)}
                                                                 options={[
                                                                     { value: "Ativo", label: "Ativo" },
                                                                     { value: "Inativo", label: "Inativo" },
@@ -295,14 +323,24 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                         {personType === "Pessoa Jurídica" ? (
                                                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
                                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                                                    <CpfCnpjInput label="CNPJ" placeholder="00.000.000/0000-00" value={cnpj} onChange={(e) => setCnpj(e.target.value)} name="cnpj" />
+                                                                    <div className="flex flex-col gap-1.5">
+                                                                        <CpfCnpjInput 
+                                                                            label="CNPJ" 
+                                                                            placeholder="00.000.000/0000-00" 
+                                                                            value={cnpj} 
+                                                                            onChange={(e) => setCnpj(e.target.value)} 
+                                                                            onBlur={handleCnpjBlur}
+                                                                            name="cnpj" 
+                                                                        />
+                                                                        {isSearchingCnpj && <span className="text-[11px] text-brand-primary animate-pulse font-medium">Consultando CNPJ...</span>}
+                                                                    </div>
                                                                     <FormInput label="Inscrição Estadual" placeholder="Isento ou número da IE" value={ie} onChange={(e) => setIe(e.target.value)} />
                                                                 </div>
                                                                 <FormInput label="Nome Fantasia" placeholder="Nome comercial" value={fantasia} onChange={(e) => setFantasia(e.target.value)} />
                                                                 <FormDropdown
                                                                     label="Contribuinte"
                                                                     value={contribuinte}
-                                                                    setValue={setContribuinte}
+                                                                    setValue={(val) => setContribuinte(val)}
                                                                     options={[
                                                                         { value: "1 - Contribuinte ICMS", label: "1 - Contribuinte ICMS" },
                                                                         { value: "2 - Contribuinte Isento", label: "2 - Contribuinte Isento" },
@@ -351,7 +389,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                                         setStreet(data.street)
                                                                         setNeighborhood(data.neighborhood)
                                                                         setCity(data.city)
-                                                                        setUf(data.state)
+                                                                        setUf(data.state || "SP")
                                                                     }}
                                                                 />
                                                             </div>
@@ -370,7 +408,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                                 <FormDropdown
                                                                     label="Tipo"
                                                                     value={addressType}
-                                                                    setValue={setAddressType}
+                                                                    setValue={(val) => setAddressType(val)}
                                                                     options={TIPO_ENDERECO_OPTIONS}
                                                                 />
                                                             </div>
@@ -386,7 +424,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                                 <FormDropdown
                                                                     label="UF"
                                                                     value={uf}
-                                                                    setValue={setUf}
+                                                                    setValue={(val) => setUf(val)}
                                                                     options={ESTADOS_BRASIL}
                                                                 />
                                                             </div>
@@ -418,7 +456,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                                             setBillingStreet(data.street)
                                                                             setBillingNeighborhood(data.neighborhood)
                                                                             setBillingCity(data.city)
-                                                                            setBillingUf(data.state)
+                                                                            setBillingUf(data.state || "SP")
                                                                         }}
                                                                     />
                                                                 </div>
@@ -437,7 +475,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                                     <FormDropdown
                                                                         label="Tipo"
                                                                         value={billingAddressType}
-                                                                        setValue={setBillingAddressType}
+                                                                        setValue={(val) => setBillingAddressType(val)}
                                                                         options={TIPO_ENDERECO_OPTIONS}
                                                                     />
                                                                 </div>
@@ -453,7 +491,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                                     <FormDropdown
                                                                         label="UF"
                                                                         value={billingUf}
-                                                                        setValue={setBillingUf}
+                                                                        setValue={(val) => setBillingUf(val)}
                                                                         options={ESTADOS_BRASIL}
                                                                     />
                                                                 </div>
@@ -484,8 +522,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
 
                                 {/* Sidebar Column */}
                                 <div className="hidden lg:block col-span-12 lg:col-span-4 border-l border-brand-border dark:border-dark-border pl-12 space-y-8">
-                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col items-center text-center relative overflow-hidden shadow-sm">
-                                        <div className="absolute top-0 left-0 w-full h-1.5 bg-brand-dark dark:bg-dark-border" />
+                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col items-center text-center relative overflow-hidden">
+                                        <div className="absolute top-0 left-0 w-full h-[6px] bg-brand-dark dark:bg-dark-border" />
                                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2 self-start text-left w-full">Foto do Perfil</h3>
                                         <div className="w-28 h-28 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4 relative group cursor-pointer overflow-hidden border-2 border-dashed border-brand-border dark:border-dark-border hover:border-brand-dark transition-colors">
                                             <EditIcon size={32} className="text-gray-300 group-hover:opacity-10 transition-opacity" />
@@ -496,34 +534,16 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                         <p className="text-xs text-brand-inactive-text max-w-[200px]">Formatos aceitos: PNG, JPG ou WEBP (máx. 2MB)</p>
                                     </div>
 
-                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border space-y-6 shadow-sm">
-                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Resumo do cadastro</h3>
-                                        <div className="space-y-4">
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text">Status:</span>
-                                                <Badge variant={status === "Ativo" ? "green" : status === "Inativo" ? "gray" : "red"}>{status}</Badge>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text">Tipo de Pessoa:</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{personType}</span>
-                                            </div>
-                                            <div className="pt-4 border-t border-brand-border dark:border-dark-border">
-                                                <label className="block text-xs font-bold text-brand-inactive-text uppercase tracking-widest mb-3">Crédito em loja</label>
-                                                <FormInput
-                                                    prefix="R$"
-                                                    placeholder="0,00"
-                                                    value={storeCredit}
-                                                    onChange={(e) => setStoreCredit(e.target.value)}
-                                                    className="font-bold !bg-gray-50 dark:!bg-dark-background"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Quick Tips or Info */}
-                                    <div className="p-6 rounded-2xl bg-brand-light/20 dark:bg-brand-dark/10 border border-brand-light/30 dark:border-brand-dark/20">
-                                        <p className="text-xs text-brand-dark dark:text-dark-body leading-relaxed italic">
-                                            "Certifique-se de que o nome fantasia seja preenchido para facilitar a identificação futura em pedidos e notas fiscais."
+                                    <div className="bg-white dark:bg-dark-surface p-0 rounded-2xl space-y-3">
+                                        <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading">Crédito em loja</label>
+                                        <MoneyInput
+                                            value={storeCredit}
+                                            onChange={setStoreCredit}
+                                            placeholder="0,00"
+                                            className="font-bold !bg-gray-50 dark:!bg-dark-background border-brand-border dark:border-dark-border"
+                                        />
+                                        <p className="text-[11px] text-brand-inactive-text leading-tight">
+                                            O limite de crédito permite que o cliente realize compras para pagar posteriormente (faturamento).
                                         </p>
                                     </div>
                                 </div>
@@ -533,7 +553,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                     </div>
 
                     {/* Mobile Bottom Action Bar */}
-                    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+                    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
                         <Button
                             variant="outline"
                             onClick={handleBack}

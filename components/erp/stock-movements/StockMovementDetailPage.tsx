@@ -9,10 +9,11 @@ import {
     DownloadIcon,
     ArrowRightIcon
 } from '@/lib/icons';
-import { Button, InfoCard } from '@/components/reusable';
+import { Button, InfoCard, ThreeDotsLoader } from '@/components/reusable';
 import { Badge } from '@/components/reusable/Badge';
 import { useNotification } from '@/hooks/use-notification';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
+import { motion } from 'framer-motion';
 
 interface StockMovement {
     id: string;
@@ -50,9 +51,8 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
 
     if (isLoading || !movement) {
         return (
-            <div className="flex flex-col items-center justify-center h-full bg-white dark:bg-dark-surface">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-green"></div>
-                <p className="mt-4 text-brand-inactive-text dark:text-dark-body">Carregando detalhes...</p>
+            <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-8 px-4 md:px-8">
+                <ThreeDotsLoader key="loading" />
             </div>
         );
     }
@@ -209,7 +209,6 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                     color="gray"
                                     title="Observações"
                                     message={data.notes}
-                                    className='text-brand-dark dark:text-dark-heading'
                                 />
                             )}
                         </div>

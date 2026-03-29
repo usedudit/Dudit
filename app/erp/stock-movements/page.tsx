@@ -1,13 +1,16 @@
 import { Suspense } from "react"
 import { ERPHeader } from "@/components/erp/erp-header"
-import StockMovementPageContent from "@/components/erp/stock-movements/StockMovementPageContent"
+import StockMovementPageContent from "@/components/erp/stock-movements/StockMovementPage"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { requireUser, getCurrentPartner } from "@/lib/auth/authorization"
+import { getCurrentPartner } from "@/lib/auth/authorization"
 import { getStockMovementsCached } from "@/lib/data/stock-movements"
 import { redirect } from "next/navigation"
+import { getCurrentUser } from "@/lib/auth/authorization"
+import { AccessDenied } from "@/components/erp/access-denied"
 
 export default async function StockMovementsPage() {
-  const user = await requireUser()
+  const user = await getCurrentUser()
+  if (!user) return <AccessDenied />
   const partner = await getCurrentPartner()
 
   if (!partner) {

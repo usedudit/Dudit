@@ -106,6 +106,7 @@ const ProductCard = ({ item, partner }: { item: any; partner: any }) => {
 const MapboxMap = ({ lat, lng, name, address }: { lat?: number; lng?: number; name?: string; address?: string }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
+  const [isMapping, setIsMapping] = useState(true)
 
   useEffect(() => {
     let cancelled = false
@@ -115,6 +116,28 @@ const MapboxMap = ({ lat, lng, name, address }: { lat?: number; lng?: number; na
       if (cancelled || !mapContainerRef.current || !token) return
 
       try {
+        let finalLat = lat
+        let finalLng = lng
+
+        // Se lat/lng estiverem vazios ou inválidos, tenta buscar as coordenadas pelo endereço (Geocoding)
+        if ((!finalLat || !finalLng || isNaN(Number(finalLat))) && address) {
+          try {
+            const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${token}&limit=1`
+            const res = await fetch(geocodeUrl)
+            const data = await res.json()
+            if (data.features && data.features.length > 0) {
+              [finalLng, finalLat] = data.features[0].center
+            }
+          } catch (err) {
+            console.warn("Geocoding failed:", err)
+          }
+        }
+
+        // Se ainda não tivermos coordenadas, cancelamos (evita mostrar SP aleatório)
+        if (!finalLat || !finalLng || isNaN(Number(finalLat))) {
+          setIsMapping(false)
+          return
+        }
         // Carrega CSS do Mapbox se necessário
         if (!document.getElementById("mapbox-gl-css")) {
           const link = document.createElement("link")
@@ -141,18 +164,18 @@ const MapboxMap = ({ lat, lng, name, address }: { lat?: number; lng?: number; na
         const mapboxgl = (window as any).mapboxgl
         mapboxgl.accessToken = token
 
-        // Inicializa o mapa com estilo light moderno
+        // Inicializa o mapa com as coordenadas finais (geocodificadas ou passadas)
         mapRef.current = new mapboxgl.Map({
           container: mapContainerRef.current,
           style: "mapbox://styles/mapbox/light-v11",
-          center: [lng ?? -46.655981, lat ?? -23.561684],
+          center: [finalLng, finalLat],
           zoom: 15,
           attributionControl: false,
         })
 
-        // Adiciona marcador customizado (Brand Green)
+        // Adiciona marcador customizado
         const marker = new mapboxgl.Marker({ color: "#059669" })
-          .setLngLat([lng ?? -46.655981, lat ?? -23.561684])
+          .setLngLat([finalLng, finalLat])
           .addTo(mapRef.current)
 
         // Adiciona Popup informativo
@@ -187,12 +210,12 @@ const MapboxMap = ({ lat, lng, name, address }: { lat?: number; lng?: number; na
         mapRef.current.remove()
       }
     }
-  }, [lat, lng])
+  }, [lat, lng, address])
 
-  if (!process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN) {
+  if (!process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || !isMapping) {
     return (
       <div className="w-full h-full bg-gray-100 flex items-center justify-center p-4 text-center">
-        <p className="text-[12px] text-brand-inactive-text">Mapa indisponível no momento.</p>
+        <p className="text-[12px] text-brand-inactive-text">Localização indisponível no mapa.</p>
       </div>
     )
   }
@@ -247,7 +270,7 @@ const InfoTab = ({ partner, stats }: any) => {
             lat={partner.lat} 
             lng={partner.lng} 
             name={partner.storeName}
-            address={`${partner.street}, ${partner.number} - ${partner.city}/${partner.state}`}
+            address={`${partner.street}, ${partner.number}, ${partner.city}/${partner.state}, CEP: ${partner.zipCode}`}
           />
         </div>
       </div>

@@ -139,9 +139,9 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                                         {/* Purchase Summary Cards */}
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
                                             {[
-                                                { label: 'Total Gasto', value: `R$ ${(customer.totalOrderValue || 0).toLocaleString('pt-BR')}`, icon: PlusIcon, color: 'brand-green' },
+                                                { label: 'Total Gasto', value: `R$ ${(customer.totalOrderValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: PlusIcon, color: 'brand-green' },
                                                 { label: 'Pedidos', value: customer.orders || 0, icon: Package, color: 'brand-dark' },
-                                                { label: 'Ticket Médio', value: `R$ ${(customer.avgOrderValue || 0).toLocaleString('pt-BR')}`, icon: SparklesIcon, color: 'brand-orange' },
+                                                { label: 'Crédito em Loja', value: `R$ ${(customer.storeCredit || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: CreditCardIcon, color: 'brand-primary' },
                                                 { label: 'Última Compra', value: customer.lastOrderDate || 'N/A', icon: ClockIcon, color: 'brand-inactive-text' }
                                             ].map((stat, i) => (
                                                 <div key={i} className="bg-white dark:bg-dark-surface p-5 rounded-2xl border border-brand-border dark:border-dark-border shadow-sm group hover:shadow-md transition-all duration-300">
