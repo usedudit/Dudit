@@ -22,7 +22,8 @@ import {
     FormDropdown,
     AlertModal,
     Separator,
-    Spinner
+    Spinner,
+    IconPlaceholder
 } from '@/components/reusable';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import { searchProductsForMovement, createStockMovementAction } from '@/app/actions/erp/stock-movements';
@@ -213,7 +214,6 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                     <div className="flex flex-col md:flex-row gap-4">
                                                         <motion.button
                                                             whileHover={{ y: -1 }}
-                                                            whileTap={{ scale: 0.99 }}
                                                             onClick={() => { setType('in'); setReason('Selecione um motivo...'); }}
                                                             className={`flex-1 flex items-center justify-between p-5 rounded-2xl transition-all border ${type === 'in'
                                                                 ? 'bg-green-50/50 dark:bg-green-900/10 border-brand-green'
@@ -234,7 +234,6 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
 
                                                         <motion.button
                                                             whileHover={{ y: -1 }}
-                                                            whileTap={{ scale: 0.99 }}
                                                             onClick={() => { setType('out'); setReason('Selecione um motivo...'); }}
                                                             className={`flex-1 flex items-center justify-between p-5 rounded-2xl transition-all border ${type === 'out'
                                                                 ? 'bg-red-50/50 dark:bg-red-900/10 border-brand-red'
@@ -415,7 +414,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                 {/* Sidebar Column */}
                                 {activeTab === 'Geral' && (
                                     <div className="hidden lg:block col-span-12 lg:col-span-4 border-l border-brand-border dark:border-dark-border pl-12 space-y-8">
-                                        <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-all duration-300 shadow-sm">
+                                        <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-all duration-300">
                                             <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
                                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Projeção de Estoque</h3>
 
@@ -423,9 +422,9 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                 {selectedProduct ? (
                                                     <motion.div
                                                         key="projection-data"
-                                                        initial={{ opacity: 0, y: 10 }}
-                                                        animate={{ opacity: 1, y: 0 }}
-                                                        exit={{ opacity: 0, scale: 0.95 }}
+                                                        initial={{ opacity: 0 }}
+                                                        animate={{ opacity: 1 }}
+                                                        exit={{ opacity: 0 }}
                                                         className="space-y-4"
                                                     >
                                                         <div className="flex items-center justify-between">
@@ -437,7 +436,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
 
                                                         <div className="flex items-center justify-between pt-4 border-t border-brand-border/40 dark:border-dark-border/40">
                                                             <span className="text-[13px] text-brand-inactive-text font-medium">Novo Estoque:</span>
-                                                            <span className={`text-lg font-black ${type === 'in' ? 'text-brand-green' : 'text-brand-red'}`}>
+                                                            <span className={`text-lg font-bold ${type === 'in' ? 'text-brand-green' : 'text-brand-red'}`}>
                                                                 {type === 'in'
                                                                     ? (selectedProduct.stock + (Number(quantity) || 0))
                                                                     : (selectedProduct.stock - (Number(quantity) || 0))}
@@ -453,12 +452,11 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                         exit={{ opacity: 0 }}
                                                         className="flex flex-col items-center justify-center py-8 text-center"
                                                     >
-                                                        <div className="w-14 h-14 rounded-full bg-brand-gray dark:bg-gray-800 flex items-center justify-center text-brand-inactive-text mb-4 shadow-inner">
-                                                            <Package size={24} />
-                                                        </div>
-                                                        <p className="text-[13px] text-brand-inactive-text font-medium leading-relaxed max-w-[180px]">
-                                                            Selecione um produto para visualizar a projeção de estoque.
-                                                        </p>
+                                                        <IconPlaceholder
+                                                            icon={Package}
+                                                            title="Selecione um produto"
+                                                            subtitle="Selecione um produto para visualizar a projeção de estoque."
+                                                        />
                                                     </motion.div>
                                                 )}
                                             </AnimatePresence>

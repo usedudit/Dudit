@@ -96,12 +96,15 @@ export async function revalidatePartnerStatus() {
 /**
  * Revalida o Cache O(1) do Redis/Explore/Home no Next.js App Router
  */
-export async function revalidateExploreSearch() {
+export async function revalidateExploreSearch(options?: { silent?: boolean }) {
   // 1. Increment global Redis version to invalidate all cached query results (O(1) invalidation)
-  try {
-    await redis.incr(GLOBAL_VERSION_KEY)
-  } catch (err) {
-    console.error("[Redis] Failed to incr cache version:", err)
+  // Only done for non-silent updates to avoid "thundering herd" re-renders of the home page
+  if (!options?.silent) {
+    try {
+      await redis.incr(GLOBAL_VERSION_KEY)
+    } catch (err) {
+      console.error("[Redis] Failed to incr cache version:", err)
+    }
   }
 
   // 2. Clear Next.js cache tags for lists
@@ -109,3 +112,4 @@ export async function revalidateExploreSearch() {
   safeRevalidateTag('home-products')
   safeRevalidateTag('explore-products')
 }
+

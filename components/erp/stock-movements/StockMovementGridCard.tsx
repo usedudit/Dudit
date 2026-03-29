@@ -4,7 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, Button } from "@/components/reusable"
 import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
-import { ThreeDotsIcon, RotateIcon } from "@/lib/icons"
+import { ThreeDotsIcon, RotateIcon, ChevronDownIcon, ChevronUpIcon } from "@/lib/icons"
 
 interface StockMovementGridCardProps {
   movement: any
@@ -46,16 +46,18 @@ const StockMovementGridCard = React.memo(
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             {/* Linha 1: Nome + Badge Checkbox */}
             <div className="flex justify-between items-start gap-1">
-              <div className="flex flex-col min-w-0 pr-1 gap-1">
+              <div className="flex items-center gap-2 min-w-0 pr-1">
                 <h3
-                  className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate"
+                  className="flex-1 min-w-0 font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate"
                   title={movement.product.name}
                 >
-                  <span className="truncate">{movement.product.name}</span>
+                  {movement.product.name}
                 </h3>
+
                 <Badge
                   variant={movement.type === 'in' ? "green" : "red"}
-                  className="text-[9px] h-4 px-1 py-3 flex-shrink-0 w-max"
+                  icon={movement.type === 'in' ? <ChevronDownIcon /> : <ChevronUpIcon />}
+                  className="whitespace-nowrap"
                 >
                   {movement.type === 'in' ? "Entrada" : "Saída"}
                 </Badge>

@@ -224,19 +224,18 @@ interface DropdownItemProps {
 export const DropdownItem: React.FC<DropdownItemProps> = ({ children, onClick, className = "" }) => {
   const { close } = useDropdownContext()
   const handleClick = (e: React.MouseEvent) => {
-    e.preventDefault()
-    close()
     if (onClick) onClick()
+    close()
   }
   return (
-    <a
-      href="#"
+    <button
+      type="button"
       onClick={handleClick}
       className={`flex items-center gap-3 w-full text-left px-3 py-2 text-sm text-brand-dark dark:text-dark-heading hover:bg-gray-100 dark:hover:bg-dark-border rounded-md transition-colors duration-150 ${className}`}
       role="menuitem"
     >
       {children}
-    </a>
+    </button>
   )
 }
 

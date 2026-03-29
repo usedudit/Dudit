@@ -11,6 +11,7 @@ interface SyncItemOptions {
   data: any // Objeto completo formatado para o marketplace
   score?: number // Se não informado, usa Date.now()
   removeFromRedis?: boolean
+  silent?: boolean
 }
 
 // Extrai imagem e preço da primeira variante ativa como fallback
@@ -36,7 +37,8 @@ export async function syncToExploreRedis({
   type,
   data,
   score,
-  removeFromRedis = false
+  removeFromRedis = false,
+  silent = false
 }: SyncItemOptions): Promise<void> {
   const typeIndexKey = `explore:index:${type === 'produto' ? 'produtos' : type === 'servico' ? 'servicos' : 'vitrines'}`
   const globalIndexKey = `explore:index:all`
@@ -53,8 +55,8 @@ export async function syncToExploreRedis({
         redis.del(dataKey)
       ])
       // Invalidate Next.js cache so home/explore reflect the removal immediately
-      await revalidateExploreSearch()
-      console.log(`[RedisSync] Removido: ${memberId}`)
+      await revalidateExploreSearch({ silent })
+      console.log(`[RedisSync] Removido: ${memberId} silent:${silent}`)
       return
     }
 
@@ -170,7 +172,7 @@ export async function syncToExploreRedis({
     ])
 
     // 4. Invalidate Next.js cache tags so home/explore reflect changes immediately
-    await revalidateExploreSearch()
+    await revalidateExploreSearch({ silent })
 
     console.log(`[RedisSync] Sincronizado com sucesso: ${memberId}`)
   } catch (error) {
@@ -182,6 +184,6 @@ export async function syncToExploreRedis({
 /**
  * Helper para remover item do Redis (ex: deleção de produto)
  */
-export async function removeFromExploreRedis(id: string, type: ItemType): Promise<void> {
-  return syncToExploreRedis({ id, type, data: {}, removeFromRedis: true })
+export async function removeFromExploreRedis(id: string, type: ItemType, silent: boolean = false): Promise<void> {
+  return syncToExploreRedis({ id, type, data: {}, removeFromRedis: true, silent })
 }

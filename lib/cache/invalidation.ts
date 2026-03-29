@@ -35,14 +35,17 @@ export async function invalidateProductCache(
   console.log(`[CACHE] INVALIDATING product:${productId} (partner:${partnerId}) action:${action} silent:${!!options?.silent}`)
   
   // 1. Increment Global Redis Version (Orphans all dynamic query lists)
-  await incrementCacheVersion()
+  // Only done for non-silent updates to avoid "thundering herd" re-renders of the home page
+  if (!options?.silent) {
+    await incrementCacheVersion()
+  }
 
   // 2. Synchronize individual product cache (ZSETs and object cache) for direct requests/FTS
   try {
     if (action === 'delete') {
-      await removeFromExploreRedis(productId, "produto")
+      await removeFromExploreRedis(productId, "produto", !!options?.silent)
     } else {
-      await syncToExploreRedis({ id: productId, type: "produto", data: {} })
+      await syncToExploreRedis({ id: productId, type: "produto", data: {}, silent: !!options?.silent })
     }
   } catch (error) {
     console.error(`[CACHE] Erro ao sincronizar ZSETs do Redis:`, error)

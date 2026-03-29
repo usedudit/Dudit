@@ -211,6 +211,13 @@ export async function middleware(request: NextRequest) {
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
     if (supabaseUrl && supabaseKey) {
+      // OPTIMIZATION (PERF-01): Skip the expensive auth.getUser() call for POST requests (Server Actions)
+      // on protected routes early. Server Actions handle their own authentication via requireUser(),
+      // avoiding a redundant network call to Supabase Auth in the middleware.
+      if (request.method === "POST" || request.headers.has("next-action")) {
+        return response
+      }
+
       const supabase = createServerClient(supabaseUrl, supabaseKey, {
         cookies: {
           getAll() { return request.cookies.getAll() },
@@ -248,14 +255,8 @@ export async function middleware(request: NextRequest) {
             url.pathname = "/auth/login"
             return NextResponse.redirect(url)
           }
-
-          // OPTIMIZATION (PERF-01): Skip the expensive auth.getUser() call for POST requests
-          // on protected routes. Server Actions (POST) handle their own authentication 
-          // via requireUser(), so this avoids a redundant network call to Supabase Auth.
-          if (request.method === "POST") {
-            return response
-          }
         }
+
 
         const { data: { user } } = await supabase.auth.getUser()
 

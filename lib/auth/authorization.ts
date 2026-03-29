@@ -84,7 +84,7 @@ export const getCurrentPartner = cache(async (): Promise<{ id: string; user_id: 
  *
  * Performance: Uses cached getCurrentPartner to avoid duplicate queries.
  */
-export async function requirePartner(): Promise<{ id: string; user_id: string }> {
+export async function requirePartner(): Promise<{ id: string; user_id: string; email: string }> {
   const user = await requireUser() // Throws if not authenticated
   const partner = await getCurrentPartner()
 
@@ -97,7 +97,7 @@ export async function requirePartner(): Promise<{ id: string; user_id: string }>
     throw new ForbiddenError("Acesso negado ao parceiro")
   }
 
-  return partner
+  return { ...partner, email: user.email || "" }
 }
 
 // ─── Shared Access Check Helper ─────────────────────────────────────────────

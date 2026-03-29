@@ -30,7 +30,8 @@ export const searchMarketplaceDirect = cache(async (
     type: MarketplaceSearchType,
     limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string } = {}
 ) => {
-    return _searchMarketplaceCore(query, type, limits)
+    const { results } = await _searchMarketplaceCore(query, type, limits)
+    return results
 })
 
 /**
@@ -48,7 +49,8 @@ export const searchMarketplace = async (
         console.warn("[Security] Rate limit exceeded on searchMarketplace")
         return []
     }
-    return _searchMarketplaceCore(query, type, limits)
+    const { results } = await _searchMarketplaceCore(query, type, limits)
+    return results
 }
 
 
@@ -63,47 +65,59 @@ async function _searchMarketplaceCore(
     query: string,
     type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' = 'tudo',
     limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string } = {}
-): Promise<any[]> {
+): Promise<{ results: any[], filteredIds: string[] }> {
     const isPagination = limits.cursor !== undefined || limits.lastId !== undefined
     
-    // Inline version read — avoids separate getCacheVersion function call
-    let version: number = 1
-    if (!isPagination) {
-        try { version = (await redis.get<number>(GLOBAL_VERSION_KEY)) || 1 } catch {}
-    }
+    // Inline version read
+    let version: number = 2 // Bumping to v2 for the ID-only cache format change
+    try { version = (await redis.get<number>(GLOBAL_VERSION_KEY)) || 2 } catch {}
     
     const queryHash = serializeSearchKey(query, type, limits)
     const safeHash = Buffer.from(queryHash).toString('base64').replace(/=/g, '')
-    const cacheKey = `mp:cache:v${version}:search:${safeHash}`
+    const cacheKey = `mp:cache:v${version}:ids:${safeHash}` // Specific key for IDs
     
-    // Only READ from cache if it's the first page
+    // 1. TRY CACHE HIT (IDs only)
     if (!isPagination) {
         try {
-            const cached = await redis.get<any[]>(cacheKey)
-            if (cached && Array.isArray(cached)) {
-                console.log(`[REDIS] HIT ${cacheKey}`)
-                return cached
+            const cachedIds = await redis.get<string[]>(cacheKey)
+            if (cachedIds && Array.isArray(cachedIds)) {
+                console.log(`[REDIS] HIT (IDs) ${cacheKey} | Fetching ${cachedIds.length} objects...`)
+                
+                const dataKeys = cachedIds.map(id => `data:${id}`)
+                const objectsRaw = await redis.mget(...dataKeys)
+                
+                const objects = objectsRaw
+                    .map((obj: any) => typeof obj === 'string' ? JSON.parse(obj) : obj)
+                    .filter(Boolean)
+                
+                // If we found ALL objects in Redis, we can return immediately (Instant Update!)
+                if (objects.length === cachedIds.length) {
+                    return { results: objects, filteredIds: cachedIds }
+                }
+                
+                console.log(`[REDIS] Partial Miss (${objects.length}/${cachedIds.length}). Falling back to Internal Search.`)
             }
-            console.log(`[REDIS] MISS ${cacheKey}`)
         } catch (err) {
-            console.error("[REDIS] Error reading query cache", err)
+            console.error("[REDIS] Error reading ID cache", err)
         }
     }
 
-    const result = await _searchMarketplaceInternal(query, type, limits)
+    // 2. CACHE MISS / PARTIAL MISS: Run heavy search logic
+    const { results, filteredIds } = await _searchMarketplaceInternal(query, type, limits)
     
-    // Only WRITE to cache if it's the first page
-    if (!isPagination && result && result.length > 0) {
+    // 3. WRITE TO CACHE (IDs only)
+    if (!isPagination && filteredIds && filteredIds.length > 0) {
         try {
-            await redis.set(cacheKey, JSON.stringify(result), { ex: 60 * 60 * 24 }) // 24h caching, wiped by version bump
-            console.log(`[REDIS] SET ${cacheKey}`)
+            await redis.set(cacheKey, JSON.stringify(filteredIds), { ex: 60 * 60 * 24 })
+            console.log(`[REDIS] SET (IDs) ${cacheKey}`)
         } catch (err) {
-            console.error("[REDIS] Error setting query cache", err)
+            console.error("[REDIS] Error setting ID cache", err)
         }
     }
     
-    return result
+    return { results, filteredIds }
 }
+
 
 /**
  * CORE interno — lógica pura de busca original. Sem rate limiting.
@@ -112,14 +126,14 @@ async function _searchMarketplaceInternal(
     query: string,
     type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' = 'tudo',
     limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string } = {}
-): Promise<any[]> {
+): Promise<{ results: any[], filteredIds: string[] }> {
     const t0 = performance.now()
     const { vitrines: vitLimit = 4, produtos: prodLimit = 20, servicos: servLimit = 20, geral = 40, cursor, lastId } = limits
 
     // ANTI-SCRAPING / DEPTH RESTRICTION
     if (cursor && Date.now() - cursor > 1000 * 60 * 60 * 24 * 365 * 10) {
         console.warn(`[Security] Scraping attempt or invalid cursor depth: ${cursor}`)
-        return []
+        return { results: [], filteredIds: [] }
     }
 
     // Se tem query de busca em texto puro, fazemos fallback pro Postgres FTS (busca aproximada)
@@ -138,7 +152,7 @@ async function _searchMarketplaceInternal(
         const startScore = cursor ? `(${cursor}` : "+inf"
         const ids = (await redis.zrange(indexKey, startScore as any, "-inf", { byScore: true, rev: true, offset: 0, count: limitCount + 5 })) as string[]
 
-        if (!ids || ids.length === 0) return []
+        if (!ids || ids.length === 0) return { results: [], filteredIds: [] }
 
         let filteredIds = ids
         if (lastId) {
@@ -162,7 +176,7 @@ async function _searchMarketplaceInternal(
         }
 
         filteredIds = filteredIds.slice(0, limitCount)
-        if (!filteredIds.length) return []
+        if (!filteredIds.length) return { results: [], filteredIds: [] }
 
         const dataKeys = filteredIds.map(id => `data:${id}`)
 
@@ -283,20 +297,21 @@ async function _searchMarketplaceInternal(
 
         console.log(`[Search Metrics] Source: ${source} | Hit Rate: ${hitRate}% (${hits}/${totalRequested}) | Total: ${(tFinal - t0).toFixed(1)}ms | ZRANGE: ${redisLatency}ms | MGET: ${mgetLatency}ms | DB Fallbacks: ${missingIndices.length} | Type: ${type}`)
 
-        return cleanData
+        return { results: cleanData, filteredIds: filteredIds }
 
     } catch (error) {
         console.error("[Redis DOWN] Falling back to Postgres:", error)
-        // DEGRADED MODE: Use Postgres with same limits to maintain full UX
         try {
             console.warn(`[DEGRADED MODE] Redis unavailable, using Postgres fallback`)
             return await searchMarketplacePostgresFTS("", type, { vitrines: vitLimit, produtos: prodLimit, servicos: servLimit })
         } catch (pgError) {
             console.error("[TOTAL FAILURE] Both Redis and Postgres failed. Returning empty:", pgError)
-            return []
+            return { results: [], filteredIds: [] }
         }
     }
 }
+
+
 
 // Lógica de FTS (Full-Text Search) antiga preservada
 async function searchMarketplacePostgresFTS(
@@ -402,9 +417,11 @@ async function searchMarketplacePostgresFTS(
             }
         }
 
-        return results
+        const finalIds = results.map(r => `${r.itemType}:${r.id}`)
+        return { results, filteredIds: finalIds }
     } catch (error) {
         console.error("Search FTS Postgres Error:", error)
-        return []
+        return { results: [], filteredIds: [] }
     }
 }
+

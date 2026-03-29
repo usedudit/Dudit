@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
+import { invalidateProductCache } from "@/lib/cache/invalidation"
 
 export async function searchProductsForMovement(query: string) {
     if (!query || query.trim().length < 2) return []
@@ -55,10 +56,10 @@ export async function createStockMovementAction(data: {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
     try {
-        // Otimização: requirePartner resolve tanto o usuário quanto o parceiro em uma única árvore de cache
+        // requirePartner resolve tanto o usuário quanto o parceiro em uma única árvore de cache
         const partner = await requirePartner()
         const partnerId = partner.id
-        const userEmail = (await requireUser()).email
+        const userEmail = partner.email
 
         if (!data.productId) return errorResponse("Produto inválido")
         if (data.quantity <= 0) return errorResponse("Quantidade deve ser maior que zero")
@@ -84,6 +85,7 @@ export async function createStockMovementAction(data: {
 
         revalidatePath('/erp/stock-movements')
         revalidatePath('/erp/products')
+        await invalidateProductCache(data.productId, partnerId, 'update', { silent: true })
 
         return successResponse(movementRecord)
     } catch (err: any) {
@@ -200,7 +202,8 @@ export async function undoStockMovementAction(id: string, customReason?: string)
         const ctx = await getCurrentPartnerContext()
         if (!ctx?.partnerId) return errorResponse("Parceiro não encontrado")
 
-        const userEmail = (await requireUser()).email
+        const partner = await requirePartner()
+        const userEmail = partner.email
         const supabase = await getSupabaseServerClient()
 
         // 1. Buscar a movimentação original para saber o que inverter
@@ -242,6 +245,9 @@ export async function undoStockMovementAction(id: string, customReason?: string)
 
         revalidatePath('/erp/stock-movements')
         revalidatePath('/erp/products')
+
+        // Sync estorno change to Redis/Marketplace (silent avoids thundering herd)
+        await invalidateProductCache(original.product_id, ctx.partnerId, 'update', { silent: true })
 
         return successResponse(movementRecord)
 
