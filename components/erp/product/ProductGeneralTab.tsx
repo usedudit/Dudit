@@ -206,29 +206,29 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                   <Input label="Peso Líquido (kg)" name="weight_net" value={productData.weight_net} onChange={handleFieldChange} disabled={!isEditing} />
                   {/* ... restante dos inputs ... */}
                   <Input label="Peso Bruto (kg)" name="weight_gross" value={productData.weight_gross} onChange={handleFieldChange} disabled={!isEditing} />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Input
-                            label="Prazo de Preparação (dias)"
-                            name="preparation_days"
-                            type="number"
-                            value={productData.preparation_days}
-                            onChange={handleFieldChange}
-                            disabled={!isEditing}
-                            placeholder="0"
-                        />
-                        <FormDropdown
-                            label="Tipo de Embalagem"
-                            options={[
-                                { value: "package", label: "Pacote/Caixa" },
-                                { value: "cilinder", label: "Cilindro/Rolo" },
-                                { value: "envelope", label: "Envelope" }
-                            ]}
-                            value={productData.packaging_type}
-                            setValue={(v) => handleFieldChange({ target: { name: "packaging_type", value: v } })}
-                            disabled={!isEditing}
-                            width="w-full"
-                        />
-                    </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input
+                      label="Prazo de Preparação (dias)"
+                      name="preparation_days"
+                      type="number"
+                      value={productData.preparation_days}
+                      onChange={handleFieldChange}
+                      disabled={!isEditing}
+                      placeholder="0"
+                    />
+                    <FormDropdown
+                      label="Tipo de Embalagem"
+                      options={[
+                        { value: "package", label: "Pacote/Caixa" },
+                        { value: "cilinder", label: "Cilindro/Rolo" },
+                        { value: "envelope", label: "Envelope" }
+                      ]}
+                      value={productData.packaging_type}
+                      setValue={(v) => handleFieldChange({ target: { name: "packaging_type", value: v } })}
+                      disabled={!isEditing}
+                      width="w-full"
+                    />
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                   <Input label="Largura (cm)" name="width" value={productData.width} onChange={handleFieldChange} disabled={!isEditing} />

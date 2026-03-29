@@ -78,7 +78,7 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
     })
 
     const { customers: rawCustomers, isLoading: customersLoading } = useStoreData(partnerId, { includeCustomers: true })
-    const isLoading = storeLoading || customersLoading
+    const isLoading = (storeLoading || customersLoading) && rawCustomers === undefined
     const itemsPerPage = 12
 
     const tableContainerRef = useRef<HTMLDivElement>(null)

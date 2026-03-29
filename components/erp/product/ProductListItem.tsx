@@ -190,7 +190,7 @@ const ProductListItem = React.memo(
         onClick={() => onDetails(product)}
       >
         <td
-          className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12"
+          className="py-2 pl-6 pr-0 border-b border-brand-border dark:border-dark-border w-14"
           onClick={(e) => e.stopPropagation()}
         >
           <Checkbox checked={selected} onChange={() => onSelect(product.id)} />
@@ -199,7 +199,7 @@ const ProductListItem = React.memo(
         {columns.map((col) => (
           <td
             key={col.id}
-            className={`p-2 border-b border-brand-border dark:border-dark-border ${getAlignClass(col.align)}`}
+            className={`py-2 px-4 border-b border-brand-border dark:border-dark-border ${getAlignClass(col.align)}`}
           >
             {renderCellContent(col.id)}
           </td>

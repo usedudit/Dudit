@@ -14,7 +14,7 @@ import CreateStockMovement from './CreateStockMovement';
 import StockMovementDetailPage from './StockMovementDetailPage';
 import StockMovementPageControls from './StockMovementPageControls';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
-import { getStockMovementDetails, deleteStockMovementAction } from '@/app/actions/erp/stock-movements';
+import { getStockMovementDetails, deleteStockMovementAction, undoStockMovementAction } from '@/app/actions/erp/stock-movements';
 import { useNotification } from '@/hooks/use-notification';
 import { useMediaQuery } from '@/components/erp/hooks';
 import { useStoreData } from "@/lib/use-store-data";
@@ -62,10 +62,11 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
     });
     const [modals, setModals] = useState({
         filter: false,
-        delete: false,
+        undo: false,
     });
-    const [deletingId, setDeletingId] = useState<string | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
+    const [undoingId, setUndoingId] = useState<string | null>(null);
+    const [undoReason, setUndoReason] = useState('');
+    const [isUndoing, setIsUndoing] = useState(false);
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
     const [selection, setSelection] = useState<Set<string>>(new Set());
 
@@ -112,32 +113,33 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
         setIsLoadingDetails(false);
     };
 
-    const handleDeleteClick = (id: string) => {
-        setDeletingId(id);
-        setModals(prev => ({ ...prev, delete: true }));
+    const handleUndoClick = (id: string) => {
+        setUndoingId(id);
+        setUndoReason('');
+        setModals(prev => ({ ...prev, undo: true }));
     };
 
-    const confirmDelete = async () => {
-        if (!deletingId) return;
-        setIsDeleting(true);
+    const confirmUndo = async () => {
+        if (!undoingId) return;
+        setIsUndoing(true);
         try {
-            const res = await deleteStockMovementAction(deletingId);
+            const res = await undoStockMovementAction(undoingId, undoReason);
             if (res.success) {
-                notifySuccess('Movimentação excluída com sucesso.');
+                notifySuccess('Movimentação desfeita com sucesso.');
                 setSelection(prev => {
                     const next = new Set(prev);
-                    next.delete(deletingId);
+                    next.delete(undoingId);
                     return next;
                 });
             } else {
-                notifyError(res.error || 'Erro ao deletar.');
+                notifyError(res.error || 'Erro ao desfazer.');
             }
         } catch (err) {
             notifyError('Erro de conexão.');
         } finally {
-            setIsDeleting(false);
-            setModals(prev => ({ ...prev, delete: false }));
-            setDeletingId(null);
+            setIsUndoing(false);
+            setModals(prev => ({ ...prev, undo: false }));
+            setUndoingId(null);
         }
     };
 
@@ -241,12 +243,12 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
 
     const columns = [
         { id: "product", label: "Produto", align: "left" as const },
-        { id: "type", label: "Tipo", align: "left" as const, width: "120px" },
         { id: "quantity", label: "Quantidade", align: "right" as const, width: "120px" },
         { id: "currentStock", label: "Estoque Final", align: "right" as const, width: "120px" },
         { id: "reason", label: "Motivo", align: "left" as const },
         { id: "reference", label: "Referência", align: "left" as const },
         { id: "date", label: "Data", align: "left" as const, width: "160px" },
+        { id: "type", label: "Tipo", align: "left" as const, width: "120px" },
         { id: "actions", label: "Ações", align: "center" as const, width: "80px" },
     ];
 
@@ -398,7 +400,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                                 movement={mov}
                                                 selected={selection.has(mov.id)}
                                                 onSelect={() => handleSelectRow(mov.id)}
-                                                onDelete={handleDeleteClick}
+                                                onUndo={handleUndoClick}
                                                 onDetails={handleViewDetails}
                                             />
                                         ))}
@@ -438,7 +440,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                                             columns={columns}
                                                             selected={selection.has(mov.id)}
                                                             onSelect={handleSelectRow}
-                                                            onDelete={handleDeleteClick}
+                                                            onUndo={handleUndoClick}
                                                             onDetails={handleViewDetails}
                                                         />
                                                     ))}
@@ -473,14 +475,24 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
             />
 
             <AlertModal
-                isOpen={modals.delete}
-                onClose={() => setModals(prev => ({ ...prev, delete: false }))}
-                onConfirm={confirmDelete}
-                title="Excluir movimentação?"
-                description="Esta ação removerá permanentemente o histórico desta movimentação. Esta ação não pode ser desfeita."
-                confirmText={isDeleting ? "Excluindo..." : "Excluir"}
-                variant="danger"
-                isLoading={isDeleting}
+                isOpen={modals.undo}
+                onClose={() => setModals(prev => ({ ...prev, undo: false }))}
+                onConfirm={confirmUndo}
+                title="Desfazer movimentação?"
+                message={
+                    <div className="flex flex-col gap-4 mt-2 text-left">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">Esta ação criará uma movimentação inversa para estornar o estoque. Deseja continuar?</p>
+                        <Input
+                            label="Motivo do estorno (opcional)"
+                            placeholder="Ex: Erro de preenchimento"
+                            value={undoReason}
+                            onChange={(e) => setUndoReason(e.target.value)}
+                        />
+                    </div>
+                }
+                confirmText={isUndoing ? "Desfazendo..." : "Desfazer"}
+                variant="warning"
+                isLoading={isUndoing}
             />
         </motion.div >
     );

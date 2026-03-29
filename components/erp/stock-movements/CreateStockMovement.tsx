@@ -202,7 +202,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                             <div className="grid grid-cols-12 gap-y-10 lg:gap-x-12">
 
                                 {/* Form Column */}
-                                <div className="col-span-12 lg:col-span-8">
+                                <div className={activeTab === 'Geral' ? "col-span-12 lg:col-span-8" : "col-span-12"}>
                                     <AnimatePresence mode="wait">
                                         <TabsContent value="Geral" className="mt-0">
                                             <motion.div key="Geral" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-10">
@@ -230,7 +230,6 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                     <span className="text-xs text-brand-inactive-text mt-0.5 font-medium">Adicionar itens ao estoque</span>
                                                                 </div>
                                                             </div>
-                                                            {type === 'in' && <div className="w-2.5 h-2.5 rounded-full bg-brand-green" />}
                                                         </motion.button>
 
                                                         <motion.button
@@ -252,7 +251,6 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                     <span className="text-xs text-brand-inactive-text mt-0.5 font-medium">Remover itens do estoque</span>
                                                                 </div>
                                                             </div>
-                                                            {type === 'out' && <div className="w-2.5 h-2.5 rounded-full bg-brand-red" />}
                                                         </motion.button>
                                                     </div>
                                                 </section>
@@ -268,14 +266,17 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                             {!selectedProduct ? (
                                                                 <div className="relative">
                                                                     <div className="relative flex items-center w-full">
-                                                                        <SearchIcon size={18} className="text-brand-inactive-text mr-3 flex-shrink-0" />
                                                                         <Input
                                                                             type="text"
                                                                             placeholder="Buscar por nome ou SKU..."
-                                                                            required
-                                                                            className="w-full h-full"
                                                                             value={searchQuery}
                                                                             onChange={(e) => setSearchQuery(e.target.value)}
+                                                                            prefix={
+                                                                                <SearchIcon
+                                                                                    size={18}
+                                                                                    className="text-brand-inactive-text flex-shrink-0"
+                                                                                />
+                                                                            }
                                                                         />
                                                                     </div>
 
@@ -412,39 +413,58 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                 </div>
 
                                 {/* Sidebar Column */}
-                                <div className="hidden lg:block col-span-12 lg:col-span-4 border-l border-brand-border dark:border-dark-border pl-12 space-y-8">
-                                    <AnimatePresence>
-                                        {selectedProduct && (
-                                            <motion.div
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                exit={{ opacity: 0, scale: 0.95 }}
-                                                className="p-6 rounded-2xl bg-brand-gray dark:bg-dark-border/20 border border-brand-border dark:border-dark-border"
-                                            >
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Projeção de Estoque</h3>
+                                {activeTab === 'Geral' && (
+                                    <div className="hidden lg:block col-span-12 lg:col-span-4 border-l border-brand-border dark:border-dark-border pl-12 space-y-8">
+                                        <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-all duration-300 shadow-sm">
+                                            <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
+                                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Projeção de Estoque</h3>
 
-                                                <div className="space-y-4">
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-[13px] text-brand-inactive-text font-medium">Estoque Atual:</span>
-                                                        <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
-                                                            {selectedProduct.stock} <span className="text-[11px] font-medium opacity-60">un</span>
-                                                        </span>
-                                                    </div>
+                                            <AnimatePresence mode="wait">
+                                                {selectedProduct ? (
+                                                    <motion.div
+                                                        key="projection-data"
+                                                        initial={{ opacity: 0, y: 10 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        exit={{ opacity: 0, scale: 0.95 }}
+                                                        className="space-y-4"
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-[13px] text-brand-inactive-text font-medium">Estoque Atual:</span>
+                                                            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
+                                                                {selectedProduct.stock} <span className="text-[11px] font-medium opacity-60">un</span>
+                                                            </span>
+                                                        </div>
 
-                                                    <div className="flex items-center justify-between pt-4 border-t border-brand-border/40 dark:border-dark-border/40">
-                                                        <span className="text-[13px] text-brand-inactive-text font-medium">Novo Estoque:</span>
-                                                        <span className={`text-lg font-black ${type === 'in' ? 'text-brand-green' : 'text-brand-red'}`}>
-                                                            {type === 'in'
-                                                                ? (selectedProduct.stock + (Number(quantity) || 0))
-                                                                : (selectedProduct.stock - (Number(quantity) || 0))}
-                                                            <span className="text-xs ml-1 font-bold">un</span>
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
+                                                        <div className="flex items-center justify-between pt-4 border-t border-brand-border/40 dark:border-dark-border/40">
+                                                            <span className="text-[13px] text-brand-inactive-text font-medium">Novo Estoque:</span>
+                                                            <span className={`text-lg font-black ${type === 'in' ? 'text-brand-green' : 'text-brand-red'}`}>
+                                                                {type === 'in'
+                                                                    ? (selectedProduct.stock + (Number(quantity) || 0))
+                                                                    : (selectedProduct.stock - (Number(quantity) || 0))}
+                                                                <span className="text-xs ml-1 font-bold">un</span>
+                                                            </span>
+                                                        </div>
+                                                    </motion.div>
+                                                ) : (
+                                                    <motion.div
+                                                        key="projection-empty"
+                                                        initial={{ opacity: 0 }}
+                                                        animate={{ opacity: 1 }}
+                                                        exit={{ opacity: 0 }}
+                                                        className="flex flex-col items-center justify-center py-8 text-center"
+                                                    >
+                                                        <div className="w-14 h-14 rounded-full bg-brand-gray dark:bg-gray-800 flex items-center justify-center text-brand-inactive-text mb-4 shadow-inner">
+                                                            <Package size={24} />
+                                                        </div>
+                                                        <p className="text-[13px] text-brand-inactive-text font-medium leading-relaxed max-w-[180px]">
+                                                            Selecione um produto para visualizar a projeção de estoque.
+                                                        </p>
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

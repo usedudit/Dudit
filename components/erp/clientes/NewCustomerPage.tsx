@@ -17,6 +17,8 @@ import {
 import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { CpfCnpjInput } from "@/components/reusable/Inputs/CpfCnpjInput"
 import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
+import { StateComboBox } from "@/components/reusable/Inputs/StateComboBox"
+import { NumberInputWithCheckbox } from "@/components/reusable/Inputs/NumberInputWithCheckbox"
 import { ChevronLeftIcon, SaveIcon, EditIcon, SearchIcon } from "@/lib/icons"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useNotification } from "@/hooks/use-notification"
@@ -73,7 +75,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
     const [website, setWebsite] = useState("")
     const [observacoes, setObservacoes] = useState("")
     const [status, setStatus] = useState("Ativo")
-    const [contribuinte, setContribuinte] = useState("9 - Não Contribuinte")
+    const [contribuinte, setContribuinte] = useState("9")
 
     // Address States
     const [cep, setCep] = useState("")
@@ -83,6 +85,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
     const [neighborhood, setNeighborhood] = useState("")
     const [city, setCity] = useState("")
     const [uf, setUf] = useState("SP")
+    const [noNumber, setNoNumber] = useState(false)
     const [addressType, setAddressType] = useState("Casa")
     const [hasDifferentBillingAddress, setHasDifferentBillingAddress] = useState(false)
 
@@ -94,6 +97,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
     const [billingNeighborhood, setBillingNeighborhood] = useState("")
     const [billingCity, setBillingCity] = useState("")
     const [billingUf, setBillingUf] = useState("SP")
+    const [billingNoNumber, setBillingNoNumber] = useState(false)
     const [billingAddressType, setBillingAddressType] = useState("Casa")
 
     const [isSaving, setIsSaving] = useState(false)
@@ -181,7 +185,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                 inscricaoEstadual: ie,
                 zipCode: cep,
                 street: street,
-                number: number,
+                number: noNumber ? "S/N" : number,
                 complement: complement,
                 neighborhood: neighborhood,
                 city: city,
@@ -208,16 +212,16 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
 
     return (
         <FadeIn>
-            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-300">
+            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
                     <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
                         {/* Sticky Header */}
-                        <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300">
-                            <div className="max-w-[1400px] mx-auto relative px-4 md:px-8 md:pt-6">
+                        <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
                                 {/* Back button — desktop only */}
-                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-300 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                     <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
@@ -242,17 +246,17 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                         </Button>
                                         <Button onClick={handleSave} disabled={isSaving} className="px-6 h-[42px] flex items-center gap-2">
                                             <SaveIcon className="w-4.5 h-4.5" />
-                                            {isSaving ? "Salvando..." : "Salvar Cliente"}
+                                            {isSaving ? "Salvando..." : "Salvar"}
                                         </Button>
                                     </div>
                                 </div>
 
                                 {/* Tabs */}
                                 <div className={`w-full transition-all duration-300 ${isScrolled ? "md:mt-0" : "md:mt-2"}`}>
-                                    <TabsList className="bg-transparent p-0 gap-8 w-full justify-start border-b-0">
-                                        <TabsTrigger value="general" className="px-0 pb-3 font-bold text-sm">Dados gerais</TabsTrigger>
-                                        <TabsTrigger value="address" className="px-0 pb-3 font-bold text-sm">Endereço</TabsTrigger>
-                                        <TabsTrigger value="notes" className="px-0 pb-3 font-bold text-sm">Observações</TabsTrigger>
+                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                        <TabsTrigger value="general">Dados gerais</TabsTrigger>
+                                        <TabsTrigger value="address">Endereço</TabsTrigger>
+                                        <TabsTrigger value="notes">Observações</TabsTrigger>
                                     </TabsList>
                                 </div>
                             </div>
@@ -263,7 +267,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                             <div className="grid grid-cols-12 gap-y-10 lg:gap-x-16">
 
                                 {/* Form Column */}
-                                <div className="col-span-12 lg:col-span-8">
+                                <div className={`col-span-12 ${activeTab !== 'notes' ? 'lg:col-span-8' : ''}`}>
                                     <AnimatePresence mode="wait">
                                         <TabsContent value="general" className="mt-0">
                                             <motion.div key="general" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-10">
@@ -324,13 +328,13 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
                                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                                                     <div className="flex flex-col gap-1.5">
-                                                                        <CpfCnpjInput 
-                                                                            label="CNPJ" 
-                                                                            placeholder="00.000.000/0000-00" 
-                                                                            value={cnpj} 
-                                                                            onChange={(e) => setCnpj(e.target.value)} 
+                                                                        <CpfCnpjInput
+                                                                            label="CNPJ"
+                                                                            placeholder="00.000.000/0000-00"
+                                                                            value={cnpj}
+                                                                            onChange={(e) => setCnpj(e.target.value)}
                                                                             onBlur={handleCnpjBlur}
-                                                                            name="cnpj" 
+                                                                            name="cnpj"
                                                                         />
                                                                         {isSearchingCnpj && <span className="text-[11px] text-brand-primary animate-pulse font-medium">Consultando CNPJ...</span>}
                                                                     </div>
@@ -342,9 +346,9 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                                     value={contribuinte}
                                                                     setValue={(val) => setContribuinte(val)}
                                                                     options={[
-                                                                        { value: "1 - Contribuinte ICMS", label: "1 - Contribuinte ICMS" },
-                                                                        { value: "2 - Contribuinte Isento", label: "2 - Contribuinte Isento" },
-                                                                        { value: "9 - Não Contribuinte", label: "9 - Não Contribuinte" }
+                                                                        { value: "1", label: "1 - Contribuinte ICMS" },
+                                                                        { value: "2", label: "2 - Contribuinte Isento" },
+                                                                        { value: "9", label: "9 - Não Contribuinte" }
                                                                     ]}
                                                                 />
                                                             </motion.div>
@@ -376,56 +380,47 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                             <motion.div key="address" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-10">
                                                 <section>
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Endereço principal</h3>
-                                                    <div className="space-y-5">
-                                                        <div className="grid grid-cols-12 gap-5">
-                                                            <div className="col-span-12 md:col-span-4">
-                                                                <CepInput
-                                                                    label="CEP"
-                                                                    placeholder="00000-000"
-                                                                    value={cep}
-                                                                    onChange={setCep}
-                                                                    name="cep"
-                                                                    onAddressFetched={(data) => {
-                                                                        setStreet(data.street)
-                                                                        setNeighborhood(data.neighborhood)
-                                                                        setCity(data.city)
-                                                                        setUf(data.state || "SP")
-                                                                    }}
+                                                    <div className="space-y-4">
+                                                        <CepInput
+                                                            label="CEP *"
+                                                            placeholder="00000-000"
+                                                            value={cep}
+                                                            onChange={setCep}
+                                                            name="cep"
+                                                            onAddressFetched={(data) => {
+                                                                setStreet(data.street)
+                                                                setNeighborhood(data.neighborhood)
+                                                                setCity(data.city)
+                                                                setUf(data.state || "SP")
+                                                            }}
+                                                        />
+                                                        <FormInput label="Logradouro *" placeholder="Rua, Avenida, etc." value={street} onChange={e => setStreet(e.target.value)} />
+                                                        <div className="grid grid-cols-2 gap-3 flex-row items-center pt-1.5 pb-1.5">
+                                                            <div>
+                                                                <NumberInputWithCheckbox
+                                                                    label="Número *"
+                                                                    value={number}
+                                                                    number={number}
+                                                                    noNumber={noNumber}
+                                                                    onNumberChange={e => setNumber(e.target.value)}
+                                                                    onNoNumberChange={checked => { setNoNumber(checked); if (checked) setNumber(""); }}
                                                                 />
                                                             </div>
-                                                            <div className="col-span-12 md:col-span-8">
-                                                                <FormInput label="Logradouro" placeholder="Rua, Avenida, etc." value={street} onChange={e => setStreet(e.target.value)} />
-                                                            </div>
-                                                        </div>
-                                                        <div className="grid grid-cols-12 gap-5">
-                                                            <div className="col-span-12 md:col-span-3">
-                                                                <FormInput label="Número" placeholder="123" value={number} onChange={e => setNumber(e.target.value)} />
-                                                            </div>
-                                                            <div className="col-span-12 md:col-span-6">
+                                                            <div className="mt-[27px]">
                                                                 <FormInput label="Complemento" placeholder="Apto, Bloco, etc." value={complement} onChange={e => setComplement(e.target.value)} />
                                                             </div>
-                                                            <div className="col-span-12 md:col-span-3">
-                                                                <FormDropdown
-                                                                    label="Tipo"
-                                                                    value={addressType}
-                                                                    setValue={(val) => setAddressType(val)}
-                                                                    options={TIPO_ENDERECO_OPTIONS}
-                                                                />
-                                                            </div>
                                                         </div>
-                                                        <div className="grid grid-cols-12 gap-5">
-                                                            <div className="col-span-12 md:col-span-5">
-                                                                <FormInput label="Bairro" placeholder="Nome do bairro" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} />
+                                                        <FormInput label="Bairro *" placeholder="Nome do bairro" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} />
+                                                        <div className="grid grid-cols-2 gap-3 items-end">
+                                                            <div className="mb-[22px]">
+                                                                <FormInput label="Cidade *" placeholder="Nome da cidade" value={city} onChange={e => setCity(e.target.value)} />
                                                             </div>
-                                                            <div className="col-span-12 md:col-span-5">
-                                                                <FormInput label="Cidade" placeholder="Nome da cidade" value={city} onChange={e => setCity(e.target.value)} />
-                                                            </div>
-                                                            <div className="col-span-12 md:col-span-2">
-                                                                <FormDropdown
-                                                                    label="UF"
+                                                            <div>
+                                                                <label className="text-sm font-medium text-brand-dark dark:text-dark-heading block mb-1.5">UF *</label>
+                                                                <StateComboBox
                                                                     value={uf}
-                                                                    setValue={(val) => setUf(val)}
-                                                                    options={ESTADOS_BRASIL}
+                                                                    onChange={setUf}
+                                                                    className="w-full"
                                                                 />
                                                             </div>
                                                         </div>
@@ -444,56 +439,49 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                     {hasDifferentBillingAddress && (
                                                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mt-8 space-y-5">
                                                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Endereço de cobrança</h3>
-                                                            <div className="grid grid-cols-12 gap-5">
-                                                                <div className="col-span-12 md:col-span-4">
-                                                                    <CepInput
-                                                                        label="CEP"
-                                                                        placeholder="00000-000"
-                                                                        value={billingCep}
-                                                                        onChange={setBillingCep}
-                                                                        name="billingCep"
-                                                                        onAddressFetched={(data) => {
-                                                                            setBillingStreet(data.street)
-                                                                            setBillingNeighborhood(data.neighborhood)
-                                                                            setBillingCity(data.city)
-                                                                            setBillingUf(data.state || "SP")
-                                                                        }}
-                                                                    />
+                                                            <div className="space-y-4">
+                                                                <CepInput
+                                                                    label="CEP *"
+                                                                    placeholder="00000-000"
+                                                                    value={billingCep}
+                                                                    onChange={setBillingCep}
+                                                                    name="billingCep"
+                                                                    onAddressFetched={(data) => {
+                                                                        setBillingStreet(data.street)
+                                                                        setBillingNeighborhood(data.neighborhood)
+                                                                        setBillingCity(data.city)
+                                                                        setBillingUf(data.state || "SP")
+                                                                    }}
+                                                                />
+                                                                <FormInput label="Logradouro *" placeholder="Rua, Avenida, etc." value={billingStreet} onChange={e => setBillingStreet(e.target.value)} />
+                                                                <div className="grid grid-cols-2 gap-3 flex-row items-center pt-1.5 pb-1.5">
+                                                                    <div>
+                                                                        <NumberInputWithCheckbox
+                                                                            label="Número *"
+                                                                            value={billingNumber}
+                                                                            number={billingNumber}
+                                                                            noNumber={billingNoNumber}
+                                                                            onNumberChange={e => setBillingNumber(e.target.value)}
+                                                                            onNoNumberChange={checked => { setBillingNoNumber(checked); if (checked) setBillingNumber(""); }}
+                                                                        />
+                                                                    </div>
+                                                                    <div className="mt-[27px]">
+                                                                        <FormInput label="Complemento" placeholder="Apto, Bloco, etc." value={billingComplement} onChange={e => setBillingComplement(e.target.value)} />
+                                                                    </div>
                                                                 </div>
-                                                                <div className="col-span-12 md:col-span-8">
-                                                                    <FormInput label="Logradouro" placeholder="Rua, Avenida, etc." value={billingStreet} onChange={e => setBillingStreet(e.target.value)} />
-                                                                </div>
-                                                            </div>
-                                                            <div className="grid grid-cols-12 gap-5">
-                                                                <div className="col-span-12 md:col-span-3">
-                                                                    <FormInput label="Número" placeholder="123" value={billingNumber} onChange={e => setBillingNumber(e.target.value)} />
-                                                                </div>
-                                                                <div className="col-span-12 md:col-span-6">
-                                                                    <FormInput label="Complemento" placeholder="Apto, Bloco, etc." value={billingComplement} onChange={e => setBillingComplement(e.target.value)} />
-                                                                </div>
-                                                                <div className="col-span-12 md:col-span-3">
-                                                                    <FormDropdown
-                                                                        label="Tipo"
-                                                                        value={billingAddressType}
-                                                                        setValue={(val) => setBillingAddressType(val)}
-                                                                        options={TIPO_ENDERECO_OPTIONS}
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                            <div className="grid grid-cols-12 gap-5">
-                                                                <div className="col-span-12 md:col-span-5">
-                                                                    <FormInput label="Bairro" placeholder="Nome do bairro" value={billingNeighborhood} onChange={e => setBillingNeighborhood(e.target.value)} />
-                                                                </div>
-                                                                <div className="col-span-12 md:col-span-5">
-                                                                    <FormInput label="Cidade" placeholder="Nome da cidade" value={billingCity} onChange={e => setBillingCity(e.target.value)} />
-                                                                </div>
-                                                                <div className="col-span-12 md:col-span-2">
-                                                                    <FormDropdown
-                                                                        label="UF"
-                                                                        value={billingUf}
-                                                                        setValue={(val) => setBillingUf(val)}
-                                                                        options={ESTADOS_BRASIL}
-                                                                    />
+                                                                <FormInput label="Bairro *" placeholder="Nome do bairro" value={billingNeighborhood} onChange={e => setBillingNeighborhood(e.target.value)} />
+                                                                <div className="grid grid-cols-2 gap-3 items-end">
+                                                                    <div className="mb-[22px]">
+                                                                        <FormInput label="Cidade *" placeholder="Nome da cidade" value={billingCity} onChange={e => setBillingCity(e.target.value)} />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-sm font-medium text-brand-dark dark:text-dark-heading block mb-1.5">UF *</label>
+                                                                        <StateComboBox
+                                                                            value={billingUf}
+                                                                            onChange={setBillingUf}
+                                                                            className="w-full"
+                                                                        />
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </motion.div>
@@ -521,32 +509,65 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                 </div>
 
                                 {/* Sidebar Column */}
-                                <div className="hidden lg:block col-span-12 lg:col-span-4 border-l border-brand-border dark:border-dark-border pl-12 space-y-8">
-                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col items-center text-center relative overflow-hidden">
-                                        <div className="absolute top-0 left-0 w-full h-[6px] bg-brand-dark dark:bg-dark-border" />
-                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2 self-start text-left w-full">Foto do Perfil</h3>
-                                        <div className="w-28 h-28 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4 relative group cursor-pointer overflow-hidden border-2 border-dashed border-brand-border dark:border-dark-border hover:border-brand-dark transition-colors">
-                                            <EditIcon size={32} className="text-gray-300 group-hover:opacity-10 transition-opacity" />
-                                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <span className="text-white text-sm font-bold uppercase tracking-wider">Alterar</span>
-                                            </div>
-                                        </div>
-                                        <p className="text-xs text-brand-inactive-text max-w-[200px]">Formatos aceitos: PNG, JPG ou WEBP (máx. 2MB)</p>
-                                    </div>
+                                {activeTab !== 'notes' && (
+                                    <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                                        {activeTab === 'general' ? (
+                                            <>
+                                                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col items-center text-center relative overflow-hidden">
+                                                    <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
+                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Foto do Perfil</h3>
+                                                    <div className="w-28 h-28 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4 relative group cursor-pointer overflow-hidden border-2 border-dashed border-brand-border dark:border-dark-border hover:border-brand-dark transition-colors">
+                                                        <EditIcon size={32} className="text-gray-300 group-hover:opacity-10 transition-opacity" />
+                                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <span className="text-white text-sm font-bold uppercase tracking-wider">Alterar</span>
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-xs text-brand-inactive-text max-w-[200px]">Formatos aceitos: PNG, JPG ou WEBP (máx. 2MB)</p>
+                                                </div>
 
-                                    <div className="bg-white dark:bg-dark-surface p-0 rounded-2xl space-y-3">
-                                        <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading">Crédito em loja</label>
-                                        <MoneyInput
-                                            value={storeCredit}
-                                            onChange={setStoreCredit}
-                                            placeholder="0,00"
-                                            className="font-bold !bg-gray-50 dark:!bg-dark-background border-brand-border dark:border-dark-border"
-                                        />
-                                        <p className="text-[11px] text-brand-inactive-text leading-tight">
-                                            O limite de crédito permite que o cliente realize compras para pagar posteriormente (faturamento).
-                                        </p>
+                                                <div className="bg-white dark:bg-dark-surface p-0 rounded-2xl space-y-3">
+                                                    <MoneyInput
+                                                        label="Crédito em loja"
+                                                        value={storeCredit}
+                                                        onChange={setStoreCredit}
+                                                        placeholder="0,00"
+                                                        className="font-bold !bg-gray-50 dark:!bg-dark-background border-brand-border dark:border-dark-border"
+                                                    />
+                                                    <p className="text-[11px] text-brand-inactive-text leading-tight">
+                                                        O limite de crédito permite que o cliente realize compras para pagar posteriormente (faturamento).
+                                                    </p>
+                                                </div>
+                                            </>
+                                        ) : activeTab === 'address' ? (
+                                            <div className="bg-white dark:bg-dark-surface p-0 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden flex flex-col">
+                                                <div className="absolute top-0 left-0 w-full h-[6px] bg-brand-dark dark:bg-dark-border" />
+                                                <div className="p-4 flex items-center justify-between border-b border-brand-border dark:border-dark-border mt-1 border-opacity-60">
+                                                    <h3 className="font-bold text-brand-dark dark:text-dark-heading">Endereço Principal</h3>
+                                                    <EditIcon size={16} className="text-brand-inactive-text" />
+                                                </div>
+                                                <div className="p-4 flex flex-col">
+                                                    <div className="w-full h-[120px] bg-gray-200 dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group" onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${street}, ${number}, ${neighborhood}, ${city} - ${uf}, ${cep}`)}`, '_blank')}>
+                                                        <img src="/map/fallback.png" alt="Satelite Map" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" onError={(e) => { e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" fill="rgb(229,231,235)"><rect width="100%" height="100%"/></svg>' }} />
+                                                        <div className="absolute inset-0 flex items-center justify-center">
+                                                            <div className="w-5 h-5 rounded-full border-[3px] border-white bg-orange-500 shadow-sm relative z-10 transition-transform group-hover:scale-110"></div>
+                                                            <div className="w-12 h-12 bg-white/30 rounded-full absolute mix-blend-overlay animate-pulse"></div>
+                                                        </div>
+                                                        <div className="absolute top-1.5 right-1.5 bg-white/95 px-1.5 py-0.5 rounded text-[9px] text-gray-500 font-medium">Map data ©2024</div>
+                                                    </div>
+                                                    <div className="flex items-start justify-between">
+                                                        <div className="flex flex-col flex-1 truncate pr-4">
+                                                            <h4 className="font-bold text-brand-dark dark:text-dark-heading text-[15px] mb-1.5 truncate">{customerName || "Nome do Cliente"}</h4>
+                                                            <p className="text-brand-inactive-text text-[13px] leading-snug truncate">{street ? `${street}, ${noNumber ? 'S/N' : number}` : 'Logradouro não informado'}</p>
+                                                            <p className="text-brand-inactive-text text-[13px] leading-snug truncate mt-0.5">{neighborhood ? `${neighborhood}, ${city} - ${uf}` : 'Bairro/Cidade não informados'}</p>
+                                                            <p className="text-brand-inactive-text text-[13px] leading-snug mt-0.5">{cep || 'CEP não informado'}</p>
+                                                        </div>
+                                                        <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${street}, ${noNumber ? 'S/N' : number}, ${neighborhood}, ${city} - ${uf}, ${cep}`)}`} target="_blank" rel="noopener noreferrer" className="text-[13px] font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark/20 dark:decoration-dark-heading/20 hover:decoration-brand-dark whitespace-nowrap pt-1">Ver no mapa</a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : null}
                                     </div>
-                                </div>
+                                )}
 
                             </div>
                         </div>

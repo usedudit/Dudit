@@ -192,3 +192,61 @@ export async function deleteStockMovementAction(id: string) {
         return errorResponse("Erro interno ao deletar movimentação")
     }
 }
+
+export async function undoStockMovementAction(id: string, customReason?: string) {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+
+    try {
+        const ctx = await getCurrentPartnerContext()
+        if (!ctx?.partnerId) return errorResponse("Parceiro não encontrado")
+
+        const userEmail = (await requireUser()).email
+        const supabase = await getSupabaseServerClient()
+
+        // 1. Buscar a movimentação original para saber o que inverter
+        const { data: original, error: fetchError } = await supabase
+            .from("stock_movements")
+            .select("product_id, variant_id, quantity")
+            .eq("id", id)
+            .eq("partner_id", ctx.partnerId)
+            .single()
+
+        if (fetchError || !original) {
+            console.error("undoStockMovementAction fetch error:", fetchError)
+            return errorResponse("Movimentação original não encontrada")
+        }
+
+        // 2. Determinar o tipo inverso e o motivo
+        // Se a original era > 0 (entrada), o estorno é saida ('out')
+        // Se a original era < 0 (saida), o estorno é entrada ('in')
+        const invertedType = original.quantity > 0 ? 'out' : 'in'
+        const reason = customReason || "Movimentação desfeita"
+        const notes = `Estorno da movimentação ID: ${id.split('-')[0].toUpperCase()}`
+
+        // 3. Criar a nova movimentação usando o RPC existente
+        const { data: movementRecord, error } = await supabase.rpc('create_manual_stock_movement', {
+            p_partner_id: ctx.partnerId,
+            p_product_id: original.product_id,
+            p_movement_type: invertedType,
+            p_quantity: Math.abs(original.quantity), // A quantidade é sempre positiva para o RPC
+            p_reason: reason,
+            p_notes: notes,
+            p_created_by: userEmail,
+            p_variant_id: original.variant_id || null
+        })
+
+        if (error) {
+            console.error("undoStockMovementAction RPC error:", error)
+            return errorResponse(error.message)
+        }
+
+        revalidatePath('/erp/stock-movements')
+        revalidatePath('/erp/products')
+
+        return successResponse(movementRecord)
+
+    } catch (err: any) {
+        console.error("undoStockMovementAction error:", err)
+        return errorResponse("Erro interno ao desfazer movimentação")
+    }
+}

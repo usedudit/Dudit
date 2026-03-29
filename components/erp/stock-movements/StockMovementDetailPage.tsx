@@ -9,11 +9,13 @@ import {
     DownloadIcon,
     ArrowRightIcon
 } from '@/lib/icons';
-import { Button, InfoCard, ThreeDotsLoader } from '@/components/reusable';
+import { Button, InfoCard, ThreeDotsLoader, Dropdown, DropdownItem, AlertModal, Input } from '@/components/reusable';
 import { Badge } from '@/components/reusable/Badge';
 import { useNotification } from '@/hooks/use-notification';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import { motion } from 'framer-motion';
+import { undoStockMovementAction } from '@/app/actions/erp/stock-movements';
+import { ThreeDotsIcon, RotateIcon } from '@/lib/icons';
 
 interface StockMovement {
     id: string;
@@ -49,6 +51,30 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5);
     }, []);
 
+    const [isUndoModalOpen, setIsUndoModalOpen] = useState(false);
+    const [undoReason, setUndoReason] = useState('');
+    const [isUndoing, setIsUndoing] = useState(false);
+    const { success: notifySuccess, error: notifyError } = useNotification();
+
+    const handleUndo = async () => {
+        if (!movement?.id) return;
+        setIsUndoing(true);
+        try {
+            const res = await undoStockMovementAction(movement.id, undoReason);
+            if (res.success) {
+                notifySuccess('Movimentação desfeita com sucesso!');
+                onBack(); // Volta para a listagem para ver o novo registro
+            } else {
+                notifyError(res.error || 'Erro ao desfazer movimentação.');
+            }
+        } catch (err) {
+            notifyError('Erro de conexão.');
+        } finally {
+            setIsUndoing(false);
+            setIsUndoModalOpen(false);
+        }
+    };
+
     if (isLoading || !movement) {
         return (
             <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-8 px-4 md:px-8">
@@ -81,46 +107,56 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                     <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                 </Button>
 
-                                <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                    <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-300 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                        <span className="truncate">Detalhes da Movimentação</span>
-                                        <div className="flex items-center gap-2 flex-shrink-0">
-                                            <Badge
-                                                variant={isIn ? "green" : "red"}
-                                                icon={isIn ? <ChevronDownIcon /> : <ChevronUpIcon />}
-                                                className="w-fit whitespace-nowrap"
-                                            >
-                                                {isIn ? "Entrada" : "Saída"}
-                                            </Badge>
-                                            <Badge
-                                                variant="gray"
-                                                icon={<CheckCircleIcon className="text-brand-green" />}
-                                                className="w-fit whitespace-nowrap"
-                                            >
-                                                Concluído
-                                            </Badge>
-                                        </div>
-                                    </h1>
+                                {/* Title row */}
+                                <div className="hidden md:flex items-start justify-between">
+                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0 mb-6">
+                                        <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-300 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                            <span className="truncate">Detalhes da Movimentação</span>
 
-                                    {/* Metadata - Hide on scroll for smaller text */}
-                                    <div className={`overflow-hidden transition-all duration-300 ${isScrolled ? 'max-h-0 opacity-0' : 'max-h-20 opacity-100 mt-1'}`}>
-                                        <div className="flex flex-wrap items-center gap-2 text-[15px] text-brand-inactive-text dark:text-dark-body font-medium">
-                                            <span className="flex items-center gap-1">Data: {data.date}</span>
-                                            <span className="text-brand-inactive-text dark:text-gray-600 mx-1">•</span>
-                                            <span className="flex items-center gap-1">{data.user}</span>
+                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                                <Badge
+                                                    variant={isIn ? "green" : "red"}
+                                                    icon={isIn ? <ChevronDownIcon /> : <ChevronUpIcon />}
+                                                    className="w-fit whitespace-nowrap"
+                                                >
+                                                    {isIn ? "Entrada" : "Saída"}
+                                                </Badge>
+                                            </div>
+                                        </h1>
+
+                                        {/* Metadata - Hide on scroll for smaller text */}
+                                        <div className={`overflow-hidden transition-all duration-300 ${isScrolled ? 'max-h-0 opacity-0' : 'max-h-20 opacity-100 mt-1'}`}>
+                                            <div className="flex flex-wrap items-center gap-2 text-[15px] text-brand-inactive-text dark:text-dark-body font-medium">
+                                                <span className="flex items-center gap-1">Data: {data.date}</span>
+                                                <span className="text-brand-inactive-text dark:text-gray-600 mx-1">•</span>
+                                                <span className="flex items-center gap-1">{data.user}</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
 
-                            {/* Desktop Actions */}
-                            <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
-                                <Button
-                                    className="px-6 h-[42px] flex items-center"
-                                >
-                                    <DownloadIcon className="w-4.5 h-4.5" />
-                                    Exportar PDF
-                                </Button>
+                                    {/* Desktop Actions */}
+                                    <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
+                                        <Dropdown
+                                            align="right"
+                                            trigger={
+                                                <Button className="px-6 h-[42px] flex items-center">
+                                                    Ações
+                                                    <ChevronDownIcon className="w-4 h-4 ml-2" />
+                                                </Button>
+                                            }
+                                        >
+                                            <DropdownItem onClick={() => { /* Implement PDF export if needed */ }}>
+                                                <DownloadIcon className="w-4 h-4 mr-2" /> Exportar PDF
+                                            </DropdownItem>
+                                            <DropdownItem
+                                                onClick={() => setIsUndoModalOpen(true)}
+                                                className="text-brand-dark dark:text-dark-heading"
+                                            >
+                                                <RotateIcon className="w-4 h-4 mr-2" /> Desfazer movimentação
+                                            </DropdownItem>
+                                        </Dropdown>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -169,9 +205,9 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                                 </div>
 
                                                 <div className="flex items-center gap-2 mt-2">
-                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{data.product.sku}</div>
-                                                    <span className="text-brand-inactive-text dark:text-gray-600">•</span>
-                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{data.product.category}</div>
+                                                    <div className="text-sm text-brand-dark dark:text-dark-body">{data.product.sku}</div>
+                                                    <span className="text-brand-inactive-text dark:text-dark-body">•</span>
+                                                    <div className="text-sm text-brand-dark dark:text-dark-body">{data.product.category}</div>
                                                 </div>
                                             </div>
                                         </div>
@@ -219,12 +255,41 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
             {/* Mobile Action Bar */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
                 <Button
+                    variant="outline"
+                    className="flex-1 h-[48px]"
+                    onClick={() => setIsUndoModalOpen(true)}
+                >
+                    <RotateIcon className="w-4 h-4 mr-2" />
+                    Desfazer
+                </Button>
+                <Button
                     className="flex-1 h-[48px]"
                 >
                     <DownloadIcon className="w-4 h-4 mr-2" />
-                    Exportar PDF
+                    PDF
                 </Button>
             </div>
+
+            <AlertModal
+                isOpen={isUndoModalOpen}
+                onClose={() => setIsUndoModalOpen(false)}
+                onConfirm={handleUndo}
+                title="Desfazer movimentação?"
+                message={
+                    <div className="flex flex-col gap-4 mt-2 text-left">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">Esta ação criará uma movimentação inversa para estornar o estoque. Deseja continuar?</p>
+                        <Input
+                            label="Motivo do estorno (opcional)"
+                            placeholder="Ex: Erro de preenchimento"
+                            value={undoReason}
+                            onChange={(e) => setUndoReason(e.target.value)}
+                        />
+                    </div>
+                }
+                confirmText={isUndoing ? "Desfazendo..." : "Desfazer"}
+                variant="warning"
+                isLoading={isUndoing}
+            />
         </div>
     );
 };

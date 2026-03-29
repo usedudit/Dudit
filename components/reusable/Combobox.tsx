@@ -4,9 +4,9 @@ import * as React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
 import { CancelIcon, UnfoldMoreIcon, CheckCircleIcon } from "@/lib/icons"
 import { cn } from "@/lib/utils"
-import Portal from "@/components/Portal"
 import { useMediaQuery } from "@/components/erp/hooks"
 import BottomSheet from "@/components/BottomSheet"
+import { createPortal } from "react-dom"
 
 export interface ComboboxOption {
   label: string
@@ -284,20 +284,19 @@ export function Combobox({
         </BottomSheet>
       )}
 
-      {!isMobile && isMounted && (
-        <Portal>
-          <div
-            ref={menuRef}
-            style={position}
-            className={cn(
-              "rounded-md shadow-lg bg-white dark:bg-dark-surface ring-1 ring-black ring-opacity-5 ring-border dark:ring-dark-border overflow-hidden",
-              "transition-all ease-out duration-200",
-              isOpen ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none",
-            )}
-          >
-            {menuContent}
-          </div>
-        </Portal>
+      {!isMobile && isMounted && typeof document !== "undefined" && createPortal(
+        <div
+          ref={menuRef}
+          style={position}
+          className={cn(
+            "rounded-md shadow-lg bg-white dark:bg-dark-surface ring-1 ring-black ring-opacity-5 ring-border dark:ring-dark-border overflow-hidden",
+            "transition-all ease-out duration-200 z-50",
+            isOpen ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none",
+          )}
+        >
+          {menuContent}
+        </div>,
+        document.body
       )}
     </>
   )

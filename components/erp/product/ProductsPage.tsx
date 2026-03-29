@@ -760,10 +760,10 @@ export default function ProductsPage({
                                             <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
 
                                             <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                                                <table className="w-full text-left border-separate border-spacing-0 min-w-[1400px]">
+                                                <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
                                                     <thead>
                                                         <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                            <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
+                                                            <th className="py-3 pl-6 pr-0 w-14 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
                                                                 <Checkbox
                                                                     checked={selection.ids.size === paginated.length && paginated.length > 0}
                                                                     onChange={(checked) =>
@@ -780,7 +780,7 @@ export default function ProductsPage({
                                                                 return (
                                                                     <th
                                                                         key={col.id}
-                                                                        className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body relative bg-brand-gray dark:bg-dark-border/50 ${isLast ? "rounded-r-lg" : ""}`}
+                                                                        className={`py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body relative bg-brand-gray dark:bg-dark-border/50 ${isLast ? "rounded-r-lg" : ""}`}
                                                                         style={{ width: col.width, minWidth: col.minWidth }}
                                                                     >
                                                                         <div

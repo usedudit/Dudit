@@ -4,13 +4,13 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, Button } from "@/components/reusable"
 import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
-import { ThreeDotsIcon, EyeIcon, TrashIcon } from "@/lib/icons"
+import { ThreeDotsIcon, RotateIcon } from "@/lib/icons"
 
 interface StockMovementGridCardProps {
   movement: any
   selected: boolean
   onSelect: () => void
-  onDelete: (id: string) => void
+  onUndo: (id: string) => void
   onDetails: (id: string) => void
 }
 
@@ -19,7 +19,7 @@ const StockMovementGridCard = React.memo(
     movement,
     selected,
     onSelect,
-    onDelete,
+    onUndo,
     onDetails
   }: StockMovementGridCardProps) => {
 
@@ -124,14 +124,8 @@ const StockMovementGridCard = React.memo(
                   </Button>
                 }
               >
-                <DropdownItem onClick={() => onDetails(movement.id)}>
-                  <EyeIcon className="w-4 h-4 mr-2" /> Ver Detalhes
-                </DropdownItem>
-                <DropdownItem
-                  onClick={() => onDelete(movement.id)}
-                  className="text-brand-red focus:text-brand-red focus:bg-red-50 dark:focus:bg-red-900/10"
-                >
-                  <TrashIcon className="w-4 h-4 mr-2" /> Excluir
+                <DropdownItem onClick={() => onUndo(movement.id)}>
+                  <RotateIcon className="w-4 h-4 mr-2" /> Desfazer movimentação
                 </DropdownItem>
               </Dropdown>
             </div>

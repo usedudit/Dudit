@@ -2,9 +2,9 @@
 
 import React, { useState, useRef, useEffect, useCallback, createContext, useContext } from "react"
 import { ChevronDownIcon } from "@/lib/icons"
-import Portal from "../Portal"
 import { useMediaQuery } from "../erp/hooks"
 import BottomSheet from "@/components/BottomSheet"
+import { createPortal } from "react-dom"
 
 interface DropdownContextType {
   close: () => void
@@ -197,20 +197,19 @@ export const Dropdown: React.FC<DropdownProps> = ({
   return (
     <div ref={triggerRef} className={containerClassName}>
       {clonedTrigger}
-      {isMounted && (
-        <Portal>
-          <DropdownContext.Provider value={{ close: closeDropdown }}>
-            <div
-              ref={menuRef}
-              style={position}
-              className={`z-50 ${width} ${originClass} rounded-md shadow-lg bg-white dark:bg-dark-surface ring-1 ring-black ring-opacity-5 ring-border dark:ring-dark-border transition-all ease-out duration-200 ${isOpen ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"}`}
-            >
-              <div className={contentClasses} role="menu" aria-orientation="vertical">
-                {children}
-              </div>
+      {isMounted && typeof document !== "undefined" && createPortal(
+        <DropdownContext.Provider value={{ close: closeDropdown }}>
+          <div
+            ref={menuRef}
+            style={position}
+            className={`z-50 ${width} ${originClass} rounded-md shadow-lg bg-white dark:bg-dark-surface ring-1 ring-black ring-opacity-5 ring-border dark:ring-dark-border transition-all ease-out duration-200 ${isOpen ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"}`}
+          >
+            <div className={contentClasses} role="menu" aria-orientation="vertical">
+              {children}
             </div>
-          </DropdownContext.Provider>
-        </Portal>
+          </div>
+        </DropdownContext.Provider>,
+        document.body
       )}
     </div>
   )
