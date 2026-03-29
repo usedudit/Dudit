@@ -108,7 +108,7 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
         { id: "status", title: "Status", type: "checkbox-list", options: ["Ativo", "Inativo", "Bloqueado"] },
     ]
 
-    const filteredCustomers = useMemo(() => {
+    const filteredCustomers: Customer[] = useMemo(() => {
         if (!rawCustomers || !selectedStore) return []
 
         const term = debouncedSearch.toLowerCase()
@@ -188,7 +188,7 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
         )
     }
 
-    const selectedCustomer = filteredCustomers.find(c => c.originalId === ui.selectedId)
+    const selectedCustomer = filteredCustomers.find((c: Customer) => c.originalId === ui.selectedId)
 
     if (ui.pageState === "details" && selectedCustomer) {
         return (
@@ -303,7 +303,7 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
                             >
                                 {viewMode === "grid" ? (
                                     <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                        {paginated.map((c) => (
+                                        {paginated.map((c: Customer) => (
                                             <CustomerGridCard
                                                 key={c.originalId}
                                                 customer={c}
@@ -332,7 +332,7 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
                                                                     checked={selection.ids.size === paginated.length && paginated.length > 0}
                                                                     onChange={(e) => {
                                                                         const checked = e.target.checked
-                                                                        setSelection({ ids: checked ? new Set(paginated.map(x => x.originalId)) : new Set() })
+                                                                        setSelection({ ids: checked ? new Set(paginated.map((x: Customer) => x.originalId)) : new Set() })
                                                                     }}
                                                                 />
                                                             </div>
@@ -351,7 +351,7 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {paginated.map((c) => (
+                                                    {paginated.map((c: Customer) => (
                                                         <CustomerListItem
                                                             key={c.originalId}
                                                             customer={c}
