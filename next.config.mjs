@@ -31,6 +31,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'maps.googleapis.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'api.mapbox.com',
+      },
     ],
   },
   compress: true,

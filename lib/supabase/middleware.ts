@@ -27,6 +27,21 @@ function isPublicPath(pathname: string): boolean {
 // ============================================================================
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
+
+  // 🚀 EARLY EXIT pra HEAD requests
+  if (request.method === "HEAD") {
+    return NextResponse.next()
+  }
+
+  // 🚀 Ignora prefetch (Next.js)
+  const isPrefetch =
+    request.headers.get("purpose") === "prefetch" ||
+    request.headers.get("next-router-prefetch")
+
+  if (isPrefetch) {
+    return NextResponse.next()
+  }
+
   console.log(`[MIDDLEWARE] ${request.method} ${pathname}`)
   const forwarded = request.headers.get("x-forwarded-for")
   const ip = forwarded ? forwarded.split(",")[0].trim() : request.headers.get("x-real-ip") || "unknown"
@@ -83,6 +98,7 @@ export async function middleware(request: NextRequest) {
         https://*.googleapis.com 
         https://*.google.com 
         https://*.gstatic.com 
+        https://api.mapbox.com 
         https://cdn.jsdelivr.net 
         https://va.vercel-scripts.com 
         https://http2.mlstatic.com 
@@ -102,6 +118,8 @@ export async function middleware(request: NextRequest) {
         https://maps.googleapis.com 
         https://*.googleapis.com 
         https://*.google.com 
+        https://api.mapbox.com 
+        https://events.mapbox.com 
         https://api.nuvemfiscal.com.br 
         https://auth.nuvemfiscal.com.br 
         https://http2.mlstatic.com 
@@ -124,12 +142,13 @@ export async function middleware(request: NextRequest) {
         https://*.googleapis.com 
         https://*.gstatic.com 
         https://maps.gstatic.com 
+        https://api.mapbox.com 
         https://http2.mlstatic.com 
         https://*.mlstatic.com 
         https://*.r2.cloudflarestorage.com
         https://www.google-analytics.com 
         https://stats.g.doubleclick.net;
-    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://api.mapbox.com;
     font-src 'self' https://fonts.gstatic.com data:;
     frame-ancestors 'none';
     base-uri 'self';
@@ -215,7 +234,7 @@ export async function middleware(request: NextRequest) {
       try {
         const protectedPrefixes = ["/erp", "/account", "/profile", "/my-orders", "/select-erp", "/ddt-admin"]
         const isProtected = protectedPrefixes.some(prefix => pathname.startsWith(prefix))
-        
+
         // FAST-FAIL: If it's a protected route and there are NO supabase cookies at all, 
         // don't even waste time calling auth.getUser()
         if (isProtected) {

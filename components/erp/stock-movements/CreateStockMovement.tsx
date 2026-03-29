@@ -267,7 +267,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                         <div className="relative">
                                                             {!selectedProduct ? (
                                                                 <div className="relative">
-                                                                    <div className="relative flex items-center w-full h-[45px] px-4 bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-xl focus-within:ring-2 focus-within:ring-brand-green/20 focus-within:border-brand-green transition-all">
+                                                                    <div className="relative flex items-center w-full">
                                                                         <SearchIcon size={18} className="text-brand-inactive-text mr-3 flex-shrink-0" />
                                                                         <Input
                                                                             type="text"

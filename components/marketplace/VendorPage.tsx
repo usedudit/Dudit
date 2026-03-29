@@ -102,56 +102,83 @@ const ProductCard = ({ item, partner }: { item: any; partner: any }) => {
   )
 }
 
-// Carrega o Google Maps corretamente, sem erros de IntersectionObserver
-const GoogleMap = ({ lat, lng }: { lat?: number; lng?: number }) => {
-  const mapRef = useRef<HTMLDivElement>(null)
+// Componente de Mapa utilizando Mapbox para melhor performance e estética
+const MapboxMap = ({ lat, lng }: { lat?: number; lng?: number }) => {
+  const mapContainerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<any>(null)
 
   useEffect(() => {
     let cancelled = false
+    const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
 
     const initMap = async () => {
-      if (cancelled || !mapRef.current) return
+      if (cancelled || !mapContainerRef.current || !token) return
+
       try {
-        const pos = { lat: lat ?? -23.561684, lng: lng ?? -46.655981 }
-        const { Map } = await (window as any).google.maps.importLibrary("maps")
-        const { AdvancedMarkerElement } = await (window as any).google.maps.importLibrary("marker")
-        if (cancelled || !mapRef.current) return
-
-        const map = new Map(mapRef.current, {
-          zoom: 15,
-          center: pos,
-          disableDefaultUI: true,
-          mapId: "DUDIT_VENDOR_MAP",
-        })
-
-        const pin = Object.assign(document.createElement("div"), {
-          style: `width:14px;height:14px;border-radius:50%;background:#059669;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.3)`,
-        })
-        new AdvancedMarkerElement({ position: pos, map, content: pin })
-      } catch (err) {
-        console.warn("Maps init error:", err)
-      }
-    }
-
-    const loadMaps = () => {
-      if ((window as any).google?.maps?.importLibrary) {
-        initMap()
-      } else {
-        ; (window as any).__duditMapCallback = initMap
-        if (!document.querySelector('script[src*="maps.googleapis.com"]')) {
-          const s = document.createElement("script")
-          s.src = "https://maps.googleapis.com/maps/api/js?key=AIzaSyBdf3qEHerho4yhseDl3vf-06ZHUcub-rI&libraries=marker&loading=async&callback=__duditMapCallback"
-          s.async = true
-          document.head.appendChild(s)
+        // Carrega CSS do Mapbox se necessário
+        if (!document.getElementById("mapbox-gl-css")) {
+          const link = document.createElement("link")
+          link.id = "mapbox-gl-css"
+          link.rel = "stylesheet"
+          link.href = "https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css"
+          document.head.appendChild(link)
         }
+
+        // Carrega JS do Mapbox se necessário
+        if (!(window as any).mapboxgl) {
+          await new Promise((resolve, reject) => {
+            const script = document.createElement("script")
+            script.src = "https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"
+            script.async = true
+            script.onload = resolve
+            script.onerror = reject
+            document.head.appendChild(script)
+          })
+        }
+
+        if (cancelled || !mapContainerRef.current) return
+
+        const mapboxgl = (window as any).mapboxgl
+        mapboxgl.accessToken = token
+
+        // Inicializa o mapa com estilo light moderno
+        mapRef.current = new mapboxgl.Map({
+          container: mapContainerRef.current,
+          style: "mapbox://styles/mapbox/light-v11",
+          center: [lng ?? -46.655981, lat ?? -23.561684],
+          zoom: 15,
+          attributionControl: false,
+        })
+
+        // Adiciona marcador customizado (Brand Green)
+        new mapboxgl.Marker({ color: "#059669" })
+          .setLngLat([lng ?? -46.655981, lat ?? -23.561684])
+          .addTo(mapRef.current)
+
+      } catch (err) {
+        console.error("Mapbox initialization error:", err)
       }
     }
 
-    loadMaps()
-    return () => { cancelled = true }
+    initMap()
+
+    return () => {
+      cancelled = true
+      if (mapRef.current) {
+        mapRef.current.remove()
+      }
+    }
   }, [lat, lng])
 
-  return <div ref={mapRef} className="w-full h-full bg-gray-200" />
+  if (!process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN) {
+    return (
+      <div className="w-full h-full bg-gray-100 flex items-center justify-center p-4 text-center">
+        <p className="text-[12px] text-brand-inactive-text">Mapa indisponível no momento.</p>
+      </div>
+    )
+  }
+
+  return <div ref={mapContainerRef} className="w-full h-full bg-gray-100" />
 }
 
 const InfoTab = ({ partner, stats }: any) => {
@@ -197,7 +224,7 @@ const InfoTab = ({ partner, stats }: any) => {
           </div>
         </div>
         <div className="w-full h-[150px] lg:h-[260px] rounded-[12px] overflow-hidden bg-gray-100 shrink-0">
-          <GoogleMap lat={partner.lat} lng={partner.lng} />
+          <MapboxMap lat={partner.lat} lng={partner.lng} />
         </div>
       </div>
     </div>
