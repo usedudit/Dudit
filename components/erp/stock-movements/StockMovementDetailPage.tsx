@@ -74,25 +74,30 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                             <div className="flex items-start gap-4 overflow-hidden min-w-0">
                                 {/* Back Button */}
                                 <Button
-                                    variant="ghost"
-                                    size="icon"
+                                    variant="filled"
                                     onClick={onBack}
-                                    className="w-10 h-10 p-0 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-dark-border flex-shrink-0 mt-1"
+                                    className="w-10 h-10 p-0 flex items-center justify-center"
                                 >
                                     <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                 </Button>
 
                                 <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                     <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-300 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                        <span className="truncate">{data.displayId || data.id}</span>
+                                        <span className="truncate">Detalhes da Movimentação</span>
                                         <div className="flex items-center gap-2 flex-shrink-0">
-                                            {isIn ? (
-                                                <Badge variant="green" className="flex items-center"><ChevronDownIcon /> Entrada</Badge>
-                                            ) : (
-                                                <Badge variant="red" className="flex items-center"><ChevronUpIcon /> Saída</Badge>
-                                            )}
-                                            <Badge variant="gray" className="flex items-center">
-                                                <CheckCircleIcon className="text-brand-green" /> Concluído
+                                            <Badge
+                                                variant={isIn ? "green" : "red"}
+                                                icon={isIn ? <ChevronDownIcon /> : <ChevronUpIcon />}
+                                                className="w-fit whitespace-nowrap"
+                                            >
+                                                {isIn ? "Entrada" : "Saída"}
+                                            </Badge>
+                                            <Badge
+                                                variant="gray"
+                                                icon={<CheckCircleIcon className="text-brand-green" />}
+                                                className="w-fit whitespace-nowrap"
+                                            >
+                                                Concluído
                                             </Badge>
                                         </div>
                                     </h1>
@@ -101,7 +106,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                     <div className={`overflow-hidden transition-all duration-300 ${isScrolled ? 'max-h-0 opacity-0' : 'max-h-20 opacity-100 mt-1'}`}>
                                         <div className="flex flex-wrap items-center gap-2 text-[15px] text-brand-inactive-text dark:text-dark-body font-medium">
                                             <span className="flex items-center gap-1">Data: {data.date}</span>
-                                            <span className="text-gray-300 dark:text-gray-600 mx-1">•</span>
+                                            <span className="text-brand-inactive-text dark:text-gray-600 mx-1">•</span>
                                             <span className="flex items-center gap-1">{data.user}</span>
                                         </div>
                                     </div>
@@ -111,7 +116,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                             {/* Desktop Actions */}
                             <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
                                 <Button
-                                    className="px-6 h-[42px] flex items-center gap-2 whitespace-nowrap bg-brand-green hover:bg-brand-green/90 text-white border-none"
+                                    className="px-6 h-[42px] flex items-center"
                                 >
                                     <DownloadIcon className="w-4.5 h-4.5" />
                                     Exportar PDF
@@ -134,13 +139,13 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                 <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
                                     <div className="flex justify-between items-start">
                                         <div className="flex flex-col gap-1">
-                                            <span className="text-sm text-brand-inactive-text dark:text-dark-body font-bold text-[10px]">Motivo da Movimentação</span>
+                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Motivo da Movimentação</span>
                                             <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-[15px]">
                                                 {data.reason}
                                             </div>
                                         </div>
                                         <div className="text-sm text-brand-inactive-text dark:text-dark-body text-right">
-                                            <span className="font-bold text-[10px]">Quantidade</span><br />
+                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Quantidade</span><br />
                                             <strong className={`font-bold text-lg ${isIn ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{isIn ? '+' : '-'}{data.quantity}</strong>
                                         </div>
                                     </div>
@@ -165,7 +170,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
 
                                                 <div className="flex items-center gap-2 mt-2">
                                                     <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{data.product.sku}</div>
-                                                    <span className="text-gray-300 dark:text-gray-600">•</span>
+                                                    <span className="text-brand-inactive-text dark:text-gray-600">•</span>
                                                     <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{data.product.category}</div>
                                                 </div>
                                             </div>
@@ -176,16 +181,16 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
 
                                         <div className="flex items-center justify-between md:justify-start gap-4 md:gap-6 min-w-fit">
                                             <div>
-                                                <div className="text-[10px] font-bold text-brand-inactive-text dark:text-dark-body mb-1">Anterior</div>
+                                                <div className="text-xs text-brand-inactive-text dark:text-dark-body">Anterior</div>
                                                 <div className="text-sm font-medium text-brand-dark dark:text-dark-heading">{data.product.previousStock} un</div>
                                             </div>
 
                                             <div className="flex items-center justify-center text-brand-inactive-text mt-4">
-                                                <ArrowRightIcon size={16} />
+                                                <ArrowRightIcon />
                                             </div>
 
                                             <div>
-                                                <div className="text-[10px] font-bold text-brand-inactive-text dark:text-dark-body mb-1">Atual</div>
+                                                <div className="text-xs text-brand-inactive-text dark:text-dark-body">Atual</div>
                                                 <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{data.product.currentStock} un</div>
                                             </div>
                                         </div>
@@ -204,6 +209,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                     color="gray"
                                     title="Observações"
                                     message={data.notes}
+                                    className='text-brand-dark dark:text-dark-heading'
                                 />
                             )}
                         </div>
@@ -214,7 +220,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
             {/* Mobile Action Bar */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
                 <Button
-                    className="flex-1 h-[48px] font-bold bg-brand-green hover:bg-brand-green/90 text-white border-none"
+                    className="flex-1 h-[48px]"
                 >
                     <DownloadIcon className="w-4 h-4 mr-2" />
                     Exportar PDF

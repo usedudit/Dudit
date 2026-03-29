@@ -103,7 +103,7 @@ const ProductCard = ({ item, partner }: { item: any; partner: any }) => {
 }
 
 // Componente de Mapa utilizando Mapbox para melhor performance e estética
-const MapboxMap = ({ lat, lng }: { lat?: number; lng?: number }) => {
+const MapboxMap = ({ lat, lng, name, address }: { lat?: number; lng?: number; name?: string; address?: string }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
 
@@ -120,7 +120,7 @@ const MapboxMap = ({ lat, lng }: { lat?: number; lng?: number }) => {
           const link = document.createElement("link")
           link.id = "mapbox-gl-css"
           link.rel = "stylesheet"
-          link.href = "https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css"
+          link.href = "https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.css"
           document.head.appendChild(link)
         }
 
@@ -128,7 +128,7 @@ const MapboxMap = ({ lat, lng }: { lat?: number; lng?: number }) => {
         if (!(window as any).mapboxgl) {
           await new Promise((resolve, reject) => {
             const script = document.createElement("script")
-            script.src = "https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"
+            script.src = "https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js"
             script.async = true
             script.onload = resolve
             script.onerror = reject
@@ -151,9 +151,28 @@ const MapboxMap = ({ lat, lng }: { lat?: number; lng?: number }) => {
         })
 
         // Adiciona marcador customizado (Brand Green)
-        new mapboxgl.Marker({ color: "#059669" })
+        const marker = new mapboxgl.Marker({ color: "#059669" })
           .setLngLat([lng ?? -46.655981, lat ?? -23.561684])
           .addTo(mapRef.current)
+
+        // Adiciona Popup informativo
+        if (name || address) {
+          const popupContent = `
+            <div style="padding: 4px; font-family: system-ui, -apple-system, sans-serif;">
+              <h4 style="margin: 0 0 2px 0; font-size: 14px; font-weight: 700; color: #111827;">${name}</h4>
+              ${address ? `<p style="margin: 0; font-size: 12px; color: #4B5563; line-height: 1.4;">${address}</p>` : ""}
+            </div>
+          `
+          const popup = new mapboxgl.Popup({ offset: 35, closeButton: false })
+            .setHTML(popupContent)
+          
+          marker.setPopup(popup)
+          
+          // Abre o popup por padrão em telas maiores para facilitar a localização
+          if (window.innerWidth > 1024) {
+            marker.togglePopup()
+          }
+        }
 
       } catch (err) {
         console.error("Mapbox initialization error:", err)
@@ -224,7 +243,12 @@ const InfoTab = ({ partner, stats }: any) => {
           </div>
         </div>
         <div className="w-full h-[150px] lg:h-[260px] rounded-[12px] overflow-hidden bg-gray-100 shrink-0">
-          <MapboxMap lat={partner.lat} lng={partner.lng} />
+          <MapboxMap 
+            lat={partner.lat} 
+            lng={partner.lng} 
+            name={partner.storeName}
+            address={`${partner.street}, ${partner.number} - ${partner.city}/${partner.state}`}
+          />
         </div>
       </div>
     </div>

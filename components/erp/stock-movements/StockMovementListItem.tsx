@@ -4,7 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, Button } from "@/components/reusable"
 import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
-import { ThreeDotsIcon, EyeIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon } from "@/lib/icons"
+import { ThreeDotsIcon, EyeIcon, TrashIcon, ChevronUpIcon, ChevronDownIcon } from "@/lib/icons"
 
 interface ColumnDef {
   id: string
@@ -38,7 +38,7 @@ const StockMovementListItem = React.memo(
         case "product":
           return (
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden border border-brand-border dark:border-dark-border">
+              <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden">
                 <img
                   src={movement.product.image || "https://img.dudit.com.br/static/Placeholder.png"}
                   alt=""
@@ -99,7 +99,7 @@ const StockMovementListItem = React.memo(
         case "type":
           return (
             <div className="flex justify-start">
-              <Badge variant={movement.type === 'in' ? "green" : "red"} icon={movement.type === 'in' ? <ArrowUpIcon /> : <ArrowDownIcon />} className="w-fit whitespace-nowrap">
+              <Badge variant={movement.type === 'in' ? "green" : "red"} icon={movement.type === 'in' ? <ChevronDownIcon /> : <ChevronUpIcon />} className="w-fit whitespace-nowrap">
                 {movement.type === 'in' ? "Entrada" : "Saída"}
               </Badge>
             </div>

@@ -90,6 +90,8 @@ export async function middleware(request: NextRequest) {
 
   const cspHeader = `
     default-src 'self';
+    worker-src 'self' blob:;
+    child-src 'self' blob:;
     script-src 'self' 'unsafe-inline' 'unsafe-eval'
         https://sdk.mercadopago.com 
         https://www.mercadopago.com 
@@ -120,6 +122,7 @@ export async function middleware(request: NextRequest) {
         https://*.google.com 
         https://api.mapbox.com 
         https://events.mapbox.com 
+        https://*.tiles.mapbox.com 
         https://api.nuvemfiscal.com.br 
         https://auth.nuvemfiscal.com.br 
         https://http2.mlstatic.com 
@@ -143,6 +146,7 @@ export async function middleware(request: NextRequest) {
         https://*.gstatic.com 
         https://maps.gstatic.com 
         https://api.mapbox.com 
+        https://*.tiles.mapbox.com 
         https://http2.mlstatic.com 
         https://*.mlstatic.com 
         https://*.r2.cloudflarestorage.com

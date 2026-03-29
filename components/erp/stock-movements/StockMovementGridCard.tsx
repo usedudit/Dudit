@@ -103,8 +103,8 @@ const StockMovementGridCard = React.memo(
           {/* Linha B: Data e Ações */}
           <div className="flex items-end justify-between mt-1">
             <div className="flex flex-col">
-              <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">{movement.date.split(',')[0]}</span>
-              <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{movement.date.split(',')[1]}</span>
+              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{movement.date.split(',')[0]}</span>
+              <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{movement.date.split(',')[1]}</span>
             </div>
 
             {/* Botão de Ações */}
