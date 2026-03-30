@@ -601,6 +601,10 @@ export default function ProductsPage({
         // Implement the logic to update view mode here
     }, [])
 
+    const selectedProds = useMemo(() =>
+        data.products.filter((p) => selection.ids.has(p.id)),
+    [data.products, selection.ids])
+
     if (ui.pageState === "form") {
         return (
             <AddProductPage
@@ -619,10 +623,6 @@ export default function ProductsPage({
             />
         )
     }
-
-    const selectedProds = useMemo(() =>
-        data.products.filter((p) => selection.ids.has(p.id)),
-    [data.products, selection.ids])
 
     return (
         <motion.div
