@@ -84,6 +84,10 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         promotional_price: product.promotional_price || null,
         unit: product.unit || "",
         fci_code: product.fci_code || null,
+        category_id: product.category_id || null,
+        subcategory_id: product.subcategory_id || null,
+        brand_id: product.brand_id || null,
+        location_id: product.location_id || null,
     }
 
     return <EditProductWrapper product={formattedProduct} suppliers={suppliers || []} partnerId={partnerId} />
