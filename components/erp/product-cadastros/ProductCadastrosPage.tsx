@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useNotification } from "@/hooks/use-notification"
+import { PlusIcon } from "@/lib/icons"
 import { Button, IconPlaceholder, Combobox, Input } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
@@ -13,7 +14,7 @@ import MetadataCard from "./MetadataCard"
 import CadastrosPageControls from "./CadastrosPageControls"
 
 // Actions
-import {
+import { 
     createCategoryAction, updateCategoryAction, deleteCategoryAction,
     createBrandAction, updateBrandAction, deleteBrandAction,
     createLocationAction, updateLocationAction, deleteLocationAction,
@@ -36,22 +37,20 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
     const [metadata, setMetadata] = useState(initialMetadata)
     const [activeTab, setActiveTab] = useState<"categories" | "subcategories" | "brands" | "locations">("categories")
     const [search, setSearch] = useState("")
-    const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all")
     const [page, setPage] = useState(1)
-    const itemsPerPage = 8
+    const ITEMS_PER_PAGE = 12
 
-    // Modal State
     const [modal, setModal] = useState<{
         isOpen: boolean
         mode: "add" | "edit"
         type: "category" | "subcategory" | "brand" | "location"
-        item: any | null
+        item: any
         isSaving: boolean
     }>({
         isOpen: false,
         mode: "add",
         type: "category",
-        item: null,
+        item: { name: "", is_active: true, parentId: null },
         isSaving: false
     })
 
@@ -64,65 +63,55 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
     // Refresh Data
     const refreshData = useCallback(async () => {
         const result = await getProductMetadataAction(partnerId)
-        if (result.success && result.data) {
+        if (result.success) {
             setMetadata(result.data)
         }
     }, [partnerId])
 
-    // Filtering Logic
-    const filteredData = useMemo(() => {
-        let source: any[] = []
-        if (activeTab === "categories") source = metadata.categories.filter(c => !c.parent_id)
-        else if (activeTab === "subcategories") {
-            source = metadata.categories.filter(c => c.parent_id).map(c => ({
-                ...c,
-                parent_name: metadata.categories.find(p => p.id === c.parent_id)?.name
-            }))
-        }
-        else if (activeTab === "brands") source = metadata.brands
-        else if (activeTab === "locations") source = metadata.locations
+    // Filtered Data
+    const filteredItems = useMemo(() => {
+        let items: any[] = []
+        if (activeTab === "categories") items = metadata.categories.filter(c => !c.parent_id)
+        else if (activeTab === "subcategories") items = metadata.categories.filter(c => c.parent_id)
+        else if (activeTab === "brands") items = metadata.brands
+        else if (activeTab === "locations") items = metadata.locations
 
-        return source.filter(item => {
-            const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase())
-            const matchesStatus = statusFilter === "all" ||
-                (statusFilter === "active" && item.is_active) ||
-                (statusFilter === "inactive" && !item.is_active)
-            return matchesSearch && matchesStatus
-        })
-    }, [metadata, activeTab, search, statusFilter])
+        return items.filter(item => 
+            item.name.toLowerCase().includes(search.toLowerCase())
+        )
+    }, [activeTab, metadata, search])
 
-    const totalPages = Math.ceil(filteredData.length / itemsPerPage)
-    const paginatedData = filteredData.slice((page - 1) * itemsPerPage, page * itemsPerPage)
+    // Pagination
+    const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE)
+    const paginatedItems = filteredItems.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
 
     // Handlers
     const handleAdd = () => {
-        const typeMap: Record<string, "category" | "subcategory" | "brand" | "location"> = {
-            categories: "category",
-            subcategories: "subcategory",
-            brands: "brand",
-            locations: "location"
-        }
+        let type: typeof modal.type = "category"
+        if (activeTab === "subcategories") type = "subcategory"
+        else if (activeTab === "brands") type = "brand"
+        else if (activeTab === "locations") type = "location"
+
         setModal({
             isOpen: true,
             mode: "add",
-            type: typeMap[activeTab],
-            item: { name: "", is_active: true, parent_id: "" },
+            type,
+            item: { name: "", is_active: true, parentId: null },
             isSaving: false
         })
     }
 
     const handleEdit = (item: any) => {
-        const typeMap: Record<string, "category" | "subcategory" | "brand" | "location"> = {
-            categories: "category",
-            subcategories: "subcategory",
-            brands: "brand",
-            locations: "location"
-        }
+        let type: typeof modal.type = "category"
+        if (activeTab === "subcategories") type = "subcategory"
+        else if (activeTab === "brands") type = "brand"
+        else if (activeTab === "locations") type = "location"
+
         setModal({
             isOpen: true,
             mode: "edit",
-            type: typeMap[activeTab],
-            item: { ...item, parentId: item.parent_id || "" },
+            type,
+            item: { ...item, parentId: item.parent_id },
             isSaving: false
         })
     }
@@ -140,11 +129,10 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
 
         setModal(prev => ({ ...prev, isSaving: true }))
         let result: any
-
         try {
             if (mode === "add") {
                 if (type === "category" || type === "subcategory") {
-                    result = await createCategoryAction({ partnerId, name: item.name, parentId: type === "subcategory" ? item.parentId : null })
+                    result = await createCategoryAction({ partnerId, name: item.name, parentId: item.parentId })
                 } else if (type === "brand") {
                     result = await createBrandAction({ partnerId, name: item.name })
                 } else if (type === "location") {
@@ -197,142 +185,144 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
     }
 
     return (
-        <div className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
+            className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
+        >
+            <style>{`
+                .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
+                .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
+                .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .hide-scrollbar::-webkit-scrollbar { display: none; }
+                .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
+
             <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-                {/* Header Section */}
-                <div className="flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                {/* Header Section - Exactly like ProductsPage */}
+                <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
                     <div className="flex flex-col gap-2 pt-1">
-                        <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                            Cadastros de Produtos
-                        </h1>
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                                Cadastros de Produtos
+                            </h1>
+                        </div>
                         <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                            Gerencie categorias, marcas e localizações dos seus produtos.
+                            Gerencie categorias, marcas e localizações do seu inventário.
                         </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <Button onClick={handleAdd} className="w-full">
+                            <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
+                            Novo Cadastro
+                        </Button>
                     </div>
                 </div>
 
-                <CadastrosPageControls
+                {/* Controls - Exactly like ProductsPage Controls Position */}
+                <CadastrosPageControls 
                     activeTab={activeTab}
-                    setActiveTab={(t) => { setActiveTab(t); setPage(1); }}
+                    setActiveTab={(tab) => { setActiveTab(tab); setPage(1); }}
                     search={search}
                     onSearchChange={setSearch}
                     onAdd={handleAdd}
-                    statusFilter={statusFilter}
-                    setStatusFilter={setStatusFilter}
                 />
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24">
+                {/* Content Area - Scrollable with exactly same padding and scrollbar behavior */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-0 px-4 md:px-8">
                     <AnimatePresence mode="wait">
-                        {filteredData.length === 0 ? (
-                            <motion.div
+                        {filteredItems.length === 0 ? (
+                            <motion.div 
                                 key="empty"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="flex flex-col items-center justify-center py-20"
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                className="w-full h-full"
                             >
-                                <IconPlaceholder
+                                <IconPlaceholder 
                                     placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
                                     title="Nenhum item encontrado"
-                                    subtitle="Tente ajustar seus filtros ou termos de busca."
-                                    itemButton={search || statusFilter !== 'all' ? {
-                                        text: "Limpar Filtros",
-                                        action: () => { setSearch(""); setStatusFilter("all"); }
-                                    } : {
-                                        text: "Adicionar Primeiro Item",
-                                        action: handleAdd
-                                    }}
+                                    subtitle="Ajuste os filtros ou adicione um novo cadastro."
+                                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
                                 />
                             </motion.div>
                         ) : (
                             <motion.div
-                                key={`${activeTab}-grid`}
+                                key="grid"
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
-                                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+                                exit={{ opacity: 0 }}
+                                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8"
                             >
-                                {paginatedData.map(item => (
-                                    <MetadataCard
+                                {paginatedItems.map((item) => (
+                                    <MetadataCard 
                                         key={item.id}
                                         item={item}
-                                        type={activeTab === 'subcategories' ? 'subcategory' : activeTab === 'categories' ? 'category' : activeTab === 'brands' ? 'brand' : 'location'}
-                                        onEdit={handleEdit}
-                                        onDelete={handleDeleteClick}
+                                        type={activeTab}
+                                        categories={metadata.categories}
+                                        onEdit={() => handleEdit(item)}
+                                        onDelete={() => handleDeleteClick(item)}
                                     />
                                 ))}
                             </motion.div>
                         )}
                     </AnimatePresence>
-
-                    {totalPages > 1 && (
-                        <div className="mt-12 mb-8">
-                            <Pagination
-                                currentPage={page}
-                                totalPages={totalPages}
-                                onPageChange={setPage}
-                            />
-                        </div>
-                    )}
                 </div>
+
+                {/* Pagination - Identical position */}
+                {totalPages > 1 && (
+                    <Pagination 
+                        currentPage={page}
+                        totalPages={totalPages}
+                        onPageChange={setPage}
+                    />
+                )}
             </div>
 
             {/* Modals */}
             <DefaultModal
                 isOpen={modal.isOpen}
                 onClose={() => setModal(prev => ({ ...prev, isOpen: false }))}
-                title={`${modal.mode === 'add' ? 'Adicionar' : 'Editar'} ${modal.type === 'category' ? 'Categoria' :
-                    modal.type === 'subcategory' ? 'Subcategoria' :
-                        modal.type === 'brand' ? 'Marca' : 'Localização'
-                    }`}
-                maxWidth="md"
-            >
-                <div className="space-y-6 pt-4 pb-2">
-                    {modal.type === "subcategory" && (
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Categoria Pai</label>
-                            <Combobox
-                                options={metadata.categories.filter(c => !c.parent_id).map(c => ({ value: c.id, label: c.name }))}
-                                value={modal.item?.parentId || ""}
-                                onChange={(v: string) => setModal(prev => ({ ...prev, item: { ...prev.item, parentId: v } }))}
-                                width="w-full"
-                            />
-                        </div>
-                    )}
-
-                    <div className="space-y-1.5">
-                        <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Nome</label>
-                        <Input
-                            placeholder="Digite o nome..."
-                            value={modal.item?.name || ""}
-                            onChange={(e: any) => setModal(prev => ({ ...prev, item: { ...prev.item, name: e.target.value } }))}
-                            onKeyDown={(e: any) => e.key === 'Enter' && handleSave()}
-                            autoFocus
-                        />
+                title={modal.mode === "add" ? "Novo Cadastro" : "Editar Cadastro"}
+                footer={
+                    <div className="flex justify-end gap-3 w-full">
+                        <Button variant="outline" onClick={() => setModal(prev => ({ ...prev, isOpen: false }))}>Cancelar</Button>
+                        <Button onClick={handleSave} isLoading={modal.isSaving}>Salvar</Button>
                     </div>
+                }
+            >
+                <div className="flex flex-col gap-4 p-4">
+                    <Input 
+                        label="Nome"
+                        placeholder="Ex: Eletrônicos, Nike, Prateleira A1"
+                        value={modal.item.name}
+                        onChange={(e) => setModal(prev => ({ ...prev, item: { ...prev.item, name: e.target.value } }))}
+                        onKeyDown={(e) => e.key === "Enter" && handleSave()}
+                    />
 
-                    {modal.mode === "edit" && (
-                        <div className="flex items-center justify-between p-4 bg-brand-gray dark:bg-dark-border/30 rounded-xl">
-                            <div className="flex flex-col">
-                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">Status do Item</span>
-                                <span className="text-[12px] text-brand-inactive-text dark:text-dark-body">Defina se este item estará disponível para seleção.</span>
-                            </div>
-                            <div
-                                className={`w-12 h-6 rounded-full relative cursor-pointer transition-colors duration-300 ${modal.item?.is_active ? 'bg-brand-green' : 'bg-gray-300 dark:bg-gray-700'}`}
-                                onClick={() => setModal(prev => ({ ...prev, item: { ...prev.item, is_active: !prev.item.is_active } }))}
-                            >
-                                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-300 ${modal.item?.is_active ? 'left-7' : 'left-1'}`} />
-                            </div>
-                        </div>
+                    {modal.type === "subcategory" && (
+                        <Combobox 
+                            label="Categoria Pai"
+                            placeholder="Selecione a categoria pai..."
+                            options={metadata.categories.filter(c => !c.parent_id).map(c => ({ value: c.id, label: c.name }))}
+                            value={modal.item.parentId}
+                            onSelect={(val) => setModal(prev => ({ ...prev, item: { ...prev.item, parentId: val } }))}
+                        />
                     )}
 
-                    <div className="flex justify-end gap-3 pt-4 border-t border-brand-border dark:border-dark-border">
-                        <Button variant="outline" onClick={() => setModal(prev => ({ ...prev, isOpen: false }))}>
-                            Cancelar
-                        </Button>
-                        <Button onClick={handleSave} disabled={modal.isSaving || !modal.item?.name?.trim()}>
-                            {modal.isSaving ? "Salvando..." : "Salvar"}
-                        </Button>
+                    <div className="flex items-center gap-2 mt-2">
+                        <input 
+                            type="checkbox" 
+                            id="is_active" 
+                            checked={modal.item.is_active}
+                            onChange={(e) => setModal(prev => ({ ...prev, item: { ...prev.item, is_active: e.target.checked } }))}
+                            className="w-4 h-4 rounded border-gray-300 text-brand-green focus:ring-brand-green"
+                        />
+                        <label htmlFor="is_active" className="text-sm font-medium text-gray-700 dark:text-dark-body">Cadastro Ativo</label>
                     </div>
                 </div>
             </DefaultModal>
@@ -346,6 +336,6 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                 isDestructive
                 isLoading={deleteModal.isDeleting}
             />
-        </div>
+        </motion.div>
     )
 }

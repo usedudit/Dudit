@@ -1,103 +1,112 @@
-"use client"
-
-import React from "react"
-import { SearchIcon, PlusIcon, FilterIcon } from "@/lib/icons"
-import { Button, Input, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
-import Dropdown from "@/components/reusable/Dropdown"
-import DropdownItem from "@/components/reusable/DropdownItem"
+import React, { useRef, useState, useCallback, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { Button, Input } from "@/components/reusable"
+import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
+import {
+  SearchIcon,
+  PlusIcon,
+  DashboardIcon,
+  Package,
+} from "@/lib/icons"
 
 interface CadastrosPageControlsProps {
     activeTab: "categories" | "subcategories" | "brands" | "locations"
-    setActiveTab: (tab: any) => void
+    setActiveTab: (tab: "categories" | "subcategories" | "brands" | "locations") => void
     search: string
-    onSearchChange: (val: string) => void
+    onSearchChange: (value: string) => void
     onAdd: () => void
-    statusFilter: "all" | "active" | "inactive"
-    setStatusFilter: (filter: "all" | "active" | "inactive") => void
 }
 
-const CadastrosPageControls = React.memo(({
+const CadastrosPageControls: React.FC<CadastrosPageControlsProps> = ({
     activeTab,
     setActiveTab,
     search,
     onSearchChange,
     onAdd,
-    statusFilter,
-    setStatusFilter
-}: CadastrosPageControlsProps) => {
+}) => {
+    // Exact layout from ProductPageControls
     return (
-        <div className="flex flex-col gap-6 mb-8 px-4 md:px-8 flex-none">
-            {/* Tabs Row */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-brand-border dark:border-dark-border pb-px">
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
-                    <TabsList className="bg-transparent p-0 gap-8 h-12 overflow-x-auto hide-scrollbar whitespace-nowrap">
-                        <TabsTrigger 
-                            value="categories" 
-                            className="text-[15px] font-bold px-0 bg-transparent border-b-2 border-transparent data-[state=active]:border-brand-green data-[state=active]:text-brand-dark dark:data-[state=active]:text-dark-heading rounded-none transition-all duration-300 h-full"
-                        >
+        <>
+            {/* --- TABS --- */}
+            <div className="mb-6 px-4 md:px-8">
+                <Tabs
+                    value={activeTab}
+                    onValueChange={(val) => setActiveTab(val as any)}
+                >
+                    <TabsList className="px-0">
+                        <TabsTrigger value="categories" icon={Package}>
                             Categorias
                         </TabsTrigger>
-                        <TabsTrigger 
-                            value="subcategories" 
-                            className="text-[15px] font-bold px-0 bg-transparent border-b-2 border-transparent data-[state=active]:border-brand-green data-[state=active]:text-brand-dark dark:data-[state=active]:text-dark-heading rounded-none transition-all duration-300 h-full"
-                        >
+                        <TabsTrigger value="subcategories" icon={Package}>
                             Subcategorias
                         </TabsTrigger>
-                        <TabsTrigger 
-                            value="brands" 
-                            className="text-[15px] font-bold px-0 bg-transparent border-b-2 border-transparent data-[state=active]:border-brand-green data-[state=active]:text-brand-dark dark:data-[state=active]:text-dark-heading rounded-none transition-all duration-300 h-full"
-                        >
+                        <TabsTrigger value="brands" icon={Package}>
                             Marcas
                         </TabsTrigger>
-                        <TabsTrigger 
-                            value="locations" 
-                            className="text-[15px] font-bold px-0 bg-transparent border-b-2 border-transparent data-[state=active]:border-brand-green data-[state=active]:text-brand-dark dark:data-[state=active]:text-dark-heading rounded-none transition-all duration-300 h-full"
-                        >
-                            Localizações
+                        <TabsTrigger value="locations" icon={Package}>
+                            Localização
                         </TabsTrigger>
                     </TabsList>
                 </Tabs>
-
-                <div className="flex items-center gap-3 md:pb-px">
-                    <Button onClick={onAdd} className="h-10 px-5 gap-2">
-                        <PlusIcon className="w-4 h-4" />
-                        <span>Novo Cadastro</span>
-                    </Button>
-                </div>
             </div>
 
-            {/* Filters Row */}
-            <div className="flex flex-col md:flex-row md:items-center gap-4">
-                <div className="relative flex-1 group">
-                    <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-inactive-text dark:text-dark-body group-focus-within:text-brand-green transition-colors" />
-                    <Input
-                        placeholder={`Buscar ${activeTab === 'categories' ? 'categoria' : activeTab === 'brands' ? 'marca' : activeTab === 'subcategories' ? 'subcategoria' : 'localização'}...`}
-                        value={search}
-                        onChange={(e) => onSearchChange(e.target.value)}
-                        className="pl-10 h-11 bg-brand-gray border-none dark:bg-dark-border/50 focus:bg-white dark:focus:bg-dark-background transition-all duration-300 rounded-xl"
-                    />
+            {/* --- CONTROLS BAR --- */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 flex-none px-4 md:px-8">
+                
+                {/* MOBILE CONTROLS ROW - Exactly like ProductPageControls */}
+                <div className="md:hidden flex items-center gap-2 w-full">
+                    <div className="flex-1 min-w-0">
+                        <Input
+                            name="search"
+                            placeholder="Buscar..."
+                            value={search}
+                            onChange={(e) => onSearchChange(e.target.value)}
+                            className="h-[42px] w-full"
+                            variant="full-rounded"
+                            label=""
+                        />
+                    </div>
+                    <div className="flex-none flex items-center gap-2">
+                        <Button
+                            onClick={onAdd}
+                            className="w-[42px] h-[42px] p-0 flex items-center justify-center rounded-full bg-brand-green hover:bg-brand-green/90 text-white shadow-sm shadow-brand-green/20"
+                        >
+                            <PlusIcon className="w-5 h-5" strokeWidth={3} />
+                        </Button>
+                    </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <Dropdown
-                        align="right"
-                        trigger={
-                            <Button variant="outline" className="h-11 px-4 gap-2 border-brand-border dark:border-dark-border bg-white dark:bg-dark-background hover:bg-brand-gray dark:hover:bg-dark-border/50 text-[14px] font-medium transition-all duration-300 rounded-xl">
-                                <FilterIcon className="w-4 h-4" />
-                                <span>{statusFilter === 'all' ? 'Todos Status' : statusFilter === 'active' ? 'Ativos' : 'Inativos'}</span>
-                            </Button>
-                        }
-                    >
-                        <DropdownItem onClick={() => setStatusFilter("all")}>Todos Status</DropdownItem>
-                        <DropdownItem onClick={() => setStatusFilter("active")}>Somente Ativos</DropdownItem>
-                        <DropdownItem onClick={() => setStatusFilter("inactive")}>Somente Inativos</DropdownItem>
-                    </Dropdown>
+                {/* DESKTOP CONTROLS - Exactly like ProductPageControls */}
+                <div className="hidden md:flex items-center w-full gap-4">
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                        <div className="w-80">
+                            <Input
+                                name="search"
+                                placeholder="Buscar..."
+                                value={search}
+                                onChange={(e) => onSearchChange(e.target.value)}
+                                className="h-[42px]"
+                                variant="full-rounded"
+                                label=""
+                            />
+                        </div>
+                    </div>
+
+                    {/* Spacer to push other icons to the right if needed, matching desktop alignment */}
+                    <div className="flex-1 min-w-0" />
+
+                    {/* View Toggles - Replicating ProductPageControls "Grid" only for now but keeping the container style */}
+                    <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] flex-shrink-0">
+                        <button
+                            className="w-8 h-full flex items-center justify-center rounded-full bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
+                        >
+                            <DashboardIcon className="w-[18px] h-[18px]" />
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
+        </>
     )
-})
-
-CadastrosPageControls.displayName = "CadastrosPageControls"
+}
 
 export default CadastrosPageControls
