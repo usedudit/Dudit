@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } from "react"
-import { Tabs, TabsList, TabsTrigger, Button, Badge, Tooltip } from "@/components/reusable"
+import { Tabs, TabsList, TabsTrigger, Button, Badge, Tooltip, Input, Combobox } from "@/components/reusable"
 import { ChevronLeftIcon, TrashIcon, ThreeDotsIcon, DuplicateIcon, EditIcon, SaveIcon, ShareIcon } from "@/lib/icons"
 import type { Product } from "@/lib/types/product"
 import { useToast } from "@/components/ui/use-toast"
@@ -9,6 +9,7 @@ import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useStore } from "@/lib/store-context"
 import { useSidebar } from "@/lib/sidebar-context"
 import { createProductComprehensiveAction, updateProductComprehensiveAction, deleteProductAction, createProductVariantsBatchAction } from "@/app/actions/erp/products"
+import { getProductMetadataAction, createCategoryAction, createBrandAction, createLocationAction } from "@/app/actions/erp/product-metadata"
 import { detectMonophasicByNcm } from "@/lib/fiscal-utils"
 import { mapProductToFormData } from "@/lib/utils/product-mappers"
 import { useNotification } from "@/hooks/use-notification"
@@ -41,9 +42,9 @@ const REQUIRED_FIELDS = [
 ]
 
 const getEmptyProduct = () => ({
-    id: "", name: "", category: "", productId: "", sku: "", description: "", subcategory: "", brand: "", gtin: "",
+    id: "", name: "", category: "", category_id: "", productId: "", sku: "", description: "", subcategory: "", subcategory_id: "", brand: "", brand_id: "", gtin: "",
     price: 0, costPrice: 0, stock: 0, minStock: 0, maxStock: 0, promotional_price: null, promotionTypeId: null,
-    condicao: "Novo", unidade: "UN", localizacao: "", productType: "Físico",
+    condicao: "Novo", unidade: "UN", localizacao: "", location_id: "", productType: "Físico",
     images: [], primary_image_index: 0, video_url: "",
     is_active: true, show_in_marketplace: true, allow_sell_without_stock: false, is_highlighted: false,
     marketplace_category_id: null, availability_value: 0, availability_unit: "Dias",
@@ -183,10 +184,109 @@ const AddProductPage: FC<AddProductPageProps> = ({
 
     const [activeTab, setActiveTab] = useState("general")
 
-    const [categories] = useState(["Roupas Masculinas", "Roupas Femininas", "Roupas Infantis", "Electronics", "Apparel", "Groceries"])
-    const [subCategories] = useState(["Tops e Camisetas Masculinas", "Calças Masculinas", "Acessórios Masculinos"])
-    const [brands] = useState(["Adidas", "Nike", "Puma"])
-    const [locations] = useState(["Depósito Principal", "Loja Física"])
+    const [metadata, setMetadata] = useState<{
+        categories: any[],
+        brands: any[],
+        locations: any[]
+    }>({ categories: [], brands: [], locations: [] })
+
+    const [isLoadingMetadata, setIsLoadingMetadata] = useState(false)
+
+    const fetchMetadata = useCallback(async () => {
+        if (!partnerId) return
+        setIsLoadingMetadata(true)
+        try {
+            const result = await getProductMetadataAction(partnerId)
+            if (result.success && result.data) {
+                setMetadata(result.data)
+            }
+        } catch (err) {
+            console.error("Error fetching metadata:", err)
+        } finally {
+            setIsLoadingMetadata(false)
+        }
+    }, [partnerId])
+
+    useEffect(() => {
+        fetchMetadata()
+    }, [fetchMetadata])
+
+    const categoryOptions = useMemo(() => 
+        metadata.categories.filter(c => !c.parent_id).map(c => ({ value: c.id, label: c.name })),
+    [metadata.categories])
+
+    const subCategoryOptions = useMemo(() => {
+        if (!productData.category_id) return []
+        return metadata.categories
+            .filter(c => c.parent_id === productData.category_id)
+            .map(c => ({ value: c.id, label: c.name }))
+    }, [metadata.categories, productData.category_id])
+
+    const brandOptions = useMemo(() => 
+        metadata.brands.map(b => ({ value: b.id, label: b.name })),
+    [metadata.brands])
+
+    const locationOptions = useMemo(() => 
+        metadata.locations.map(l => ({ value: l.id, label: l.name })),
+    [metadata.locations])
+
+    // State for metadata creation
+    const [metadataModal, setMetadataModal] = useState<{
+        isOpen: boolean,
+        type: "category" | "subcategory" | "brand" | "location" | null,
+        name: string,
+        parentId?: string | null,
+        isSaving: boolean
+    }>({ isOpen: false, type: null, name: "", parentId: null, isSaving: false })
+
+    const handleOpenMetadataModal = (type: "category" | "subcategory" | "brand" | "location") => {
+        setMetadataModal({
+            isOpen: true,
+            type,
+            name: "",
+            parentId: type === "subcategory" ? productData.category_id : null,
+            isSaving: false
+        })
+    }
+
+    const handleSaveMetadata = async () => {
+        if (!metadataModal.name.trim() || !partnerId) return
+        setMetadataModal(prev => ({ ...prev, isSaving: true }))
+        
+        let result: any
+        try {
+            switch (metadataModal.type) {
+                case "category":
+                    result = await createCategoryAction({ partnerId, name: metadataModal.name })
+                    if (result.success) setProductData((prev: any) => ({ ...prev, category_id: result.data.id }))
+                    break
+                case "subcategory":
+                    result = await createCategoryAction({ partnerId, name: metadataModal.name, parentId: metadataModal.parentId })
+                    if (result.success) setProductData((prev: any) => ({ ...prev, subcategory_id: result.data.id }))
+                    break
+                case "brand":
+                    result = await createBrandAction({ partnerId, name: metadataModal.name })
+                    if (result.success) setProductData((prev: any) => ({ ...prev, brand_id: result.data.id }))
+                    break
+                case "location":
+                    result = await createLocationAction({ partnerId, name: metadataModal.name })
+                    if (result.success) setProductData((prev: any) => ({ ...prev, location_id: result.data.id }))
+                    break
+            }
+
+            if (result.success) {
+                notifySuccess(`${metadataModal.type === "subcategory" ? "Subcategoria" : metadataModal.type === "category" ? "Categoria" : metadataModal.type === "brand" ? "Marca" : "Localização"} adicionada com sucesso!`)
+                await fetchMetadata()
+                setMetadataModal({ isOpen: false, type: null, name: "", isSaving: false })
+            } else {
+                notifyError(result.error || "Erro ao salvar")
+            }
+        } catch (err) {
+            notifyError("Erro ao processar solicitação")
+        } finally {
+            setMetadataModal(prev => ({ ...prev, isSaving: false }))
+        }
+    }
 
     const handleNcmChange = useCallback((ncm: string) =>
         setProductData((prev: any) => ({ ...prev, ncm, is_monophasic: ncm.length === 8 && detectMonophasicByNcm(ncm) }))
@@ -198,6 +298,10 @@ const AddProductPage: FC<AddProductPageProps> = ({
             if (BOOLEAN_FIELDS.has(name)) return { ...prev, [name]: value === true || value === "true" }
             if (NUMERIC_FIELDS.has(name)) return { ...prev, [name]: value === "" || value === null ? prev[name] : Number(value) }
             if (name === "ncm") queueMicrotask(() => handleNcmChange(String(value)))
+            
+            // Special handling for category change to reset subcategory
+            if (name === "category_id") return { ...prev, [name]: value, subcategory_id: "" }
+            
             return { ...prev, [name]: value }
         })
     }, [handleNcmChange])
@@ -388,7 +492,9 @@ const AddProductPage: FC<AddProductPageProps> = ({
             const payload = {
                 partnerId, storeId, csrf_token: csrfToken,
                 name: d.name, description: d.description, sku: d.sku, gtin: d.gtin, brand: d.brand,
+                brandId: d.brand_id, categoryId: d.category_id, locationId: d.location_id,
                 category: d.category, subcategory: d.subcategory, condition: d.condicao, unit: d.unidade,
+                subcategory_id: d.subcategory_id,
                 productType: d.productType, location: d.localizacao, deliveryFormat: d.digital_format,
                 costPrice: Number(d.costPrice) || 0, price: Number(d.price),
                 promotionalPrice: d.promotional_price ? Number(d.promotional_price) : null,
@@ -588,7 +694,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                         <FadeIn key="general" className="block">
                                             <ProductGeneralTab
                                                 productData={productData} handleInputChange={handleInputChange}
-                                                categories={categories} subCategories={subCategories} brands={brands} locations={locations}
+                                                categories={categoryOptions} subCategories={subCategoryOptions} brands={brandOptions} locations={locationOptions}
                                                 unidadesMedida={unidadesMedida} isEditing={isEditing && !isSavingProduct}
                                                 images={productData.images || []} onImageUpload={handleImageUpload}
                                                 onRemoveImage={handleRemoveImage} onSetPrimaryImage={handleSetPrimaryImage}
@@ -597,7 +703,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                 blockedImages={blockedImages} isSaving={isSavingProduct}
                                                 sellsOnline={sellsOnline}
                                                 generateRandomCode={() => { }}
-                                                openAddItemModal={() => { }}
+                                                openAddItemModal={handleOpenMetadataModal}
                                             />
                                         </FadeIn>
                                     </div>
@@ -734,6 +840,47 @@ const AddProductPage: FC<AddProductPageProps> = ({
                     onSelect={handleNcmSelect}
                     isLoading={isLoadingNcmSuggestion}
                 />
+                <DefaultModal
+                    isOpen={metadataModal.isOpen}
+                    onClose={() => setMetadataModal(prev => ({ ...prev, isOpen: false }))}
+                    title={`Adicionar ${metadataModal.type === "subcategory" ? "Subcategoria" : metadataModal.type === "category" ? "Categoria" : metadataModal.type === "brand" ? "Marca" : "Localização"}`}
+                    maxWidth="md"
+                >
+                    <div className="space-y-6 pt-4 pb-2">
+                        {metadataModal.type === "subcategory" && (
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Categoria Pai</label>
+                                <Combobox
+                                    options={categoryOptions}
+                                    value={metadataModal.parentId || ""}
+                                    onChange={(v: string) => setMetadataModal(prev => ({ ...prev, parentId: v }))}
+                                    width="w-full"
+                                />
+                            </div>
+                        )}
+                        
+                        <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Nome</label>
+                            <Input
+                                placeholder="Digite o nome..."
+                                value={metadataModal.name}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setMetadataModal(prev => ({ ...prev, name: e.target.value }))}
+                                onKeyDown={(e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => e.key === 'Enter' && handleSaveMetadata()}
+                                autoFocus
+                            />
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-4 border-t border-brand-border dark:border-dark-border">
+                            <Button variant="outline" onClick={() => setMetadataModal(prev => ({ ...prev, isOpen: false }))}>
+                                Cancelar
+                            </Button>
+                            <Button onClick={handleSaveMetadata} disabled={metadataModal.isSaving || !metadataModal.name.trim()}>
+                                {metadataModal.isSaving ? "Salvando..." : "Salvar"}
+                            </Button>
+                        </div>
+                    </div>
+                </DefaultModal>
+
                 <DefaultModal isOpen={isSavingProduct} onClose={() => { }} title="" maxWidth="sm" hideHeader>
                     <div className="flex flex-col items-center justify-center p-6 gap-6 h-full mt-4">
                         <img src="https://img.dudit.com.br/static/mascots/Aguarde.png" alt="Aguarde" className="w-36 h-36 object-contain" />

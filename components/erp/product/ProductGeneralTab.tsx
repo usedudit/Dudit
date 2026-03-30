@@ -58,10 +58,10 @@ interface ProductGeneralTabProps {
   productData: any
   handleInputChange: (e: any) => void
   generateRandomCode: () => void
-  categories: string[]
-  subCategories: string[]
-  brands: string[]
-  locations: string[]
+  categories: { label: string, value: string }[]
+  subCategories: { label: string, value: string }[]
+  brands: { label: string, value: string }[]
+  locations: { label: string, value: string }[]
   unidadesMedida: Array<{ codigo: string; descricao: string }>
   openAddItemModal: (type: any) => void
   isEditing: boolean
@@ -171,9 +171,9 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 
             <FormCombobox
               label="Localização"
-              options={locations.map((l) => ({ value: l, label: l }))}
-              value={productData.localizacao}
-              onChange={(v) => handleFieldChange({ target: { name: "localizacao", value: v } })}
+              options={locations}
+              value={productData.location_id}
+              onChange={(v) => handleFieldChange({ target: { name: "location_id", value: v } })}
               disabled={!isEditing}
               width="w-full"
               actionItem={{ label: "Add", icon: <PlusIcon className="w-3 h-3" />, onClick: () => openAddItemModal("location") }}
@@ -264,9 +264,9 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 
             <FormCombobox
               label="Categoria"
-              options={categories.map(c => ({ value: c, label: c }))}
-              value={productData.category}
-              onChange={(v) => handleFieldChange({ target: { name: "category", value: v } })}
+              options={categories}
+              value={productData.category_id}
+              onChange={(v) => handleFieldChange({ target: { name: "category_id", value: v } })}
               disabled={!isEditing}
               width="w-full"
               actionItem={{ label: "Add", icon: <PlusIcon className="w-4 h-4" />, onClick: () => openAddItemModal("category") }}
@@ -274,20 +274,22 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 
             <FormCombobox
               label="Subcategoria"
-              options={subCategories.map(c => ({ value: c, label: c }))}
-              value={productData.subcategory}
-              onChange={(v) => handleFieldChange({ target: { name: "subcategory", value: v } })}
+              options={subCategories}
+              value={productData.subcategory_id}
+              onChange={(v) => handleFieldChange({ target: { name: "subcategory_id", value: v } })}
               disabled={!isEditing}
               width="w-full"
+              actionItem={{ label: "Add", icon: <PlusIcon className="w-4 h-4" />, onClick: () => openAddItemModal("subcategory") }}
             />
 
             <FormCombobox
               label="Marca"
-              options={brands.map(c => ({ value: c, label: c }))}
-              value={productData.brand}
-              onChange={(v) => handleFieldChange({ target: { name: "brand", value: v } })}
+              options={brands}
+              value={productData.brand_id}
+              onChange={(v) => handleFieldChange({ target: { name: "brand_id", value: v } })}
               disabled={!isEditing}
               width="w-full"
+              actionItem={{ label: "Add", icon: <PlusIcon className="w-4 h-4" />, onClick: () => openAddItemModal("brand") }}
             />
 
             <FormCombobox

@@ -34,5 +34,9 @@ export function mapProductToFormData(initialProduct: Product | null | undefined)
     availability_value: (initialProduct as any).availability && (initialProduct as any).availability !== "in_stock" ? parseInt((initialProduct as any).availability.split(" ")[0]) || 0 : 0,
     availability_unit: (initialProduct as any).availability && (initialProduct as any).availability !== "in_stock" ? ((initialProduct as any).availability.split(" ").slice(1).join(" ") || "Dias") : "Dias",
     digital_format: (initialProduct as any).delivery_format !== undefined ? (initialProduct as any).delivery_format : "Download",
+    category_id: initialProduct.category_id,
+    subcategory_id: initialProduct.subcategory_id,
+    brand_id: initialProduct.brand_id,
+    location_id: initialProduct.location_id,
   }
 }

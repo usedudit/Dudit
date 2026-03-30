@@ -348,7 +348,7 @@ export const BusinessDataSubPage = ({
                             <AnimatePresence mode="wait">
                                 <TabsContent value="general" className="mt-0 focus-visible:outline-none">
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-                                        <div className="col-span-12 lg:col-span-8 space-y-10">
+                                        <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                                             {/* Identificação */}
                                             <section>
                                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Identificação</h3>
@@ -498,7 +498,7 @@ export const BusinessDataSubPage = ({
 
                                 <TabsContent value="address" className="mt-0 focus-visible:outline-none">
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-                                        <div className="col-span-12 lg:col-span-8 space-y-10">
+                                        <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                                             <section>
                                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Endereço do negócio</h3>
                                                 <div className="space-y-4">

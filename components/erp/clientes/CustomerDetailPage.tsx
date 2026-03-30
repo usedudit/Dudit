@@ -133,7 +133,7 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
 
                             {/* Main Column */}
-                            <div className={`col-span-12 lg:col-span-8 ${isInformationTab ? 'hidden lg:block' : 'block'}`}>
+                            <div className={`col-span-12 lg:col-span-8 pr-0 lg:pr-12 ${isInformationTab ? 'hidden lg:block' : 'block'}`}>
                                 <TabsContent value="Purchase History" className="mt-0">
                                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
                                         {/* Purchase Summary Cards */}

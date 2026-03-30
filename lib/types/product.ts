@@ -6,7 +6,9 @@ export interface Product {
   price: number
   stock_quantity: number
   category: string | null
+  category_id: string | null
   subcategory: string | null
+  subcategory_id: string | null
   is_active: boolean
   sku: string | null
   rating: number
@@ -14,10 +16,12 @@ export interface Product {
   created_at: string
   partner_id: string
   brand: string | null
+  brand_id: string | null
   product_type: string | null
   condition: string | null
   gtin: string | null
   location: string | null
+  location_id: string | null
   cost_price: number | null
   profit_margin: number | null
   min_stock: number | null
@@ -52,8 +56,11 @@ export interface ProductInput {
   price: number
   stock_quantity: number
   category?: string | null
+  category_id?: string | null
   subcategory?: string | null
+  subcategory_id?: string | null
   brand?: string | null
+  brand_id?: string | null
   sku?: string | null
   gtin?: string | null
   unit?: string | null

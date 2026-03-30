@@ -203,7 +203,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                             <div className="grid grid-cols-12 gap-y-10 lg:gap-x-12">
 
                                 {/* Form Column */}
-                                <div className={activeTab === 'Geral' ? "col-span-12 lg:col-span-8" : "col-span-12"}>
+                                <div className={activeTab === 'Geral' ? "col-span-12 lg:col-span-8 pr-0 lg:pr-12" : "col-span-12"}>
                                     <AnimatePresence mode="wait">
                                         <TabsContent value="Geral" className="mt-0">
                                             <motion.div key="Geral" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-10">

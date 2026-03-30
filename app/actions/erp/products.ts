@@ -177,12 +177,15 @@ export async function createProductComprehensiveAction(data: {
     gtin?: string
     brand?: string
     category?: string
+    categoryId?: string | null
     subcategory?: string
+    subcategory_id?: string | null
     subcategoryId?: string | null
     condition?: string
     unit?: string | null
     productType?: string
     location?: string
+    locationId?: string | null
     costPrice?: number
     price: number
     promotionalPrice?: number | null
@@ -308,12 +311,15 @@ export async function createProductComprehensiveAction(data: {
             gtin: data.gtin || null,
             brand: data.brand || null,
             category: data.category || null,
+            category_id: data.categoryId || null,
             subcategory: data.subcategory || null,
-            subcategory_id: data.subcategoryId || null,
+            subcategory_id: data.subcategoryId || data.subcategory_id || null, // Handle both names
             condition: data.condition || "Novo",
             unit: data.unit || null,
+            brand_id: (data as any).brandId || null,
             product_type: data.productType || "FÃ­sico",
             location: data.location || null,
+            location_id: data.locationId || null,
             cost_price: data.costPrice || 0,
             price: data.price,
             promotional_price: data.promotionalPrice || null,
@@ -441,7 +447,9 @@ interface UpdateProductData {
     name?: string
     description?: string
     category?: string
+    categoryId?: string
     brand?: string
+    brandId?: string
     sku?: string
     gtin?: string
     condition?: string
@@ -459,6 +467,8 @@ interface UpdateProductData {
     showInMarketplace?: boolean
     showPriceInStore?: boolean
     subcategoryId?: string
+    subcategory_id?: string
+    locationId?: string
     featured?: boolean
     productType?: string
     packagingType?: string
@@ -523,7 +533,8 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         const directMapFields = [
             'name', 'description', 'category', 'brand', 'sku', 'gtin', 'condition',
             'price', 'images',
-            'availability', 'warranty', 'unit'
+            'availability', 'warranty', 'unit',
+            'category_id', 'brand_id', 'location_id', 'subcategory_id'
         ]
 
         const fiscalMapFields = [
@@ -582,6 +593,10 @@ export async function updateProductComprehensiveAction(productId: string, data: 
 
         // Novos campos (Marketplace/Outros)
         if (data.subcategoryId !== undefined) payload.subcategory_id = data.subcategoryId
+        if (data.subcategory_id !== undefined) payload.subcategory_id = data.subcategory_id
+        if (data.categoryId !== undefined) payload.category_id = data.categoryId
+        if (data.brandId !== undefined) payload.brand_id = data.brandId
+        if (data.locationId !== undefined) payload.location_id = data.locationId
         if (data.videoUrl !== undefined) payload.video_url = data.videoUrl
         if (data.technicalSpecs !== undefined) payload.technical_specs = data.technicalSpecs
         if (data.featured !== undefined) payload.is_featured = data.featured
