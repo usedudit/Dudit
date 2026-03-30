@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useRef } from "react"
+import React, { useState, useEffect, useCallback, useRef, useTransition } from "react"
 import cn from "classnames"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, InfoCard, Badge, AlertModal, Input as FormInput, Checkbox as FormCheckbox, RadioButton as FormRadioButton, IconPlaceholder } from "@/components/reusable"
@@ -56,6 +56,7 @@ export const BusinessDataSubPage = ({
     onBack: () => void
 }) => {
     const { success: notifySuccess, error: notifyError } = useNotification()
+    const [isPending, startTransition] = useTransition()
     const [isLoading, setIsLoading] = useState(false)
     const [activeTab, setActiveTab] = useState("general")
     const [isScrolled, setIsScrolled] = useState(false)
@@ -121,47 +122,49 @@ export const BusinessDataSubPage = ({
 
     const handleSubmit = async (e: React.FormEvent) => {
         if (e) e.preventDefault()
-        setIsLoading(true)
+        startTransition(async () => {
+            setIsLoading(true)
 
-        try {
-            const businessInfoData = {
-                sells: generalInfo.sells,
-                channels: generalInfo.channels,
+            try {
+                const businessInfoData = {
+                    sells: generalInfo.sells,
+                    channels: generalInfo.channels,
+                }
+
+                const result = await updatePartnerAction(partner.id, {
+                    storeName: generalInfo.storeName,
+                    storeDescription: generalInfo.storeDescription,
+                    storeImageUrl: generalInfo.storeImageUrl || null,
+                    businessType: generalInfo.businessType as "pf" | "pj",
+                    cnpj: generalInfo.cnpj || null,
+                    business_info: businessInfoData,
+                    zipCode: addresses.zipCode,
+                    street: addresses.street,
+                    number: addresses.noNumber ? "S/N" : addresses.number,
+                    complement: addresses.complement,
+                    neighborhood: addresses.neighborhood,
+                    city: addresses.city,
+                    state: addresses.state,
+                    openingHours: hours,
+                    crt: fiscalInfo.crt,
+                    contribuinte: fiscalInfo.contribuinte,
+                    inscricaoEstadual: fiscalInfo.inscricaoEstadual || null,
+                    ieIsento: fiscalInfo.ieIsento,
+                    inscricaoMunicipal: fiscalInfo.inscricaoMunicipal || null,
+                    userId: partner.user_id,
+                })
+
+                if (result?.error) {
+                    notifyError(result.error)
+                } else {
+                    notifySuccess("Configurações atualizadas com sucesso!")
+                }
+            } catch (err) {
+                notifyError("Erro ao atualizar configurações")
+            } finally {
+                setIsLoading(false)
             }
-
-            const result = await updatePartnerAction(partner.id, {
-                storeName: generalInfo.storeName,
-                storeDescription: generalInfo.storeDescription,
-                storeImageUrl: generalInfo.storeImageUrl || null,
-                businessType: generalInfo.businessType as "pf" | "pj",
-                cnpj: generalInfo.cnpj || null,
-                business_info: businessInfoData,
-                zipCode: addresses.zipCode,
-                street: addresses.street,
-                number: addresses.noNumber ? "S/N" : addresses.number,
-                complement: addresses.complement,
-                neighborhood: addresses.neighborhood,
-                city: addresses.city,
-                state: addresses.state,
-                openingHours: hours,
-                crt: fiscalInfo.crt,
-                contribuinte: fiscalInfo.contribuinte,
-                inscricaoEstadual: fiscalInfo.inscricaoEstadual || null,
-                ieIsento: fiscalInfo.ieIsento,
-                inscricaoMunicipal: fiscalInfo.inscricaoMunicipal || null,
-                userId: partner.user_id,
-            })
-
-            if (result?.error) {
-                notifyError(result.error)
-            } else {
-                notifySuccess("Configurações atualizadas com sucesso!")
-            }
-        } catch (err) {
-            notifyError("Erro ao atualizar configurações")
-        } finally {
-            setIsLoading(false)
-        }
+        })
     }
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -212,41 +215,43 @@ export const BusinessDataSubPage = ({
     }
 
     const handleSavePaymentMethod = async (data: any) => {
-        setIsSavingPayment(true)
-        try {
-            if (editingPayment) {
-                const res = await updatePaymentMethodAction(editingPayment.id, {
-                    name: data.name,
-                    isActive: data.isActive,
-                    cardBrand: data.cardBrand,
-                    maxInstallments: data.maxInstallments,
-                    feeType: data.feeType,
-                    percentageRate: data.percentageRate,
-                    fixedAmount: data.fixedAmount,
-                    receivingDays: data.receivingDays,
-                    discountPercent: data.discountPercent
-                })
-                if (res.success) {
-                    setMethods(prev => prev.map(m => m.id === editingPayment.id ? { ...m, ...data } : m))
-                    notifySuccess("Método atualizado!")
-                    setPaymentModalOpen(false)
-                } else notifyError(res.error || "Erro ao atualizar")
-            } else {
-                const res = await createPaymentMethodAction({
-                    partnerId: partner.id,
-                    ...data
-                })
-                if (res.success) {
-                    setMethods(prev => [...prev, res.method])
-                    notifySuccess("Método adicionado!")
-                    setPaymentModalOpen(false)
-                } else notifyError(res.error || "Erro ao adicionar")
+        startTransition(async () => {
+            setIsSavingPayment(true)
+            try {
+                if (editingPayment) {
+                    const res = await updatePaymentMethodAction(editingPayment.id, {
+                        name: data.name,
+                        isActive: data.isActive,
+                        cardBrand: data.cardBrand,
+                        maxInstallments: data.maxInstallments,
+                        feeType: data.feeType,
+                        percentageRate: data.percentageRate,
+                        fixedAmount: data.fixedAmount,
+                        receivingDays: data.receivingDays,
+                        discountPercent: data.discountPercent
+                    })
+                    if (res.success) {
+                        setMethods(prev => prev.map(m => m.id === editingPayment.id ? { ...m, ...data } : m))
+                        notifySuccess("Método atualizado!")
+                        setPaymentModalOpen(false)
+                    } else notifyError(res.error || "Erro ao atualizar")
+                } else {
+                    const res = await createPaymentMethodAction({
+                        partnerId: partner.id,
+                        ...data
+                    })
+                    if (res.success) {
+                        setMethods(prev => [...prev, res.method])
+                        notifySuccess("Método adicionado!")
+                        setPaymentModalOpen(false)
+                    } else notifyError(res.error || "Erro ao adicionar")
+                }
+            } catch {
+                notifyError("Erro ao salvar método")
+            } finally {
+                setIsSavingPayment(false)
             }
-        } catch {
-            notifyError("Erro ao salvar método")
-        } finally {
-            setIsSavingPayment(false)
-        }
+        })
     }
 
     const handleDeletePaymentMethod = async (id: string) => {
@@ -262,14 +267,17 @@ export const BusinessDataSubPage = ({
     }
 
     const togglePaymentStatus = async (method: any, checked: boolean) => {
-        try {
-            const res = await updatePaymentMethodAction(method.id, { isActive: checked })
-            if (res.success) {
-                setMethods(prev => prev.map(m => m.id === method.id ? { ...m, is_active: checked } : m))
-            } else notifyError(res.error || "Erro ao alterar status")
-        } catch {
-            notifyError("Erro ao alterar status")
-        }
+        startTransition(async () => {
+            try {
+                const res = await updatePaymentMethodAction(method.id, { isActive: checked })
+                if (res.success) {
+                    setMethods(prev => prev.map(m => m.id === method.id ? { ...m, is_active: checked } : m))
+                    notifySuccess("Status atualizado!")
+                } else notifyError(res.error || "Erro ao alterar status")
+            } catch {
+                notifyError("Erro ao alterar status")
+            }
+        })
     }
 
     const getPaymentIcon = (type: string) => {
@@ -288,7 +296,7 @@ export const BusinessDataSubPage = ({
 
                         {/* Sticky Header */}
                         <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
-                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
+                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
 
                                 {/* Back button — desktop only */}
                                 <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
@@ -334,7 +342,7 @@ export const BusinessDataSubPage = ({
                         </div>
 
                         {/* Content Body */}
-                        <div className="px-4 md:px-8 py-8 max-w-[1400px] mx-auto">
+                        <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                             <AnimatePresence mode="wait">
                                 <TabsContent value="general" className="mt-0 focus-visible:outline-none">
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-10 lg:gap-x-16">
@@ -458,24 +466,29 @@ export const BusinessDataSubPage = ({
                                         </div>
 
                                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                                            <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col items-center text-center relative overflow-hidden">
+                                            <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col relative overflow-hidden">
                                                 <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
                                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Logo do Negócio</h3>
-                                                <div
-                                                    onClick={() => fileInputRef.current?.click()}
-                                                    className="w-28 h-28 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4 relative group cursor-pointer overflow-hidden border-2 border-dashed border-brand-border dark:border-dark-border hover:border-brand-dark transition-colors"
-                                                >
-                                                    {imagePreview ? (
-                                                        <img src={imagePreview} alt="Logo" className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <EditIcon size={32} className="text-gray-300 group-hover:opacity-10 transition-opacity" />
-                                                    )}
-                                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <span className="text-white text-sm font-bold uppercase tracking-wider">{imageUploading ? "Subindo..." : "Alterar"}</span>
+                                                
+                                                <div className="flex items-center gap-4 p-3 border rounded-xl bg-brand-gray/50 border-dashed border-gray-200 dark:border-dark-border dark:bg-dark-background/50">
+                                                    <div onClick={() => fileInputRef.current?.click()} className="h-16 w-16 bg-white dark:bg-dark-border border dark:border-dark-border rounded-lg flex items-center justify-center cursor-pointer hover:border-brand-green dark:hover:border-brand-green relative overflow-hidden shadow-sm">
+                                                        {imagePreview ? (
+                                                            <img src={imagePreview} alt="Logo" className="object-cover w-full h-full" />
+                                                        ) : (
+                                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                                        )}
+                                                        {imageUploading && (
+                                                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                                                <Spinner size={20} className="text-white" />
+                                                            </div>
+                                                        )}
                                                     </div>
+                                                    <div className="flex-1">
+                                                        <p className="text-sm font-semibold text-gray-900 dark:text-dark-heading">Logo da Loja</p>
+                                                        <p className="text-xs text-gray-500 dark:text-dark-body">Máx 3MB (PNG, JPG, WEBP)</p>
+                                                    </div>
+                                                    <input ref={fileInputRef} type="file" hidden accept="image/*" onChange={handleImageChange} />
                                                 </div>
-                                                <p className="text-xs text-brand-inactive-text max-w-[200px]">Formatos aceitos: PNG, JPG ou WEBP (máx. 3MB)</p>
-                                                <input ref={fileInputRef} type="file" hidden accept="image/*" onChange={handleImageChange} />
                                             </div>
                                         </div>
                                     </motion.div>
@@ -571,7 +584,6 @@ export const BusinessDataSubPage = ({
                                                         onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${addresses.street}, ${addresses.number}, ${addresses.neighborhood}, ${addresses.city} - ${addresses.state}, ${addresses.zipCode}`)}`, '_blank')}
                                                     >
                                                         <img
-                                                            src="/map/fallback.png"
                                                             alt="Satelite Map"
                                                             className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
                                                             onError={(e) => { e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" fill="rgb(229,231,235)"><rect width="100%" height="100%"/></svg>' }}

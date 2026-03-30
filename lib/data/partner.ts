@@ -41,9 +41,21 @@ export const getPartnerByUserIdCached = cache(async (userId: string) => {
     const supabase = await getSupabaseServerClient()
     const { data } = await supabase
         .from("partners")
-        .select("*")
+        .select("*, addresses(*)")
         .eq("user_id", userId)
         .maybeSingle()
+
+    // attach address to partner root for backward compatibility with components
+    if (data && data.addresses && data.addresses.length > 0) {
+        const defaultAddress = data.addresses.find((a: any) => a.is_default) || data.addresses[0];
+        data.zip_code = defaultAddress.zip_code;
+        data.street = defaultAddress.street;
+        data.number = defaultAddress.number;
+        data.complement = defaultAddress.complement;
+        data.neighborhood = defaultAddress.neighborhood;
+        data.city = defaultAddress.city;
+        data.state = defaultAddress.state;
+    }
 
     return data
 })
@@ -55,7 +67,7 @@ export const getPartnerByUserIdCached = cache(async (userId: string) => {
 export const getPartnerPaymentMethodsCached = cache(async (partnerId: string) => {
     const supabase = await getSupabaseServerClient()
     const { data } = await supabase
-        .from("partner_payment_methods")
+        .from("payment_methods")
         .select("*")
         .eq("partner_id", partnerId)
 

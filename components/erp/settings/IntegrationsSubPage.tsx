@@ -130,8 +130,8 @@ export const IntegrationsSubPage = ({
         <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
           {/* Sticky Header */}
-          <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
-            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
+          <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
 
               {/* Back button — desktop only */}
               <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
@@ -148,22 +148,15 @@ export const IntegrationsSubPage = ({
                   </h1>
 
                   <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-1"}`}>
-                    Conecte sua loja com ferramentas externas e meios de pagamento.
+                    Conecte seu negócio com ferramentas externas e meios de pagamento.
                   </div>
-                </div>
-
-                {/* Desktop action buttons */}
-                <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
-                  <Button variant="outline" onClick={onBack} className="px-5 h-[42px]">
-                    Voltar
-                  </Button>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Content Body */}
-          <div className="px-4 md:px-8 py-8 max-w-[1400px] mx-auto">
+          <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
             {searchParams.get("mp_connected") === "true" && (
               <InfoCard
                 message="Mercado Pago conectado com sucesso! Agora você pode receber pagamentos online."

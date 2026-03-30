@@ -31,12 +31,12 @@ export const ListItem: React.FC<ListItemProps> = ({
     return (
         <div
             onClick={onClick}
-            className={`group flex items-center py-3 gap-2 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-dark-heading/30 transition-all cursor-pointer ${className}`}
+            className={`group flex items-center gap-4 p-5 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-dark-border/90 transition-all cursor-pointer h-full ${className}`}
         >
             {left && <div className="flex-shrink-0">{left}</div>}
 
             {Icon && (
-                <div className="w-12 h-12 rounded-full bg-[#f3f5f9] dark:bg-gray-800 flex items-center justify-center flex-shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-gray-700 transition-colors">
+                <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex items-center justify-center flex-shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
                     <Icon className="text-brand-dark dark:text-dark-heading" />
                 </div>
             )}

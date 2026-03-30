@@ -41,7 +41,7 @@ export default async function SettingsPage() {
         }}
       />
       <FadeIn className="p-4">
-        <SettingsTabs partner={partner} paymentMethods={paymentMethods?.map((pm: any) => pm.payment_method) || []} />
+        <SettingsTabs partner={partner} paymentMethods={paymentMethods || []} />
       </FadeIn>
     </>
   )

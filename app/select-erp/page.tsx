@@ -102,6 +102,7 @@ export default async function SelectErpPage() {
                     <div className="mt-6 text-center">
                         <Link
                             href="/auth/login?mode=partner"
+                            prefetch={false}
                             className="inline-flex items-center gap-2 px-5 py-3 text-sm font-semibold text-[#022C2B] bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">

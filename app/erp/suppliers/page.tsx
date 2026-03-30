@@ -22,10 +22,10 @@ export default async function SuppliersPage() {
           </div>
           <div className="flex gap-2">
             <Button asChild variant="outline">
-              <Link href="/erp/dashboard">Voltar</Link>
+              <Link href="/erp/dashboard" prefetch={false}>Voltar</Link>
             </Button>
             <Button asChild>
-              <Link href="/erp/suppliers/new">Adicionar fornecedor</Link>
+              <Link href="/erp/suppliers/new" prefetch={false}>Adicionar fornecedor</Link>
             </Button>
           </div>
         </div>

@@ -59,11 +59,11 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
         <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-300">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
                 <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
-                    
+
                     {/* Sticky Header */}
                     <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300">
                         <div className="max-w-[1400px] mx-auto relative px-4 md:px-8 md:pt-6">
-                            
+
                             {/* Back button — desktop only */}
                             <div className={`absolute -left-12 top-8 h-full hidden xl:flex justify-center transition-all duration-300 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                 <Button variant="ghost" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-dark-border">
@@ -129,9 +129,9 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                     </div>
 
                     {/* Content Body */}
-                    <div className="px-4 md:px-8 py-8 max-w-[1400px] mx-auto">
+                    <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                         <div className="grid grid-cols-12 gap-y-10 lg:gap-x-16">
-                            
+
                             {/* Main Column */}
                             <div className={`col-span-12 lg:col-span-8 ${isInformationTab ? 'hidden lg:block' : 'block'}`}>
                                 <TabsContent value="Purchase History" className="mt-0">
@@ -206,7 +206,7 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
 
                             {/* Sidebar Column */}
                             <div className="col-span-12 lg:col-span-4 border-l border-brand-border dark:border-dark-border lg:pl-12 space-y-10">
-                                
+
                                 <section>
                                     <div className="flex items-center justify-between mb-6">
                                         <h3 className="text-[17px] font-bold text-brand-dark dark:text-dark-heading">Observações</h3>

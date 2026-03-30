@@ -263,7 +263,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                         </div>
 
                         {/* Content Body */}
-                        <div className="px-4 md:px-8 py-8 max-w-[1400px] mx-auto">
+                        <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                             <div className="grid grid-cols-12 gap-y-10 lg:gap-x-16">
 
                                 {/* Form Column */}
@@ -419,7 +419,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                             </div>
                                                             <div>
                                                                 <StateComboBox
-                                                                    label="UF"
+                                                                    label="Estado"
                                                                     value={uf}
                                                                     onChange={setUf}
                                                                     className="w-full"
@@ -443,7 +443,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Endereço de cobrança</h3>
                                                             <div className="space-y-4">
                                                                 <CepInput
-                                                                    label="CEP *"
+                                                                    label="CEP"
                                                                     placeholder="00000-000"
                                                                     value={billingCep}
                                                                     onChange={setBillingCep}
@@ -471,14 +471,14 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                                         <FormInput label="Complemento" placeholder="Apto, Bloco, etc." value={billingComplement} onChange={e => setBillingComplement(e.target.value)} />
                                                                     </div>
                                                                 </div>
-                                                                <FormInput label="Bairro *" placeholder="Nome do bairro" value={billingNeighborhood} onChange={e => setBillingNeighborhood(e.target.value)} />
+                                                                <FormInput label="Bairro" placeholder="Nome do bairro" value={billingNeighborhood} onChange={e => setBillingNeighborhood(e.target.value)} />
                                                                 <div className="grid grid-cols-2 gap-3 items-end">
                                                                     <div className="mb-[22px]">
-                                                                        <FormInput label="Cidade *" placeholder="Nome da cidade" value={billingCity} onChange={e => setBillingCity(e.target.value)} />
+                                                                        <FormInput label="Cidade" placeholder="Nome da cidade" value={billingCity} onChange={e => setBillingCity(e.target.value)} />
                                                                     </div>
                                                                     <div>
-                                                                        <label className="text-sm font-medium text-brand-dark dark:text-dark-heading block mb-1.5">UF *</label>
                                                                         <StateComboBox
+                                                                            label="Estado"
                                                                             value={billingUf}
                                                                             onChange={setBillingUf}
                                                                             className="w-full"
@@ -517,7 +517,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                             <>
                                                 <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col items-center text-center relative overflow-hidden">
                                                     <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Foto do Perfil</h3>
+                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Imagem do Cliente</h3>
                                                     <div className="w-28 h-28 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4 relative group cursor-pointer overflow-hidden border-2 border-dashed border-brand-border dark:border-dark-border hover:border-brand-dark transition-colors">
                                                         <EditIcon size={32} className="text-gray-300 group-hover:opacity-10 transition-opacity" />
                                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -527,16 +527,15 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                     <p className="text-xs text-brand-inactive-text max-w-[200px]">Formatos aceitos: PNG, JPG ou WEBP (máx. 2MB)</p>
                                                 </div>
 
-                                                <div className="bg-white dark:bg-dark-surface p-0 rounded-2xl space-y-3">
+                                                <div className="bg-white dark:bg-dark-surface p-0 rounded-2xl space-y-3 mt-8">
                                                     <MoneyInput
                                                         label="Crédito em loja"
                                                         value={storeCredit}
                                                         onChange={setStoreCredit}
                                                         placeholder="0,00"
-                                                        className="font-bold !bg-gray-50 dark:!bg-dark-background border-brand-border dark:border-dark-border"
                                                     />
                                                     <p className="text-[11px] text-brand-inactive-text leading-tight">
-                                                        O limite de crédito permite que o cliente realize compras para pagar posteriormente (faturamento).
+                                                        É o valor disponível para o cliente usar em compras futuras.
                                                     </p>
                                                 </div>
                                             </>
@@ -548,7 +547,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                 </div>
                                                 <div className="p-4 flex flex-col">
                                                     <div className="w-full h-[120px] bg-gray-200 dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group" onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${street}, ${number}, ${neighborhood}, ${city} - ${uf}, ${cep}`)}`, '_blank')}>
-                                                        <img src="/map/fallback.png" alt="Satelite Map" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" onError={(e) => { e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" fill="rgb(229,231,235)"><rect width="100%" height="100%"/></svg>' }} />
+                                                        <img alt="Satelite Map" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" onError={(e) => { e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" fill="rgb(229,231,235)"><rect width="100%" height="100%"/></svg>' }} />
                                                         <div className="absolute inset-0 flex items-center justify-center">
                                                             <div className="w-5 h-5 rounded-full border-[3px] border-white bg-orange-500 shadow-sm relative z-10 transition-transform group-hover:scale-110"></div>
                                                             <div className="w-12 h-12 bg-white/30 rounded-full absolute mix-blend-overlay animate-pulse"></div>

@@ -26,10 +26,10 @@ export default async function ServicesPage() {
           </div>
           <div className="flex gap-2">
             <Button asChild variant="outline">
-              <Link href="/erp/dashboard">Voltar</Link>
+              <Link href="/erp/dashboard" prefetch={false}>Voltar</Link>
             </Button>
             <Button asChild>
-              <Link href="/erp/services/new">Adicionar serviço</Link>
+              <Link href="/erp/services/new" prefetch={false}>Adicionar serviço</Link>
             </Button>
           </div>
         </div>
@@ -48,7 +48,7 @@ export default async function ServicesPage() {
                     <span className="font-semibold">R$ {Number(service.price).toFixed(2)}</span>
                   </div>
                   <Button asChild variant="outline" size="sm" className="w-full bg-transparent">
-                    <Link href={`/erp/services/${service.id}`}>Editar</Link>
+                    <Link href={`/erp/services/${service.id}`} prefetch={false}>Editar</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -59,7 +59,7 @@ export default async function ServicesPage() {
             <CardContent className="p-12 text-center">
               <p className="text-muted-foreground mb-4">Nenhum serviço cadastrado ainda</p>
               <Button asChild>
-                <Link href="/erp/services/new">Adicionar primeiro serviço</Link>
+                <Link href="/erp/services/new" prefetch={false}>Adicionar primeiro serviço</Link>
               </Button>
             </CardContent>
           </Card>

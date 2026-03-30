@@ -31,7 +31,7 @@ export default async function GenerateLabelsPage() {
             <p className="text-muted-foreground">Selecione produtos para gerar etiquetas com código de barras</p>
           </div>
           <Button asChild variant="outline">
-            <Link href="/erp/labels">Voltar</Link>
+            <Link href="/erp/labels" prefetch={false}>Voltar</Link>
           </Button>
         </div>
 

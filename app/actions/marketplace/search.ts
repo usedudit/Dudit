@@ -69,8 +69,11 @@ async function _searchMarketplaceCore(
     const isPagination = limits.cursor !== undefined || limits.lastId !== undefined
     
     // Inline version read
+    const tV0 = performance.now()
     let version: number = 2 // Bumping to v2 for the ID-only cache format change
     try { version = (await redis.get<number>(GLOBAL_VERSION_KEY)) || 2 } catch {}
+    const tV1 = performance.now()
+    if (tV1 - tV0 > 1000) console.warn(`[REDIS] SLOW VERSION READ: ${(tV1 - tV0).toFixed(1)}ms`)
     
     const queryHash = serializeSearchKey(query, type, limits)
     const safeHash = Buffer.from(queryHash).toString('base64').replace(/=/g, '')
@@ -79,7 +82,11 @@ async function _searchMarketplaceCore(
     // 1. TRY CACHE HIT (IDs only)
     if (!isPagination) {
         try {
+            const tR0 = performance.now()
             const cachedIds = await redis.get<string[]>(cacheKey)
+            const tR1 = performance.now()
+            
+            if (tR1 - tR0 > 1000) console.warn(`[REDIS] SLOW ID FETCH (${cacheKey}): ${(tR1 - tR0).toFixed(1)}ms`)
             if (cachedIds && Array.isArray(cachedIds)) {
                 console.log(`[REDIS] HIT (IDs) ${cacheKey} | Fetching ${cachedIds.length} objects...`)
                 

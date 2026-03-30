@@ -44,7 +44,7 @@ export default async function PaymentFailurePage({
               <Link href="/cart" prefetch={false}>Voltar ao Carrinho</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href="/marketplace">Continuar Comprando</Link>
+              <Link href="/marketplace" prefetch={false}>Continuar Comprando</Link>
             </Button>
           </div>
         </CardContent>

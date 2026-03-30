@@ -132,7 +132,7 @@ const InfoCard = ({ icon: Icon, title, description, onClick, rightIcon: RightIco
         onClick={onClick}
         className="group flex items-center gap-4 p-4 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-dark-heading/30 transition-all cursor-pointer"
     >
-        <div className="w-12 h-12 rounded-full bg-[#f3f5f9] dark:bg-gray-800 flex items-center justify-center flex-shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-gray-700 transition-colors">
+        <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex items-center justify-center flex-shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
             <Icon size={20} className="text-brand-dark dark:text-dark-heading" />
         </div>
         <div className="flex-1 w-full min-w-0 pr-2">

@@ -15,13 +15,13 @@ export default async function LabelsPage() {
             <p className="text-muted-foreground">Crie e imprima etiquetas de produtos com código de barras</p>
           </div>
           <Button asChild variant="outline">
-            <Link href="/erp/dashboard">Voltar</Link>
+            <Link href="/erp/dashboard" prefetch={false}>Voltar</Link>
           </Button>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="p-6 border rounded-lg hover:bg-accent cursor-pointer">
-            <Link href="/erp/labels/generate" className="space-y-2 block h-full">
+            <Link href="/erp/labels/generate" prefetch={false} className="space-y-2 block h-full">
               <h3 className="font-semibold text-lg">Gerar Etiquetas</h3>
               <p className="text-sm text-muted-foreground">
                 Selecione produtos e gere etiquetas com código de barras para impressão

@@ -8,11 +8,12 @@ import { Suspense } from "react"
 
 async function ProductFeedWrapper({ productsPromise, user, userProfile, cartCount }: any) {
   const t0 = performance.now()
+  console.log(`[SSR] Home (Feed Payload) | START`)
 
   const products = await productsPromise
 
   const tEnd = performance.now()
-  console.log(`[SSR] Home (Feed Payload) | Time: ${(tEnd - t0).toFixed(2)}ms`)
+  console.log(`[SSR] Home (Feed Payload) | END | Time: ${(tEnd - t0).toFixed(2)}ms`)
 
   return (
     <MarketplaceHome
@@ -26,19 +27,24 @@ async function ProductFeedWrapper({ productsPromise, user, userProfile, cartCoun
 }
 
 export default async function HomePage() {
-  const t0 = performance.now()
+  const tStart = performance.now()
+  console.log(`[SSR] Home (Page) | START at ${new Date().toISOString()}`)
 
   // 🔥 roda em paralelo
   const userPromise = getCurrentUser()
   const productsPromise = getCachedHomeProducts()
 
   const user = await userPromise
+  const tUser = performance.now()
+  console.log(`[SSR] Home (Page) | User resolved in ${(tUser - tStart).toFixed(2)}ms`)
 
   const sessionDataPromise = user
     ? getUserSessionData(user.id)
     : Promise.resolve(null)
 
   const sessionData = await sessionDataPromise
+  const tSession = performance.now()
+  console.log(`[SSR] Home (Page) | Session resolved in ${(tSession - tUser).toFixed(2)}ms`)
 
   const userProfile = sessionData?.profile
     ? {
@@ -52,7 +58,7 @@ export default async function HomePage() {
   const cartCount = sessionData?.cartCount || 0
 
   const tEnd = performance.now()
-  console.log(`[SSR] Home (Header) | Time: ${(tEnd - t0).toFixed(2)}ms | User: ${!!user}`)
+  console.log(`[SSR] Home (Header) | END | Total Time: ${(tEnd - tStart).toFixed(2)}ms | User: ${!!user}`)
 
   return (
     <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col pt-[110px] lg:pt-[108px]">

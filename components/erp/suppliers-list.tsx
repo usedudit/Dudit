@@ -58,7 +58,7 @@ export function SuppliersList({ suppliers }: { suppliers: Supplier[] }) {
         <CardContent className="p-12 text-center">
           <p className="text-muted-foreground mb-4">Nenhum fornecedor cadastrado ainda</p>
           <Button asChild>
-            <Link href="/erp/suppliers/new">Adicionar primeiro fornecedor</Link>
+            <Link href="/erp/suppliers/new" prefetch={false}>Adicionar primeiro fornecedor</Link>
           </Button>
         </CardContent>
       </Card>
@@ -92,7 +92,7 @@ export function SuppliersList({ suppliers }: { suppliers: Supplier[] }) {
                   <TableCell>
                     <div className="flex gap-2">
                       <Button asChild variant="outline" size="sm">
-                        <Link href={`/erp/suppliers/${supplier.id}`}>Editar</Link>
+                        <Link href={`/erp/suppliers/${supplier.id}`} prefetch={false}>Editar</Link>
                       </Button>
                       <Button
                         variant="destructive"

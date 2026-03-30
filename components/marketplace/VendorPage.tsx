@@ -47,6 +47,37 @@ const openWhatsApp = (phone?: string, storeName?: string) => {
   window.open(`https://wa.me/${number}?text=${text}`, "_blank")
 }
 
+const formatOpeningHours = (hours: any) => {
+  if (typeof hours === 'string') return hours;
+  if (!hours || typeof hours !== 'object' || Object.keys(hours).length === 0) {
+    return "Segunda a Sexta: 09:00 - 18:00";
+  }
+
+  const daysMap: Record<string, string> = {
+    monday: "Seg",
+    tuesday: "Ter",
+    wednesday: "Qua",
+    thursday: "Qui",
+    friday: "Sex",
+    saturday: "Sáb",
+    sunday: "Dom"
+  };
+
+  const enabledDays = Object.entries(hours)
+    .filter(([_, value]: [string, any]) => value?.enabled)
+    .sort((a, b) => {
+      const order = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+      return order.indexOf(a[0]) - order.indexOf(b[0]);
+    })
+    .map(([key, value]: [string, any]) => {
+      const dayName = daysMap[key] || key;
+      return `${dayName}: ${value.from}-${value.to}`;
+    });
+
+  if (enabledDays.length === 0) return "Fechado temporariamente";
+  return enabledDays.join(" • ");
+};
+
 // --- SUB-COMPONENTS ---
 
 const StoreStats = ({ rating, sales, createdAt, reviewsCount }: any) => (
@@ -249,7 +280,7 @@ const InfoTab = ({ partner, stats }: any) => {
           <ChevronDownIcon size={20} className="text-brand-inactive-text" />
         </div>
         <p className="text-[14px] text-brand-inactive-text">
-          {partner.openingHours ?? "Segunda a Sexta: 09:00 - 18:00"}
+          {formatOpeningHours(partner.openingHours)}
         </p>
       </div>
 

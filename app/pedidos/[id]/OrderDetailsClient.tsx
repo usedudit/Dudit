@@ -245,7 +245,7 @@ export const OrderDetailsClient = ({ order }: { order: any }) => {
                                                     <span className="text-brand-border hidden sm:block">|</span>
                                                     <span className="font-bold text-brand-dark">R$ {Number(item.product_price).toFixed(2)} / un</span>
                                                     <span className="text-brand-border">|</span>
-                                                    <Link href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)} className="text-brand-green font-medium cursor-pointer hover:underline">
+                                                    <Link href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)} prefetch={false} className="text-brand-green font-medium cursor-pointer hover:underline">
                                                         Acessar página do produto
                                                     </Link>
                                                 </div>
@@ -280,7 +280,7 @@ export const OrderDetailsClient = ({ order }: { order: any }) => {
                                 </div>
                                 <div>
                                     <div className="text-[15px] font-bold text-brand-dark">{order.partners?.store_name}</div>
-                                    <Link href={getPartnerUrl({ ...order.partners, id: order.partner_id })} className="text-[13px] font-medium text-brand-green cursor-pointer hover:underline mt-0.5 block">
+                                    <Link href={getPartnerUrl({ ...order.partners, id: order.partner_id })} prefetch={false} className="text-[13px] font-medium text-brand-green cursor-pointer hover:underline mt-0.5 block">
                                         Ver perfil da loja
                                     </Link>
                                 </div>

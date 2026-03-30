@@ -259,6 +259,10 @@ export async function middleware(request: NextRequest) {
 
 
         const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          requestHeaders.set("x-user-id", user.id)
+          requestHeaders.set("x-user-email", user.email || "")
+        }
 
         // Se não estiver logado e tentar acessar rotas protegidas -> Manda pro Login
         if (!user && isProtected) {

@@ -24,7 +24,7 @@ export default async function NewServicePage() {
             <h1 className="text-3xl font-bold">Novo Serviço</h1>
           </div>
           <Button asChild variant="outline">
-            <Link href="/erp/services">Voltar</Link>
+            <Link href="/erp/services" prefetch={false}>Voltar</Link>
           </Button>
         </div>
 

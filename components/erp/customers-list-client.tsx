@@ -77,7 +77,7 @@ export function CustomersListClient({ partnerId }: CustomersListClientProps) {
         <CardContent className="p-12 text-center">
           <p className="text-muted-foreground mb-4">Nenhum cliente neste local</p>
           <Button asChild>
-            <Link href="/erp/customers/new">Adicionar cliente</Link>
+            <Link href="/erp/customers/new" prefetch={false}>Adicionar cliente</Link>
           </Button>
         </CardContent>
       </Card>
@@ -127,7 +127,7 @@ export function CustomersListClient({ partnerId }: CustomersListClientProps) {
                 </TableCell>
                 <TableCell>
                   <Button asChild variant="outline" size="sm">
-                    <Link href={`/erp/customers/${customer.id}`}>Editar</Link>
+                    <Link href={`/erp/customers/${customer.id}`} prefetch={false}>Editar</Link>
                   </Button>
                 </TableCell>
               </TableRow>

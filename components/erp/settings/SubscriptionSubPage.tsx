@@ -501,8 +501,8 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
         <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
           {/* Sticky Header */}
-          <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
-            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
+          <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
 
               {/* Back button — desktop only */}
               <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
@@ -534,7 +534,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
           </div>
 
           {/* Content Body */}
-          <div className="px-4 md:px-8 py-8 max-w-[1400px] mx-auto">
+          <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
             {/* Current Plan Info Bar */}
             {!loading && subData && (
               <motion.div

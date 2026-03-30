@@ -26,7 +26,7 @@ export default async function OrdersPage() {
             <p className="text-muted-foreground">Gerencie os pedidos recebidos</p>
           </div>
           <Button asChild variant="outline">
-            <Link href="/erp/dashboard">Voltar</Link>
+            <Link href="/erp/dashboard" prefetch={false}>Voltar</Link>
           </Button>
         </div>
 
@@ -93,7 +93,7 @@ export default async function OrdersPage() {
                         <TableCell>{new Date(order.created_at).toLocaleDateString("pt-BR")}</TableCell>
                         <TableCell>
                           <Button asChild variant="outline" size="sm">
-                            <Link href={`/erp/orders/${order.id}`}>Ver detalhes</Link>
+                            <Link href={`/erp/orders/${order.id}`} prefetch={false}>Ver detalhes</Link>
                           </Button>
                         </TableCell>
                       </TableRow>
