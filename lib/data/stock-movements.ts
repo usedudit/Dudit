@@ -25,10 +25,11 @@ export const getStockMovementsCached = cache(async (partnerId: string) => {
       created_at,
       created_by,
       products(id, name, sku, stock_quantity, images),
-      orders(id, order_number, mp_payment_id, payment_method)
+      orders(id, order_number)
     `)
         .eq("partner_id", partnerId)
         .order("created_at", { ascending: false })
+        .limit(100) // Limit to 100 most recent — prepared for server-side pagination via .range()
 
     return data
 })

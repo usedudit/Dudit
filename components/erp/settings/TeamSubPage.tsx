@@ -24,6 +24,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
 
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [currentUserRole, setCurrentUserRole] = useState<PartnerRole | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [invitations, setInvitations] = useState<any[]>([])
   const [isLoadingMembers, setIsLoadingMembers] = useState(true)
   const [errorMembers, setErrorMembers] = useState<string | null>(null)
@@ -32,12 +33,13 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
   const fetchMembers = async () => {
     setIsLoadingMembers(true)
     setErrorMembers(null)
-    const { members, currentUserRole: role, error } = await getTeamMembers()
+    const { members, currentUserRole: role, currentUserId: userId, error } = await getTeamMembers()
     if (error) {
       setErrorMembers(error)
     } else {
       setTeamMembers(members || [])
       setCurrentUserRole(role || null)
+      setCurrentUserId(userId || null)
     }
 
     try {
@@ -168,7 +170,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                   <div>
                     <p className="font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
                       {member.fullName}
-                      {member.userId === currentUserRole ? (
+                      {member.userId === currentUserId ? (
                         <span className="text-[10px] bg-brand-slate dark:bg-gray-800 px-1.5 py-0.5 rounded text-brand-dark dark:text-dark-heading">VOCÊ</span>
                       ) : null}
                     </p>
@@ -191,7 +193,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      {currentUserRole === "OWNER" && member.userId !== currentUserRole && (
+                      {currentUserRole === "OWNER" && member.userId !== currentUserId && (
                         <>
                           {(Object.keys(ROLE_LABELS) as PartnerRole[]).map((role) => (
                             <DropdownMenuItem
@@ -205,12 +207,14 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                           <div className="h-px bg-gray-100 my-1" />
                         </>
                       )}
-                      <DropdownMenuItem
-                        className="text-red-600 focus:bg-red-50 focus:text-red-700 cursor-pointer"
-                        onClick={() => handleRemoveMember(member.userId)}
-                      >
-                        <TrashIcon className="w-4 h-4 mr-2" /> Remover Membro
-                      </DropdownMenuItem>
+                      {member.userId !== currentUserId && (
+                        <DropdownMenuItem
+                          className="text-red-600 focus:bg-red-50 focus:text-red-700 cursor-pointer"
+                          onClick={() => handleRemoveMember(member.userId)}
+                        >
+                          <TrashIcon className="w-4 h-4 mr-2" /> Remover Membro
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

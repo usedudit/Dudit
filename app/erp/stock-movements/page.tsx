@@ -7,10 +7,12 @@ import { getStockMovementsCached } from "@/lib/data/stock-movements"
 import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { AccessDenied } from "@/components/erp/access-denied"
+import StockMovementsLoading from "./loading"
 
 export default async function StockMovementsPage() {
   const user = await getCurrentUser()
   if (!user) return <AccessDenied />
+
   const partner = await getCurrentPartner()
 
   if (!partner) {
@@ -33,7 +35,7 @@ export default async function StockMovementsPage() {
         userProfile={userProfile}
       />
       <FadeIn className="p-4">
-        <Suspense fallback={<div className='p-4'>Carregando movimentações...</div>}>
+        <Suspense fallback={<StockMovementsLoading />}>
           <StockMovementPageContent
             partnerId={partner.id}
             movements={movements || []}

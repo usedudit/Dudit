@@ -14,7 +14,7 @@ import MetadataCard from "./MetadataCard"
 import CadastrosPageControls from "./CadastrosPageControls"
 
 // Actions
-import { 
+import {
     createCategoryAction, updateCategoryAction, deleteCategoryAction,
     createBrandAction, updateBrandAction, deleteBrandAction,
     createLocationAction, updateLocationAction, deleteLocationAction,
@@ -76,7 +76,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
         else if (activeTab === "brands") items = metadata.brands
         else if (activeTab === "locations") items = metadata.locations
 
-        return items.filter(item => 
+        return items.filter(item =>
             item.name.toLowerCase().includes(search.toLowerCase())
         )
     }, [activeTab, metadata, search])
@@ -224,7 +224,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                 </div>
 
                 {/* Controls - Exactly like ProductsPage Controls Position */}
-                <CadastrosPageControls 
+                <CadastrosPageControls
                     activeTab={activeTab}
                     setActiveTab={(tab) => { setActiveTab(tab); setPage(1); }}
                     search={search}
@@ -236,14 +236,14 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                 <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-0 px-4 md:px-8">
                     <AnimatePresence mode="wait">
                         {filteredItems.length === 0 ? (
-                            <motion.div 
+                            <motion.div
                                 key="empty"
                                 initial={{ opacity: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
                                 className="w-full h-full"
                             >
-                                <IconPlaceholder 
+                                <IconPlaceholder
                                     placeholderType="image"
                                     title="Nenhum item encontrado"
                                     subtitle="Ajuste os filtros ou adicione um novo cadastro."
@@ -259,7 +259,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8"
                             >
                                 {paginatedItems.map((item) => (
-                                    <MetadataCard 
+                                    <MetadataCard
                                         key={item.id}
                                         item={item}
                                         type={activeTab}
@@ -275,7 +275,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
 
                 {/* Pagination - Identical position */}
                 {totalPages > 1 && (
-                    <Pagination 
+                    <Pagination
                         currentPage={page}
                         totalPages={totalPages}
                         onPageChange={setPage}
@@ -296,7 +296,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                 }
             >
                 <div className="flex flex-col gap-4 p-4">
-                    <Input 
+                    <Input
                         label="Nome"
                         placeholder="Ex: Eletrônicos, Nike, Prateleira A1"
                         value={modal.item.name}
@@ -309,7 +309,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                             <label className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                                 Categoria Pai
                             </label>
-                            <Combobox 
+                            <Combobox
                                 placeholder="Selecione a categoria pai..."
                                 options={metadata.categories.filter((c: any) => !c.parent_id).map((c: any) => ({ value: c.id, label: c.name }))}
                                 value={modal.item.parentId}
@@ -319,9 +319,9 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                     )}
 
                     <div className="flex items-center gap-2 mt-2">
-                        <input 
-                            type="checkbox" 
-                            id="is_active" 
+                        <input
+                            type="checkbox"
+                            id="is_active"
                             checked={modal.item.is_active}
                             onChange={(e) => setModal(prev => ({ ...prev, item: { ...prev.item, is_active: e.target.checked } }))}
                             className="w-4 h-4 rounded border-gray-300 text-brand-green focus:ring-brand-green"

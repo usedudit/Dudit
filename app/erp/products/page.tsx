@@ -5,6 +5,7 @@ import { getERPProductsPageData } from "@/app/actions/erp/products"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { AccessDenied } from "@/components/erp/access-denied"
+import ProductsLoading from "./loading"
 
 export default async function ProductsPageServer() {
     const user = await getCurrentUser()
@@ -29,7 +30,7 @@ export default async function ProductsPageServer() {
                 userProfile={userProfile}
             />
             <FadeIn className="p-4">
-                <Suspense fallback={<div className='p-4'>Carregando produtos...</div>}>
+                <Suspense fallback={<ProductsLoading />}>
                     <ProductsPage
                         products={data.products}
                         partnerId={partnerId}

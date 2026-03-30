@@ -323,7 +323,9 @@ export default function ProductsPage({
     }, [filteredProducts, ui.sort])
 
     const totalPages = Math.ceil(sortedProducts.length / itemsPerPage)
-    const paginated = sortedProducts.slice((data.page - 1) * itemsPerPage, data.page * itemsPerPage)
+    const paginated = useMemo(() =>
+        sortedProducts.slice((data.page - 1) * itemsPerPage, data.page * itemsPerPage),
+    [sortedProducts, data.page, itemsPerPage])
 
     // --- Handlers ---
 
@@ -526,9 +528,10 @@ export default function ProductsPage({
                 }
             }
 
-            // 3. Prepare Updates
+            // 3. Prepare Updates — O(1) lookup via Map (was O(n²) with .find())
+            const productsMap = new Map(data.products.map(p => [p.id, p]))
             const updates = ids.map(id => {
-                const product = data.products.find(p => p.id === id)
+                const product = productsMap.get(id)
                 if (!product) return null
 
                 const update: any = { id }
@@ -617,7 +620,9 @@ export default function ProductsPage({
         )
     }
 
-    const selectedProds = data.products.filter((p) => selection.ids.has(p.id))
+    const selectedProds = useMemo(() =>
+        data.products.filter((p) => selection.ids.has(p.id)),
+    [data.products, selection.ids])
 
     return (
         <motion.div

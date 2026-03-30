@@ -200,10 +200,9 @@ export async function undoStockMovementAction(id: string, customReason?: string)
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
     try {
-        const ctx = await getCurrentPartnerContext()
-        if (!ctx?.partnerId) return errorResponse("Parceiro não encontrado")
-
+        // Single partner resolution (previously called getCurrentPartnerContext + requirePartner = 2x DB)
         const partner = await requirePartner()
+        const partnerId = partner.id
         const userId = partner.user_id
         const supabase = await getSupabaseServerClient()
 
@@ -212,7 +211,7 @@ export async function undoStockMovementAction(id: string, customReason?: string)
             .from("stock_movements")
             .select("product_id, variant_id, quantity")
             .eq("id", id)
-            .eq("partner_id", ctx.partnerId)
+            .eq("partner_id", partnerId)
             .single()
 
         if (fetchError || !original) {
@@ -229,7 +228,7 @@ export async function undoStockMovementAction(id: string, customReason?: string)
 
         // 3. Criar a nova movimentação usando o RPC existente
         const { data: movementRecord, error } = await supabase.rpc('create_manual_stock_movement', {
-            p_partner_id: ctx.partnerId,
+            p_partner_id: partnerId,
             p_product_id: original.product_id,
             p_movement_type: invertedType,
             p_quantity: Math.abs(original.quantity), // A quantidade é sempre positiva para o RPC
@@ -248,7 +247,7 @@ export async function undoStockMovementAction(id: string, customReason?: string)
         revalidatePath('/erp/products')
 
         // Sync estorno change to Redis/Marketplace (silent avoids thundering herd)
-        await invalidateProductCache(original.product_id, ctx.partnerId, 'update', { silent: true })
+        await invalidateProductCache(original.product_id, partnerId, 'update', { silent: true })
 
         return successResponse(movementRecord)
 

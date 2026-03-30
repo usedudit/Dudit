@@ -25,7 +25,7 @@ export interface TeamMember {
  * Get all team members for the current ERP.
  * Returns users from partner_users table + the partner owner.
  */
-export async function getTeamMembers(): Promise<{ members: TeamMember[]; currentUserRole?: PartnerRole; error?: string }> {
+export async function getTeamMembers(): Promise<{ members: TeamMember[]; currentUserRole?: PartnerRole; currentUserId?: string; error?: string }> {
     try {
         await requireUser()
         const context = await getCurrentPartnerContext()
@@ -119,7 +119,7 @@ export async function getTeamMembers(): Promise<{ members: TeamMember[]; current
             return (roleOrder[a.role] ?? 5) - (roleOrder[b.role] ?? 5)
         })
 
-        return { members, currentUserRole: context.role }
+        return { members, currentUserRole: context.role, currentUserId: context.userId }
     } catch (error: any) {
         return { members: [], error: error.message }
     }
@@ -136,6 +136,11 @@ export async function updateTeamMemberRole(
         const user = await requireUser()
         const context = await getCurrentPartnerContext()
         if (!context) return { success: false, error: "Contexto não encontrado." }
+
+        // SECURITY: Prevent users from changing their own role
+        if (user.id === memberUserId) {
+            return { success: false, error: "Você não pode alterar seu próprio cargo." }
+        }
 
         const admin = getAdminClient()
         const partnerId = context.partnerId

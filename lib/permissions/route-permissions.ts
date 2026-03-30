@@ -68,7 +68,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
         specificPermissions: ["can_import_products"],
     },
     suppliers: { key: "suppliers", path: "/erp/suppliers", label: "Fornecedores", category: "Produtos", legacyCategory: "suppliers" },
-    cadastros_produtos: { key: "cadastros_produtos", path: "/erp/cadastros-produtos", label: "Cadastros", category: "Produtos", legacyCategory: "products" },
+    cadastros_produtos: { key: "cadastros_produtos", path: "/erp/products/cadastros", label: "Cadastros", category: "Produtos", legacyCategory: "products" },
 
     // ── Serviços
     appointments: {

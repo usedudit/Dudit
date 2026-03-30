@@ -9,7 +9,8 @@ import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useStore } from "@/lib/store-context"
 import { useSidebar } from "@/lib/sidebar-context"
 import { createProductComprehensiveAction, updateProductComprehensiveAction, deleteProductAction, createProductVariantsBatchAction } from "@/app/actions/erp/products"
-import { getProductMetadataAction, createCategoryAction, createBrandAction, createLocationAction } from "@/app/actions/erp/product-metadata"
+import { createCategoryAction, createBrandAction, createLocationAction } from "@/app/actions/erp/product-metadata"
+import { useProductMetadata } from "@/lib/product-metadata-context"
 import { detectMonophasicByNcm } from "@/lib/fiscal-utils"
 import { mapProductToFormData } from "@/lib/utils/product-mappers"
 import { useNotification } from "@/hooks/use-notification"
@@ -184,32 +185,16 @@ const AddProductPage: FC<AddProductPageProps> = ({
 
     const [activeTab, setActiveTab] = useState("general")
 
-    const [metadata, setMetadata] = useState<{
-        categories: any[],
-        brands: any[],
-        locations: any[]
-    }>({ categories: [], brands: [], locations: [] })
-
-    const [isLoadingMetadata, setIsLoadingMetadata] = useState(false)
-
-    const fetchMetadata = useCallback(async () => {
-        if (!partnerId) return
-        setIsLoadingMetadata(true)
-        try {
-            const result = await getProductMetadataAction(partnerId)
-            if (result.success && result.data) {
-                setMetadata(result.data)
-            }
-        } catch (err) {
-            console.error("Error fetching metadata:", err)
-        } finally {
-            setIsLoadingMetadata(false)
-        }
-    }, [partnerId])
+    // Use shared metadata context (cached across form opens)
+    const { metadata, isLoading: isLoadingMetadata, loadMetadata, refreshMetadata } = useProductMetadata()
 
     useEffect(() => {
-        fetchMetadata()
-    }, [fetchMetadata])
+        if (partnerId) loadMetadata(partnerId)
+    }, [partnerId, loadMetadata])
+
+    const fetchMetadata = useCallback(async () => {
+        if (partnerId) await refreshMetadata(partnerId)
+    }, [partnerId, refreshMetadata])
 
     const categoryOptions = useMemo(() => 
         metadata.categories.filter(c => !c.parent_id).map(c => ({ value: c.id, label: c.name })),

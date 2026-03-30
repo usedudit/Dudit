@@ -44,7 +44,7 @@ interface StateComboBoxProps {
 export const StateComboBox: React.FC<StateComboBoxProps> = ({
     value,
     onChange,
-    label = "UF *",
+    label = "Estado",
     placeholder = "Selecione",
     disabled,
     className

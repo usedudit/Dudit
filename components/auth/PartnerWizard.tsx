@@ -368,7 +368,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
             {step === 4 && (
               <div className="space-y-4">
                 <CepInput
-                  name="cep" label="CEP *"
+                  name="cep" label="CEP"
                   value={partnerData.address.cep}
                   onChange={(value: string) => patchAddress({ cep: value })}
                   onAddressFetched={(addr) => patchAddress({
@@ -378,10 +378,10 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                     state: addr.state || partnerData.address.state,
                   })}
                 />
-                <Input name="street" label="Rua *" value={partnerData.address.street} onChange={e => patchAddress({ street: e.target.value })} />
+                <Input name="street" label="Rua" value={partnerData.address.street} onChange={e => patchAddress({ street: e.target.value })} />
                 <div className="grid grid-cols-2 gap-3">
                   <NumberInputWithCheckbox
-                    label="Número *"
+                    label="Número"
                     value={partnerData.address.number}
                     number={partnerData.address.number}
                     noNumber={partnerData.address.noNumber}
@@ -390,9 +390,9 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                   />
                   <Input name="complement" label="Complemento" value={partnerData.address.complement} onChange={e => patchAddress({ complement: e.target.value })} />
                 </div>
-                <Input name="neighborhood" label="Bairro *" value={partnerData.address.neighborhood} onChange={e => patchAddress({ neighborhood: e.target.value })} />
+                <Input name="neighborhood" label="Bairro" value={partnerData.address.neighborhood} onChange={e => patchAddress({ neighborhood: e.target.value })} />
                 <div className="grid grid-cols-2 gap-3 items-end">
-                  <Input name="city" label="Cidade *" value={partnerData.address.city} onChange={e => patchAddress({ city: e.target.value })} />
+                  <Input name="city" label="Cidade" value={partnerData.address.city} onChange={e => patchAddress({ city: e.target.value })} />
                   <StateComboBox value={partnerData.address.state} onChange={v => patchAddress({ state: v })} className="w-full" />
                 </div>
               </div>

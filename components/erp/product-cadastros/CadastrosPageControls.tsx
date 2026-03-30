@@ -1,12 +1,10 @@
-import React, { useRef, useState, useCallback, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import React from "react"
 import { Button, Input } from "@/components/reusable"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import {
-  SearchIcon,
-  PlusIcon,
-  DashboardIcon,
-  Package,
+    SearchIcon,
+    PlusIcon,
+    Package,
 } from "@/lib/icons"
 
 interface CadastrosPageControlsProps {
@@ -52,7 +50,7 @@ const CadastrosPageControls: React.FC<CadastrosPageControlsProps> = ({
 
             {/* --- CONTROLS BAR --- */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 flex-none px-4 md:px-8">
-                
+
                 {/* MOBILE CONTROLS ROW - Exactly like ProductPageControls */}
                 <div className="md:hidden flex items-center gap-2 w-full">
                     <div className="flex-1 min-w-0">
@@ -94,15 +92,6 @@ const CadastrosPageControls: React.FC<CadastrosPageControlsProps> = ({
 
                     {/* Spacer to push other icons to the right if needed, matching desktop alignment */}
                     <div className="flex-1 min-w-0" />
-
-                    {/* View Toggles - Replicating ProductPageControls "Grid" only for now but keeping the container style */}
-                    <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] flex-shrink-0">
-                        <button
-                            className="w-8 h-full flex items-center justify-center rounded-full bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
-                        >
-                            <DashboardIcon className="w-[18px] h-[18px]" />
-                        </button>
-                    </div>
                 </div>
             </div>
         </>

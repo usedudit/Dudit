@@ -18,6 +18,7 @@ import SkeletonLoader from "@/components/erp/skeleton-loader"
 import { ThemeProvider } from "@/components/theme-provider"
 import { StoreProvider } from "@/lib/store-context"
 import { PermissionProvider } from "@/lib/permission-context"
+import { ProductMetadataProvider } from "@/lib/product-metadata-context"
 import { requireUser } from "@/lib/auth/authorization"
 import {
   getAllUserPartnerAccess,
@@ -83,6 +84,7 @@ export default async function ERPLayout({
 
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+    <ProductMetadataProvider>
       <PermissionProvider role={role} routePermissions={routePermissions} partnerId={context.partnerId} businessInfo={context.businessInfo}>
         <StoreProvider partnerId={context.partnerId}>
           <SidebarProvider initialExpanded={initialExpanded}>
@@ -95,6 +97,7 @@ export default async function ERPLayout({
           </SidebarProvider>
         </StoreProvider>
       </PermissionProvider>
+    </ProductMetadataProvider>
     </ThemeProvider>
   )
 }

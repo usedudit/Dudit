@@ -125,12 +125,11 @@ export async function deleteProductAction(productId: string) {
 
         const admin = getAdminClient()
 
-        // Paralelo: buscar variantes + deletar produto (independentes apÃ³s ownership check)
-        const [variantsRes, deleteResult] = await Promise.all([
-            admin.from("product_variants").select("variant_options").eq("product_id", productId),
-            admin.from("products").delete().eq("id", productId),
-        ])
+        // Sequential: fetch variants FIRST (before delete cascades them away)
+        const variantsRes = await admin.from("product_variants").select("variant_options").eq("product_id", productId)
 
+        // Now safe to delete the product
+        const deleteResult = await admin.from("products").delete().eq("id", productId)
         if (deleteResult.error) return { error: deleteResult.error.message }
 
         // Coletar TODAS as imagens para deletar: produto + variantes
@@ -560,16 +559,19 @@ export async function updateProductComprehensiveAction(productId: string, data: 
             if (dataRecord[field] !== undefined) logisticsPayload[field] = dataRecord[field]
         })
 
-        const adminForBusinessInfo = getAdminClient()
-        const { data: partnerData } = await adminForBusinessInfo.from('partners').select('business_info').eq('id', product.partner_id).single()
-        const businessInfo = partnerData?.business_info || { sells: ["products"], channels: ["online"] }
-        const sellsOnline = businessInfo.channels?.includes("online") ?? true
+        // Only fetch business_info when marketplace-related fields are being updated
+        const hasMarketplaceFields = data.showInMarketplace !== undefined || data.subcategoryId !== undefined || data.featured !== undefined
+        if (hasMarketplaceFields) {
+            const adminForBusinessInfo = getAdminClient()
+            const { data: partnerData } = await adminForBusinessInfo.from('partners').select('business_info').eq('id', product.partner_id).single()
+            const businessInfo = partnerData?.business_info || { sells: ["products"], channels: ["online"] }
+            const sellsOnline = businessInfo.channels?.includes("online") ?? true
 
-        // Se nÃ£o vende online, remove essas permissÃµes
-        if (!sellsOnline) {
-            data.showInMarketplace = false
-            data.subcategoryId = undefined
-            data.featured = false
+            if (!sellsOnline) {
+                data.showInMarketplace = false
+                data.subcategoryId = undefined
+                data.featured = false
+            }
         }
 
         // Mapeamento CamelCase â†’ SnakeCase
@@ -624,15 +626,14 @@ export async function updateProductComprehensiveAction(productId: string, data: 
 
         if (transactionError) return errorResponse(transactionError.message, transactionError)
 
-        // FIX: A funÃ§Ã£o RPC no Supabase ignora o campo moderation_status. Fazemos o update direto aqui.
-        const admin = getAdminClient()
-        await admin.from('products').update({ moderation_status: payload.moderation_status }).eq('id', productId)
+        // FIX: A função RPC no Supabase ignora o campo moderation_status. Fazemos o update direto aqui.
+        const adminUpdate = getAdminClient()
+        await adminUpdate.from('products').update({ moderation_status: payload.moderation_status }).eq('id', productId)
 
-        // Criar moderation job se necessÃ¡rio (cron processa)
+        // Criar moderation job se necessário (cron processa) — reuses same admin client
         if (needsTextRemoderation) {
-            const admin = getAdminClient()
             Promise.resolve(
-                admin.from('moderation_jobs').insert({
+                adminUpdate.from('moderation_jobs').insert({
                     product_id: productId,
                     type: 'product',
                     status: 'pending',
@@ -1345,38 +1346,15 @@ export const getERPProductsPageData = cache(async () => {
     if (!context) return null
 
     const partnerId = context.partnerId
-    const supabase = await getSupabaseServerClient()
 
-    // 1. Fetch products first (we need IDs for variants)
-    const { data: products, error: prodError } = await supabase
-        .from("products")
-        .select("*")
-        .eq("partner_id", partnerId)
-        .order("created_at", { ascending: false })
-
-    if (prodError) {
-        console.error("Error fetching ERP products:", prodError)
-        return null
-    }
-
-    const productIds = products?.map((p: any) => p.id) || []
-
-    // 2. Fetch variants for these products
-    const { data: variants, error: varError } = productIds.length > 0
-        ? await supabase
-            .from("product_variants")
-            .select("*")
-            .in("product_id", productIds)
-        : { data: [], error: null }
-
-    if (varError) {
-        console.error("Error fetching ERP variants:", varError)
-    }
+    // Use cached products with explicit column selection (12 cols vs 40+ from SELECT *)
+    // Variant count is fetched inline — no second query needed
+    const products = await getCachedProducts(partnerId)
 
     return {
         products: products || [],
         partnerId: partnerId,
-        variants: variants || []
+        variants: [] // Variants are loaded on-demand when editing a specific product
     }
 })
 

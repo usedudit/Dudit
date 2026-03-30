@@ -1,0 +1,69 @@
+"use client"
+
+import React, { createContext, useContext, useState, useCallback, useRef, type FC, type ReactNode } from "react"
+import { getProductMetadataAction } from "@/app/actions/erp/product-metadata"
+
+interface MetadataState {
+    categories: any[]
+    brands: any[]
+    locations: any[]
+}
+
+interface MetadataContextValue {
+    metadata: MetadataState
+    isLoading: boolean
+    /** Loads metadata if not already cached. Subsequent calls are no-ops unless force=true. */
+    loadMetadata: (partnerId: string, force?: boolean) => Promise<void>
+    /** Forces a fresh fetch from the server */
+    refreshMetadata: (partnerId: string) => Promise<void>
+}
+
+const EMPTY_METADATA: MetadataState = { categories: [], brands: [], locations: [] }
+
+const MetadataContext = createContext<MetadataContextValue>({
+    metadata: EMPTY_METADATA,
+    isLoading: false,
+    loadMetadata: async () => {},
+    refreshMetadata: async () => {},
+})
+
+export const useProductMetadata = () => useContext(MetadataContext)
+
+export const ProductMetadataProvider: FC<{ children: ReactNode }> = ({ children }) => {
+    const [metadata, setMetadata] = useState<MetadataState>(EMPTY_METADATA)
+    const [isLoading, setIsLoading] = useState(false)
+    const loadedForPartnerRef = useRef<string | null>(null)
+
+    const fetchMetadata = useCallback(async (partnerId: string) => {
+        setIsLoading(true)
+        try {
+            const result = await getProductMetadataAction(partnerId)
+            if (result.success && result.data) {
+                setMetadata(result.data)
+                loadedForPartnerRef.current = partnerId
+            }
+        } catch (err) {
+            console.error("[MetadataContext] Error fetching metadata:", err)
+        } finally {
+            setIsLoading(false)
+        }
+    }, [])
+
+    const loadMetadata = useCallback(async (partnerId: string, force = false) => {
+        // Skip if already loaded for this partner (quasi-static data)
+        if (!force && loadedForPartnerRef.current === partnerId && metadata.categories.length > 0) {
+            return
+        }
+        await fetchMetadata(partnerId)
+    }, [fetchMetadata, metadata.categories.length])
+
+    const refreshMetadata = useCallback(async (partnerId: string) => {
+        await fetchMetadata(partnerId)
+    }, [fetchMetadata])
+
+    return (
+        <MetadataContext.Provider value={{ metadata, isLoading, loadMetadata, refreshMetadata }}>
+            {children}
+        </MetadataContext.Provider>
+    )
+}
