@@ -17,6 +17,7 @@ import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
 import { CSRFTokenInput } from "@/components/security/csrf-token-input"
 import { useSidebar } from "@/lib/sidebar-context"
+import DefaultModal from "@/components/reusable/DefaultModal"
 
 interface ComprehensiveCustomerFormProps {
   partnerId: string
@@ -81,7 +82,11 @@ export function ComprehensiveCustomerForm({ partnerId, customer }: Comprehensive
   })
 
   const [isDirty, setIsDirty] = useState(false)
-  const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
+  const [isSubmitted, setIsSubmitted] = useState(false)
+  const isActuallyDirty = isDirty && !isSubmitted
+  const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isActuallyDirty)
+
+  const [actionModal, setActionModal] = useState<{ open: boolean; text: string }>({ open: false, text: "" })
 
   useEffect(() => {
     const hasChanges =
@@ -140,16 +145,19 @@ export function ComprehensiveCustomerForm({ partnerId, customer }: Comprehensive
     e.preventDefault()
     setIsLoading(true)
     setError(null)
+    setActionModal({ open: true, text: customer ? "Atualizando cliente..." : "Salvando cliente..." })
 
     if (!formData.name.trim()) {
       setError("Nome é obrigatório")
       setIsLoading(false)
+      setActionModal({ open: false, text: "" })
       return
     }
 
     if (!formData.email && !formData.phone) {
       setError("Email ou telefone é obrigatório")
       setIsLoading(false)
+      setActionModal({ open: false, text: "" })
       return
     }
 
@@ -208,14 +216,18 @@ export function ComprehensiveCustomerForm({ partnerId, customer }: Comprehensive
 
       const result = await action(payload)
 
-      if (result.error) {
+      if (result && result.error) {
         setError(result.error)
+        setActionModal({ open: false, text: "" })
       } else {
-        router.push("/erp/customers")
-        // No router.refresh() needed - push already navigates
+        setIsSubmitted(true)
+        setTimeout(() => {
+          router.push("/erp/customers")
+        }, 50)
       }
     } catch (err) {
       setError(`Erro ao ${customer ? "atualizar" : "salvar"} cliente`)
+      setActionModal({ open: false, text: "" })
     } finally {
       setIsLoading(false)
     }
@@ -547,6 +559,20 @@ export function ComprehensiveCustomerForm({ partnerId, customer }: Comprehensive
       </div>
 
       <UnsavedChangesDialog open={showConfirmDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />
+
+      <DefaultModal
+        isOpen={actionModal.open}
+        onClose={() => {}}
+        title=""
+        hideHeader
+      >
+        <div className="flex flex-col items-center justify-center p-6 gap-6 h-full mt-4">
+          <img src="https://img.dudit.com.br/static/mascots/Aguarde.png" alt="Aguarde" className="w-36 h-36 object-contain" />
+          <p className="text-lg font-semibold text-brand-dark dark:text-dark-heading text-center leading-tight">
+            {actionModal.text}
+          </p>
+        </div>
+      </DefaultModal>
     </form>
   )
 }

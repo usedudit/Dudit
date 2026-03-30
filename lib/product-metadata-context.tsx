@@ -33,6 +33,7 @@ export const ProductMetadataProvider: FC<{ children: ReactNode }> = ({ children 
     const [metadata, setMetadata] = useState<MetadataState>(EMPTY_METADATA)
     const [isLoading, setIsLoading] = useState(false)
     const loadedForPartnerRef = useRef<string | null>(null)
+    const hasDataRef = useRef(false)
 
     const fetchMetadata = useCallback(async (partnerId: string) => {
         setIsLoading(true)
@@ -41,6 +42,7 @@ export const ProductMetadataProvider: FC<{ children: ReactNode }> = ({ children 
             if (result.success && result.data) {
                 setMetadata(result.data)
                 loadedForPartnerRef.current = partnerId
+                hasDataRef.current = true
             }
         } catch (err) {
             console.error("[MetadataContext] Error fetching metadata:", err)
@@ -51,11 +53,11 @@ export const ProductMetadataProvider: FC<{ children: ReactNode }> = ({ children 
 
     const loadMetadata = useCallback(async (partnerId: string, force = false) => {
         // Skip if already loaded for this partner (quasi-static data)
-        if (!force && loadedForPartnerRef.current === partnerId && metadata.categories.length > 0) {
+        if (!force && loadedForPartnerRef.current === partnerId && hasDataRef.current) {
             return
         }
         await fetchMetadata(partnerId)
-    }, [fetchMetadata, metadata.categories.length])
+    }, [fetchMetadata])
 
     const refreshMetadata = useCallback(async (partnerId: string) => {
         await fetchMetadata(partnerId)

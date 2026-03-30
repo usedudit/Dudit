@@ -1,4 +1,4 @@
-import { getActivePartnerId } from "@/lib/auth/partner-context"
+import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getProductMetadataAction } from "@/app/actions/erp/product-metadata"
 import ProductCadastrosPage from "@/components/erp/product-cadastros/ProductCadastrosPage"
 import { redirect } from "next/navigation"
@@ -14,10 +14,11 @@ export default async function Page() {
   const user = await getCurrentUser()
   if (!user) return <AccessDenied />
 
-  const partnerId = await getActivePartnerId()
-  if (!partnerId) {
+  const context = await getCurrentPartnerContext()
+  if (!context) {
     redirect("/select-erp")
   }
+  const partnerId = context.partnerId
 
   const result = await getProductMetadataAction(partnerId)
   if (!result.success || !result.data) {

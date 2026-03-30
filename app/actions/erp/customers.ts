@@ -59,9 +59,9 @@ export async function createComprehensiveCustomerAction(data: {
     email: data.email || null,
     phone: data.phone || null,
     person_type: data.personType,
-    cpf: data.cpf || null,
+    cpf: data.cpf ? data.cpf.replace(/\D/g, "") : null,
     contribuinte: data.contribuinte || null,
-    cnpj: data.cnpj || null,
+    cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
     nome_fantasia: data.nomeFantasia || null,
     inscricao_estadual: data.inscricaoEstadual || null,
     regime_tributario: data.regimeTributario || null,
@@ -93,7 +93,7 @@ export async function createComprehensiveCustomerAction(data: {
   }
 
   revalidatePath("/erp/customers")
-  redirect("/erp/customers")
+  return { success: true }
 }
 
 export async function createCustomerAction(data: {
@@ -263,9 +263,9 @@ export async function updateComprehensiveCustomerAction(data: {
         .filter(Boolean)
         .join(", "),
       person_type: data.personType,
-      cpf: data.cpf || null,
+      cpf: data.cpf ? data.cpf.replace(/\D/g, "") : null,
       contribuinte: data.contribuinte || null,
-      cnpj: data.cnpj || null,
+      cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
       nome_fantasia: data.nomeFantasia || null,
       inscricao_estadual: data.inscricaoEstadual || null,
       regime_tributario: data.regimeTributario || null,
