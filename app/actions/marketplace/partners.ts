@@ -306,7 +306,10 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   if (data.storeDescription !== undefined) updateData.store_description = data.storeDescription
   if (data.storeImageUrl !== undefined) updateData.store_image_url = data.storeImageUrl
   if (data.businessType) updateData.business_type = data.businessType
-  if (data.cnpj !== undefined) updateData.cnpj = data.cnpj
+  if (data.cnpj !== undefined) {
+    updateData.cnpj = data.cnpj ? data.cnpj.replace(/\D/g, "") : null
+    if (updateData.cnpj === "") updateData.cnpj = null
+  }
   if (data.businessInfo !== undefined) updateData.business_info = data.businessInfo
   if (data.openingHours !== undefined) updateData.opening_hours = data.openingHours
 

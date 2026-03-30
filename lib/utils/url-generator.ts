@@ -27,10 +27,10 @@ export function getProductUrl(product: any, partner?: any): string {
     // Se não passar partner explicitamente, tenta pegar do próprio produto
     const p = partner || (Array.isArray(product.partners) ? product.partners[0] : product.partners) || {}
 
-    // As vezes o endereço está em p.addresses[0], as vezes na raiz
+    // As vezes o endereço está em p.addresses[0], as vezes na raiz (p.address ou p direto se já normalizado)
     const address = p.addresses?.[0] || p.address || p
-    const city = address.city || p.city
-    const state = address.state || p.state
+    const city = p.city || address.city
+    const state = p.state || address.state
 
     const cityStateSlug = formatCityStateSlug(city, state)
 
@@ -48,10 +48,11 @@ export function getPartnerUrl(partner: any): string {
     const partnerId = partner.id || ""
 
     const address = partner.addresses?.[0] || partner.address || partner
-    const city = address.city || partner.city
-    const state = address.state || partner.state
+    const city = partner.city || address.city
+    const state = partner.state || address.state
 
     const cityStateSlug = formatCityStateSlug(city, state)
 
     return `/vitrine/${partnerSlug}/${cityStateSlug}/v/${partnerId}`
 }
+

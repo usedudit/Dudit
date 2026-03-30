@@ -93,7 +93,12 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
   // --- MÁGICA DE SEO (Canonical Redirect) ---
   const correctUrl = getPartnerUrl(partner)
   const currentPath = `/vitrine/${currentSlug}/${currentCidadeUf}/v/${id}`
-  if (currentPath !== correctUrl) {
+  
+  // Bugfix: Evita downgrade de slug informativo para 'vitrine' genérico (ou 'brasil')
+  const isCurrentlyDetailed = currentCidadeUf !== 'vitrine' && currentCidadeUf !== 'brasil'
+  const isNewOneGeneric = correctUrl.includes('/vitrine/v/') || correctUrl.includes('/brasil/v/')
+
+  if (currentPath !== correctUrl && !(isCurrentlyDetailed && isNewOneGeneric)) {
     redirect(correctUrl)
   }
 
@@ -165,12 +170,12 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     storeDescription: partner.store_description,
     storeImageUrl: partner.store_image_url,
     profile_image_url: partner.profile_image_url,
-    city: partner.addresses?.[0]?.city || "",
-    state: partner.addresses?.[0]?.state || "",
-    street: partner.addresses?.[0]?.street || "",
-    number: partner.addresses?.[0]?.number || "",
-    neighborhood: partner.addresses?.[0]?.neighborhood || "",
-    zipCode: partner.addresses?.[0]?.zip_code || "",
+    city: partner.addresses?.[0]?.city || partner.city || "",
+    state: partner.addresses?.[0]?.state || partner.state || "",
+    street: partner.addresses?.[0]?.street || partner.street || "",
+    number: partner.addresses?.[0]?.number || partner.number || "",
+    neighborhood: partner.addresses?.[0]?.neighborhood || partner.neighborhood || "",
+    zipCode: partner.addresses?.[0]?.zip_code || partner.zip_code || "",
     rating: Number(partner.rating) || 5.0,
     createdAt: partner.created_at,
     offeringType: partner.offering_type,

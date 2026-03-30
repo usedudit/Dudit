@@ -81,15 +81,16 @@ export const BusinessDataSubPage = ({
         phone: partner.phone || "",
     })
 
+    const address = partner.addresses?.[0] || {};
     const [addresses, setAddresses] = useState({
-        zipCode: partner.zip_code || "",
-        street: partner.street || "",
-        number: partner.number || "",
-        complement: partner.complement || "",
-        neighborhood: partner.neighborhood || "",
-        city: partner.city || "",
-        state: partner.state || "",
-        noNumber: partner.number === "S/N",
+        zipCode: partner.zip_code || address.zip_code || "",
+        street: partner.street || address.street || "",
+        number: partner.number || address.number || "",
+        complement: partner.complement || address.complement || "",
+        neighborhood: partner.neighborhood || address.neighborhood || "",
+        city: partner.city || address.city || "",
+        state: partner.state || address.state || "",
+        noNumber: (partner.number || address.number) === "S/N",
     })
 
     const [fiscalInfo, setFiscalInfo] = useState({
@@ -136,7 +137,8 @@ export const BusinessDataSubPage = ({
                     storeDescription: generalInfo.storeDescription,
                     storeImageUrl: generalInfo.storeImageUrl || null,
                     businessType: generalInfo.businessType as "pf" | "pj",
-                    cnpj: generalInfo.cnpj || null,
+                    cnpj: generalInfo.businessType === "pj" ? (generalInfo.cnpj || null) : null,
+                    cpf: generalInfo.businessType === "pf" ? (generalInfo.cnpj || null) : null,
                     business_info: businessInfoData,
                     zipCode: addresses.zipCode,
                     street: addresses.street,
@@ -296,7 +298,7 @@ export const BusinessDataSubPage = ({
 
                         {/* Sticky Header */}
                         <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
-                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
                                 {/* Back button — desktop only */}
                                 <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
@@ -307,30 +309,30 @@ export const BusinessDataSubPage = ({
 
                                 {/* Title row */}
                                 <div className="hidden md:flex items-start justify-between">
-                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0 mb-6">
-                                        <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-300 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                        <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                             <span className="truncate">Dados do Negócio</span>
                                         </h1>
 
-                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-1"}`}>
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                             Gerencie informações da empresa, endereço, fiscal e horários
                                         </div>
                                     </div>
 
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
-                                        <Button variant="outline" onClick={onBack} disabled={isLoading} className="px-5 h-[42px]">
+                                        <Button variant="outline" onClick={onBack} disabled={isLoading}>
                                             Cancelar
                                         </Button>
-                                        <Button onClick={handleSubmit} disabled={isLoading} className="px-6 h-[42px] flex items-center gap-2">
-                                            <SaveIcon className="w-4.5 h-4.5" />
+                                        <Button onClick={handleSubmit} disabled={isLoading}>
+                                            <SaveIcon className="w-5 h-5 mr-2" />
                                             {isLoading ? "Salvando..." : "Salvar"}
                                         </Button>
                                     </div>
                                 </div>
 
                                 {/* Tabs */}
-                                <div className={`w-full transition-all duration-300 ${isScrolled ? "md:mt-0" : "md:mt-2"}`}>
+                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="general">Dados gerais</TabsTrigger>
                                         <TabsTrigger value="address">Endereço</TabsTrigger>
@@ -345,7 +347,7 @@ export const BusinessDataSubPage = ({
                         <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                             <AnimatePresence mode="wait">
                                 <TabsContent value="general" className="mt-0 focus-visible:outline-none">
-                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-10 lg:gap-x-16">
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                         <div className="col-span-12 lg:col-span-8 space-y-10">
                                             {/* Identificação */}
                                             <section>
@@ -469,13 +471,13 @@ export const BusinessDataSubPage = ({
                                             <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col relative overflow-hidden">
                                                 <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
                                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Logo do Negócio</h3>
-                                                
+
                                                 <div className="flex items-center gap-4 p-3 border rounded-xl bg-brand-gray/50 border-dashed border-gray-200 dark:border-dark-border dark:bg-dark-background/50">
                                                     <div onClick={() => fileInputRef.current?.click()} className="h-16 w-16 bg-white dark:bg-dark-border border dark:border-dark-border rounded-lg flex items-center justify-center cursor-pointer hover:border-brand-green dark:hover:border-brand-green relative overflow-hidden shadow-sm">
                                                         {imagePreview ? (
                                                             <img src={imagePreview} alt="Logo" className="object-cover w-full h-full" />
                                                         ) : (
-                                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
                                                         )}
                                                         {imageUploading && (
                                                             <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
@@ -495,7 +497,7 @@ export const BusinessDataSubPage = ({
                                 </TabsContent>
 
                                 <TabsContent value="address" className="mt-0 focus-visible:outline-none">
-                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-10 lg:gap-x-16">
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                         <div className="col-span-12 lg:col-span-8 space-y-10">
                                             <section>
                                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Endereço do negócio</h3>
@@ -828,6 +830,15 @@ export const BusinessDataSubPage = ({
                             </Button>
                             <Button variant="outline" onClick={() => setPaymentModalOpen(false)}>Cancelar</Button>
                         </div>
+                    </div>
+                </DefaultModal>
+
+                <DefaultModal isOpen={isLoading} onClose={() => { }} title="" maxWidth="sm" hideHeader>
+                    <div className="flex flex-col items-center justify-center p-6 gap-6 h-full mt-4">
+                        <img src="https://img.dudit.com.br/static/mascots/Aguarde.png" alt="Aguarde" className="w-36 h-36 object-contain" />
+                        <p className="text-lg font-semibold text-brand-dark dark:text-dark-heading text-center leading-tight">
+                            Salvando configurações...
+                        </p>
                     </div>
                 </DefaultModal>
 

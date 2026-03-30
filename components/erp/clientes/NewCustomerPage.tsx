@@ -27,22 +27,6 @@ import { motion, AnimatePresence } from "framer-motion"
 import { createComprehensiveCustomerAction } from "@/app/actions/erp/customers"
 import { consultarCNPJ } from "@/lib/nuvem-fiscal"
 
-const ESTADOS_BRASIL = [
-    { value: "AC", label: "AC" }, { value: "AL", label: "AL" }, { value: "AP", label: "AP" }, { value: "AM", label: "AM" },
-    { value: "BA", label: "BA" }, { value: "CE", label: "CE" }, { value: "DF", label: "DF" }, { value: "ES", label: "ES" },
-    { value: "GO", label: "GO" }, { value: "MA", label: "MA" }, { value: "MT", label: "MT" }, { value: "MS", label: "MS" },
-    { value: "MG", label: "MG" }, { value: "PA", label: "PA" }, { value: "PB", label: "PB" }, { value: "PR", label: "PR" },
-    { value: "PE", label: "PE" }, { value: "PI", label: "PI" }, { value: "RJ", label: "RJ" }, { value: "RN", label: "RN" },
-    { value: "RS", label: "RS" }, { value: "RO", label: "RO" }, { value: "RR", label: "RR" }, { value: "SC", label: "SC" },
-    { value: "SP", label: "SP" }, { value: "SE", label: "SE" }, { value: "TO", label: "TO" }
-]
-
-const TIPO_ENDERECO_OPTIONS = [
-    { value: "Casa", label: "Casa" },
-    { value: "Trabalho", label: "Trabalho" },
-    { value: "Outro", label: "Outro" }
-]
-
 interface NewCustomerPageProps {
     onBack: () => void;
     partnerId: string;
@@ -229,8 +213,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
 
                                 {/* Title row */}
                                 <div className="hidden md:flex items-start justify-between">
-                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0 mb-6">
-                                        <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-300 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                        <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                             <span className="truncate">{pageTitle}</span>
                                         </h1>
 
@@ -241,11 +225,11 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
 
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
-                                        <Button variant="outline" onClick={handleBack} disabled={isSaving} className="px-5 h-[42px]">
+                                        <Button variant="outline" onClick={handleBack} disabled={isSaving}>
                                             Cancelar
                                         </Button>
-                                        <Button onClick={handleSave} disabled={isSaving} className="px-6 h-[42px] flex items-center gap-2">
-                                            <SaveIcon className="w-4.5 h-4.5" />
+                                        <Button onClick={handleSave} disabled={isSaving}>
+                                            <SaveIcon className="w-5 h-5 mr-2" />
                                             {isSaving ? "Salvando..." : "Salvar"}
                                         </Button>
                                     </div>
@@ -264,7 +248,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
 
                         {/* Content Body */}
                         <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                            <div className="grid grid-cols-12 gap-y-10 lg:gap-x-16">
+                            <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
 
                                 {/* Form Column */}
                                 <div className={`col-span-12 ${activeTab !== 'notes' ? 'lg:col-span-8' : ''}`}>
@@ -579,14 +563,14 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                             variant="outline"
                             onClick={handleBack}
                             disabled={isSaving}
-                            className="flex-1 h-[48px] font-bold"
+                            className="flex-1 h-[48px]"
                         >
                             Cancelar
                         </Button>
                         <Button
                             onClick={handleSave}
                             disabled={isSaving}
-                            className="flex-1 h-[48px] font-bold"
+                            className="flex-1 h-[48px]"
                         >
                             <SaveIcon className="w-4 h-4 mr-2" />
                             {isSaving ? "Salvando..." : "Salvar"}

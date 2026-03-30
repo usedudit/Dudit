@@ -118,11 +118,11 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                             </div>
 
                             {/* Tabs Trigger */}
-                            <div className={`w-full transition-all duration-300 ${isScrolled ? "md:mt-0" : "md:mt-2"}`}>
-                                <TabsList className="bg-transparent p-0 gap-8 w-full justify-start border-b-0">
-                                    <TabsTrigger value="Purchase History" className="px-0 pb-3 font-bold text-sm">Histórico</TabsTrigger>
-                                    <TabsTrigger value="Review" className="px-0 pb-3 font-bold text-sm">Avaliações</TabsTrigger>
-                                    <TabsTrigger value="Information" className="px-0 pb-3 font-bold text-sm">Informações</TabsTrigger>
+                            <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                    <TabsTrigger value="Purchase History">Histórico</TabsTrigger>
+                                    <TabsTrigger value="Review">Avaliações</TabsTrigger>
+                                    <TabsTrigger value="Information">Informações</TabsTrigger>
                                 </TabsList>
                             </div>
                         </div>
@@ -130,7 +130,7 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
 
                     {/* Content Body */}
                     <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                        <div className="grid grid-cols-12 gap-y-10 lg:gap-x-16">
+                        <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
 
                             {/* Main Column */}
                             <div className={`col-span-12 lg:col-span-8 ${isInformationTab ? 'hidden lg:block' : 'block'}`}>

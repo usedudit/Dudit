@@ -29,7 +29,7 @@ const StockMovementGridCard = React.memo(
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
-        className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-dark-heading/30 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
+        className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-dark-border/90 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
         onClick={() => onDetails(movement.id)}
       >
         <div className="flex gap-4 mb-2">
@@ -70,15 +70,8 @@ const StockMovementGridCard = React.memo(
             </div>
 
             {/* Linha 2: SKU */}
-            <div className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate mt-1">
+            <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate mt-1">
               <span>SKU {movement.product.sku || "N/A"}</span>
-            </div>
-
-            {/* Linha 3: ID */}
-            <div className="mt-1">
-              <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">
-                ID {movement.displayId}
-              </span>
             </div>
           </div>
         </div>
@@ -89,7 +82,7 @@ const StockMovementGridCard = React.memo(
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-0.5">
               <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Quantidade</span>
-              <span className={`text-[14px] font-bold ${movement.type === 'in' ? 'text-green-600' : 'text-red-600'}`}>
+              <span className={`text-[14px] font-bold ${movement.type === 'in' ? 'text-brand-green' : 'text-brand-red'}`}>
                 {movement.type === 'in' ? '+' : '-'}{movement.quantity}
               </span>
             </div>
@@ -120,7 +113,7 @@ const StockMovementGridCard = React.memo(
                 trigger={
                   <Button
                     variant="outline"
-                    className="w-[34px] h-[34px] rounded-full border-brand-border hover:bg-white dark:hover:bg-dark-surface p-0 flex items-center justify-center"
+                    className="w-[34px] h-[34px] p-0 flex items-center justify-center"
                   >
                     <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
                   </Button>

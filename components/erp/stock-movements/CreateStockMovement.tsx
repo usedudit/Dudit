@@ -188,7 +188,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                 {/* Tabs container - ensured alignment */}
 
                                 {/* Tabs */}
-                                <div className={`w-full transition-all duration-300 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="Geral" className="px-0 pb-3">Dados gerais</TabsTrigger>
                                         <TabsTrigger value="Observações" className="px-0 pb-3">Observações</TabsTrigger>
