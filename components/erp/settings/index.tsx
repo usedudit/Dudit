@@ -1,4 +1,4 @@
-export * from "./SettingsTabs"
+export * from "./SettingsPage"
 export * from "./SettingsCard"
 export * from "./BusinessDataSubPage"
 export * from "./IntegrationsSubPage"

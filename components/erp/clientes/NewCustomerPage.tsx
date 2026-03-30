@@ -234,7 +234,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                             <span className="truncate">{pageTitle}</span>
                                         </h1>
 
-                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-1"}`}>
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                             Preencha as informações para cadastrar o novo cliente
                                         </div>
                                     </div>
@@ -252,7 +252,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                 </div>
 
                                 {/* Tabs */}
-                                <div className={`w-full transition-all duration-300 ${isScrolled ? "md:mt-0" : "md:mt-2"}`}>
+                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="general">Dados gerais</TabsTrigger>
                                         <TabsTrigger value="address">Endereço</TabsTrigger>
@@ -382,7 +382,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Endereço principal</h3>
                                                     <div className="space-y-4">
                                                         <CepInput
-                                                            label="CEP *"
+                                                            label="CEP"
                                                             placeholder="00000-000"
                                                             value={cep}
                                                             onChange={setCep}
@@ -394,11 +394,12 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                                 setUf(data.state || "SP")
                                                             }}
                                                         />
-                                                        <FormInput label="Logradouro *" placeholder="Rua, Avenida, etc." value={street} onChange={e => setStreet(e.target.value)} />
+                                                        <FormInput label="Logradouro" placeholder="Rua, Avenida, etc." value={street} onChange={e => setStreet(e.target.value)} />
+
                                                         <div className="grid grid-cols-2 gap-3 flex-row items-center pt-1.5 pb-1.5">
                                                             <div>
                                                                 <NumberInputWithCheckbox
-                                                                    label="Número *"
+                                                                    label="Número"
                                                                     value={number}
                                                                     number={number}
                                                                     noNumber={noNumber}
@@ -410,14 +411,15 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                                 <FormInput label="Complemento" placeholder="Apto, Bloco, etc." value={complement} onChange={e => setComplement(e.target.value)} />
                                                             </div>
                                                         </div>
-                                                        <FormInput label="Bairro *" placeholder="Nome do bairro" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} />
+                                                        <FormInput label="Bairro" placeholder="Nome do bairro" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} />
+
                                                         <div className="grid grid-cols-2 gap-3 items-end">
                                                             <div className="mb-[22px]">
-                                                                <FormInput label="Cidade *" placeholder="Nome da cidade" value={city} onChange={e => setCity(e.target.value)} />
+                                                                <FormInput label="Cidade" placeholder="Nome da cidade" value={city} onChange={e => setCity(e.target.value)} />
                                                             </div>
                                                             <div>
-                                                                <label className="text-sm font-medium text-brand-dark dark:text-dark-heading block mb-1.5">UF *</label>
                                                                 <StateComboBox
+                                                                    label="UF"
                                                                     value={uf}
                                                                     onChange={setUf}
                                                                     className="w-full"
@@ -454,10 +456,10 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                                     }}
                                                                 />
                                                                 <FormInput label="Logradouro *" placeholder="Rua, Avenida, etc." value={billingStreet} onChange={e => setBillingStreet(e.target.value)} />
-                                                                <div className="grid grid-cols-2 gap-3 flex-row items-center pt-1.5 pb-1.5">
+                                                                <div className="grid grid-cols-2 gap-3 flex-row items-center">
                                                                     <div>
                                                                         <NumberInputWithCheckbox
-                                                                            label="Número *"
+                                                                            label="Número"
                                                                             value={billingNumber}
                                                                             number={billingNumber}
                                                                             noNumber={billingNoNumber}
@@ -540,10 +542,9 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                             </>
                                         ) : activeTab === 'address' ? (
                                             <div className="bg-white dark:bg-dark-surface p-0 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden flex flex-col">
-                                                <div className="absolute top-0 left-0 w-full h-[6px] bg-brand-dark dark:bg-dark-border" />
+                                                <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
                                                 <div className="p-4 flex items-center justify-between border-b border-brand-border dark:border-dark-border mt-1 border-opacity-60">
                                                     <h3 className="font-bold text-brand-dark dark:text-dark-heading">Endereço Principal</h3>
-                                                    <EditIcon size={16} className="text-brand-inactive-text" />
                                                 </div>
                                                 <div className="p-4 flex flex-col">
                                                     <div className="w-full h-[120px] bg-gray-200 dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group" onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${street}, ${number}, ${neighborhood}, ${city} - ${uf}, ${cep}`)}`, '_blank')}>

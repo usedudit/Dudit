@@ -39,6 +39,7 @@ interface FormInputProps {
   spellCheck?: boolean
   autoCorrect?: string
   autoCapitalize?: string
+  showCharacterCount?: boolean
 }
 
 export const Input: React.FC<FormInputProps> = ({
@@ -76,6 +77,7 @@ export const Input: React.FC<FormInputProps> = ({
   spellCheck,
   autoCorrect,
   autoCapitalize,
+  showCharacterCount = false,
 }) => {
   const inputId = id || name || Math.random().toString(36).substring(7)
 
@@ -186,15 +188,25 @@ export const Input: React.FC<FormInputProps> = ({
         )}
 
         {suffix && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          <div className="absolute right-3 top-0 h-full flex items-center justify-center">
             {suffix}
           </div>
         )}
       </div>
 
-      {error && errorMessage && (
-        <p className="mt-1 text-xs text-brand-red">{errorMessage}</p>
-      )}
+      <div className="flex justify-between mt-1">
+        {error && errorMessage ? (
+          <p className="text-xs text-brand-red">{errorMessage}</p>
+        ) : (
+          <div />
+        )}
+
+        {maxLength && showCharacterCount && (
+          <p className="text-[11px] text-brand-inactive-text font-medium">
+            {String(value || "").length}/{maxLength}
+          </p>
+        )}
+      </div>
     </div>
   )
 }

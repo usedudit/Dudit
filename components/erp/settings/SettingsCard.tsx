@@ -18,9 +18,9 @@ export const SettingsCard = ({
 }) => (
   <div
     onClick={onClick}
-    className="group flex items-center gap-4 p-5 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-dark-heading/30 transition-all cursor-pointer h-full"
+    className="group flex items-center gap-4 p-5 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-dark-border/60 transition-all cursor-pointer h-full"
   >
-    <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-gray-800 flex items-center justify-center flex-shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-gray-700 transition-colors">
+    <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex items-center justify-center flex-shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-gray-700 transition-colors">
       <Icon size={20} className="text-brand-dark dark:text-dark-heading" />
     </div>
     <div className="flex-1">
@@ -49,7 +49,7 @@ export const SubPageHeader = ({
     <button
       type="button"
       onClick={onBack}
-      className="h-10 w-10 p-0 rounded-full border border-brand-border dark:border-dark-border flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex-shrink-0"
+      className="h-10 w-10 p-0 rounded-full border border-brand-border dark:border-dark-border flex items-center justify-center hover:bg-gray-100 dark:hover:bg-dark-border/60 transition-colors flex-shrink-0"
     >
       <ChevronLeftIcon size={20} className="text-brand-dark dark:text-dark-heading" />
     </button>

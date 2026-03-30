@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { ERPHeader } from "@/components/erp/erp-header"
-import { SettingsTabs } from "@/components/erp/settings/SettingsTabs"
+import { SettingsTabs } from "@/components/erp/settings/SettingsPage"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { requireUser } from "@/lib/auth/authorization"
 import { getPartnerByUserIdCached, getPartnerPaymentMethodsCached } from "@/lib/data/partner"
@@ -15,7 +15,7 @@ export default async function SettingsPage() {
   const partner = await getPartnerByUserIdCached(user.id)
 
   if (!partner) {
-    redirect("/dashboard")
+    redirect("/auth/login?mode=partner")
   }
 
   // SECURITY: Only MANAGER+ can access settings

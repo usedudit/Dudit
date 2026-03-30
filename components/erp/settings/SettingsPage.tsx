@@ -21,40 +21,36 @@ interface SettingsTabsProps {
 type ActivePage = "home" | "business-data" | "integrations" | "team" | "subscription"
 
 export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
-  const searchParams = useSearchParams()
   const [activePage, setActivePage] = useState<ActivePage>("home")
   const [mpConnected] = useState(!!partner.mp_user_id)
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={activePage}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -8 }}
-        transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-        className="w-full px-4 md:px-8"
-      >
+    <motion.div
+      key={activePage}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.2 }}
+      className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
+    >
+      <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
         {activePage === "home" && (
-          <div className="flex justify-between items-center mb-6">
+
+          <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
             <div className="flex flex-col gap-2 pt-1">
               <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                Configurações da Loja
+                Configurações do negócio
               </h1>
               <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                Gerencie as informações e configurações da sua loja
+                Gerencie as informações do seu negócio
               </p>
             </div>
-            <Button asChild variant="filled">
-              <Link href="/erp/dashboard">Voltar</Link>
-            </Button>
           </div>
         )}
 
         {activePage === "home" && (
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             transition={{ duration: 0.2 }}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
           >
@@ -104,7 +100,7 @@ export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
         {activePage === "team" && <TeamSubPage partnerId={partner.id} onBack={() => setActivePage("home")} />}
 
         {activePage === "subscription" && <SubscriptionSubPage onBack={() => setActivePage("home")} />}
-      </motion.div>
-    </AnimatePresence>
+      </div>
+    </motion.div>
   )
 }

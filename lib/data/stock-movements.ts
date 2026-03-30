@@ -20,6 +20,7 @@ export const getStockMovementsCached = cache(async (partnerId: string) => {
       new_quantity,
       reference_type,
       reference_name,
+      reason,
       notes,
       created_at,
       created_by,

@@ -6,9 +6,11 @@ import { Input } from "../Input"
 interface MoneyInputProps extends Omit<React.ComponentProps<typeof Input>, 'onChange' | 'value'> {
     value?: number | string
     onChange?: (value: number) => void
+    min?: number
+    max?: number
 }
 
-export function MoneyInput({ value = 0, onChange, ...props }: MoneyInputProps) {
+export function MoneyInput({ value = 0, onChange, min, max, ...props }: MoneyInputProps) {
     const numericVal = typeof value === 'string' ? Number(value) : value
 
     const [displayValue, setDisplayValue] = useState(
@@ -32,13 +34,24 @@ export function MoneyInput({ value = 0, onChange, ...props }: MoneyInputProps) {
             return
         }
 
-        const numericValue = Number(numericString) / 100
+
+        let numericValue = Number(numericString) / 100
+
+        if (max !== undefined && numericValue > max) {
+            numericValue = max
+        }
+
         onChange?.(numericValue)
         setDisplayValue(new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2 }).format(numericValue))
     }
 
     const handleBlur = () => {
-        setDisplayValue(numericVal > 0 ? new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2 }).format(numericVal) : "")
+        let finalValue = numericVal
+        if (min !== undefined && finalValue < min) {
+            finalValue = min
+            onChange?.(finalValue)
+        }
+        setDisplayValue(finalValue > 0 ? new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2 }).format(finalValue) : "")
         props.onBlur?.()
     }
 

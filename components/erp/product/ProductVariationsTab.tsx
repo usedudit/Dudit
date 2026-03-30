@@ -860,7 +860,7 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
                                                                 onClick={() => col.sortable && col.key && handleSort(col.key)}
                                                             >
                                                                 <div className={`flex items-center gap-1 ${col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : ""}`}>
-                                                                    <span className={isSorted ? "text-brand-dark dark:text-dark-heading font-bold" : ""}>
+                                                                    <span>
                                                                         {col.label}
                                                                     </span>
                                                                     {col.sortable && (

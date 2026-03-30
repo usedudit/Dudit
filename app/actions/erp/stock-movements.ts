@@ -59,7 +59,7 @@ export async function createStockMovementAction(data: {
         // requirePartner resolve tanto o usuário quanto o parceiro em uma única árvore de cache
         const partner = await requirePartner()
         const partnerId = partner.id
-        const userEmail = partner.email
+        const userId = partner.user_id
 
         if (!data.productId) return errorResponse("Produto inválido")
         if (data.quantity <= 0) return errorResponse("Quantidade deve ser maior que zero")
@@ -74,7 +74,7 @@ export async function createStockMovementAction(data: {
             p_quantity: data.quantity,
             p_reason: data.reason,
             p_notes: data.notes,
-            p_created_by: userEmail,
+            p_created_by: userId,
             p_variant_id: data.variantId || null
         })
 
@@ -111,6 +111,7 @@ export async function getStockMovementDetails(id: string) {
                 previous_quantity,
                 new_quantity,
                 reference_name,
+                reason,
                 notes,
                 created_by,
                 products (
@@ -131,8 +132,8 @@ export async function getStockMovementDetails(id: string) {
 
         if (!data) return errorResponse("Movimentação não encontrada")
 
-        let reason = data.movement_type;
-        if (data.reference_name) {
+        let reason = data.reason || data.movement_type;
+        if (!data.reason && data.reference_name) {
             reason = data.reference_name;
         }
 
@@ -203,7 +204,7 @@ export async function undoStockMovementAction(id: string, customReason?: string)
         if (!ctx?.partnerId) return errorResponse("Parceiro não encontrado")
 
         const partner = await requirePartner()
-        const userEmail = partner.email
+        const userId = partner.user_id
         const supabase = await getSupabaseServerClient()
 
         // 1. Buscar a movimentação original para saber o que inverter
@@ -232,9 +233,9 @@ export async function undoStockMovementAction(id: string, customReason?: string)
             p_product_id: original.product_id,
             p_movement_type: invertedType,
             p_quantity: Math.abs(original.quantity), // A quantidade é sempre positiva para o RPC
-            p_reason: reason,
+            p_reason: customReason || "Estorno",
             p_notes: notes,
-            p_created_by: userEmail,
+            p_created_by: userId,
             p_variant_id: original.variant_id || null
         })
 

@@ -20,7 +20,7 @@ export const PasswordInput: React.FC<PasswordInputProps> = (props) => {
                 <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    className="text-gray-400 hover:text-gray-600 transition-colors flex items-center justify-center"
                     tabIndex={-1}
                 >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/reusable"
 import { Input as FormInput } from "@/components/reusable/Input"
@@ -33,6 +33,7 @@ import {
   cancelSubscriptionAction,
   upgradeSubscriptionAction,
 } from "@/app/actions/subscriptions"
+import { FadeIn } from "@/components/animations/FadeIn"
 
 // ─── Feature & Limit Label Maps ────────────────────────────────────────────
 
@@ -170,8 +171,8 @@ const PlanCard: React.FC<PlanCardProps> = ({
     whileInView={{ opacity: 1, y: 0 }}
     viewport={{ once: true }}
     className={`rounded-3xl p-8 flex flex-col h-full relative border overflow-hidden ${popular
-        ? "bg-brand-dark border-brand-dark shadow-xl"
-        : "bg-white dark:bg-dark-surface border-brand-border dark:border-dark-border hover:border-brand-green/30 transition-all duration-300"
+      ? "bg-brand-dark border-brand-dark shadow-xl"
+      : "bg-white dark:bg-dark-surface border-brand-border dark:border-dark-border hover:border-brand-green/30 transition-all duration-300"
       }`}
   >
     {popular && (
@@ -323,6 +324,13 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
   })
 
   const [cancelModal, setCancelModal] = useState(false)
+
+  const [isScrolled, setIsScrolled] = useState(false)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  const handleScroll = useCallback(() => {
+    if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
+  }, [])
 
   // ─── Load Data ─────────────────────────────────────────────────────────
 
@@ -488,280 +496,311 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
     currentPlanSlug !== "free"
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-dark-surface transition-colors duration-300">
-      <div className="w-full max-w-[1400px] mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Button
-            variant="outline"
-            onClick={onBack}
-            className="h-10 w-10 p-0 rounded-full flex items-center justify-center border-brand-border dark:border-dark-border"
-          >
-            <ChevronLeftIcon size={20} />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
-              Meus Planos & Faturamento
-            </h1>
-            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-              Gerencie seu plano e visualize o histórico de pagamentos.
-            </p>
+    <FadeIn>
+      <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
+        <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
+
+          {/* Sticky Header */}
+          <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
+
+              {/* Back button — desktop only */}
+              <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                  <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                </Button>
+              </div>
+
+              {/* Title row */}
+              <div className="hidden md:flex items-start justify-between pb-4">
+                <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                  <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-300 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                    <span className="truncate">Meus Planos & Faturamento</span>
+                  </h1>
+
+                  <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-1"}`}>
+                    Gerencie seu plano e visualize o histórico de pagamentos.
+                  </div>
+                </div>
+
+                {/* Desktop action buttons */}
+                <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
+                  <Button variant="outline" onClick={onBack} className="px-5 h-[42px]">
+                    Voltar
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Content Body */}
+          <div className="px-4 md:px-8 py-8 max-w-[1400px] mx-auto">
+            {/* Current Plan Info Bar */}
+            {!loading && subData && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-8 p-4 rounded-2xl border border-brand-green/20 bg-brand-green/5 dark:bg-brand-green/10 flex flex-col md:flex-row md:items-center justify-between gap-4"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-brand-green/10 flex items-center justify-center">
+                    <Crown size={20} className="text-brand-green" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                      Plano {subData.plan.name}
+                    </p>
+                    <p className="text-xs text-brand-inactive-text">
+                      {subData.subscription?.status === "active" && "Ativo"}
+                      {subData.subscription?.status === "trialing" && "Período de teste"}
+                      {subData.subscription?.status === "past_due" && "Pagamento pendente"}
+                      {subData.subscription?.cancel_at_period_end && " · Cancelamento agendado"}
+                      {!subData.subscription && "Plano gratuito"}
+                      {subData.subscription?.current_period_end && (
+                        <> · Renova em {new Date(subData.subscription.current_period_end).toLocaleDateString("pt-BR")}</>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {hasActivePaidSub && !subData.subscription?.cancel_at_period_end && (
+                  <Button
+                    variant="outline"
+                    className="text-red-500 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-900/20 text-sm"
+                    onClick={() => setCancelModal(true)}
+                  >
+                    Cancelar assinatura
+                  </Button>
+                )}
+              </motion.div>
+            )}
+
+            {/* Plans Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-12 items-stretch">
+              {loading ? (
+                <>
+                  <PlanCardSkeleton />
+                  <PlanCardSkeleton />
+                  <PlanCardSkeleton />
+                  <PlanCardSkeleton />
+                </>
+              ) : (
+                plans.map((plan) => {
+                  const isCurrent = subData?.plan?.id === plan.id
+                  const isDowngrade = plan.price < currentPlanPrice && currentPlanSlug !== "free"
+                  const isPopular = plan.slug === "vendedor"
+
+                  return (
+                    <PlanCard
+                      key={plan.id}
+                      name={plan.name}
+                      price={formatPrice(plan.price)}
+                      features={buildFeaturesDisplay(plan.features_json || [], plan.slug, plans)}
+                      limits={buildLimitsDisplay(plan.limits_json || {})}
+                      popular={isPopular}
+                      isCurrent={isCurrent}
+                      isDowngrade={isDowngrade}
+                      isLoading={actionLoading === plan.id}
+                      onAction={() => handlePlanAction(plan)}
+                    />
+                  )
+                })
+              )}
+            </div>
+
+            {/* ─── Subscribe Dialog ─────────────────────────────────── */}
+            <Dialog
+              open={subscribeModal.open}
+              onOpenChange={(open) => {
+                if (!open && !actionLoading) setSubscribeModal({ open: false, planId: "", planName: "" })
+              }}
+            >
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Zap size={20} className="text-brand-green" />
+                    Assinar {subscribeModal.planName}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Insira seu email de faturamento para prosseguir. Você será redirecionado para o Mercado Pago para finalizar o pagamento de forma segura.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="py-4 space-y-4">
+                  <FormInput
+                    label="Email de faturamento"
+                    name="billing_email"
+                    type="email"
+                    placeholder="seuemail@exemplo.com"
+                    value={billingEmail}
+                    onChange={(e) => {
+                      setBillingEmail(e.target.value)
+                      setEmailError("")
+                    }}
+                    className="mb-0"
+                  />
+                  {emailError && (
+                    <p className="text-sm text-red-500 flex items-center gap-1">
+                      <AlertTriangleIcon size={14} /> {emailError}
+                    </p>
+                  )}
+
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-gray-50 dark:bg-zinc-900/50 text-xs text-brand-inactive-text">
+                    <ShieldCheck size={14} className="text-brand-green shrink-0 mt-0.5" />
+                    <span>
+                      Pagamento processado com segurança pelo Mercado Pago. Seus dados financeiros nunca passam pela Dudit.
+                    </span>
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setSubscribeModal({ open: false, planId: "", planName: "" })}
+                    disabled={!!actionLoading}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="bg-brand-green text-white hover:bg-brand-green/90"
+                    onClick={handleSubscribe}
+                    disabled={!!actionLoading}
+                  >
+                    {actionLoading ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin mr-2" />
+                        Processando...
+                      </>
+                    ) : (
+                      <>
+                        <ArrowUpRight size={16} className="mr-2" />
+                        Ir para o pagamento
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* ─── Downgrade Confirmation Dialog ────────────────────── */}
+            <Dialog
+              open={downgradeModal.open}
+              onOpenChange={(open) => {
+                if (!open && !actionLoading) setDowngradeModal({ open: false, planId: "", planName: "" })
+              }}
+            >
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <AlertTriangleIcon size={20} className="text-amber-500" />
+                    Confirmar downgrade
+                  </DialogTitle>
+                  <DialogDescription>
+                    Você está rebaixando seu plano para <strong>{downgradeModal.planName}</strong>. A mudança será aplicada no final do ciclo de faturamento atual. Até lá, você continua com todos os recursos do plano atual.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="py-2">
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-xs text-amber-700 dark:text-amber-300">
+                    <AlertTriangleIcon size={14} className="shrink-0 mt-0.5" />
+                    <span>
+                      Recursos exclusivos do plano atual podem ficar indisponíveis após o downgrade. Verifique se seus dados estão dentro dos limites do novo plano.
+                    </span>
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setDowngradeModal({ open: false, planId: "", planName: "" })}
+                    disabled={!!actionLoading}
+                  >
+                    Manter plano atual
+                  </Button>
+                  <Button
+                    className="bg-amber-500 text-white hover:bg-amber-600"
+                    onClick={handleDowngrade}
+                    disabled={!!actionLoading}
+                  >
+                    {actionLoading ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin mr-2" />
+                        Agendando...
+                      </>
+                    ) : (
+                      "Confirmar downgrade"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* ─── Cancel Subscription Dialog ──────────────────────── */}
+            <Dialog
+              open={cancelModal}
+              onOpenChange={(open) => {
+                if (!open && !actionLoading) setCancelModal(false)
+              }}
+            >
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2 text-red-600">
+                    <XIcon size={20} />
+                    Cancelar assinatura
+                  </DialogTitle>
+                  <DialogDescription>
+                    Tem certeza? Ao cancelar sua assinatura do plano <strong>{subData?.plan.name}</strong>, você voltará para o plano Grátis e perderá acesso aos recursos premium.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="py-2">
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-xs text-red-600 dark:text-red-300">
+                    <AlertTriangleIcon size={14} className="shrink-0 mt-0.5" />
+                    <span>
+                      Esta ação não pode ser desfeita instantaneamente. Para reativar, será necessário criar uma nova assinatura.
+                    </span>
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setCancelModal(false)}
+                    disabled={!!actionLoading}
+                  >
+                    Não, manter plano
+                  </Button>
+                  <Button
+                    className="bg-red-600 text-white hover:bg-red-700"
+                    onClick={handleCancel}
+                    disabled={!!actionLoading}
+                  >
+                    {actionLoading === "cancel" ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin mr-2" />
+                        Cancelando...
+                      </>
+                    ) : (
+                      "Sim, cancelar assinatura"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
-
-        {/* Current Plan Info Bar */}
-        {!loading && subData && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-8 p-4 rounded-2xl border border-brand-green/20 bg-brand-green/5 dark:bg-brand-green/10 flex flex-col md:flex-row md:items-center justify-between gap-4"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-brand-green/10 flex items-center justify-center">
-                <Crown size={20} className="text-brand-green" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                  Plano {subData.plan.name}
-                </p>
-                <p className="text-xs text-brand-inactive-text">
-                  {subData.subscription?.status === "active" && "Ativo"}
-                  {subData.subscription?.status === "trialing" && "Período de teste"}
-                  {subData.subscription?.status === "past_due" && "Pagamento pendente"}
-                  {subData.subscription?.cancel_at_period_end && " · Cancelamento agendado"}
-                  {!subData.subscription && "Plano gratuito"}
-                  {subData.subscription?.current_period_end && (
-                    <> · Renova em {new Date(subData.subscription.current_period_end).toLocaleDateString("pt-BR")}</>
-                  )}
-                </p>
-              </div>
-            </div>
-
-            {hasActivePaidSub && !subData.subscription?.cancel_at_period_end && (
-              <Button
-                variant="outline"
-                className="text-red-500 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-900/20 text-sm"
-                onClick={() => setCancelModal(true)}
-              >
-                Cancelar assinatura
-              </Button>
-            )}
-          </motion.div>
-        )}
-
-        {/* Plans Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-12 items-stretch">
-          {loading ? (
-            <>
-              <PlanCardSkeleton />
-              <PlanCardSkeleton />
-              <PlanCardSkeleton />
-              <PlanCardSkeleton />
-            </>
-          ) : (
-            plans.map((plan) => {
-              const isCurrent = subData?.plan?.id === plan.id
-              const isDowngrade = plan.price < currentPlanPrice && currentPlanSlug !== "free"
-              const isPopular = plan.slug === "vendedor"
-
-              return (
-                <PlanCard
-                  key={plan.id}
-                  name={plan.name}
-                  price={formatPrice(plan.price)}
-                  features={buildFeaturesDisplay(plan.features_json || [], plan.slug, plans)}
-                  limits={buildLimitsDisplay(plan.limits_json || {})}
-                  popular={isPopular}
-                  isCurrent={isCurrent}
-                  isDowngrade={isDowngrade}
-                  isLoading={actionLoading === plan.id}
-                  onAction={() => handlePlanAction(plan)}
-                />
-              )
-            })
-          )}
-        </div>
-
-        {/* ─── Subscribe Dialog ─────────────────────────────────── */}
-        <Dialog
-          open={subscribeModal.open}
-          onOpenChange={(open) => {
-            if (!open && !actionLoading) setSubscribeModal({ open: false, planId: "", planName: "" })
-          }}
-        >
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Zap size={20} className="text-brand-green" />
-                Assinar {subscribeModal.planName}
-              </DialogTitle>
-              <DialogDescription>
-                Insira seu email de faturamento para prosseguir. Você será redirecionado para o Mercado Pago para finalizar o pagamento de forma segura.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="py-4 space-y-4">
-              <FormInput
-                label="Email de faturamento"
-                name="billing_email"
-                type="email"
-                placeholder="seuemail@exemplo.com"
-                value={billingEmail}
-                onChange={(e) => {
-                  setBillingEmail(e.target.value)
-                  setEmailError("")
-                }}
-                className="mb-0"
-              />
-              {emailError && (
-                <p className="text-sm text-red-500 flex items-center gap-1">
-                  <AlertTriangleIcon size={14} /> {emailError}
-                </p>
-              )}
-
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-gray-50 dark:bg-zinc-900/50 text-xs text-brand-inactive-text">
-                <ShieldCheck size={14} className="text-brand-green shrink-0 mt-0.5" />
-                <span>
-                  Pagamento processado com segurança pelo Mercado Pago. Seus dados financeiros nunca passam pela Dudit.
-                </span>
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setSubscribeModal({ open: false, planId: "", planName: "" })}
-                disabled={!!actionLoading}
-              >
-                Cancelar
-              </Button>
-              <Button
-                className="bg-brand-green text-white hover:bg-brand-green/90"
-                onClick={handleSubscribe}
-                disabled={!!actionLoading}
-              >
-                {actionLoading ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin mr-2" />
-                    Processando...
-                  </>
-                ) : (
-                  <>
-                    <ArrowUpRight size={16} className="mr-2" />
-                    Ir para o pagamento
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* ─── Downgrade Confirmation Dialog ────────────────────── */}
-        <Dialog
-          open={downgradeModal.open}
-          onOpenChange={(open) => {
-            if (!open && !actionLoading) setDowngradeModal({ open: false, planId: "", planName: "" })
-          }}
-        >
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <AlertTriangleIcon size={20} className="text-amber-500" />
-                Confirmar downgrade
-              </DialogTitle>
-              <DialogDescription>
-                Você está rebaixando seu plano para <strong>{downgradeModal.planName}</strong>. A mudança será aplicada no final do ciclo de faturamento atual. Até lá, você continua com todos os recursos do plano atual.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="py-2">
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-xs text-amber-700 dark:text-amber-300">
-                <AlertTriangleIcon size={14} className="shrink-0 mt-0.5" />
-                <span>
-                  Recursos exclusivos do plano atual podem ficar indisponíveis após o downgrade. Verifique se seus dados estão dentro dos limites do novo plano.
-                </span>
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setDowngradeModal({ open: false, planId: "", planName: "" })}
-                disabled={!!actionLoading}
-              >
-                Manter plano atual
-              </Button>
-              <Button
-                className="bg-amber-500 text-white hover:bg-amber-600"
-                onClick={handleDowngrade}
-                disabled={!!actionLoading}
-              >
-                {actionLoading ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin mr-2" />
-                    Agendando...
-                  </>
-                ) : (
-                  "Confirmar downgrade"
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* ─── Cancel Subscription Dialog ──────────────────────── */}
-        <Dialog
-          open={cancelModal}
-          onOpenChange={(open) => {
-            if (!open && !actionLoading) setCancelModal(false)
-          }}
-        >
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-red-600">
-                <XIcon size={20} />
-                Cancelar assinatura
-              </DialogTitle>
-              <DialogDescription>
-                Tem certeza? Ao cancelar sua assinatura do plano <strong>{subData?.plan.name}</strong>, você voltará para o plano Grátis e perderá acesso aos recursos premium.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="py-2">
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-xs text-red-600 dark:text-red-300">
-                <AlertTriangleIcon size={14} className="shrink-0 mt-0.5" />
-                <span>
-                  Esta ação não pode ser desfeita instantaneamente. Para reativar, será necessário criar uma nova assinatura.
-                </span>
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setCancelModal(false)}
-                disabled={!!actionLoading}
-              >
-                Não, manter plano
-              </Button>
-              <Button
-                className="bg-red-600 text-white hover:bg-red-700"
-                onClick={handleCancel}
-                disabled={!!actionLoading}
-              >
-                {actionLoading === "cancel" ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin mr-2" />
-                    Cancelando...
-                  </>
-                ) : (
-                  "Sim, cancelar assinatura"
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
-    </div>
+
+      {/* Mobile Bottom Action Bar */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
+        <Button
+          variant="outline"
+          onClick={onBack}
+          className="flex-1 h-[48px] font-bold"
+        >
+          Voltar
+        </Button>
+      </div>
+    </FadeIn>
   )
 }
