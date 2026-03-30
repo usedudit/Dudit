@@ -13,8 +13,8 @@ export default async function Page() {
   }
 
   const result = await getProductMetadataAction(partnerId)
-  if (!result.success) {
-    throw new Error(result.error)
+  if (!result.success || !result.data) {
+    throw new Error(result.error || "Erro ao carregar dados")
   }
 
   return (

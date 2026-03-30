@@ -60,7 +60,8 @@ export async function createPaymentMethodAction(data: {
   })
 
   if (!validation.success) {
-    return { error: validation.error.issues[0].message }
+    const errorDetails = validation.error.issues.map(i => i.message).join(", ")
+    return { error: errorDetails }
   }
 
   const supabase = await getSupabaseServerClient()
@@ -166,8 +167,6 @@ export async function deletePaymentMethodAction(methodId: string) {
   }
 
   await requirePartnerAccessWithPermission(method.partner_id, "financial", "delete")
-
-  await supabase.from("payment_method_fees").delete().eq("payment_method_id", methodId)
 
   const { error } = await supabase.from("payment_methods").delete().eq("id", methodId)
 

@@ -63,7 +63,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
     // Refresh Data
     const refreshData = useCallback(async () => {
         const result = await getProductMetadataAction(partnerId)
-        if (result.success) {
+        if (result.success && result.data) {
             setMetadata(result.data)
         }
     }, [partnerId])
@@ -305,13 +305,17 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                     />
 
                     {modal.type === "subcategory" && (
-                        <Combobox 
-                            label="Categoria Pai"
-                            placeholder="Selecione a categoria pai..."
-                            options={metadata.categories.filter(c => !c.parent_id).map(c => ({ value: c.id, label: c.name }))}
-                            value={modal.item.parentId}
-                            onSelect={(val) => setModal(prev => ({ ...prev, item: { ...prev.item, parentId: val } }))}
-                        />
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                Categoria Pai
+                            </label>
+                            <Combobox 
+                                placeholder="Selecione a categoria pai..."
+                                options={metadata.categories.filter((c: any) => !c.parent_id).map((c: any) => ({ value: c.id, label: c.name }))}
+                                value={modal.item.parentId}
+                                onChange={(val: string) => setModal(prev => ({ ...prev, item: { ...prev.item, parentId: val } }))}
+                            />
+                        </div>
                     )}
 
                     <div className="flex items-center gap-2 mt-2">

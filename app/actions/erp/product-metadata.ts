@@ -9,6 +9,12 @@ const CACHE_TAGS = {
   metadata: (partnerId: string) => `partner-${partnerId}-product-metadata`,
 }
 
+interface MetadataResponse {
+  categories: any[]
+  brands: any[]
+  locations: any[]
+}
+
 /**
  * Fetches all product metadata (categories, brands, locations) for a partner.
  * Categories are returned as a flat list but include parent_id for hierarchical processing.
@@ -38,7 +44,7 @@ export async function getProductMetadataAction(partnerId: string) {
     )
 
     const data = await getCachedMetadata(partnerId)
-    return { success: true, data }
+    return { success: true, data: data as MetadataResponse }
   } catch (error: any) {
     console.error("Error fetching product metadata:", error)
     return { success: false, error: error.message }
