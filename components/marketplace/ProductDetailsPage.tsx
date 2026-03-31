@@ -125,6 +125,7 @@ export function ProductDetailsPageClient({
   const galleryContainerRef = useRef<HTMLDivElement>(null)
   const reviewsRef = useRef<HTMLDivElement>(null)
   const lightboxJustOpened = useRef(false)
+  const isActionInProgress = useRef(false)
 
   const zoomOriginX = useMotionValue(50)
   const zoomOriginY = useMotionValue(50)
@@ -289,6 +290,9 @@ export function ProductDetailsPageClient({
 
   const handleAddToCart = useCallback(async () => {
     if (!userId) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname))
+    if (isActionInProgress.current) return
+    
+    isActionInProgress.current = true
     setLoading(true)
     try {
       const { token } = await fetch("/api/csrf-token").then((r) => r.json())
@@ -303,6 +307,7 @@ export function ProductDetailsPageClient({
       notifyError("Erro", "Erro ao adicionar ao carrinho")
     } finally {
       setLoading(false)
+      isActionInProgress.current = false
     }
   }, [userId, router, product.id, quantity, selectedVariant, notifySuccess, notifyError])
 

@@ -212,8 +212,10 @@ export async function middleware(request: NextRequest) {
   // 5. SUPABASE AUTH (ONLY for routes that need it)
   // CRITICAL: Skip auth for public cacheable pages to avoid Set-Cookie headers
   // that would prevent Cloudflare from caching the response.
-  const NEEDS_AUTH_CHECK = ["/erp", "/account", "/profile", "/my-orders", "/auth/login", "/select-erp", "/ddt-admin"]
-  const needsAuthCheck = NEEDS_AUTH_CHECK.some(prefix => pathname === prefix || pathname.startsWith(prefix + "/"))
+  const NEEDS_AUTH_CHECK = ["/erp", "/account", "/profile", "/my-orders", "/auth/login", "/select-erp", "/ddt-admin", "/cart"]
+  const isPost = request.method === "POST"
+  const isAction = request.headers.has("Next-Action")
+  const needsAuthCheck = isPost || isAction || NEEDS_AUTH_CHECK.some(prefix => pathname === prefix || pathname.startsWith(prefix + "/"))
 
   if (needsAuthCheck) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -262,11 +264,12 @@ export async function middleware(request: NextRequest) {
 
         const { data: { user } } = await supabase.auth.getUser()
 
-        if (user) {
-          requestHeaders.set("x-user-id", user.id)
-          requestHeaders.set("x-user-email", user.email || "")
+          if (user) {
+            console.log(`[MIDDLEWARE] Injected x-user-id for ${pathname}`)
+            requestHeaders.set("x-user-id", user.id)
+            requestHeaders.set("x-user-email", user.email || "")
 
-          // Re-create the response to inject the new requestHeaders downstream
+            // Re-create the response to inject the new requestHeaders downstream
           const oldResponse = response
           response = NextResponse.next({
             request: { headers: requestHeaders }

@@ -10,22 +10,48 @@ import { headers } from "next/headers"
  * Ensures `auth.getUser()` is called AT MOST ONCE per server request.
  * If the middleware already verified the user, it reads from headers to avoid a redundant call.
  */
+// Request-scoped cache that works even in API Route Handlers where React cache() might be lost.
+// Keyed by the headers() object which is unique per request in Next.js App Router.
+const requestCache = new WeakMap<any, User | null>()
+
+/**
+ * Single request-scoped auth resolver.
+ * Ensures `auth.getUser()` is called AT MOST ONCE per server request.
+ * 1. Checks internal module-level request cache (deduplication across util functions in Route Handlers).
+ * 2. Checks middleware headers (Fast path - no DB call).
+ * 3. Fallback to Supabase verification (Slow path - cached for current request).
+ */
 export const getCurrentUser = cache(async (): Promise<User | null> => {
     const timestamp = new Date().toISOString()
     
-    // 1. Try to get user from middleware headers (passed to the page)
-    const headerList = await headers()
+    // 0. Use headers() object as a request-specific identifier key
+    let headerList: any
+    try {
+        headerList = await headers()
+    } catch {
+        // Fallback for cases where headers aren't available
+        return null
+    }
+
+    // 1. Check module-level cache (Deduplicates calls within the same Node.js request lifecycle)
+    if (requestCache.has(headerList)) {
+        const cachedUser = requestCache.get(headerList)
+        console.log(`[OPT] getCurrentUser() returning from INTERNAL CACHE at ${timestamp} for ${cachedUser?.email || "anonymous"}`)
+        return cachedUser!
+    }
+
+    // 2. Try to get user from middleware headers (passed to the page/action)
     const userId = headerList.get("x-user-id")
     const userEmail = headerList.get("x-user-email")
     const skipAuthFallback = headerList.get("x-skip-auth-fallback") === "true"
 
     if (skipAuthFallback) {
+        requestCache.set(headerList, null)
         return null
     }
 
     if (userId) {
-        console.log(`[OPT] getCurrentUser() returning from HEADERS at ${timestamp} for ${userEmail}`)
-        return {
+        const user = {
             id: userId,
             email: userEmail || undefined,
             app_metadata: {},
@@ -33,9 +59,12 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
             aud: "authenticated",
             created_at: "",
         } as User
+        console.log(`[OPT] getCurrentUser() returning from HEADERS at ${timestamp} for ${userEmail}`)
+        requestCache.set(headerList, user)
+        return user
     }
 
-    // 2. Fallback to full Supabase verification if headers are missing
+    // 3. Fallback to full Supabase verification if headers are missing
     console.log(`[SUPABASE CALL] auth.getUser() (FALLBACK) at ${timestamp}`)
     const supabase = await getSupabaseServerClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -46,6 +75,8 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
         console.log(`[SUPABASE CALL] auth.getUser() EMPTY at ${timestamp}`)
     }
     
+    // Cache the result for subsequent calls in this request
+    requestCache.set(headerList, user || null)
     return user
 })
 

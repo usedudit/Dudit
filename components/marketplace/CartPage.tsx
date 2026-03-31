@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { useSupabase } from "@/providers/supabase-provider"
 import { useRouter } from "next/navigation"
 import { getPartnerUrl, getProductUrl } from "@/lib/utils/url-generator"
@@ -32,6 +32,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
   const [showPixModal, setShowPixModal] = useState(false)
   const [pixPaymentData, setPixPaymentData] = useState<any>(null)
   const [showErrorModal, setShowErrorModal] = useState(false)
+  const isActionInProgress = useRef(false)
 
   // Optimistic overrides for instant UI feedback (selection + quantity)
   const [optimisticItems, setOptimisticItems] = useState<Record<string, { selected?: boolean; quantity?: number }>>({})
@@ -79,7 +80,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
   }
 
   const updateQty = async (cartItemId: string, delta: number, currentQty: number) => {
-    if (loading) return
+    if (loading || isActionInProgress.current) return
+    isActionInProgress.current = true
     const newQty = Math.max(1, currentQty + delta)
     setOptimisticItems(prev => ({ ...prev, [cartItemId]: { ...prev[cartItemId], quantity: newQty } }))
     setLoading(cartItemId)
@@ -90,11 +92,15 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
       // Removed router.refresh() — optimistic state update handles UI
     } catch {
       setOptimisticItems(prev => ({ ...prev, [cartItemId]: { ...prev[cartItemId], quantity: currentQty } }))
-    } finally { setLoading(null) }
+    } finally { 
+      setLoading(null)
+      isActionInProgress.current = false
+    }
   }
 
   const removeItem = async (cartItemId: string) => {
-    if (loading) return
+    if (loading || isActionInProgress.current) return
+    isActionInProgress.current = true
     setLoading(cartItemId)
     try {
       const token = await getCsrfToken()
@@ -103,12 +109,14 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
       // Removed router.refresh() — item removal is handled by server action revalidation
     } finally {
       setLoading(null)
+      isActionInProgress.current = false
       setDeleteModal({ open: false, cartItemId: null })
     }
   }
 
   const toggleItemSelection = async (cartItemId: string, currentSelected: boolean) => {
-    if (loading) return
+    if (loading || isActionInProgress.current) return
+    isActionInProgress.current = true
     setOptimisticItems(prev => ({ ...prev, [cartItemId]: { ...prev[cartItemId], selected: !currentSelected } }))
     setLoading(cartItemId)
     try {
@@ -118,11 +126,15 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
       // Removed router.refresh() — optimistic state update handles UI
     } catch {
       setOptimisticItems(prev => ({ ...prev, [cartItemId]: { ...prev[cartItemId], selected: currentSelected } }))
-    } finally { setLoading(null) }
+    } finally { 
+      setLoading(null)
+      isActionInProgress.current = false
+    }
   }
 
   const togglePartnerSelection = async (partnerId: string, items: any[], currentAllSelected: boolean) => {
-    if (loading) return
+    if (loading || isActionInProgress.current) return
+    isActionInProgress.current = true
     const newState = !currentAllSelected
     setLoading(partnerId)
 
@@ -145,7 +157,10 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         revert[item.id] = { ...optimisticItems[item.id], selected: item.selected }
       })
       setOptimisticItems(prev => ({ ...prev, ...revert }))
-    } finally { setLoading(null) }
+    } finally { 
+      setLoading(null)
+      isActionInProgress.current = false
+    }
   }
 
   const handleOpenCheckout = (partnerId: string) => {
@@ -166,12 +181,14 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
   const { success: notifySuccess, error: notifyError } = useNotification()
 
   const handleCheckout = async (data: any) => {
-    if (!checkoutPartner) return
+    if (!checkoutPartner || isActionInProgress.current) return
+    isActionInProgress.current = true
     const partnerData = itemsByPartner[checkoutPartner]
     const partnerItems = partnerData.items.filter((item: any) => getItemSelected(item))
 
     if (!partnerItems.length) {
       notifyError("Erro", "Por favor, selecione pelo menos um item para finalizar o pedido")
+      isActionInProgress.current = false
       return
     }
 
@@ -203,6 +220,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
       })
       setShowPixModal(true)
       setCheckoutPartner(null)
+      isActionInProgress.current = false
       return
     }
 
@@ -226,6 +244,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
       router.push("/my-orders")
     } catch {
       notifyError("Erro", "Erro ao finalizar pedido.")
+    } finally {
+      isActionInProgress.current = false
     }
   }
 

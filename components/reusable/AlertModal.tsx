@@ -104,6 +104,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
   isLoading
 }) => {
   const [isAnimating, setIsAnimating] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const isMobile = useMediaQuery("(max-width: 768px)")
   const displayMessage = description || message || ""
 
@@ -118,11 +119,12 @@ const AlertModal: React.FC<AlertModalProps> = ({
       return () => clearTimeout(id)
     } else {
       setIsAnimating(false)
+      setIsSubmitting(false)
     }
   }, [isOpen])
 
   const handleClose = () => {
-    if (disabled) return
+    if (disabled || isSubmitting) return
     // 1. Inicia a animação de saída
     setIsAnimating(false)
     // 2. Espera a animação terminar (200ms) para desmontar de fato
@@ -130,8 +132,9 @@ const AlertModal: React.FC<AlertModalProps> = ({
   }
 
   const handleConfirm = () => {
-    if (disabled) return
+    if (disabled || isSubmitting) return
     if (onConfirm) {
+      setIsSubmitting(true)
       setIsAnimating(false)
       setTimeout(onConfirm, 200)
     } else {
@@ -140,7 +143,8 @@ const AlertModal: React.FC<AlertModalProps> = ({
   }
 
   const handleButtonClick = (callback: () => void) => {
-    if (disabled) return
+    if (disabled || isSubmitting) return
+    setIsSubmitting(true)
     setIsAnimating(false)
     setTimeout(callback, 200)
   }
