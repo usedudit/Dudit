@@ -41,7 +41,7 @@ export const AddressView = ({
         ) : (
           <motion.div key="addr-edit" {...fade} className="space-y-4">
             <CepInput
-              label="CEP *"
+              label="CEP"
               id="zipCode"
               name="zipCode"
               value={addressData.zipCode}
@@ -57,7 +57,7 @@ export const AddressView = ({
               }}
             />
             <Input
-              label="Rua *"
+              label="Rua"
               id="street"
               name="street"
               value={addressData.street}
@@ -65,7 +65,7 @@ export const AddressView = ({
             />
             <div className="grid grid-cols-2 gap-4">
               <Input
-                label="Número *"
+                label="Número"
                 id="number"
                 name="number"
                 value={addressData.number}
@@ -80,7 +80,7 @@ export const AddressView = ({
               />
             </div>
             <Input
-              label="Bairro *"
+              label="Bairro"
               id="neighborhood"
               name="neighborhood"
               value={addressData.neighborhood}
@@ -88,7 +88,7 @@ export const AddressView = ({
             />
             <div className="grid grid-cols-2 gap-4">
               <Input
-                label="Cidade *"
+                label="Cidade"
                 id="city"
                 name="city"
                 value={addressData.city}

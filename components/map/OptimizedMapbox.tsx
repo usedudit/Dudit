@@ -20,7 +20,7 @@ interface OptimizedMapboxProps {
   initialLng?: number
   address?: string | null
   partners: PartnerMapData[]
-  onBoundsChange: (bounds: BoundingBox) => void
+  onBoundsChange: (bounds: BoundingBox, isInitialLoad?: boolean) => void
   onMarkerClick: (partner: PartnerMapData) => void
   activePartnerId?: string | null
 }
@@ -42,7 +42,7 @@ export function OptimizedMapbox({
   const [isMapping, setIsMapping] = useState(true)
 
   // Dispara onBoundsChange para o componente pai
-  const fireBoundsChange = useCallback(() => {
+  const fireBoundsChange = useCallback((isInitialLoad = false) => {
     if (!mapRef.current) return
     const bounds = mapRef.current.getBounds()
     onBoundsChange({
@@ -50,7 +50,7 @@ export function OptimizedMapbox({
       minLat: bounds.getSouth(),
       maxLng: bounds.getEast(),
       maxLat: bounds.getNorth()
-    })
+    }, isInitialLoad)
   }, [onBoundsChange])
 
   // Inicializa o Mapbox
@@ -117,11 +117,10 @@ export function OptimizedMapbox({
 
         map.on("load", () => {
           if (cancelled) return
-          fireBoundsChange()
+          fireBoundsChange(true) // Fetch inicial automático
 
-          // Listeners para requisições de bounds
-          map.on("moveend", () => fireBoundsChange())
-          map.on("zoomend", () => fireBoundsChange())
+          // Apenas moveend (acionado ao terminar drag/zoom e inércia)
+          map.on("moveend", () => fireBoundsChange(false))
         })
 
       } catch (err) {

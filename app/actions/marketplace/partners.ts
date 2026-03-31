@@ -381,6 +381,24 @@ export async function updatePartnerAction(partnerId: string, data: any) {
         is_default: true
       });
     }
+
+    // GEOCODING: Atualiza a Latiude e Longitude no partner baseada no novo endereço
+    if (addressData.street && addressData.city) {
+      const addressString = `${addressData.street}, ${addressData.number || ''}, ${addressData.city} - ${addressData.state || ''}, Brazil, ${addressData.zip_code || ''}`
+      const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+      if (mapboxToken) {
+        try {
+          const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(addressString)}.json?access_token=${mapboxToken}&limit=1&country=BR`)
+          const geocodeData: any = await res.json()
+          if (geocodeData.features && geocodeData.features.length > 0) {
+            const [lng, lat] = geocodeData.features[0].center
+            await supabase.from('partners').update({ latitude: lat, longitude: lng }).eq('id', partnerId)
+          }
+        } catch (e) {
+          console.error("Geocoding exception:", e)
+        }
+      }
+    }
   }
 
   await revalidatePartnerProfile(partnerId)
@@ -497,6 +515,22 @@ export async function registerPartner(data: any) {
         console.error("Error inserting address:", addressError)
         // Não lançamos erro fatal aqui para não bloquear o cadastro se apenas o endereço falhar,
         // mas idealmente deveria tratar.
+      }
+      
+      // GEOCODING AUTOMATICO PARA NOVOS REGISTROS
+      if (data.street && data.city) {
+        const addressString = `${data.street}, ${data.number || ''}, ${data.city} - ${data.state || ''}, Brazil, ${data.zipCode || ''}`
+        const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+        if (mapboxToken) {
+          try {
+            const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(addressString)}.json?access_token=${mapboxToken}&limit=1&country=BR`)
+            const geocodeData: any = await res.json()
+            if (geocodeData.features && geocodeData.features.length > 0) {
+              const [lng, lat] = geocodeData.features[0].center
+              await supabaseAdmin.from('partners').update({ latitude: lat, longitude: lng }).eq('id', newPartner.id)
+            }
+          } catch(e) { console.error("Geocoding failed on register", e) }
+        }
       }
     }
 
