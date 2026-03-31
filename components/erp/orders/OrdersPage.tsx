@@ -127,7 +127,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                 return {
                     originalId: o.id,
                     displayId: o.mp_payment_id || o.order_number || `#${o.id.substring(0, 8)}`,
-                    customer_name: o.customer_name || o.profiles?.full_name || o.profiles?.email || "Cliente sem nome",
+                    customer_name: o.customer_name || o.user_profiles?.full_name || "Cliente sem nome",
                     customer_id: o.customer_id ? `CST-${o.customer_id.substring(0, 4).toUpperCase()}` : null,
                     total_amount: Number(o.total_amount),
                     statusLabel: statusInfo.label,

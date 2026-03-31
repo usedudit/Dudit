@@ -16,7 +16,7 @@ export const getPartnerOrdersCached = cache(async (partnerId: string) => {
                 .from("orders")
                 .select(`
                     *,
-                    profiles(full_name, email),
+                    user_profiles:buyer_id (full_name),
                     order_items(quantity, product_name),
                     stores(name)
                 `)
