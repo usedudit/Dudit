@@ -213,7 +213,6 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Tipo de Movimentação</h3>
                                                     <div className="flex flex-col md:flex-row gap-4">
                                                         <motion.button
-                                                            whileHover={{ y: -1 }}
                                                             onClick={() => { setType('in'); setReason('Selecione um motivo...'); }}
                                                             className={`flex-1 flex items-center justify-between p-5 rounded-2xl transition-all border ${type === 'in'
                                                                 ? 'bg-green-50/50 dark:bg-green-900/10 border-brand-green'
@@ -233,7 +232,6 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                         </motion.button>
 
                                                         <motion.button
-                                                            whileHover={{ y: -1 }}
                                                             onClick={() => { setType('out'); setReason('Selecione um motivo...'); }}
                                                             className={`flex-1 flex items-center justify-between p-5 rounded-2xl transition-all border ${type === 'out'
                                                                 ? 'bg-red-50/50 dark:bg-red-900/10 border-brand-red'

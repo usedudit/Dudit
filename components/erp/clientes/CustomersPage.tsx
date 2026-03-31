@@ -109,17 +109,18 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
     ]
 
     const filteredCustomers: Customer[] = useMemo(() => {
-        if (!rawCustomers || !selectedStore) return []
+        if (!rawCustomers) return []
 
         const term = debouncedSearch.toLowerCase()
 
         return rawCustomers
-            .filter((c: any) =>
-                (!c.store_id || c.store_id === selectedStore.id) &&
-                (c.name?.toLowerCase().includes(term) ||
-                    c.email?.toLowerCase().includes(term) ||
-                    c.phone?.includes(debouncedSearch))
-            )
+            .filter((c: any) => {
+                const nameMatch = (c.name || "").toLowerCase().includes(term)
+                const emailMatch = (c.email || "").toLowerCase().includes(term)
+                const phoneMatch = (c.phone || "").includes(debouncedSearch)
+                
+                return nameMatch || emailMatch || phoneMatch
+            })
             .filter((c: any) => {
                 const statusLabel = c.status === 'Blocked' ? "Bloqueado" : (c.is_active !== false ? "Ativo" : "Inativo")
 
@@ -144,7 +145,7 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
                 lastOrderDate: c.last_order_at ? new Date(c.last_order_at).toLocaleDateString('pt-BR') : 'N/A',
                 storeCredit: c.store_credit || 0
             }))
-    }, [rawCustomers, selectedStore, debouncedSearch, activeTab, filters])
+    }, [rawCustomers, debouncedSearch, activeTab, filters])
 
     const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage)
     const paginated = filteredCustomers.slice((page - 1) * itemsPerPage, page * itemsPerPage)

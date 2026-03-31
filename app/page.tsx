@@ -6,11 +6,11 @@ import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 import { Suspense } from "react"
 
-async function ProductFeedWrapper({ productsPromise, user, userProfile, cartCount }: any) {
+async function ProductFeedWrapper({ user, userProfile, cartCount }: any) {
   const t0 = performance.now()
   console.log(`[SSR] Home (Feed Payload) | START`)
 
-  const products = await productsPromise
+  const products = await getCachedHomeProducts()
 
   const tEnd = performance.now()
   console.log(`[SSR] Home (Feed Payload) | END | Time: ${(tEnd - t0).toFixed(2)}ms`)
@@ -30,11 +30,8 @@ export default async function HomePage() {
   const tStart = performance.now()
   console.log(`[SSR] Home (Page) | START at ${new Date().toISOString()}`)
 
-  // 🔥 roda em paralelo
-  const userPromise = getCurrentUser()
-  const productsPromise = getCachedHomeProducts()
-
-  const user = await userPromise
+  // Fetches required for the header
+  const user = await getCurrentUser()
   const tUser = performance.now()
   console.log(`[SSR] Home (Page) | User resolved in ${(tUser - tStart).toFixed(2)}ms`)
 
@@ -72,7 +69,6 @@ export default async function HomePage() {
         }
       >
         <ProductFeedWrapper
-          productsPromise={productsPromise}
           user={user}
           userProfile={userProfile}
           cartCount={cartCount}

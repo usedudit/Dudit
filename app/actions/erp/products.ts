@@ -51,28 +51,29 @@ const verifyAuth = async () => {
     return user
 }
 
-const fetchProductAndVerifyOwnership = async (productId: string, requiredAction?: "view" | "create" | "edit" | "delete", selectColumns = "id, partner_id, images, sku, name") => {
+const fetchProductAndVerifyOwnership = async (productId: string, requiredAction?: "view" | "create" | "edit" | "delete", selectColumns = "id, partner_id, images, sku, name", resolvedUser?: any) => {
     const admin = getAdminClient()
 
-    const { data: product, error } = await admin
-        .from("products")
-        .select(selectColumns)
-        .eq("id", productId)
-        .single()
+    const [productRes, user] = await Promise.all([
+        admin.from("products").select(selectColumns).eq("id", productId).single(),
+        resolvedUser ? Promise.resolve(resolvedUser) : verifyAuth()
+    ])
+    
+    const { data: product, error } = productRes
 
-    if (error || !product) throw new Error("Produto nÃ£o encontrado")
+    if (error || !product) throw new Error("Produto não encontrado")
 
     if (requiredAction) {
-        await requirePartnerAccessWithPermission(product.partner_id, "products", requiredAction)
+        await requirePartnerAccessWithPermission(product.partner_id, "products", requiredAction, user)
     } else {
         const { requirePartnerAccess } = await import("@/lib/auth/authorization")
-        await requirePartnerAccess(product.partner_id)
+        await requirePartnerAccess(product.partner_id, user)
     }
 
     return product
 }
 
-const verifyBatchOwnership = async (productIds: string[]) => {
+const verifyBatchOwnership = async (productIds: string[], resolvedUser?: any) => {
     const { sanitizeUUID } = await import("@/lib/security/input-sanitizer")
     const sanitized = productIds.map(sanitizeUUID).filter((id): id is string => id !== null)
 
@@ -81,10 +82,12 @@ const verifyBatchOwnership = async (productIds: string[]) => {
 
     const admin = getAdminClient()
 
-    const { data } = await admin
-        .from("products")
-        .select("id, partner_id")
-        .in("id", sanitized)
+    const [dataRes, user] = await Promise.all([
+        admin.from("products").select("id, partner_id").in("id", sanitized),
+        resolvedUser ? Promise.resolve(resolvedUser) : verifyAuth()
+    ])
+    
+    const { data } = dataRes
 
     if (!data || data.length !== sanitized.length) throw new Error("Produtos nÃ£o encontrados")
 
@@ -93,9 +96,9 @@ const verifyBatchOwnership = async (productIds: string[]) => {
     if (!partnerId || data.some((p: any) => p.partner_id !== partnerId)) throw new Error("Produtos de parceiros diferentes")
 
     const { requirePartnerAccess } = await import("@/lib/auth/authorization")
-    await requirePartnerAccess(partnerId)
+    await requirePartnerAccess(partnerId, user)
 
-    return { sanitized, partnerId }
+    return { sanitized, partnerId, user }
 }
 
 
@@ -253,7 +256,7 @@ export async function createProductComprehensiveAction(data: {
         let finalPartnerId = data.partnerId
         if (!finalPartnerId || finalPartnerId.trim() === "") {
             const { getCurrentPartnerContext } = await import("@/lib/auth/partner-context")
-            const ctx = await getCurrentPartnerContext()
+            const ctx = await getCurrentPartnerContext(_user)
             if (ctx?.partnerId) finalPartnerId = ctx.partnerId
             else throw new Error("Acesso negado: ID do Parceiro nÃ£o pÃ´de ser resolvido.")
         }
@@ -262,7 +265,7 @@ export async function createProductComprehensiveAction(data: {
 
         // 3. Permission + Store em paralelo (moderaÃ§Ã£o agora Ã© assÃ­ncrona)
         const [_access, storeResult] = await Promise.all([
-            requirePartnerAccessWithPermission(finalPartnerId, "products", "create"),
+            requirePartnerAccessWithPermission(finalPartnerId, "products", "create", _user),
             (async () => {
                 if (data.storeId && data.storeId.trim() !== "") return data.storeId
                 const admin = getAdminClient()

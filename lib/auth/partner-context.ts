@@ -110,8 +110,8 @@ import { PERMISSION_PRESETS } from "@/lib/permissions/partner-roles"
  * Gets ALL partner access records for the current user.
  * Combines both "owned" stores (from partners table) and "invited" stores (from partner_users).
  */
-export const getAllUserPartnerAccess = cache(async (): Promise<PartnerAccessRecord[]> => {
-    const user = await getCurrentUser()
+export const getAllUserPartnerAccess = cache(async (resolvedUser?: any): Promise<PartnerAccessRecord[]> => {
+    const user = resolvedUser || await getCurrentUser()
     if (!user) return []
 
     const admin = createAdminClient()
@@ -225,11 +225,11 @@ export const getUserPartnerCount = cache(async (): Promise<number> => {
  * 2. If no valid cookie → if user has exactly 1 access, use it
  * 3. Otherwise return null (indicating they need to select or create)
  */
-export const getCurrentPartnerContext = cache(async (): Promise<PartnerContext | null> => {
-    const user = await getCurrentUser()
+export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promise<PartnerContext | null> => {
+    const user = resolvedUser || await getCurrentUser()
     if (!user) return null
 
-    const allAccess = await getAllUserPartnerAccess()
+    const allAccess = await getAllUserPartnerAccess(user)
     if (allAccess.length === 0) return null
 
     const activePartnerId = await getActivePartnerId()

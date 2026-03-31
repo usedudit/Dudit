@@ -342,7 +342,12 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
             placeholder="Buscar..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            suffix={<SearchIcon className="w-4 h-4 text-brand-inactive-text" />}
+            prefix={
+              <SearchIcon
+                size={18}
+                className="text-brand-inactive-text flex-shrink-0"
+              />
+            }
           />
         </div>
         <div className="flex gap-2">

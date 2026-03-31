@@ -8,4 +8,3 @@ export const redis = new Redis({
   url: kvUrl,
   token: kvToken,
 })
-

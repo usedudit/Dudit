@@ -19,10 +19,10 @@ export const metadata: Metadata = {
 
 
 
-async function ExploreResultsWrapper({ productsPromise, query, type, userProfile, cartCount }: any) {
+async function ExploreResultsWrapper({ query, type, userProfile, cartCount }: any) {
     const t0 = performance.now()
 
-    const products = await productsPromise
+    const products = await getCachedExploreProducts(query, type)
 
     const tEnd = performance.now()
     console.log(`[SSR] Explorar (Feed Payload) | Time: ${(tEnd - t0).toFixed(2)}ms`)
@@ -49,14 +49,9 @@ export default async function ExplorarPage({
     const resolvedSearchParams = await searchParams
 
     const query = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : ""
-
     const type = parseMarketplaceType(resolvedSearchParams.type)
 
-    // 🔥 paraleliza TUDO
-    const userPromise = getCurrentUser()
-    const productsPromise = getCachedExploreProducts(query, type)
-
-    const user = await userPromise
+    const user = await getCurrentUser()
 
     const sessionDataPromise = user
         ? getUserSessionData(user.id)
@@ -90,7 +85,6 @@ export default async function ExplorarPage({
                 }
             >
                 <ExploreResultsWrapper
-                    productsPromise={productsPromise}
                     query={query}
                     type={type}
                     userProfile={userProfile}

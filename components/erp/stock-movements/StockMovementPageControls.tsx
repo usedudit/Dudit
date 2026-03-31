@@ -117,6 +117,12 @@ const StockMovementPageControls: React.FC<StockMovementPageControlsProps> = ({
               onChange={(e) => onSearchChange(e.target.value)}
               className="h-[42px] w-full"
               variant="full-rounded"
+              prefix={
+                <SearchIcon
+                  size={18}
+                  className="text-brand-inactive-text flex-shrink-0"
+                />
+              }
               label=""
             />
           </div>

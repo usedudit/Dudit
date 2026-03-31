@@ -7,6 +7,7 @@ import { getMarketplaceCategoriesClient } from "@/lib/data/marketplace-categorie
 import { Input } from "@/components/reusable"
 import { Spinner } from "@/components/reusable/Spinner"
 import { ChevronRight, ChevronLeft, Search, Package } from "lucide-react"
+import { SearchIcon } from "@/lib/icons"
 
 interface Category {
   id: string
@@ -135,6 +136,12 @@ export default function MarketplaceCategoryModal({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="bg-brand-gray border-gray-200"
+            prefix={
+              <SearchIcon
+                size={18}
+                className="text-brand-inactive-text flex-shrink-0"
+              />
+            }
           />
         </div>
 

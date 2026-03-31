@@ -42,14 +42,15 @@ async function getClientIP(): Promise<string> {
     }
 }
 
+import { getCurrentUser } from "@/lib/auth/server-user"
+
 /**
  * Get the authenticated user ID from the current session.
- * Uses dynamic import to avoid circular dependencies.
+ * Uses static import to ensure React cache() identity is preserved.
  * Returns null if not authenticated.
  */
 async function getCurrentUserId(): Promise<string | null> {
     try {
-        const { getCurrentUser } = await import("@/lib/auth/authorization")
         const user = await getCurrentUser()
         return user?.id || null
     } catch {

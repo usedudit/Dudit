@@ -62,6 +62,32 @@ export async function getPartnersInBoundsAction(bounds: BoundingBox, limit: numb
        }
     }
 
+    // IF STILL EMPTY (or no bounds matched), check if we have uncached legacy partners
+    if (!data || data.length === 0) {
+      console.log("[DEBUG MAP] Both Bounds and Radius empty, fetching legacy missing-coordinate partners...")
+      const { data: legacyData, error: legacyError } = await supabase
+         .from("partners_public_secure")
+         .select("*")
+         .limit(50)
+
+      if (legacyData && legacyData.length > 0) {
+         console.log(`[DEBUG MAP] Returning ${legacyData.length} legacy partners to be resolved by Frontend!`)
+         const mappedLegacy = legacyData.map((p: any) => ({
+           id: p.id,
+           store_name: p.store_name,
+           store_image_url: p.store_image_url,
+           store_description: p.store_description,
+           business_type: p.business_type,
+           latitude: null,
+           longitude: null,
+           opening_hours: p.opening_hours,
+           rating: p.rating,
+           address_display: `${p.street || ''}, ${p.number || ''} - ${p.city || ''}`
+         }))
+         return { success: true, data: mappedLegacy, isFallback: true }
+      }
+    }
+
     return { success: true, data: data || [] }
   } catch (error) {
     console.error("[MapAction] Exception:", error)
@@ -107,6 +133,8 @@ export async function geocodeMissingPartnersAction() {
         const addressString = `${addressRecord.street}, ${addressRecord.number || ''}, ${addressRecord.city} - ${addressRecord.state || ''}, Brazil, ${addressRecord.zip_code || ''}`
         const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(addressString)}.json?access_token=${mapboxToken}&limit=1&country=BR`
         
+        console.log(`[DEBUG MAP] Geocoding attempt for ${p.id} with address: ${addressString}`)
+        
         try {
           const res = await fetch(geocodeUrl)
           const geocodeData: any = await res.json()
@@ -117,10 +145,14 @@ export async function geocodeMissingPartnersAction() {
             await supabaseAdmin.from("partners").update({ latitude: lat, longitude: lng }).eq("id", p.id)
             successCount++
             console.log(`[DEBUG MAP] Geocoded ${p.id} successfully to [${lat}, ${lng}].`)
+          } else {
+            console.log(`[DEBUG MAP] No Mapbox features returned for ${addressString}`)
           }
         } catch (e) {
           console.error("Geocoding mapbox err:", e)
         }
+      } else {
+        console.log(`[DEBUG MAP] Partner ${p.id} has no full address (record=${JSON.stringify(addressRecord)})`)
       }
     }
 

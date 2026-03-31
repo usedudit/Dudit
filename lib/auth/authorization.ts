@@ -44,7 +44,8 @@ export { getCurrentUser }
  *
  * Performance: Uses React cache() to deduplicate within the same request.
  */
-export async function requireUser(): Promise<User> {
+export async function requireUser(resolvedUser?: User | any): Promise<User> {
+  if (resolvedUser && resolvedUser.id) return resolvedUser as User
   const user = await getCurrentUser()
   if (!user) {
     redirect("/auth/login")
@@ -64,8 +65,8 @@ export const requireAuth = requireUser
  * Get the current user's partner record, or null if not a partner.
  * Uses React cache() for deduplication.
  */
-export const getCurrentPartner = cache(async (): Promise<{ id: string; user_id: string } | null> => {
-  const user = await getCurrentUser()
+export const getCurrentPartner = cache(async (resolvedUser?: User | any): Promise<{ id: string; user_id: string } | null> => {
+  const user = resolvedUser || await getCurrentUser()
   if (!user) return null
 
   const supabase = await getSupabaseServerClient()
@@ -84,9 +85,9 @@ export const getCurrentPartner = cache(async (): Promise<{ id: string; user_id: 
  *
  * Performance: Uses cached getCurrentPartner to avoid duplicate queries.
  */
-export async function requirePartner(): Promise<{ id: string; user_id: string; email: string }> {
-  const user = await requireUser() // Throws if not authenticated
-  const partner = await getCurrentPartner()
+export async function requirePartner(resolvedUser?: User | any): Promise<{ id: string; user_id: string; email: string }> {
+  const user = await requireUser(resolvedUser) // Throws if not authenticated
+  const partner = await getCurrentPartner(user)
 
   if (!partner) {
     throw new ForbiddenError("Conta de parceiro não encontrada")
@@ -387,6 +388,8 @@ export async function requireOrderAccess(
 
 // ─── Partner Access via partner_users (multi-user) ──────────────────────────
 
+import { getCurrentPartnerContext as getPartnerContextHelper } from "@/lib/auth/partner-context"
+
 /**
  * Get the current user's partner access record, or null.
  * Checks partner_users table (supports invited users, not just owners).
@@ -399,8 +402,7 @@ export const getCurrentPartnerAccess = cache(async (): Promise<{
   role: string
   permissions: any
 } | null> => {
-  const { getCurrentPartnerContext } = await import("@/lib/auth/partner-context")
-  const context = await getCurrentPartnerContext()
+  const context = await getPartnerContextHelper()
   if (!context) return null
   return { ...context, role: String(context.role) }
 })
@@ -413,14 +415,15 @@ export const getCurrentPartnerAccess = cache(async (): Promise<{
 export async function requirePartnerAccessWithPermission(
   partnerId: string,
   resource?: keyof PartnerPermissions,
-  action?: keyof ResourcePermissions
+  action?: keyof ResourcePermissions,
+  resolvedUser?: User | any
 ): Promise<{
   partnerId: string
   userId: string
   role: string
   permissions: PartnerPermissions
 }> {
-  const user = await requireUser()
+  const user = await requireUser(resolvedUser)
 
   const access = await checkPartnerAccess(partnerId, user.id)
   if (!access) {
@@ -500,11 +503,11 @@ export async function checkPartnerPermission(
  * Checks against both owned and invited stores. THROWS if no access.
  * Uses React cache() for deduplication.
  */
-export const requirePartnerAccess = cache(async (partnerId: string): Promise<{
+export const requirePartnerAccess = cache(async (partnerId: string, resolvedUser?: User | any): Promise<{
   partnerId: string
   userId: string
   role: string
   permissions: any
 }> => {
-  return requirePartnerAccessWithPermission(partnerId)
+  return requirePartnerAccessWithPermission(partnerId, undefined, undefined, resolvedUser)
 })

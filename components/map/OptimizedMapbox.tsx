@@ -155,9 +155,31 @@ export function OptimizedMapbox({
       }
     })
 
+    const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+    
     // Adiciona marcadores novos
-    partners.forEach(partner => {
+    partners.forEach(async (partner) => {
       if (!markersRef.current[partner.id]) {
+        let finalLat = partner.latitude
+        let finalLng = partner.longitude
+
+        // FALLBACK FRONTAL: Se a latitude vier vazia (banco legado sem coord), usa a API do mapbox como a página do Vendor faz!
+        const tokenStr = token || ""
+        if ((!finalLat || !finalLng) && (partner as any).address_display && tokenStr) {
+           try {
+              const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent((partner as any).address_display)}.json?access_token=${tokenStr}&limit=1&country=BR`)
+              const data = await res.json()
+              if (data.features && data.features.length > 0) {
+                 finalLng = data.features[0].center[0]
+                 finalLat = data.features[0].center[1]
+
+                 // Update in background if possible? For now just show it!
+              }
+           } catch(e) { }
+        }
+
+        if (!finalLat || !finalLng) return // Se não achou na net tbm, ignora o pino.
+
         // Criar elemento de Marker DOM customizado
         const el = document.createElement("div")
         el.className = "cursor-pointer group relative transition-transform duration-300 transform-gpu hover:scale-110 hover:z-50"
@@ -183,7 +205,7 @@ export function OptimizedMapbox({
         })
 
         const markerInstance = new mapboxgl.Marker({ element: el, anchor: "bottom", pitchAlignment: "map" })
-          .setLngLat([partner.longitude, partner.latitude])
+          .setLngLat([finalLng, finalLat])
           .addTo(mapRef.current)
 
         markersRef.current[partner.id] = markerInstance
@@ -199,7 +221,7 @@ export function OptimizedMapbox({
         markerEl.querySelector('.rounded-full')?.classList.add("border-brand-green", "border-2")
         // Pan to marker
         const p = partners.find(p => p.id === id)
-        if (p) {
+        if (p && p.longitude && p.latitude) {
             mapRef.current.flyTo({ center: [p.longitude, p.latitude], zoom: Math.max(mapRef.current.getZoom(), 15), speed: 1.2 })
         }
       } else {
