@@ -18,7 +18,11 @@ export interface BoundingBox {
  */
 export async function getPartnersInBoundsAction(bounds: BoundingBox, limit: number = 200) {
   try {
-    const supabase = await getSupabaseServerClient()
+    // BUG FIX: getSupabaseServerClient respects RLS which often hides 'partners' from strictly untrusted sessions.
+    // VendorProfile uses getAdminClient() under the hood, so we must use it here too to guarantee visibility.
+    const supabase = getAdminClient()
+    
+    console.log("[DEBUG MAP] Bounding Box Query:", bounds)
 
     // O uso de RPC é a forma mais performática para consultas geo-espaciais no Supabase
     // sem expor a complexidade no Client Side
@@ -35,6 +39,29 @@ export async function getPartnersInBoundsAction(bounds: BoundingBox, limit: numb
       return { success: false, data: [] }
     }
 
+    console.log(`[DEBUG MAP] Found ${data?.length || 0} partners via Bounds on DB.`)
+
+    // FALLBACK: User requested radius search if NO partners are found in the bounding box.
+    if (!data || data.length === 0) {
+       console.log("[DEBUG MAP] Bounds empty! Executing Haversine Radius Fallback (30km)...")
+       const centerLat = (bounds.minLat + bounds.maxLat) / 2
+       const centerLng = (bounds.minLng + bounds.maxLng) / 2
+
+       const { data: radiusData, error: radiusError } = await supabase.rpc("get_partners_in_radius", {
+          center_lat: centerLat,
+          center_lng: centerLng,
+          radius_km: 30.0,
+          max_limit: limit
+       })
+
+       if (radiusError) {
+         console.error("[MapAction] Radius error:", radiusError)
+       } else if (radiusData && radiusData.length > 0) {
+         console.log(`[DEBUG MAP] Fallback Success! Found ${radiusData.length} via Radius 30km.`)
+         return { success: true, data: radiusData, isFallback: true }
+       }
+    }
+
     return { success: true, data: data || [] }
   } catch (error) {
     console.error("[MapAction] Exception:", error)
@@ -49,21 +76,28 @@ export async function getPartnersInBoundsAction(bounds: BoundingBox, limit: numb
  */
 export async function geocodeMissingPartnersAction() {
   try {
-    const supabase = await getSupabaseServerClient()
+    console.log("[DEBUG MAP] Starting auto-geocode background task...")
+    // Usamos admin client para poder ler e escrever partners ignorando RLS
+    const supabaseAdmin = getAdminClient()
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
 
     if (!mapboxToken) return { success: false, error: "No Mapbox token" }
 
     // Pega até 50 parceiros sem coordenada para não estourar o limite de geocoding
-    const { data: partners } = await supabase
+    const { data: partners, error } = await supabaseAdmin
       .from("partners")
       .select("id, addresses(street, number, city, state, zip_code)")
       .is("latitude", null)
       .limit(50)
 
+    if (error) console.error("[DEBUG MAP] Fetch null lat err:", error)
+
     if (!partners || partners.length === 0) {
+      console.log("[DEBUG MAP] No missing coordinates found.")
       return { success: true, processed: 0 }
     }
+
+    console.log(`[DEBUG MAP] Found ${partners.length} legacy partners without coordinates to fix...`)
 
     let successCount = 0
 
@@ -79,11 +113,10 @@ export async function geocodeMissingPartnersAction() {
           
           if (geocodeData.features && geocodeData.features.length > 0) {
             const [lng, lat] = geocodeData.features[0].center
-            // Atualiza partner usando Supabase Service Role para ignorar RLS ou auth puro se tivermos trigger.
-            // Aqui usamos request-client, mas o update em partner talvez peça o adminClient.
-            const adminClient = getAdminClient()
-            await adminClient.from("partners").update({ latitude: lat, longitude: lng }).eq("id", p.id)
+            // Atualiza partner usando Supabase Service Role
+            await supabaseAdmin.from("partners").update({ latitude: lat, longitude: lng }).eq("id", p.id)
             successCount++
+            console.log(`[DEBUG MAP] Geocoded ${p.id} successfully to [${lat}, ${lng}].`)
           }
         } catch (e) {
           console.error("Geocoding mapbox err:", e)
