@@ -7,6 +7,8 @@ import { ServiceForm } from "@/components/erp/service-form"
 
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 
+export const dynamic = "force-dynamic"
+
 export default async function NewServicePage() {
   const context = await getCurrentPartnerContext()
 

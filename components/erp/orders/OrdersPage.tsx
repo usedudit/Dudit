@@ -123,7 +123,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     pending: { label: "Pendente", color: "gray" },
                 }
                 const statusInfo = statusMap[o.situation] || { label: o.situation, color: "gray" }
-                
+
                 return {
                     originalId: o.id,
                     displayId: o.mp_payment_id || o.order_number || `#${o.id.substring(0, 8)}`,
@@ -141,11 +141,11 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                 }
             })
             .filter((o: Order) => {
-                const searchMatch = 
+                const searchMatch =
                     o.displayId.toLowerCase().includes(term) ||
                     o.customer_name.toLowerCase().includes(term) ||
                     (o.customer_id || "").toLowerCase().includes(term)
-                
+
                 return searchMatch
             })
             .filter((o: Order) => {
@@ -261,7 +261,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                             <motion.div key="empty-no-data" className="w-full h-full flex items-center justify-center min-h-[500px]">
                                 <IconPlaceholder
                                     placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/Pedidos.png"
+                                    imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
                                     imageAlt="Sem pedidos"
                                     title="Você ainda não tem pedidos"
                                     subtitle="Seus pedidos aparecerão aqui assim que seus clientes começarem a comprar."
@@ -271,7 +271,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                             <motion.div key="empty-results" className="w-full h-full flex items-center justify-center min-h-[500px]">
                                 <IconPlaceholder
                                     placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/clientes/naoencontrado.png"
+                                    imageSrc="https://img.dudit.com.br/static/mascots/clientes/NaoEncontrado.png"
                                     imageAlt="Nenhum pedido encontrado"
                                     title="Nenhum pedido encontrado"
                                     subtitle="Tente ajustar seus filtros ou termos de busca."

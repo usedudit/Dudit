@@ -8,12 +8,16 @@ import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
 import OrdersLoading from "./loading"
 
+export const dynamic = "force-dynamic"
+
 export default async function OrdersPageServer() {
   const user = await getCurrentUser()
   if (!user) return <AccessDenied />
 
   // Layout already guarantees auth + valid context
-  const context = (await getCurrentPartnerContext())!
+  const context = await getCurrentPartnerContext()
+  if (!context) return <AccessDenied />
+
   const partnerId = context.partnerId
 
   const { allowed } = await checkPartnerPermission(partnerId, "orders", "view")

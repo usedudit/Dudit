@@ -7,6 +7,8 @@ import { getCurrentUser } from "@/lib/auth/authorization"
 import { AccessDenied } from "@/components/erp/access-denied"
 import ProductsLoading from "./loading"
 
+export const dynamic = "force-dynamic"
+
 export default async function ProductsPageServer() {
     const user = await getCurrentUser()
     if (!user) return <AccessDenied />

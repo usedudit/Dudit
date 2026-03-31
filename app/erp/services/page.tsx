@@ -6,9 +6,13 @@ import { getPartnerServicesCached } from "@/lib/data/services"
 import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { AccessDenied } from "@/components/erp/access-denied"
 
+export const dynamic = "force-dynamic"
+
 export default async function ServicesPage() {
   // Layout already guarantees auth + valid context
-  const context = (await getCurrentPartnerContext())!
+  const context = await getCurrentPartnerContext()
+  if (!context) return <AccessDenied />
+
   const partnerId = context.partnerId
 
   const { allowed } = await checkPartnerPermission(partnerId, "services", "view")

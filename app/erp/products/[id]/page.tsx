@@ -3,6 +3,8 @@ import { EditProductWrapper } from "@/components/erp/product/edit-product-wrappe
 import { getCachedProductById, getCachedSuppliers } from "@/app/actions/erp/products"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 
+export const dynamic = "force-dynamic"
+
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
 
@@ -11,7 +13,9 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
     }
 
     // Layout already guarantees auth + valid context
-    const context = (await getCurrentPartnerContext())!
+    const context = await getCurrentPartnerContext()
+    if (!context) redirect("/select-erp")
+
     const partnerId = context.partnerId
 
     let product

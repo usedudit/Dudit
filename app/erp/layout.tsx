@@ -14,6 +14,8 @@ export const metadata: Metadata = {
   },
 }
 
+export const dynamic = "force-dynamic"
+
 import SkeletonLoader from "@/components/erp/skeleton-loader"
 import { ThemeProvider } from "@/components/theme-provider"
 import { StoreProvider } from "@/lib/store-context"
