@@ -17,6 +17,11 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
     const headerList = await headers()
     const userId = headerList.get("x-user-id")
     const userEmail = headerList.get("x-user-email")
+    const skipAuthFallback = headerList.get("x-skip-auth-fallback") === "true"
+
+    if (skipAuthFallback) {
+        return null
+    }
 
     if (userId) {
         console.log(`[OPT] getCurrentUser() returning from HEADERS at ${timestamp} for ${userEmail}`)

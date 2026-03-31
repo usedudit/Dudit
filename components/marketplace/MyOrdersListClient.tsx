@@ -140,7 +140,7 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                     <div className="flex flex-col items-end">
                                                         <span className="text-xs font-medium text-brand-inactive-text md:block hidden">Total</span>
                                                         <span className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight">
-                                                            R$ {Number(order.mp_transaction_amount || order.total_amount).toFixed(2)}
+                                                            R$ {Number(order.total_amount).toFixed(2)}
                                                         </span>
                                                     </div>
                                                     <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold ${statusConfig.bg} ${statusConfig.color} ${statusConfig.border} dark:bg-opacity-20`}>

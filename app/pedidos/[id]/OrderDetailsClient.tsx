@@ -161,7 +161,7 @@ export const OrderDetailsClient = ({ order }: { order: any }) => {
     const isPaid = order.situation === 'paid'
     const isDelivery = order.delivery_type === 'delivery'
     const storeAvatar = order.partners?.store_image_url ? getR2ImageUrl(order.partners.store_image_url) : "https://img.dudit.com.br/static/Placeholder.png"
-    const totalAmount = Number(order.mp_transaction_amount || order.total_amount)
+    const totalAmount = Number(order.total_amount)
     const shippingAmount = 0 // Ajustar com seu sistema de frete (se houver campo frete)
     const productsSubtotal = totalAmount - shippingAmount
 
@@ -175,8 +175,7 @@ export const OrderDetailsClient = ({ order }: { order: any }) => {
         paymentMethodLabel = methodMap[order.payment_method] || order.payment_method
     }
 
-    // Se tem MP Status detail extra:
-    const paymentDetails = order.mp_payment_status_detail ? ` • ${order.mp_payment_status_detail}` : ''
+    // Removido Status Detail Extra
 
     return (
         <div className="container mx-auto px-4 lg:px-6 max-w-[1300px] w-full pt-6 md:pt-10 pb-20">
@@ -364,7 +363,7 @@ export const OrderDetailsClient = ({ order }: { order: any }) => {
                                 <InfoCard
                                     icon={paymentMethodLabel === 'Pix' ? QrCodeIcon : CreditCardIcon}
                                     title={`Pagamento via ${paymentMethodLabel}`}
-                                    description={`${isPaid ? 'Aprovado' : 'Pendente'}${paymentDetails}`}
+                                    description={isPaid ? 'Aprovado' : 'Pendente'}
                                 />
                             </div>
 

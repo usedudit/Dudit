@@ -165,7 +165,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
     const isDelivery = order.delivery_type === "delivery";
     const sellerName = order.partners?.store_name || "Loja Parceira";
-    const totalAmount = Number(order.mp_transaction_amount || order.total_amount).toFixed(2);
+    const totalAmount = Number(order.total_amount).toFixed(2);
 
     const isPix = order.payment_method?.toLowerCase() === "pix" || order.payment_method?.toLowerCase() === "bank_transfer";
     const paymentMethodName = isPix ? "Pix" : (order.payment_method || order.payment_provider || "Pix");

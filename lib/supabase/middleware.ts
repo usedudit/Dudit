@@ -16,6 +16,9 @@ const PUBLIC_PATHS = [
   "/api",
 ]
 
+// Rotas que são puramente estáticas e não precisam de contexto de usuário no RootLayout
+const STATIC_INSTITUTIONAL_PATHS = ["/institucional"]
+
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some(p =>
     p.endsWith("/") ? pathname.startsWith(p) : pathname === p || pathname.startsWith(p + "/")
@@ -163,6 +166,12 @@ export async function middleware(request: NextRequest) {
   // Prepara os headers iniciais
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('Content-Security-Policy', contentSecurityPolicyHeaderValue)
+
+  // Otimização para páginas institucionais: pula a busca de usuário no RootLayout (server-side)
+  // pois essas páginas são estáticas e não usam o contexto de usuário.
+  if (STATIC_INSTITUTIONAL_PATHS.some(p => pathname.startsWith(p))) {
+    requestHeaders.set('x-skip-auth-fallback', 'true')
+  }
 
   // 3. INICIA A RESPOSTA
   let response = NextResponse.next({
