@@ -1,7 +1,6 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { unstable_cache } from "next/cache"
 import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { revalidateTag } from "next/cache"
 
@@ -23,27 +22,20 @@ export async function getProductMetadataAction(partnerId: string) {
   try {
     await requirePartnerAccessWithPermission(partnerId, "products", "view")
 
-    const getCachedMetadata = unstable_cache(
-      async (pId: string) => {
-        const supabase = await getSupabaseServerClient()
-        
-        const [categoriesRes, brandsRes, locationsRes] = await Promise.all([
-          supabase.from("product_categories").select("*").eq("partner_id", pId).order("name"),
-          supabase.from("brands").select("*").eq("partner_id", pId).order("name"),
-          supabase.from("storage_locations").select("*").eq("partner_id", pId).order("name"),
-        ])
+    const supabase = await getSupabaseServerClient()
 
-        return {
-          categories: categoriesRes.data || [],
-          brands: brandsRes.data || [],
-          locations: locationsRes.data || [],
-        }
-      },
-      [CACHE_TAGS.metadata(partnerId)],
-      { tags: [CACHE_TAGS.metadata(partnerId)], revalidate: 3600 }
-    )
+    const [categoriesRes, brandsRes, locationsRes] = await Promise.all([
+      supabase.from("product_categories").select("id, name, parent_id, is_active, created_at").eq("partner_id", partnerId).order("name"),
+      supabase.from("brands").select("id, name, is_active, created_at").eq("partner_id", partnerId).order("name"),
+      supabase.from("storage_locations").select("id, name, is_active, created_at").eq("partner_id", partnerId).order("name"),
+    ])
 
-    const data = await getCachedMetadata(partnerId)
+    const data = {
+      categories: categoriesRes.data || [],
+      brands: brandsRes.data || [],
+      locations: locationsRes.data || [],
+    }
+
     return { success: true, data: data as MetadataResponse }
   } catch (error: any) {
     console.error("Error fetching product metadata:", error)
@@ -55,7 +47,7 @@ export async function getProductMetadataAction(partnerId: string) {
  * Revalidates the product metadata cache for a partner.
  */
 export async function revalidateProductMetadata(partnerId: string) {
-  revalidateTag(CACHE_TAGS.metadata(partnerId), "max")
+  // No-op. Real-time fetch in place since unstable_cache didn't support cookies()
 }
 
 /**
@@ -76,7 +68,7 @@ export async function createCategoryAction(data: { partnerId: string, name: stri
         .eq("id", data.parentId)
         .eq("partner_id", data.partnerId)
         .single()
-      
+
       if (pError || !parent) throw new Error("Categoria pai inválida.")
     }
 
@@ -87,7 +79,7 @@ export async function createCategoryAction(data: { partnerId: string, name: stri
         name: data.name.trim(),
         parent_id: data.parentId || null,
       })
-      .select()
+      .select("id, name, parent_id, is_active, created_at")
       .single()
 
     if (error) throw error
@@ -115,7 +107,7 @@ export async function createBrandAction(data: { partnerId: string, name: string 
         partner_id: data.partnerId,
         name: data.name.trim(),
       })
-      .select()
+      .select("id, name, is_active, created_at")
       .single()
 
     if (error) throw error
@@ -143,7 +135,7 @@ export async function createLocationAction(data: { partnerId: string, name: stri
         partner_id: data.partnerId,
         name: data.name.trim(),
       })
-      .select()
+      .select("id, name, is_active, created_at")
       .single()
 
     if (error) throw error
@@ -171,7 +163,7 @@ export async function updateCategoryAction(id: string, partnerId: string, data: 
         .eq("id", data.parentId)
         .eq("partner_id", partnerId)
         .single()
-      
+
       if (pError || !parent) throw new Error("Categoria pai inválida.")
     }
 
@@ -185,7 +177,7 @@ export async function updateCategoryAction(id: string, partnerId: string, data: 
       .update(payload)
       .eq("id", id)
       .eq("partner_id", partnerId)
-      .select()
+      .select("id, name, parent_id, is_active, created_at")
       .single()
 
     if (error) throw error
@@ -237,7 +229,7 @@ export async function updateBrandAction(id: string, partnerId: string, data: { n
       .update(payload)
       .eq("id", id)
       .eq("partner_id", partnerId)
-      .select()
+      .select("id, name, is_active, created_at")
       .single()
 
     if (error) throw error
@@ -289,7 +281,7 @@ export async function updateLocationAction(id: string, partnerId: string, data: 
       .update(payload)
       .eq("id", id)
       .eq("partner_id", partnerId)
-      .select()
+      .select("id, name, is_active, created_at")
       .single()
 
     if (error) throw error

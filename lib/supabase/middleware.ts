@@ -8,7 +8,7 @@ import { RateLimitCategory, getLimiter, RATE_LIMIT_CONFIGS } from "@/lib/rate-li
 // ============================================================================
 const PUBLIC_PATHS = [
   "/",
-  "/auth", // Cobre /auth/login, /auth/sign-up, etc
+  "/auth", // Cobre /auth/login, /auth/sign-up, etc   
   "/explorar",
   "/partners",
   "/services",
@@ -211,19 +211,12 @@ export async function middleware(request: NextRequest) {
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
     if (supabaseUrl && supabaseKey) {
-      // OPTIMIZATION (PERF-01): Skip the expensive auth.getUser() call for POST requests (Server Actions)
-      // on protected routes early. Server Actions handle their own authentication via requireUser(),
-      // avoiding a redundant network call to Supabase Auth in the middleware.
-      if (request.method === "POST" || request.headers.has("next-action")) {
-        return response
-      }
-
       const supabase = createServerClient(supabaseUrl, supabaseKey, {
         cookies: {
           getAll() { return request.cookies.getAll() },
           setAll(cookiesToSet) {
             cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-            response = NextResponse.next({ request })
+            response = NextResponse.next({ request: { headers: requestHeaders } })
             // Re-apply ALL security headers on the new response
             response.headers.set('Content-Security-Policy', contentSecurityPolicyHeaderValue)
             response.headers.set("X-Content-Type-Options", "nosniff")
@@ -236,6 +229,7 @@ export async function middleware(request: NextRequest) {
             response.headers.set("Cache-Control", "private, no-store")
             response.headers.set("CDN-Cache-Control", "no-store")
 
+            // Important: we need to re-apply any response cookies as well
             cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
           },
         },
@@ -257,11 +251,22 @@ export async function middleware(request: NextRequest) {
           }
         }
 
-
         const { data: { user } } = await supabase.auth.getUser()
+
         if (user) {
           requestHeaders.set("x-user-id", user.id)
           requestHeaders.set("x-user-email", user.email || "")
+
+          // Re-create the response to inject the new requestHeaders downstream
+          const oldResponse = response
+          response = NextResponse.next({
+            request: { headers: requestHeaders }
+          })
+
+          // Ensure we copy all response headers (CSP, Rate Limit, Cache Control, Set-Cookie)
+          oldResponse.headers.forEach((value, key) => {
+            response.headers.set(key, value)
+          })
         }
 
         // Se não estiver logado e tentar acessar rotas protegidas -> Manda pro Login

@@ -114,74 +114,105 @@ export const getCachedCart = async (userId: string) => {
 // --- ACTIONS DE ESCRITA (Adicionar/Remover/Checkout) ---
 
 export async function addToCartAction(productId: string, quantity = 1, csrf_token?: string, variantId?: string) {
-  await requireRateLimit(RateLimitCategory.CART)
-  // Validação CSRF
-  const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
-  const csrfValidation = await requireCSRF(csrf_token)
+  // 1. Otimização Primeira Fase: Paralelizar carregamentos estáticos e Auth
+  const [{ requireCSRF }] = await Promise.all([
+    import("@/lib/security/csrf-action-wrapper"),
+    requireRateLimit(RateLimitCategory.CART)
+  ])
+
+  // A validação do CSRF precisa da promessa resolvida, mas podemos paralelizar a busca do usuário
+  // e do cliente supabase que são chamadas de rede/db independentes.
+  const [csrfValidation, supabase, user] = await Promise.all([
+    requireCSRF(csrf_token),
+    getSupabaseServerClient(),
+    requireUser()
+  ])
+
   if (!csrfValidation.valid) {
     return { error: csrfValidation.error || "Token CSRF inválido" }
   }
 
-  const supabase = await getSupabaseServerClient()
-  const user = await requireUser()
+  const adminClient = getAdminClient()
 
-  // LOW-04: Limit cart items per user
-  const { count: currentCartCount } = await supabase
+  // 2. Otimização Segunda Fase: Leituras no DB Paralelizadas
+  // 2.A - Contagem para o limite LOW-04
+  const cartCountPromise = supabase
     .from("cart_items")
     .select("*", { count: "exact", head: true })
     .eq("user_id", user.id)
 
-  if (currentCartCount && currentCartCount >= 50) {
-    return { error: "O limite de itens na sua sacola foi atingido. Remova alguns itens para adicionar mais." }
-  }
-
-  let resolvedProductId = productId
-  let partnerId: string
-  let partnerUserId: string | null = null
-
-  // Use admin client to read product and variant to bypass strict RLS 
-  // that might block public users from viewing full relation chains.
-  const adminClient = getAdminClient()
+  // 2.B - Verifica item existente usando a chave fornecida
+  let existingQuery = supabase
+    .from("cart_items")
+    .select("id, quantity")
+    .eq("user_id", user.id)
+    .eq("product_id", productId)
 
   if (variantId) {
-    // Busca variante e resolve o produto pai
-    const { data: variant, error: variantError } = await adminClient
+    existingQuery = existingQuery.eq("variant_id", variantId)
+  } else {
+    existingQuery = existingQuery.is("variant_id", null)
+  }
+  const existingItemPromise = existingQuery.maybeSingle()
+
+  // 2.C - Busca detalhes de quem é o dono do produto/variante
+  let productPromise
+  if (variantId) {
+    productPromise = adminClient
       .from("product_variants")
       .select("id, product_id, products(partner_id, partners(user_id))")
       .eq("id", variantId)
       .single()
-
-    if (variantError || !variant) {
-      return { error: "Variante não encontrada" }
-    }
-
-    resolvedProductId = variant.product_id
-    const parentProduct = variant.products as any
-    partnerId = parentProduct.partner_id
-    partnerUserId = parentProduct.partners?.user_id
   } else {
-    // Busca produto normal
-    const { data: product, error: productError } = await adminClient
+    productPromise = adminClient
       .from("products")
       .select("partner_id, partners(user_id)")
       .eq("id", productId)
       .single()
-
-    if (productError || !product) {
-      return { error: "Produto não encontrado" }
-    }
-
-    partnerId = product.partner_id
-    // @ts-ignore
-    partnerUserId = product.partners?.user_id
   }
 
-  // Bloqueia compra da própria loja: verifica dono (legado) E membros da equipe
+  const [
+    { count: currentCartCount },
+    { data: initialExistingItem },
+    productResult
+  ] = await Promise.all([
+    cartCountPromise,
+    existingItemPromise,
+    productPromise
+  ])
+
+  // Verificações que dependem do resultado em paralelo
+  if (currentCartCount && currentCartCount >= 50) {
+    return { error: "O limite de itens na sua sacola foi atingido. Remova alguns itens para adicionar mais." }
+  }
+
+  const { data: entity, error: entityError } = productResult
+
+  if (entityError || !entity) {
+    return { error: variantId ? "Variante não encontrada" : "Produto não encontrado" }
+  }
+
+  let partnerId: string
+  let partnerUserId: string | null = null
+  let resolvedProductId = productId
+
+  if (variantId) {
+    resolvedProductId = entity.product_id
+    const parentProduct = entity.products as any
+    partnerId = parentProduct.partner_id
+    partnerUserId = parentProduct.partners?.user_id
+  } else {
+    partnerId = entity.partner_id
+    // @ts-ignore
+    partnerUserId = entity.partners?.user_id
+  }
+
+  // 3. Segurança: Bloqueia compra da própria loja
   if (partnerUserId === user.id) {
     return { error: "Você não pode comprar produtos da sua própria loja" }
   }
 
-  // Verifica se o comprador é membro da equipe do vendedor (via partner_users)
+  // Segurança: Membros da equipe não podem comprar
   if (partnerId) {
     const { data: teamMembership } = await supabase
       .from("partner_users")
@@ -195,20 +226,21 @@ export async function addToCartAction(productId: string, quantity = 1, csrf_toke
     }
   }
 
-  // Verifica item existente (Upsert logic) — inclui variant_id na busca
-  let existingQuery = supabase
-    .from("cart_items")
-    .select("id, quantity")
-    .eq("user_id", user.id)
-    .eq("product_id", resolvedProductId)
+  // 4. Executa Inserção ou Atualização
+  let existingItem = initialExistingItem
 
-  if (variantId) {
-    existingQuery = existingQuery.eq("variant_id", variantId)
-  } else {
-    existingQuery = existingQuery.is("variant_id", null)
+  // Condição Rara (Anti-Falsificação): Se o Front enviou um productId forjado e desatualizado comparado a variante real.
+  // Pesquisamos novamente pelo verdadeiro dono pra não criar um item clonado fantasma.
+  if (variantId && resolvedProductId !== productId) {
+    const { data: retryExisting } = await supabase
+      .from("cart_items")
+      .select("id, quantity")
+      .eq("user_id", user.id)
+      .eq("product_id", resolvedProductId)
+      .eq("variant_id", variantId)
+      .maybeSingle()
+    existingItem = retryExisting
   }
-
-  const { data: existingItem } = await existingQuery.maybeSingle()
 
   let error
   if (existingItem) {
@@ -331,7 +363,7 @@ export async function toggleCartSelectionAction(cartItemId: string, csrf_token?:
 
   await revalidateCart(user.id)
   return { success: true }
-}export async function toggleCartPartnerSelectionAction(partnerId: string, selected: boolean, csrf_token?: string) {
+} export async function toggleCartPartnerSelectionAction(partnerId: string, selected: boolean, csrf_token?: string) {
   await requireRateLimit(RateLimitCategory.CART)
 
   const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
@@ -534,7 +566,7 @@ export async function checkoutCartAction(
       if (stockError) {
         console.error("[CART-STOCK] Erro ao decrementar estoque:", stockError)
         // O pedido já foi criado neste ponto, registramos o erro no log
-        // para monitoramento pois transações JS multi-tabela não são ACID seguras no Supabase sem RPC.
+        // para monitoramento pois transações JS multi-tabela não são ACID seguras no Supabase sem RPC.'
       }
     })
   )

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { Input } from "@/components/reusable"
 import { consultarCEP } from "@/lib/nuvem-fiscal"
 import { Spinner } from "@/components/reusable/Spinner"
@@ -29,6 +29,7 @@ export const CepInput: React.FC<CepInputProps> = ({
 }) => {
     const [loading, setLoading] = useState(false)
     const [lastFetchedCep, setLastFetchedCep] = useState("")
+    const fetchingCepRef = useRef("")
 
     // Formata o CEP enquando o usuário digita
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -43,8 +44,9 @@ export const CepInput: React.FC<CepInputProps> = ({
     // Busca o endereço pelo CEP
     const fetchAddressByCep = async (cepToFetch: string) => {
         const cleanCep = cepToFetch.replace(/\D/g, "")
-        if (cleanCep.length !== 8 || cleanCep === lastFetchedCep) return
+        if (cleanCep.length !== 8 || cleanCep === lastFetchedCep || cleanCep === fetchingCepRef.current) return
 
+        fetchingCepRef.current = cleanCep
         setLoading(true)
         try {
             // Usando a API consolidada que já tem fallback automático
@@ -59,9 +61,12 @@ export const CepInput: React.FC<CepInputProps> = ({
                     city: data.localidade || data.municipio || "",
                     state: data.uf || "",
                 })
+            } else {
+                fetchingCepRef.current = ""
             }
         } catch (e) {
             console.error("Erro ao buscar CEP:", e)
+            fetchingCepRef.current = ""
         } finally {
             setLoading(false)
         }

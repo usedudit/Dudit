@@ -20,7 +20,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
-import { checkLimit, canUseFeature, increment_usage_counter } from "@/lib/services/subscription.service"
+import { checkLimit, canUseFeature, increment_usage_counter, decrement_usage_counter } from "@/lib/services/subscription.service"
 
 const _deleteFromR2 = async (url: string) => {
     if (!url || !url.trim()) return;
@@ -101,7 +101,7 @@ const verifyBatchOwnership = async (productIds: string[]) => {
 
 
 // ============================================================================
-// ACTIONS BÃSICAS (Mantidas por compatibilidade)
+// ACTIONS BÃ SICAS (Mantidas por compatibilidade)
 // ============================================================================
 
 /**
@@ -151,6 +151,7 @@ export async function deleteProductAction(productId: string) {
         // Fire-and-forget: R2 image cleanup (non-blocking)
         if (imagesToDelete.length > 0) {
             Promise.all(imagesToDelete.map(img => _deleteFromR2(img))).catch(console.error)
+            decrement_usage_counter(product.partner_id, "images_count", imagesToDelete.length).catch(console.error)
         }
 
         // Synchronous revalidation and Redis sync to prevent stale data
@@ -273,7 +274,6 @@ export async function createProductComprehensiveAction(data: {
 
         const finalStoreId = storeResult
 
-        // 3.5 Subscription limit check â€” enforce product limits before creating
         // 3.5 Subscription limit check — enforce product and image limits before creating
         const [limitCheck, imagesLimitCheck] = await Promise.all([
             checkLimit(finalPartnerId, "products"),
@@ -424,10 +424,9 @@ export async function createProductComprehensiveAction(data: {
         ).catch(console.error)
 
         // Synchronous revalidation and Redis sync to prevent stale data
-        await invalidateProductCache(insertedProduct.id, finalPartnerId, 'create', { silent: true })
+        await invalidateProductCache(insertedProduct.id, finalPartnerId, 'create')
 
-        // Increment usage counters
-        increment_usage_counter(finalPartnerId, "products_count").catch(console.error)
+        // DB_TRIGGER handles products_count, so we ONLY handle images_count manually
         if (data.images && data.images.length > 0) {
             increment_usage_counter(finalPartnerId, "images_count", data.images.length).catch(console.error)
         }
@@ -646,14 +645,21 @@ export async function updateProductComprehensiveAction(productId: string, data: 
             const oldImages = product.images.filter((img: any) => typeof img === 'string' && img.trim());
             const newImages = payload.images || [];
             const deletedImages = oldImages.filter((img: string) => !newImages.includes(img));
+            const addedImages = newImages.filter((img: string) => !oldImages.includes(img));
 
             if (deletedImages.length > 0) {
                 Promise.all(deletedImages.map((img: string) => _deleteFromR2(img))).catch(console.error)
+                decrement_usage_counter(product.partner_id, "images_count", deletedImages.length).catch(console.error)
             }
+            if (addedImages.length > 0) {
+                increment_usage_counter(product.partner_id, "images_count", addedImages.length).catch(console.error)
+            }
+        } else if (payload.images && payload.images.length > 0) {
+            increment_usage_counter(product.partner_id, "images_count", payload.images.length).catch(console.error)
         }
 
         // Synchronous revalidation and Redis sync to prevent stale data
-        await invalidateProductCache(productId, product.partner_id, 'update', { silent: true })
+        await invalidateProductCache(productId, product.partner_id, 'update')
 
         console.log(`[PERF] updateProduct took ${Math.round(performance.now() - actionStart)}ms`)
         return successResponse({ ...updatedProduct, ...fiscalPayload, ...logisticsPayload })
@@ -678,7 +684,7 @@ export async function createProductVariantAction(data: {
     await requireRateLimit(RateLimitCategory.PRODUCT_CREATE)
     try {
         const product = await fetchProductAndVerifyOwnership(data.productId, "edit")
-        
+
         // Check subscription feature
         if (!await canUseFeature(product.partner_id, "product_variants")) {
             return { error: "Seu plano não permite o uso de variantes. Faça upgrade para desbloquear." }
@@ -700,8 +706,7 @@ export async function createProductVariantAction(data: {
 
         if (error) return { error: error.message }
 
-        // Silent mode prevents redundant ERP list re-render
-        await invalidateProductCache(data.productId, product.partner_id, 'update', { silent: true })
+        await invalidateProductCache(data.productId, product.partner_id, 'update')
         return { success: true, variantSku }
     } catch (error: any) {
         return { error: error.message }
@@ -734,7 +739,7 @@ export async function createProductVariantsBatchAction(data: {
         if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
 
         const product = await fetchProductAndVerifyOwnership(data.productId, "edit")
-        
+
         // Check subscription feature
         if (!await canUseFeature(product.partner_id, "product_variants")) {
             return errorResponse("Seu plano não permite o uso de variantes. Faça upgrade para desbloquear.")
@@ -781,12 +786,22 @@ export async function createProductVariantsBatchAction(data: {
             }
         }
         if (data.deletedImages?.length) imagesToCleanup.push(...data.deletedImages)
+
+        let newImagesCount = 0;
+        data.variants.forEach(v => {
+            if (v.image && (!existingVariants?.some((ev: any) => ev.variant_options?.image === v.image))) newImagesCount++;
+        })
+
         if (imagesToCleanup.length > 0) {
             Promise.all(imagesToCleanup.map(img => _deleteFromR2(img))).catch(console.error)
+            decrement_usage_counter(product.partner_id, "images_count", imagesToCleanup.length).catch(console.error)
         }
 
-        // Silent mode prevents redundant ERP list re-render
-        await invalidateProductCache(data.productId, product.partner_id, 'update', { silent: true })
+        if (newImagesCount > 0) {
+            increment_usage_counter(product.partner_id, "images_count", newImagesCount).catch(console.error)
+        }
+
+        await invalidateProductCache(data.productId, product.partner_id, 'update')
         return successResponse(inserted)
     } catch (error: any) {
         return errorResponse(error.message)
@@ -938,7 +953,7 @@ export async function batchDeleteVariantsAction(variantIds: string[]): Promise<A
         }
 
         if (variants[0]?.products?.partner_id) {
-            await invalidateProductCache(variants[0].product_id, variants[0].products.partner_id, 'update', { silent: true })
+            await invalidateProductCache(variants[0].product_id, variants[0].products.partner_id, 'update')
         }
         return successResponse({ deletedCount: variantIds.length })
     } catch (error: any) {
@@ -998,7 +1013,7 @@ export async function batchUpdateVariantsAction(updates: Array<{ id: string; pri
         }))
 
         if (variants[0]?.products?.partner_id) {
-            await invalidateProductCache(variants[0].product_id, variants[0].products.partner_id, 'update', { silent: true })
+            await invalidateProductCache(variants[0].product_id, variants[0].products.partner_id, 'update')
         }
         return successResponse({ updatedCount: updates.length })
     } catch (error: any) {
@@ -1074,8 +1089,8 @@ export async function toggleProductStatusAction(productIds: string[], isActive: 
 
         if (partnerId) {
             // Revalidate each product to ensure Redis marketplace index is updated
-            Promise.all(sanitized.map(id => 
-                invalidateProductCache(id, partnerId, 'update', { silent: true })
+            Promise.all(sanitized.map(id =>
+                invalidateProductCache(id, partnerId, 'update')
             )).catch(console.error)
         }
         return { success: true, count: sanitized.length }
@@ -1102,8 +1117,8 @@ export async function deleteProductsInBatchAction(productIds: string[]) {
 
         if (partnerId) {
             // Revalidate each product to ensure Redis marketplace index is updated
-            Promise.all(sanitized.map(id => 
-                invalidateProductCache(id, partnerId, 'delete', { silent: true })
+            Promise.all(sanitized.map(id =>
+                invalidateProductCache(id, partnerId, 'delete')
             )).catch(console.error)
         }
         return { success: true, deletedCount: sanitized.length }
@@ -1135,8 +1150,8 @@ export async function batchUpdateProductsAction(updates: Array<{ id: string;[key
 
         if (partnerId) {
             // Revalidate each product to ensure Redis marketplace index is updated
-            Promise.all(sanitized.map(id => 
-                invalidateProductCache(id, partnerId, 'update', { silent: true })
+            Promise.all(sanitized.map(id =>
+                invalidateProductCache(id, partnerId, 'update')
             )).catch(console.error)
         }
         return { success: true, count: updates.length }
@@ -1243,7 +1258,7 @@ export const getCachedProducts = async (partnerId: string) => {
             return data || []
         },
         [TAGS.products(partnerId)],
-        { tags: [TAGS.products(partnerId)], revalidate: 60 }
+        { tags: [TAGS.products(partnerId)], revalidate: 5 }
     )()
 }
 
@@ -1260,7 +1275,7 @@ export const getCachedProductById = async (productId: string) => {
             return product
         },
         [`product-details-${productId}`],
-        { tags: [TAGS.product(productId)], revalidate: 60 }
+        { tags: [TAGS.product(productId)], revalidate: 5 }
     )()
 }
 
@@ -1357,4 +1372,3 @@ export const getERPProductsPageData = cache(async () => {
         variants: [] // Variants are loaded on-demand when editing a specific product
     }
 })
-
