@@ -48,6 +48,7 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
         financial: fullAccess,
         customers: fullAccess,
         suppliers: fullAccess,
+        quotes: fullAccess,
     },
     ADMIN: {
         products: fullAccess,
@@ -56,6 +57,7 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
         financial: fullAccess,
         customers: fullAccess,
         suppliers: fullAccess,
+        quotes: fullAccess,
     },
     MANAGER: {
         products: fullAccess,
@@ -64,6 +66,7 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
         financial: viewOnly,
         customers: fullAccess,
         suppliers: fullAccess,
+        quotes: fullAccess,
     },
     OPERATOR: {
         products: viewOnly,
@@ -72,6 +75,7 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
         financial: noAccess,
         customers: viewOnly,
         suppliers: noAccess,
+        quotes: editAccess,
     },
     DELIVERY: {
         products: noAccess,
@@ -80,6 +84,7 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
         financial: noAccess,
         customers: noAccess,
         suppliers: noAccess,
+        quotes: noAccess,
     },
     VIEWER: {
         products: viewOnly,
@@ -88,6 +93,7 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
         financial: noAccess,
         customers: viewOnly,
         suppliers: viewOnly,
+        quotes: viewOnly,
     },
 }
 

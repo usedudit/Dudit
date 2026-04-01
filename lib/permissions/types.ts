@@ -18,6 +18,7 @@ export interface PartnerPermissions {
     financial: ResourcePermissions
     customers: ResourcePermissions
     suppliers: ResourcePermissions
+    quotes: ResourcePermissions
 }
 
 // ─── New Route-Based Permissions ────────────────────────────────────────────

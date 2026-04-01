@@ -55,7 +55,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
         key: "pos", path: "/erp/pos", label: "PDV (Frente de Caixa)", category: "Vendas", legacyCategory: "orders",
         specificPermissions: ["can_discount", "can_cancel_sale"],
     },
-    quotes: { key: "quotes", path: "/erp/quotes", label: "Orçamentos", category: "Vendas", legacyCategory: "orders" },
+    quotes: { key: "quotes", path: "/erp/quotes", label: "Orçamentos", category: "Vendas", legacyCategory: "quotes" },
 
     // ── Produtos
     products: {
@@ -499,6 +499,7 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
         financial: mapRoute("financial_transactions"),
         customers: mapRoute("customers"),
         suppliers: mapRoute("suppliers"),
+        quotes: mapRoute("quotes"),
     }
 }
 
@@ -521,10 +522,11 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
     const categoryRoutes: Record<keyof PartnerPermissions, RouteKey[]> = {
         products: ["products", "stock_movements", "import_notes", "cadastros_produtos"],
         services: ["appointments", "services", "cadastros_services"],
-        orders: ["orders", "returns", "logistics", "invoices", "pos", "quotes"],
+        orders: ["orders", "returns", "logistics", "invoices", "pos"],
         financial: ["financial_transactions", "financial_dashboard", "financial_dre", "cadastros_financeiro"],
         customers: ["customers"],
         suppliers: ["suppliers"],
+        quotes: ["quotes"],
     }
 
     for (const [cat, routes] of Object.entries(categoryRoutes)) {

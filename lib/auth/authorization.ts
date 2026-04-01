@@ -143,6 +143,7 @@ async function checkPartnerAccess(
         orders: { view: true, create: true, edit: true, delete: true },
         financial: { view: true, create: true, edit: true, delete: true },
         customers: { view: true, create: true, edit: true, delete: true },
+        quotes: { view: true, create: true, edit: true, delete: true },
       }
     }
   }
@@ -350,6 +351,31 @@ export async function requireSupplierOwnership(supplierId: string): Promise<void
   const access = await checkPartnerAccess(supplier.partner_id, user.id)
   if (!access) {
     throw new ForbiddenError("Você não tem acesso a este fornecedor")
+  }
+}
+
+/**
+ * Requires the authenticated user to have access to the quote (via partner_users).
+ * Supports both owners and invited users.
+ * THROWS ForbiddenError if access check fails.
+ */
+export async function requireQuoteOwnership(quoteId: string): Promise<void> {
+  const user = await requireUser()
+
+  const supabase = await getSupabaseServerClient()
+  const { data: quote } = await supabase
+    .from("quotes")
+    .select("partner_id")
+    .eq("id", quoteId)
+    .single()
+
+  if (!quote) {
+    throw new ForbiddenError("Orçamento não encontrado")
+  }
+
+  const access = await checkPartnerAccess(quote.partner_id, user.id)
+  if (!access) {
+    throw new ForbiddenError("Você não tem acesso a este orçamento")
   }
 }
 

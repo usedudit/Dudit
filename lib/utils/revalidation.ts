@@ -44,6 +44,17 @@ export async function revalidateOrders(partnerId: string) {
 }
 
 /**
+ * Revalida dados de ORÇAMENTOS
+ */
+export async function revalidateQuotes(partnerId: string) {
+  if (partnerId) {
+    safeRevalidateTag(TAGS.quotes(partnerId))
+    safeRevalidateTag(partnerId)
+  }
+  safeRevalidateTag("quotes")
+}
+
+/**
  * Revalida dados de MARKETPLACE e CATEGORIAS
  */
 export async function revalidateMarketplace() {
