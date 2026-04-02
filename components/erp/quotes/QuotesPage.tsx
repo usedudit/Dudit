@@ -1,0 +1,408 @@
+"use client"
+
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { useMediaQuery } from "../hooks"
+import { useToast } from "@/hooks/use-toast"
+import { useStore } from "@/lib/store-context"
+
+// Components
+import { Button, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
+import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
+import Pagination from "@/components/reusable/Pagination"
+import QuoteListItem from "./QuoteListItem"
+import QuoteGridCard from "./QuoteGridCard"
+import QuotePageControls from "./QuotePageControls"
+
+// Icons
+import {
+    PlusIcon,
+    ExportFileIcon,
+} from "@/lib/icons"
+import { useRouter } from "next/navigation"
+
+// --- TYPES & INTERFACES ---
+
+interface Quote {
+    originalId: string;
+    displayId: string;
+    customer_name: string;
+    customer_id: string | null;
+    total_amount: number;
+    statusLabel: string;
+    statusColor: any;
+    formattedIssueDate: string;
+    formattedExpirationDate: string | null;
+    created_at_time: number;
+    status: string;
+}
+
+interface FilterState {
+    status: string[]
+    period: string[]
+    expiration: string[]
+}
+
+const INITIAL_FILTERS: FilterState = {
+    status: [],
+    period: [],
+    expiration: []
+}
+
+const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
+    { id: "quote_id", label: "Cód. Orçamento", align: "left", width: "150px" },
+    { id: "customer", label: "Cliente", align: "left", width: "250px" },
+    { id: "issue_date", label: "Data Emissão", align: "left", width: "150px" },
+    { id: "expiration_date", label: "Validade", align: "left", width: "150px" },
+    { id: "total", label: "Total", align: "left", width: "150px" },
+    { id: "status", label: "Status", align: "left", width: "150px" },
+    { id: "actions", label: "Ações", align: "center", width: "80px" },
+]
+
+export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: any[], partnerId: string }) {
+    const { toast } = useToast()
+    const router = useRouter()
+    const { isLoading: storeLoading } = useStore()
+    const isMobile = useMediaQuery("(max-width: 767px)")
+
+    // State
+    const [search, setSearch] = useState("")
+    const [debouncedSearch, setDebouncedSearch] = useState("")
+    const [activeTab, setActiveTab] = useState<"Todos" | "Enviados" | "Aprovados" | "Rejeitados" | "Expirados">("Todos")
+    const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
+    const [page, setPage] = useState(1)
+    const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
+    const [modals, setModals] = useState({ filter: false })
+    const [selection, setSelection] = useState({ ids: new Set<string>() })
+
+    const isLoading = storeLoading && rawQuotes === undefined
+    const itemsPerPage = 12
+
+    const tableContainerRef = useRef<HTMLDivElement>(null)
+    const [scrollState, setScrollState] = useState({ left: false, right: false })
+
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedSearch(search), 500)
+        return () => clearTimeout(t)
+    }, [search])
+
+    const checkScroll = useCallback(() => {
+        if (!tableContainerRef.current) return
+        const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
+        setScrollState({
+            left: scrollLeft > 0,
+            right: scrollLeft < scrollWidth - clientWidth - 2,
+        })
+    }, [])
+
+    useEffect(() => {
+        checkScroll()
+        window.addEventListener("resize", checkScroll)
+        return () => window.removeEventListener("resize", checkScroll)
+    }, [checkScroll, viewMode, rawQuotes])
+
+    const filterSections: FilterSectionConfig[] = [
+        { id: "status", title: "Status", type: "checkbox-list", options: ["Rascunho", "Enviado", "Aprovado", "Rejeitado", "Expirado"] },
+        // Simple period filter implementation for now
+        { id: "period", title: "Período Emissão", type: "checkbox-list", options: ["Últimos 7 dias", "Últimos 30 dias", "Mês Atual", "Ano Atual"] },
+    ]
+
+    const filteredQuotes: Quote[] = useMemo(() => {
+        if (!rawQuotes) return []
+
+        const term = debouncedSearch.toLowerCase()
+
+        return rawQuotes
+            .map((q: any): Quote => {
+                const statusMap: Record<string, { label: string; color: string }> = {
+                    draft: { label: "Rascunho", color: "gray" },
+                    sent: { label: "Enviado", color: "blue" },
+                    approved: { label: "Aprovado", color: "green" },
+                    rejected: { label: "Rejeitado", color: "red" },
+                    expired: { label: "Expirado", color: "yellow" },
+                }
+                const statusInfo = statusMap[q.status] || { label: q.status, color: "gray" }
+
+                let parsedIssueDate;
+                let formattedIssueDate = "";
+                if (q.issue_date) {
+                    // YYYY-MM-DD to JS date directly might get timezone issues if not careful, assuming UTC split
+                    const [y, m, d] = q.issue_date.split("-");
+                    parsedIssueDate = new Date(y, m - 1, d);
+                    formattedIssueDate = `${d}/${m}/${y}`;
+                } else if (q.created_at) {
+                    parsedIssueDate = new Date(q.created_at);
+                    formattedIssueDate = parsedIssueDate.toLocaleDateString('pt-BR');
+                }
+
+                let formattedExpirationDate = null;
+                if (q.expiration_date) {
+                    const [y, m, d] = q.expiration_date.split("-");
+                    formattedExpirationDate = `${d}/${m}/${y}`;
+                }
+
+                return {
+                    originalId: q.id,
+                    displayId: q.quote_number || `#${q.id.substring(0, 8)}`,
+                    customer_name: q.customers?.name || "Cliente sem nome",
+                    customer_id: q.customers?.id ? `CST-${q.customers.id.substring(0, 4).toUpperCase()}` : null,
+                    total_amount: Number(q.total),
+                    statusLabel: statusInfo.label,
+                    statusColor: statusInfo.color,
+                    formattedIssueDate,
+                    formattedExpirationDate,
+                    created_at_time: parsedIssueDate ? parsedIssueDate.getTime() : 0,
+                    status: q.status
+                }
+            })
+            .filter((q: Quote) => {
+                const searchMatch =
+                    q.displayId.toLowerCase().includes(term) ||
+                    q.customer_name.toLowerCase().includes(term) ||
+                    (q.customer_id || "").toLowerCase().includes(term)
+
+                return searchMatch
+            })
+            .filter((q: Quote) => {
+                let tabMatch = true
+                if (activeTab === "Enviados") tabMatch = q.status === "sent"
+                else if (activeTab === "Aprovados") tabMatch = q.status === "approved"
+                else if (activeTab === "Rejeitados") tabMatch = q.status === "rejected"
+                else if (activeTab === "Expirados") tabMatch = q.status === "expired"
+
+                const statusFilterMatch = filters.status.length === 0 || filters.status.includes(q.statusLabel)
+
+                // For simplicity, skip strict period/expiration filters if they're complex string arrays "Mês atual" etc.
+                // In production you would map these to actual dates
+                const periodFilterMatch = true
+
+                return tabMatch && statusFilterMatch && periodFilterMatch
+            })
+            .sort((a, b) => b.created_at_time - a.created_at_time)
+    }, [rawQuotes, debouncedSearch, activeTab, filters])
+
+    const totalPages = Math.ceil(filteredQuotes.length / itemsPerPage)
+    const paginated = filteredQuotes.slice((page - 1) * itemsPerPage, page * itemsPerPage)
+
+    const hasActiveFilters = filters.status.length > 0 || filters.period.length > 0 || filters.expiration.length > 0 || debouncedSearch.length > 0
+    const hasQuotes = (rawQuotes?.length || 0) > 0
+
+    // Handlers
+    const handleAddQuote = () => {
+        router.push(`/erp/quotes/new`)
+    }
+    const handleEditQuote = (quote: Quote) => {
+        router.push(`/erp/quotes/${quote.originalId}`)
+    }
+    const handleDuplicateQuote = (quote: Quote) => {
+        toast({ title: "Duplicar", description: "Em breve: Duplicar orçamento " + quote.displayId })
+    }
+    const handleDeleteQuote = (quote: Quote) => {
+        toast({ title: "Excluir", description: "Em breve: Excluir orçamento " + quote.displayId })
+    }
+    const handleSelectRow = (id: string) => {
+        setSelection((p) => {
+            const s = new Set(p.ids)
+            s.has(id) ? s.delete(id) : s.add(id)
+            return { ids: s }
+        })
+    }
+
+    const handleClearFilters = () => {
+        setSearch("")
+        setFilters(INITIAL_FILTERS)
+        setActiveTab("Todos")
+    }
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
+            className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
+        >
+            <style>{`
+                .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
+                .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
+                .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .hide-scrollbar::-webkit-scrollbar { display: none; }
+                .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
+
+            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                {/* Desktop Header */}
+                <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                    <div className="flex flex-col gap-2 pt-1">
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                                Orçamentos
+                            </h1>
+                        </div>
+                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                            Gerencie propostas comerciais para seus clientes.
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <Button variant="outline" onClick={() => { }}>
+                            <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
+                        </Button>
+
+                        <Button onClick={handleAddQuote}>
+                            <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
+                            Novo Orçamento
+                        </Button>
+                    </div>
+                </div>
+
+                {hasQuotes && (
+                    <QuotePageControls
+                        activeTab={activeTab}
+                        setActiveTab={setActiveTab}
+                        search={search}
+                        onSearchChange={setSearch}
+                        onOpenFilter={() => setModals({ filter: true })}
+                        onExport={() => { }}
+                        onAddQuote={handleAddQuote}
+                        filters={filters}
+                        setFilters={setFilters as any}
+                        viewMode={viewMode}
+                        onViewModeChange={setViewModeState}
+                        hasActiveFilters={hasActiveFilters}
+                    />
+                )}
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-8 px-4 md:px-8">
+                    <AnimatePresence mode="wait">
+                        {isLoading ? (
+                            <ThreeDotsLoader key="loading" />
+                        ) : !hasQuotes ? (
+                            <motion.div key="empty-no-data" className="w-full h-full flex items-center justify-center min-h-[500px]">
+                                <IconPlaceholder
+                                    placeholderType="image"
+                                    imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
+                                    imageAlt="Sem orçamentos"
+                                    title="Você ainda não tem orçamentos"
+                                    subtitle="Seus orçamentos aparecerão aqui assim que você criá-los."
+                                />
+                            </motion.div>
+                        ) : paginated.length === 0 ? (
+                            <motion.div key="empty-results" className="w-full h-full flex items-center justify-center min-h-[500px]">
+                                <IconPlaceholder
+                                    placeholderType="image"
+                                    imageSrc="https://img.dudit.com.br/static/mascots/clientes/NaoEncontrado.png"
+                                    imageAlt="Nenhum orçamento encontrado"
+                                    title="Nenhum orçamento encontrado"
+                                    subtitle="Tente ajustar seus filtros ou termos de busca."
+                                    itemButton={{
+                                        text: "Limpar Filtros",
+                                        action: handleClearFilters,
+                                        variant: "outline"
+                                    }}
+                                />
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                key={viewMode}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="w-full"
+                            >
+                                {viewMode === "grid" ? (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                        {paginated.map((q: Quote) => (
+                                            <QuoteGridCard
+                                                key={q.originalId}
+                                                quote={q}
+                                                selected={selection.ids.has(q.originalId)}
+                                                onSelect={() => handleSelectRow(q.originalId)}
+                                                onEdit={() => handleEditQuote(q)}
+                                                onDuplicate={() => handleDuplicateQuote(q)}
+                                                onDelete={() => handleDeleteQuote(q)}
+                                            />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="w-full overflow-hidden rounded-xl relative">
+                                        <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                        <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                                        <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                                <thead>
+                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                        <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
+                                                            <div className="flex items-center">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="w-4 h-4 rounded border-brand-border"
+                                                                    checked={selection.ids.size === paginated.length && paginated.length > 0}
+                                                                    onChange={(e) => {
+                                                                        const checked = e.target.checked
+                                                                        setSelection({ ids: checked ? new Set(paginated.map((x: Quote) => x.originalId)) : new Set() })
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        </th>
+                                                        {COLUMNS.map((col, idx) => (
+                                                            <th
+                                                                key={col.id}
+                                                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""}`}
+                                                                style={{ width: col.width }}
+                                                            >
+                                                                <div className={`flex items-center gap-1 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
+                                                                    {col.label}
+                                                                </div>
+                                                            </th>
+                                                        ))}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {paginated.map((q: Quote) => (
+                                                        <QuoteListItem
+                                                            key={q.originalId}
+                                                            quote={q}
+                                                            columns={COLUMNS}
+                                                            selected={selection.ids.has(q.originalId)}
+                                                            onSelect={handleSelectRow}
+                                                            onEdit={handleEditQuote}
+                                                            onDuplicate={handleDuplicateQuote}
+                                                            onDelete={handleDeleteQuote}
+                                                        />
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                {!isLoading && filteredQuotes.length > itemsPerPage && (
+                    <div className="flex justify-center mb-8 mt-4">
+                        <Pagination
+                            currentPage={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                        />
+                    </div>
+                )}
+            </div>
+
+            <FilterSheet
+                isOpen={modals.filter}
+                onClose={() => setModals({ filter: false })}
+                sections={filterSections}
+                filters={filters}
+                setFilters={setFilters as any}
+                onClear={() => setFilters(INITIAL_FILTERS)}
+            />
+        </motion.div>
+    )
+}

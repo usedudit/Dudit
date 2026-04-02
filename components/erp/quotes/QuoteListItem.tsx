@@ -1,0 +1,171 @@
+'use client';
+
+import React from "react"
+import { motion } from "framer-motion"
+import { Checkbox, Badge, Button } from "@/components/reusable"
+import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
+import { ThreeDotsIcon, EditIcon, TrashIcon, CopyIcon } from "@/lib/icons"
+
+interface ColumnDef {
+    id: string
+    align?: "left" | "center" | "right"
+    width?: string
+    minWidth?: string
+}
+
+interface QuoteListItemProps {
+    quote: any
+    columns: ColumnDef[]
+    selected: boolean
+    onSelect: (id: string) => void
+    onEdit: (quote: any) => void
+    onDelete: (quote: any) => void
+    onDuplicate: (quote: any) => void
+}
+
+const QuoteListItem = React.memo(
+    ({
+        quote,
+        columns,
+        selected,
+        onSelect,
+        onEdit,
+        onDelete,
+        onDuplicate,
+    }: QuoteListItemProps) => {
+
+        const renderCellContent = (colId: string) => {
+            switch (colId) {
+                case "quote_id":
+                    return (
+                        <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full flex-shrink-0 bg-${quote.statusColor}`} />
+                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[150px]">
+                                {quote.displayId}
+                            </span>
+                        </div>
+                    )
+
+                case "total":
+                    return (
+                        <span className="text-[13px] font-bold text-brand-primary">
+                            R$ {Number(quote.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                    )
+
+                case "status":
+                    return (
+                        <div className="flex items-center gap-2">
+                            <Badge variant={quote.statusColor}>
+                                {quote.statusLabel}
+                            </Badge>
+                        </div>
+                    )
+
+                case "customer":
+                    return (
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[180px]">
+                                {quote.customer_name}
+                            </span>
+                            {quote.customer_id && (
+                                <Badge variant="gray" className="text-[10px] h-4 px-1">
+                                    {quote.customer_id}
+                                </Badge>
+                            )}
+                        </div>
+                    )
+
+                case "issue_date":
+                    return (
+                        <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+                            {quote.formattedIssueDate}
+                        </span>
+                    )
+
+                case "expiration_date":
+                    return (
+                        <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+                            {quote.formattedExpirationDate || "—"}
+                        </span>
+                    )
+
+                case "actions":
+                    return (
+                        <div
+                            className="flex justify-center action-btn"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <Dropdown
+                                align="right"
+                                showChevron={false}
+                                trigger={
+                                    <Button
+                                        variant="outline"
+                                        className="w-[34px] h-[34px] rounded-full border-brand-border hover:bg-white dark:hover:bg-dark-surface p-0 flex items-center justify-center"
+                                    >
+                                        <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
+                                    </Button>
+                                }
+                            >
+                                <DropdownItem onClick={() => onEdit(quote)}>
+                                    <EditIcon className="w-4 h-4 mr-2" /> Editar
+                                </DropdownItem>
+                                <DropdownItem onClick={() => onDuplicate(quote)}>
+                                    <CopyIcon className="w-4 h-4 mr-2" /> Duplicar
+                                </DropdownItem>
+                                <DropdownItem
+                                    onClick={() => onDelete(quote)}
+                                    className="text-brand-red focus:text-brand-red focus:bg-red-50 dark:focus:bg-red-900/10"
+                                >
+                                    <TrashIcon className="w-4 h-4 mr-2" /> Excluir
+                                </DropdownItem>
+                            </Dropdown>
+                        </div>
+                    )
+
+                default:
+                    return null
+            }
+        }
+
+        const getAlignClass = (align?: string) => {
+            if (align === "center") return "text-center justify-center"
+            if (align === "right") return "text-right justify-end"
+            return "text-left justify-start"
+        }
+
+        return (
+            <motion.tr
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
+                onClick={() => onEdit(quote)}
+            >
+                <td
+                    className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <Checkbox checked={selected} onChange={() => onSelect(quote.originalId)} />
+                </td>
+
+                {columns.map((col) => (
+                    <td
+                        key={col.id}
+                        className={`p-2 border-b border-brand-border dark:border-dark-border ${getAlignClass(col.align)}`}
+                    >
+                        {renderCellContent(col.id)}
+                    </td>
+                ))}
+            </motion.tr>
+        )
+    },
+    (prev, next) =>
+        prev.quote === next.quote &&
+        prev.selected === next.selected &&
+        prev.columns === next.columns
+)
+
+QuoteListItem.displayName = "QuoteListItem"
+
+export default QuoteListItem
