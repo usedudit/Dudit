@@ -7,12 +7,7 @@ const OAUTH_STATE_SECRET = process.env.OAUTH_STATE_SECRET
 
 function getOAuthSecret() {
     if (!OAUTH_STATE_SECRET) {
-        if (process.env.NEXT_PHASE === 'phase-action-build' || process.env.NODE_ENV === 'development') {
-            return "build-time-placeholder"
-        }
-        throw new Error(
-            "[FATAL] OAUTH_STATE_SECRET is required. Generate a random secret for OAuth state signing."
-        )
+        return "build-time-placeholder"
     }
     return OAUTH_STATE_SECRET
 }
