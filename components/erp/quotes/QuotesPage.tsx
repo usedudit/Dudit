@@ -225,7 +225,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
         >
             <AnimatePresence>
                 {isCreatingQuote && (
-                    <CreateQuote onBack={() => setIsCreatingQuote(false)} />
+                    <CreateQuote partnerId={partnerId} onBack={() => setIsCreatingQuote(false)} />
                 )}
             </AnimatePresence>
             <style>{`

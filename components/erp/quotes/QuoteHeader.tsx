@@ -6,11 +6,13 @@ import { Button, TabsList, TabsTrigger } from '@/components/reusable';
 interface QuoteHeaderProps {
     isScrolled: boolean;
     onBack: () => void;
+    onSave?: () => void;
+    isSaving?: boolean;
     title: string;
     subtitle: string;
 }
 
-const QuoteHeader = ({ isScrolled, onBack, title, subtitle }: QuoteHeaderProps) => {
+const QuoteHeader = ({ isScrolled, onBack, onSave, isSaving, title, subtitle }: QuoteHeaderProps) => {
     return (
         <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300">
             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
@@ -39,8 +41,11 @@ const QuoteHeader = ({ isScrolled, onBack, title, subtitle }: QuoteHeaderProps) 
                         <Button variant="outline" onClick={onBack}>
                             Cancelar
                         </Button>
-                        <Button>
-                            <SaveIcon className="w-[18px] h-[18px] mr-2" />
+                        <Button
+                            onClick={onSave}
+                            isLoading={isSaving}
+                        >
+                            {!isSaving && <SaveIcon className="w-[18px] h-[18px] mr-2" />}
                             Salvar
                         </Button>
                     </div>

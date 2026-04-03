@@ -8,14 +8,25 @@ import QuoteEditor from './QuoteEditor';
 import QuotePreview from './QuotePreview';
 import SelectCustomerSheet from './SelectCustomerSheet';
 import SelectVariantSheet from './SelectVariantSheet';
-import { searchProductsForQuotes } from '@/app/actions/erp/quotes';
+import { useToast } from '@/hooks/use-toast';
+import { useStore } from '@/lib/store-context';
+import { searchProductsForQuotes, createQuoteAction } from '@/app/actions/erp/quotes';
 
 interface CreateQuoteProps {
+    partnerId: string;
     onBack: () => void;
     existingQuote?: any;
 }
 
-const CreateQuote = ({ onBack, existingQuote }: CreateQuoteProps) => {
+const CreateQuote = ({ partnerId, onBack, existingQuote }: CreateQuoteProps) => {
+    const { toast } = useToast();
+    const { selectedStore } = useStore();
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Partner info for preview
+    const partnerName = selectedStore?.name || 'Sua Loja';
+    const partnerAddress = 'Endereço não informado'; // We'll stick with this for now as address isn't in selectedStore
+    const partnerAvatar = selectedStore?.image_url || '';
     const [isScrolled, setIsScrolled] = useState(false);
     const [activeTab, setActiveTab] = useState('Dados Gerais');
 
@@ -237,6 +248,62 @@ const CreateQuote = ({ onBack, existingQuote }: CreateQuoteProps) => {
     const tax = subtotal * 0.10; // Mock 10% tax
     const total = Math.max(0, subtotal + tax + shippingNum + otherCostsNum - discountValue);
 
+    const handleSave = async () => {
+        if (quoteItems.length === 0) {
+            toast({
+                title: "Carrinho vazio",
+                description: "Adicione pelo menos um item ao orçamento.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const result = await createQuoteAction({
+                partnerId: partnerId,
+                customerId: selectedCustomer?.id,
+                issueDate: quoteDate,
+                expirationDate: expiryDate,
+                notes: internalNote,
+                discountType: discountType === '%' ? 'percentage' : 'fixed',
+                discountValue: discountNum,
+                shippingCost: shippingNum,
+                additionalCosts: otherCostsNum,
+                items: quoteItems.map((item, idx) => ({
+                    productId: item.isBlank ? null : item.id,
+                    customName: item.isBlank ? item.name : undefined,
+                    quantity: item.qty,
+                    unitPrice: item.price,
+                    sortOrder: idx
+                }))
+            });
+
+            if (result.success) {
+                toast({
+                    title: "Orçamento criado!",
+                    description: "O orçamento foi salvo com sucesso.",
+                });
+                onBack(); // Close wrapper
+            } else {
+                toast({
+                    title: "Erro ao salvar",
+                    description: (result as any).error || "Ocorreu um erro inesperado.",
+                    variant: "destructive"
+                });
+            }
+        } catch (error) {
+            console.error(error);
+            toast({
+                title: "Erro fatal",
+                description: "Não foi possível conectar ao servidor.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const filteredProducts = searchResults;
 
     return (
@@ -257,6 +324,8 @@ const CreateQuote = ({ onBack, existingQuote }: CreateQuoteProps) => {
                     <QuoteHeader
                         isScrolled={isScrolled}
                         onBack={onBack}
+                        onSave={handleSave}
+                        isSaving={isSaving}
                         title={existingQuote ? `Editar Orçamento #${existingQuote.id}` : 'Novo Orçamento'}
                         subtitle="Crie uma proposta comercial para seu cliente"
                     />
@@ -340,6 +409,9 @@ const CreateQuote = ({ onBack, existingQuote }: CreateQuoteProps) => {
                 secondaryColor={secondaryColor}
                 quoteTitle={quoteTitle}
                 quoteSubtitle={quoteSubtitle}
+                partnerName={partnerName}
+                partnerAddress={partnerAddress}
+                partnerAvatar={partnerAvatar}
             />
 
             {/* Reusable Customer Selection Sheet */}
