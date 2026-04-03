@@ -29,14 +29,14 @@ const QuoteGridCard = React.memo(
 
         return (
             <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-dark-border/90 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`group relative bg-white dark:bg-dark-surface rounded-2xl border transition-all duration-300 cursor-pointer overflow-hidden flex flex-col h-full ${selected ? 'border-brand-primary ring-1 ring-brand-primary' : 'border-brand-border dark:border-dark-border hover:border-brand-primary/50'}`}
                 onClick={onClick}
             >
-                <div className="flex gap-4 mb-2">
+                <div className="absolute top-0 left-0 w-full h-1 bg-brand-primary"></div>
+
+                <div className="flex gap-4 mb-2 p-4 pb-0 pt-5">
                     {/* Visual Indicator */}
                     <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center">
                         <FileIcon className="w-6 h-6 text-brand-dark dark:text-dark-heading" />
@@ -78,8 +78,8 @@ const QuoteGridCard = React.memo(
                 </div>
 
                 {/* Info Rows */}
-                <div className="mt-4 flex flex-col gap-3">
-                    <div className="flex flex-col gap-0.5">
+                <div className="mt-4 flex flex-col gap-3 px-4">
+                    <div className="flex flex-col gap-0.5 text-left">
                         <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Cliente</span>
                         <div className="flex items-center gap-1.5 min-w-0">
                             <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
@@ -95,10 +95,10 @@ const QuoteGridCard = React.memo(
                 </div>
 
                 {/* Footer Area */}
-                <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
+                <div className="mt-auto pt-3 px-4 pb-4 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
                     {/* Stats Row */}
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="flex flex-col gap-0.5">
+                        <div className="flex flex-col gap-0.5 text-left">
                             <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Total</span>
                             <span className="text-[14px] font-bold text-brand-primary">
                                 R$ {Number(quote.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
