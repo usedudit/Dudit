@@ -61,82 +61,97 @@ const SelectCustomerSheet = ({ isOpen, onClose, onSelect, onAddNew }: SelectCust
     }, [isOpen]);
 
     const content = (
-        <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
-            <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center">
+        <div className="flex flex-col h-full bg-white dark:bg-dark-surface shadow-2xl rounded-2xl overflow-hidden">
+            <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center bg-white dark:bg-dark-surface z-10">
                 <h2 className="text-xl font-bold dark:text-dark-heading">Selecionar Cliente</h2>
-                <Button variant="ghost" onClick={onClose} size="icon">
-                    <CloseIcon className="w-5 h-5" />
+                <Button variant="ghost" onClick={onClose} size="icon" className="rounded-full hover:bg-brand-gray dark:hover:bg-dark-border">
+                    <XIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                 </Button>
             </header>
 
             <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-6">
-                <FormInput
-                    label=""
-                    name="clientSearch"
-                    placeholder="Pesquisar cliente por nome ou email..."
-                    prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
-                    autoFocus
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="mb-0"
-                />
+                <div className="sticky top-0 bg-white dark:bg-dark-surface z-10 pb-4">
+                    <FormInput
+                        label=""
+                        name="clientSearch"
+                        placeholder="Pesquisar cliente por nome ou email..."
+                        prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                        autoFocus
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="mb-0"
+                    />
+                </div>
 
-                <div className="space-y-2">
-                    {onAddNew && (
+                <div className="space-y-3">
+                    {onAddNew && searchQuery && (
                         <button
                             onClick={onAddNew}
-                            className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-brand-gray dark:hover:bg-dark-border/50 transition-colors text-left group border border-transparent hover:border-brand-border dark:hover:border-dark-border"
+                            className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-brand-gray dark:hover:bg-dark-border/50 transition-all text-left border border-brand-border dark:border-dark-border group shadow-sm bg-white dark:bg-dark-surface"
                         >
-                            <div className="w-12 h-12 rounded-full bg-[#f3e8ff] dark:bg-[#3b0764]/50 flex items-center justify-center text-[#7c3aed] dark:text-[#d8b4fe]">
-                                <PlusIcon size={20} />
+                            <div className="w-12 h-12 rounded-full bg-brand-primary/10 flex items-center justify-center text-brand-primary group-hover:scale-110 transition-transform">
+                                <PlusIcon size={24} strokeWidth={2.5} />
                             </div>
-                            <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">Cadastrar novo cliente</span>
+                            <div className="flex flex-col">
+                                <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">Novo Cliente</span>
+                                <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body">Cadastrar "{searchQuery}" como novo cliente</span>
+                            </div>
                         </button>
                     )}
 
-                    {onAddNew && <div className="border-t border-brand-border dark:border-dark-border my-4"></div>}
-
                     {isSearching ? (
-                        <div className="flex justify-center items-center py-12">
-                            <Spinner size={24} className="text-brand-primary" />
+                        <div className="flex flex-col justify-center items-center py-16 gap-3">
+                            <Spinner size={32} className="text-brand-primary" />
+                            <span className="text-sm font-medium text-brand-inactive-text">Buscando clientes...</span>
                         </div>
                     ) : customers.length > 0 ? (
-                        <div className="space-y-2">
+                        <div className="grid grid-cols-1 gap-3">
                             {customers.map(c => (
                                 <button
                                     key={c.id}
                                     onClick={() => { onSelect(c); onClose(); }}
-                                    className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-brand-gray dark:hover:bg-dark-border/50 transition-colors text-left group border border-transparent hover:border-brand-border dark:hover:border-dark-border"
+                                    className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-brand-gray dark:hover:bg-dark-border/50 transition-all text-left border border-transparent hover:border-brand-border dark:hover:border-dark-border group bg-white dark:bg-dark-surface"
                                 >
-                                    <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center text-lg font-bold text-gray-600 dark:text-gray-300 border border-brand-border dark:border-dark-border shrink-0 overflow-hidden">
+                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex items-center justify-center text-lg font-bold text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border shrink-0 overflow-hidden shadow-sm group-hover:scale-105 transition-transform">
                                         {c.avatar ? (
                                             <img src={c.avatar} className="w-full h-full object-cover" />
                                         ) : (
-                                            c.name.charAt(0).toUpperCase()
+                                            <span className="text-brand-inactive-text">{c.name.charAt(0).toUpperCase()}</span>
                                         )}
                                     </div>
-                                    <div className="flex flex-col flex-1 truncate text-left">
-                                        <div className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">{c.name}</div>
-                                        <div className="text-[13px] text-brand-inactive-text dark:text-dark-body truncate">{c.email || c.phone || 'Sem contato'}</div>
+                                    <div className="flex flex-col flex-1 truncate">
+                                        <div className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate group-hover:text-brand-primary transition-colors">{c.name}</div>
+                                        <div className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body truncate">{c.email || c.phone || 'Sem contato vinculado'}</div>
                                     </div>
                                 </button>
                             ))}
                         </div>
                     ) : (
-                        <div className="py-8">
+                        <div className="py-12 px-4">
                             <IconPlaceholder
                                 icon={UserIcon}
-                                title="Nenhum cliente encontrado"
-                                subtitle={searchQuery ? "Nenhum resultado para sua busca." : "Você ainda não possui clientes."}
+                                title={searchQuery ? "Nenhum cliente encontrado" : "Nenhum cliente"}
+                                subtitle={searchQuery ? `Não encontramos nenhum cliente correspondente a "${searchQuery}".` : "Sua lista de clientes cadastrados aparecerá aqui."}
                                 itemButton={onAddNew ? {
-                                    text: "Cadastrar novo cliente",
-                                    action: onAddNew
+                                    text: "Cadastrar Novo Cliente",
+                                    action: onAddNew,
+                                    variant: "outline"
                                 } : undefined}
                             />
                         </div>
                     )}
                 </div>
             </div>
+
+            <footer className="border-t border-brand-border dark:border-dark-border p-6 bg-brand-gray/20 dark:bg-dark-surface">
+                <Button
+                    variant="outline"
+                    onClick={onClose}
+                    className="w-full rounded-full h-12 font-bold text-[15px]"
+                >
+                    Fechar
+                </Button>
+            </footer>
         </div>
     );
 
@@ -150,28 +165,17 @@ const SelectCustomerSheet = ({ isOpen, onClose, onSelect, onAddNew }: SelectCust
 
     return (
         <Portal>
-            <AnimatePresence>
-                {isOpen && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex justify-end"
-                        onClick={onClose}
-                    >
-                        <motion.div
-                            initial={{ x: "100%" }}
-                            animate={{ x: 0 }}
-                            exit={{ x: "100%" }}
-                            transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                            className="w-[500px] h-[calc(100vh-32px)] bg-white dark:bg-dark-surface shadow-2xl rounded-2xl m-4 overflow-hidden"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            {content}
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <div
+                className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                onClick={onClose}
+            >
+                <div
+                    className={`fixed right-4 top-4 bottom-4 w-[480px] bg-white dark:bg-dark-surface shadow-2xl rounded-3xl transition-transform duration-500 ease-out overflow-hidden ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {content}
+                </div>
+            </div>
         </Portal>
     );
 };

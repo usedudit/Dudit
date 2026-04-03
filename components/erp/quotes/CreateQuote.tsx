@@ -252,11 +252,11 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const tax = subtotal * 0.10; // Mock 10% tax
     const total = Math.max(0, subtotal + tax + shippingNum + otherCostsNum - discountValue);
 
-    const quoteCode = existingQuote?.quote_number || (existingQuote?.id ? `#${existingQuote.id.substring(0, 8)}` : '');
+    const quoteCode = existingQuote?.quote_number || "";
     const pageTitle = mode === 'create' ? 'Novo Orçamento' :
-                      mode === 'edit' ? `Editar Orçamento ${quoteCode}` :
-                      mode === 'duplicate' ? `Duplicar Orçamento ${quoteCode}` :
-                      `Orçamento ${quoteCode}`;
+                      mode === 'edit' ? `Editar Orçamento ${quoteCode}`.trim() :
+                      mode === 'duplicate' ? `Duplicar Orçamento ${quoteCode}`.trim() :
+                      `Orçamento ${quoteCode}`.trim();
 
     useEffect(() => {
         setHeaderOverride({
@@ -450,12 +450,12 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
             </div>
 
             {/* Mobile Bottom Action Bar */}
-            <div className="lg:hidden fixed bottom-16 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
                 <Button
                     variant="outline"
                     onClick={onBack}
                     disabled={isSaving}
-                    className="flex-1 h-12 text-sm font-bold"
+                    className="flex-1 h-12 text-sm font-bold rounded-xl"
                 >
                     {mode === 'view' ? "Voltar" : "Cancelar"}
                 </Button>
@@ -463,7 +463,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     <Button
                         onClick={handleSave}
                         disabled={isSaving}
-                        className="flex-1 h-12 text-sm font-bold bg-brand-primary text-white"
+                        className="flex-1 h-12 text-sm font-bold bg-brand-primary text-white rounded-xl shadow-lg shadow-brand-primary/20"
                     >
                         {isSaving ? "Salvando..." : mode === 'edit' ? "Salvar Alterações" : "Salvar Orçamento"}
                     </Button>

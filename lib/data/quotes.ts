@@ -31,8 +31,7 @@ export const getPartnerQuotesCached = cache(async (partnerId: string) => {
                     customer_id,
                     created_at,
                     updated_at,
-                    customers (id, name, email, phone),
-                    user_profiles:user_id (full_name)
+                    customers (id, name, email, phone)
                 `)
                 .eq("partner_id", partnerId)
                 .order("created_at", { ascending: false })
