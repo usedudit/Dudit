@@ -13,6 +13,7 @@ import Pagination from "@/components/reusable/Pagination"
 import QuoteListItem from "./QuoteListItem"
 import QuoteGridCard from "./QuoteGridCard"
 import QuotePageControls from "./QuotePageControls"
+import CreateQuote from "./CreateQuote"
 
 // Icons
 import {
@@ -66,6 +67,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
     const isMobile = useMediaQuery("(max-width: 767px)")
 
     // State
+    const [isCreatingQuote, setIsCreatingQuote] = useState(false)
     const [search, setSearch] = useState("")
     const [debouncedSearch, setDebouncedSearch] = useState("")
     const [activeTab, setActiveTab] = useState<"Todos" | "Enviados" | "Aprovados" | "Rejeitados" | "Expirados">("Todos")
@@ -189,7 +191,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
 
     // Handlers
     const handleAddQuote = () => {
-        router.push(`/erp/quotes/new`)
+        setIsCreatingQuote(true)
     }
     const handleEditQuote = (quote: Quote) => {
         router.push(`/erp/quotes/${quote.originalId}`)
@@ -219,8 +221,13 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.2 }}
-            className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
+            className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300 overflow-hidden relative"
         >
+            <AnimatePresence>
+                {isCreatingQuote && (
+                    <CreateQuote onBack={() => setIsCreatingQuote(false)} />
+                )}
+            </AnimatePresence>
             <style>{`
                 .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 

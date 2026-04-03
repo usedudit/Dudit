@@ -547,7 +547,41 @@ export async function searchProductsForQuote(query: string) {
 
 // ─── SEARCH CUSTOMERS FOR QUOTE ─────────────────────────────────────────────
 
-export async function searchCustomersForQuote(query: string) {
+export async function searchCustomersForQuote(query?: string) {
+    try {
+        const ctx = await getCurrentPartnerContext()
+        if (!ctx?.partnerId) return []
+
+        const supabase = await getSupabaseServerClient()
+        let queryBuilder = supabase
+            .from("customers")
+            .select("id, name, email, phone, created_at")
+            .eq("partner_id", ctx.partnerId)
+            .limit(10)
+
+        if (query && query.trim().length >= 2) {
+            const searchTerm = `%${query}%`
+            queryBuilder = queryBuilder.or(`name.ilike.${searchTerm},email.ilike.${searchTerm}`)
+        } else {
+            queryBuilder = queryBuilder.order('created_at', { ascending: false })
+        }
+
+        const { data, error } = await queryBuilder
+
+        if (error) {
+            console.error("[searchCustomersForQuote] Error:", error)
+            return []
+        }
+
+        return data || []
+    } catch (err) {
+        console.error("[searchCustomersForQuote] Error:", err)
+        return []
+    }
+}
+// ─── SEARCH PRODUCTS WITH VARIANTS ────────────────────────────────────────────────
+
+export async function searchProductsForQuotes(query: string) {
     if (!query || query.trim().length < 2) return []
 
     try {
@@ -558,20 +592,39 @@ export async function searchCustomersForQuote(query: string) {
         const searchTerm = `%${query}%`
 
         const { data, error } = await supabase
-            .from("customers")
-            .select("id, name, email, phone")
+            .from("products")
+            .select(`
+                id, name, sku, price, stock_quantity, images, unit,
+                variants:product_variants(id, variant_name, sku, price_adjustment, stock_quantity)
+            `)
             .eq("partner_id", ctx.partnerId)
-            .or(`name.ilike.${searchTerm},email.ilike.${searchTerm}`)
+            .eq("is_active", true)
+            .or(`name.ilike.${searchTerm},sku.ilike.${searchTerm}`)
             .limit(10)
 
         if (error) {
-            console.error("[searchCustomersForQuote] Error:", error)
+            console.error("Error searching products for quotes:", error)
             return []
         }
 
-        return data || []
+        return data.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            sku: p.sku || 'N/A',
+            stock: p.stock_quantity || 0,
+            price: p.price || 0,
+            unit: p.unit || 'un',
+            image: p.images && p.images.length > 0 ? p.images[0] : 'https://img.dudit.com.br/static/mascots/Box.png',
+            variants: p.variants ? p.variants.map((v: any) => ({
+                id: v.id,
+                name: v.variant_name,
+                sku: v.sku || 'N/A',
+                stock: v.stock_quantity || 0,
+                price: (p.price || 0) + (v.price_adjustment || 0)
+            })) : []
+        }))
     } catch (err) {
-        console.error("[searchCustomersForQuote] Error:", err)
+        console.error("searchProductsForQuotes error:", err)
         return []
     }
 }

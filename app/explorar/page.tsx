@@ -7,6 +7,7 @@ import { getUserSessionData } from "@/lib/data/user"
 import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 import { Suspense } from "react"
+import { ThreeDotsLoader } from "@/components/reusable"
 
 export const metadata: Metadata = {
     title: "Explorar | Vitrine Digital Dudit",
@@ -80,7 +81,7 @@ export default async function ExplorarPage({
             <Suspense
                 fallback={
                     <div className="flex items-center justify-center min-h-[50vh] w-full pt-10">
-                        <div className="w-10 h-10 border-4 border-brand-green/30 border-t-brand-green rounded-full animate-spin" />
+                        <ThreeDotsLoader />
                     </div>
                 }
             >
