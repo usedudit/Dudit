@@ -215,7 +215,7 @@ const QuotePreview = ({
                                                             <div className="text-xs text-gray-600 space-y-1">
                                                                 <p className="font-bold text-black">{selectedCustomer.name}</p>
                                                                 <p>{selectedCustomer.email}</p>
-                                                                <p>{selectedCustomer.phone || "(XX) XXXXX-XXXX"}</p>
+                                                                {selectedCustomer.phone && <p>{selectedCustomer.phone}</p>}
                                                             </div>
                                                         ) : (
                                                             <p className="text-xs text-gray-400">Nenhum cliente selecionado</p>

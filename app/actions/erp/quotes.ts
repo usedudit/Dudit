@@ -677,3 +677,35 @@ export async function getQuoteDetailsAction(quoteId: string, partnerId: string) 
         return errorResponse(err.message || "Erro interno ao buscar detalhes do orçamento")
     }
 }
+
+// ─── GET PARTNER ADDRESS ───────────────────────────────────────────────────
+
+export async function getPartnerAddressAction(partnerId: string) {
+    try {
+        const supabase = await getSupabaseServerClient()
+        
+        const { data, error } = await supabase
+            .from("addresses")
+            .select("*")
+            .eq("partner_id", partnerId)
+            .eq("is_default", true)
+            .maybeSingle()
+
+        if (error) {
+            console.error("[getPartnerAddressAction] Error:", error)
+            return errorResponse("Erro ao buscar endereço do parceiro")
+        }
+
+        if (!data) return successResponse(null)
+
+        const formattedAddress = `${data.street}, ${data.number}${data.complement ? ` - ${data.complement}` : ''}\n${data.neighborhood} - ${data.city}/${data.state}\nCEP: ${data.zip_code}`;
+
+        return successResponse({
+            ...data,
+            formatted: formattedAddress
+        })
+    } catch (err: any) {
+        console.error("[getPartnerAddressAction] Error:", err)
+        return errorResponse("Erro interno ao buscar endereço")
+    }
+}

@@ -124,7 +124,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
                     sent: { label: "Enviado", color: "blue" },
                     approved: { label: "Aprovado", color: "green" },
                     rejected: { label: "Rejeitado", color: "red" },
-                    expired: { label: "Expirado", color: "yellow" },
+                    expired: { label: "Expirado", color: "orange" },
                 }
                 const statusInfo = statusMap[q.status] || { label: q.status, color: "gray" }
 

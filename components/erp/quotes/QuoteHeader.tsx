@@ -65,6 +65,7 @@ const QuoteHeader = ({ isScrolled, onBack, onSave, isSaving, title, subtitle, sa
                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0 h-auto">
                         <TabsTrigger value="Dados Gerais" className={`px-0 transition-all duration-300 ${isScrolled ? "pb-2 text-xs" : "pb-3 text-sm"}`}>Dados Gerais</TabsTrigger>
                         <TabsTrigger value="Observações" className={`px-0 transition-all duration-300 ${isScrolled ? "pb-2 text-xs" : "pb-3 text-sm"}`}>Observações</TabsTrigger>
+                        <TabsTrigger value="Visualização" className={`px-0 transition-all duration-300 ${isScrolled ? "pb-2 text-xs" : "pb-3 text-sm"}`}>Visualização</TabsTrigger>
                     </TabsList>
                 </div>
             </div>

@@ -11,7 +11,7 @@ import SelectCustomerSheet from './SelectCustomerSheet';
 import SelectVariantSheet from './SelectVariantSheet';
 import { useToast } from '@/hooks/use-toast';
 import { useStore } from '@/lib/store-context';
-import { searchProductsForQuotes, createQuoteAction, getQuoteDetailsAction } from '@/app/actions/erp/quotes';
+import { searchProductsForQuotes, createQuoteAction, getQuoteDetailsAction, getPartnerAddressAction } from '@/app/actions/erp/quotes';
 import { useSidebar } from '@/lib/sidebar-context';
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 
@@ -31,10 +31,22 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
     // Partner info for preview
     const partnerName = selectedStore?.name || 'Sua Loja';
-    const partnerAddress = 'Endereço não informado'; // We'll stick with this for now as address isn't in selectedStore
+    const [partnerAddress, setPartnerAddress] = useState('Endereço não informado');
     const partnerAvatar = selectedStore?.image_url || '';
     const [isScrolled, setIsScrolled] = useState(false);
     const [activeTab, setActiveTab] = useState('Dados Gerais');
+
+    // Fetch Partner Address
+    useEffect(() => {
+        const fetchAddress = async () => {
+            if (!partnerId) return;
+            const res = await getPartnerAddressAction(partnerId);
+            if (res.success && res.data?.formatted) {
+                setPartnerAddress(res.data.formatted);
+            }
+        };
+        fetchAddress();
+    }, [partnerId]);
 
     // Search States
     const [searchQuery, setSearchQuery] = useState('');
@@ -435,24 +447,6 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                             saveLabel={mode === 'edit' ? "Salvar Alterações" : "Salvar Orçamento"}
                         />
 
-                        {/* MOBILE TAB TOGGLE */}
-                        <div className="lg:hidden px-4 md:px-8 py-2 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
-                            <div className="flex items-center p-1 bg-brand-gray dark:bg-dark-border/20 rounded-full w-full">
-                                <button
-                                    onClick={() => setActiveTab('Dados Gerais')}
-                                    className={`flex-1 py-1.5 text-xs font-bold rounded-full transition-all ${activeTab !== 'Visualização' ? 'bg-white dark:bg-dark-surface shadow-sm text-brand-primary' : 'text-brand-inactive-text'}`}
-                                >
-                                    Edição
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab('Visualização')}
-                                    className={`flex-1 py-1.5 text-xs font-bold rounded-full transition-all ${activeTab === 'Visualização' ? 'bg-white dark:bg-dark-surface shadow-sm text-brand-primary' : 'text-brand-inactive-text'}`}
-                                >
-                                    Visualização
-                                </button>
-                            </div>
-                        </div>
-
                         {/* SCROLLABLE FORM AREA */}
                         <div
                             className="flex-1 overflow-auto no-scrollbar bg-white dark:bg-dark-surface transition-colors duration-300 scroll-smooth pb-24 lg:pb-0"
@@ -513,7 +507,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                 {/* RIGHT SIDE - PREVIEW */}
                 <div className={`h-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 ${activeTab === 'Visualização' ? 'flex w-full' : 'hidden lg:flex'}`}>
                     <QuotePreview
-                        invoiceNumber={mode === 'create' ? 'QTE-2024-NEW' : existingQuote?.id}
+                        invoiceNumber={mode === 'create' ? 'QTE-2024-NEW' : (existingQuote?.quote_number || existingQuote?.id)}
                         quoteDate={quoteDate}
                         expiryDate={expiryDate}
                         selectedCustomer={selectedCustomer}
