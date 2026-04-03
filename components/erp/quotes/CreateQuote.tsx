@@ -1,8 +1,8 @@
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Tabs, Button } from '@/components/reusable';
+import { Tabs, Button, AlertModal } from '@/components/reusable';
 import { FadeIn } from '@/components/animations/FadeIn';
 import QuoteHeader from './QuoteHeader';
 import QuoteEditor from './QuoteEditor';
@@ -11,8 +11,9 @@ import SelectCustomerSheet from './SelectCustomerSheet';
 import SelectVariantSheet from './SelectVariantSheet';
 import { useToast } from '@/hooks/use-toast';
 import { useStore } from '@/lib/store-context';
-import { searchProductsForQuotes, createQuoteAction } from '@/app/actions/erp/quotes';
+import { searchProductsForQuotes, createQuoteAction, getQuoteDetailsAction } from '@/app/actions/erp/quotes';
 import { useSidebar } from '@/lib/sidebar-context';
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 
 interface CreateQuoteProps {
     partnerId: string;
@@ -26,6 +27,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const { selectedStore } = useStore();
     const { setHeaderOverride } = useSidebar();
     const [isSaving, setIsSaving] = useState(false);
+    const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
     // Partner info for preview
     const partnerName = selectedStore?.name || 'Sua Loja';
@@ -39,6 +41,135 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const [isProductSearchOpen, setIsProductSearchOpen] = useState(false);
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
+
+    // Sheet States
+    const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false);
+    const [isVariantSheetOpen, setIsVariantSheetOpen] = useState(false);
+    const [productToSelectVariant, setProductToSelectVariant] = useState<any | null>(null);
+
+    // Quote State
+    const [quoteItems, setQuoteItems] = useState<any[]>([]);
+    const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+    const [internalNote, setInternalNote] = useState('');
+
+    // Settings State
+    const [quoteDate, setQuoteDate] = useState(new Date().toISOString().split('T')[0]);
+    const [expiryDate, setExpiryDate] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+    const [status, setStatus] = useState('draft');
+
+    // Layout Settings State
+    const [primaryColor, setPrimaryColor] = useState('#113833');
+    const [secondaryColor, setSecondaryColor] = useState('#d4f995');
+    const [quoteTitle, setQuoteTitle] = useState('ORÇAMENTO');
+    const [quoteSubtitle, setQuoteSubtitle] = useState('');
+
+    // Financials State
+    const [discount, setDiscount] = useState('');
+    const [discountType, setDiscountType] = useState<'R$' | '%'>('R$');
+    const [shippingFee, setShippingFee] = useState('');
+    const [otherCosts, setOtherCosts] = useState('');
+
+    // Persistence State (for isDirty)
+    const [originalQuoteData, setOriginalQuoteData] = useState<any>(null);
+
+    // 1. Fetch Full Quote Details if existingQuote is provided
+    useEffect(() => {
+        const fetchDetails = async () => {
+            if (!existingQuote?.id || (mode === 'create')) return;
+
+            setIsLoadingDetails(true);
+            try {
+                const res = await getQuoteDetailsAction(existingQuote.id, partnerId);
+                if (res.success && res.data) {
+                    const q = res.data;
+                    
+                    // Map items
+                    const items = q.items.map((item: any) => ({
+                        id: item.product_id || `legacy-${item.id}`,
+                        rowId: `item-${item.id}`,
+                        name: item.custom_name || item.products?.name || 'Item sem nome',
+                        sku: item.products?.sku || 'N/A',
+                        price: Number(item.unit_price),
+                        qty: Number(item.quantity),
+                        image: item.products?.images?.[0] || 'https://img.dudit.com.br/static/mascots/Box.png',
+                        isEditing: false
+                    }));
+
+                    setQuoteItems(items);
+                    setSelectedCustomer(q.customers);
+                    setInternalNote(q.notes || '');
+                    setQuoteDate(q.issue_date);
+                    setExpiryDate(q.expiration_date);
+                    setStatus(q.status);
+                    setDiscount(q.discount_value?.toString() || '');
+                    setDiscountType(q.discount_type === 'percentage' ? '%' : 'R$');
+                    setShippingFee(q.shipping_cost?.toString() || '');
+                    setOtherCosts(q.additional_costs?.toString() || '');
+
+                    // Snapshot for dirty check
+                    const snapshot = {
+                        items,
+                        customer: q.customers,
+                        note: q.notes || '',
+                        date: q.issue_date,
+                        expiry: q.expiration_date,
+                        status: q.status,
+                        discount: q.discount_value?.toString() || '',
+                        discountType: q.discount_type === 'percentage' ? '%' : 'R$',
+                        shipping: q.shipping_cost?.toString() || '',
+                        others: q.additional_costs?.toString() || ''
+                    };
+                    setOriginalQuoteData(snapshot);
+                }
+            } catch (err) {
+                console.error("Error fetching quote details:", err);
+            } finally {
+                setIsLoadingDetails(false);
+            }
+        };
+
+        fetchDetails();
+    }, [existingQuote?.id, mode, partnerId]);
+
+    // Unsaved Changes Logic
+    const currentData = useMemo(() => ({
+        items: quoteItems,
+        customer: selectedCustomer,
+        note: internalNote,
+        date: quoteDate,
+        expiry: expiryDate,
+        status,
+        discount,
+        discountType,
+        shipping: shippingFee,
+        others: otherCosts
+    }), [quoteItems, selectedCustomer, internalNote, quoteDate, expiryDate, status, discount, discountType, shippingFee, otherCosts]);
+
+    const isDirty = useMemo(() => {
+        if (!originalQuoteData) return mode === 'create' && quoteItems.length > 0;
+        return JSON.stringify(currentData) !== JSON.stringify(originalQuoteData);
+    }, [currentData, originalQuoteData, mode, quoteItems.length]);
+
+    const { showConfirmDialog: unsavedChangesDialogOpen, confirmNavigation: handleUnsavedChangesConfirm, cancelNavigation: handleUnsavedChangesDialogClose } = useUnsavedChanges(isDirty && mode !== 'view');
+
+    const [showAlertModal, setShowAlertModal] = useState(false);
+    const [nextAction, setNextAction] = useState<(() => void) | null>(null);
+
+    const handleAttemptNav = useCallback((action: () => void) => {
+        if (isDirty && mode !== 'view') {
+            setNextAction(() => action);
+            setShowAlertModal(true);
+        } else {
+            action();
+        }
+    }, [isDirty, mode]);
+
+    const handleBackWithSafety = useCallback(() => handleAttemptNav(onBack), [handleAttemptNav, onBack]);
+
+    const confirmNavigation = useCallback(() => {
+        nextAction?.();
+        setShowAlertModal(false);
+    }, [nextAction]);
 
     // Debounced real search
     useEffect(() => {
@@ -55,61 +186,24 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
-    // Sheet States
-    const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false);
-    const [isVariantSheetOpen, setIsVariantSheetOpen] = useState(false);
-    const [productToSelectVariant, setProductToSelectVariant] = useState<any | null>(null);
-
-    // Quote State
-    const [quoteItems, setQuoteItems] = useState<any[]>(existingQuote?.items || []);
-    const [selectedCustomer, setSelectedCustomer] = useState<any>(existingQuote?.customer || null);
-    const [internalNote, setInternalNote] = useState('');
-
-    // Settings State
-    const [quoteDate, setQuoteDate] = useState(existingQuote?.date || new Date().toISOString().split('T')[0]);
-    const [expiryDate, setExpiryDate] = useState(existingQuote?.expiry || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-    const [salesperson, setSalesperson] = useState('Jenny Wilson');
-
-    // Layout Settings State
-    const [primaryColor, setPrimaryColor] = useState('#113833');
-    const [secondaryColor, setSecondaryColor] = useState('#d4f995');
-    const [quoteTitle, setQuoteTitle] = useState('ORÇAMENTO');
-    const [quoteSubtitle, setQuoteSubtitle] = useState('');
-
-    // Financials State
-    const [discount, setDiscount] = useState('');
-    const [discountType, setDiscountType] = useState<'R$' | '%'>('R$');
-    const [shippingFee, setShippingFee] = useState('');
-    const [otherCosts, setOtherCosts] = useState('');
-
-    // Derived Values
-    const invoiceNumber = (mode === 'edit') ? existingQuote?.id : 'QTE-2024-NEW';
-
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         setIsScrolled(e.currentTarget.scrollTop > 20);
     };
 
     // 1. Handle Product Click
     const handleProductClick = (product: any) => {
-        // Prepare variants or synthetic variant
-        let variants = product.variants || [];
-
+        // If product has no variants, add it directly
+        const variants = product.variants || [];
+        
         if (variants.length === 0) {
-            variants = [{
-                id: 'default',
-                name: product.name,
-                sku: product.sku,
-                price: product.price,
-                stock: product.stock,
-                qty: 0
-            }];
-        } else {
-            variants = variants.map((v: any) => ({ ...v, qty: 0 }));
+            addItem(product, undefined, undefined, 1, product.price);
+            setIsProductSearchOpen(false);
+            return;
         }
 
         const productWithQty = {
             ...product,
-            variants: variants
+            variants: variants.map((v: any) => ({ ...v, qty: 0 }))
         };
         setProductToSelectVariant(productWithQty);
         setIsVariantSheetOpen(true);
@@ -141,7 +235,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     price: finalPrice,
                     variant: variantName,
                     qty: qty,
-                    isEditing: false // Search items start in view mode
+                    isEditing: false
                 }];
             }
         });
@@ -163,7 +257,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                 qty: 1,
                 image: '',
                 isBlank: true,
-                isEditing: true // Starts in edit mode
+                isEditing: true
             }
         ]);
     };
@@ -222,14 +316,12 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         setQuoteItems(newItems);
     };
 
-    // Generic update for name/sku
     const updateItemField = (index: number, field: string, value: any) => {
         const newItems = [...quoteItems];
         newItems[index] = { ...newItems[index], [field]: value };
         setQuoteItems(newItems);
     };
 
-    // Toggle Edit Mode
     const toggleItemEdit = (index: number, isEditing: boolean) => {
         const newItems = [...quoteItems];
         newItems[index] = { ...newItems[index], isEditing };
@@ -261,11 +353,11 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     useEffect(() => {
         setHeaderOverride({
             title: pageTitle,
-            onBack: onBack,
+            onBack: handleBackWithSafety,
             isSubPage: true
         });
         return () => setHeaderOverride(null);
-    }, [pageTitle, onBack, setHeaderOverride]);
+    }, [pageTitle, handleBackWithSafety, setHeaderOverride]);
 
     const handleSave = async () => {
         if (quoteItems.length === 0) {
@@ -300,10 +392,13 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
             if (result.success) {
                 toast({
-                    title: "Orçamento criado!",
+                    title: mode === 'edit' ? "Alterações salvas!" : "Orçamento criado!",
                     description: "O orçamento foi salvo com sucesso.",
                 });
-                onBack(); // Close wrapper
+                
+                // Clear dirty state
+                setOriginalQuoteData(currentData);
+                onBack();
             } else {
                 toast({
                     title: "Erro ao salvar",
@@ -323,19 +418,16 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         }
     };
 
-    const filteredProducts = searchResults;
-
     return (
         <FadeIn className="flex flex-col h-[calc(100vh-64px)] md:h-[calc(100vh-72px)] bg-white dark:bg-dark-background transition-colors duration-300 overflow-hidden relative">
             <div className="flex flex-row h-full w-full overflow-hidden">
-                {/* LEFT SIDE - EDITOR (Full width on mobile, 50% on large) */}
+                {/* LEFT SIDE - EDITOR */}
                 <div className={`flex flex-col h-full w-full lg:w-1/2 transition-all duration-300 ease-in-out relative z-10 border-r border-brand-border dark:border-dark-border ${activeTab === 'Visualização' ? 'hidden lg:flex' : 'flex'}`}>
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
 
-                        {/* MODULAR HEADER */}
                         <QuoteHeader
                             isScrolled={isScrolled}
-                            onBack={onBack}
+                            onBack={handleBackWithSafety}
                             onSave={mode !== 'view' ? handleSave : undefined}
                             isSaving={isSaving}
                             title={pageTitle}
@@ -343,7 +435,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                             saveLabel={mode === 'edit' ? "Salvar Alterações" : "Salvar Orçamento"}
                         />
 
-                        {/* MOBILE TAB TOGGLE (Editor vs Preview) */}
+                        {/* MOBILE TAB TOGGLE */}
                         <div className="lg:hidden px-4 md:px-8 py-2 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
                             <div className="flex items-center p-1 bg-brand-gray dark:bg-dark-border/20 rounded-full w-full">
                                 <button
@@ -371,7 +463,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                 setSearchQuery={setSearchQuery}
                                 isProductSearchOpen={isProductSearchOpen}
                                 setIsProductSearchOpen={setIsProductSearchOpen}
-                                filteredProducts={filteredProducts}
+                                filteredProducts={searchResults}
                                 isSearching={isSearching}
                                 handleProductClick={handleProductClick}
                                 addBlankItem={addBlankItem}
@@ -381,7 +473,6 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                 updateItemField={updateItemField}
                                 toggleItemEdit={toggleItemEdit}
                                 removeItem={removeItem}
-                                // Financial Props
                                 discount={discount}
                                 setDiscount={setDiscount}
                                 discountType={discountType}
@@ -390,25 +481,21 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                 setShippingFee={setShippingFee}
                                 otherCosts={otherCosts}
                                 setOtherCosts={setOtherCosts}
-                                // Calc Props
                                 subtotal={subtotal}
                                 tax={tax}
                                 discountValue={discountValue}
                                 total={total}
-                                // Customer Props
                                 selectedCustomer={selectedCustomer}
                                 setSelectedCustomer={setSelectedCustomer}
                                 setIsCustomerSheetOpen={setIsCustomerSheetOpen}
-                                // Settings Props
                                 quoteDate={quoteDate}
                                 setQuoteDate={setQuoteDate}
                                 expiryDate={expiryDate}
                                 setExpiryDate={setExpiryDate}
-                                salesperson={salesperson}
-                                setSalesperson={setSalesperson}
+                                status={status}
+                                setStatus={setStatus}
                                 internalNote={internalNote}
                                 setInternalNote={setInternalNote}
-                                // Layout Props
                                 primaryColor={primaryColor}
                                 setPrimaryColor={setPrimaryColor}
                                 secondaryColor={secondaryColor}
@@ -423,10 +510,10 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     </Tabs>
                 </div>
 
-                {/* RIGHT SIDE - PREVIEW (Hidden on mobile if not in Preview tab) */}
+                {/* RIGHT SIDE - PREVIEW */}
                 <div className={`h-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 ${activeTab === 'Visualização' ? 'flex w-full' : 'hidden lg:flex'}`}>
                     <QuotePreview
-                        invoiceNumber={invoiceNumber}
+                        invoiceNumber={mode === 'create' ? 'QTE-2024-NEW' : existingQuote?.id}
                         quoteDate={quoteDate}
                         expiryDate={expiryDate}
                         selectedCustomer={selectedCustomer}
@@ -453,7 +540,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
                 <Button
                     variant="outline"
-                    onClick={onBack}
+                    onClick={handleBackWithSafety}
                     disabled={isSaving}
                     className="flex-1 h-12 text-sm font-bold rounded-xl"
                 >
@@ -462,35 +549,47 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                 {mode !== 'view' && (
                     <Button
                         onClick={handleSave}
-                        disabled={isSaving}
+                        isLoading={isSaving}
                         className="flex-1 h-12 text-sm font-bold bg-brand-primary text-white rounded-xl shadow-lg shadow-brand-primary/20"
                     >
-                        {isSaving ? "Salvando..." : mode === 'edit' ? "Salvar Alterações" : "Salvar Orçamento"}
+                        {mode === 'edit' ? "Salvar Alterações" : "Salvar Orçamento"}
                     </Button>
                 )}
             </div>
 
-            {/* Reusable Customer Selection Sheet */}
             <SelectCustomerSheet
                 isOpen={isCustomerSheetOpen}
                 onClose={() => setIsCustomerSheetOpen(false)}
-                onSelect={(c: any) => {
-                    setSelectedCustomer(c);
-                    setIsCustomerSheetOpen(false);
-                }}
+                onSelect={(c: any) => setSelectedCustomer(c)}
             />
 
-            {/* Variant Selection Modal */}
-            <AnimatePresence>
-                {productToSelectVariant && (
-                    <SelectVariantSheet
-                        isOpen={isVariantSheetOpen}
-                        onClose={() => setIsVariantSheetOpen(false)}
-                        product={productToSelectVariant}
-                        onConfirm={handleConfirmVariants}
-                    />
-                )}
-            </AnimatePresence>
+            <SelectVariantSheet
+                isOpen={isVariantSheetOpen}
+                onClose={() => setIsVariantSheetOpen(false)}
+                product={productToSelectVariant}
+                onConfirm={handleConfirmVariants}
+            />
+
+            {/* Confirmation Modals */}
+            <AlertModal
+                isOpen={showAlertModal}
+                onClose={() => setShowAlertModal(false)}
+                onConfirm={confirmNavigation}
+                title="Descartar Alterações"
+                description="Você tem alterações não salvas. Deseja realmente sair sem salvar?"
+                confirmText="Sim, Descartar"
+                cancelText="Continuar Editando"
+            />
+
+            <AlertModal
+                isOpen={unsavedChangesDialogOpen}
+                onClose={handleUnsavedChangesDialogClose}
+                onConfirm={handleUnsavedChangesConfirm}
+                title="Descartar Alterações"
+                description="Você tem alterações não salvas. Deseja realmente sair sem salvar?"
+                confirmText="Sim, Descartar"
+                cancelText="Continuar Editando"
+            />
         </FadeIn>
     );
 };

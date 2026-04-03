@@ -63,9 +63,17 @@ const QuoteListItem = React.memo(
                     )
 
                 case "status":
+                    const dotColors: Record<string, string> = {
+                        green: "bg-green-500",
+                        blue: "bg-blue-500",
+                        red: "bg-red-500",
+                        yellow: "bg-yellow-500",
+                        gray: "bg-gray-500",
+                    }
                     return (
-                        <div className="flex items-center justify-center gap-2">
-                            <Badge variant={quote.statusColor}>
+                        <div className="flex items-center justify-center">
+                            <Badge variant={quote.statusColor} className="pl-1.5 pr-3 py-1 flex items-center gap-2">
+                                <div className={`w-1.5 h-1.5 rounded-full ${dotColors[quote.statusColor] || "bg-gray-500"}`} />
                                 {quote.statusLabel}
                             </Badge>
                         </div>

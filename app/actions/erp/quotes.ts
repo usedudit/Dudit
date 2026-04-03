@@ -628,3 +628,52 @@ export async function searchProductsForQuotes(query: string) {
         return []
     }
 }
+
+// ─── GET QUOTE DETAILS ──────────────────────────────────────────────────────
+
+export async function getQuoteDetailsAction(quoteId: string, partnerId: string) {
+    try {
+        const user = await requireUser()
+        await requirePartnerAccessWithPermission(partnerId, "quotes", "view", user)
+
+        const supabase = await getSupabaseServerClient()
+
+        // 1. Fetch quote
+        const { data: quote, error: quoteError } = await supabase
+            .from("quotes")
+            .select(`
+                *,
+                customers (id, name, email, phone)
+            `)
+            .eq("id", quoteId)
+            .eq("partner_id", partnerId)
+            .single()
+
+        if (quoteError || !quote) {
+            console.error("[getQuoteDetailsAction] Quote error:", quoteError)
+            return errorResponse("Orçamento não encontrado")
+        }
+
+        // 2. Fetch items with product info
+        const { data: items, error: itemsError } = await supabase
+            .from("quote_items")
+            .select(`
+                *,
+                products (id, name, sku, images, price)
+            `)
+            .eq("quote_id", quoteId)
+            .order("sort_order", { ascending: true })
+
+        if (itemsError) {
+            console.error("[getQuoteDetailsAction] Items error:", itemsError)
+        }
+
+        return successResponse({
+            ...quote,
+            items: items || []
+        })
+    } catch (err: any) {
+        console.error("[getQuoteDetailsAction] Error:", err)
+        return errorResponse(err.message || "Erro interno ao buscar detalhes do orçamento")
+    }
+}
