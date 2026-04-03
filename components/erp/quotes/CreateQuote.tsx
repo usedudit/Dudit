@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Tabs } from '@/components/reusable';
+import { Tabs, Button } from '@/components/reusable';
+import { FadeIn } from '@/components/animations/FadeIn';
 import QuoteHeader from './QuoteHeader';
 import QuoteEditor from './QuoteEditor';
 import QuotePreview from './QuotePreview';
@@ -11,17 +12,19 @@ import SelectVariantSheet from './SelectVariantSheet';
 import { useToast } from '@/hooks/use-toast';
 import { useStore } from '@/lib/store-context';
 import { searchProductsForQuotes, createQuoteAction } from '@/app/actions/erp/quotes';
+import { useSidebar } from '@/lib/sidebar-context';
 
 interface CreateQuoteProps {
     partnerId: string;
     onBack: () => void;
     existingQuote?: any;
-    mode: 'create' | 'edit' | 'duplicate';
+    mode: 'create' | 'edit' | 'duplicate' | 'view';
 }
 
 const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProps) => {
     const { toast } = useToast();
     const { selectedStore } = useStore();
+    const { setHeaderOverride } = useSidebar();
     const [isSaving, setIsSaving] = useState(false);
 
     // Partner info for preview
@@ -249,6 +252,21 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const tax = subtotal * 0.10; // Mock 10% tax
     const total = Math.max(0, subtotal + tax + shippingNum + otherCostsNum - discountValue);
 
+    const quoteCode = existingQuote?.quote_number || (existingQuote?.id ? `#${existingQuote.id.substring(0, 8)}` : '');
+    const pageTitle = mode === 'create' ? 'Novo Orçamento' :
+                      mode === 'edit' ? `Editar Orçamento ${quoteCode}` :
+                      mode === 'duplicate' ? `Duplicar Orçamento ${quoteCode}` :
+                      `Orçamento ${quoteCode}`;
+
+    useEffect(() => {
+        setHeaderOverride({
+            title: pageTitle,
+            onBack: onBack,
+            isSubPage: true
+        });
+        return () => setHeaderOverride(null);
+    }, [pageTitle, onBack, setHeaderOverride]);
+
     const handleSave = async () => {
         if (quoteItems.length === 0) {
             toast({
@@ -308,112 +326,149 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const filteredProducts = searchResults;
 
     return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="fixed inset-0 z-[60] flex h-screen w-screen bg-white dark:bg-dark-surface transition-colors duration-300 overflow-hidden shadow-2xl"
-        >
-            {/* LEFT SIDE - EDITOR (50% Width on Large Screens) */}
-            <div
-                className="flex flex-col h-full w-full lg:w-1/2 transition-all duration-300 ease-in-out relative z-10 border-r border-brand-border dark:border-dark-border"
-            >
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
+        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300 overflow-hidden relative">
+            <div className="flex flex-row h-full w-full overflow-hidden">
+                {/* LEFT SIDE - EDITOR (Full width on mobile, 50% on large) */}
+                <div className={`flex flex-col h-full w-full lg:w-1/2 transition-all duration-300 ease-in-out relative z-10 border-r border-brand-border dark:border-dark-border ${activeTab === 'Visualização' ? 'hidden lg:flex' : 'flex'}`}>
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
 
-                    {/* MODULAR HEADER */}
-                    <QuoteHeader
-                        isScrolled={isScrolled}
-                        onBack={onBack}
-                        onSave={handleSave}
-                        isSaving={isSaving}
-                        title={existingQuote ? `Editar Orçamento #${existingQuote.id}` : 'Novo Orçamento'}
-                        subtitle="Crie uma proposta comercial para seu cliente"
-                    />
-
-                    {/* SCROLLABLE FORM AREA */}
-                    <div
-                        className="flex-1 overflow-auto no-scrollbar bg-white dark:bg-dark-surface transition-colors duration-300 scroll-smooth"
-                        onScroll={handleScroll}
-                    >
-                        <QuoteEditor
-                            searchQuery={searchQuery}
-                            setSearchQuery={setSearchQuery}
-                            isProductSearchOpen={isProductSearchOpen}
-                            setIsProductSearchOpen={setIsProductSearchOpen}
-                            filteredProducts={filteredProducts}
-                            isSearching={isSearching}
-                            handleProductClick={handleProductClick}
-                            addBlankItem={addBlankItem}
-                            quoteItems={quoteItems}
-                            updateItemPrice={updateItemPrice}
-                            updateItemQty={updateItemQty}
-                            updateItemField={updateItemField}
-                            toggleItemEdit={toggleItemEdit}
-                            removeItem={removeItem}
-                            // Financial Props
-                            discount={discount}
-                            setDiscount={setDiscount}
-                            discountType={discountType}
-                            setDiscountType={setDiscountType}
-                            shippingFee={shippingFee}
-                            setShippingFee={setShippingFee}
-                            otherCosts={otherCosts}
-                            setOtherCosts={setOtherCosts}
-                            // Calc Props
-                            subtotal={subtotal}
-                            tax={tax}
-                            discountValue={discountValue}
-                            total={total}
-                            // Customer Props
-                            selectedCustomer={selectedCustomer}
-                            setSelectedCustomer={setSelectedCustomer}
-                            setIsCustomerSheetOpen={setIsCustomerSheetOpen}
-                            // Settings Props
-                            quoteDate={quoteDate}
-                            setQuoteDate={setQuoteDate}
-                            expiryDate={expiryDate}
-                            setExpiryDate={setExpiryDate}
-                            salesperson={salesperson}
-                            setSalesperson={setSalesperson}
-                            internalNote={internalNote}
-                            setInternalNote={setInternalNote}
-                            // Layout Props
-                            primaryColor={primaryColor}
-                            setPrimaryColor={setPrimaryColor}
-                            secondaryColor={secondaryColor}
-                            setSecondaryColor={setSecondaryColor}
-                            quoteTitle={quoteTitle}
-                            setQuoteTitle={setQuoteTitle}
-                            quoteSubtitle={quoteSubtitle}
-                            setQuoteSubtitle={setQuoteSubtitle}
+                        {/* MODULAR HEADER */}
+                        <QuoteHeader
+                            isScrolled={isScrolled}
+                            onBack={onBack}
+                            onSave={mode !== 'view' ? handleSave : undefined}
+                            isSaving={isSaving}
+                            title={pageTitle}
+                            subtitle={mode === 'view' ? "Detalhes da proposta comercial" : "Crie uma proposta comercial para seu cliente"}
+                            saveLabel={mode === 'edit' ? "Salvar Alterações" : "Salvar Orçamento"}
                         />
-                    </div>
-                </Tabs>
+
+                        {/* MOBILE TAB TOGGLE (Editor vs Preview) */}
+                        <div className="lg:hidden px-4 md:px-8 py-2 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                            <div className="flex items-center p-1 bg-brand-gray dark:bg-dark-border/20 rounded-full w-full">
+                                <button
+                                    onClick={() => setActiveTab('Dados Gerais')}
+                                    className={`flex-1 py-1.5 text-xs font-bold rounded-full transition-all ${activeTab !== 'Visualização' ? 'bg-white dark:bg-dark-surface shadow-sm text-brand-primary' : 'text-brand-inactive-text'}`}
+                                >
+                                    Edição
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('Visualização')}
+                                    className={`flex-1 py-1.5 text-xs font-bold rounded-full transition-all ${activeTab === 'Visualização' ? 'bg-white dark:bg-dark-surface shadow-sm text-brand-primary' : 'text-brand-inactive-text'}`}
+                                >
+                                    Visualização
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* SCROLLABLE FORM AREA */}
+                        <div
+                            className="flex-1 overflow-auto no-scrollbar bg-white dark:bg-dark-surface transition-colors duration-300 scroll-smooth pb-24 lg:pb-0"
+                            onScroll={handleScroll}
+                        >
+                            <QuoteEditor
+                                searchQuery={searchQuery}
+                                setSearchQuery={setSearchQuery}
+                                isProductSearchOpen={isProductSearchOpen}
+                                setIsProductSearchOpen={setIsProductSearchOpen}
+                                filteredProducts={filteredProducts}
+                                isSearching={isSearching}
+                                handleProductClick={handleProductClick}
+                                addBlankItem={addBlankItem}
+                                quoteItems={quoteItems}
+                                updateItemPrice={updateItemPrice}
+                                updateItemQty={updateItemQty}
+                                updateItemField={updateItemField}
+                                toggleItemEdit={toggleItemEdit}
+                                removeItem={removeItem}
+                                // Financial Props
+                                discount={discount}
+                                setDiscount={setDiscount}
+                                discountType={discountType}
+                                setDiscountType={setDiscountType}
+                                shippingFee={shippingFee}
+                                setShippingFee={setShippingFee}
+                                otherCosts={otherCosts}
+                                setOtherCosts={setOtherCosts}
+                                // Calc Props
+                                subtotal={subtotal}
+                                tax={tax}
+                                discountValue={discountValue}
+                                total={total}
+                                // Customer Props
+                                selectedCustomer={selectedCustomer}
+                                setSelectedCustomer={setSelectedCustomer}
+                                setIsCustomerSheetOpen={setIsCustomerSheetOpen}
+                                // Settings Props
+                                quoteDate={quoteDate}
+                                setQuoteDate={setQuoteDate}
+                                expiryDate={expiryDate}
+                                setExpiryDate={setExpiryDate}
+                                salesperson={salesperson}
+                                setSalesperson={setSalesperson}
+                                internalNote={internalNote}
+                                setInternalNote={setInternalNote}
+                                // Layout Props
+                                primaryColor={primaryColor}
+                                setPrimaryColor={setPrimaryColor}
+                                secondaryColor={secondaryColor}
+                                setSecondaryColor={setSecondaryColor}
+                                quoteTitle={quoteTitle}
+                                setQuoteTitle={setQuoteTitle}
+                                quoteSubtitle={quoteSubtitle}
+                                setQuoteSubtitle={setQuoteSubtitle}
+                                isReadOnly={mode === 'view'}
+                            />
+                        </div>
+                    </Tabs>
+                </div>
+
+                {/* RIGHT SIDE - PREVIEW (Hidden on mobile if not in Preview tab) */}
+                <div className={`h-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 ${activeTab === 'Visualização' ? 'flex w-full' : 'hidden lg:flex'}`}>
+                    <QuotePreview
+                        invoiceNumber={invoiceNumber}
+                        quoteDate={quoteDate}
+                        expiryDate={expiryDate}
+                        selectedCustomer={selectedCustomer}
+                        quoteItems={quoteItems}
+                        subtotal={subtotal}
+                        tax={tax}
+                        shippingNum={shippingNum}
+                        otherCosts={parseFloat(otherCosts) || 0}
+                        discountValue={discountValue}
+                        total={total}
+                        note={internalNote}
+                        primaryColor={primaryColor}
+                        secondaryColor={secondaryColor}
+                        quoteTitle={quoteTitle}
+                        quoteSubtitle={quoteSubtitle}
+                        partnerName={partnerName}
+                        partnerAddress={partnerAddress}
+                        partnerAvatar={partnerAvatar}
+                    />
+                </div>
             </div>
 
-            {/* RIGHT SIDE - PREVIEW */}
-            <QuotePreview
-                invoiceNumber={invoiceNumber}
-                quoteDate={quoteDate}
-                expiryDate={expiryDate}
-                selectedCustomer={selectedCustomer}
-                quoteItems={quoteItems}
-                subtotal={subtotal}
-                tax={tax}
-                shippingNum={shippingNum}
-                otherCosts={parseFloat(otherCosts) || 0}
-                discountValue={discountValue}
-                total={total}
-                note={internalNote}
-                primaryColor={primaryColor}
-                secondaryColor={secondaryColor}
-                quoteTitle={quoteTitle}
-                quoteSubtitle={quoteSubtitle}
-                partnerName={partnerName}
-                partnerAddress={partnerAddress}
-                partnerAvatar={partnerAvatar}
-            />
+            {/* Mobile Bottom Action Bar */}
+            <div className="lg:hidden fixed bottom-16 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+                <Button
+                    variant="outline"
+                    onClick={onBack}
+                    disabled={isSaving}
+                    className="flex-1 h-12 text-sm font-bold"
+                >
+                    {mode === 'view' ? "Voltar" : "Cancelar"}
+                </Button>
+                {mode !== 'view' && (
+                    <Button
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="flex-1 h-12 text-sm font-bold bg-brand-primary text-white"
+                    >
+                        {isSaving ? "Salvando..." : mode === 'edit' ? "Salvar Alterações" : "Salvar Orçamento"}
+                    </Button>
+                )}
+            </div>
 
             {/* Reusable Customer Selection Sheet */}
             <SelectCustomerSheet
@@ -436,7 +491,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     />
                 )}
             </AnimatePresence>
-        </motion.div>
+        </FadeIn>
     );
 };
 

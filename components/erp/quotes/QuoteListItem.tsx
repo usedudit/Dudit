@@ -4,7 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, Button } from "@/components/reusable"
 import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
-import { ThreeDotsIcon, EditIcon, TrashIcon, CopyIcon } from "@/lib/icons"
+import { ThreeDotsIcon, EditIcon, TrashIcon, CopyIcon, FileIcon } from "@/lib/icons"
 
 interface ColumnDef {
     id: string
@@ -40,11 +40,18 @@ const QuoteListItem = React.memo(
             switch (colId) {
                 case "quote_id":
                     return (
-                        <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full flex-shrink-0 bg-${quote.statusColor}`} />
-                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[150px]">
-                                {quote.displayId}
-                            </span>
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center">
+                                <FileIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                            </div>
+                            <div className="flex flex-col text-left">
+                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[150px]">
+                                    {quote.displayId}
+                                </span>
+                                <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                    Criado por {quote.user_profiles?.full_name || "Sistema"}
+                                </span>
+                            </div>
                         </div>
                     )
 
@@ -57,7 +64,7 @@ const QuoteListItem = React.memo(
 
                 case "status":
                     return (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center gap-2">
                             <Badge variant={quote.statusColor}>
                                 {quote.statusLabel}
                             </Badge>
@@ -104,7 +111,7 @@ const QuoteListItem = React.memo(
                                 trigger={
                                     <Button
                                         variant="outline"
-                                        className="w-[34px] h-[34px] rounded-full border-brand-border hover:bg-white dark:hover:bg-dark-surface p-0 flex items-center justify-center"
+                                        className="w-[40px] h-[40px] p-0 flex items-center justify-center"
                                     >
                                         <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
                                     </Button>

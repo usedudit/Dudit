@@ -14,7 +14,6 @@ import QuoteListItem from "./QuoteListItem"
 import QuoteGridCard from "./QuoteGridCard"
 import QuotePageControls from "./QuotePageControls"
 import CreateQuote from "./CreateQuote"
-import QuoteDetails from "./QuoteDetails"
 
 // Icons
 import {
@@ -57,7 +56,7 @@ const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; 
     { id: "issue_date", label: "Data Emissão", align: "left", width: "150px" },
     { id: "expiration_date", label: "Validade", align: "left", width: "150px" },
     { id: "total", label: "Total", align: "left", width: "150px" },
-    { id: "status", label: "Status", align: "left", width: "150px" },
+    { id: "status", label: "Status", align: "center", width: "150px" },
     { id: "actions", label: "Ações", align: "center", width: "80px" },
 ]
 
@@ -107,7 +106,6 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
 
     const filterSections: FilterSectionConfig[] = [
         { id: "status", title: "Status", type: "checkbox-list", options: ["Rascunho", "Enviado", "Aprovado", "Rejeitado", "Expirado"] },
-        // Simple period filter implementation for now
         { id: "period", title: "Período Emissão", type: "checkbox-list", options: ["Últimos 7 dias", "Últimos 30 dias", "Mês Atual", "Ano Atual"] },
     ]
 
@@ -130,7 +128,6 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
                 let parsedIssueDate;
                 let formattedIssueDate = "";
                 if (q.issue_date) {
-                    // YYYY-MM-DD to JS date directly might get timezone issues if not careful, assuming UTC split
                     const [y, m, d] = q.issue_date.split("-");
                     parsedIssueDate = new Date(y, m - 1, d);
                     formattedIssueDate = `${d}/${m}/${y}`;
@@ -175,9 +172,6 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
                 else if (activeTab === "Expirados") tabMatch = q.status === "expired"
 
                 const statusFilterMatch = filters.status.length === 0 || filters.status.includes(q.statusLabel)
-
-                // For simplicity, skip strict period/expiration filters if they're complex string arrays "Mês atual" etc.
-                // In production you would map these to actual dates
                 const periodFilterMatch = true
 
                 return tabMatch && statusFilterMatch && periodFilterMatch
@@ -197,7 +191,6 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
         setActiveQuote(null)
     }
     const handleViewQuote = (quote: any) => {
-        // Find the raw quote data from rawQuotes using originalId
         const rawQuote = rawQuotes.find((q: any) => q.id === quote.originalId)
         setActiveQuote(rawQuote)
         setWrapperMode('view')
@@ -229,6 +222,21 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
         setActiveTab("Todos")
     }
 
+    // Unified Sub-page render pattern
+    if (wrapperMode !== null) {
+        return (
+            <CreateQuote
+                partnerId={partnerId}
+                existingQuote={activeQuote}
+                mode={wrapperMode}
+                onBack={() => {
+                    setWrapperMode(null)
+                    setActiveQuote(null)
+                }}
+            />
+        )
+    }
+
     return (
         <motion.div
             initial={{ opacity: 0 }}
@@ -236,29 +244,6 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
             transition={{ duration: 0.2 }}
             className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300 overflow-hidden relative"
         >
-            <AnimatePresence>
-                {(wrapperMode === 'create' || wrapperMode === 'edit' || wrapperMode === 'duplicate') && (
-                    <CreateQuote 
-                        partnerId={partnerId} 
-                        existingQuote={activeQuote} 
-                        mode={wrapperMode}
-                        onBack={() => {
-                            setWrapperMode(null)
-                            setActiveQuote(null)
-                        }} 
-                    />
-                )}
-                {wrapperMode === 'view' && activeQuote && (
-                    <QuoteDetails 
-                        quote={activeQuote} 
-                        onBack={() => {
-                            setWrapperMode(null)
-                            setActiveQuote(null)
-                        }} 
-                        onEdit={() => setWrapperMode('edit')}
-                    />
-                )}
-            </AnimatePresence>
             <style>{`
                 .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 

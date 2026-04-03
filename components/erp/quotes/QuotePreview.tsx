@@ -151,11 +151,11 @@ const QuotePreview = ({
                                     <div className="relative z-10 mt-2">
                                         <div className="flex items-center gap-3 mb-6">
                                             {partnerAvatar ? (
-                                                <div className="w-8 h-8 rounded-md overflow-hidden bg-white shadow-md border border-gray-100 flex-shrink-0">
+                                                <div className="w-8 h-8 rounded-full overflow-hidden bg-white flex-shrink-0">
                                                     <img src={partnerAvatar} className="w-full h-full object-cover" alt="Logo do Parceiro" />
                                                 </div>
                                             ) : (
-                                                <div className="w-8 h-8 rounded-md flex items-center justify-center shadow-md bg-white text-[15px] font-bold text-black border border-gray-100 flex-shrink-0">
+                                                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white text-[15px] font-bold text-black flex-shrink-0">
                                                     {partnerName.charAt(0).toUpperCase()}
                                                 </div>
                                             )}

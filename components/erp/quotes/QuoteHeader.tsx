@@ -29,7 +29,7 @@ const QuoteHeader = ({ isScrolled, onBack, onSave, isSaving, title, subtitle, sa
                 <div className="hidden md:flex items-start justify-between">
                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                         <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-300 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                            <span className="truncate">{title}</span>
+                            <span className="hidden md:inline truncate">{title}</span>
                         </h1>
 
                         <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
@@ -37,19 +37,20 @@ const QuoteHeader = ({ isScrolled, onBack, onSave, isSaving, title, subtitle, sa
                         </div>
                     </div>
 
-                    {/* Desktop action buttons */}
-                    <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3 mb-4">
-                        <Button variant="outline" onClick={onBack}>
-                            Cancelar
-                        </Button>
-                        <Button
-                            onClick={onSave}
-                            isLoading={isSaving}
-                        >
-                            {!isSaving && <SaveIcon className="w-[18px] h-[18px] mr-2" />}
-                            Salvar
-                        </Button>
-                    </div>
+                    {onSave && (
+                        <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3 mb-4">
+                            <Button variant="outline" onClick={onBack}>
+                                Cancelar
+                            </Button>
+                            <Button
+                                onClick={onSave}
+                                isLoading={isSaving}
+                            >
+                                {!isSaving && <SaveIcon className="w-[18px] h-[18px] mr-2" />}
+                                {saveLabel}
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Tabs */}
