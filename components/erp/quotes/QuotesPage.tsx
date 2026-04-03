@@ -14,6 +14,7 @@ import QuoteListItem from "./QuoteListItem"
 import QuoteGridCard from "./QuoteGridCard"
 import QuotePageControls from "./QuotePageControls"
 import CreateQuote from "./CreateQuote"
+import { FadeIn } from "@/components/animations/FadeIn"
 
 // Icons
 import {
@@ -36,6 +37,7 @@ interface Quote {
     formattedExpirationDate: string | null;
     created_at_time: number;
     status: string;
+    user_profiles?: { full_name: string } | null;
 }
 
 interface FilterState {
@@ -153,7 +155,8 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
                     formattedIssueDate,
                     formattedExpirationDate,
                     created_at_time: parsedIssueDate ? parsedIssueDate.getTime() : 0,
-                    status: q.status
+                    status: q.status,
+                    user_profiles: q.user_profiles
                 }
             })
             .filter((q: Quote) => {
@@ -238,12 +241,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
     }
 
     return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.2 }}
-            className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300 overflow-hidden relative"
-        >
+        <FadeIn className="flex flex-col h-[calc(100vh-64px)] md:h-[calc(100vh-72px)] bg-white dark:bg-dark-background transition-colors duration-300 overflow-hidden relative">
             <style>{`
                 .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
@@ -428,6 +426,6 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
                 setFilters={setFilters as any}
                 onClear={() => setFilters(INITIAL_FILTERS)}
             />
-        </motion.div>
+        </FadeIn>
     )
 }

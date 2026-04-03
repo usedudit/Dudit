@@ -28,7 +28,7 @@ export default async function QuotesPageServer() {
     return (
         <>
             <ERPPageHeader title="Orçamentos" />
-            <FadeIn className="p-4">
+            <FadeIn>
                 <Suspense fallback={<QuotesLoading />}>
                     <QuotesPage
                         quotes={quotes || []}

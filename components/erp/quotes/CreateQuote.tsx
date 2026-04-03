@@ -326,7 +326,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const filteredProducts = searchResults;
 
     return (
-        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300 overflow-hidden relative">
+        <FadeIn className="flex flex-col h-[calc(100vh-64px)] md:h-[calc(100vh-72px)] bg-white dark:bg-dark-background transition-colors duration-300 overflow-hidden relative">
             <div className="flex flex-row h-full w-full overflow-hidden">
                 {/* LEFT SIDE - EDITOR (Full width on mobile, 50% on large) */}
                 <div className={`flex flex-col h-full w-full lg:w-1/2 transition-all duration-300 ease-in-out relative z-10 border-r border-brand-border dark:border-dark-border ${activeTab === 'Visualização' ? 'hidden lg:flex' : 'flex'}`}>

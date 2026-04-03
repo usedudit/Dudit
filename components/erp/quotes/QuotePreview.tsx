@@ -119,7 +119,7 @@ const QuotePreview = ({
     }, [quoteItems, note]);
 
     return (
-        <div className="hidden xl:flex flex-col w-1/2 h-full bg-white dark:bg-dark-surface relative border-l border-brand-border dark:border-dark-border">
+        <div className="flex flex-col w-full h-full bg-white dark:bg-dark-surface relative border-l border-brand-border dark:border-dark-border overflow-hidden">
             <div className="absolute top-4 right-4 bottom-4 left-4 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden flex flex-col shadow-sm">
 
                 {/* Preview Content Scrollable */}
