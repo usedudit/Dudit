@@ -198,41 +198,56 @@ const QuotePreview = ({
                                 )}
 
                                 <div className="px-8 pb-4">
-                                    {/* Gold Standard Header Pattern for Preview */}
-                                    <div className="flex items-center bg-brand-gray rounded-lg px-4 py-2.5 mb-2">
-                                        <div className="flex-1 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Produto</div>
-                                        <div className="w-24 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right">Total</div>
-                                    </div>
-
-                                    <div className="space-y-0">
-                                        {page.items.map((item, idx) => (
-                                            <div key={idx} className="flex items-center gap-4 py-4 border-b border-gray-100 last:border-0 bg-white">
-                                                {/* Left side: Avatar/Image */}
-                                                <div className="w-12 h-12 rounded-full bg-brand-gray border border-gray-100 flex-shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-bold text-gray-400">
-                                                    {item.image && item.image.length > 5 ? (
-                                                        <img src={item.image} className="w-full h-full object-cover mix-blend-multiply" alt={item.name} />
-                                                    ) : (
-                                                        <span className="uppercase text-lg">{item.name?.charAt(0) || 'P'}</span>
-                                                    )}
-                                                </div>
-
-                                                {/* Middle side: Titles */}
-                                                <div className="flex-1 min-w-0">
-                                                    <h3 className="text-[13px] font-bold text-black truncate leading-tight mb-0.5">{item.name || 'Novo Item'}</h3>
-                                                    <p className="text-[11px] font-medium text-gray-500 truncate">
-                                                        {item.sku ? `SKU: ${item.sku} • ` : ''}{item.qty} un • {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}
-                                                    </p>
-                                                </div>
-
-                                                {/* Right side: Total Price */}
-                                                <div className="text-right flex-shrink-0">
-                                                    <p className="font-bold text-[14px] text-black">
-                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.qty * item.price)}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <table className="w-full text-left border-separate border-spacing-0">
+                                        <thead>
+                                            <tr className="bg-brand-gray">
+                                                <th className="py-3 pl-4 pr-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider rounded-l-lg">Produto</th>
+                                                <th className="py-3 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider w-32">Preço Unit.</th>
+                                                <th className="py-3 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center w-24">Qtd.</th>
+                                                <th className="py-3 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right w-28 rounded-r-lg">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {page.items.map((item, idx) => (
+                                                <tr key={idx} className="bg-white">
+                                                    <td className="py-4 pl-4 pr-4 border-b border-gray-100">
+                                                        <div className="flex items-center gap-3 text-left">
+                                                            <div className="w-10 h-10 rounded-full bg-brand-gray border border-gray-100 flex-shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-bold text-gray-400">
+                                                                {item.image && item.image.length > 5 ? (
+                                                                    <img src={item.image} className="w-full h-full object-cover mix-blend-multiply" alt={item.name} />
+                                                                ) : (
+                                                                    <span className="uppercase text-lg">{item.name?.charAt(0) || 'P'}</span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex flex-col min-w-0">
+                                                                <span className="font-bold text-[13px] text-black truncate max-w-[200px]">
+                                                                    {item.name || 'Produto sem nome'}
+                                                                </span>
+                                                                <span className="text-[11px] font-medium text-gray-400 truncate">
+                                                                    {item.sku || 'Sem SKU'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-4 px-4 border-b border-gray-100">
+                                                        <span className="text-[13px] font-medium text-gray-600">
+                                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-4 px-4 border-b border-gray-100 text-center">
+                                                        <span className="text-[13px] font-medium text-gray-600">
+                                                            {item.qty}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-4 px-4 border-b border-gray-100 text-right">
+                                                        <span className="text-[13px] font-bold text-black">
+                                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price * item.qty)}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
 
                                 {page.hasTotals && (
