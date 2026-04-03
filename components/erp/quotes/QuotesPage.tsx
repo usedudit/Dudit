@@ -14,6 +14,7 @@ import QuoteListItem from "./QuoteListItem"
 import QuoteGridCard from "./QuoteGridCard"
 import QuotePageControls from "./QuotePageControls"
 import CreateQuote from "./CreateQuote"
+import QuoteDetail from "./QuoteDetail"
 import { FadeIn } from "@/components/animations/FadeIn"
 
 // Icons
@@ -227,6 +228,19 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
 
     // Unified Sub-page render pattern
     if (wrapperMode !== null) {
+        if (wrapperMode === 'view' && activeQuote) {
+            return (
+                <QuoteDetail
+                    partnerId={partnerId}
+                    quoteId={activeQuote.id}
+                    onBack={() => {
+                        setWrapperMode(null)
+                        setActiveQuote(null)
+                    }}
+                />
+            )
+        }
+
         return (
             <CreateQuote
                 partnerId={partnerId}
