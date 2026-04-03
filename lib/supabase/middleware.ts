@@ -256,20 +256,20 @@ export async function middleware(request: NextRequest) {
         if (isProtected) {
           const hasAuthCookie = request.cookies.getAll().some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
           if (!hasAuthCookie) {
-            const url = request.nextUrl.clone()
-            url.pathname = "/auth/login"
-            return NextResponse.redirect(url)
+            const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
+            const loginUrl = new URL("/auth/login", baseUrl)
+            return NextResponse.redirect(loginUrl)
           }
         }
 
         const { data: { user } } = await supabase.auth.getUser()
 
-          if (user) {
-            console.log(`[MIDDLEWARE] Injected x-user-id for ${pathname}`)
-            requestHeaders.set("x-user-id", user.id)
-            requestHeaders.set("x-user-email", user.email || "")
+        if (user) {
+          console.log(`[MIDDLEWARE] Injected x-user-id for ${pathname}`)
+          requestHeaders.set("x-user-id", user.id)
+          requestHeaders.set("x-user-email", user.email || "")
 
-            // Re-create the response to inject the new requestHeaders downstream
+          // Re-create the response to inject the new requestHeaders downstream
           const oldResponse = response
           response = NextResponse.next({
             request: { headers: requestHeaders }
@@ -283,9 +283,9 @@ export async function middleware(request: NextRequest) {
 
         // Se não estiver logado e tentar acessar rotas protegidas -> Manda pro Login
         if (!user && isProtected) {
-          const url = request.nextUrl.clone()
-          url.pathname = "/auth/login"
-          return NextResponse.redirect(url)
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
+          const loginUrl = new URL("/auth/login", baseUrl)
+          return NextResponse.redirect(loginUrl)
         }
 
         // SECURITY: If already logged in and trying to access auth pages -> redirect to home
@@ -296,11 +296,22 @@ export async function middleware(request: NextRequest) {
         const hasModePartner = request.nextUrl.searchParams.get("mode") === "partner"
 
         if (user && !hasNextParam && !hasModePartner && authBlockedPaths.some(p => pathname === p || pathname.startsWith(p + "/"))) {
-          const url = request.nextUrl.clone()
-          url.pathname = "/"
-          // Clear auth-specific query params before redirecting
+          // Define a base usando a sua variável de ambiente ou o domínio fixo
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
+
+          // Cria uma URL nova do zero baseada no seu domínio real, não no request interno
+          const url = new URL("/", baseUrl)
+
+          // Se você quiser manter os parâmetros da busca original (exceto os deletados), 
+          // você pode copiá-los assim:
+          request.nextUrl.searchParams.forEach((value, key) => {
+            url.searchParams.set(key, value)
+          })
+
+          // Agora limpa os parâmetros específicos que você não quer levar pra Home
           url.searchParams.delete("mode")
           url.searchParams.delete("verified")
+
           return NextResponse.redirect(url)
         }
       } catch {
