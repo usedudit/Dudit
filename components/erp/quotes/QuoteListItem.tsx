@@ -62,6 +62,7 @@ const QuoteListItem = React.memo(
                         </span>
                     )
 
+                case "status":
                     return (
                         <div className="flex items-center justify-center">
                             <Badge variant={quote.statusColor}>

@@ -29,8 +29,8 @@ const QuoteGridCard = React.memo(
 
         return (
             <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 className={`group relative bg-white dark:bg-dark-surface rounded-2xl border transition-all duration-300 cursor-pointer overflow-hidden flex flex-col h-full ${selected ? 'border-brand-primary ring-1 ring-brand-primary' : 'border-brand-border dark:border-dark-border hover:border-brand-primary/50'}`}
                 onClick={onClick}
             >

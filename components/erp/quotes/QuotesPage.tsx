@@ -7,7 +7,8 @@ import { useToast } from "@/hooks/use-toast"
 import { useStore } from "@/lib/store-context"
 
 // Components
-import { Button, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
+import { Button, IconPlaceholder, ThreeDotsLoader, AlertModal } from "@/components/reusable"
+import { deleteQuoteAction } from "@/app/actions/erp/quotes"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import QuoteListItem from "./QuoteListItem"
@@ -78,8 +79,10 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const [page, setPage] = useState(1)
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
-    const [modals, setModals] = useState({ filter: false })
+    const [modals, setModals] = useState({ filter: false, delete: false })
     const [selection, setSelection] = useState({ ids: new Set<string>() })
+    const [isDeleting, setIsDeleting] = useState(false)
+    const [quoteToDelete, setQuoteToDelete] = useState<any>(null)
 
     const isLoading = storeLoading && rawQuotes === undefined
     const itemsPerPage = 12
@@ -210,7 +213,30 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
         setWrapperMode('duplicate')
     }
     const handleDeleteQuote = (quote: any) => {
-        toast({ title: "Excluir", description: "Em breve: Excluir orçamento " + quote.displayId })
+        setQuoteToDelete(quote)
+        setModals(prev => ({ ...prev, delete: true }))
+    }
+
+    const handleConfirmDelete = async () => {
+        if (!quoteToDelete) return
+        setIsDeleting(true)
+        try {
+            const res = await deleteQuoteAction(quoteToDelete.originalId)
+            if (res.success) {
+                toast({ title: "Sucesso", description: "Orçamento excluído com sucesso." })
+                // The router.refresh() or local state update should happen here
+                // But since rawQuotes is passed as prop, we might need router.refresh()
+                router.refresh()
+            } else {
+                toast({ title: "Erro", description: res.error || "Erro ao excluir orçamento.", variant: "destructive" })
+            }
+        } catch (err) {
+            toast({ title: "Erro", description: "Erro de conexão ao excluir orçamento.", variant: "destructive" })
+        } finally {
+            setIsDeleting(false)
+            setModals(prev => ({ ...prev, delete: false }))
+            setQuoteToDelete(null)
+        }
     }
     const handleSelectRow = (id: string) => {
         setSelection((p) => {
@@ -298,7 +324,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
                         setActiveTab={setActiveTab}
                         search={search}
                         onSearchChange={setSearch}
-                        onOpenFilter={() => setModals({ filter: true })}
+                        onOpenFilter={() => setModals(prev => ({ ...prev, filter: true }))}
                         onExport={() => { }}
                         onAddQuote={handleAddQuote}
                         filters={filters}
@@ -434,11 +460,22 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
 
             <FilterSheet
                 isOpen={modals.filter}
-                onClose={() => setModals({ filter: false })}
+                onClose={() => setModals(prev => ({ ...prev, filter: false }))}
                 sections={filterSections}
                 filters={filters}
                 setFilters={setFilters as any}
                 onClear={() => setFilters(INITIAL_FILTERS)}
+            />
+
+            <AlertModal
+                isOpen={modals.delete}
+                onClose={() => setModals(prev => ({ ...prev, delete: false }))}
+                onConfirm={handleConfirmDelete}
+                title="Excluir Orçamento"
+                description={`Tem certeza que deseja excluir o orçamento ${quoteToDelete?.displayId}? Esta ação não pode ser desfeita.`}
+                confirmText="Excluir"
+                variant="danger"
+                isLoading={isDeleting}
             />
         </FadeIn>
     )
