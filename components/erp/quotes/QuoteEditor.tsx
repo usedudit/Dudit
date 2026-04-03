@@ -142,47 +142,70 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                         </div>
 
                         {/* --- ITEMS TABLE (Desktop) --- */}
-                        <div className="hidden md:block w-full overflow-hidden border border-brand-border dark:border-dark-border rounded-xl bg-white dark:bg-dark-surface mb-4 shadow-sm">
-                            <table className="w-full border-collapse">
-                                {/* ... table content unchanged except for removing tax col if it existed (it didn't) ... */}
+                        <div className="hidden md:block w-full overflow-x-auto pb-4 custom-scrollbar mb-4">
+                            <table className="w-full text-left border-separate border-spacing-0">
                                 <thead>
-                                    <tr className="bg-[#f8f9fa] dark:bg-dark-border/30 border-b border-brand-border dark:border-dark-border">
-                                        <th className="py-4 px-6 text-[11px] font-bold text-gray-500 dark:text-dark-body uppercase tracking-wider text-left">Produto</th>
-                                        <th className="py-4 px-6 text-[11px] font-bold text-gray-500 dark:text-dark-body uppercase tracking-wider text-left w-44">Preço Unit.</th>
-                                        <th className="py-4 px-6 text-[11px] font-bold text-gray-500 dark:text-dark-body uppercase tracking-wider text-center w-36">Qtd.</th>
-                                        <th className="py-4 px-6 text-[11px] font-bold text-gray-500 dark:text-dark-body uppercase tracking-wider text-right w-36">Total</th>
-                                        {!props.isReadOnly && <th className="py-4 px-6 text-[11px] font-bold text-gray-500 dark:text-dark-body uppercase tracking-wider text-center w-32">Ações</th>}
+                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                        <th className="py-3 pl-6 pr-4 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg">Produto</th>
+                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-44">Preço Unit.</th>
+                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36">Qtd.</th>
+                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-right w-36">Total</th>
+                                        {!props.isReadOnly && <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-24 rounded-r-lg">Ações</th>}
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-brand-border dark:divide-dark-border">
+                                <tbody>
                                     {props.quoteItems.map((item, index) => (
-                                        <tr key={index} className="group bg-white dark:bg-dark-surface hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
-                                            <td className="py-4 px-6">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-11 h-11 rounded-full bg-brand-gray/50 dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center border border-brand-border dark:border-dark-border shadow-sm">
-                                                        {item.image ? <img src={item.image} className="w-full h-full object-cover" /> : <span className="text-xs font-bold text-brand-inactive-text">P</span>}
+                                        <tr key={index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+                                            <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
+                                                        {item.image ? (
+                                                            <img src={item.image} className="w-full h-full object-cover" alt="" />
+                                                        ) : (
+                                                            <span className="text-xs font-bold text-brand-inactive-text">P</span>
+                                                        )}
                                                     </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">{item.name || 'Produto sem nome'}</span>
-                                                        <p className="text-[11px] font-medium text-brand-inactive-text">SKU: {item.sku || 'N/A'}</p>
+                                                    <div className="flex flex-col text-left">
+                                                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[250px]">
+                                                            {item.name || 'Produto sem nome'}
+                                                        </span>
+                                                        <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                            {item.sku || 'Sem SKU'}
+                                                        </span>
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="py-4 px-6">
-                                                <input
-                                                    type="number"
-                                                    value={item.price}
-                                                    onChange={(e) => props.updateItemPrice(index, parseFloat(e.target.value) || 0)}
-                                                    className="w-full h-10 px-3 rounded-lg border border-brand-border bg-brand-gray/20 font-bold text-sm"
-                                                />
+                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                <div className="flex items-center">
+                                                    <span className="text-[13px] font-medium text-brand-inactive-text mr-1">R$</span>
+                                                    <input
+                                                        type="number"
+                                                        value={item.price}
+                                                        onChange={(e) => props.updateItemPrice(index, parseFloat(e.target.value) || 0)}
+                                                        className="w-full h-9 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[13px] focus:ring-1 focus:ring-brand-primary outline-none transition-all"
+                                                    />
+                                                </div>
                                             </td>
-                                            <td className="py-4 px-6 flex justify-center">
-                                                <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} size="sm" />
+                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                <div className="flex justify-center">
+                                                    <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} size="sm" />
+                                                </div>
                                             </td>
-                                            <td className="py-4 px-6 text-right font-bold text-sm">R$ {(item.price * item.qty).toFixed(2)}</td>
+                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right">
+                                                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price * item.qty)}
+                                                </span>
+                                            </td>
                                             {!props.isReadOnly && (
-                                                <td className="py-4 px-6 text-center">
-                                                    <button onClick={() => props.removeItem(index)} className="text-red-500 hover:text-red-700"><TrashIcon size={18} /></button>
+                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                    <div className="flex justify-center">
+                                                        <button 
+                                                            onClick={() => props.removeItem(index)} 
+                                                            className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
+                                                        >
+                                                            <TrashIcon size={16} />
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             )}
                                         </tr>
@@ -192,39 +215,56 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                         </div>
 
                         {/* --- ITEMS LIST (Mobile/Tablet) --- */}
-                        <div className="block md:hidden space-y-4 mb-6">
+                        <div className="block md:hidden space-y-2 mb-6">
                             {props.quoteItems.map((item, index) => (
-                                <div key={index} className="flex flex-col gap-4 py-5 border-b border-brand-border dark:border-dark-border last:border-0">
-                                    <div className="flex items-start gap-4">
-                                        <div className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border flex-shrink-0 flex items-center justify-center overflow-hidden">
-                                            {item.image ? <img src={item.image} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-brand-inactive-text">P</span>}
+                                <div key={index} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
+                                    {/* Left side: Avatar/Image */}
+                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
+                                        {item.image ? (
+                                            <img src={item.image} className="w-full h-full object-cover" alt="" />
+                                        ) : (
+                                            <span className="text-xs font-bold text-brand-inactive-text">P</span>
+                                        )}
+                                    </div>
+
+                                    {/* Middle: Content */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex justify-between items-start mb-0.5">
+                                            <h4 className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate pr-2">
+                                                {item.name || 'Produto sem nome'}
+                                            </h4>
+                                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading flex-shrink-0">
+                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price * item.qty)}
+                                            </span>
                                         </div>
-                                        <div className="flex-1 min-w-0 flex flex-col gap-1">
-                                            <div className="flex justify-between items-start gap-2">
-                                                <h4 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.name || 'Produto sem nome'}</h4>
-                                                {!props.isReadOnly && (
-                                                    <button onClick={() => props.removeItem(index)} className="text-brand-red p-1"><TrashIcon size={16} /></button>
-                                                )}
-                                            </div>
-                                            <p className="text-xs font-medium text-brand-inactive-text">SKU: {item.sku || 'N/A'}</p>
-                                            
-                                            <div className="flex items-center justify-between mt-2">
-                                                <div className="flex items-center gap-3">
-                                                    <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} size="sm" />
-                                                    <span className="text-xs text-brand-inactive-text">x</span>
-                                                    <div className="relative">
-                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-brand-inactive-text">R$</span>
-                                                        <input
-                                                            type="number"
-                                                            value={item.price}
-                                                            onChange={(e) => props.updateItemPrice(index, parseFloat(e.target.value) || 0)}
-                                                            className="w-24 h-8 pl-6 pr-2 rounded-lg border border-brand-border bg-brand-gray/10 font-bold text-xs"
-                                                        />
-                                                    </div>
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-[11px] font-medium text-brand-inactive-text pr-2 truncate">
+                                                {item.sku || 'Sem SKU'} • {item.qty} un • {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}
+                                            </p>
+                                            {!props.isReadOnly && (
+                                                <button 
+                                                    onClick={() => props.removeItem(index)} 
+                                                    className="w-8 h-8 flex items-center justify-center text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors"
+                                                >
+                                                    <TrashIcon size={14} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        
+                                        {!props.isReadOnly && (
+                                            <div className="flex items-center gap-4 mt-2">
+                                                <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} size="sm" />
+                                                <div className="flex items-center flex-1 max-w-[120px]">
+                                                    <span className="text-[11px] font-medium text-brand-inactive-text mr-1">R$</span>
+                                                    <input
+                                                        type="number"
+                                                        value={item.price}
+                                                        onChange={(e) => props.updateItemPrice(index, parseFloat(e.target.value) || 0)}
+                                                        className="w-full h-8 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[11px] focus:ring-1 focus:ring-brand-primary outline-none"
+                                                    />
                                                 </div>
-                                                <span className="font-bold text-[14px] text-brand-dark">R$ {(item.price * item.qty).toFixed(2)}</span>
                                             </div>
-                                        </div>
+                                        )}
                                     </div>
                                 </div>
                             ))}

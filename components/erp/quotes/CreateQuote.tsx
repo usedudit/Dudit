@@ -466,7 +466,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                 hideOnMobile={true}
                             />
 
-                            <div className="flex-1">
+                            <div className={`flex-1 ${activeTab === 'Visualização' ? 'hidden lg:block' : 'block'}`}>
                                 <QuoteEditor
                                     searchQuery={searchQuery}
                                     setSearchQuery={setSearchQuery}

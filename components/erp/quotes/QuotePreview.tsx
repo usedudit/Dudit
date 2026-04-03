@@ -197,32 +197,42 @@ const QuotePreview = ({
                                     </>
                                 )}
 
-                                <div className="px-8 pb-4 space-y-4">
-                                    <h3 className="font-bold text-sm text-black mb-1">Itens da Proposta</h3>
-                                    {page.items.map((item, idx) => (
-                                        <div key={idx} className="flex items-center gap-4 py-5 border-b border-gray-100 last:border-0 bg-white">
-                                            <div className="w-14 h-14 rounded-full bg-brand-gray border border-gray-100 flex-shrink-0 overflow-hidden flex items-center justify-center text-xs font-bold text-gray-400">
-                                                {item.image && item.image.length > 5 ? (
-                                                    <img src={item.image} className="w-full h-full object-cover mix-blend-multiply" alt={item.name} />
-                                                ) : (
-                                                    <span className="uppercase text-lg">{item.name?.charAt(0) || 'P'}</span>
-                                                )}
-                                            </div>
+                                <div className="px-8 pb-4">
+                                    {/* Gold Standard Header Pattern for Preview */}
+                                    <div className="flex items-center bg-brand-gray rounded-lg px-4 py-2.5 mb-2">
+                                        <div className="flex-1 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Produto</div>
+                                        <div className="w-24 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right">Total</div>
+                                    </div>
 
-                                            <div className="flex-1 min-w-0">
-                                                <h3 className="text-[15px] font-bold text-black truncate leading-tight">{item.name || 'Novo Item'}</h3>
-                                                <p className="text-xs font-medium text-gray-500 mt-1">
-                                                    {item.sku ? `SKU: ${item.sku} • ` : ''}{item.qty} un • {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}
-                                                </p>
-                                            </div>
+                                    <div className="space-y-0">
+                                        {page.items.map((item, idx) => (
+                                            <div key={idx} className="flex items-center gap-4 py-4 border-b border-gray-100 last:border-0 bg-white">
+                                                {/* Left side: Avatar/Image */}
+                                                <div className="w-12 h-12 rounded-full bg-brand-gray border border-gray-100 flex-shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-bold text-gray-400">
+                                                    {item.image && item.image.length > 5 ? (
+                                                        <img src={item.image} className="w-full h-full object-cover mix-blend-multiply" alt={item.name} />
+                                                    ) : (
+                                                        <span className="uppercase text-lg">{item.name?.charAt(0) || 'P'}</span>
+                                                    )}
+                                                </div>
 
-                                            <div className="text-right flex-shrink-0">
-                                                <p className="font-bold text-[16px] text-black">
-                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.qty * item.price)}
-                                                </p>
+                                                {/* Middle side: Titles */}
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="text-[13px] font-bold text-black truncate leading-tight mb-0.5">{item.name || 'Novo Item'}</h3>
+                                                    <p className="text-[11px] font-medium text-gray-500 truncate">
+                                                        {item.sku ? `SKU: ${item.sku} • ` : ''}{item.qty} un • {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}
+                                                    </p>
+                                                </div>
+
+                                                {/* Right side: Total Price */}
+                                                <div className="text-right flex-shrink-0">
+                                                    <p className="font-bold text-[14px] text-black">
+                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.qty * item.price)}
+                                                    </p>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
                                 </div>
 
                                 {page.hasTotals && (
