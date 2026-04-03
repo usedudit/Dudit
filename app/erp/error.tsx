@@ -1,17 +1,14 @@
 "use client"
 
 import { useEffect } from "react"
-import { Button, IconPlaceholder } from "@/components/reusable"
+import { IconPlaceholder } from "@/components/reusable"
 
 export default function ERPErrorBoundary({
     error,
-    reset,
 }: {
     error: Error & { digest?: string }
-    reset: () => void
 }) {
     useEffect(() => {
-        // Log error to an error reporting service if desired
         console.error("ERP Error Boundary caught:", error)
     }, [error])
 
@@ -19,8 +16,8 @@ export default function ERPErrorBoundary({
     const isAccessDenied = msg.includes("acesso negado") || msg.includes("permissão") || error.name === "ForbiddenError"
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] p-4 text-center">
-            <div className="flex flex-col items-center mb-8">
+        <div className="flex items-center justify-center h-screen p-4 text-center">
+            <div className="flex flex-col items-center">
                 <IconPlaceholder
                     placeholderType="image"
                     imageSrc="https://img.dudit.com.br/static/mascots/Ops.png"
