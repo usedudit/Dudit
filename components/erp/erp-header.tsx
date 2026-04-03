@@ -51,7 +51,7 @@ const ChevronRight = ({ className }: { className?: string }) => (
 interface ERPHeaderProps {
   sidebarOpen?: boolean
   setSidebarOpen?: (arg: boolean) => void
-  pageTitle: string
+  pageTitle?: string
   backHref?: string // Link to go back (e.g., /erp/products)
   onBack?: () => void // Custom back logic (e.g. discard changes)
   isSubPage?: boolean // Force ChevronLeftIcon even without backHref
@@ -63,7 +63,7 @@ interface ERPHeaderProps {
   }
 }
 
-export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle, backHref, onBack, isSubPage, userProfile }: ERPHeaderProps) {
+export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHref, onBack, isSubPage, userProfile }: ERPHeaderProps) {
   const { theme, setTheme } = useTheme()
   const router = useRouter()
   const [isTransitioning, setIsTransitioning] = useState(false)
@@ -165,7 +165,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle, backHref, on
     router.push("/")
   }
 
-  const displayTitle = headerOverride?.title || pageTitle
+  const displayTitle = headerOverride?.title || pageTitle || "Painel"
   const displayBackHref = headerOverride?.backHref || backHref
   const displayOnBack = headerOverride?.onBack || onBack
   const displayIsSubPage = headerOverride?.isSubPage || isSubPage

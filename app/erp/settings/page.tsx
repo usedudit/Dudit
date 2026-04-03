@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { ERPHeader } from "@/components/erp/erp-header"
+import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { SettingsTabs } from "@/components/erp/settings/SettingsPage"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { requireUser } from "@/lib/auth/authorization"
@@ -31,15 +31,7 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <ERPHeader
-        pageTitle="Configurações"
-        userProfile={{
-          fullName: user.email?.split("@")[0] || "Usuário",
-          email: user.email || "",
-          initials: (user.email?.[0] || "U").toUpperCase(),
-          avatarColor: "bg-brand-primary",
-        }}
-      />
+      <ERPPageHeader title="Configurações" />
       <FadeIn className="p-4">
         <SettingsTabs partner={partner} paymentMethods={paymentMethods || []} />
       </FadeIn>

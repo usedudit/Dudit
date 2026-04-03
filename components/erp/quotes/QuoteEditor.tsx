@@ -129,147 +129,128 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                             </AnimatePresence>
                         </div>
 
-                        <div className="w-full overflow-hidden rounded-xl mb-4 border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
-                            <div className="overflow-x-auto custom-scrollbar">
-                                {props.quoteItems.length > 0 ? (
-                                    <table className="w-full text-left border-separate border-spacing-0 min-w-[600px]">
-                                        <thead>
-                                            <tr className="bg-brand-gray dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
-                                                <th className="py-3 px-4 pl-6 rounded-tl-xl text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">Produto</th>
-                                                <th className="py-3 px-4 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body text-center">Preço</th>
-                                                <th className="py-3 px-4 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body text-center">Quantidade</th>
-                                                <th className="py-3 px-4 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body text-right">Total</th>
-                                                <th className="py-3 px-4 w-24 rounded-tr-xl"></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <AnimatePresence initial={false} mode="popLayout">
-                                                {props.quoteItems.map((item, index) => (
-                                                    <motion.tr
-                                                        key={item.rowId || `item-${index}-${item.id}`}
-                                                        layout
-                                                        initial={{ opacity: 0, x: -20 }}
-                                                        animate={{ opacity: 1, x: 0 }}
-                                                        exit={{ opacity: 0, x: -20 }}
-                                                        className={`group hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-colors border-b border-brand-border dark:border-dark-border last:border-0`}
-                                                    >
-                                                        <td className="p-4 pl-6 border-b border-brand-border dark:border-dark-border">
-                                                            <div className="flex items-center gap-4">
-                                                                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-gray-800 border border-brand-border dark:border-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
-                                                                    {item.image ? (
-                                                                        <img src={item.image} className="w-full h-full object-cover mix-blend-multiply dark:mix-blend-normal" alt={item.name} />
-                                                                    ) : (
-                                                                        <div className="w-full h-full bg-gray-100 dark:bg-zinc-800" />
-                                                                    )}
-                                                                </div>
+                        <div className="space-y-4 mb-6">
+                            {props.quoteItems.length > 0 ? (
+                                <AnimatePresence initial={false} mode="popLayout">
+                                    {props.quoteItems.map((item, index) => (
+                                        <motion.div
+                                            key={item.rowId || `item-${index}-${item.id}`}
+                                            layout
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
+                                            className="p-4 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface/50 hover:border-brand-dark/20 dark:hover:border-dark-border/80 transition-all group"
+                                        >
+                                            <div className="flex flex-col md:flex-row md:items-center gap-4">
+                                                {/* Product Info & Thumb */}
+                                                <div className="flex items-center gap-4 flex-1 min-w-0">
+                                                    <div className="w-14 h-14 rounded-2xl bg-brand-gray dark:bg-zinc-800 border border-brand-border dark:border-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
+                                                        {item.image ? (
+                                                            <img src={item.image} className="w-full h-full object-cover mix-blend-multiply dark:mix-blend-normal" alt={item.name} />
+                                                        ) : (
+                                                            <div className="w-full h-full bg-gray-50 dark:bg-zinc-900" />
+                                                        )}
+                                                    </div>
 
-                                                                {/* Conditional Rendering: Input vs Text */}
-                                                                {item.isEditing ? (
-                                                                    <div className="flex flex-col gap-2 flex-1 justify-center">
-                                                                        <FormInput
-                                                                            label=""
-                                                                            name={`name-${index}`}
-                                                                            value={item.name}
-                                                                            onChange={(e) => props.updateItemField(index, 'name', e.target.value)}
-                                                                            className="mb-0 h-8 text-sm font-bold"
-                                                                            placeholder="Nome do produto"
-                                                                            autoFocus
-                                                                        />
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="flex flex-col pt-1">
-                                                                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5">
-                                                                            {item.name || 'Sem nome'}
-                                                                        </span>
-                                                                        <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body uppercase tracking-wide">
-                                                                            {item.sku ? `SKU: ${item.sku}` : ''}
-                                                                        </span>
-                                                                    </div>
+                                                    <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                                        {item.isEditing ? (
+                                                            <FormInput
+                                                                label=""
+                                                                name={`name-${index}`}
+                                                                value={item.name}
+                                                                onChange={(e) => props.updateItemField(index, 'name', e.target.value)}
+                                                                className="mb-0 h-9 text-sm font-bold"
+                                                                placeholder="Nome do produto"
+                                                                autoFocus
+                                                            />
+                                                        ) : (
+                                                            <>
+                                                                <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate group-hover:text-brand-primary transition-colors">
+                                                                    {item.name || 'Produto sem nome'}
+                                                                </span>
+                                                                {item.sku && (
+                                                                    <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-widest mt-1">
+                                                                        {item.sku}
+                                                                    </span>
                                                                 )}
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-4 align-middle border-b border-brand-border dark:border-dark-border">
-                                                            <div className="flex justify-center">
-                                                                <div className="w-28">
-                                                                    <FormInput
-                                                                        label=""
-                                                                        name={`price-${index}`}
-                                                                        value={item.price}
-                                                                        onChange={(e) => props.updateItemPrice(index, parseFloat(e.target.value))}
-                                                                        prefix="$"
-                                                                        className="mb-0 h-9 text-sm text-center"
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-4 text-center align-middle border-b border-brand-border dark:border-dark-border">
-                                                            <div className="flex justify-center">
-                                                                <QuantitySelector
-                                                                    value={item.qty}
-                                                                    onChange={(val) => props.updateItemQty(index, val)}
-                                                                    min={1}
-                                                                    size="sm"
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-4 text-right align-middle border-b border-brand-border dark:border-dark-border">
-                                                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                                                                ${(item.price * item.qty).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                            </span>
-                                                        </td>
-                                                        <td className="p-4 text-center align-middle border-b border-brand-border dark:border-dark-border">
-                                                            <div className="flex items-center justify-end gap-1">
-                                                                {item.isBlank && (
-                                                                    item.isEditing ? (
-                                                                        <Button
-                                                                            variant="outline"
-                                                                            onClick={() => props.toggleItemEdit(index, false)}
-                                                                            className="w-8 h-8 flex items-center justify-center text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
-                                                                            title="Salvar item"
-                                                                        >
-                                                                            <CheckIcon size={16} strokeWidth={3} />
-                                                                        </Button>
-                                                                    ) : (
-                                                                        <Button
-                                                                            variant="outline"
-                                                                            onClick={() => props.toggleItemEdit(index, true)}
-                                                                            className="w-8 h-8 flex items-center justify-center hover:bg-brand-gray dark:hover:bg-dark-border/50 text-brand-inactive-text"
-                                                                            title="Editar item"
-                                                                        >
-                                                                            <EditIcon size={16} />
-                                                                        </Button>
-                                                                    )
-                                                                )}
-                                                                <Button
-                                                                    variant="outline"
-                                                                    onClick={() => props.removeItem(index)}
-                                                                    className="w-8 h-8 flex items-center justify-center text-brand-inactive-text hover:bg-red-50 hover:text-brand-red dark:hover:bg-red-900/20"
-                                                                    title="Remover item"
-                                                                >
-                                                                    <TrashIcon size={16} />
-                                                                </Button>
-                                                            </div>
-                                                        </td>
-                                                    </motion.tr>
-                                                ))}
-                                            </AnimatePresence>
-                                        </tbody>
-                                    </table>
-                                ) : (
-                                    <div className="py-12">
-                                        <IconPlaceholder
-                                            icon={SearchIcon}
-                                            title="Nenhum produto"
-                                            subtitle="Busque produtos acima ou adicione manualmente."
-                                            itemButton={{
-                                                text: "Adicionar item manual",
-                                                action: props.addBlankItem,
-                                                variant: "outline"
-                                            }}
-                                        />
-                                    </div>
-                                )}
-                            </div>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Inputs & Total Area */}
+                                                <div className="flex flex-wrap items-center gap-4 md:gap-8 pt-3 md:pt-0 border-t md:border-t-0 border-brand-border/50 dark:border-dark-border/50">
+                                                    
+                                                    {/* Price Input */}
+                                                    <div className="flex flex-col gap-1.5 min-w-[110px]">
+                                                        <span className="text-[10px] uppercase font-bold text-brand-inactive-text dark:text-dark-body tracking-wider">Preço Unit.</span>
+                                                        <FormInput
+                                                            label=""
+                                                            name={`price-${index}`}
+                                                            value={item.price}
+                                                            onChange={(e) => props.updateItemPrice(index, parseFloat(e.target.value))}
+                                                            prefix="R$"
+                                                            className="mb-0 h-10 text-sm font-bold"
+                                                        />
+                                                    </div>
+
+                                                    {/* Quantity Selector */}
+                                                    <div className="flex flex-col gap-1.5">
+                                                        <span className="text-[10px] uppercase font-bold text-brand-inactive-text dark:text-dark-body tracking-wider">Qtd.</span>
+                                                        <QuantitySelector
+                                                            value={item.qty}
+                                                            onChange={(val) => props.updateItemQty(index, val)}
+                                                            min={1}
+                                                            size="md"
+                                                        />
+                                                    </div>
+
+                                                    {/* Row Total */}
+                                                    <div className="flex flex-col gap-1.5 min-w-[100px] text-right ml-auto md:ml-0">
+                                                        <span className="text-[10px] uppercase font-bold text-brand-inactive-text dark:text-dark-body tracking-wider">Total</span>
+                                                        <span className="text-[15px] font-extrabold text-brand-dark dark:text-dark-heading bg-brand-gray/50 dark:bg-zinc-800 px-3 py-2 rounded-xl border border-brand-border/40 dark:border-dark-border/40">
+                                                            R$ {(item.price * item.qty).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Actions */}
+                                                    <div className="flex items-center gap-2 ml-4">
+                                                        {item.isBlank && (
+                                                            <Button
+                                                                variant="outline"
+                                                                onClick={() => props.toggleItemEdit(index, !item.isEditing)}
+                                                                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${item.isEditing ? 'text-green-600 bg-green-50 border-green-200' : 'text-brand-inactive-text'}`}
+                                                            >
+                                                                {item.isEditing ? <CheckIcon size={18} strokeWidth={3} /> : <EditIcon size={18} />}
+                                                            </Button>
+                                                        )}
+                                                        <Button
+                                                            variant="outline"
+                                                            onClick={() => props.removeItem(index)}
+                                                            className="w-10 h-10 rounded-xl flex items-center justify-center text-brand-inactive-text hover:text-brand-red hover:bg-red-50 dark:hover:bg-red-900/20 border-brand-border dark:border-dark-border"
+                                                        >
+                                                            <TrashIcon size={18} />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    ))}
+                                </AnimatePresence>
+                            ) : (
+                                <div className="py-12 bg-white dark:bg-dark-surface border border-dashed border-brand-border dark:border-dark-border rounded-3xl">
+                                    <IconPlaceholder
+                                        icon={SearchIcon}
+                                        title="Nenhum produto"
+                                        subtitle="Busque produtos acima ou adicione manualmente."
+                                        itemButton={{
+                                            text: "Adicionar item manual",
+                                            action: props.addBlankItem,
+                                            variant: "outline"
+                                        }}
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         {/* Add Item Link (Visible below table if items exist) */}

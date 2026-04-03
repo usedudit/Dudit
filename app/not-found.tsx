@@ -34,7 +34,7 @@ export default function NotFound() {
         </div>
       </main>
 
-      <footer className="w-full py-8 border-t border-white/10 bg-[#0F0F0F]">
+      <footer className="w-full py-8 border-t border-white/10 bg-brand-dark">
         <div className="max-w-[1300px] mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
           <a href="/" className="opacity-80 hover:opacity-100 transition-opacity">
             <img

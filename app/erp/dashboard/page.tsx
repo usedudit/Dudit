@@ -1,4 +1,4 @@
-import { ERPHeader } from "@/components/erp/erp-header"
+import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getAllUserPartnerAccess, getCurrentPartnerContext } from "@/lib/auth/partner-context"
 
@@ -10,7 +10,7 @@ export default async function ERPDashboardPage() {
 
   return (
     <>
-      <ERPHeader pageTitle={activeStore?.storeName ?? "ERP"} />
+      <ERPPageHeader title={activeStore?.storeName ?? "Painel"} />
       <FadeIn className="min-h-svh p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           <div>

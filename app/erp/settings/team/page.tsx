@@ -1,5 +1,5 @@
 import { Suspense } from "react"
-import { ERPHeader } from "@/components/erp/erp-header"
+import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getTeamMembers } from "@/app/actions/erp/team"
@@ -21,7 +21,7 @@ export default async function TeamPage() {
 
     return (
         <>
-            <ERPHeader pageTitle="Equipe e Acessos" />
+            <ERPPageHeader title="Equipe e Acessos" />
             <FadeIn className="p-4">
                 <Suspense fallback={<div className="p-4">Carregando equipe...</div>}>
                     <TeamList />

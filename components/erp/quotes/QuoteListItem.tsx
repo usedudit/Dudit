@@ -21,6 +21,7 @@ interface QuoteListItemProps {
     onEdit: (quote: any) => void
     onDelete: (quote: any) => void
     onDuplicate: (quote: any) => void
+    onClick: (quote: any) => void
 }
 
 const QuoteListItem = React.memo(
@@ -32,6 +33,7 @@ const QuoteListItem = React.memo(
         onEdit,
         onDelete,
         onDuplicate,
+        onClick,
     }: QuoteListItemProps) => {
 
         const renderCellContent = (colId: string) => {
@@ -140,7 +142,7 @@ const QuoteListItem = React.memo(
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
-                onClick={() => onEdit(quote)}
+                onClick={() => onClick(quote)}
             >
                 <td
                     className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12"

@@ -13,6 +13,7 @@ interface QuoteGridCardProps {
     onEdit: () => void
     onDelete: () => void
     onDuplicate: () => void
+    onClick?: () => void
 }
 
 const QuoteGridCard = React.memo(
@@ -22,7 +23,8 @@ const QuoteGridCard = React.memo(
         onSelect,
         onEdit,
         onDelete,
-        onDuplicate
+        onDuplicate,
+        onClick
     }: QuoteGridCardProps) => {
 
         return (
@@ -32,7 +34,7 @@ const QuoteGridCard = React.memo(
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
                 className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-dark-border/90 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
-                onClick={onEdit}
+                onClick={onClick}
             >
                 <div className="flex gap-4 mb-2">
                     {/* Visual Indicator */}

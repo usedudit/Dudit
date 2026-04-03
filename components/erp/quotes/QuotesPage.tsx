@@ -14,6 +14,7 @@ import QuoteListItem from "./QuoteListItem"
 import QuoteGridCard from "./QuoteGridCard"
 import QuotePageControls from "./QuotePageControls"
 import CreateQuote from "./CreateQuote"
+import QuoteDetails from "./QuoteDetails"
 
 // Icons
 import {
@@ -67,7 +68,8 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
     const isMobile = useMediaQuery("(max-width: 767px)")
 
     // State
-    const [isCreatingQuote, setIsCreatingQuote] = useState(false)
+    const [wrapperMode, setWrapperMode] = useState<'create' | 'edit' | 'duplicate' | 'view' | null>(null)
+    const [activeQuote, setActiveQuote] = useState<any>(null)
     const [search, setSearch] = useState("")
     const [debouncedSearch, setDebouncedSearch] = useState("")
     const [activeTab, setActiveTab] = useState<"Todos" | "Enviados" | "Aprovados" | "Rejeitados" | "Expirados">("Todos")
@@ -191,15 +193,26 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
 
     // Handlers
     const handleAddQuote = () => {
-        setIsCreatingQuote(true)
+        setWrapperMode('create')
+        setActiveQuote(null)
     }
-    const handleEditQuote = (quote: Quote) => {
-        router.push(`/erp/quotes/${quote.originalId}`)
+    const handleViewQuote = (quote: any) => {
+        // Find the raw quote data from rawQuotes using originalId
+        const rawQuote = rawQuotes.find((q: any) => q.id === quote.originalId)
+        setActiveQuote(rawQuote)
+        setWrapperMode('view')
     }
-    const handleDuplicateQuote = (quote: Quote) => {
-        toast({ title: "Duplicar", description: "Em breve: Duplicar orçamento " + quote.displayId })
+    const handleEditQuote = (quote: any) => {
+        const rawQuote = rawQuotes.find((q: any) => q.id === quote.originalId)
+        setActiveQuote(rawQuote)
+        setWrapperMode('edit')
     }
-    const handleDeleteQuote = (quote: Quote) => {
+    const handleDuplicateQuote = (quote: any) => {
+        const rawQuote = rawQuotes.find((q: any) => q.id === quote.originalId)
+        setActiveQuote(rawQuote)
+        setWrapperMode('duplicate')
+    }
+    const handleDeleteQuote = (quote: any) => {
         toast({ title: "Excluir", description: "Em breve: Excluir orçamento " + quote.displayId })
     }
     const handleSelectRow = (id: string) => {
@@ -224,8 +237,26 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
             className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300 overflow-hidden relative"
         >
             <AnimatePresence>
-                {isCreatingQuote && (
-                    <CreateQuote partnerId={partnerId} onBack={() => setIsCreatingQuote(false)} />
+                {(wrapperMode === 'create' || wrapperMode === 'edit' || wrapperMode === 'duplicate') && (
+                    <CreateQuote 
+                        partnerId={partnerId} 
+                        existingQuote={activeQuote} 
+                        mode={wrapperMode}
+                        onBack={() => {
+                            setWrapperMode(null)
+                            setActiveQuote(null)
+                        }} 
+                    />
+                )}
+                {wrapperMode === 'view' && activeQuote && (
+                    <QuoteDetails 
+                        quote={activeQuote} 
+                        onBack={() => {
+                            setWrapperMode(null)
+                            setActiveQuote(null)
+                        }} 
+                        onEdit={() => setWrapperMode('edit')}
+                    />
                 )}
             </AnimatePresence>
             <style>{`
@@ -299,7 +330,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
                             <motion.div key="empty-results" className="w-full h-full flex items-center justify-center min-h-[500px]">
                                 <IconPlaceholder
                                     placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/clientes/NaoEncontrado.png"
+                                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
                                     imageAlt="Nenhum orçamento encontrado"
                                     title="Nenhum orçamento encontrado"
                                     subtitle="Tente ajustar seus filtros ou termos de busca."
@@ -330,6 +361,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
                                                 onEdit={() => handleEditQuote(q)}
                                                 onDuplicate={() => handleDuplicateQuote(q)}
                                                 onDelete={() => handleDeleteQuote(q)}
+                                                onClick={() => handleViewQuote(q)}
                                             />
                                         ))}
                                     </div>
@@ -379,6 +411,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
                                                             onEdit={handleEditQuote}
                                                             onDuplicate={handleDuplicateQuote}
                                                             onDelete={handleDeleteQuote}
+                                                            onClick={handleViewQuote}
                                                         />
                                                     ))}
                                                 </tbody>

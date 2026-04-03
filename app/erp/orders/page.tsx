@@ -1,5 +1,5 @@
 import { Suspense } from "react"
-import { ERPHeader } from "@/components/erp/erp-header"
+import { ERPPageHeader } from "@/components/erp/page-header-state"
 import OrdersPage from "@/components/erp/orders/OrdersPage"
 import { getPartnerOrdersCached } from "@/lib/data/orders"
 import { checkPartnerPermission, getCurrentUser } from "@/lib/auth/authorization"
@@ -25,19 +25,9 @@ export default async function OrdersPageServer() {
 
   const orders = await getPartnerOrdersCached(partnerId)
 
-  const userProfile = {
-    fullName: user.email?.split("@")[0] || "Usuário",
-    email: user.email || "",
-    initials: (user.email?.[0] || "U").toUpperCase(),
-    avatarColor: "bg-brand-primary"
-  }
-
   return (
     <>
-      <ERPHeader
-        pageTitle="Pedidos"
-        userProfile={userProfile}
-      />
+      <ERPPageHeader title="Pedidos" />
       <FadeIn className="p-4">
         <Suspense fallback={<OrdersLoading />}>
           <OrdersPage

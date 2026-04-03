@@ -1,5 +1,5 @@
 import { Suspense } from "react"
-import { ERPHeader } from "@/components/erp/erp-header"
+import { ERPPageHeader } from "@/components/erp/page-header-state"
 import ProductsPage from "@/components/erp/product/ProductsPage"
 import { getERPProductsPageData } from "@/app/actions/erp/products"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -14,23 +14,12 @@ export default async function ProductsPageServer() {
     if (!user) return <AccessDenied />
 
     const data = await getERPProductsPageData()
-    if (!data) return <AccessDenied />
-
+    if (!data || !data.products) return <AccessDenied />
     const partnerId = data.partnerId
-
-    const userProfile = {
-        fullName: user.email?.split("@")[0] || "Usuário",
-        email: user.email || "",
-        initials: (user.email?.[0] || "U").toUpperCase(),
-        avatarColor: "bg-brand-primary"
-    }
 
     return (
         <>
-            <ERPHeader
-                pageTitle="Produtos"
-                userProfile={userProfile}
-            />
+            <ERPPageHeader title="Produtos" />
             <FadeIn className="p-4">
                 <Suspense fallback={<ProductsLoading />}>
                     <ProductsPage

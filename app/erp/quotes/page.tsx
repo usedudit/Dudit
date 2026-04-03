@@ -1,5 +1,5 @@
 import { Suspense } from "react"
-import { ERPHeader } from "@/components/erp/erp-header"
+import { ERPPageHeader } from "@/components/erp/page-header-state"
 import QuotesPage from "@/components/erp/quotes/QuotesPage"
 import { getPartnerQuotesCached } from "@/lib/data/quotes"
 import { checkPartnerPermission, getCurrentUser } from "@/lib/auth/authorization"
@@ -25,19 +25,9 @@ export default async function QuotesPageServer() {
 
     const quotes = await getPartnerQuotesCached(partnerId)
 
-    const userProfile = {
-        fullName: user.email?.split("@")[0] || "Usuário",
-        email: user.email || "",
-        initials: (user.email?.[0] || "U").toUpperCase(),
-        avatarColor: "bg-brand-primary"
-    }
-
     return (
         <>
-            <ERPHeader
-                pageTitle="Orçamentos"
-                userProfile={userProfile}
-            />
+            <ERPPageHeader title="Orçamentos" />
             <FadeIn className="p-4">
                 <Suspense fallback={<QuotesLoading />}>
                     <QuotesPage

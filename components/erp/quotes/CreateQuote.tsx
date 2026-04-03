@@ -16,9 +16,10 @@ interface CreateQuoteProps {
     partnerId: string;
     onBack: () => void;
     existingQuote?: any;
+    mode: 'create' | 'edit' | 'duplicate';
 }
 
-const CreateQuote = ({ partnerId, onBack, existingQuote }: CreateQuoteProps) => {
+const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProps) => {
     const { toast } = useToast();
     const { selectedStore } = useStore();
     const [isSaving, setIsSaving] = useState(false);
@@ -79,7 +80,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote }: CreateQuoteProps) => 
     const [otherCosts, setOtherCosts] = useState('');
 
     // Derived Values
-    const invoiceNumber = existingQuote?.id || 'QTE-2024-NEW';
+    const invoiceNumber = (mode === 'edit') ? existingQuote?.id : 'QTE-2024-NEW';
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         setIsScrolled(e.currentTarget.scrollTop > 20);
@@ -308,11 +309,11 @@ const CreateQuote = ({ partnerId, onBack, existingQuote }: CreateQuoteProps) => 
 
     return (
         <motion.div
-            initial={{ opacity: 0, scale: 0.98, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98, y: 10 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="absolute inset-0 z-50 flex h-full w-full bg-white dark:bg-dark-surface transition-colors duration-300 overflow-hidden shadow-2xl"
+            className="fixed inset-0 z-[60] flex h-screen w-screen bg-white dark:bg-dark-surface transition-colors duration-300 overflow-hidden shadow-2xl"
         >
             {/* LEFT SIDE - EDITOR (50% Width on Large Screens) */}
             <div

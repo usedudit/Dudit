@@ -2,7 +2,7 @@ import CustomersPage from "@/components/erp/clientes/CustomersPage"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { AccessDenied } from "@/components/erp/access-denied"
-import { ERPHeader } from "@/components/erp/erp-header"
+import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getCurrentUser } from "@/lib/auth/authorization"
 
@@ -19,19 +19,9 @@ export default async function CustomersRoute() {
   const { allowed } = await checkPartnerPermission(partnerId, "customers", "view")
   if (!allowed) return <AccessDenied />
 
-  const userProfile = {
-    fullName: user.email?.split("@")[0] || "Usuário",
-    email: user.email || "",
-    initials: (user.email?.[0] || "U").toUpperCase(),
-    avatarColor: "bg-brand-primary"
-  }
-
   return (
     <>
-      <ERPHeader
-        pageTitle="Clientes"
-        userProfile={userProfile}
-      />
+      <ERPPageHeader title="Clientes" />
       <FadeIn className="p-4">
         <CustomersPage partnerId={partnerId} />
       </FadeIn>

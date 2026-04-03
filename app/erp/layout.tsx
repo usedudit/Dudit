@@ -2,6 +2,7 @@ import type React from "react"
 import { Suspense } from "react"
 import type { Metadata } from "next"
 import { ERPSidebar } from "@/components/erp/erp-sidebar"
+import { ERPHeader } from "@/components/erp/erp-header"
 import { SidebarProvider } from "@/lib/sidebar-context"
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
@@ -21,7 +22,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { StoreProvider } from "@/lib/store-context"
 import { PermissionProvider } from "@/lib/permission-context"
 import { ProductMetadataProvider } from "@/lib/product-metadata-context"
-import { requireUser } from "@/lib/auth/authorization"
+import { requireUser, getCurrentUser } from "@/lib/auth/authorization"
 import {
   getAllUserPartnerAccess,
   getActivePartnerId,
@@ -35,6 +36,14 @@ export default async function ERPLayout({
   children: React.ReactNode
 }) {
   await requireUser() // Ensure authenticated — single auth call for the entire ERP tree
+  const user = await getCurrentUser()
+
+  const userProfile = user ? {
+    fullName: user.email?.split("@")[0] || "Usuário",
+    email: user.email || "",
+    initials: (user.email?.[0] || "U").toUpperCase(),
+    avatarColor: "bg-brand-primary"
+  } : undefined
 
   // Single call to get all partner access (cached for child pages via React cache)
   const allAccess = await getAllUserPartnerAccess()
@@ -93,6 +102,7 @@ export default async function ERPLayout({
             <div className="flex h-screen bg-brand-page-bg dark:bg-brand-page-bg text-brand-dark dark:text-white transition-colors duration-200">
               <ERPSidebar />
               <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+                <ERPHeader userProfile={userProfile} />
                 <Suspense fallback={<SkeletonLoader />}>{children}</Suspense>
               </div>
             </div>
