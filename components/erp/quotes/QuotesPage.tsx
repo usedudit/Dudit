@@ -7,7 +7,8 @@ import { useToast } from "@/hooks/use-toast"
 import { useStore } from "@/lib/store-context"
 
 // Components
-import { Button, IconPlaceholder, ThreeDotsLoader, AlertModal, Separator, Badge } from "@/components/reusable"
+import { Button, IconPlaceholder, AlertModal, Separator, Badge } from "@/components/reusable"
+import QuoteSkeleton from "./QuoteSkeleton"
 import { deleteQuoteAction } from "@/app/actions/erp/quotes"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
@@ -65,7 +66,7 @@ const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; 
     { id: "actions", label: "Ações", align: "center", width: "80px" },
 ]
 
-export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: any[], partnerId: string }) {
+export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, currentPage = 1, limit = 50 }: { quotes: any[], partnerId: string, totalQuotes?: number, currentPage?: number, limit?: number }) {
     const { success, error } = useNotification()
     const router = useRouter()
     const { isLoading: storeLoading } = useStore()
@@ -86,7 +87,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
     const [debouncedSearch, setDebouncedSearch] = useState("")
     const [activeTab, setActiveTab] = useState<"Todos" | "Enviados" | "Aprovados" | "Rejeitados" | "Expirados">("Todos")
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
-    const [page, setPage] = useState(1)
+    const [page, setPage] = useState(currentPage)
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
     const [modals, setModals] = useState({ filter: false, delete: false })
     const [selection, setSelection] = useState({ ids: new Set<string>() })
@@ -195,71 +196,92 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
             .sort((a, b) => b.created_at_time - a.created_at_time)
     }, [rawQuotes, debouncedSearch, activeTab, filters])
 
-    const totalPages = Math.ceil(filteredQuotes.length / itemsPerPage)
-    const paginated = filteredQuotes.slice((page - 1) * itemsPerPage, page * itemsPerPage)
+    const isServerPaginated = (totalQuotes !== undefined)
+    const totalPages = isServerPaginated ? Math.ceil(totalQuotes / limit) : Math.ceil(filteredQuotes.length / itemsPerPage)
+    const paginated = isServerPaginated ? filteredQuotes : filteredQuotes.slice((page - 1) * itemsPerPage, page * itemsPerPage)
 
     const hasActiveFilters = filters.status.length > 0 || filters.period.length > 0 || filters.expiration.length > 0 || debouncedSearch.length > 0
     const hasQuotes = (rawQuotes?.length || 0) > 0
 
     // Handlers
-    const handleAddQuote = () => {
+    const handleAddQuote = useCallback(() => {
         setWrapperMode('create')
         setActiveQuote(null)
-    }
-    const handleViewQuote = (quote: any) => {
+    }, [])
+    
+    const handleViewQuote = useCallback((quote: any) => {
         const rawQuote = currentQuotes.find((q: any) => q.id === (quote.originalId || quote.id))
         setActiveQuote(rawQuote)
         setWrapperMode('view')
-    }
-    const handleEditQuote = (quote: any) => {
+    }, [currentQuotes])
+    
+    const handleEditQuote = useCallback((quote: any) => {
         const rawQuote = currentQuotes.find((q: any) => q.id === (quote.originalId || quote.id))
         setActiveQuote(rawQuote)
         setWrapperMode('edit')
-    }
-    const handleDuplicateQuote = (quote: any) => {
+    }, [currentQuotes])
+    
+    const handleDuplicateQuote = useCallback((quote: any) => {
         const rawQuote = currentQuotes.find((q: any) => q.id === (quote.originalId || quote.id))
         setActiveQuote(rawQuote)
         setWrapperMode('duplicate')
-    }
-    const handleDeleteQuote = (quote: any) => {
+    }, [currentQuotes])
+    
+    const handleDeleteQuote = useCallback((quote: any) => {
         setQuoteToDelete(quote)
         setModals(prev => ({ ...prev, delete: true }))
-    }
+    }, [])
 
     const handleConfirmDelete = async () => {
         if (!quoteToDelete) return
+
+        // OPTIMISTIC DELETE: hide instantly from UI
+        const previousQuotes = [...currentQuotes]
+        setCurrentQuotes(prev => prev.filter(q => q.id !== quoteToDelete.originalId))
+        setModals(prev => ({ ...prev, delete: false }))
+
         setIsDeleting(true)
         try {
             const res = await deleteQuoteAction(quoteToDelete.originalId)
             if (res.success) {
                 success("Orçamento excluído", "O orçamento foi removido com sucesso.")
-                // Local update
-                setCurrentQuotes(prev => prev.filter(q => q.id !== quoteToDelete.originalId))
                 router.refresh()
             } else {
+                // Revert
+                setCurrentQuotes(previousQuotes)
+                setQuoteToDelete(null)
                 error("Erro", res.error || "Não foi possível excluir o orçamento.")
             }
         } catch (err) {
+            // Revert
+            setCurrentQuotes(previousQuotes)
+            setQuoteToDelete(null)
             error("Erro", "Erro de conexão ao excluir orçamento.")
         } finally {
             setIsDeleting(false)
-            setModals(prev => ({ ...prev, delete: false }))
-            setQuoteToDelete(null)
         }
     }
-    const handleSelectRow = (id: string) => {
+    const handleSelectRow = useCallback((id: string) => {
         setSelection((p) => {
             const s = new Set(p.ids)
             s.has(id) ? s.delete(id) : s.add(id)
             return { ids: s }
         })
-    }
+    }, [])
 
-    const handleClearFilters = () => {
+    const handleClearFilters = useCallback(() => {
         setSearch("")
         setFilters(INITIAL_FILTERS)
         setActiveTab("Todos")
-    }
+    }, [])
+
+    const handlePageChange = useCallback((newPage: number) => {
+        if (isServerPaginated) {
+            router.push(`?page=${newPage}`)
+        } else {
+            setPage(newPage)
+        }
+    }, [isServerPaginated, router])
 
     // Unified Sub-page render pattern
     if (wrapperMode !== null) {
@@ -347,7 +369,9 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
                 <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-8 px-4 md:px-8">
                     <AnimatePresence mode="wait">
                         {isLoading ? (
-                            <ThreeDotsLoader key="loading" />
+                            <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                                <QuoteSkeleton count={5} viewMode={viewMode} />
+                            </motion.div>
                         ) : !hasQuotes ? (
                             <motion.div key="empty-no-data" className="w-full h-full flex items-center justify-center min-h-[500px]">
                                 <IconPlaceholder
@@ -482,12 +506,12 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
                     </AnimatePresence>
                 </div>
 
-                {!isLoading && filteredQuotes.length > itemsPerPage && (
+                {!isLoading && (isServerPaginated ? totalPages > 1 : filteredQuotes.length > itemsPerPage) && (
                     <div className="flex justify-center mb-8 mt-4">
                         <Pagination
-                            currentPage={page}
+                            currentPage={isServerPaginated ? currentPage : page}
                             totalPages={totalPages}
-                            onPageChange={setPage}
+                            onPageChange={handlePageChange}
                         />
                     </div>
                 )}

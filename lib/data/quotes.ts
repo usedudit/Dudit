@@ -8,11 +8,11 @@ import { TAGS } from "@/lib/utils/revalidation-tags"
  * Uses getAdminClient to bypass RLS (filtered by partner_id) and
  * implements cross-request caching (unstable_cache) + per-request deduplication (cache).
  */
-export const getPartnerQuotesCached = cache(async (partnerId: string) => {
+export const getPartnerQuotesCached = cache(async (partnerId: string, limit: number = 50, offset: number = 0) => {
     return unstable_cache(
         async () => {
             const supabase = getAdminClient()
-            const { data, error } = await supabase
+            const { data, error, count } = await supabase
                 .from("quotes")
                 .select(`
                     id,
@@ -20,33 +20,26 @@ export const getPartnerQuotesCached = cache(async (partnerId: string) => {
                     status,
                     issue_date,
                     expiration_date,
-                    subtotal,
-                    discount_type,
-                    discount_value,
-                    shipping_cost,
-                    additional_costs,
                     total,
-                    notes,
-                    user_id,
                     customer_id,
                     created_at,
                     updated_at,
-                    customers (id, name, email, phone)
-                `)
+                    customers (id, name, email)
+                `, { count: 'exact' })
                 .eq("partner_id", partnerId)
                 .order("created_at", { ascending: false })
+                .range(offset, offset + limit - 1)
 
             if (error) {
                 console.error("[getPartnerQuotesCached] Error:", error)
-                return []
+                return { data: [], total: 0 }
             }
 
             // Mark expired quotes on read (virtual status)
             const now = new Date()
             now.setHours(0, 0, 0, 0)
 
-            return (data || []).map((q: any) => {
-                // If the quote is still "sent" or "draft" but past expiration, show as expired
+            const mappedData = (data || []).map((q: any) => {
                 if (
                     q.expiration_date &&
                     (q.status === 'draft' || q.status === 'sent') &&
@@ -56,8 +49,10 @@ export const getPartnerQuotesCached = cache(async (partnerId: string) => {
                 }
                 return q
             })
+
+            return { data: mappedData, total: count || 0 }
         },
-        [TAGS.quotes(partnerId)],
+        [TAGS.quotes(partnerId), String(limit), String(offset)],
         {
             tags: [TAGS.quotes(partnerId)],
             revalidate: 5

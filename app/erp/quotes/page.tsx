@@ -10,7 +10,7 @@ import QuotesLoading from "./loading"
 
 export const dynamic = "force-dynamic"
 
-export default async function QuotesPageServer() {
+export default async function QuotesPageServer({ searchParams }: { searchParams: { page?: string } }) {
     const user = await getCurrentUser()
     if (!user) return <AccessDenied />
 
@@ -23,7 +23,11 @@ export default async function QuotesPageServer() {
     const { allowed } = await checkPartnerPermission(partnerId, "quotes", "view")
     if (!allowed) return <AccessDenied />
 
-    const quotes = await getPartnerQuotesCached(partnerId)
+    const page = Number(searchParams?.page) || 1
+    const limit = 50
+    const offset = (page - 1) * limit
+
+    const { data: quotes, total } = await getPartnerQuotesCached(partnerId, limit, offset)
 
     return (
         <>
@@ -32,6 +36,9 @@ export default async function QuotesPageServer() {
                 <Suspense fallback={<QuotesLoading />}>
                     <QuotesPage
                         quotes={quotes || []}
+                        totalQuotes={total}
+                        currentPage={page}
+                        limit={limit}
                         partnerId={partnerId}
                     />
                 </Suspense>

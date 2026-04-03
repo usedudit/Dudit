@@ -159,7 +159,25 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
     const isDirty = useMemo(() => {
         if (!originalQuoteData) return mode === 'create' && quoteItems.length > 0;
-        return JSON.stringify(currentData) !== JSON.stringify(originalQuoteData);
+        
+        // Fast shallow checks first
+        if (
+            currentData.date !== originalQuoteData.date ||
+            currentData.expiry !== originalQuoteData.expiry ||
+            currentData.status !== originalQuoteData.status ||
+            currentData.discount !== originalQuoteData.discount ||
+            currentData.discountType !== originalQuoteData.discountType ||
+            currentData.shipping !== originalQuoteData.shipping ||
+            currentData.others !== originalQuoteData.others ||
+            currentData.note !== originalQuoteData.note ||
+            currentData.customer?.id !== originalQuoteData.customer?.id ||
+            currentData.items.length !== originalQuoteData.items.length
+        ) {
+            return true;
+        }
+
+        // Fallback to deep check only for items if necessary
+        return JSON.stringify(currentData.items) !== JSON.stringify(originalQuoteData.items);
     }, [currentData, originalQuoteData, mode, quoteItems.length]);
 
     const { showConfirmDialog: unsavedChangesDialogOpen, confirmNavigation: handleUnsavedChangesConfirm, cancelNavigation: handleUnsavedChangesDialogClose } = useUnsavedChanges(isDirty && mode !== 'view');
