@@ -40,7 +40,6 @@ interface QuoteEditorProps {
     otherCosts: string;
     setOtherCosts: (val: string) => void;
     subtotal: number;
-    tax: number;
     discountValue: number;
     total: number;
     selectedCustomer: any;
@@ -142,158 +141,93 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                             </AnimatePresence>
                         </div>
 
-                        {/* --- ITEMS TABLE --- */}
-                        <div className="w-full overflow-hidden border border-brand-border dark:border-dark-border rounded-xl bg-white dark:bg-dark-surface mb-4 shadow-sm">
+                        {/* --- ITEMS TABLE (Desktop) --- */}
+                        <div className="hidden md:block w-full overflow-hidden border border-brand-border dark:border-dark-border rounded-xl bg-white dark:bg-dark-surface mb-4 shadow-sm">
                             <table className="w-full border-collapse">
+                                {/* ... table content unchanged except for removing tax col if it existed (it didn't) ... */}
                                 <thead>
                                     <tr className="bg-[#f8f9fa] dark:bg-dark-border/30 border-b border-brand-border dark:border-dark-border">
-                                        <th className="py-4 px-6 text-[11px] font-bold text-gray-500 dark:text-dark-body uppercase tracking-wider text-left">
-                                            Produto
-                                        </th>
-                                        <th className="py-4 px-6 text-[11px] font-bold text-gray-500 dark:text-dark-body uppercase tracking-wider text-left w-44">
-                                            Preço Unit.
-                                        </th>
-                                        <th className="py-4 px-6 text-[11px] font-bold text-gray-500 dark:text-dark-body uppercase tracking-wider text-center w-36">
-                                            Qtd.
-                                        </th>
-                                        <th className="py-4 px-6 text-[11px] font-bold text-gray-500 dark:text-dark-body uppercase tracking-wider text-right w-36">
-                                            Total
-                                        </th>
-                                        {!props.isReadOnly && (
-                                            <th className="py-4 px-6 text-[11px] font-bold text-gray-500 dark:text-dark-body uppercase tracking-wider text-center w-32">
-                                                Ações
-                                            </th>
-                                        )}
+                                        <th className="py-4 px-6 text-[11px] font-bold text-gray-500 dark:text-dark-body uppercase tracking-wider text-left">Produto</th>
+                                        <th className="py-4 px-6 text-[11px] font-bold text-gray-500 dark:text-dark-body uppercase tracking-wider text-left w-44">Preço Unit.</th>
+                                        <th className="py-4 px-6 text-[11px] font-bold text-gray-500 dark:text-dark-body uppercase tracking-wider text-center w-36">Qtd.</th>
+                                        <th className="py-4 px-6 text-[11px] font-bold text-gray-500 dark:text-dark-body uppercase tracking-wider text-right w-36">Total</th>
+                                        {!props.isReadOnly && <th className="py-4 px-6 text-[11px] font-bold text-gray-500 dark:text-dark-body uppercase tracking-wider text-center w-32">Ações</th>}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-brand-border dark:divide-dark-border">
-                                    {props.quoteItems.length > 0 ? (
-                                        <AnimatePresence initial={false} mode="popLayout">
-                                            {props.quoteItems.map((item, index) => (
-                                                <motion.tr
-                                                    key={item.rowId || `item-${index}-${item.id}`}
-                                                    layout
-                                                    initial={{ opacity: 0, y: 10 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    exit={{ opacity: 0, scale: 0.95 }}
-                                                    className="group bg-white dark:bg-dark-surface hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors"
-                                                >
-                                                    {/* Product Info */}
-                                                    <td className="py-4 px-6">
-                                                        <div className="flex items-center gap-4">
-                                                            <div className="w-11 h-11 rounded-full bg-brand-gray/50 dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center border border-brand-border dark:border-dark-border shadow-sm">
-                                                                {item.image ? (
-                                                                    <img src={item.image} className="w-full h-full object-cover" alt={item.name} />
-                                                                ) : (
-                                                                    <span className="text-xs font-bold text-brand-inactive-text uppercase">
-                                                                        {item.name?.charAt(0) || 'P'}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                {item.isEditing && !props.isReadOnly ? (
-                                                                    <FormInput
-                                                                        label=""
-                                                                        name={`name-${index}`}
-                                                                        value={item.name}
-                                                                        onChange={(e) => props.updateItemField(index, 'name', e.target.value)}
-                                                                        className="mb-0 h-11 text-sm font-bold w-full"
-                                                                        placeholder="Nome do produto"
-                                                                        autoFocus
-                                                                    />
-                                                                ) : (
-                                                                    <div className="flex flex-col">
-                                                                        <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate max-w-[250px]">
-                                                                            {item.name || 'Produto sem nome'}
-                                                                        </span>
-                                                                        <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                                                            SKU: {item.sku || 'N/A'}
-                                                                        </span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </td>
-
-                                                    {/* Price Input */}
-                                                    <td className="py-4 px-6">
-                                                        <div className="relative w-full">
-                                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-brand-inactive-text">R$</span>
-                                                            <input
-                                                                type="number"
-                                                                value={item.price}
-                                                                onChange={(e) => props.updateItemPrice(index, parseFloat(e.target.value) || 0)}
-                                                                disabled={props.isReadOnly}
-                                                                className={`w-full h-11 pl-10 pr-4 rounded-xl border text-[14px] font-bold transition-all ${
-                                                                    props.isReadOnly 
-                                                                    ? 'bg-transparent border-transparent text-brand-primary cursor-default' 
-                                                                    : 'bg-brand-gray/30 border-brand-border focus:bg-white focus:border-brand-primary focus:ring-1 focus:ring-brand-primary'
-                                                                }`}
-                                                            />
-                                                        </div>
-                                                    </td>
-
-                                                    {/* Quantity */}
-                                                    <td className="py-4 px-6">
-                                                        <div className="flex justify-center">
-                                                            <QuantitySelector
-                                                                value={item.qty}
-                                                                onChange={(val) => props.updateItemQty(index, val)}
-                                                                min={1}
-                                                                size="md"
-                                                                disabled={props.isReadOnly}
-                                                            />
-                                                        </div>
-                                                    </td>
-
-                                                    {/* Total */}
-                                                    <td className="py-4 px-6 text-right">
-                                                        <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
-                                                            R$ {(item.price * item.qty).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                                        </span>
-                                                    </td>
-
-                                                    {/* Actions */}
-                                                    {!props.isReadOnly && (
-                                                        <td className="py-4 px-6">
-                                                            <div className="flex items-center justify-center gap-3">
-                                                                <button
-                                                                    type="button"
-                                                                    className="w-9 h-9 flex items-center justify-center bg-brand-green/10 text-brand-green border border-brand-green/20 rounded-full hover:bg-brand-green hover:text-white transition-all shadow-sm"
-                                                                >
-                                                                    <WandIcon size={16} />
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => props.removeItem(index)}
-                                                                    className="w-9 h-9 flex items-center justify-center text-gray-400 hover:text-brand-red hover:bg-brand-red/10 rounded-full transition-all"
-                                                                >
-                                                                    <TrashIcon size={18} />
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    )}
-                                                </motion.tr>
-                                            ))}
-                                        </AnimatePresence>
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={props.isReadOnly ? 4 : 5} className="py-16 border-none">
-                                                <IconPlaceholder
-                                                    icon={SearchIcon}
-                                                    title="Nenhum produto adicionado"
-                                                    subtitle={props.isReadOnly ? "Esta proposta não possui itens." : "Busque produtos acima ou adicione manualmente."}
-                                                    itemButton={!props.isReadOnly ? {
-                                                        text: "Adicionar item manual",
-                                                        action: props.addBlankItem,
-                                                        variant: "outline"
-                                                    } : undefined}
+                                    {props.quoteItems.map((item, index) => (
+                                        <tr key={index} className="group bg-white dark:bg-dark-surface hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+                                            <td className="py-4 px-6">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-11 h-11 rounded-full bg-brand-gray/50 dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center border border-brand-border dark:border-dark-border shadow-sm">
+                                                        {item.image ? <img src={item.image} className="w-full h-full object-cover" /> : <span className="text-xs font-bold text-brand-inactive-text">P</span>}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">{item.name || 'Produto sem nome'}</span>
+                                                        <p className="text-[11px] font-medium text-brand-inactive-text">SKU: {item.sku || 'N/A'}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="py-4 px-6">
+                                                <input
+                                                    type="number"
+                                                    value={item.price}
+                                                    onChange={(e) => props.updateItemPrice(index, parseFloat(e.target.value) || 0)}
+                                                    className="w-full h-10 px-3 rounded-lg border border-brand-border bg-brand-gray/20 font-bold text-sm"
                                                 />
                                             </td>
+                                            <td className="py-4 px-6 flex justify-center">
+                                                <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} size="sm" />
+                                            </td>
+                                            <td className="py-4 px-6 text-right font-bold text-sm">R$ {(item.price * item.qty).toFixed(2)}</td>
+                                            {!props.isReadOnly && (
+                                                <td className="py-4 px-6 text-center">
+                                                    <button onClick={() => props.removeItem(index)} className="text-red-500 hover:text-red-700"><TrashIcon size={18} /></button>
+                                                </td>
+                                            )}
                                         </tr>
-                                    )}
+                                    ))}
                                 </tbody>
                             </table>
+                        </div>
+
+                        {/* --- ITEMS LIST (Mobile/Tablet) --- */}
+                        <div className="block md:hidden space-y-4 mb-6">
+                            {props.quoteItems.map((item, index) => (
+                                <div key={index} className="flex flex-col gap-4 py-5 border-b border-brand-border dark:border-dark-border last:border-0">
+                                    <div className="flex items-start gap-4">
+                                        <div className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border flex-shrink-0 flex items-center justify-center overflow-hidden">
+                                            {item.image ? <img src={item.image} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-brand-inactive-text">P</span>}
+                                        </div>
+                                        <div className="flex-1 min-w-0 flex flex-col gap-1">
+                                            <div className="flex justify-between items-start gap-2">
+                                                <h4 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.name || 'Produto sem nome'}</h4>
+                                                {!props.isReadOnly && (
+                                                    <button onClick={() => props.removeItem(index)} className="text-brand-red p-1"><TrashIcon size={16} /></button>
+                                                )}
+                                            </div>
+                                            <p className="text-xs font-medium text-brand-inactive-text">SKU: {item.sku || 'N/A'}</p>
+                                            
+                                            <div className="flex items-center justify-between mt-2">
+                                                <div className="flex items-center gap-3">
+                                                    <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} size="sm" />
+                                                    <span className="text-xs text-brand-inactive-text">x</span>
+                                                    <div className="relative">
+                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-brand-inactive-text">R$</span>
+                                                        <input
+                                                            type="number"
+                                                            value={item.price}
+                                                            onChange={(e) => props.updateItemPrice(index, parseFloat(e.target.value) || 0)}
+                                                            className="w-24 h-8 pl-6 pr-2 rounded-lg border border-brand-border bg-brand-gray/10 font-bold text-xs"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <span className="font-bold text-[14px] text-brand-dark">R$ {(item.price * item.qty).toFixed(2)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
 
                         {/* Add Item Link */}

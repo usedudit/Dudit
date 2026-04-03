@@ -9,6 +9,7 @@ import { useStore } from "@/lib/store-context"
 // Components
 import { Button, IconPlaceholder, AlertModal, Separator, Badge } from "@/components/reusable"
 import QuoteSkeleton from "./QuoteSkeleton"
+import { FileIcon } from "@/lib/icons"
 import { deleteQuoteAction } from "@/app/actions/erp/quotes"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
@@ -407,28 +408,41 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                                 className="w-full"
                             >
                                 {isTablet ? (
-                                    <div className="flex flex-col w-full bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
+                                    <div className="flex flex-col w-full">
                                         {paginated.map((q: Quote, idx) => (
                                             <React.Fragment key={q.originalId}>
                                                 <div 
-                                                    className="p-4 hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 cursor-pointer transition-colors"
+                                                    className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex items-center gap-4"
                                                     onClick={() => handleViewQuote(q)}
                                                 >
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <div className="flex flex-col">
-                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{q.displayId}</span>
-                                                            <span className="text-xs text-brand-inactive-text font-medium">{q.customer_name}</span>
-                                                        </div>
-                                                        <Badge variant={q.statusColor}>{q.statusLabel}</Badge>
+                                                    <div className="w-14 h-14 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border flex-shrink-0 flex items-center justify-center">
+                                                        <FileIcon className="w-6 h-6 text-brand-dark dark:text-dark-heading" />
                                                     </div>
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-sm font-bold text-brand-primary">
-                                                            R$ {q.total_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                                        </span>
-                                                        <span className="text-[11px] text-brand-inactive-text font-medium">{q.formattedIssueDate}</span>
+                                                    
+                                                    <div className="flex-1 min-w-0 flex flex-col gap-1">
+                                                        <div className="flex justify-between items-start">
+                                                            <div className="flex flex-col min-w-0 pr-1">
+                                                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                    {q.displayId}
+                                                                </h3>
+                                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                                    {q.customer_name}
+                                                                </span>
+                                                            </div>
+                                                            <Badge variant={q.statusColor} className="flex-shrink-0 text-[10px] h-5 px-1.5">
+                                                                {q.statusLabel}
+                                                            </Badge>
+                                                        </div>
+                                                        <div className="flex justify-between items-center mt-1">
+                                                            <span className="text-[14px] font-bold text-brand-primary">
+                                                                R$ {q.total_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                            </span>
+                                                            <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                {q.formattedIssueDate}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                {idx < paginated.length - 1 && <Separator />}
                                             </React.Fragment>
                                         ))}
                                     </div>

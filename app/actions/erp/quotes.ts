@@ -10,6 +10,47 @@ import { revalidateQuotes } from "@/lib/utils/revalidation"
 import { checkLimit, increment_usage_counter, decrement_usage_counter } from "@/lib/services/subscription.service"
 import { withTelemetry } from "@/lib/utils/action-logger"
 
+// ─── GET NEXT QUOTE NUMBER ──────────────────────────────────────────────────
+
+export async function getNextQuoteNumberAction(partnerId: string) {
+    return withTelemetry("getNextQuoteNumberAction", async () => {
+        try {
+            const user = await requireUser()
+            await requirePartnerAccessWithPermission(partnerId, "quotes", "view", user)
+
+            const supabase = await getSupabaseServerClient()
+
+            // Fetch the latest quote number for this partner
+            const { data, error } = await supabase
+                .from("quotes")
+                .select("quote_number")
+                .eq("partner_id", partnerId)
+                .order("quote_number", { ascending: false })
+                .limit(1)
+                .single()
+
+            if (error && error.code !== 'PGRST116') { // PGRST116 is 'no rows found'
+                console.error("[getNextQuoteNumberAction] Error:", error)
+                return errorResponse("Erro ao buscar próximo número")
+            }
+
+            let nextNumber = "QTE-0001"
+            if (data?.quote_number) {
+                const match = data.quote_number.match(/(\d+)$/)
+                if (match) {
+                    const currentNum = parseInt(match[0], 10)
+                    nextNumber = `QTE-${(currentNum + 1).toString().padStart(4, '0')}`
+                }
+            }
+
+            return successResponse(nextNumber)
+        } catch (err: any) {
+            console.error("[getNextQuoteNumberAction] Error:", err)
+            return errorResponse(err.message || "Erro interno")
+        }
+    })
+}
+
 // ─── CREATE QUOTE ───────────────────────────────────────────────────────────
 
 export async function createQuoteAction(data: {
