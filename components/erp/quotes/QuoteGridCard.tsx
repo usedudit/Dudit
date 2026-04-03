@@ -76,11 +76,6 @@ const QuoteGridCard = React.memo(
                             <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
                                 {quote.customer_name}
                             </span>
-                            {quote.customer_id && (
-                                <Badge variant="gray" className="text-[9px] h-3.5 px-0.5">
-                                    {quote.customer_id}
-                                </Badge>
-                            )}
                         </div>
                     </div>
                 </div>

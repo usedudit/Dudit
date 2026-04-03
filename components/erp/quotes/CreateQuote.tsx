@@ -9,7 +9,7 @@ import QuoteEditor from './QuoteEditor';
 import QuotePreview from './QuotePreview';
 import SelectCustomerSheet from './SelectCustomerSheet';
 import SelectVariantSheet from './SelectVariantSheet';
-import { useToast } from '@/hooks/use-toast';
+import { useNotification } from '@/hooks/use-notification';
 import { useStore } from '@/lib/store-context';
 import { searchProductsForQuotes, createQuoteAction, getQuoteDetailsAction, getPartnerAddressAction } from '@/app/actions/erp/quotes';
 import { useSidebar } from '@/lib/sidebar-context';
@@ -23,7 +23,7 @@ interface CreateQuoteProps {
 }
 
 const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProps) => {
-    const { toast } = useToast();
+    const { success: notifySuccess, error: notifyError } = useNotification();
     const { selectedStore } = useStore();
     const { setHeaderOverride } = useSidebar();
     const [isSaving, setIsSaving] = useState(false);
@@ -373,11 +373,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
     const handleSave = async () => {
         if (quoteItems.length === 0) {
-            toast({
-                title: "Carrinho vazio",
-                description: "Adicione pelo menos um item ao orçamento.",
-                variant: "destructive"
-            });
+            notifyError("Carrinho vazio", "Adicione pelo menos um item ao orçamento.");
             return;
         }
 
@@ -390,9 +386,9 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                 expirationDate: expiryDate,
                 notes: internalNote,
                 discountType: discountType === '%' ? 'percentage' : 'fixed',
-                discountValue: discountNum,
-                shippingCost: shippingNum,
-                additionalCosts: otherCostsNum,
+                discountValue: Number(discount) || 0,
+                shippingCost: Number(shippingFee) || 0,
+                additionalCosts: Number(otherCosts) || 0,
                 items: quoteItems.map((item, idx) => ({
                     productId: item.isBlank ? null : item.id,
                     customName: item.isBlank ? item.name : undefined,
@@ -403,28 +399,15 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
             });
 
             if (result.success) {
-                toast({
-                    title: mode === 'edit' ? "Alterações salvas!" : "Orçamento criado!",
-                    description: "O orçamento foi salvo com sucesso.",
-                });
-                
-                // Clear dirty state
-                setOriginalQuoteData(currentData);
+                notifySuccess(mode === 'edit' ? "Alterações salvas!" : "Orçamento criado!", 
+                        "O orçamento foi salvo com sucesso.");
                 onBack();
             } else {
-                toast({
-                    title: "Erro ao salvar",
-                    description: (result as any).error || "Ocorreu um erro inesperado.",
-                    variant: "destructive"
-                });
+                notifyError("Erro ao salvar", (result as any).error || "Ocorreu um erro inesperado.");
             }
         } catch (error) {
             console.error(error);
-            toast({
-                title: "Erro fatal",
-                description: "Não foi possível conectar ao servidor.",
-                variant: "destructive"
-            });
+            notifyError("Erro fatal", "Não foi possível conectar ao servidor.");
         } finally {
             setIsSaving(false);
         }
@@ -433,10 +416,9 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     return (
         <FadeIn className="flex flex-col h-[calc(100vh-64px)] md:h-[calc(100vh-72px)] bg-white dark:bg-dark-background transition-colors duration-300 overflow-hidden relative">
             <div className="flex flex-row h-full w-full overflow-hidden">
-                {/* LEFT SIDE - EDITOR */}
-                <div className={`flex flex-col h-full w-full lg:w-1/2 transition-all duration-300 ease-in-out relative z-10 border-r border-brand-border dark:border-dark-border ${activeTab === 'Visualização' ? 'hidden lg:flex' : 'flex'}`}>
+                {/* EDITOR / TABS WRAPPER */}
+                <div className="flex flex-col h-full w-full lg:w-1/2 relative z-10 border-r border-brand-border dark:border-dark-border">
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
-
                         <QuoteHeader
                             isScrolled={isScrolled}
                             onBack={handleBackWithSafety}
@@ -445,11 +427,12 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                             title={pageTitle}
                             subtitle={mode === 'view' ? "Detalhes da proposta comercial" : "Crie uma proposta comercial para seu cliente"}
                             saveLabel={mode === 'edit' ? "Salvar Alterações" : "Salvar Orçamento"}
+                            activeTab={activeTab}
                         />
 
-                        {/* SCROLLABLE FORM AREA */}
+                        {/* SCROLLABLE FORM AREA - Hidden when preview is active on mobile */}
                         <div
-                            className="flex-1 overflow-auto no-scrollbar bg-white dark:bg-dark-surface transition-colors duration-300 scroll-smooth pb-24 lg:pb-0"
+                            className={`flex-1 overflow-auto no-scrollbar bg-white dark:bg-dark-surface transition-colors duration-300 scroll-smooth pb-24 lg:pb-0 ${activeTab === 'Visualização' ? 'hidden lg:block' : 'block'}`}
                             onScroll={handleScroll}
                         >
                             <QuoteEditor

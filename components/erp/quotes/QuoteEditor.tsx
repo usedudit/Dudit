@@ -13,7 +13,7 @@ import {
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import QuantitySelector from '@/components/reusable/QuantitySelector';
-import { Button, Input as FormInput, Dropdown, DropdownItem, TabsContent, FormCurrencyInput } from '@/components/reusable';
+import { Button, Input as FormInput, Dropdown, DropdownItem, TabsContent, FormCurrencyInput, FormDropdown, MoneyInput, PercentageInput } from '@/components/reusable';
 import IconPlaceholder from '@/components/reusable/IconPlaceholder';
 
 interface QuoteEditorProps {
@@ -386,31 +386,13 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                             />
 
                             <div className="flex flex-col gap-1.5">
-                                <label className="block text-[13px] font-bold text-brand-dark dark:text-dark-heading">Status</label>
-                                <Dropdown
-                                    width="w-full"
-                                    trigger={
-                                        <button 
-                                            type="button"
-                                            disabled={props.isReadOnly}
-                                            className="flex items-center justify-between w-full h-[46px] px-4 bg-transparent border border-brand-border dark:border-dark-border rounded-xl text-[15px] font-medium text-brand-dark dark:text-dark-heading focus:outline-none focus:ring-1 focus:ring-brand-border transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                                            <div className="flex items-center gap-2">
-                                                <currentStatus.icon size={18} className={currentStatus.color} />
-                                                {currentStatus.label}
-                                            </div>
-                                            <ChevronDownIcon size={18} className="text-brand-inactive-text" />
-                                        </button>
-                                    }
-                                >
-                                    {statusOptions.slice(0, 4).map(option => (
-                                        <DropdownItem key={option.value} onClick={() => props.setStatus(option.value)}>
-                                            <div className="flex items-center gap-2">
-                                                <option.icon size={16} className={option.color} />
-                                                {option.label}
-                                            </div>
-                                        </DropdownItem>
-                                    ))}
-                                </Dropdown>
+                                <FormDropdown
+                                    label="Status"
+                                    value={props.status}
+                                    setValue={props.setStatus}
+                                    options={statusOptions.map(o => ({ value: o.value, label: o.label }))}
+                                    disabled={props.isReadOnly}
+                                />
                             </div>
                         </div>
 
@@ -418,33 +400,34 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="relative">
                                 {props.discountType === 'R$' ? (
-                                    <FormCurrencyInput
+                                    <MoneyInput
                                         label="Desconto"
-                                        value={Number(props.discount) || 0}
+                                        value={props.discount}
                                         onChange={(val) => props.setDiscount(val.toString())}
                                         disabled={props.isReadOnly}
+                                        suffix={
+                                            <div className="flex items-center gap-1.5 border-l border-brand-border dark:border-dark-border ml-2 pl-2">
+                                                <button type="button" onClick={() => props.setDiscountType('R$')} className="text-[11px] font-black text-brand-primary">R$</button>
+                                                <div className="w-[1px] h-3 bg-brand-border dark:border-dark-border" />
+                                                <button type="button" onClick={() => props.setDiscountType('%')} className="text-[11px] font-bold text-brand-inactive-text hover:text-brand-dark transition-colors">%</button>
+                                            </div>
+                                        }
                                     />
                                 ) : (
-                                    <FormInput
-                                        label="Desconto (%)"
-                                        type="number"
+                                    <PercentageInput
+                                        label="Desconto"
                                         value={props.discount}
-                                        onChange={(e) => props.setDiscount(e.target.value)}
+                                        onChange={(val) => props.setDiscount(val.toString())}
                                         disabled={props.isReadOnly}
-                                        suffix="%"
+                                        suffix={
+                                            <div className="flex items-center gap-1.5 border-l border-brand-border dark:border-dark-border ml-2 pl-2">
+                                                <button type="button" onClick={() => props.setDiscountType('R$')} className="text-[11px] font-bold text-brand-inactive-text hover:text-brand-dark transition-colors">R$</button>
+                                                <div className="w-[1px] h-3 bg-brand-border dark:border-dark-border" />
+                                                <button type="button" onClick={() => props.setDiscountType('%')} className="text-[11px] font-black text-brand-primary">%</button>
+                                            </div>
+                                        }
                                     />
                                 )}
-                                
-                                <div className="absolute top-0 right-0 h-[30px] flex items-center pr-2">
-                                    <button 
-                                        type="button"
-                                        onClick={() => props.setDiscountType(props.discountType === 'R$' ? '%' : 'R$')}
-                                        className="text-[10px] font-bold text-brand-primary dark:text-brand-secondary underline underline-offset-2 hover:opacity-80 transition-opacity"
-                                        disabled={props.isReadOnly}
-                                    >
-                                        Alterar para {props.discountType === 'R$' ? '%' : 'R$'}
-                                    </button>
-                                </div>
                             </div>
 
                             <FormCurrencyInput

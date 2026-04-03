@@ -20,7 +20,7 @@ import {
 } from '@/lib/icons';
 import { Button, Badge, Dropdown, DropdownItem, ThreeDotsLoader, FormDropdown, Tooltip, AlertModal } from '@/components/reusable';
 import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction } from '@/app/actions/erp/quotes';
-import { useToast } from "@/hooks/use-toast";
+import { useNotification } from "@/hooks/use-notification";
 import CustomerCard from '@/components/reusable/CustomerCard';
 import { useSidebar } from "@/lib/sidebar-context";
 
@@ -47,7 +47,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack }: QuoteDetailProps) => {
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
-    const { toast } = useToast();
+    const { success: notifySuccess, error: notifyError } = useNotification();
     const { setHeaderOverride } = useSidebar();
 
     const handleScroll = useCallback(() => {
@@ -62,21 +62,21 @@ const QuoteDetail = ({ quoteId, partnerId, onBack }: QuoteDetailProps) => {
             if (res.success) {
                 setQuote(res.data);
             } else {
-                toast({ title: "Erro", description: res.error, variant: "destructive" });
+                notifyError("Erro", res.error);
                 onBack();
             }
             setLoading(false);
         }
         load();
-    }, [quoteId, partnerId, toast, onBack]);
+    }, [quoteId, partnerId, notifyError, onBack]);
 
     const handleStatusChange = async (newStatus: any) => {
         const res = await updateQuoteStatusAction({ quoteId, partnerId, status: newStatus });
         if (res.success) {
             setQuote((prev: any) => ({ ...prev, status: newStatus }));
-            toast({ title: "Sucesso", description: "Status atualizado!" });
+            notifySuccess("Sucesso", "Status atualizado!");
         } else {
-            toast({ title: "Erro", description: res.error, variant: "destructive" });
+            notifyError("Erro", res.error);
         }
     };
 
@@ -107,13 +107,13 @@ const QuoteDetail = ({ quoteId, partnerId, onBack }: QuoteDetailProps) => {
         try {
             const res = await deleteQuoteAction(quoteId);
             if (res.success) {
-                toast({ title: "Orçamento excluído", description: "O orçamento foi removido com sucesso." });
+                notifySuccess("Orçamento excluído", "O orçamento foi removido com sucesso.");
                 onBack();
             } else {
-                toast({ title: "Erro ao excluir", description: "Não foi possível remover o orçamento.", variant: "destructive" });
+                notifyError("Erro ao excluir", "Não foi possível remover o orçamento.");
             }
         } catch (error) {
-            toast({ title: "Erro fatal", description: "Erro de conexão ao excluir orçamento.", variant: "destructive" });
+            notifyError("Erro fatal", "Erro de conexão ao excluir orçamento.");
         } finally {
             setIsDeleting(false);
             setShowDeleteModal(false);

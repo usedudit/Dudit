@@ -77,11 +77,6 @@ const QuoteListItem = React.memo(
                             <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[180px]">
                                 {quote.customer_name}
                             </span>
-                            {quote.customer_id && (
-                                <Badge variant="gray" className="text-[10px] h-4 px-1">
-                                    {quote.customer_id}
-                                </Badge>
-                            )}
                         </div>
                     )
 

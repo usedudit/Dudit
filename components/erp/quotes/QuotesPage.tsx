@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useStore } from "@/lib/store-context"
 
 // Components
-import { Button, IconPlaceholder, ThreeDotsLoader, AlertModal } from "@/components/reusable"
+import { Button, IconPlaceholder, ThreeDotsLoader, AlertModal, Separator, Badge } from "@/components/reusable"
 import { deleteQuoteAction } from "@/app/actions/erp/quotes"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
@@ -17,6 +17,7 @@ import QuotePageControls from "./QuotePageControls"
 import CreateQuote from "./CreateQuote"
 import QuoteDetail from "./QuoteDetail"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { useNotification } from "@/hooks/use-notification"
 
 // Icons
 import {
@@ -65,10 +66,18 @@ const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; 
 ]
 
 export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: any[], partnerId: string }) {
-    const { toast } = useToast()
+    const { success, error } = useNotification()
     const router = useRouter()
     const { isLoading: storeLoading } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
+    const isTablet = useMediaQuery("(max-width: 1024px)")
+
+    // Local state for instant updates
+    const [currentQuotes, setCurrentQuotes] = useState<any[]>(rawQuotes)
+
+    useEffect(() => {
+        setCurrentQuotes(rawQuotes)
+    }, [rawQuotes])
 
     // State
     const [wrapperMode, setWrapperMode] = useState<'create' | 'edit' | 'duplicate' | 'view' | null>(null)
@@ -116,11 +125,11 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
     ]
 
     const filteredQuotes: Quote[] = useMemo(() => {
-        if (!rawQuotes) return []
+        if (!currentQuotes) return []
 
         const term = debouncedSearch.toLowerCase()
 
-        return rawQuotes
+        return currentQuotes
             .map((q: any): Quote => {
                 const statusMap: Record<string, { label: string; color: string }> = {
                     draft: { label: "Rascunho", color: "gray" },
@@ -198,17 +207,17 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
         setActiveQuote(null)
     }
     const handleViewQuote = (quote: any) => {
-        const rawQuote = rawQuotes.find((q: any) => q.id === quote.originalId)
+        const rawQuote = currentQuotes.find((q: any) => q.id === (quote.originalId || quote.id))
         setActiveQuote(rawQuote)
         setWrapperMode('view')
     }
     const handleEditQuote = (quote: any) => {
-        const rawQuote = rawQuotes.find((q: any) => q.id === quote.originalId)
+        const rawQuote = currentQuotes.find((q: any) => q.id === (quote.originalId || quote.id))
         setActiveQuote(rawQuote)
         setWrapperMode('edit')
     }
     const handleDuplicateQuote = (quote: any) => {
-        const rawQuote = rawQuotes.find((q: any) => q.id === quote.originalId)
+        const rawQuote = currentQuotes.find((q: any) => q.id === (quote.originalId || quote.id))
         setActiveQuote(rawQuote)
         setWrapperMode('duplicate')
     }
@@ -223,15 +232,15 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
         try {
             const res = await deleteQuoteAction(quoteToDelete.originalId)
             if (res.success) {
-                toast({ title: "Sucesso", description: "Orçamento excluído com sucesso." })
-                // The router.refresh() or local state update should happen here
-                // But since rawQuotes is passed as prop, we might need router.refresh()
+                success("Orçamento excluído", "O orçamento foi removido com sucesso.")
+                // Local update
+                setCurrentQuotes(prev => prev.filter(q => q.id !== quoteToDelete.originalId))
                 router.refresh()
             } else {
-                toast({ title: "Erro", description: res.error || "Erro ao excluir orçamento.", variant: "destructive" })
+                error("Erro", res.error || "Não foi possível excluir o orçamento.")
             }
         } catch (err) {
-            toast({ title: "Erro", description: "Erro de conexão ao excluir orçamento.", variant: "destructive" })
+            error("Erro", "Erro de conexão ao excluir orçamento.")
         } finally {
             setIsDeleting(false)
             setModals(prev => ({ ...prev, delete: false }))
@@ -373,7 +382,33 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId }: { quotes: a
                                 transition={{ duration: 0.2 }}
                                 className="w-full"
                             >
-                                {viewMode === "grid" ? (
+                                {isTablet ? (
+                                    <div className="flex flex-col w-full bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
+                                        {paginated.map((q: Quote, idx) => (
+                                            <React.Fragment key={q.originalId}>
+                                                <div 
+                                                    className="p-4 hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 cursor-pointer transition-colors"
+                                                    onClick={() => handleViewQuote(q)}
+                                                >
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{q.displayId}</span>
+                                                            <span className="text-xs text-brand-inactive-text font-medium">{q.customer_name}</span>
+                                                        </div>
+                                                        <Badge variant={q.statusColor}>{q.statusLabel}</Badge>
+                                                    </div>
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-sm font-bold text-brand-primary">
+                                                            R$ {q.total_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                        </span>
+                                                        <span className="text-[11px] text-brand-inactive-text font-medium">{q.formattedIssueDate}</span>
+                                                    </div>
+                                                </div>
+                                                {idx < paginated.length - 1 && <Separator />}
+                                            </React.Fragment>
+                                        ))}
+                                    </div>
+                                ) : viewMode === "grid" ? (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                         {paginated.map((q: Quote) => (
                                             <QuoteGridCard

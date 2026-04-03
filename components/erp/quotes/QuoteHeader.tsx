@@ -11,17 +11,29 @@ interface QuoteHeaderProps {
     title: string;
     subtitle: string;
     saveLabel?: string;
+    activeTab?: string;
 }
 
-const QuoteHeader = ({ isScrolled, onBack, onSave, isSaving, title, subtitle, saveLabel = "Salvar" }: QuoteHeaderProps) => {
+const QuoteHeader = ({ 
+    isScrolled, 
+    onBack, 
+    onSave, 
+    isSaving, 
+    title, 
+    subtitle, 
+    saveLabel = "Salvar",
+    activeTab = "Dados Gerais"
+}: QuoteHeaderProps) => {
+    // Hide title on mobile/tablet when preview tab is active
+    const showTitle = activeTab !== 'Visualização';
+
     return (
         <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300">
             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
-
                 {/* Header Content */}
                 <div className={`flex items-start justify-between transition-all duration-300 ${isScrolled ? "py-2" : "py-4 md:py-6"}`}>
                     <div className="flex items-center gap-4 min-w-0">
-                        {/* Back button — Mobile & Desktop */}
+                        {/* Back button */}
                         <Button 
                             variant="outline" 
                             onClick={onBack} 
@@ -30,7 +42,7 @@ const QuoteHeader = ({ isScrolled, onBack, onSave, isSaving, title, subtitle, sa
                             <ChevronLeftIcon className={`${isScrolled ? "w-4 h-4" : "w-5 h-5"} text-brand-inactive-text dark:text-dark-body`} />
                         </Button>
 
-                        <div className="flex flex-col gap-0.5 overflow-hidden min-w-0">
+                        <div className={`flex flex-col gap-0.5 overflow-hidden min-w-0 transition-opacity duration-300 md:opacity-100 ${!showTitle ? "opacity-0 h-0 md:h-auto overflow-hidden md:overflow-visible" : "opacity-100"}`}>
                             <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-300 truncate ${isScrolled ? "text-lg" : "text-xl md:text-2xl"}`}>
                                 {title}
                             </h1>
