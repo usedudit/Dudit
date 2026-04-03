@@ -11,15 +11,14 @@ import { clearActivePartner, getAllUserPartnerAccess, setActivePartner } from "@
 export async function GET(request: Request) {
     const allAccess = await getAllUserPartnerAccess()
 
-    // Redirect to the dashboard if they only have 1 ERP
+    // Força a base URL
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
+
     if (allAccess.length === 1) {
         await setActivePartner(allAccess[0].partnerId)
-        const origin = new URL(request.url).origin
-        return NextResponse.redirect(`${origin}/erp/dashboard`)
+        return NextResponse.redirect(`${baseUrl}/erp/dashboard`)
     }
 
-    // Otherwise, clear and go to selection screen
     await clearActivePartner()
-    const origin = new URL(request.url).origin
-    return NextResponse.redirect(`${origin}/select-erp`)
+    return NextResponse.redirect(`${baseUrl}/select-erp`)
 }

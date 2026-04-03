@@ -7,23 +7,22 @@ import { createClient } from "@/lib/supabase/server"
  * link or completes an OAuth login. It exchanges the "code" parameter for a session.
  */
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams } = new URL(request.url) // Tirei o 'origin' daqui
   const code = searchParams.get("code")
-  
-  // if "next" is in the search params, use it as the redirection URL (e.g. for inviting users)
   const next = searchParams.get("next") ?? "/"
+
+  // Use sua variável de ambiente ou o domínio fixo
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
 
   if (code) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
-    
+
     if (!error) {
-      // If we have a next URL (from searchParams), redirect there
-      return NextResponse.redirect(`${origin}${next}`)
+      // Força o redirecionamento para o domínio real
+      return NextResponse.redirect(`${baseUrl}${next}`)
     }
   }
 
-  // Fallback: Redirect to home or an error page
-  // You can customize this if you have a specific error page
-  return NextResponse.redirect(`${origin}/`)
+  return NextResponse.redirect(`${baseUrl}/`)
 }

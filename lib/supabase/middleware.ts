@@ -31,6 +31,10 @@ function isPublicPath(pathname: string): boolean {
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
+  request.headers.set("host", "dudit.com.br")
+  request.headers.set("x-forwarded-host", "dudit.com.br")
+
   // 🚀 EARLY EXIT pra HEAD requests
   if (request.method === "HEAD") {
     return NextResponse.next()

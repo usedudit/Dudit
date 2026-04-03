@@ -135,7 +135,7 @@ export default function AuthView({
     try {
       await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextParam)}`, queryParams: { access_type: "offline", prompt: "consent" } },
+        options: { redirectTo: `https://dudit.com.br/auth/callback?next=${encodeURIComponent(nextParam)}`, queryParams: { access_type: "offline", prompt: "consent" } },
       })
     } catch (e: any) {
       setError(getErrorMessage(e))
