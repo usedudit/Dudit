@@ -39,6 +39,8 @@ interface Customer {
     lastOrderDate: string;
     rawLastOrderDate: number;
     storeCredit?: number;
+    createdAt?: string;
+    address?: string;
 }
 
 interface FilterState {
@@ -84,7 +86,7 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
 
     const { customers: rawCustomers, isLoading: customersLoading } = useStoreData(partnerId, { includeCustomers: true })
-    const isLoading = (storeLoading || customersLoading) && rawCustomers === undefined
+    const isLoading = customersLoading && (rawCustomers === undefined || rawCustomers === null)
     const itemsPerPage = 12
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
@@ -140,7 +142,7 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
                 return tabMatch && filterMatch
             })
             .map((c: any): Customer => ({
-                id: `#${c.id.substring(0, 5).toUpperCase()}`,
+                id: c.id ? `#${c.id.substring(0, 5).toUpperCase()}` : '-',
                 originalId: c.id,
                 name: c.name || 'Cliente Sem Nome',
                 avatar: c.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name || 'C')}&background=random`,
@@ -148,9 +150,11 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
                 totalOrderValue: c.total_spent || 0.00,
                 avgOrderValue: 0.00,
                 status: c.status || (c.is_active !== false ? 'Active' : 'Inactive'),
-                lastOrderDate: c.last_order_at ? new Date(c.last_order_at).toLocaleDateString('pt-BR') : 'N/A',
+                lastOrderDate: c.last_order_at ? new Date(c.last_order_at).toLocaleDateString('pt-BR') : '-',
                 rawLastOrderDate: c.last_order_at ? new Date(c.last_order_at).getTime() : 0,
-                storeCredit: c.store_credit || 0
+                storeCredit: c.store_credit || 0,
+                createdAt: c.created_at,
+                address: c.address
             }))
 
         const result = [...filtered]

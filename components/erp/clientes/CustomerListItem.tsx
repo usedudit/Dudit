@@ -50,7 +50,7 @@ const CustomerListItem = React.memo(
                   {customer.name}
                 </span>
                 <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                  ID {customer.id}
+                  ID {customer.id || "-"}
                 </span>
               </div>
             </div>
@@ -66,14 +66,14 @@ const CustomerListItem = React.memo(
         case "total_spent":
           return (
             <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-              R$ {customer.totalOrderValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              {customer.totalOrderValue ? `R$ ${customer.totalOrderValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
             </span>
           )
         
         case "store_credit":
            return (
             <span className={`text-[13px] font-bold ${customer.storeCredit > 0 ? 'text-brand-primary' : 'text-brand-inactive-text'}`}>
-              R$ {customer.storeCredit?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              {customer.storeCredit ? `R$ ${customer.storeCredit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
             </span>
           )
 

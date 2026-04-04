@@ -335,3 +335,42 @@ export async function getCustomerOrdersAction(customerId: string) {
 
   return { orders: formattedOrders }
 }
+
+/**
+ * Fetch all customers for a partner with store priority
+ */
+export async function getPartnerCustomersAction(partnerId: string, currentStoreId?: string | null) {
+  try {
+    const user = await requireUser()
+    await requirePartnerAccessWithPermission(partnerId, "customers", "view", user)
+
+    const supabase = await getSupabaseServerClient()
+
+    const { data: customers, error } = await supabase
+      .from("customers")
+      .select("*")
+      .eq("partner_id", partnerId)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("[getPartnerCustomersAction] Error:", error)
+      return { error: error.message }
+    }
+
+    let result = customers || []
+
+    // Prioritize: current store customers first, then others
+    if (currentStoreId) {
+      result = [...result].sort((a: any, b: any) => {
+        if (a.store_id === currentStoreId && b.store_id !== currentStoreId) return -1
+        if (a.store_id !== currentStoreId && b.store_id === currentStoreId) return 1
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      })
+    }
+
+    return { customers: result }
+  } catch (err: any) {
+    console.error("[getPartnerCustomersAction] Error:", err)
+    return { error: err.message || "Erro interno ao buscar clientes" }
+  }
+}

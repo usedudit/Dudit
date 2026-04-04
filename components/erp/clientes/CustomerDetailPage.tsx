@@ -68,7 +68,7 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                                     </h1>
 
                                     <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-1"}`}>
-                                        {customer.email || 'Sem e-mail cadastrado'} • Cliente desde 17 Mar, 2023
+                                        {customer.email || 'Sem e-mail cadastrado'} • {customer.createdAt ? `Cliente desde ${new Date(customer.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}` : '-'}
                                     </div>
                                 </div>
 
@@ -119,10 +119,10 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                                         {/* Purchase Summary Cards */}
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
                                             {[
-                                                { label: 'Total Gasto', value: `R$ ${(customer.totalOrderValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: PlusIcon, color: 'brand-green' },
-                                                { label: 'Pedidos', value: customer.orders || 0, icon: Package, color: 'brand-dark' },
-                                                { label: 'Crédito em Loja', value: `R$ ${(customer.storeCredit || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: CreditCardIcon, color: 'brand-primary' },
-                                                { label: 'Última Compra', value: customer.lastOrderDate || 'N/A', icon: ClockIcon, color: 'brand-inactive-text' }
+                                                { label: 'Total Gasto', value: customer.totalOrderValue ? `R$ ${customer.totalOrderValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-", icon: PlusIcon, color: 'brand-green' },
+                                                { label: 'Pedidos', value: customer.orders ?? "-", icon: Package, color: 'brand-dark' },
+                                                { label: 'Crédito em Loja', value: customer.storeCredit ? `R$ ${customer.storeCredit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-", icon: CreditCardIcon, color: 'brand-primary' },
+                                                { label: 'Última Compra', value: customer.lastOrderDate || '-', icon: ClockIcon, color: 'brand-inactive-text' }
                                             ].map((stat, i) => (
                                                 <div key={i} className="bg-white dark:bg-dark-surface p-5 rounded-2xl border border-brand-border dark:border-dark-border shadow-sm group hover:shadow-md transition-all duration-300">
                                                     <span className="text-[11px] font-bold text-brand-inactive-text uppercase tracking-widest block mb-2">{stat.label}</span>
@@ -220,7 +220,9 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                                             </div>
                                             <div>
                                                 <span className="text-[11px] font-bold text-brand-inactive-text uppercase tracking-widest block mb-0.5">Endereço Principal</span>
-                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading leading-tight block truncate max-w-[200px]">Rua das Palmeiras, 123 - Centro</span>
+                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading leading-tight block truncate max-w-[200px]">
+                                                    {customer.address || "-"}
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
@@ -228,7 +230,7 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
 
                                 <div className="mt-8 pt-8 border-t border-brand-border dark:border-dark-border">
                                     <p className="text-[11px] text-brand-inactive-text italic leading-relaxed">
-                                        * Cliente cadastrado em 17/03/2023. Última movimentação em {customer.lastOrderDate || 'recentemente'}.
+                                        * Cliente cadastrado em {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('pt-BR') : '-'}. Última movimentação em {customer.lastOrderDate || '-'}.
                                     </p>
                                 </div>
                             </div>

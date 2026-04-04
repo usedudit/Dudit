@@ -246,7 +246,7 @@ export default function CreateOrder({ onBack, partnerId }: CreateOrderProps) {
             const result = await createERPOrderAction({
                 partnerId,
                 customerId: selectedCustomer?.id,
-                customerName: selectedCustomer ? selectedCustomer.name : "Venda Rápida",
+                customerName: selectedCustomer ? selectedCustomer.name : "Consumidor final",
                 deliveryMethod,
                 paymentStatus: paymentData.paymentStatus,
                 paymentMethod: paymentData.paymentMethod,

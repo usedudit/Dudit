@@ -147,9 +147,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         .select(`
             *,
             order_items(*),
-            stores(name),
-            seller:created_by(full_name),
-            user_profiles:buyer_id(user_id, full_name, avatar_url, phone)
+            stores(name)
         `)
         .eq("id", orderId)
         .eq("partner_id", partnerId)

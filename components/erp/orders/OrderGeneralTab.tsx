@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
     Input, Button, FormDropdown, FormCurrencyInput,
-    CustomerCard, IconPlaceholder
+    CustomerCard, IconPlaceholder, DatePicker
 } from "@/components/reusable"
 import {
     SearchIcon, PlusIcon, TagIcon, TrashIcon,
@@ -413,18 +413,17 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                         <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight">Configurações do Pedido</h3>
 
                         <div className="space-y-4">
-                            <div>
-                                <label className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-1.5 block">Data do Pedido</label>
-                                <div className="relative">
-                                    <input
-                                        type="date"
-                                        className="w-full h-11 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl px-4 text-sm focus:border-brand-green focus:outline-none transition-colors"
-                                        value={orderDate}
-                                        onChange={(e) => setOrderDate(e.target.value)}
-                                    />
-                                    <ClockIcon className="absolute right-4 top-1/2 -translate-y-1/2 text-brand-inactive-text pointer-events-none" size={18} />
-                                </div>
-                            </div>
+                            <DatePicker
+                                label="Data do Pedido"
+                                value={orderDate}
+                                onChange={(date) => {
+                                    if (date) {
+                                        // Adjust for timezone when converting to ISO string
+                                        const d = new Date(date);
+                                        setOrderDate(d.toISOString().split('T')[0]);
+                                    }
+                                }}
+                            />
 
                             <FormDropdown
                                 label="Canal de Venda"

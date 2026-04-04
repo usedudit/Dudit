@@ -70,7 +70,7 @@ const CustomerGridCard = React.memo(
 
             {/* Linha 2: ID */}
             <div className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate mt-1">
-              <span>ID {customer.id || "N/A"}</span>
+              <span>ID {customer.id || "-"}</span>
             </div>
           </div>
         </div>
@@ -82,7 +82,7 @@ const CustomerGridCard = React.memo(
             <div className="flex flex-col gap-0.5">
               <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Total Gasto</span>
               <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
-                R$ {customer.totalOrderValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                {customer.totalOrderValue ? `R$ ${customer.totalOrderValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
               </span>
             </div>
 
@@ -98,7 +98,7 @@ const CustomerGridCard = React.memo(
           <div className="flex items-end justify-between mt-1">
             <div className="flex flex-col">
               <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Último Pedido</span>
-              <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.lastOrderDate || "N/A"}</span>
+              <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.lastOrderDate || "-"}</span>
             </div>
 
             {/* Botão de Ações */}

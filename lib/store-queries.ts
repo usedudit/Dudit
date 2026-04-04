@@ -35,36 +35,23 @@ export async function fetchAllPartnerProducts(partnerId: string) {
   return data || []
 }
 
+import { getPartnerCustomersAction } from "@/app/actions/erp/customers"
+
 /**
  * Fetch customers with store prioritization
  * Returns customers from the selected store first, then others
+ * Uses server action for reliability and RLS bypass
  */
 export async function fetchCustomersWithStorePriority(partnerId: string, currentStoreId: string | null) {
-  // supabase singleton imported directly
-
-  // Get all customers for the partner
-  const { data, error } = await supabase
-    .from("customers")
-    .select("*")
-    .eq("partner_id", partnerId)
-    .order("created_at", { ascending: false })
-
-  if (error) throw error
-
-  const customers = data || []
-
-  // Prioritize: current store customers first, then others
-  if (currentStoreId) {
-    return customers.sort((a: any, b: any) => {
-      // Current store customers come first
-      if (a.store_id === currentStoreId && b.store_id !== currentStoreId) return -1
-      if (a.store_id !== currentStoreId && b.store_id === currentStoreId) return 1
-      // Secondary sort: newer first
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    })
+  const response = await getPartnerCustomersAction(partnerId, currentStoreId)
+  
+  if (response.error) {
+    console.error("[fetchCustomersWithStorePriority] Server Action Error:", response.error)
+    // Fallback to empty array if error
+    return []
   }
 
-  return customers
+  return response.customers || []
 }
 
 /**

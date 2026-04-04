@@ -293,9 +293,9 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                             {/* Customer Section */}
                             <CustomerCard
                                 customer={{
-                                    name: order.user_profiles?.full_name || order.customer_name || "Cliente Balcão",
-                                    email: order.user_profiles?.email || order.buyer_email, // buyer_email might not exist, but adding as fallback
-                                    phone: order.user_profiles?.phone
+                                    name: order.customer_name || "Cliente Balcão",
+                                    email: order.buyer_email || "-", // Fallback as joins are gone
+                                    phone: "-" // Fallback as joins are gone
                                 }}
                                 address={order.delivery_address ? { street: order.delivery_address } : null}
                             />
@@ -308,7 +308,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                         <ClockIcon size={16} />
                                     </div>
                                     <div className="flex flex-col">
-                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{order.seller?.full_name || "Venda Automática"}</span>
+                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{order.seller_name || "Venda Automática"}</span>
                                         <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body">Operador no ERP</span>
                                     </div>
                                 </div>

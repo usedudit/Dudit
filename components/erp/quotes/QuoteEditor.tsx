@@ -14,7 +14,7 @@ import {
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import QuantitySelector from '@/components/reusable/QuantitySelector';
-import { Button, Input as FormInput, Dropdown, DropdownItem, TabsContent, FormCurrencyInput, FormDropdown, MoneyInput, PercentageInput } from '@/components/reusable';
+import { Button, Input as FormInput, Dropdown, DropdownItem, TabsContent, FormCurrencyInput, FormDropdown, MoneyInput, PercentageInput, DatePicker } from '@/components/reusable';
 import IconPlaceholder from '@/components/reusable/IconPlaceholder';
 
 interface QuoteEditorProps {
@@ -395,23 +395,27 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                         <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading mb-6">Configurações</h3>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                            <FormInput
-                                type="date"
+                            <DatePicker
                                 label="Data Emissão"
-                                name="quoteDate"
                                 value={props.quoteDate}
-                                onChange={(e) => props.setQuoteDate(e.target.value)}
-                                className="mb-0"
+                                onChange={(date: any) => {
+                                    if (date) {
+                                        const d = new Date(date);
+                                        props.setQuoteDate(d.toISOString().split('T')[0]);
+                                    }
+                                }}
                                 disabled={props.isReadOnly}
                             />
 
-                            <FormInput
-                                type="date"
+                            <DatePicker
                                 label="Validade da Proposta"
-                                name="expiryDate"
                                 value={props.expiryDate}
-                                onChange={(e) => props.setExpiryDate(e.target.value)}
-                                className="mb-0"
+                                onChange={(date: any) => {
+                                    if (date) {
+                                        const d = new Date(date);
+                                        props.setExpiryDate(d.toISOString().split('T')[0]);
+                                    }
+                                }}
                                 disabled={props.isReadOnly}
                             />
 

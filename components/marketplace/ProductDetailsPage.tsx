@@ -291,7 +291,7 @@ export function ProductDetailsPageClient({
   const handleAddToCart = useCallback(async () => {
     if (!userId) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname))
     if (isActionInProgress.current) return
-    
+
     isActionInProgress.current = true
     setLoading(true)
     try {
@@ -678,7 +678,7 @@ export function ProductDetailsPageClient({
               initial={lightboxJustOpened.current ? false : "enter"}
               animate="center"
               exit={lightboxJustOpened.current ? undefined : "exit"}
-              transition={{ duration: 0.2, ease: "easeInOut" }}
+              transition={{ duration: 0.2 }}
             />
           </AnimatePresence>
           {productImages.length > 1 && (
@@ -710,7 +710,7 @@ export function ProductDetailsPageClient({
             initial={lightboxJustOpened.current ? false : "enter"}
             animate="center"
             exit={lightboxJustOpened.current ? undefined : "exit"}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
+            transition={{ duration: 0.2 }}
           />
         </AnimatePresence>
 
@@ -839,7 +839,7 @@ export function ProductDetailsPageClient({
                             className="absolute inset-0 w-full h-full object-contain" alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`}
                             custom={slideDirection} variants={slideVariants}
                             initial="enter" animate="center" exit="exit"
-                            transition={{ duration: 0.25, ease: "easeInOut" }}
+                            transition={{ duration: 0.2 }}
                             style={{ transformOrigin, scale: smoothScale }} />
                         </AnimatePresence>
                         {productImages.length > 1 && (
@@ -868,7 +868,7 @@ export function ProductDetailsPageClient({
                           className="absolute inset-0 w-full h-full object-contain" alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`}
                           custom={slideDirection} variants={slideVariants}
                           initial="enter" animate="center" exit="exit"
-                          transition={{ duration: 0.25, ease: "easeInOut" }}
+                          transition={{ duration: 0.2 }}
                           onClick={() => openLightbox(activeImgIndex)} />
                       </AnimatePresence>
                       {productImages.length > 1 && (
