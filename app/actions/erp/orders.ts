@@ -21,8 +21,6 @@ export async function createERPOrderAction(data: {
     partnerId: string
     customerId?: string
     customerName?: string
-    orderDate: string
-    salesChannel: string
     deliveryMethod: 'delivery' | 'pickup'
     paymentStatus: 'paid' | 'partially_paid' | 'unpaid'
     deliveryStatus: 'not_sent' | 'preparing' | 'sent' | 'delivered' | 'pickup_available' | 'delivery_failed'
@@ -89,8 +87,7 @@ export async function createERPOrderAction(data: {
             buyer_id: data.customerId || null,
             customer_name: data.customerName || null,
             order_number: orderNumber,
-            order_date: data.orderDate,
-            sales_channel: data.salesChannel,
+            order_source: data.deliveryMethod === 'pickup' ? 'Balcão' : 'Entrega', // Defaulting to source based on method for now, or use channel if passed
             delivery_type: data.deliveryMethod,
             situation: data.paymentStatus === 'paid' ? 'paid' : (data.paymentStatus === 'partially_paid' ? 'partially_paid' : 'pending'),
             delivery_status: data.deliveryStatus,
@@ -101,7 +98,8 @@ export async function createERPOrderAction(data: {
             additional_costs: data.additionalCosts,
             notes: data.notes || null,
             payment_method: data.paymentMethod,
-            delivery_address: deliveryAddressStr || null
+            delivery_address: deliveryAddressStr || null,
+            created_by: user.id
         })
         .select()
         .single()
@@ -134,4 +132,29 @@ export async function createERPOrderAction(data: {
     await revalidateOrders(partnerId)
 
     return { success: true, orderId: order.id, orderNumber: order.order_number }
+}
+
+export async function getOrderDetailsAction(orderId: string, partnerId: string) {
+    await requireRateLimit(RateLimitCategory.DEFAULT)
+    const user = await requireUser()
+    if (!user) return { error: "Não autenticado" }
+
+    await requirePartnerAccess(partnerId)
+    const supabase = await getSupabaseServerClient()
+
+    const { data, error } = await supabase
+        .from("orders")
+        .select(`
+            *,
+            order_items(*),
+            stores(name),
+            seller:created_by(full_name),
+            user_profiles:buyer_id(user_id, full_name, avatar_url, phone)
+        `)
+        .eq("id", orderId)
+        .eq("partner_id", partnerId)
+        .single()
+
+    if (error) return { error: error.message }
+    return { success: true, data }
 }

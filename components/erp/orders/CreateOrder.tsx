@@ -247,8 +247,6 @@ export default function CreateOrder({ onBack, partnerId }: CreateOrderProps) {
                 partnerId,
                 customerId: selectedCustomer?.id,
                 customerName: selectedCustomer ? selectedCustomer.name : "Venda Rápida",
-                orderDate,
-                salesChannel,
                 deliveryMethod,
                 paymentStatus: paymentData.paymentStatus,
                 paymentMethod: paymentData.paymentMethod,
@@ -317,16 +315,18 @@ export default function CreateOrder({ onBack, partnerId }: CreateOrderProps) {
     ]
 
     const statusOptions = [
-        { value: "unpaid", label: "Não pago", color: "#ef4444" },
-        { value: "paid", label: "Pago", color: "#10b981" },
-        { value: "partially_paid", label: "Parcialmente Pago", color: "#f59e0b" }
+        { value: "unpaid", label: "Não pago", color: "brand-red" },
+        { value: "paid", label: "Pago", color: "brand-green" },
+        { value: "partially_paid", label: "Parcialmente Pago", color: "brand-orange" }
     ]
 
     const deliveryStatusOptions = [
         { value: "not_sent", label: "Não enviado" },
         { value: "preparing", label: "Preparando" },
         { value: "sent", label: "Enviado" },
-        { value: "delivered", label: "Entregue" }
+        { value: "delivered", label: "Entregue" },
+        { value: "pickup_available", label: "Disponível para retirada" },
+        { value: "delivery_failed", label: "Entrega não realizada" }
     ]
 
     return (

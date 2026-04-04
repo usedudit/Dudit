@@ -14,7 +14,7 @@ import OrderListItem from "./OrderListItem"
 import OrderGridCard from "./OrderGridCard"
 import OrderPageControls from "./OrderPageControls"
 import CreateOrder from "./CreateOrder"
-
+import OrderDetailView from "./OrderDetailView"
 
 // Icons
 import {
@@ -78,6 +78,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
     const [modals, setModals] = useState({ filter: false })
     const [selection, setSelection] = useState({ ids: new Set<string>() })
     const [wrapperMode, setWrapperMode] = useState<'create' | 'edit' | 'view' | null>(null)
+    const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
 
     const isLoading = storeLoading && rawOrders === undefined
     const itemsPerPage = 12
@@ -180,7 +181,8 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
         router.push(`/erp/orders/${order.originalId}`)
     }
     const handleDetailsOrder = (order: Order) => {
-        router.push(`/erp/orders/${order.originalId}`)
+        setSelectedOrderId(order.originalId)
+        setWrapperMode('view')
     }
     const handleSelectRow = (id: string) => {
         setSelection((p) => {
@@ -196,6 +198,35 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
         setActiveTab("Todos")
     }
 
+    if (wrapperMode === 'view' && selectedOrderId) {
+        return (
+            <AnimatePresence mode="wait">
+                <motion.div
+                    key="view-order"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                    className="w-full h-full bg-white dark:bg-dark-background fixed inset-0 z-[60]"
+                >
+                    <OrderDetailView
+                        orderId={selectedOrderId}
+                        partnerId={partnerId}
+                        onBack={() => {
+                            setWrapperMode(null)
+                            setSelectedOrderId(null)
+                            router.refresh()
+                        }}
+                        onEditOrder={(order: any) => {
+                            setSelectedOrderId(order.id)
+                            setWrapperMode('edit')
+                        }}
+                    />
+                </motion.div>
+            </AnimatePresence>
+        )
+    }
+
     if (wrapperMode === 'create') {
         return (
             <AnimatePresence mode="wait">
@@ -207,12 +238,12 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     transition={{ duration: 0.3, ease: "easeOut" }}
                     className="w-full h-full bg-white dark:bg-dark-background"
                 >
-                    <CreateOrder 
-                        partnerId={partnerId} 
+                    <CreateOrder
+                        partnerId={partnerId}
                         onBack={() => {
                             setWrapperMode(null)
                             router.refresh()
-                        }} 
+                        }}
                     />
                 </motion.div>
             </AnimatePresence>

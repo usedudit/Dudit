@@ -391,10 +391,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-8 flex flex-col items-center justify-center text-center relative overflow-hidden"
                                 onClick={() => setIsCustomerSheetOpen(true)}
                             >
-                                <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark opacity-10"></div>
-                                <div className="flex items-center gap-2 mb-6 w-full justify-start border-b border-brand-border dark:border-dark-border pb-4 -mt-2 -mx-2 px-2">
-                                    <span className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Cliente</span>
-                                </div>
+                                <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
 
                                 <IconPlaceholder
                                     icon={UserIcon}

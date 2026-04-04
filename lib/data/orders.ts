@@ -17,10 +17,11 @@ export const getPartnerOrdersCached = cache(async (partnerId: string) => {
                 .select(`
                     *,
                     order_items(quantity, product_name),
-                    stores(name)
+                    stores(name),
+                    seller:created_by(full_name)
                 `)
                 .eq("partner_id", partnerId)
-                .order("order_date", { ascending: false }) // Use order_date instead of created_at as primary sort
+                .order("created_at", { ascending: false })
 
             if (error) {
                 console.error("[getPartnerOrdersCached] Error:", error)
