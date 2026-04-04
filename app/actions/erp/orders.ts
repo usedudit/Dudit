@@ -40,6 +40,7 @@ export async function createERPOrderAction(data: {
     additionalCosts: number
     totalAmount: number
     notes?: string
+    paymentMethod: string
     address?: {
         zipCode: string
         street: string
@@ -99,6 +100,7 @@ export async function createERPOrderAction(data: {
             shipping_cost: data.shippingCost,
             additional_costs: data.additionalCosts,
             notes: data.notes || null,
+            payment_method: data.paymentMethod,
             delivery_address: deliveryAddressStr || null
         })
         .select()

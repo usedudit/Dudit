@@ -250,6 +250,7 @@ export default function CreateOrder({ onBack, partnerId }: CreateOrderProps) {
                 salesChannel,
                 deliveryMethod,
                 paymentStatus: paymentData.paymentStatus,
+                paymentMethod: paymentData.paymentMethod,
                 deliveryStatus: deliveryStatus as any,
                 address: deliveryMethod === 'delivery' ? {
                     zipCode: cep,

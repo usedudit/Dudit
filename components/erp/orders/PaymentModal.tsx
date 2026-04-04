@@ -271,7 +271,7 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId }:
         // Final Confirmation to Parent Action
         try {
             const result = await onConfirm({
-                paymentMethod: view === 'split' ? 'multiple' : (view === 'money' ? 'dinheiro' : (view === 'pix' ? 'pix' : 'cartao')),
+                paymentMethod: isPendingPayment ? 'pendente' : (view === 'split' ? 'multiple' : (view === 'money' ? 'dinheiro' : (view === 'pix' ? 'pix' : 'cartao'))),
                 splitPayments: view === 'split' ? payments : [],
                 paymentStatus: isUnderpaid ? 'partially_paid' : 'paid',
                 isPendingDelivery
