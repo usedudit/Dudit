@@ -673,3 +673,80 @@ export async function getPartnerAddressAction(partnerId: string) {
         return errorResponse("Erro interno ao buscar endereço")
     }
 }
+
+// ─── BATCH DELETE QUOTES ────────────────────────────────────────────────────
+export async function batchDeleteQuotesAction(quoteIds: string[]) {
+    return withTelemetry("batchDeleteQuotesAction", async () => {
+        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+
+        try {
+            const ctx = await getCurrentPartnerContext()
+            if (!ctx?.partnerId) return errorResponse("Parceiro não encontrado")
+
+            const user = await requireUser()
+            await requirePartnerAccessWithPermission(ctx.partnerId, "quotes", "delete", user)
+
+            const supabase = await getSupabaseServerClient()
+
+            const { error } = await supabase
+                .from("quotes")
+                .delete()
+                .in("id", quoteIds)
+                .eq("partner_id", ctx.partnerId)
+
+            if (error) {
+                console.error("[batchDeleteQuotesAction] Error:", error)
+                return errorResponse(error.message)
+            }
+
+            await revalidateQuotes(ctx.partnerId)
+
+            // Update usage counter (estimate)
+            for (let i = 0; i < quoteIds.length; i++) {
+                decrement_usage_counter(ctx.partnerId, "quotes_month_count").catch(console.error).catch(() => {})
+            }
+
+            return successResponse({ count: quoteIds.length })
+        } catch (err: any) {
+            console.error("[batchDeleteQuotesAction] Error:", err)
+            return errorResponse(err.message || "Erro interno ao deletar orçamentos")
+        }
+    });
+}
+
+// ─── BATCH UPDATE QUOTE STATUS ──────────────────────────────────────────────
+export async function batchUpdateQuotesStatusAction(quoteIds: string[], status: "draft" | "sent" | "approved" | "rejected" | "expired") {
+    return withTelemetry("batchUpdateQuotesStatusAction", async () => {
+        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+
+        try {
+            const ctx = await getCurrentPartnerContext()
+            if (!ctx?.partnerId) return errorResponse("Parceiro não encontrado")
+
+            const user = await requireUser()
+            await requirePartnerAccessWithPermission(ctx.partnerId, "quotes", "edit", user)
+
+            const supabase = await getSupabaseServerClient()
+
+            const { error } = await supabase
+                .from("quotes")
+                .update({
+                    status: status,
+                    updated_at: new Date().toISOString(),
+                })
+                .in("id", quoteIds)
+                .eq("partner_id", ctx.partnerId)
+
+            if (error) {
+                console.error("[batchUpdateQuotesStatusAction] Error:", error)
+                return errorResponse(error.message)
+            }
+
+            await revalidateQuotes(ctx.partnerId)
+            return successResponse({ count: quoteIds.length, status })
+        } catch (err: any) {
+            console.error("[batchUpdateQuotesStatusAction] Error:", err)
+            return errorResponse(err.message || "Erro interno ao atualizar status")
+        }
+    });
+}

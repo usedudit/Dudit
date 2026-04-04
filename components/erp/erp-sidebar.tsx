@@ -358,7 +358,7 @@ export function ERPSidebar() {
                       )}
                     >
                       {item.href && !hasSubmenu ? (
-                        <Link href={item.href} prefetch={false} className="absolute inset-0 z-10" onClick={() => setIsMobileOpen(false)} />
+                        <Link href={item.href} className="absolute inset-0 z-10" onClick={() => setIsMobileOpen(false)} />
                       ) : null}
 
                       <div className="w-[44px] h-[44px] flex items-center justify-center shrink-0">
@@ -427,7 +427,6 @@ export function ERPSidebar() {
 
                                   <Link
                                     href={subItem.href}
-                                    prefetch={false}
                                     onClick={() => setIsMobileOpen(false)}
                                     className={cn(
                                       "flex items-center px-3 py-2 rounded-lg text-sm transition-colors duration-200 relative z-10",
@@ -469,7 +468,6 @@ export function ERPSidebar() {
                                   <Link
                                     key={subItem.href}
                                     href={subItem.href}
-                                    prefetch={false}
                                     className="w-full text-left px-4 py-2.5 text-sm text-brand-inactive-text hover:text-white hover:bg-white/5 transition-colors flex items-center justify-between group/sub"
                                   >
                                     <span className={isActive ? "text-brand-green font-medium" : ""}>
@@ -521,7 +519,7 @@ export function ERPSidebar() {
                         )}
                       >
                         {item.href && !hasSubmenu && (
-                          <Link href={item.href} prefetch={false} className="absolute inset-0" onClick={() => setIsMobileOpen(false)} />
+                          <Link href={item.href} className="absolute inset-0" onClick={() => setIsMobileOpen(false)} />
                         )}
                         <Icon size={20} className={isActive ? "text-brand-green" : ""} />
                         <span className="text-[15px] font-medium flex-1 text-left">{item.label}</span>
@@ -536,7 +534,6 @@ export function ERPSidebar() {
                             <Link
                               key={sub.href}
                               href={sub.href}
-                              prefetch={false}
                               onClick={() => setIsMobileOpen(false)}
                               className={cn(
                                 "py-2 px-3 rounded-lg text-sm transition-colors",

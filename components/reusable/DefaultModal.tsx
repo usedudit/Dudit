@@ -18,6 +18,7 @@ interface DefaultModalProps {
   icon?: React.ReactElement<{ className?: string }>
   hideHeader?: boolean
   className?: string
+  leftAction?: ReactNode
 }
 
 const DefaultModal: React.FC<DefaultModalProps> = ({
@@ -29,6 +30,7 @@ const DefaultModal: React.FC<DefaultModalProps> = ({
   maxWidth = "xl",
   hideHeader = false,
   className = "",
+  leftAction,
 }) => {
   const [isAnimating, setIsAnimating] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
@@ -68,7 +70,10 @@ const DefaultModal: React.FC<DefaultModalProps> = ({
           {/* Header Mobile Clean */}
           {!hideHeader && (
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">{title}</h3>
+              <div className="flex items-center gap-2">
+                {leftAction}
+                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">{title}</h3>
+              </div>
             </div>
           )}
 
@@ -92,8 +97,11 @@ const DefaultModal: React.FC<DefaultModalProps> = ({
         >
           {!hideHeader && (
             <div className="flex items-center justify-between p-6 pb-2">
-              <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</h3>
-              <Button variant="filled" onClick={handleClose} className="w-[40px] h-[40px] p-0 flex items-center justify-center">
+              <div className="flex items-center gap-3">
+                {leftAction}
+                <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</h3>
+              </div>
+              <Button variant="filled" onClick={handleClose} className="w-[40px] h-[40px] p-0 flex items-center justify-center flex-shrink-0">
                 <CloseIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
               </Button>
             </div>

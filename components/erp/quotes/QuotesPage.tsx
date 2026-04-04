@@ -10,8 +10,10 @@ import { useStore } from "@/lib/store-context"
 import { Button, IconPlaceholder, AlertModal, Separator, Badge, Checkbox } from "@/components/reusable"
 import QuoteSkeleton from "./QuoteSkeleton"
 import { FileIcon } from "@/lib/icons"
-import { deleteQuoteAction } from "@/app/actions/erp/quotes"
+import { deleteQuoteAction, batchDeleteQuotesAction, batchUpdateQuotesStatusAction } from "@/app/actions/erp/quotes"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
+import FloatingActionBar from "@/components/reusable/FloatingActionBar"
+import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import Pagination from "@/components/reusable/Pagination"
 import QuoteListItem from "./QuoteListItem"
 import QuoteGridCard from "./QuoteGridCard"
@@ -25,7 +27,10 @@ import { useNotification } from "@/hooks/use-notification"
 import {
     PlusIcon,
     ExportFileIcon,
-    ArrowUpDownIcon
+    ArrowUpDownIcon,
+    TrashIcon,
+    EditIcon,
+    CheckIcon
 } from "@/lib/icons"
 import { useRouter } from "next/navigation"
 
@@ -99,6 +104,8 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
     const [isDeleting, setIsDeleting] = useState(false)
     const [quoteToDelete, setQuoteToDelete] = useState<any>(null)
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
+    const [bulkEditModalOpen, setBulkEditModalOpen] = useState(false)
+    const [confirmations, setConfirmations] = useState({ bulkDelete: false })
 
     const isLoading = storeLoading && rawQuotes === undefined
     const itemsPerPage = 12
@@ -315,6 +322,40 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
             setIsDeleting(false)
         }
     }
+
+    const handleBulkEditApply = async (payload: BulkActionPayload) => {
+        if (payload.type === 'status' && payload.status) {
+            const res = await batchUpdateQuotesStatusAction(Array.from(selection.ids), payload.status)
+            if (res.success) {
+                success("Status atualizado", `${selection.ids.size} ${selection.ids.size === 1 ? 'orçamento atualizado' : 'orçamentos atualizados'} para ${payload.status}.`)
+                setSelection({ ids: new Set() })
+                router.refresh()
+            } else {
+                error("Erro", res.error || "Erro ao atualizar status em massa.")
+            }
+        } else if (payload.type === 'delete') {
+            setConfirmations(prev => ({ ...prev, bulkDelete: true }))
+        }
+    }
+
+    const handleConfirmBulkDelete = async () => {
+        setIsDeleting(true)
+        try {
+            const res = await batchDeleteQuotesAction(Array.from(selection.ids))
+            if (res.success) {
+                success("Orçamentos excluídos", `${selection.ids.size} orçamentos removidos com sucesso.`)
+                setSelection({ ids: new Set() })
+                setConfirmations(prev => ({ ...prev, bulkDelete: false }))
+                router.refresh()
+            } else {
+                error("Erro", res.error || "Erro ao excluir orçamentos em massa.")
+            }
+        } catch (err) {
+            error("Erro", "Erro de conexão ao excluir orçamentos.")
+        } finally {
+            setIsDeleting(false)
+        }
+    }
     const handleSelectRow = useCallback((id: string) => {
         setSelection((p) => {
             const s = new Set(p.ids)
@@ -490,9 +531,14 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                                                             <span className="text-[14px] font-bold text-brand-primary">
                                                                 R$ {q.total_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                                             </span>
-                                                            <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                {q.formattedIssueDate}
-                                                            </span>
+                                                            <div className="flex items-center gap-4">
+                                                                <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                    {q.formattedIssueDate}
+                                                                </span>
+                                                                <div onClick={(e) => { e.stopPropagation(); handleSelectRow(q.originalId); }}>
+                                                                    <Checkbox checked={selection.ids.has(q.originalId)} />
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -618,6 +664,47 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                 variant="danger"
                 isLoading={isDeleting}
             />
+
+            <AlertModal
+                isOpen={confirmations.bulkDelete}
+                onClose={() => setConfirmations(prev => ({ ...prev, bulkDelete: false }))}
+                onConfirm={handleConfirmBulkDelete}
+                title="Excluir Orçamentos"
+                description={`Tem certeza que deseja excluir os ${selection.ids.size} orçamentos selecionados? Esta ação não pode ser desfeita.`}
+                confirmText="Excluir Seleção"
+                variant="danger"
+                isLoading={isDeleting}
+            />
+
+            <BulkEditActionsModal
+                isOpen={bulkEditModalOpen}
+                onClose={() => setBulkEditModalOpen(false)}
+                selectedCount={selection.ids.size}
+                targetType="quote"
+                onApply={handleBulkEditApply}
+            />
+
+            <FloatingActionBar 
+                selectedCount={selection.ids.size} 
+                onClearSelection={() => setSelection({ ids: new Set() })}
+            >
+                <Button 
+                    variant="ghost" 
+                    className="h-9 px-3 gap-2 font-bold text-brand-primary"
+                    onClick={() => setBulkEditModalOpen(true)}
+                >
+                    <EditIcon className="w-4 h-4" />
+                    Ações em massa
+                </Button>
+                <Button 
+                    variant="ghost" 
+                    className="h-9 px-3 gap-2 font-bold text-brand-red"
+                    onClick={() => setConfirmations(prev => ({ ...prev, bulkDelete: true }))}
+                >
+                    <TrashIcon className="w-4 h-4" />
+                    Excluir
+                </Button>
+            </FloatingActionBar>
         </FadeIn>
     )
 }

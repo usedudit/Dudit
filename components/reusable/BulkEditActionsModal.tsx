@@ -12,7 +12,7 @@ import {
 import DefaultModal from "./DefaultModal"
 
 // --- Tipagens ---
-export type BulkActionType = 'price' | 'stock' | 'visibility' | 'image' | 'remove_image' | 'delete'
+export type BulkActionType = 'price' | 'stock' | 'visibility' | 'image' | 'remove_image' | 'delete' | 'status'
 
 export interface BulkActionPayload {
   type: BulkActionType
@@ -24,13 +24,14 @@ export interface BulkActionPayload {
   stockIgnoreNegative?: boolean
   visibilityMode?: 'publish' | 'hide'
   imageFile?: File | null
+  status?: 'draft' | 'sent' | 'approved' | 'rejected' | 'expired'
 }
 
 interface BulkEditActionsModalProps {
   isOpen: boolean
   onClose: () => void
   selectedCount: number
-  targetType: 'product' | 'variation'
+  targetType: 'product' | 'variation' | 'quote'
   onApply: (payload: BulkActionPayload) => Promise<void>
 }
 
@@ -54,9 +55,20 @@ const BulkActionCard = ({ icon, label, onClick, danger }: { icon: any, label: st
     <IconPlaceholder
       icon={icon}
       title={label}
-      containerSize="w-12 h-12 bg-brand-red-light dark:bg-brand-red/20"
-      iconSize="w-6 h-6 text-brand-red-dark dark:text-brand-red"
-      titleClass={`text-sm font-semibold mb-0 ${danger ? 'text-brand-red' : 'text-brand-dark dark:text-dark-heading'}`}
+      containerSize={
+        danger
+          ? "w-12 h-12 bg-brand-red-light dark:bg-brand-red/20"
+          : "w-12 h-12"
+      }
+      iconSize={
+        danger
+          ? "w-6 h-6 text-brand-red-dark dark:text-brand-red"
+          : "w-6 h-6"
+      }
+      titleClass={`text-sm font-semibold mb-0 ${danger
+        ? "text-brand-red"
+        : "text-brand-dark dark:text-dark-heading"
+        }`}
       className="mb-0"
     />
   </div>
@@ -72,11 +84,11 @@ const ConfirmationView = ({ icon: Icon, title, desc, colorClass }: { icon: any, 
   </div>
 )
 
-export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({ 
+export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
   isOpen,
   onClose,
-  selectedCount, 
-  targetType, 
+  selectedCount,
+  targetType,
   onApply
 }) => {
   const [view, setView] = useState<BulkActionType | 'menu'>('menu')
@@ -86,6 +98,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
   const [priceConfig, setPriceConfig] = useState({ mode: 'percent_inc', value: 0, onlyPublished: false })
   const [stockConfig, setStockConfig] = useState({ mode: 'add', value: 0, ignoreNegative: false })
   const [visConfig, setVisConfig] = useState<'publish' | 'hide'>('publish')
+  const [statusConfig, setStatusConfig] = useState<'draft' | 'sent' | 'approved' | 'rejected' | 'expired'>('sent')
   const [imageState, setImageState] = useState<{ file: File | null, preview: string | null }>({ file: null, preview: null })
 
   // UI Helpers
@@ -115,16 +128,18 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
         payload.stockIgnoreNegative = stockConfig.ignoreNegative
       } else if (view === 'visibility') {
         payload.visibilityMode = visConfig
+      } else if (view === 'status') {
+        payload.status = statusConfig
       } else if (view === 'image') {
         payload.imageFile = imageState.file
       }
 
       await onApply(payload)
       onClose()
-    } catch (error) { 
-        console.error(error) 
-    } finally { 
-        setIsApplying(false) 
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setIsApplying(false)
     }
   }
 
@@ -150,12 +165,13 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
     } catch (error) { console.error("Erro ao processar imagem", error) }
   }
 
-  const targetLabel = targetType === 'product' ? 'produtos' : 'variantes'
-  const singularTargetLabel = targetType === 'product' ? 'produto' : 'variante'
+  const targetLabel = targetType === 'product' ? 'produtos' : targetType === 'variation' ? 'variantes' : 'orçamentos'
+  const singularTargetLabel = targetType === 'product' ? 'produto' : targetType === 'variation' ? 'variante' : 'orçamento'
 
   const viewTitles: Record<string, string> = {
-    menu: 'Edição em Massa', price: 'Alterar Preço', stock: 'Ajustar Estoque',
-    visibility: 'Visibilidade', image: 'Aplicar Imagem', remove_image: 'Remover Imagem', 
+    menu: '', price: 'Alterar Preço', stock: 'Ajustar Estoque',
+    visibility: 'Visibilidade', image: 'Aplicar Imagem', remove_image: 'Remover Imagem',
+    status: 'Alterar Status',
     delete: `Excluir ${targetLabel.charAt(0).toUpperCase() + targetLabel.slice(1)}`
   }
 
@@ -164,11 +180,18 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
       case 'menu':
         return (
           <div className="grid grid-cols-2 gap-4 pt-2">
-            <BulkActionCard icon={MoneyIcon} label="Alterar Preço" onClick={() => setView('price')} />
-            <BulkActionCard icon={Package} label="Ajustar Estoque" onClick={() => setView('stock')} />
-            <BulkActionCard icon={EyeIcon} label="Publicar / Ocultar" onClick={() => setView('visibility')} />
-            <BulkActionCard icon={UploadIcon} label="Aplicar Imagem" onClick={() => setView('image')} />
-            <BulkActionCard icon={RemoveImageIcon} label="Remover Imagem" onClick={() => setView('remove_image')} />
+            {targetType !== 'quote' && (
+              <>
+                <BulkActionCard icon={MoneyIcon} label="Alterar Preço" onClick={() => setView('price')} />
+                <BulkActionCard icon={Package} label="Ajustar Estoque" onClick={() => setView('stock')} />
+                <BulkActionCard icon={EyeIcon} label="Publicar / Ocultar" onClick={() => setView('visibility')} />
+                <BulkActionCard icon={UploadIcon} label="Aplicar Imagem" onClick={() => setView('image')} />
+                <BulkActionCard icon={RemoveImageIcon} label="Remover Imagem" onClick={() => setView('remove_image')} />
+              </>
+            )}
+            {targetType === 'quote' && (
+              <BulkActionCard icon={CheckIcon} label="Alterar Status" onClick={() => setView('status')} />
+            )}
             <BulkActionCard icon={TrashIcon} label="Excluir" onClick={() => setView('delete')} danger />
           </div>
         )
@@ -310,6 +333,34 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
             />
           </div>
         )
+      case 'status':
+        const statuses: Array<{ value: BulkActionPayload['status'], label: string }> = [
+          { value: 'draft', label: 'Rascunho' },
+          { value: 'sent', label: 'Enviado' },
+          { value: 'approved', label: 'Aprovado' },
+          { value: 'rejected', label: 'Rejeitado' },
+          { value: 'expired', label: 'Expirado' },
+        ]
+        return (
+          <div className="space-y-1 pt-2">
+            {statuses.map((s) => (
+              <ListItem
+                key={s.value}
+                title={s.label}
+                onClick={() => setStatusConfig(s.value!)}
+                className="cursor-pointer px-4"
+                right={
+                  <RadioButton
+                    checked={statusConfig === s.value}
+                    onChange={() => setStatusConfig(s.value!)}
+                    name="statusM"
+                    value={s.value!}
+                  />
+                }
+              />
+            ))}
+          </div>
+        )
       case 'image':
         return (
           <div className="flex flex-col items-center justify-center pt-2 h-full">
@@ -342,18 +393,17 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
   }
 
   return (
-    <DefaultModal isOpen={isOpen} onClose={onClose} title="">
+    <DefaultModal 
+      isOpen={isOpen} 
+      onClose={onClose} 
+      title={view === 'menu' ? "Ações em Massa" : viewTitles[view]}
+      leftAction={view !== 'menu' ? (
+        <Button variant="filled" className="h-10 w-10 p-0 flex items-center justify-center flex-shrink-0" onClick={() => setView('menu')}>
+          <ChevronLeftIcon className="w-6 h-6" />
+        </Button>
+      ) : undefined}
+    >
       <div className="flex flex-col h-full">
-        <div className="flex items-center gap-2 mb-4">
-          {view !== 'menu' && (
-            <Button variant="ghost" className="h-10 w-10 p-0 rounded-full" onClick={() => setView('menu')}>
-              <ChevronLeftIcon className="w-6 h-6" />
-            </Button>
-          )}
-          <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-            {viewTitles[view]}
-          </h2>
-        </div>
 
         <div className="flex-1 min-h-[300px] relative">
           <AnimatePresence mode="wait">

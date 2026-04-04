@@ -205,7 +205,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
                     transition={{ duration: 0.3, ease: "easeOut" }}
-                    className="fixed inset-0 z-[60] bg-white dark:bg-dark-background"
+                    className="w-full h-full bg-white dark:bg-dark-background"
                 >
                     <CreateOrder 
                         partnerId={partnerId} 

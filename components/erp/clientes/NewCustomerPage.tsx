@@ -19,7 +19,7 @@ import { CpfCnpjInput } from "@/components/reusable/Inputs/CpfCnpjInput"
 import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
 import { StateComboBox } from "@/components/reusable/Inputs/StateComboBox"
 import { NumberInputWithCheckbox } from "@/components/reusable/Inputs/NumberInputWithCheckbox"
-import { ChevronLeftIcon, SaveIcon, EditIcon, SearchIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, EditIcon } from "@/lib/icons"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useNotification } from "@/hooks/use-notification"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -251,7 +251,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
 
                                 {/* Form Column */}
-                                <div className={`col-span-12 ${activeTab !== 'notes' ? 'lg:col-span-8' : ''}`}>
+                                <div className={`col-span-12 ${activeTab !== 'notes' ? 'lg:col-span-8 lg:pr-12' : ''}`}>
                                     <AnimatePresence mode="wait">
                                         <TabsContent value="general" className="mt-0">
                                             <motion.div key="general" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-10">
@@ -381,34 +381,26 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                         <FormInput label="Logradouro" placeholder="Rua, Avenida, etc." value={street} onChange={e => setStreet(e.target.value)} />
 
                                                         <div className="grid grid-cols-2 gap-3 flex-row items-center pt-1.5 pb-1.5">
-                                                            <div>
-                                                                <NumberInputWithCheckbox
-                                                                    label="Número"
-                                                                    value={number}
-                                                                    number={number}
-                                                                    noNumber={noNumber}
-                                                                    onNumberChange={e => setNumber(e.target.value)}
-                                                                    onNoNumberChange={checked => { setNoNumber(checked); if (checked) setNumber(""); }}
-                                                                />
-                                                            </div>
-                                                            <div className="mt-[27px]">
-                                                                <FormInput label="Complemento" placeholder="Apto, Bloco, etc." value={complement} onChange={e => setComplement(e.target.value)} />
-                                                            </div>
+                                                            <NumberInputWithCheckbox
+                                                                label="Número"
+                                                                value={number}
+                                                                number={number}
+                                                                noNumber={noNumber}
+                                                                onNumberChange={e => setNumber(e.target.value)}
+                                                                onNoNumberChange={checked => { setNoNumber(checked); if (checked) setNumber(""); }}
+                                                            />
+                                                            <FormInput label="Complemento" placeholder="Apto, Bloco, etc." value={complement} onChange={e => setComplement(e.target.value)} />
                                                         </div>
                                                         <FormInput label="Bairro" placeholder="Nome do bairro" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} />
 
                                                         <div className="grid grid-cols-2 gap-3 items-end">
-                                                            <div className="mb-[22px]">
-                                                                <FormInput label="Cidade" placeholder="Nome da cidade" value={city} onChange={e => setCity(e.target.value)} />
-                                                            </div>
-                                                            <div>
-                                                                <StateComboBox
-                                                                    label="Estado"
-                                                                    value={uf}
-                                                                    onChange={setUf}
-                                                                    className="w-full"
-                                                                />
-                                                            </div>
+                                                            <FormInput label="Cidade" placeholder="Nome da cidade" value={city} onChange={e => setCity(e.target.value)} />
+                                                            <StateComboBox
+                                                                label="Estado"
+                                                                value={uf}
+                                                                onChange={setUf}
+                                                                className="w-full"
+                                                            />
                                                         </div>
                                                     </div>
                                                 </section>
@@ -439,35 +431,27 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                                         setBillingUf(data.state || "SP")
                                                                     }}
                                                                 />
-                                                                <FormInput label="Logradouro *" placeholder="Rua, Avenida, etc." value={billingStreet} onChange={e => setBillingStreet(e.target.value)} />
+                                                                <FormInput label="Logradouro" placeholder="Rua, Avenida, etc." value={billingStreet} onChange={e => setBillingStreet(e.target.value)} />
                                                                 <div className="grid grid-cols-2 gap-3 flex-row items-center">
-                                                                    <div>
-                                                                        <NumberInputWithCheckbox
-                                                                            label="Número"
-                                                                            value={billingNumber}
-                                                                            number={billingNumber}
-                                                                            noNumber={billingNoNumber}
-                                                                            onNumberChange={e => setBillingNumber(e.target.value)}
-                                                                            onNoNumberChange={checked => { setBillingNoNumber(checked); if (checked) setBillingNumber(""); }}
-                                                                        />
-                                                                    </div>
-                                                                    <div className="mt-[27px]">
-                                                                        <FormInput label="Complemento" placeholder="Apto, Bloco, etc." value={billingComplement} onChange={e => setBillingComplement(e.target.value)} />
-                                                                    </div>
+                                                                    <NumberInputWithCheckbox
+                                                                        label="Número"
+                                                                        value={billingNumber}
+                                                                        number={billingNumber}
+                                                                        noNumber={billingNoNumber}
+                                                                        onNumberChange={e => setBillingNumber(e.target.value)}
+                                                                        onNoNumberChange={checked => { setBillingNoNumber(checked); if (checked) setBillingNumber(""); }}
+                                                                    />
+                                                                    <FormInput label="Complemento" placeholder="Apto, Bloco, etc." value={billingComplement} onChange={e => setBillingComplement(e.target.value)} />
                                                                 </div>
                                                                 <FormInput label="Bairro" placeholder="Nome do bairro" value={billingNeighborhood} onChange={e => setBillingNeighborhood(e.target.value)} />
                                                                 <div className="grid grid-cols-2 gap-3 items-end">
-                                                                    <div className="mb-[22px]">
-                                                                        <FormInput label="Cidade" placeholder="Nome da cidade" value={billingCity} onChange={e => setBillingCity(e.target.value)} />
-                                                                    </div>
-                                                                    <div>
-                                                                        <StateComboBox
-                                                                            label="Estado"
-                                                                            value={billingUf}
-                                                                            onChange={setBillingUf}
-                                                                            className="w-full"
-                                                                        />
-                                                                    </div>
+                                                                    <FormInput label="Cidade" placeholder="Nome da cidade" value={billingCity} onChange={e => setBillingCity(e.target.value)} />
+                                                                    <StateComboBox
+                                                                        label="Estado"
+                                                                        value={billingUf}
+                                                                        onChange={setBillingUf}
+                                                                        className="w-full"
+                                                                    />
                                                                 </div>
                                                             </div>
                                                         </motion.div>

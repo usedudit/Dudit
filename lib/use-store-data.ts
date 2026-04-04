@@ -51,46 +51,46 @@ export function useStoreData(partnerId: string, options: UseStoreDataOptions = {
   ])
 
   const storeId = selectedStore?.id
-  const baseKey = storeId ? `store-${storeId}` : null
+  const baseKey = storeId ? `store-${storeId}` : `partner-${partnerId}`
 
   const { data: products, isLoading: productsLoading } = useSWR(
-    baseKey && options.includeProducts ? [baseKey, "products"] : null,
+    options.includeProducts ? [baseKey, "products"] : null,
     () => fetchStoreProducts(partnerId, storeId || null),
     SWR_CONFIG
   )
 
   const { data: customers, isLoading: customersLoading } = useSWR(
-    baseKey && options.includeCustomers ? [baseKey, "customers"] : null,
+    options.includeCustomers ? [baseKey, "customers"] : null,
     () => fetchCustomersWithStorePriority(partnerId, storeId || null),
     SWR_CONFIG
   )
 
   const { data: orders, isLoading: ordersLoading } = useSWR(
-    baseKey && options.includeOrders ? [baseKey, "orders"] : null,
+    options.includeOrders ? [baseKey, "orders"] : null,
     () => fetchStoreOrders(partnerId, storeId || null),
     SWR_CONFIG
   )
 
   const { data: services, isLoading: servicesLoading } = useSWR(
-    baseKey && options.includeServices ? [baseKey, "services"] : null,
+    options.includeServices ? [baseKey, "services"] : null,
     () => fetchStoreServices(partnerId, storeId || null),
     SWR_CONFIG
   )
 
   const { data: suppliers, isLoading: suppliersLoading } = useSWR(
-    baseKey && options.includeSuppliers ? [baseKey, "suppliers"] : null,
+    options.includeSuppliers ? [baseKey, "suppliers"] : null,
     () => fetchStoreSuppliers(partnerId, storeId || null),
     SWR_CONFIG
   )
 
   const { data: stockMovements, isLoading: stockMovementsLoading } = useSWR(
-    baseKey && options.includeStockMovements ? [baseKey, "stockMovements"] : null,
+    options.includeStockMovements ? [baseKey, "stockMovements"] : null,
     () => fetchStoreStockMovements(partnerId, storeId || null),
     SWR_CONFIG
   )
 
   const { data: paymentMethods, isLoading: paymentMethodsLoading } = useSWR(
-    baseKey && options.includePaymentMethods ? [baseKey, "paymentMethods"] : null,
+    options.includePaymentMethods ? [baseKey, "paymentMethods"] : null,
     () => fetchStorePaymentMethods(partnerId, storeId || null),
     SWR_CONFIG
   )
