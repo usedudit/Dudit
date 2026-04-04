@@ -85,7 +85,7 @@ export async function createERPOrderAction(data: {
         .from("orders")
         .insert({
             partner_id: partnerId,
-            customer_id: data.customerId || null,
+            buyer_id: data.customerId || null,
             customer_name: data.customerName || null,
             order_number: orderNumber,
             order_date: data.orderDate,
@@ -99,8 +99,7 @@ export async function createERPOrderAction(data: {
             shipping_cost: data.shippingCost,
             additional_costs: data.additionalCosts,
             notes: data.notes || null,
-            delivery_address: deliveryAddressStr || null,
-            buyer_id: null // Manual ERP orders might not have a platform user buyer_id
+            delivery_address: deliveryAddressStr || null
         })
         .select()
         .single()
