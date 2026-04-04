@@ -40,18 +40,55 @@ import { getPartnerCustomersAction } from "@/app/actions/erp/customers"
 /**
  * Fetch customers with store prioritization
  * Returns customers from the selected store first, then others
- * Uses server action for reliability and RLS bypass
+ * Uses server action first, falls back to direct client query
  */
 export async function fetchCustomersWithStorePriority(partnerId: string, currentStoreId: string | null) {
-  const response = await getPartnerCustomersAction(partnerId, currentStoreId)
-  
-  if (response.error) {
-    console.error("[fetchCustomersWithStorePriority] Server Action Error:", response.error)
-    // Fallback to empty array if error
-    return []
+  try {
+    const response = await getPartnerCustomersAction(partnerId, currentStoreId)
+    
+    if (response.error) {
+      console.error("[fetchCustomersWithStorePriority] Server Action Error:", response.error)
+      // Fall through to client-side fallback
+    } else {
+      return response.customers || []
+    }
+  } catch (err) {
+    console.error("[fetchCustomersWithStorePriority] Server Action threw:", err)
+    // Fall through to client-side fallback
   }
 
-  return response.customers || []
+  // Client-side fallback: query Supabase directly
+  console.warn("[fetchCustomersWithStorePriority] Using client-side fallback for partnerId:", partnerId)
+  try {
+    let query = supabase
+      .from("customers")
+      .select("*")
+      .eq("partner_id", partnerId)
+      .order("created_at", { ascending: false })
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error("[fetchCustomersWithStorePriority] Client fallback error:", error)
+      throw new Error(error.message)
+    }
+
+    let result = data || []
+
+    // Prioritize: current store customers first, then others
+    if (currentStoreId) {
+      result = [...result].sort((a: any, b: any) => {
+        if (a.store_id === currentStoreId && b.store_id !== currentStoreId) return -1
+        if (a.store_id !== currentStoreId && b.store_id === currentStoreId) return 1
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      })
+    }
+
+    return result
+  } catch (fallbackErr) {
+    console.error("[fetchCustomersWithStorePriority] All attempts failed:", fallbackErr)
+    throw fallbackErr // Let SWR handle the error properly
+  }
 }
 
 /**

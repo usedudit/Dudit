@@ -3,7 +3,7 @@
 import * as React from "react"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon } from "@/lib/icons"
 import { DateRange } from "react-day-picker"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -105,8 +105,8 @@ export const DatePicker: React.FC<DatePickerProps> = ({
             </span>
           </Button>
         </PopoverTrigger>
-        <PopoverContent 
-          className="w-auto p-0 border-brand-border dark:border-dark-border shadow-2xl rounded-2xl overflow-hidden" 
+        <PopoverContent
+          className="w-auto p-0 border-brand-border dark:border-dark-border rounded-2xl overflow-hidden"
           align="start"
           sideOffset={8}
         >

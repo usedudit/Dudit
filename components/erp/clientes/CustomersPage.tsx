@@ -85,7 +85,7 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
     })
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
 
-    const { customers: rawCustomers, isLoading: customersLoading } = useStoreData(partnerId, { includeCustomers: true })
+    const { customers: rawCustomers, customersLoading, customersError } = useStoreData(partnerId, { includeCustomers: true })
     const isLoading = customersLoading && (rawCustomers === undefined || rawCustomers === null)
     const itemsPerPage = 12
 
@@ -321,6 +321,20 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
                     <AnimatePresence mode="wait">
                         {isLoading ? (
                             <ThreeDotsLoader key="loading" />
+                        ) : customersError && !hasCustomers ? (
+                            <motion.div key="error-state" className="w-full h-full flex items-center justify-center min-h-[500px]">
+                                <IconPlaceholder
+                                    placeholderType="image"
+                                    imageSrc="https://img.dudit.com.br/static/mascots/clientes/naoencontrado.png"
+                                    imageAlt="Erro ao carregar"
+                                    title="Erro ao carregar clientes"
+                                    subtitle="Não foi possível carregar seus clientes. Tente novamente."
+                                    itemButton={{
+                                        text: "Tentar Novamente",
+                                        action: () => window.location.reload(),
+                                    }}
+                                />
+                            </motion.div>
                         ) : !hasCustomers ? (
                             <motion.div key="empty-no-data" className="w-full h-full flex items-center justify-center min-h-[500px]">
                                 <IconPlaceholder

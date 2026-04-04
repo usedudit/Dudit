@@ -59,10 +59,16 @@ export function useStoreData(partnerId: string, options: UseStoreDataOptions = {
     SWR_CONFIG
   )
 
-  const { data: customers, isLoading: customersLoading } = useSWR(
+  const { data: customers, isLoading: customersLoading, error: customersError } = useSWR(
     options.includeCustomers ? [baseKey, "customers"] : null,
     () => fetchCustomersWithStorePriority(partnerId, storeId || null),
-    SWR_CONFIG
+    {
+      ...SWR_CONFIG,
+      errorRetryCount: 3,
+      onError: (err: any) => {
+        console.error("[useStoreData] SWR customers error:", err)
+      },
+    }
   )
 
   const { data: orders, isLoading: ordersLoading } = useSWR(
@@ -114,5 +120,7 @@ export function useStoreData(partnerId: string, options: UseStoreDataOptions = {
     stockMovements,
     paymentMethods,
     isLoading,
+    customersLoading,
+    customersError,
   }
 }

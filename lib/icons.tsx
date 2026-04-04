@@ -48,6 +48,7 @@ import {
   FloppyDiskIcon,
   ImageUploadIcon,
   ImageDelete02Icon,
+  Calendar03Icon,
   Camera01Icon,
   Facebook02Icon,
   TelegramIcon as TelegramIcon01,
@@ -298,6 +299,7 @@ export const TelegramIcon = createIcon(TelegramIcon01)
 export const LinkedinIcon = createIcon(Linkedin02Icon)
 
 export const WrenchIcon = createIcon(Wrench01Icon)
+export const CalendarIcon = createIcon(Calendar03Icon)
 
 // ============================
 // BUSINESS / APP
