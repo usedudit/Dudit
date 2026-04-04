@@ -2,9 +2,8 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Checkbox, Badge, Button } from "@/components/reusable"
-import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
-import { ThreeDotsIcon, EyeIcon, EditIcon, TrashIcon } from "@/lib/icons"
+import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
+import { ThreeDotsIcon } from "@/lib/icons"
 
 interface CustomerGridCardProps {
   customer: any
@@ -107,31 +106,11 @@ const CustomerGridCard = React.memo(
               className="flex-shrink-0"
               onClick={(e) => e.stopPropagation()}
             >
-              <Dropdown
-                align="right"
-                showChevron={false}
-                trigger={
-                  <Button
-                    variant="outline"
-                    className="w-[34px] h-[34px] rounded-full border-brand-border hover:bg-white dark:hover:bg-dark-surface p-0 flex items-center justify-center"
-                  >
-                    <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
-                  </Button>
-                }
-              >
-                <DropdownItem onClick={onDetails}>
-                  <EyeIcon className="w-4 h-4 mr-2" /> Ver Detalhes
-                </DropdownItem>
-                <DropdownItem onClick={onEdit}>
-                  <EditIcon className="w-4 h-4 mr-2" /> Editar
-                </DropdownItem>
-                <DropdownItem
-                  onClick={onDelete}
-                  className="text-brand-red focus:text-brand-red focus:bg-red-50 dark:focus:bg-red-900/10"
-                >
-                  <TrashIcon className="w-4 h-4 mr-2" /> Excluir
-                </DropdownItem>
-              </Dropdown>
+            <ActionsDropdown
+              onView={onDetails}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
             </div>
           </div>
         </div>

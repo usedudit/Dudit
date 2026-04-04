@@ -573,7 +573,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                             {/* RIGHT SIDE / BELOW - PREVIEW */}
                             <div className={`w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 overflow-y-auto no-scrollbar ${activeTab === 'Visualização' ? 'flex flex-col flex-1 min-h-[1000px] lg:min-h-0' : 'hidden lg:flex flex-col'}`}>
                                 <QuotePreview
-                                    invoiceNumber={quoteCode || (mode === 'create' ? 'QTE-0000' : 'N/A')}
+                                    invoiceNumber={quoteCode || (mode === 'create' ? 'ORC-0000' : 'N/A')}
                                     quoteDate={quoteDate}
                                     expiryDate={expiryDate}
                                     selectedCustomer={selectedCustomer}

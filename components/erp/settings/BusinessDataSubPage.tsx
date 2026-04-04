@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, useTransition } from "
 import cn from "classnames"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, InfoCard, Badge, AlertModal, Input as FormInput, Checkbox as FormCheckbox, RadioButton as FormRadioButton, IconPlaceholder } from "@/components/reusable"
-import { CpfCnpjInput, CepInput, StateComboBox, MoneyInput, PhoneInput, ListItem, Spinner, Tabs, TabsList, TabsTrigger, TabsContent, DefaultModal, Dropdown, DropdownItem, FormDropdown } from "@/components/reusable"
+import { CpfCnpjInput, CepInput, StateComboBox, MoneyInput, PhoneInput, ListItem, Spinner, Tabs, TabsList, TabsTrigger, TabsContent, DefaultModal, ActionsDropdown, FormDropdown } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { BusinessHoursSelector } from "@/components/business-hours-selector"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
@@ -423,22 +423,15 @@ export const BusinessDataSubPage = ({
                     {isDeletingMethod.has(method.id) ? (
                         <Spinner size={16} className="text-brand-red" />
                     ) : (
-                        <Dropdown
-                            align="right"
-                            showChevron={false}
+                        <ActionsDropdown
+                            onEdit={() => onEdit(method)}
+                            onDelete={() => setMethodToDelete(method)}
                             trigger={
                                 <Button variant="outline" size="icon" className="w-[36px] h-[36px] p-0 flex items-center justify-center bg-transparent border-opacity-40">
                                     <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
                                 </Button>
                             }
-                        >
-                            <DropdownItem onClick={() => onEdit(method)}>
-                                <EditIcon className="w-4 h-4 mr-2" /> Editar
-                            </DropdownItem>
-                            <DropdownItem onClick={() => setMethodToDelete(method)} className="text-brand-red focus:text-brand-red focus:bg-red-50 dark:focus:bg-red-900/10">
-                                <TrashIcon className="w-4 h-4 mr-2" /> Excluir
-                            </DropdownItem>
-                        </Dropdown>
+                        />
                     )}
                 </div>
             </td>

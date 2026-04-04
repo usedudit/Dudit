@@ -77,7 +77,6 @@ const MetadataCard = React.memo(({ item, type, categories, onEdit, onDelete }: M
                     <ActionsDropdown 
                         onEdit={onEdit}
                         onDelete={onDelete}
-                        onDuplicate={() => {}} // Not needed for metadata
                     />
                 </div>
             </div>

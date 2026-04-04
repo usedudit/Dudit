@@ -2,9 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Checkbox, Button, IconPlaceholder, Input } from "@/components/reusable"
-import Dropdown from "@/components/reusable/Dropdown"
-import DropdownItem from "@/components/reusable/DropdownItem"
+import { Checkbox, Button, IconPlaceholder, Input, ActionsDropdown } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { Spinner } from "@/components/reusable/Spinner"
 import Pagination from "@/components/reusable/Pagination"
@@ -122,22 +120,15 @@ const VariationRow = React.memo(({ item, isSelected, isEditing, onSelect, onTogg
             </td>
             <td className="p-3 border-b border-brand-border dark:border-dark-border text-center">
                 <div className="flex justify-center action-btn">
-                    <Dropdown
-                        align="right"
-                        showChevron={false}
+                    <ActionsDropdown
+                        onEdit={() => onEdit(item)}
+                        onDelete={() => onDelete(item)}
                         trigger={
                             <Button variant="outline" size="icon" className="w-[40px] h-[40px] p-0 flex items-center justify-center bg-transparent" disabled={!isEditing}>
                                 <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
                             </Button>
                         }
-                    >
-                        <DropdownItem onClick={() => onEdit(item)}>
-                            <EditIcon className="w-4 h-4 mr-2" /> Editar
-                        </DropdownItem>
-                        <DropdownItem onClick={() => onDelete(item)} className="text-brand-red focus:text-brand-red focus:bg-red-50 dark:focus:bg-red-900/10">
-                            <TrashIcon className="w-4 h-4 mr-2" /> Excluir
-                        </DropdownItem>
-                    </Dropdown>
+                    />
                 </div>
             </td>
         </motion.tr>

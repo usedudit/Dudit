@@ -2,12 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SearchIcon, ChevronDownIcon, EditIcon, PlusIcon, SparklesIcon, CheckCircleIcon, MoreHorizontalIcon, ArchiveIcon, ShareIcon, StarIcon, Package, CreditCardIcon, CopyIcon, ChevronLeftIcon, ChevronRightIcon, FileIcon, StoreIcon, ThreeDotsIcon, TrashIcon, ClockIcon, MapPin } from '@/lib/icons';
-import { Button } from '@/components/reusable/Button';
-import { Badge } from '@/components/reusable/Badge';
-import { Input as FormInput } from '@/components/reusable/Input';
-import Dropdown, { DropdownItem } from '@/components/reusable/Dropdown';
-import { Checkbox as FormCheckbox } from '@/components/reusable/Checkbox';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/reusable/Tabs';
+import { Button, Badge, Input as FormInput, Checkbox as FormCheckbox, Tabs, TabsList, TabsTrigger, TabsContent, ActionsDropdown } from '@/components/reusable';
 import { useNotification } from '@/hooks/use-notification';
 import IconPlaceholder from '@/components/reusable/IconPlaceholder';
 import { getCustomerOrdersAction } from '@/app/actions/erp/customers';
@@ -15,14 +10,7 @@ import { getCustomerOrdersAction } from '@/app/actions/erp/customers';
 interface Props { customer: any; onBack: () => void; }
 
 // Sub-components
-const StyledDropdownItem: React.FC<{ onClick?: () => void; children: React.ReactNode; className?: string }> = ({ onClick, children, className }) => (
-    <div
-        className={`flex items-center gap-2 px-3 py-2 text-sm font-medium cursor-pointer rounded-md hover:bg-gray-100 dark:hover:bg-dark-border transition-colors ${className}`}
-        onClick={(e) => { e.stopPropagation(); onClick?.(); }}
-    >
-        {children}
-    </div>
-);
+
 
 export const CustomerDetailPage = ({ customer, onBack }: Props) => {
     const { success: notifySuccess, error: notifyError } = useNotification();
@@ -86,19 +74,11 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
 
                                 {/* Desktop action buttons */}
                                 <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
-                                    <Dropdown
-                                        align="right"
-                                        showChevron={false}
-                                        trigger={
-                                            <Button variant="outline" className="w-10 h-10 p-0 flex items-center justify-center bg-transparent">
-                                                <ThreeDotsIcon className="w-5 h-5" />
-                                            </Button>
-                                        }
-                                    >
-                                        <StyledDropdownItem><ShareIcon className="w-[18px] h-[18px]" /> Compartilhar</StyledDropdownItem>
-                                        <StyledDropdownItem className="text-brand-orange"><ArchiveIcon className="w-[18px] h-[18px]" /> Suspender</StyledDropdownItem>
-                                        <StyledDropdownItem className="text-brand-red"><TrashIcon className="w-[18px] h-[18px]" /> Excluir</StyledDropdownItem>
-                                    </Dropdown>
+                                    <ActionsDropdown
+                                        onShare={() => { }}
+                                        onArchive={() => { }}
+                                        onDelete={() => { }}
+                                    />
                                     <Button className="px-6 h-[42px] flex items-center gap-2">
                                         <EditIcon className="w-4.5 h-4.5" />
                                         Editar Cliente
@@ -258,19 +238,17 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
 
                 {/* Mobile Bottom Action Bar */}
                 <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
-                    <Dropdown
-                        showChevron={false}
+                    <ActionsDropdown
+                        onShare={() => { }}
+                        onArchive={() => { }}
+                        onDelete={() => { }}
                         trigger={
                             <Button variant="outline" className="flex-1 h-[48px] font-bold">
                                 <ThreeDotsIcon className="w-4 h-4 mr-2" />
                                 Opções
                             </Button>
                         }
-                    >
-                        <StyledDropdownItem><ShareIcon className="w-[18px] h-[18px]" /> Compartilhar</StyledDropdownItem>
-                        <StyledDropdownItem className="text-brand-orange"><ArchiveIcon className="w-[18px] h-[18px]" /> Suspender</StyledDropdownItem>
-                        <StyledDropdownItem className="text-brand-red"><TrashIcon className="w-[18px] h-[18px]" /> Excluir</StyledDropdownItem>
-                    </Dropdown>
+                    />
                     <Button
                         className="flex-1 h-[48px] font-bold"
                     >

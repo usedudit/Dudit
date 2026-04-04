@@ -2,12 +2,10 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Checkbox, Badge, Button, Tooltip } from "@/components/reusable"
-import Dropdown from "@/components/reusable/Dropdown"
-import DropdownItem from "@/components/reusable/DropdownItem"
+import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getStockStatus, formatCurrency } from "./product-utils"
-import { ThreeDotsIcon, EditIcon, TrashIcon, CopyIcon } from "@/lib/icons"
+import { ThreeDotsIcon } from "@/lib/icons"
 import type { Product } from "@/lib/types/product"
 
 interface ColumnDef {
@@ -143,31 +141,11 @@ const ProductListItem = React.memo(
               className="flex justify-center action-btn"
               onClick={(e) => e.stopPropagation()}
             >
-              <Dropdown
-                align="right"
-                showChevron={false}
-                trigger={
-                  <Button
-                    variant="outline"
-                    className="w-[40px] h-[40px] p-0 flex items-center justify-center"
-                  >
-                    <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
-                  </Button>
-                }
-              >
-                <DropdownItem onClick={() => onEdit(product)}>
-                  <EditIcon className="w-4 h-4 mr-2" /> Editar
-                </DropdownItem>
-                <DropdownItem onClick={() => onDuplicate(product)}>
-                  <CopyIcon className="w-4 h-4 mr-2" /> Duplicar
-                </DropdownItem>
-                <DropdownItem
-                  onClick={() => onDelete(product)}
-                  className="text-brand-red focus:text-brand-red focus:bg-red-50 dark:focus:bg-red-900/10"
-                >
-                  <TrashIcon className="w-4 h-4 mr-2" /> Excluir
-                </DropdownItem>
-              </Dropdown>
+              <ActionsDropdown
+                onEdit={() => onEdit(product)}
+                onDuplicate={() => onDuplicate(product)}
+                onDelete={() => onDelete(product)}
+              />
             </div>
           )
 

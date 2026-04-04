@@ -2,9 +2,8 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge, Button } from "@/components/reusable"
-import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
-import { ThreeDotsIcon, RotateIcon, ChevronDownIcon, ChevronUpIcon } from "@/lib/icons"
+import { Badge, ActionsDropdown } from "@/components/reusable"
+import { ThreeDotsIcon, ChevronDownIcon, ChevronUpIcon } from "@/lib/icons"
 
 interface StockMovementGridCardProps {
   movement: any
@@ -97,22 +96,9 @@ const StockMovementGridCard = React.memo(
               className="flex-shrink-0"
               onClick={(e) => e.stopPropagation()}
             >
-              <Dropdown
-                align="right"
-                showChevron={false}
-                trigger={
-                  <Button
-                    variant="outline"
-                    className="w-[40px] h-[40px] p-0 flex items-center justify-center font-bold"
-                  >
-                    <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
-                  </Button>
-                }
-              >
-                <DropdownItem onClick={() => onUndo(movement.id)}>
-                  <RotateIcon className="w-4 h-4 mr-2" /> Desfazer movimentação
-                </DropdownItem>
-              </Dropdown>
+              <ActionsDropdown
+                onUndo={() => onUndo(movement.id)}
+              />
             </div>
           </div>
         </div>

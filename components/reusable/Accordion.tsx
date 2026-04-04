@@ -8,7 +8,13 @@ import {
   ThreeDotsIcon,
   EditIcon,
   DuplicateIcon,
-  TrashIcon
+  TrashIcon,
+  EyeIcon,
+  RotateIcon,
+  ShareIcon,
+  PrinterIcon,
+  MailIcon,
+  ArchiveIcon
 } from "@/lib/icons"
 
 interface AccordionProps {
@@ -66,29 +72,90 @@ export const Accordion: React.FC<AccordionProps> = ({
 
 // ... ActionsDropdown permanece igual ...
 interface ActionsDropdownProps {
-  onEdit: () => void
-  onDuplicate: () => void
-  onDelete: () => void
+  onEdit?: () => void
+  onDuplicate?: () => void
+  onDelete?: () => void
+  onView?: () => void
+  onUndo?: () => void
+  onShare?: () => void
+  onPrint?: () => void
+  onEmail?: () => void
+  onArchive?: () => void
+  trigger?: React.ReactElement
+  className?: string
+  children?: React.ReactNode
 }
 
-export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({ onEdit, onDuplicate, onDelete }) => (
+export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({ 
+  onEdit, 
+  onDuplicate, 
+  onDelete,
+  onView,
+  onUndo,
+  onShare,
+  onPrint,
+  onEmail,
+  onArchive,
+  trigger,
+  className,
+  children
+}) => (
   <Dropdown
     trigger={
-      <Button variant="outline" className="w-[40px] h-[40px] p-0 flex items-center justify-center">
-        <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
-      </Button>
+      trigger || (
+        <Button variant="outline" className={`w-[40px] h-[40px] p-0 flex items-center justify-center ${className || ""}`}>
+          <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
+        </Button>
+      )
     }
     align="right"
     showChevron={false}
   >
-    <DropdownItem onClick={onEdit}>
-      <EditIcon className="w-4 h-4" /> Editar
-    </DropdownItem>
-    <DropdownItem onClick={onDuplicate}>
-      <DuplicateIcon className="w-4 h-4" /> Duplicar
-    </DropdownItem>
-    <DropdownItem onClick={onDelete} className="text-brand-red">
-      <TrashIcon className="w-4 h-4" /> Excluir
-    </DropdownItem>
+    {onView && (
+      <DropdownItem onClick={onView}>
+        <EyeIcon className="w-4 h-4" /> Ver Detalhes
+      </DropdownItem>
+    )}
+    {onEdit && (
+      <DropdownItem onClick={onEdit}>
+        <EditIcon className="w-4 h-4" /> Editar
+      </DropdownItem>
+    )}
+    {onDuplicate && (
+      <DropdownItem onClick={onDuplicate}>
+        <DuplicateIcon className="w-4 h-4" /> Duplicar
+      </DropdownItem>
+    )}
+    {onUndo && (
+      <DropdownItem onClick={onUndo}>
+        <RotateIcon className="w-4 h-4" /> Desfazer
+      </DropdownItem>
+    )}
+    {onShare && (
+      <DropdownItem onClick={onShare}>
+        <ShareIcon className="w-4 h-4" /> Compartilhar
+      </DropdownItem>
+    )}
+    {onPrint && (
+      <DropdownItem onClick={onPrint}>
+        <PrinterIcon className="w-4 h-4" /> Imprimir
+      </DropdownItem>
+    )}
+    {onEmail && (
+      <DropdownItem onClick={onEmail}>
+        <MailIcon className="w-4 h-4" /> Enviar por E-mail
+      </DropdownItem>
+    )}
+    {onArchive && (
+      <DropdownItem onClick={onArchive} className="text-brand-orange">
+        <ArchiveIcon className="w-4 h-4" /> Arquivar
+      </DropdownItem>
+    )}
+    {onDelete && (
+      <DropdownItem onClick={onDelete} className="text-brand-red">
+        <TrashIcon className="w-4 h-4" /> Excluir
+      </DropdownItem>
+    )}
+    {children}
   </Dropdown>
 )

@@ -34,12 +34,12 @@ export async function getNextQuoteNumberAction(partnerId: string) {
                 return errorResponse("Erro ao buscar próximo número")
             }
 
-            let nextNumber = "QTE-0001"
+            let nextNumber = "ORC-0001"
             if (data?.quote_number) {
                 const match = data.quote_number.match(/(\d+)$/)
                 if (match) {
                     const currentNum = parseInt(match[0], 10)
-                    nextNumber = `QTE-${(currentNum + 1).toString().padStart(4, '0')}`
+                    nextNumber = `ORC-${(currentNum + 1).toString().padStart(4, '0')}`
                 }
             }
 
@@ -647,7 +647,7 @@ export async function getQuoteDetailsAction(quoteId: string, partnerId: string) 
 export async function getPartnerAddressAction(partnerId: string) {
     try {
         const supabase = await getSupabaseServerClient()
-        
+
         const { data, error } = await supabase
             .from("addresses")
             .select("*")

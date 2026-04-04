@@ -13,12 +13,9 @@ import {
     AlertTriangleIcon,
     ArrowRightIcon,
     UploadIcon,
-    EditIcon,
-    ThreeDotsIcon,
-    TrashIcon,
-    CopyIcon
+    EditIcon
 } from '@/lib/icons';
-import { Button, Badge, Dropdown, DropdownItem, ThreeDotsLoader, FormDropdown, Tooltip, AlertModal } from '@/components/reusable';
+import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, Tooltip, AlertModal } from '@/components/reusable';
 import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction } from '@/app/actions/erp/quotes';
 import { useNotification } from "@/hooks/use-notification";
 import CustomerCard from '@/components/reusable/CustomerCard';
@@ -31,14 +28,7 @@ interface QuoteDetailProps {
     onBack: () => void;
 }
 
-const StyledDropdownItem: React.FC<{ onClick: () => void; children: React.ReactNode; className?: string }> = ({ onClick, children, className }) => (
-    <div
-        className={`flex items-center gap-2 px-3 py-2 text-sm font-medium cursor-pointer rounded-md hover:bg-gray-100 dark:hover:bg-dark-border transition-colors ${className}`}
-        onClick={(e) => { e.stopPropagation(); onClick() }}
-    >
-        {children}
-    </div>
-)
+
 
 const QuoteDetail = ({ quoteId, partnerId, onBack }: QuoteDetailProps) => {
     const [isScrolled, setIsScrolled] = useState(false);
@@ -178,21 +168,13 @@ const QuoteDetail = ({ quoteId, partnerId, onBack }: QuoteDetailProps) => {
 
                             {/* Desktop action buttons only */}
                             <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
-                                <Dropdown
-                                    align="right"
-                                    showChevron={false}
-                                    trigger={
-                                        <Button variant="outline" className="w-10 h-10 p-0 flex items-center justify-center bg-transparent">
-                                            <ThreeDotsIcon className="w-5 h-5" />
-                                        </Button>
-                                    }
-                                >
-                                    <StyledDropdownItem onClick={() => { }}><PrinterIcon className="w-[18px] h-[18px]" /> Imprimir PDF</StyledDropdownItem>
-                                    <StyledDropdownItem onClick={() => { }}><MailIcon className="w-[18px] h-[18px]" /> Enviar por E-mail</StyledDropdownItem>
-                                    <StyledDropdownItem onClick={() => { }}><ShareIcon className="w-[18px] h-[18px]" /> Compartilhar Link</StyledDropdownItem>
-                                    <StyledDropdownItem onClick={() => setShowDeleteModal(true)} className="text-brand-red"><TrashIcon className="w-[18px] h-[18px]" /> Excluir Orçamento</StyledDropdownItem>
-                                    <StyledDropdownItem onClick={() => { }}><CopyIcon className="w-[18px] h-[18px]" /> Duplicar</StyledDropdownItem>
-                                </Dropdown>
+                                <ActionsDropdown
+                                    onPrint={() => { }}
+                                    onEmail={() => { }}
+                                    onShare={() => { }}
+                                    onDelete={() => setShowDeleteModal(true)}
+                                    onDuplicate={() => { }}
+                                />
 
                                 <Button onClick={() => { }} className="whitespace-nowrap">
                                     <EditIcon className="w-[18px] h-[18px] mr-2" />

@@ -4,7 +4,7 @@ import { useState, useRef } from "react"
 import { useSupabase } from "@/providers/supabase-provider"
 import { useRouter } from "next/navigation"
 import { getPartnerUrl, getProductUrl } from "@/lib/utils/url-generator"
-import { Minus, PlusIcon, TrashIcon, ChevronLeftIcon, ChevronUpIcon, ChevronDownIcon } from "@/lib/icons"
+import { MinusIcon, PlusIcon, TrashIcon, ChevronLeftIcon, ChevronUpIcon, ChevronDownIcon } from "@/lib/icons"
 import { AnimatePresence, motion } from "framer-motion"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
@@ -13,7 +13,6 @@ import { CheckoutWrapper } from "@/components/marketplace/CheckoutWrapper"
 import { PaymentWrapper } from "@/components/PaymentWrapper"
 import { Button, Checkbox, IconPlaceholder, AlertModal, DefaultModal } from "@/components/reusable"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import Link from "next/link"
 import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
 
@@ -92,7 +91,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
       // Removed router.refresh() — optimistic state update handles UI
     } catch {
       setOptimisticItems(prev => ({ ...prev, [cartItemId]: { ...prev[cartItemId], quantity: currentQty } }))
-    } finally { 
+    } finally {
       setLoading(null)
       isActionInProgress.current = false
     }
@@ -126,7 +125,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
       // Removed router.refresh() — optimistic state update handles UI
     } catch {
       setOptimisticItems(prev => ({ ...prev, [cartItemId]: { ...prev[cartItemId], selected: currentSelected } }))
-    } finally { 
+    } finally {
       setLoading(null)
       isActionInProgress.current = false
     }
@@ -157,7 +156,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         revert[item.id] = { ...optimisticItems[item.id], selected: item.selected }
       })
       setOptimisticItems(prev => ({ ...prev, ...revert }))
-    } finally { 
+    } finally {
       setLoading(null)
       isActionInProgress.current = false
     }
@@ -408,7 +407,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
                                         <div className="flex items-center justify-between mt-2">
                                           <div className="flex items-center border border-brand-border rounded-[6px] h-[32px]">
-                                            <button onClick={() => updateQty(item.id, -1, itemQty)} className="w-8 h-full flex items-center justify-center hover:bg-brand-gray" disabled={loading === item.id || itemQty <= 1}><Minus size={13} /></button>
+                                            <button onClick={() => updateQty(item.id, -1, itemQty)} className="w-8 h-full flex items-center justify-center hover:bg-brand-gray" disabled={loading === item.id || itemQty <= 1}><MinusIcon size={13} /></button>
                                             <span className="w-7 text-center text-[13px] font-medium">{itemQty}</span>
                                             <button onClick={() => updateQty(item.id, 1, itemQty)} className="w-8 h-full flex items-center justify-center hover:bg-brand-gray" disabled={loading === item.id}><PlusIcon size={13} /></button>
                                           </div>
@@ -453,7 +452,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
                                         <div className="flex items-center justify-end gap-4">
                                           <div className="flex items-center border border-brand-border rounded-[6px] h-[36px]">
-                                            <button onClick={() => updateQty(item.id, -1, itemQty)} className="w-9 h-full flex items-center justify-center hover:bg-brand-gray" disabled={loading === item.id || itemQty <= 1}><Minus size={14} /></button>
+                                            <button onClick={() => updateQty(item.id, -1, itemQty)} className="w-9 h-full flex items-center justify-center hover:bg-brand-gray" disabled={loading === item.id || itemQty <= 1}><MinusIcon size={14} /></button>
                                             <span className="w-8 text-center text-[14px] font-medium">{itemQty}</span>
                                             <button onClick={() => updateQty(item.id, 1, itemQty)} className="w-9 h-full flex items-center justify-center hover:bg-brand-gray" disabled={loading === item.id}><PlusIcon size={14} /></button>
                                           </div>

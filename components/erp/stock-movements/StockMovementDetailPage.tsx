@@ -9,7 +9,7 @@ import {
     RotateIcon,
     ChevronLeftIcon
 } from '@/lib/icons';
-import { Button, ThreeDotsLoader, Dropdown, DropdownItem, AlertModal, Input } from '@/components/reusable';
+import { Button, ThreeDotsLoader, ActionsDropdown, AlertModal, Input } from '@/components/reusable';
 import { Badge } from '@/components/reusable/Badge';
 import { useNotification } from '@/hooks/use-notification';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
@@ -144,25 +144,10 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                     <DownloadIcon className="w-4 h-4 mr-2" /> PDF
                                 </Button>
                                 
-                                <Dropdown
-                                    align="right"
-                                    showChevron={false}
-                                    trigger={
-                                        <Button
-                                            variant="outline"
-                                            className="w-[42px] h-[42px] p-0 flex items-center justify-center"
-                                        >
-                                            <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
-                                        </Button>
-                                    }
-                                >
-                                    <DropdownItem
-                                        onClick={() => setIsUndoModalOpen(true)}
-                                        className="text-brand-dark dark:text-dark-heading"
-                                    >
-                                        <RotateIcon className="w-4 h-4 mr-2" /> Desfazer movimentação
-                                    </DropdownItem>
-                                </Dropdown>
+                                <ActionsDropdown
+                                    onUndo={() => setIsUndoModalOpen(true)}
+                                    className="w-[42px] h-[42px]"
+                                />
                             </div>
                         </div>
                     </div>

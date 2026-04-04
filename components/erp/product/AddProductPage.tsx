@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } from "react"
-import { Tabs, TabsList, TabsTrigger, Button, Badge, Tooltip, Input, Combobox } from "@/components/reusable"
+import { Tabs, TabsList, TabsTrigger, Button, Badge, Tooltip, Input, Combobox, ActionsDropdown } from "@/components/reusable"
 import { ChevronLeftIcon, TrashIcon, ThreeDotsIcon, DuplicateIcon, EditIcon, SaveIcon, ShareIcon } from "@/lib/icons"
 import type { Product } from "@/lib/types/product"
 import { useToast } from "@/components/ui/use-toast"
@@ -19,7 +19,6 @@ import { fetchJSONWithCSRF, fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { Spinner } from "@/components/reusable/Spinner"
 
-import Dropdown from "@/components/reusable/Dropdown"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
 import ImageCropperModal from "@/components/ImageCropperModal"
@@ -59,14 +58,7 @@ const getEmptyProduct = () => ({
     tags: [], pending_variants: [],
 })
 
-const StyledDropdownItem: FC<{ onClick: () => void; children: React.ReactNode; className?: string }> = ({ onClick, children, className }) => (
-    <div
-        className={`flex items-center gap-2 px-3 py-2 text-sm font-medium cursor-pointer rounded-md hover:bg-gray-100 dark:hover:bg-dark-border transition-colors ${className}`}
-        onClick={(e) => { e.stopPropagation(); onClick() }}
-    >
-        {children}
-    </div>
-)
+
 
 interface AddProductPageProps {
     onBack: () => void
@@ -629,19 +621,11 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             </>
                                         ) : (
                                             <>
-                                                <Dropdown
-                                                    align="right"
-                                                    showChevron={false}
-                                                    trigger={
-                                                        <Button variant="outline" className="w-10 h-10 p-0 flex items-center justify-center bg-transparent" disabled={isLoadingDetails}>
-                                                            <ThreeDotsIcon className="w-5 h-5" />
-                                                        </Button>
-                                                    }
-                                                >
-                                                    <StyledDropdownItem onClick={handleDuplicateProduct}><DuplicateIcon className="w-[18px] h-[18px]" /> Duplicar</StyledDropdownItem>
-                                                    <StyledDropdownItem onClick={handleShareProduct}><ShareIcon className="w-[18px] h-[18px]" /> Compartilhar</StyledDropdownItem>
-                                                    <StyledDropdownItem onClick={() => setShowDeleteModal(true)} className="text-brand-red"><TrashIcon className="w-[18px] h-[18px]" /> Excluir</StyledDropdownItem>
-                                                </Dropdown>
+                                                <ActionsDropdown
+                                                    onDuplicate={handleDuplicateProduct}
+                                                    onShare={handleShareProduct}
+                                                    onDelete={() => setShowDeleteModal(true)}
+                                                />
                                                 <Button onClick={enterEditMode} className="whitespace-nowrap" disabled={isLoadingDetails}>
                                                     <EditIcon className="w-[18px] h-[18px] mr-2" />
                                                     Editar produto
@@ -737,8 +721,10 @@ const AddProductPage: FC<AddProductPageProps> = ({
                             </>
                         ) : (
                             <>
-                                <Dropdown
-                                    showChevron={false}
+                                <ActionsDropdown
+                                    onDuplicate={handleDuplicateProduct}
+                                    onShare={handleShareProduct}
+                                    onDelete={() => setShowDeleteModal(true)}
                                     trigger={
                                         <Button
                                             variant="outline"
@@ -749,11 +735,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             Opções
                                         </Button>
                                     }
-                                >
-                                    <StyledDropdownItem onClick={handleDuplicateProduct}><DuplicateIcon className="w-[18px] h-[18px]" /> Duplicar</StyledDropdownItem>
-                                    <StyledDropdownItem onClick={handleShareProduct}><ShareIcon className="w-[18px] h-[18px]" /> Compartilhar</StyledDropdownItem>
-                                    <StyledDropdownItem onClick={() => setShowDeleteModal(true)} className="text-brand-red"><TrashIcon className="w-[18px] h-[18px]" /> Excluir</StyledDropdownItem>
-                                </Dropdown>
+                                />
                                 <Button
                                     onClick={enterEditMode}
                                     className="flex-1 whitespace-nowrap"

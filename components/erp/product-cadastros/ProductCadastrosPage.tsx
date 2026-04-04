@@ -4,7 +4,7 @@ import React, { useState, useMemo, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useNotification } from "@/hooks/use-notification"
 import { PlusIcon } from "@/lib/icons"
-import { Button, IconPlaceholder, Combobox, Input } from "@/components/reusable"
+import { Button, IconPlaceholder, Combobox, Input, Checkbox } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
 import Pagination from "@/components/reusable/Pagination"
@@ -318,16 +318,13 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                         </div>
                     )}
 
-                    <div className="flex items-center gap-2 mt-2">
-                        <input
-                            type="checkbox"
-                            id="is_active"
-                            checked={modal.item.is_active}
-                            onChange={(e) => setModal(prev => ({ ...prev, item: { ...prev.item, is_active: e.target.checked } }))}
-                            className="w-4 h-4 rounded border-gray-300 text-brand-green focus:ring-brand-green"
-                        />
-                        <label htmlFor="is_active" className="text-sm font-medium text-gray-700 dark:text-dark-body">Cadastro Ativo</label>
-                    </div>
+                    <Checkbox
+                        id="is_active"
+                        label="Cadastro Ativo"
+                        checked={modal.item.is_active}
+                        onChange={(checked) => setModal(prev => ({ ...prev, item: { ...prev.item, is_active: checked } }))}
+                        className="mt-2"
+                    />
                 </div>
             </DefaultModal>
 

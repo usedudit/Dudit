@@ -2,9 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Checkbox, Badge, Button } from "@/components/reusable"
-import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
-import { ThreeDotsIcon, EditIcon, TrashIcon, EyeIcon } from "@/lib/icons"
+import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
 
 interface ColumnDef {
   id: string
@@ -99,31 +97,11 @@ const CustomerListItem = React.memo(
               className="flex justify-center action-btn"
               onClick={(e) => e.stopPropagation()}
             >
-              <Dropdown
-                align="right"
-                showChevron={false}
-                trigger={
-                  <Button
-                    variant="outline"
-                    className="w-[34px] h-[34px] rounded-full border-brand-border hover:bg-white dark:hover:bg-dark-surface p-0 flex items-center justify-center"
-                  >
-                    <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
-                  </Button>
-                }
-              >
-                <DropdownItem onClick={() => onDetails(customer)}>
-                  <EyeIcon className="w-4 h-4 mr-2" /> Ver Detalhes
-                </DropdownItem>
-                <DropdownItem onClick={() => onEdit(customer)}>
-                  <EditIcon className="w-4 h-4 mr-2" /> Editar
-                </DropdownItem>
-                <DropdownItem
-                  onClick={() => onDelete(customer)}
-                  className="text-brand-red focus:text-brand-red focus:bg-red-50 dark:focus:bg-red-900/10"
-                >
-                  <TrashIcon className="w-4 h-4 mr-2" /> Excluir
-                </DropdownItem>
-              </Dropdown>
+              <ActionsDropdown
+                onView={() => onDetails(customer)}
+                onEdit={() => onEdit(customer)}
+                onDelete={() => onDelete(customer)}
+              />
             </div>
           )
 

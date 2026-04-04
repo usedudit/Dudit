@@ -2,9 +2,8 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Checkbox, Badge, Button } from "@/components/reusable"
-import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
-import { ThreeDotsIcon, EditIcon, TrashIcon, CopyIcon, ClockIcon, FileIcon } from "@/lib/icons"
+import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
+import { ClockIcon, FileIcon } from "@/lib/icons"
 
 interface QuoteGridCardProps {
     quote: any
@@ -108,36 +107,18 @@ const QuoteGridCard = React.memo(
                             {quote.formattedExpirationDate ? `Validade: ${quote.formattedExpirationDate}` : ""}
                         </div>
 
-                        {/* Dropdown Button */}
+                        {/* Botão de Ações */}
                         <div
                             className="flex-shrink-0"
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                            }}
                         >
-                            <Dropdown
-                                align="right"
-                                showChevron={false}
-                                trigger={
-                                    <Button
-                                        variant="outline"
-                                        className="w-[34px] h-[34px] rounded-full border-brand-border hover:bg-white dark:hover:bg-dark-surface p-0 flex items-center justify-center"
-                                    >
-                                        <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
-                                    </Button>
-                                }
-                            >
-                                <DropdownItem onClick={onEdit}>
-                                    <EditIcon className="w-4 h-4 mr-2" /> Editar
-                                </DropdownItem>
-                                <DropdownItem onClick={onDuplicate}>
-                                    <CopyIcon className="w-4 h-4 mr-2" /> Duplicar
-                                </DropdownItem>
-                                <DropdownItem
-                                    onClick={onDelete}
-                                    className="text-brand-red focus:text-brand-red focus:bg-red-50 dark:focus:bg-red-900/10"
-                                >
-                                    <TrashIcon className="w-4 h-4 mr-2" /> Excluir
-                                </DropdownItem>
-                            </Dropdown>
+                            <ActionsDropdown
+                                onEdit={onEdit}
+                                onDuplicate={onDuplicate}
+                                onDelete={onDelete}
+                            />
                         </div>
                     </div>
                 </div>
