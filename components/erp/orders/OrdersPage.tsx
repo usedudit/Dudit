@@ -130,8 +130,8 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                 return {
                     originalId: o.id,
                     displayId: o.mp_payment_id || o.order_number || `#${o.id.substring(0, 8)}`,
-                    customer_name: o.customer_name || o.user_profiles?.full_name || "Cliente sem nome",
-                    customer_id: o.customer_id ? `CST-${o.customer_id.substring(0, 4).toUpperCase()}` : null,
+                    customer_name: o.customer_name || "Cliente Balcão",
+                    customer_id: o.buyer_id ? `CST-${o.buyer_id.substring(0, 4).toUpperCase()}` : "-",
                     total_amount: Number(o.total_amount),
                     statusLabel: statusInfo.label,
                     statusColor: statusInfo.color,
