@@ -8,31 +8,13 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
 
 async function generateOrderNumber(supabase: any): Promise<string> {
-    const { data: lastOrder } = await supabase
-        .from("orders")
-        .select("order_number")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single()
-
-    let nextNumber = 1
-    if (lastOrder?.order_number) {
-        const match = lastOrder.order_number.match(/#([A-Z0-9]{3})-/)
-        if (match) {
-            const currentBase36 = match[1]
-            const currentNum = parseInt(currentBase36, 36)
-            nextNumber = currentNum + 1
-        }
-    }
-
-    const firstPart = nextNumber.toString(36).toUpperCase().padStart(3, '0')
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    const chars = '0123456789'
     let secondPart = ''
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
         secondPart += chars.charAt(Math.floor(Math.random() * chars.length))
     }
 
-    return `#${firstPart}-${secondPart}`
+    return `DDT${secondPart}`
 }
 
 export async function createERPOrderAction(data: {
@@ -80,9 +62,8 @@ export async function createERPOrderAction(data: {
     // requirePartnerAccess throws if no access, so we're safe here.
 
     // CSRF check
-    const { requireCSRF, extractCSRFTokenFromObject } = await import("@/lib/security/csrf-action-wrapper")
-    const csrfToken = extractCSRFTokenFromObject(data as Record<string, unknown>)
-    const csrfValidation = await requireCSRF(csrfToken)
+    const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
+    const csrfValidation = await requireCSRF(data.csrf_token)
     if (!csrfValidation.valid) return { error: csrfValidation.error || "Token CSRF inválido" }
 
     // Check limits
@@ -110,7 +91,7 @@ export async function createERPOrderAction(data: {
             order_date: data.orderDate,
             sales_channel: data.salesChannel,
             delivery_type: data.deliveryMethod,
-            situation: data.paymentStatus === 'paid' ? 'paid' : 'pending', // map to current order situation
+            situation: data.paymentStatus === 'paid' ? 'paid' : (data.paymentStatus === 'partially_paid' ? 'partially_paid' : 'pending'),
             delivery_status: data.deliveryStatus,
             total_amount: data.totalAmount,
             discount_value: data.discountValue,
@@ -143,6 +124,7 @@ export async function createERPOrderAction(data: {
         await supabase.from("orders").delete().eq("id", order.id)
         return { error: itemsError.message }
     }
+
 
     // Handle Stock & Counter
     increment_usage_counter(partnerId, "orders_month_count").catch(console.error)

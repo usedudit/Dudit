@@ -28,6 +28,8 @@ import { searchProductsForQuote } from "@/app/actions/erp/quotes"
 import { FadeIn } from "@/components/animations/FadeIn"
 import QuantitySelector from "@/components/reusable/QuantitySelector"
 import { useRouter } from "next/navigation"
+import PaymentModal from "./PaymentModal"
+import { useCSRFToken } from "@/hooks/use-csrf-token"
 
 interface CreateOrderProps {
     onBack: () => void
@@ -38,6 +40,7 @@ export default function CreateOrder({ onBack, partnerId }: CreateOrderProps) {
     const { toast } = useToast()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const router = useRouter()
+    const csrfToken = useCSRFToken()
 
     // --- State ---
     const [activeTab, setActiveTab] = useState("general")
@@ -84,6 +87,8 @@ export default function CreateOrder({ onBack, partnerId }: CreateOrderProps) {
     const [isVariantSheetOpen, setIsVariantSheetOpen] = useState(false)
     const [selectedProductForVariant, setSelectedProductForVariant] = useState<any>(null)
     const [showAlertModal, setShowAlertModal] = useState(false)
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
+    const [wasSaleSuccessful, setWasSaleSuccessful] = useState(false)
 
     // --- Calculations ---
     const subtotal = useMemo(() => {
@@ -220,11 +225,33 @@ export default function CreateOrder({ onBack, partnerId }: CreateOrderProps) {
         setItems(newItems)
     }
 
-    const handleSaveOrder = async () => {
+    const resetForm = () => {
+        setItems([])
+        setSelectedCustomer(null)
+        setOrderDate(new Date().toISOString().split('T')[0])
+        setNotes("")
+        setShippingFee("0")
+        setOtherCosts("0")
+        setDiscountValue(0)
+        setPaymentStatus("unpaid")
+        setDeliveryStatus("not_sent")
+        setActiveTab("general")
+    }
+
+    const handleClosePaymentModal = () => {
+        setIsPaymentModalOpen(false)
+        if (wasSaleSuccessful) {
+            resetForm()
+            setWasSaleSuccessful(false)
+        }
+    }
+
+    const handleConfirmPayment = async (paymentData: any) => {
         if (items.length === 0) {
             notifyError("Adicione pelo menos um item ao pedido.")
-            return
+            return { error: "Sem itens" }
         }
+        
         setIsSaving(true)
         try {
             const result = await createERPOrderAction({
@@ -234,7 +261,7 @@ export default function CreateOrder({ onBack, partnerId }: CreateOrderProps) {
                 orderDate,
                 salesChannel,
                 deliveryMethod,
-                paymentStatus,
+                paymentStatus: paymentData.paymentStatus,
                 deliveryStatus: deliveryStatus as any,
                 address: deliveryMethod === 'delivery' ? {
                     zipCode: cep,
@@ -258,20 +285,32 @@ export default function CreateOrder({ onBack, partnerId }: CreateOrderProps) {
                 shippingCost: parseFloat(shippingFee || "0"),
                 additionalCosts: parseFloat(otherCosts || "0"),
                 totalAmount,
-                notes
+                notes,
+                csrf_token: csrfToken || undefined
             })
 
             if (result.success) {
-                notifySuccess("Pedido criado com sucesso!")
-                onBack()
+                notifySuccess(`Pedido ${result.orderNumber} criado com sucesso!`)
+                setWasSaleSuccessful(true)
+                return { success: true, orderNumber: result.orderNumber }
             } else {
                 notifyError(result.error || "Erro ao criar pedido")
+                return { error: result.error }
             }
         } catch (error) {
             notifyError("Erro ao processar pedido")
+            return { error: "Erro de processamento" }
         } finally {
             setIsSaving(false)
         }
+    }
+
+    const handleSaveOrder = async () => {
+        if (items.length === 0) {
+            notifyError("Adicione pelo menos um item ao pedido.")
+            return
+        }
+        setIsPaymentModalOpen(true)
     }
 
     const salesChannelOptions = [
@@ -762,49 +801,80 @@ export default function CreateOrder({ onBack, partnerId }: CreateOrderProps) {
 
                     <TabsContent value="delivery" className="mt-0">
                         <FadeIn>
-                            <div className="max-w-[800px] space-y-10">
-                                <section>
-                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Endereço de Entrega</h3>
-                                    <div className="space-y-4">
-                                        <CepInput
-                                            label="CEP"
-                                            placeholder="00000-000"
-                                            value={cep}
-                                            onChange={setCep}
-                                            name="cep"
-                                            onAddressFetched={(data) => {
-                                                setStreet(data.street)
-                                                setNeighborhood(data.neighborhood)
-                                                setCity(data.city)
-                                                setUf(data.state || "SP")
-                                            }}
-                                        />
-                                        <Input label="Logradouro" placeholder="Rua, Avenida, etc." value={street} onChange={(e: any) => setStreet(e.target.value)} />
-
-                                        <div className="grid grid-cols-2 gap-3 flex-row items-center pt-1.5 pb-1.5">
-                                            <NumberInputWithCheckbox
-                                                label="Número"
-                                                value={number}
-                                                number={number}
-                                                noNumber={noNumber}
-                                                onNumberChange={(e: any) => setNumber(e.target.value)}
-                                                onNoNumberChange={checked => { setNoNumber(checked); if (checked) setNumber(""); }}
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                                <div className="lg:col-span-8 flex flex-col gap-8">
+                                    <section>
+                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Endereço de Entrega</h3>
+                                        <div className="space-y-4">
+                                            <CepInput
+                                                label="CEP"
+                                                placeholder="00000-000"
+                                                value={cep}
+                                                onChange={setCep}
+                                                name="cep"
+                                                onAddressFetched={(data) => {
+                                                    setStreet(data.street)
+                                                    setNeighborhood(data.neighborhood)
+                                                    setCity(data.city)
+                                                    setUf(data.state || "SP")
+                                                }}
                                             />
-                                            <Input label="Complemento" placeholder="Apto, Bloco, etc." value={complement} onChange={(e: any) => setComplement(e.target.value)} />
+                                            <Input label="Logradouro" placeholder="Rua, Avenida, etc." value={street} onChange={(e: any) => setStreet(e.target.value)} />
+
+                                            <div className="grid grid-cols-2 gap-3 flex-row items-center pt-1.5 pb-1.5">
+                                                <NumberInputWithCheckbox
+                                                    label="Número"
+                                                    value={number}
+                                                    number={number}
+                                                    noNumber={noNumber}
+                                                    onNumberChange={(e: any) => setNumber(e.target.value)}
+                                                    onNoNumberChange={checked => { setNoNumber(checked); if (checked) setNumber(""); }}
+                                                />
+                                                <Input label="Complemento" placeholder="Apto, Bloco, etc." value={complement} onChange={(e: any) => setComplement(e.target.value)} />
+                                            </div>
+                                            <Input label="Bairro" placeholder="Nome do bairro" value={neighborhood} onChange={(e: any) => setNeighborhood(e.target.value)} />
+
+                                            <div className="grid grid-cols-2 gap-3 items-end">
+                                                <Input label="Cidade" placeholder="Nome da cidade" value={city} onChange={(e: any) => setCity(e.target.value)} />
+                                                <StateComboBox
+                                                    label="Estado"
+                                                    value={uf}
+                                                    onChange={setUf}
+                                                    className="w-full"
+                                                />
+                                            </div>
                                         </div>
-                                        <Input label="Bairro" placeholder="Nome do bairro" value={neighborhood} onChange={(e: any) => setNeighborhood(e.target.value)} />
+                                    </section>
+                                    <div className="h-px bg-brand-border dark:bg-dark-border w-full my-4" />
+                                </div>
 
-                                        <div className="grid grid-cols-2 gap-3 items-end">
-                                            <Input label="Cidade" placeholder="Nome da cidade" value={city} onChange={(e: any) => setCity(e.target.value)} />
-                                            <StateComboBox
-                                                label="Estado"
-                                                value={uf}
-                                                onChange={setUf}
-                                                className="w-full"
-                                            />
+                                <div className="lg:col-span-4 flex flex-col gap-8">
+                                    <div className="bg-white dark:bg-dark-surface p-0 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden flex flex-col">
+                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
+                                        <div className="p-4 flex items-center justify-between border-b border-brand-border dark:border-dark-border mt-1 border-opacity-60">
+                                            <h3 className="font-bold text-brand-dark dark:text-dark-heading">Endereço Principal</h3>
+                                        </div>
+                                        <div className="p-4 flex flex-col">
+                                            <div className="w-full h-[120px] bg-gray-200 dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group" onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${street}, ${number}, ${neighborhood}, ${city} - ${uf}, ${cep}`)}`, '_blank')}>
+                                                <img alt="Satelite Map" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" onError={(e) => { e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" fill="rgb(229,231,235)"><rect width="100%" height="100%"/></svg>' }} />
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                    <div className="w-5 h-5 rounded-full border-[3px] border-white bg-orange-500 shadow-sm relative z-10 transition-transform group-hover:scale-110"></div>
+                                                    <div className="w-12 h-12 bg-white/30 rounded-full absolute mix-blend-overlay animate-pulse"></div>
+                                                </div>
+                                                <div className="absolute top-1.5 right-1.5 bg-white/95 px-1.5 py-0.5 rounded text-[9px] text-gray-500 font-medium">Map data ©2024</div>
+                                            </div>
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex flex-col flex-1 truncate pr-4">
+                                                    <h4 className="font-bold text-brand-dark dark:text-dark-heading text-[15px] mb-1.5 truncate">{selectedCustomer?.name || "Nome do Cliente"}</h4>
+                                                    <p className="text-brand-inactive-text text-[13px] leading-snug truncate">{street ? `${street}, ${noNumber ? 'S/N' : number}` : 'Logradouro não informado'}</p>
+                                                    <p className="text-brand-inactive-text text-[13px] leading-snug truncate mt-0.5">{neighborhood ? `${neighborhood}, ${city} - ${uf}` : 'Bairro/Cidade não informados'}</p>
+                                                    <p className="text-brand-inactive-text text-[13px] leading-snug mt-0.5">{cep || 'CEP não informado'}</p>
+                                                </div>
+                                                <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${street}, ${noNumber ? 'S/N' : number}, ${neighborhood}, ${city} - ${uf}, ${cep}`)}`} target="_blank" rel="noopener noreferrer" className="text-[13px] font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark/20 dark:decoration-dark-heading/20 hover:decoration-brand-dark whitespace-nowrap pt-1">Ver no mapa</a>
+                                            </div>
                                         </div>
                                     </div>
-                                </section>
+                                </div>
                             </div>
                         </FadeIn>
                     </TabsContent>
@@ -860,6 +930,18 @@ export default function CreateOrder({ onBack, partnerId }: CreateOrderProps) {
                 confirmText="Sair sem salvar"
                 variant="danger"
             />
+            <AnimatePresence>
+                {isPaymentModalOpen && (
+                    <PaymentModal 
+                        isOpen={isPaymentModalOpen}
+                        onClose={handleClosePaymentModal}
+                        cart={items}
+                        customer={selectedCustomer}
+                        partnerId={partnerId}
+                        onConfirm={handleConfirmPayment}
+                    />
+                )}
+            </AnimatePresence>
         </Tabs>
     )
 }
