@@ -21,7 +21,8 @@ import NewCustomerPage from "./NewCustomerPage"
 import {
     PlusIcon,
     ExportFileIcon,
-    Users
+    Users,
+    ArrowUpDownIcon
 } from "@/lib/icons"
 
 // --- TYPES & INTERFACES ---
@@ -36,6 +37,7 @@ interface Customer {
     avgOrderValue: number;
     status: string;
     lastOrderDate: string;
+    rawLastOrderDate: number;
     storeCredit?: number;
 }
 
@@ -46,6 +48,9 @@ interface FilterState {
 const INITIAL_FILTERS: FilterState = {
     status: [],
 }
+
+type SortKey = 'name' | 'orders' | 'total_spent' | 'store_credit' | 'status' | 'last_order';
+type SortDirection = 'asc' | 'desc';
 
 // --- CONFIGURAÇÃO DE COLUNAS ---
 const COLUMNS = [
@@ -76,6 +81,7 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
         pageState: "list",
         selectedId: null
     })
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
 
     const { customers: rawCustomers, isLoading: customersLoading } = useStoreData(partnerId, { includeCustomers: true })
     const isLoading = (storeLoading || customersLoading) && rawCustomers === undefined
@@ -113,7 +119,7 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
 
         const term = debouncedSearch.toLowerCase()
 
-        return rawCustomers
+        const filtered = rawCustomers
             .filter((c: any) => {
                 const nameMatch = (c.name || "").toLowerCase().includes(term)
                 const emailMatch = (c.email || "").toLowerCase().includes(term)
@@ -143,9 +149,56 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
                 avgOrderValue: 0.00,
                 status: c.status || (c.is_active !== false ? 'Active' : 'Inactive'),
                 lastOrderDate: c.last_order_at ? new Date(c.last_order_at).toLocaleDateString('pt-BR') : 'N/A',
+                rawLastOrderDate: c.last_order_at ? new Date(c.last_order_at).getTime() : 0,
                 storeCredit: c.store_credit || 0
             }))
-    }, [rawCustomers, debouncedSearch, activeTab, filters])
+
+        const result = [...filtered]
+
+        if (sortConfig) {
+            const { key, direction } = sortConfig;
+            result.sort((a, b) => {
+                let aVal: any;
+                let bVal: any;
+
+                switch (key) {
+                    case 'name':
+                        aVal = a.name;
+                        bVal = b.name;
+                        break;
+                    case 'orders':
+                        aVal = a.orders;
+                        bVal = b.orders;
+                        break;
+                    case 'total_spent':
+                        aVal = a.totalOrderValue;
+                        bVal = b.totalOrderValue;
+                        break;
+                    case 'store_credit':
+                        aVal = a.storeCredit;
+                        bVal = b.storeCredit;
+                        break;
+                    case 'status':
+                        aVal = a.status;
+                        bVal = b.status;
+                        break;
+                    case 'last_order':
+                        aVal = a.rawLastOrderDate;
+                        bVal = b.rawLastOrderDate;
+                        break;
+                    default:
+                        aVal = (a as any)[key];
+                        bVal = (b as any)[key];
+                }
+
+                if (aVal === bVal) return 0;
+                const comparison = aVal < bVal ? -1 : 1;
+                return direction === 'asc' ? comparison : -comparison;
+            });
+        }
+
+        return result;
+    }, [rawCustomers, debouncedSearch, activeTab, filters, sortConfig])
 
     const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage)
     const paginated = filteredCustomers.slice((page - 1) * itemsPerPage, page * itemsPerPage)
@@ -338,17 +391,35 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
                                                                 />
                                                             </div>
                                                         </th>
-                                                        {COLUMNS.map((col, idx) => (
-                                                            <th
-                                                                key={col.id}
-                                                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""}`}
-                                                                style={{ width: col.width }}
-                                                            >
-                                                                <div className={`flex items-center gap-1 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
-                                                                    {col.label}
-                                                                </div>
-                                                            </th>
-                                                        ))}
+                                                        {COLUMNS.map((col, idx) => {
+                                                            const isSortable = col.id !== "actions";
+                                                            const isSorted = sortConfig?.key === col.id;
+                                                            return (
+                                                                <th
+                                                                    key={col.id}
+                                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""}`}
+                                                                    style={{ width: col.width }}
+                                                                    onClick={() => {
+                                                                        if (!isSortable) return;
+                                                                        setSortConfig(prev => ({
+                                                                            key: col.id as SortKey,
+                                                                            direction: prev?.key === col.id && prev.direction === 'asc' ? 'desc' : 'asc'
+                                                                        }));
+                                                                    }}
+                                                                >
+                                                                    <div className={`flex items-center gap-1.5 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
+                                                                        {col.label}
+                                                                        {isSortable && (
+                                                                            <ArrowUpDownIcon
+                                                                                size={14}
+                                                                                className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100' : 'text-brand-inactive-text opacity-0 group-hover:opacity-40'
+                                                                                    } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
+                                                                            />
+                                                                        )}
+                                                                    </div>
+                                                                </th>
+                                                            );
+                                                        })}
                                                     </tr>
                                                 </thead>
                                                 <tbody>

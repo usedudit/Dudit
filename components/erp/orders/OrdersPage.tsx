@@ -13,6 +13,8 @@ import Pagination from "@/components/reusable/Pagination"
 import OrderListItem from "./OrderListItem"
 import OrderGridCard from "./OrderGridCard"
 import OrderPageControls from "./OrderPageControls"
+import CreateOrder from "./CreateOrder"
+
 
 // Icons
 import {
@@ -75,6 +77,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
     const [modals, setModals] = useState({ filter: false })
     const [selection, setSelection] = useState({ ids: new Set<string>() })
+    const [wrapperMode, setWrapperMode] = useState<'create' | 'edit' | 'view' | null>(null)
 
     const isLoading = storeLoading && rawOrders === undefined
     const itemsPerPage = 12
@@ -171,7 +174,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
 
     // Handlers
     const handleAddOrder = () => {
-        toast({ title: "Informação", description: "Criação manual de pedidos em breve." })
+        setWrapperMode('create')
     }
     const handleEditOrder = (order: Order) => {
         router.push(`/erp/orders/${order.originalId}`)
@@ -191,6 +194,29 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
         setSearch("")
         setFilters(INITIAL_FILTERS)
         setActiveTab("Todos")
+    }
+
+    if (wrapperMode === 'create') {
+        return (
+            <AnimatePresence mode="wait">
+                <motion.div
+                    key="create-order"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                    className="fixed inset-0 z-[60] bg-white dark:bg-dark-background"
+                >
+                    <CreateOrder 
+                        partnerId={partnerId} 
+                        onBack={() => {
+                            setWrapperMode(null)
+                            router.refresh()
+                        }} 
+                    />
+                </motion.div>
+            </AnimatePresence>
+        )
     }
 
     return (

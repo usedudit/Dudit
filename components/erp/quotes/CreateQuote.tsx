@@ -7,7 +7,7 @@ import { FadeIn } from '@/components/animations/FadeIn';
 import { ChevronLeftIcon, SaveIcon } from '@/lib/icons';
 import QuoteEditor from './QuoteEditor';
 import QuotePreview from './QuotePreview';
-import SelectCustomerSheet from './SelectCustomerSheet';
+import SelectCustomerSheet from '../clientes/SelectCustomerSheet';
 import SelectVariantSheet from './SelectVariantSheet';
 import { useNotification } from '@/hooks/use-notification';
 import { useStore } from '@/lib/store-context';
@@ -458,21 +458,21 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                         <div className="flex flex-col lg:flex-row w-full h-full">
 
                             {/* LEFT SIDE - EDITOR */}
-                            <div 
+                            <div
                                 className="w-full lg:w-1/2 flex flex-col border-r-0 lg:border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background overflow-y-auto no-scrollbar"
-                                ref={scrollContainerRef} 
+                                ref={scrollContainerRef}
                                 onScroll={handleScroll}
                             >
                                 {/* Sticky Header inside Left Side */}
                                 <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 ease-in-out">
                                     <div className="px-4 md:px-6 pt-4 md:pt-6">
-                                        
+
                                         <div className="flex items-start justify-between">
                                             <div className="flex items-center gap-4 min-w-0">
                                                 {/* Back button */}
-                                                <Button 
-                                                    variant="outline" 
-                                                    onClick={handleBackWithSafety} 
+                                                <Button
+                                                    variant="filled"
+                                                    onClick={handleBackWithSafety}
                                                     className={`flex-shrink-0 flex items-center justify-center transition-all duration-300 ${isScrolled ? "w-8 h-8" : "w-10 h-10"}`}
                                                 >
                                                     <ChevronLeftIcon className={`${isScrolled ? "w-4 h-4" : "w-5 h-5"} text-brand-inactive-text dark:text-dark-body`} />
@@ -638,8 +638,9 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     onConfirm={confirmNavigation}
                     title="Descartar Alterações"
                     description="Você tem alterações não salvas. Deseja realmente sair sem salvar?"
-                    confirmText="Sim, Descartar"
-                    cancelText="Continuar Editando"
+                    confirmText="Descartar"
+                    cancelText="Cancelar"
+                    variant="warning"
                 />
 
                 <AlertModal
@@ -648,8 +649,9 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     onConfirm={handleUnsavedChangesConfirm}
                     title="Descartar Alterações"
                     description="Você tem alterações não salvas. Deseja realmente sair sem salvar?"
-                    confirmText="Sim, Descartar"
-                    cancelText="Continuar Editando"
+                    confirmText="Descartar"
+                    cancelText="Cancelar"
+                    variant="warning"
                 />
             </div>
         </FadeIn>

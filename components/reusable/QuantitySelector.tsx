@@ -1,5 +1,5 @@
 import React from 'react';
-import { PlusIcon, Minus } from "@/lib/icons"
+import { PlusIcon, MinusIcon } from "@/lib/icons"
 
 interface QuantitySelectorProps {
   value: number;
@@ -45,7 +45,7 @@ export const QuantitySelector: React.FC<QuantitySelectorProps> = ({
         disabled={value <= min}
         className={`h-full w-9 flex items-center justify-center text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading hover:bg-brand-gray dark:hover:bg-gray-800 transition-colors rounded-l-lg border-r border-brand-border dark:border-dark-border disabled:opacity-30`}
       >
-        <Minus size={iconSize} />
+        <MinusIcon size={iconSize} />
       </button>
       <div className={`flex-1 flex items-center justify-center font-bold text-brand-dark dark:text-dark-heading ${fontSize}`}>
         {value}

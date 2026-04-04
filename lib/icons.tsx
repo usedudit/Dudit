@@ -89,7 +89,8 @@ import {
   TextItalicIcon,
   Link02Icon,
   PrinterIcon as Printer,
-  TextUnderlineIcon
+  TextUnderlineIcon,
+  MinusSignIcon
 } from "@hugeicons/core-free-icons"
 
 interface IconProps {
@@ -252,7 +253,7 @@ export const ListIcon = createIcon(ParagraphBulletsPoint01Icon)
 
 export const Square = createIcon(MenuSquare01)
 export const Circle = createIcon(MenuSquare01)
-export const Minus = createIcon(MenuSquare01)
+export const MinusIcon = createIcon(MinusSignIcon)
 
 export const MoreHorizontal = createIcon(MoreVerticalCircle01Icon)
 export const MoreHorizontalIcon = createIcon(MoreVerticalCircle01Icon)

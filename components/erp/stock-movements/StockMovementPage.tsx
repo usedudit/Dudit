@@ -241,7 +241,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
     const columns = [
         { id: "product", label: "Produto", align: "left" as const },
         { id: "quantity", label: "Quantidade", align: "right" as const, width: "120px" },
-        { id: "currentStock", label: "Estoque Final", align: "right" as const, width: "120px" },
+        { id: "currentStock", label: "Estoque Final", align: "right" as const, width: "160px" },
         { id: "reason", label: "Motivo", align: "left" as const },
         { id: "reference", label: "Referência", align: "left" as const },
         { id: "date", label: "Data", align: "left" as const, width: "160px" },

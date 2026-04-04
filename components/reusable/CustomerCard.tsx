@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import { Button } from "./Button";
+import { TrashIcon } from "@/lib/icons";
 
 interface CustomerCardProps {
     customer?: {
@@ -17,9 +19,10 @@ interface CustomerCardProps {
     } | null;
     showMap?: boolean;
     className?: string;
+    onRemove?: () => void;
 }
 
-const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, showMap = true, className = "" }) => {
+const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, showMap = true, className = "", onRemove }) => {
     const hasAddress = !!address?.street || !!address?.city;
     const hasContact = !!customer?.email || !!customer?.phone;
 
@@ -46,6 +49,20 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, showMap 
                             <span className="text-xs text-brand-inactive-text dark:text-dark-body">Cliente Ativo</span>
                         </div>
                     </div>
+
+                    {onRemove && (
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="w-8 h-8 text-brand-red hover:bg-red-50 rounded-full" 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onRemove();
+                            }}
+                        >
+                            <TrashIcon size={14} />
+                        </Button>
+                    )}
                 </div>
             </div>
             

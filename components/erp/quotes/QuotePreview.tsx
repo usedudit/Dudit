@@ -13,7 +13,7 @@ interface QuotePreviewProps {
     otherCosts: number;
     discountValue: number;
     total: number;
-    note?: string; 
+    note?: string;
     primaryColor?: string;
     secondaryColor?: string;
     quoteTitle?: string;
@@ -46,9 +46,9 @@ const QuotePreview = ({
 
     // Advanced Pagination Logic
     const pages = useMemo(() => {
-        const ROW_HEIGHT = 85; 
-        const TOTALS_SECTION_HEIGHT = 180; 
-        const NOTE_HEIGHT = note ? 40 : 0; 
+        const ROW_HEIGHT = 85;
+        const TOTALS_SECTION_HEIGHT = 180;
+        const NOTE_HEIGHT = note ? 40 : 0;
 
         const P1_FIXED_CONTENT_HEIGHT = 570;
         const P1_TOTAL_AVAILABLE_HEIGHT = 1050;
@@ -200,48 +200,34 @@ const QuotePreview = ({
                                 <div className="px-8 pb-4">
                                     <table className="w-full text-left border-separate border-spacing-0">
                                         <thead>
-                                            <tr className="bg-brand-gray">
-                                                <th className="py-3 pl-4 pr-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider rounded-l-lg">Produto</th>
-                                                <th className="py-3 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider w-32">Preço Unit.</th>
-                                                <th className="py-3 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center w-24">Qtd.</th>
-                                                <th className="py-3 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right w-28 rounded-r-lg">Total</th>
+                                            <tr className="bg-brand-gray/40">
+                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">Item</th>
+                                                <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-center w-24 border-b border-gray-100">Qtd</th>
+                                                <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-28 border-b border-gray-100">Preço</th>
+                                                <th className="py-2.5 pl-4 pr-6 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-32 rounded-tr-xl border-b border-gray-100">Total</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {page.items.map((item, idx) => (
                                                 <tr key={idx} className="bg-white">
-                                                    <td className="py-4 pl-4 pr-4 border-b border-gray-100">
-                                                        <div className="flex items-center gap-3 text-left">
-                                                            <div className="w-10 h-10 rounded-full bg-brand-gray border border-gray-100 flex-shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-bold text-gray-400">
-                                                                {item.image && item.image.length > 5 ? (
-                                                                    <img src={item.image} className="w-full h-full object-cover mix-blend-multiply" alt={item.name} />
-                                                                ) : (
-                                                                    <span className="uppercase text-lg">{item.name?.charAt(0) || 'P'}</span>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex flex-col min-w-0">
-                                                                <span className="font-bold text-[13px] text-black truncate max-w-[200px]">
-                                                                    {item.name || 'Produto sem nome'}
-                                                                </span>
-                                                                <span className="text-[11px] font-medium text-gray-400 truncate">
-                                                                    {item.sku || 'Sem SKU'}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="py-4 px-4 border-b border-gray-100">
-                                                        <span className="text-[13px] font-medium text-gray-600">
-                                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}
+                                                    <td className="py-4 pl-6 pr-4 border-b border-gray-50">
+                                                        <span className="font-bold text-[13px] text-black block truncate max-w-[250px]">
+                                                            {item.name || 'Produto sem nome'}
                                                         </span>
                                                     </td>
-                                                    <td className="py-4 px-4 border-b border-gray-100 text-center">
+                                                    <td className="py-4 px-4 border-b border-gray-50 text-center">
                                                         <span className="text-[13px] font-medium text-gray-600">
                                                             {item.qty}
                                                         </span>
                                                     </td>
-                                                    <td className="py-4 px-4 border-b border-gray-100 text-right">
+                                                    <td className="py-4 px-4 border-b border-gray-50 text-right">
+                                                        <span className="text-[13px] font-medium text-gray-600">
+                                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price).replace('R$', '$')}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-4 pl-4 pr-6 border-b border-gray-50 text-right">
                                                         <span className="text-[13px] font-bold text-black">
-                                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price * item.qty)}
+                                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price * item.qty).replace('R$', '$')}
                                                         </span>
                                                     </td>
                                                 </tr>
@@ -280,7 +266,7 @@ const QuotePreview = ({
                                                 {discountValue > 0 && (
                                                     <div className="flex justify-between items-center text-xs mb-2">
                                                         <span className="text-gray-500 font-medium">Desconto</span>
-                                                        <span className="font-bold text-red-500">
+                                                        <span className="font-bold text-brand-red">
                                                             -{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(discountValue)}
                                                         </span>
                                                     </div>

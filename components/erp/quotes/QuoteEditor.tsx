@@ -9,7 +9,8 @@ import {
     CheckIcon,
     AlertCircleIcon,
     ClockIcon,
-    CheckCircleIcon
+    CheckCircleIcon,
+    EditIcon
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import QuantitySelector from '@/components/reusable/QuantitySelector';
@@ -22,7 +23,7 @@ interface QuoteEditorProps {
     isProductSearchOpen: boolean;
     setIsProductSearchOpen: (val: boolean) => void;
     filteredProducts: any[];
-    isSearching: boolean; 
+    isSearching: boolean;
     handleProductClick: (product: any) => void;
     addBlankItem: () => void;
     quoteItems: any[];
@@ -165,10 +166,20 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                             <span className="text-xs font-bold text-brand-inactive-text">P</span>
                                                         )}
                                                     </div>
-                                                    <div className="flex flex-col text-left">
-                                                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[250px]">
-                                                            {item.name || 'Produto sem nome'}
-                                                        </span>
+                                                    <div className="flex flex-col text-left flex-1 min-w-0">
+                                                        {item.isEditing ? (
+                                                            <input
+                                                                type="text"
+                                                                value={item.name}
+                                                                onChange={(e) => props.updateItemField(index, 'name', e.target.value)}
+                                                                placeholder="Nome do produto..."
+                                                                className="w-full h-8 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[13px] focus:ring-1 focus:ring-brand-primary outline-none transition-all mb-1"
+                                                            />
+                                                        ) : (
+                                                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[250px]">
+                                                                {item.name || 'Produto sem nome'}
+                                                            </span>
+                                                        )}
                                                         <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
                                                             {item.sku || 'Sem SKU'}
                                                         </span>
@@ -198,12 +209,30 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                             </td>
                                             {!props.isReadOnly && (
                                                 <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                    <div className="flex justify-center">
-                                                        <button 
-                                                            onClick={() => props.removeItem(index)} 
-                                                            className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
+                                                    <div className="flex justify-center gap-2">
+                                                        {item.isEditing ? (
+                                                            <button
+                                                                onClick={() => props.toggleItemEdit(index, false)}
+                                                                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-green-50 dark:hover:bg-green-900/10 text-green-600 transition-colors"
+                                                                title="Salvar nome"
+                                                            >
+                                                                <CheckIcon size={18} />
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => props.toggleItemEdit(index, true)}
+                                                                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark transition-colors"
+                                                                title="Editar nome"
+                                                            >
+                                                                <EditIcon size={18} />
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={() => props.removeItem(index)}
+                                                            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
+                                                            title="Remover item"
                                                         >
-                                                            <TrashIcon size={16} />
+                                                            <TrashIcon size={18} />
                                                         </button>
                                                     </div>
                                                 </td>
@@ -230,9 +259,19 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                     {/* Middle: Content */}
                                     <div className="flex-1 min-w-0">
                                         <div className="flex justify-between items-start mb-0.5">
-                                            <h4 className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate pr-2">
-                                                {item.name || 'Produto sem nome'}
-                                            </h4>
+                                            {item.isEditing ? (
+                                                <input
+                                                    type="text"
+                                                    value={item.name}
+                                                    onChange={(e) => props.updateItemField(index, 'name', e.target.value)}
+                                                    placeholder="Nome do produto..."
+                                                    className="flex-1 h-8 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[13px] focus:ring-1 focus:ring-brand-primary outline-none transition-all mr-2"
+                                                />
+                                            ) : (
+                                                <h4 className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate pr-2">
+                                                    {item.name || 'Produto sem nome'}
+                                                </h4>
+                                            )}
                                             <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading flex-shrink-0">
                                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price * item.qty)}
                                             </span>
@@ -242,15 +281,32 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                 {item.sku || 'Sem SKU'} • {item.qty} un • {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}
                                             </p>
                                             {!props.isReadOnly && (
-                                                <button 
-                                                    onClick={() => props.removeItem(index)} 
-                                                    className="w-8 h-8 flex items-center justify-center text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors"
-                                                >
-                                                    <TrashIcon size={14} />
-                                                </button>
+                                                <div className="flex items-center gap-1">
+                                                    {item.isEditing ? (
+                                                        <button
+                                                            onClick={() => props.toggleItemEdit(index, false)}
+                                                            className="w-8 h-8 flex items-center justify-center text-green-600 hover:bg-green-50 dark:hover:bg-green-900/10 rounded-lg transition-colors"
+                                                        >
+                                                            <CheckIcon size={16} />
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => props.toggleItemEdit(index, true)}
+                                                            className="w-8 h-8 flex items-center justify-center text-brand-inactive-text hover:text-brand-dark hover:bg-brand-gray dark:hover:bg-dark-border rounded-lg transition-colors"
+                                                        >
+                                                            <EditIcon size={16} />
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => props.removeItem(index)}
+                                                        className="w-8 h-8 flex items-center justify-center text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full transition-colors"
+                                                    >
+                                                        <TrashIcon size={14} />
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
-                                        
+
                                         {!props.isReadOnly && (
                                             <div className="flex items-center gap-4 mt-2">
                                                 <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} size="sm" />
@@ -410,7 +466,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 onChange={(val) => props.setShippingFee(val.toString())}
                                 disabled={props.isReadOnly}
                             />
-                            
+
                             <FormCurrencyInput
                                 label="Outros Custos"
                                 value={Number(props.otherCosts) || 0}

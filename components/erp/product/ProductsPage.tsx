@@ -781,33 +781,37 @@ export default function ProductsPage({
                                                                 />
                                                             </th>
                                                             {FIXED_COLUMNS.map((col, idx) => {
-                                                                const isLast = idx === FIXED_COLUMNS.length - 1
+                                                                const isSortable = col.id !== "actions";
+                                                                const isSorted = ui.sort?.key === col.id;
+                                                                const isLast = idx === FIXED_COLUMNS.length - 1;
+
                                                                 return (
                                                                     <th
                                                                         key={col.id}
-                                                                        className={`py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body relative bg-brand-gray dark:bg-dark-border/50 ${isLast ? "rounded-r-lg" : ""}`}
+                                                                        className={`py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isLast ? "rounded-r-lg" : ""}`}
                                                                         style={{ width: col.width, minWidth: col.minWidth }}
+                                                                        onClick={() => {
+                                                                            if (!isSortable) return;
+                                                                            setUi((p) => ({
+                                                                                ...p,
+                                                                                sort: p.sort?.key === col.id && p.sort.direction === "asc"
+                                                                                    ? { key: col.id, direction: "desc" }
+                                                                                    : { key: col.id, direction: "asc" },
+                                                                            }));
+                                                                        }}
                                                                     >
-                                                                        <div
-                                                                            className={`flex items-center gap-1 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}
-                                                                            onClick={() =>
-                                                                                col.id !== "actions" &&
-                                                                                setUi((p) => ({
-                                                                                    ...p,
-                                                                                    sort:
-                                                                                        p.sort?.key === col.id && p.sort.direction === "asc"
-                                                                                            ? { key: col.id, direction: "desc" }
-                                                                                            : { key: col.id, direction: "asc" },
-                                                                                }))
-                                                                            }
-                                                                        >
+                                                                        <div className={`flex items-center gap-1.5 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
                                                                             {col.label}
-                                                                            {col.id !== "actions" && (
-                                                                                <ArrowUpDownIcon className="w-3 h-3 text-gray-400 group-hover:text-gray-600 dark:text-dark-body" />
+                                                                            {isSortable && (
+                                                                                <ArrowUpDownIcon
+                                                                                    size={14}
+                                                                                    className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100' : 'text-brand-inactive-text opacity-0 group-hover:opacity-40'
+                                                                                        } ${isSorted && ui.sort?.direction === 'desc' ? 'rotate-180' : ''}`}
+                                                                                />
                                                                             )}
                                                                         </div>
                                                                     </th>
-                                                                )
+                                                                );
                                                             })}
                                                         </tr>
                                                     </thead>

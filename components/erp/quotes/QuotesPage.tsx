@@ -25,6 +25,7 @@ import { useNotification } from "@/hooks/use-notification"
 import {
     PlusIcon,
     ExportFileIcon,
+    ArrowUpDownIcon
 } from "@/lib/icons"
 import { useRouter } from "next/navigation"
 
@@ -56,6 +57,9 @@ const INITIAL_FILTERS: FilterState = {
     period: [],
     expiration: []
 }
+
+type SortKey = 'quote_id' | 'customer' | 'issue_date' | 'expiration_date' | 'total' | 'status';
+type SortDirection = 'asc' | 'desc';
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
     { id: "quote_id", label: "Cód. Orçamento", align: "left", width: "150px" },
@@ -94,6 +98,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
     const [selection, setSelection] = useState({ ids: new Set<string>() })
     const [isDeleting, setIsDeleting] = useState(false)
     const [quoteToDelete, setQuoteToDelete] = useState<any>(null)
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
 
     const isLoading = storeLoading && rawQuotes === undefined
     const itemsPerPage = 12
@@ -131,7 +136,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
 
         const term = debouncedSearch.toLowerCase()
 
-        return currentQuotes
+        const filtered = currentQuotes
             .map((q: any): Quote => {
                 const statusMap: Record<string, { label: string; color: string }> = {
                     draft: { label: "Rascunho", color: "gray" },
@@ -194,8 +199,56 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
 
                 return tabMatch && statusFilterMatch && periodFilterMatch
             })
-            .sort((a, b) => b.created_at_time - a.created_at_time)
-    }, [rawQuotes, debouncedSearch, activeTab, filters])
+
+        const result = [...filtered]
+
+        if (sortConfig) {
+            const { key, direction } = sortConfig;
+            result.sort((a: any, b: any) => {
+                let aVal: any;
+                let bVal: any;
+
+                switch (key) {
+                    case 'quote_id':
+                        aVal = a.displayId;
+                        bVal = b.displayId;
+                        break;
+                    case 'customer':
+                        aVal = a.customer_name;
+                        bVal = b.customer_name;
+                        break;
+                    case 'issue_date':
+                        aVal = a.created_at_time;
+                        bVal = b.created_at_time;
+                        break;
+                    case 'expiration_date':
+                        aVal = a.formattedExpirationDate || "";
+                        bVal = b.formattedExpirationDate || "";
+                        break;
+                    case 'total':
+                        aVal = a.total_amount;
+                        bVal = b.total_amount;
+                        break;
+                    case 'status':
+                        aVal = a.statusLabel;
+                        bVal = b.statusLabel;
+                        break;
+                    default:
+                        aVal = a[key as keyof Quote];
+                        bVal = b[key as keyof Quote];
+                }
+
+                if (aVal === bVal) return 0;
+                const comparison = aVal < bVal ? -1 : 1;
+                return direction === 'asc' ? comparison : -comparison;
+            });
+        } else {
+            // Default sort
+            result.sort((a: any, b: any) => b.created_at_time - a.created_at_time)
+        }
+
+        return result;
+    }, [rawQuotes, debouncedSearch, activeTab, filters, sortConfig])
 
     const isServerPaginated = (totalQuotes !== undefined)
     const totalPages = isServerPaginated ? Math.ceil(totalQuotes / limit) : Math.ceil(filteredQuotes.length / itemsPerPage)
@@ -480,17 +533,35 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                                                                 />
                                                             </div>
                                                         </th>
-                                                        {COLUMNS.map((col, idx) => (
-                                                            <th
-                                                                key={col.id}
-                                                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""}`}
-                                                                style={{ width: col.width }}
-                                                            >
-                                                                <div className={`flex items-center gap-1 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
-                                                                    {col.label}
-                                                                </div>
-                                                            </th>
-                                                        ))}
+                                                        {COLUMNS.map((col, idx) => {
+                                                            const isSortable = col.id !== "actions";
+                                                            const isSorted = sortConfig?.key === col.id;
+                                                            return (
+                                                                <th
+                                                                    key={col.id}
+                                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""}`}
+                                                                    style={{ width: col.width }}
+                                                                    onClick={() => {
+                                                                        if (!isSortable) return;
+                                                                        setSortConfig(prev => ({
+                                                                            key: col.id as SortKey,
+                                                                            direction: prev?.key === col.id && prev.direction === 'asc' ? 'desc' : 'asc'
+                                                                        }));
+                                                                    }}
+                                                                >
+                                                                    <div className={`flex items-center gap-1.5 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
+                                                                        {col.label}
+                                                                        {isSortable && (
+                                                                            <ArrowUpDownIcon
+                                                                                size={14}
+                                                                                className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100' : 'text-brand-inactive-text opacity-0 group-hover:opacity-40'
+                                                                                    } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
+                                                                            />
+                                                                        )}
+                                                                    </div>
+                                                                </th>
+                                                            );
+                                                        })}
                                                     </tr>
                                                 </thead>
                                                 <tbody>
