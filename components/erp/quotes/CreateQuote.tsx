@@ -1,10 +1,10 @@
 "use client"
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Tabs, Button, AlertModal } from '@/components/reusable';
+import { Tabs, TabsList, TabsTrigger, Badge, Button, AlertModal } from '@/components/reusable';
 import { FadeIn } from '@/components/animations/FadeIn';
-import QuoteHeader from './QuoteHeader';
+import { ChevronLeftIcon, SaveIcon } from '@/lib/icons';
 import QuoteEditor from './QuoteEditor';
 import QuotePreview from './QuotePreview';
 import SelectCustomerSheet from './SelectCustomerSheet';
@@ -14,6 +14,7 @@ import { useStore } from '@/lib/store-context';
 import { searchProductsForQuotes, createQuoteAction, getQuoteDetailsAction, getPartnerAddressAction, getNextQuoteNumberAction } from '@/app/actions/erp/quotes';
 import { useSidebar } from '@/lib/sidebar-context';
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
+import { useRouter } from "next/navigation";
 
 interface CreateQuoteProps {
     partnerId: string;
@@ -24,6 +25,7 @@ interface CreateQuoteProps {
 
 const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProps) => {
     const { success: notifySuccess, error: notifyError } = useNotification();
+    const router = useRouter();
     const { selectedStore } = useStore();
     const { setHeaderOverride } = useSidebar();
     const [isSaving, setIsSaving] = useState(false);
@@ -35,6 +37,10 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const [partnerAddress, setPartnerAddress] = useState('Endereço não informado');
     const partnerAvatar = selectedStore?.image_url || '';
     const [isScrolled, setIsScrolled] = useState(false);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const handleScroll = useCallback(() => {
+        if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5);
+    }, []);
     const [activeTab, setActiveTab] = useState('Dados Gerais');
 
     // Fetch Partner Address
@@ -100,7 +106,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                 const res = await getQuoteDetailsAction(existingQuote.id, partnerId);
                 if (res.success && res.data) {
                     const q = res.data;
-                    
+
                     // Map items
                     const items = q.items.map((item: any) => ({
                         id: item.product_id || `legacy-${item.id}`,
@@ -165,7 +171,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
     const isDirty = useMemo(() => {
         if (!originalQuoteData) return mode === 'create' && quoteItems.length > 0;
-        
+
         // Fast shallow checks first
         if (
             currentData.date !== originalQuoteData.date ||
@@ -222,15 +228,13 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
-    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-        setIsScrolled(e.currentTarget.scrollTop > 20);
-    };
+
 
     // 1. Handle Product Click
     const handleProductClick = (product: any) => {
         // If product has no variants, add it directly
         const variants = product.variants || [];
-        
+
         if (variants.length === 0) {
             addItem(product, undefined, undefined, 1, product.price);
             setIsProductSearchOpen(false);
@@ -381,9 +385,9 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
     const quoteCode = realQuoteNumber || existingQuote?.quote_number || "";
     const pageTitle = mode === 'create' ? 'Novo Orçamento' :
-                      mode === 'edit' ? `Editar Orçamento ${quoteCode}`.trim() :
-                      mode === 'duplicate' ? `Duplicar Orçamento ${quoteCode}`.trim() :
-                      `Orçamento ${quoteCode}`.trim();
+        mode === 'edit' ? `Editar Orçamento ${quoteCode}`.trim() :
+            mode === 'duplicate' ? `Duplicar Orçamento ${quoteCode}`.trim() :
+                `Orçamento ${quoteCode}`.trim();
 
     useEffect(() => {
         const isMobile = window.innerWidth < 768;
@@ -427,8 +431,9 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
             });
 
             if (result.success) {
-                notifySuccess(mode === 'edit' ? "Alterações salvas!" : "Orçamento criado!", 
-                        "O orçamento foi salvo com sucesso.");
+                notifySuccess(mode === 'edit' ? "Alterações salvas!" : "Orçamento criado!",
+                    "O orçamento foi salvo com sucesso.");
+                router.refresh();
                 onBack();
             } else {
                 notifyError("Erro ao salvar", (result as any).error || "Ocorreu um erro inesperado.");
@@ -446,158 +451,201 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const hasItems = itemsCount > 0;
 
     return (
-        <FadeIn className="flex flex-col min-h-screen bg-white dark:bg-dark-background transition-colors duration-300 relative">
-            {/* SCROLLABLE MAIN CONTENT */}
-            <div className="flex-1 overflow-y-auto no-scrollbar pb-32">
-                <div className="flex flex-col lg:flex-row w-full h-full">
-                    
-                    {/* LEFT SIDE - EDITOR */}
-                    <div className="w-full lg:w-1/2 flex flex-col border-r border-brand-border dark:border-dark-border">
-                        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col">
-                            <QuoteHeader
-                                isScrolled={isScrolled}
-                                onBack={handleBackWithSafety}
-                                onSave={mode !== 'view' ? handleSave : undefined}
-                                isSaving={isSaving}
-                                title={pageTitle}
-                                subtitle={mode === 'view' ? "Detalhes da proposta comercial" : "Crie uma proposta comercial para seu cliente"}
-                                saveLabel={mode === 'edit' ? "Salvar Alterações" : "Salvar Orçamento"}
-                                activeTab={activeTab}
-                                hideOnMobile={true}
-                            />
+        <FadeIn>
+            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto no-scrollbar w-full relative pb-20 md:pb-0">
 
-                            <div className={`flex-1 ${activeTab === 'Visualização' ? 'hidden lg:block' : 'block'}`}>
-                                <QuoteEditor
-                                    searchQuery={searchQuery}
-                                    setSearchQuery={setSearchQuery}
-                                    isProductSearchOpen={isProductSearchOpen}
-                                    setIsProductSearchOpen={setIsProductSearchOpen}
-                                    filteredProducts={searchResults}
-                                    isSearching={isSearching}
-                                    handleProductClick={handleProductClick}
-                                    addBlankItem={addBlankItem}
+                        {/* Sticky Header - Desktop Only title and tabs */}
+                        <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-500 ease-in-out">
+                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
+
+                                {/* Back button — desktop only */}
+                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                    <Button variant="filled" onClick={handleBackWithSafety} className="w-10 h-10 p-0 flex items-center justify-center">
+                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                    </Button>
+                                </div>
+
+                                {/* Title row */}
+                                <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
+                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                        <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                            <span className="hidden md:inline truncate">{pageTitle}</span>
+                                            {mode === "edit" && (
+                                                <Badge variant="gray" className="text-sm font-normal h-fit whitespace-nowrap px-2 py-0.5 hidden md:inline-flex">
+                                                    Editando
+                                                </Badge>
+                                            )}
+                                        </h1>
+
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                            {mode === 'create' && "Crie uma proposta comercial para seu cliente"}
+                                            {mode === 'duplicate' && "Crie uma nova proposta a partir de uma existente"}
+                                            {mode === 'edit' && "Edite os detalhes da sua proposta comercial"}
+                                        </div>
+                                    </div>
+
+                                    {/* Desktop action buttons only */}
+                                    <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
+                                        <Button variant="outline" onClick={handleBackWithSafety} disabled={isSaving}>
+                                            Cancelar
+                                        </Button>
+                                        <Button onClick={handleSave} disabled={isSaving} isLoading={isSaving}>
+                                            {!isSaving && <SaveIcon className="w-[18px] h-[18px] mr-2" />}
+                                            {mode === 'edit' ? "Salvar Alterações" : "Salvar Orçamento"}
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {/* Tabs */}
+                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0 h-auto">
+                                        <TabsTrigger value="Dados Gerais" className={`px-0 transition-all duration-500 ${isScrolled ? "pb-2 text-[13px]" : "pb-3"}`}>Dados Gerais</TabsTrigger>
+                                        <TabsTrigger value="Observações" className={`px-0 transition-all duration-500 ${isScrolled ? "pb-2 text-[13px]" : "pb-3"}`}>Observações</TabsTrigger>
+                                        <TabsTrigger value="Visualização" className={`px-0 transition-all duration-500 md:hidden ${isScrolled ? "pb-2 text-[13px]" : "pb-3"}`}>Visualização</TabsTrigger>
+                                    </TabsList>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Content Split Pane */}
+                        <div className="flex flex-col lg:flex-row w-full max-w-[1300px] mx-auto min-h-[calc(100vh-200px)]">
+                            {/* LEFT SIDE - EDITOR */}
+                            <div className="w-full lg:w-1/2 flex flex-col border-r-0 lg:border-r border-brand-border dark:border-dark-border px-0 md:px-6">
+                                <div className={`flex-1 pt-4 pb-12 px-4 md:px-0 ${activeTab === 'Visualização' ? 'hidden lg:block' : 'block'}`}>
+                                    <QuoteEditor
+                                        searchQuery={searchQuery}
+                                        setSearchQuery={setSearchQuery}
+                                        isProductSearchOpen={isProductSearchOpen}
+                                        setIsProductSearchOpen={setIsProductSearchOpen}
+                                        filteredProducts={searchResults}
+                                        isSearching={isSearching}
+                                        handleProductClick={handleProductClick}
+                                        addBlankItem={addBlankItem}
+                                        quoteItems={quoteItems}
+                                        updateItemPrice={updateItemPrice}
+                                        updateItemQty={updateItemQty}
+                                        updateItemField={updateItemField}
+                                        toggleItemEdit={toggleItemEdit}
+                                        removeItem={removeItem}
+                                        discount={discount}
+                                        setDiscount={setDiscount}
+                                        discountType={discountType}
+                                        setDiscountType={setDiscountType}
+                                        shippingFee={shippingFee}
+                                        setShippingFee={setShippingFee}
+                                        otherCosts={otherCosts}
+                                        setOtherCosts={setOtherCosts}
+                                        subtotal={subtotal}
+                                        discountValue={discountValue}
+                                        total={total}
+                                        selectedCustomer={selectedCustomer}
+                                        setSelectedCustomer={setSelectedCustomer}
+                                        setIsCustomerSheetOpen={setIsCustomerSheetOpen}
+                                        quoteDate={quoteDate}
+                                        setQuoteDate={setQuoteDate}
+                                        expiryDate={expiryDate}
+                                        setExpiryDate={setExpiryDate}
+                                        status={status}
+                                        setStatus={setStatus}
+                                        internalNote={internalNote}
+                                        setInternalNote={setInternalNote}
+                                        primaryColor={primaryColor}
+                                        setPrimaryColor={setPrimaryColor}
+                                        secondaryColor={secondaryColor}
+                                        setSecondaryColor={setSecondaryColor}
+                                        quoteTitle={quoteTitle}
+                                        setQuoteTitle={setQuoteTitle}
+                                        quoteSubtitle={quoteSubtitle}
+                                        setQuoteSubtitle={setQuoteSubtitle}
+                                        isReadOnly={mode === 'view'}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* RIGHT SIDE / BELOW - PREVIEW */}
+                            <div className={`w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 ${activeTab === 'Visualização' ? 'block flex-1 min-h-[800px] lg:min-h-0' : 'hidden lg:block'}`}>
+                                <QuotePreview
+                                    invoiceNumber={quoteCode || (mode === 'create' ? 'QTE-0000' : 'N/A')}
+                                    quoteDate={quoteDate}
+                                    expiryDate={expiryDate}
+                                    selectedCustomer={selectedCustomer}
                                     quoteItems={quoteItems}
-                                    updateItemPrice={updateItemPrice}
-                                    updateItemQty={updateItemQty}
-                                    updateItemField={updateItemField}
-                                    toggleItemEdit={toggleItemEdit}
-                                    removeItem={removeItem}
-                                    discount={discount}
-                                    setDiscount={setDiscount}
-                                    discountType={discountType}
-                                    setDiscountType={setDiscountType}
-                                    shippingFee={shippingFee}
-                                    setShippingFee={setShippingFee}
-                                    otherCosts={otherCosts}
-                                    setOtherCosts={setOtherCosts}
                                     subtotal={subtotal}
+                                    shippingNum={shippingNum}
+                                    otherCosts={parseFloat(otherCosts) || 0}
                                     discountValue={discountValue}
                                     total={total}
-                                    selectedCustomer={selectedCustomer}
-                                    setSelectedCustomer={setSelectedCustomer}
-                                    setIsCustomerSheetOpen={setIsCustomerSheetOpen}
-                                    quoteDate={quoteDate}
-                                    setQuoteDate={setQuoteDate}
-                                    expiryDate={expiryDate}
-                                    setExpiryDate={setExpiryDate}
-                                    status={status}
-                                    setStatus={setStatus}
-                                    internalNote={internalNote}
-                                    setInternalNote={setInternalNote}
+                                    note={internalNote}
                                     primaryColor={primaryColor}
-                                    setPrimaryColor={setPrimaryColor}
                                     secondaryColor={secondaryColor}
-                                    setSecondaryColor={setSecondaryColor}
                                     quoteTitle={quoteTitle}
-                                    setQuoteTitle={setQuoteTitle}
                                     quoteSubtitle={quoteSubtitle}
-                                    setQuoteSubtitle={setQuoteSubtitle}
-                                    isReadOnly={mode === 'view'}
+                                    partnerName={partnerName}
+                                    partnerAddress={partnerAddress}
+                                    partnerAvatar={partnerAvatar}
                                 />
                             </div>
-                        </Tabs>
+                        </div>
                     </div>
 
-                    {/* RIGHT SIDE / BELOW - PREVIEW */}
-                    <div className="w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20">
-                        <QuotePreview
-                            invoiceNumber={quoteCode || (mode === 'create' ? 'QTE-0000' : 'N/A')}
-                            quoteDate={quoteDate}
-                            expiryDate={expiryDate}
-                            selectedCustomer={selectedCustomer}
-                            quoteItems={quoteItems}
-                            subtotal={subtotal}
-                            shippingNum={shippingNum}
-                            otherCosts={parseFloat(otherCosts) || 0}
-                            discountValue={discountValue}
-                            total={total}
-                            note={internalNote}
-                            primaryColor={primaryColor}
-                            secondaryColor={secondaryColor}
-                            quoteTitle={quoteTitle}
-                            quoteSubtitle={quoteSubtitle}
-                            partnerName={partnerName}
-                            partnerAddress={partnerAddress}
-                            partnerAvatar={partnerAvatar}
-                        />
+                    {/* Mobile Bottom Action Bar */}
+                    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+                        <Button
+                            variant="outline"
+                            onClick={handleBackWithSafety}
+                            disabled={isSaving}
+                            className="flex-1 h-12"
+                        >
+                            {mode === 'view' ? "Voltar" : "Cancelar"}
+                        </Button>
+                        {mode !== 'view' && (
+                            <Button
+                                onClick={handleSave}
+                                isLoading={isSaving}
+                                className="flex-1 h-12"
+                            >
+                                {mode === 'edit' ? "Salvar Alterações" : "Salvar Orçamento"}
+                            </Button>
+                        )}
                     </div>
-                </div>
+                </Tabs>
+
+                <SelectCustomerSheet
+                    isOpen={isCustomerSheetOpen}
+                    onClose={() => setIsCustomerSheetOpen(false)}
+                    onSelect={(c: any) => setSelectedCustomer(c)}
+                />
+
+                <SelectVariantSheet
+                    isOpen={isVariantSheetOpen}
+                    onClose={() => setIsVariantSheetOpen(false)}
+                    product={productToSelectVariant}
+                    onConfirm={handleConfirmVariants}
+                />
+
+                {/* Confirmation Modals */}
+                <AlertModal
+                    isOpen={showAlertModal}
+                    onClose={() => setShowAlertModal(false)}
+                    onConfirm={confirmNavigation}
+                    title="Descartar Alterações"
+                    description="Você tem alterações não salvas. Deseja realmente sair sem salvar?"
+                    confirmText="Sim, Descartar"
+                    cancelText="Continuar Editando"
+                />
+
+                <AlertModal
+                    isOpen={unsavedChangesDialogOpen}
+                    onClose={handleUnsavedChangesDialogClose}
+                    onConfirm={handleUnsavedChangesConfirm}
+                    title="Descartar Alterações"
+                    description="Você tem alterações não salvas. Deseja realmente sair sem salvar?"
+                    confirmText="Sim, Descartar"
+                    cancelText="Continuar Editando"
+                />
             </div>
-
-            {/* Mobile Bottom Action Bar */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-                <Button
-                    variant="outline"
-                    onClick={handleBackWithSafety}
-                    disabled={isSaving}
-                    className="flex-1 h-12 text-sm font-bold rounded-xl"
-                >
-                    {mode === 'view' ? "Voltar" : "Cancelar"}
-                </Button>
-                {mode !== 'view' && (
-                    <Button
-                        onClick={handleSave}
-                        isLoading={isSaving}
-                        className="flex-1 h-12 text-sm font-bold bg-brand-primary text-white rounded-xl shadow-lg shadow-brand-primary/20"
-                    >
-                        {mode === 'edit' ? "Salvar Alterações" : "Salvar Orçamento"}
-                    </Button>
-                )}
-            </div>
-
-            <SelectCustomerSheet
-                isOpen={isCustomerSheetOpen}
-                onClose={() => setIsCustomerSheetOpen(false)}
-                onSelect={(c: any) => setSelectedCustomer(c)}
-            />
-
-            <SelectVariantSheet
-                isOpen={isVariantSheetOpen}
-                onClose={() => setIsVariantSheetOpen(false)}
-                product={productToSelectVariant}
-                onConfirm={handleConfirmVariants}
-            />
-
-            {/* Confirmation Modals */}
-            <AlertModal
-                isOpen={showAlertModal}
-                onClose={() => setShowAlertModal(false)}
-                onConfirm={confirmNavigation}
-                title="Descartar Alterações"
-                description="Você tem alterações não salvas. Deseja realmente sair sem salvar?"
-                confirmText="Sim, Descartar"
-                cancelText="Continuar Editando"
-            />
-
-            <AlertModal
-                isOpen={unsavedChangesDialogOpen}
-                onClose={handleUnsavedChangesDialogClose}
-                onConfirm={handleUnsavedChangesConfirm}
-                title="Descartar Alterações"
-                description="Você tem alterações não salvas. Deseja realmente sair sem salvar?"
-                confirmText="Sim, Descartar"
-                cancelText="Continuar Editando"
-            />
         </FadeIn>
     );
 };

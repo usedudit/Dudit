@@ -23,6 +23,7 @@ import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction } fro
 import { useNotification } from "@/hooks/use-notification";
 import CustomerCard from '@/components/reusable/CustomerCard';
 import { useSidebar } from "@/lib/sidebar-context";
+import { useRouter } from "next/navigation";
 
 interface QuoteDetailProps {
     quoteId: string;
@@ -48,6 +49,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack }: QuoteDetailProps) => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const { success: notifySuccess, error: notifyError } = useNotification();
+    const router = useRouter();
     const { setHeaderOverride } = useSidebar();
 
     const handleScroll = useCallback(() => {
@@ -75,6 +77,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack }: QuoteDetailProps) => {
         if (res.success) {
             setQuote((prev: any) => ({ ...prev, status: newStatus }));
             notifySuccess("Sucesso", "Status atualizado!");
+            router.refresh();
         } else {
             notifyError("Erro", res.error);
         }
@@ -108,6 +111,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack }: QuoteDetailProps) => {
             const res = await deleteQuoteAction(quoteId);
             if (res.success) {
                 notifySuccess("Orçamento excluído", "O orçamento foi removido com sucesso.");
+                router.refresh();
                 onBack();
             } else {
                 notifyError("Erro ao excluir", "Não foi possível remover o orçamento.");
