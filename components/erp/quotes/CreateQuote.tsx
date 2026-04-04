@@ -622,6 +622,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     isOpen={isCustomerSheetOpen}
                     onClose={() => setIsCustomerSheetOpen(false)}
                     onSelect={(c: any) => setSelectedCustomer(c)}
+                    partnerId={partnerId}
                 />
 
                 <SelectVariantSheet

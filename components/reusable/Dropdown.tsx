@@ -91,7 +91,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
         styles.top = `${rect.bottom + 4}px`
       }
 
-      if (width) {
+      if (width && width !== "w-full") {
         styles.width = width.startsWith("w-") ? "auto" : width
       } else {
         styles.width = `${rect.width}px`

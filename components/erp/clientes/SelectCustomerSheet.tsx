@@ -12,9 +12,10 @@ interface SelectCustomerSheetProps {
     isOpen: boolean;
     onClose: () => void;
     onSelect: (customer: any) => void;
+    partnerId: string;
 }
 
-const SelectCustomerSheet = ({ isOpen, onClose, onSelect }: SelectCustomerSheetProps) => {
+const SelectCustomerSheet = ({ isOpen, onClose, onSelect, partnerId }: SelectCustomerSheetProps) => {
     const [search, setSearch] = useState('');
     const [customers, setCustomers] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
