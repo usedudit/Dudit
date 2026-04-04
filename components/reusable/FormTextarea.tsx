@@ -37,7 +37,7 @@ export const FormTextarea: React.FC<FormTextareaProps> = ({
 }) => (
   <div className={`flex-1 w-full ${className || ""}`}>
     <div className="flex items-center gap-2 mb-1.5">
-      <label htmlFor={id || name} className="text-sm font-medium text-brand-dark/80 dark:text-dark-body truncate">
+      <label htmlFor={id || name} className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
         {label}
         {required && <span className="text-brand-red"> *</span>}
       </label>

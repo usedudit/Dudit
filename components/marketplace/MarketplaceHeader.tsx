@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useRef, useEffect, useMemo, memo, useCallback } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import {
   ShoppingBag,
   MapPin,
@@ -55,6 +55,10 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
   const { profile, cartCount, isLoading: isSessionLoading } = useUserSession(serverSessionData)
   const isLoading = isSupabaseLoading || isSessionLoading
   const router = useRouter()
+  const pathname = usePathname()
+
+  const isHome = useMemo(() => currentView === "home" || pathname === "/", [currentView, pathname])
+  const showDeliveryInfo = useMemo(() => isHome || ["/profile", "/my-orders", "/cart"].includes(pathname), [isHome, pathname])
 
   const [searchValue, setSearchValue] = useState("")
   const [suggestionBucket, setSuggestionBucket] = useState<{ label: string; type: string }[]>([])
@@ -185,8 +189,6 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
   }, [router])
 
   const renderMobileHeader = () => {
-    const pathname = typeof window !== "undefined" ? window.location.pathname : "/"
-    const isHome = currentView === "home" || pathname === "/"
 
     return (
       <header className="lg:hidden w-full bg-brand-dark fixed top-0 left-0 right-0 z-50 transition-all duration-300">
@@ -256,7 +258,7 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
               )}
             </Link>
           </div>
-          {(!isScrolled && isHome) && (
+          {(!isScrolled && showDeliveryInfo) && (
             <div className="flex items-center gap-1.5 px-1 mt-2.5 text-brand-inactive-text cursor-pointer w-full overflow-hidden">
               <MapPin size={14} className="shrink-0 text-white" />
               <span className="text-[12px] font-normal truncate leading-tight ml-0.5 text-white">

@@ -718,7 +718,7 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Variações ({filteredVariations.length})</h3>
                         <Button variant="link" className="flex items-center hidden md:flex" onClick={() => setIsSheetOpen(true)} disabled={!isEditing}>
-                            <PlusIcon className="w-4 h-4" /> Adicionar Variação
+                            + Adicionar Variação
                         </Button>
                     </div>
 

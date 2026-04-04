@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import {
     PlusIcon,
     FileIcon,
+    ArrowUpDownIcon,
+    ArrowRightIcon
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, Checkbox, IconPlaceholder, Input, Badge, AlertModal } from '@/components/reusable';
+import { Button, IconPlaceholder, Input, Badge, AlertModal } from '@/components/reusable';
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet";
 import Pagination from "@/components/reusable/Pagination";
 import CreateStockMovement from './CreateStockMovement';
@@ -27,7 +29,7 @@ interface StockMovementPageProps {
 }
 
 type TabType = 'all' | 'in' | 'out';
-type SortKey = 'product' | 'quantity' | 'date' | 'displayId';
+type SortKey = 'product' | 'quantity' | 'currentStock' | 'reason' | 'reference' | 'date' | 'type';
 type SortDirection = 'asc' | 'desc';
 
 const ITEMS_PER_PAGE = 8;
@@ -68,7 +70,6 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
     const [undoReason, setUndoReason] = useState('');
     const [isUndoing, setIsUndoing] = useState(false);
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
-    const [selection, setSelection] = useState<Set<string>>(new Set());
 
     const tableContainerRef = useRef<HTMLDivElement>(null);
     const [scrollState, setScrollState] = useState({ left: false, right: false });
@@ -126,11 +127,6 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
             const res = await undoStockMovementAction(undoingId, undoReason);
             if (res.success) {
                 notifySuccess('Movimentação desfeita com sucesso.');
-                setSelection(prev => {
-                    const next = new Set(prev);
-                    next.delete(undoingId);
-                    return next;
-                });
             } else {
                 notifyError(res.error || 'Erro ao desfazer.');
             }
@@ -201,15 +197,30 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
 
         if (sortConfig) {
             result = [...result].sort((a: any, b: any) => {
-                const aVal = sortConfig.key === 'product' ? a.product.name
-                    : sortConfig.key === 'date' ? a.rawDate
-                        : a[sortConfig.key];
-                const bVal = sortConfig.key === 'product' ? b.product.name
-                    : sortConfig.key === 'date' ? b.rawDate
-                        : b[sortConfig.key];
-                if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-                if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
-                return 0;
+                let aVal: any;
+                let bVal: any;
+
+                switch (sortConfig.key) {
+                    case 'product':
+                        aVal = a.product.name;
+                        bVal = b.product.name;
+                        break;
+                    case 'date':
+                        aVal = a.rawDate;
+                        bVal = b.rawDate;
+                        break;
+                    case 'currentStock':
+                        aVal = a.product.currentStock;
+                        bVal = b.product.currentStock;
+                        break;
+                    default:
+                        aVal = a[sortConfig.key];
+                        bVal = b[sortConfig.key];
+                }
+
+                if (aVal === bVal) return 0;
+                const comparison = aVal < bVal ? -1 : 1;
+                return sortConfig.direction === 'asc' ? comparison : -comparison;
             });
         }
 
@@ -221,20 +232,6 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
         (page - 1) * ITEMS_PER_PAGE,
         page * ITEMS_PER_PAGE
     );
-
-    const handleSelectRow = (id: string) => {
-        setSelection(prev => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
-    };
-
-    const handleSelectAll = (checked: boolean) => {
-        if (checked) setSelection(new Set(paginatedMovements.map(m => m.id)));
-        else setSelection(new Set());
-    };
 
     const handleClearFilters = () => {
         setSearchTerm("");
@@ -248,7 +245,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
         { id: "reason", label: "Motivo", align: "left" as const },
         { id: "reference", label: "Referência", align: "left" as const },
         { id: "date", label: "Data", align: "left" as const, width: "160px" },
-        { id: "type", label: "Tipo", align: "left" as const, width: "120px" },
+        { id: "type", label: "Tipo", align: "center" as const, width: "120px" },
         { id: "actions", label: "Ações", align: "center" as const, width: "80px" },
     ];
 
@@ -385,8 +382,11 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                                         <span className={`font-bold ${mov.type === 'in' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                                             {mov.type === 'in' ? '+' : '-'}{mov.quantity}
                                                         </span>
-                                                        <span className="text-gray-300 dark:text-gray-600">•</span>
-                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">{mov.date.split(',')[0]}</span>
+                                                        <ArrowRightIcon className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600" />
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                            {mov.product.currentStock}
+                                                        </span>
+                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium ml-auto">{mov.date.split(',')[0]}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -398,8 +398,6 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                             <StockMovementGridCard
                                                 key={mov.id}
                                                 movement={mov}
-                                                selected={selection.has(mov.id)}
-                                                onSelect={() => handleSelectRow(mov.id)}
                                                 onUndo={handleUndoClick}
                                                 onDetails={handleViewDetails}
                                             />
@@ -414,22 +412,39 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                             <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
                                                 <thead>
                                                     <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                        <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
-                                                            <Checkbox
-                                                                checked={selection.size === paginatedMovements.length && paginatedMovements.length > 0}
-                                                                onChange={handleSelectAll}
-                                                                className="bg-white dark:bg-dark-background"
-                                                            />
+                                                        <th className="py-3 px-2 w-4 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
+                                                            {/* Empty spacer for alignment if needed, or just remove */}
                                                         </th>
-                                                        {columns.map(col => (
-                                                            <th
-                                                                key={col.id}
-                                                                className={`py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}
-                                                                style={{ width: col.width }}
-                                                            >
-                                                                {col.label}
-                                                            </th>
-                                                        ))}
+                                                        {columns.map(col => {
+                                                            const isSortable = col.id !== 'actions';
+                                                            const isSorted = sortConfig?.key === col.id;
+
+                                                            return (
+                                                                <th
+                                                                    key={col.id}
+                                                                    className={`py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'} ${isSortable ? 'cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors' : ''}`}
+                                                                    style={{ width: col.width }}
+                                                                    onClick={() => {
+                                                                        if (!isSortable) return;
+                                                                        setSortConfig(prev => ({
+                                                                            key: col.id as SortKey,
+                                                                            direction: prev?.key === col.id && prev.direction === 'asc' ? 'desc' : 'asc'
+                                                                        }));
+                                                                    }}
+                                                                >
+                                                                    <div className={`flex items-center gap-1.5 ${col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : ''}`}>
+                                                                        {col.label}
+                                                                        {isSortable && (
+                                                                            <ArrowUpDownIcon
+                                                                                size={14}
+                                                                                className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100' : 'text-brand-inactive-text opacity-0 group-hover:opacity-40'
+                                                                                    } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
+                                                                            />
+                                                                        )}
+                                                                    </div>
+                                                                </th>
+                                                            );
+                                                        })}
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -438,8 +453,6 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                                             key={mov.id}
                                                             movement={mov}
                                                             columns={columns}
-                                                            selected={selection.has(mov.id)}
-                                                            onSelect={handleSelectRow}
                                                             onUndo={handleUndoClick}
                                                             onDetails={handleViewDetails}
                                                         />

@@ -37,7 +37,7 @@ export async function searchProductsForMovement(query: string) {
             name: p.name,
             sku: p.sku || 'N/A',
             stock: p.stock_quantity || 0,
-            image: p.images && p.images.length > 0 ? p.images[0] : 'https://img.dudit.com.br/static/mascots/Box.png'
+            image: p.images && p.images.length > 0 ? p.images[0] : null
         }))
     } catch (err) {
         console.error("searchProductsForMovement error:", err)
@@ -114,6 +114,9 @@ export async function getStockMovementDetails(id: string) {
                 reason,
                 notes,
                 created_by,
+                user_profiles:created_by (
+                    full_name
+                ),
                 products (
                     name,
                     sku,
@@ -138,8 +141,17 @@ export async function getStockMovementDetails(id: string) {
         }
 
         const dateObj = new Date(data.created_at);
-        const dateStr = dateObj.toLocaleDateString("pt-BR", { day: '2-digit', month: 'short', year: 'numeric' });
-        const timeStr = dateObj.toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' });
+        const dateStr = dateObj.toLocaleDateString("pt-BR", { 
+            day: '2-digit', 
+            month: 'short', 
+            year: 'numeric',
+            timeZone: 'America/Sao_Paulo'
+        });
+        const timeStr = dateObj.toLocaleTimeString("pt-BR", { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            timeZone: 'America/Sao_Paulo'
+        });
 
         return successResponse({
             id: data.id,
@@ -148,7 +160,7 @@ export async function getStockMovementDetails(id: string) {
             product: {
                 name: data.products?.name || 'Produto Excluído',
                 sku: data.products?.sku || 'N/A',
-                image: (data.products?.images && data.products.images.length > 0) ? data.products.images[0] : 'https://img.dudit.com.br/static/mascots/Box.png',
+                image: (data.products?.images && data.products.images.length > 0) ? data.products.images[0] : null,
                 category: data.products?.category || 'Sem Categoria',
                 previousStock: data.previous_quantity || 0,
                 currentStock: data.new_quantity || 0,
@@ -156,7 +168,7 @@ export async function getStockMovementDetails(id: string) {
             type: data.quantity > 0 ? 'in' : 'out',
             quantity: Math.abs(data.quantity),
             reason: reason,
-            user: data.created_by || 'Sistema',
+            user: data.user_profiles?.full_name || data.created_by || 'Sistema',
             notes: data.notes || '',
         });
 

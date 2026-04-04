@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useStore } from "@/lib/store-context"
 
 // Components
-import { Button, IconPlaceholder, AlertModal, Separator, Badge } from "@/components/reusable"
+import { Button, IconPlaceholder, AlertModal, Separator, Badge, Checkbox } from "@/components/reusable"
 import QuoteSkeleton from "./QuoteSkeleton"
 import { FileIcon } from "@/lib/icons"
 import { deleteQuoteAction } from "@/app/actions/erp/quotes"
@@ -209,25 +209,25 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
         setWrapperMode('create')
         setActiveQuote(null)
     }, [])
-    
+
     const handleViewQuote = useCallback((quote: any) => {
         const rawQuote = currentQuotes.find((q: any) => q.id === (quote.originalId || quote.id))
         setActiveQuote(rawQuote)
         setWrapperMode('view')
     }, [currentQuotes])
-    
+
     const handleEditQuote = useCallback((quote: any) => {
         const rawQuote = currentQuotes.find((q: any) => q.id === (quote.originalId || quote.id))
         setActiveQuote(rawQuote)
         setWrapperMode('edit')
     }, [currentQuotes])
-    
+
     const handleDuplicateQuote = useCallback((quote: any) => {
         const rawQuote = currentQuotes.find((q: any) => q.id === (quote.originalId || quote.id))
         setActiveQuote(rawQuote)
         setWrapperMode('duplicate')
     }, [currentQuotes])
-    
+
     const handleDeleteQuote = useCallback((quote: any) => {
         setQuoteToDelete(quote)
         setModals(prev => ({ ...prev, delete: true }))
@@ -411,14 +411,14 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                                     <div className="flex flex-col w-full">
                                         {paginated.map((q: Quote, idx) => (
                                             <React.Fragment key={q.originalId}>
-                                                <div 
+                                                <div
                                                     className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex items-center gap-4"
                                                     onClick={() => handleViewQuote(q)}
                                                 >
                                                     <div className="w-14 h-14 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border flex-shrink-0 flex items-center justify-center">
                                                         <FileIcon className="w-6 h-6 text-brand-dark dark:text-dark-heading" />
                                                     </div>
-                                                    
+
                                                     <div className="flex-1 min-w-0 flex flex-col gap-1">
                                                         <div className="flex justify-between items-start">
                                                             <div className="flex flex-col min-w-0 pr-1">
@@ -472,12 +472,9 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                                                     <tr className="bg-brand-gray dark:bg-dark-border/50">
                                                         <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
                                                             <div className="flex items-center">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    className="w-4 h-4 rounded border-brand-border"
+                                                                <Checkbox
                                                                     checked={selection.ids.size === paginated.length && paginated.length > 0}
-                                                                    onChange={(e) => {
-                                                                        const checked = e.target.checked
+                                                                    onChange={(checked) => {
                                                                         setSelection({ ids: checked ? new Set(paginated.map((x: Quote) => x.originalId)) : new Set() })
                                                                     }}
                                                                 />

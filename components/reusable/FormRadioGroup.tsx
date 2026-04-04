@@ -33,7 +33,7 @@ export const FormRadioGroup: React.FC<FormRadioGroupProps> = ({
   return (
     <div className={`w-full ${className || ""}`}>
       {label && (
-        <label className="block text-sm font-medium text-brand-dark/80 dark:text-dark-body mb-3">
+        <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">
           {label}
           {required && <span className="text-brand-red ml-1">*</span>}
         </label>

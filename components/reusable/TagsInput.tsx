@@ -43,7 +43,7 @@ export function TagsInput({
 
   return (
     <div className={cn("space-y-2", className)}>
-      {label && <label className="block text-sm font-medium text-brand-dark dark:text-dark-body">{label}</label>}
+      {label && <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">{label}</label>}
       <div
         className={cn(
           "flex flex-wrap gap-2 h-[42px] px-3 py-2 rounded-lg border focus:border-brand-green dark:focus:border-brand-green focus:outline-none transition-all border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface",

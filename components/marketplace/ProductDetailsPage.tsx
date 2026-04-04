@@ -11,6 +11,7 @@ import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { Button, Input, FormDropdown, IconPlaceholder, DefaultModal, Separator } from "@/components/reusable"
+import { ShareModal } from "./ShareModal"
 import dynamic from "next/dynamic"
 import { addToCartAction } from "@/app/actions/marketplace/cart"
 import { createOrderAction } from "@/app/actions/orders"
@@ -120,7 +121,6 @@ export function ProductDetailsPageClient({
   const [showResponsibilityModal, setShowResponsibilityModal] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
-  const [isLinkCopied, setIsLinkCopied] = useState(false)
 
   const galleryContainerRef = useRef<HTMLDivElement>(null)
   const reviewsRef = useRef<HTMLDivElement>(null)
@@ -774,106 +774,15 @@ export function ProductDetailsPageClient({
         </div>
       </DefaultModal>
 
-      <DefaultModal
+      <ShareModal
         isOpen={showShareModal}
-        onClose={() => {
-          setShowShareModal(false)
-          setIsLinkCopied(false)
-        }}
-        maxWidth="md"
-      >
-        <div className="flex flex-col items-center">
-          <div className="flex justify-center w-full">
-            <IconPlaceholder
-              icon={ShareIcon}
-            />
-          </div>
-          <h4 className="text-brand-dark dark:text-dark-heading mt-3 text-xl font-bold text-brand-dark dark:text-dark-heading mb-2">Gostou? Espalhe a novidade!</h4>
-          <p className="text-brand-inactive-text dark:text-dark-body mt-1 text-brand-inactive-text dark:text-dark-body max-w-sm text-md mb-8">
-            Compartilhe com seus amigos e ajude mais pessoas a descobrirem!
-          </p>
+        onClose={() => setShowShareModal(false)}
+        url={isMounted ? window.location.href : ""}
+        title={product.name}
+        shareMessage={shareMessage}
+        label="Link do produto"
+      />
 
-          <div className="w-full space-y-6">
-            <div>
-              <div className="flex gap-2">
-                <Input
-                  label="Link do produto"
-                  value={isMounted ? window.location.href : ""}
-                  readOnly
-                  className="flex-1"
-                />
-                <Button
-                  variant="outline"
-                  className="shrink-0 h-[42px] w-[42px] p-0"
-                  onClick={() => {
-                    navigator.clipboard.writeText(window.location.href)
-                    setIsLinkCopied(true)
-                    notifySuccess("Sucesso", "Link copiado para a área de transferência!")
-                    setTimeout(() => setIsLinkCopied(false), 2000)
-                  }}
-                >
-                  {isLinkCopied ? <CheckCircleIcon size={20} className="text-brand-green" /> : <CopyIcon size={20} />}
-                </Button>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div>
-              <label className="text-sm font-medium text-brand-dark dark:text-dark-body truncate">Compartilhar em:</label>
-              <div className="flex items-center justify-center gap-4 sm:gap-6">
-                {[
-                  {
-                    icon: WhatsappIcon,
-                    name: "WhatsApp",
-                    color: "bg-[#25D366]",
-                    url: `https://api.whatsapp.com/send?text=${encodeURIComponent(shareMessage + "\n" + (isMounted ? window.location.href : ""))}`
-                  },
-                  {
-                    icon: FacebookIcon,
-                    name: "Facebook",
-                    color: "bg-[#1877F2]",
-                    url: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareMessage + "\n" + (isMounted ? window.location.href : ""))}`
-                  },
-                  {
-                    icon: TwitterIcon,
-                    name: "X",
-                    color: "bg-black",
-                    url: `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Olha o que eu achei na Dudit: ${product.name}`)}&url=${encodeURIComponent(isMounted ? window.location.href : "")}`
-                  },
-                  {
-                    icon: TelegramIcon,
-                    name: "Telegram",
-                    color: "bg-[#26A5E4]",
-                    url: `https://t.me/share/url?url=${encodeURIComponent(shareMessage + "\n" + (isMounted ? window.location.href : ""))}&text=${encodeURIComponent(product.name)}`
-                  },
-                  {
-                    icon: LinkedinIcon,
-                    name: "Linkedin",
-                    color: "bg-[#0A66C2]",
-                    url: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareMessage + "\n" + (isMounted ? window.location.href : ""))}`
-                  }
-                ].map((social) => (
-                  <a
-                    key={social.name}
-                    href={social.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex flex-col items-center gap-2 group transition-transform"
-                  >
-                    <div className={`${social.color} w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-white transition-all`}>
-                      <social.icon size={24} />
-                    </div>
-                    <span className="text-[10px] sm:text-xs font-medium text-brand-inactive-text group-hover:text-brand-dark transition-colors">{social.name}</span>
-                  </a>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <Button onClick={() => setShowShareModal(false)} variant="outline" className="w-full mt-8 h-[44px]">Fechar</Button>
-        </div>
-      </DefaultModal>
 
       {!hideHeaderAndFooter && <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />}
       <motion.div

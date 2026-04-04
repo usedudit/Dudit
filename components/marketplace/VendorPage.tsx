@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getProductUrl } from "@/lib/utils/url-generator"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
+import { ShareModal } from "./ShareModal"
 
 // --- TYPES ---
 interface VendorPageClientProps {
@@ -449,7 +450,11 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
   const [searchValue, setSearchValue] = useState("")
   const [isDesktopSortOpen, setIsDesktopSortOpen] = useState(false)
   const [selectedSort, setSelectedSort] = useState("Mais recentes")
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
   const sortRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => { setIsMounted(true) }, [])
 
   const partnerProfileImageUrl = getImageUrl(partner.profile_image_url || partner.storeImageUrl)
   const currentTags = useMemo(
@@ -467,6 +472,12 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
       )
       .sort(sorter)
   }, [products, services, activeContext, activeTag, searchValue, selectedSort])
+
+  const shareMessage = useMemo(() => {
+    return `🔥 Olha essa loja na Dudit!\n\n` +
+      `*${partner.storeName}*\n` +
+      `Confere aqui os produtos:`;
+  }, [partner.storeName])
 
   // Scroll para mostrar/esconder header sticky mobile
   useEffect(() => {
@@ -563,7 +574,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
           </button>
           <div className="flex flex-col gap-2">
             <button className="w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-brand-green shadow-sm"><HeartIcon size={20} /></button>
-            <button className="w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-brand-green shadow-sm"><ShareIcon size={20} /></button>
+            <button onClick={() => setShowShareModal(true)} className="w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-brand-green shadow-sm"><ShareIcon size={20} /></button>
           </div>
         </div>
 
@@ -621,7 +632,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
               <div>
                 <div className="flex items-center gap-3 mb-1">
                   <h1 className="text-[24px] font-semibold text-brand-dark leading-none">{partner.storeName}</h1>
-                  <button className="hidden lg:flex w-[26px] h-[26px] rounded-full border border-brand-border items-center justify-center text-brand-inactive-text hover:text-brand-green hover:border-brand-green transition-colors">
+                  <button onClick={() => setShowShareModal(true)} className="hidden lg:flex w-[26px] h-[26px] rounded-full border border-brand-border items-center justify-center text-brand-inactive-text hover:text-brand-green hover:border-brand-green transition-colors">
                     <ShareIcon size={14} />
                   </button>
                 </div>
@@ -783,6 +794,15 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
           </main>
         </div>
       </div>
+
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        url={isMounted ? window.location.href : ""}
+        title={partner.storeName}
+        shareMessage={shareMessage}
+        label="Link da loja"
+      />
 
       {/* Bottom-sheet modals mobile */}
       <BottomSheetModal

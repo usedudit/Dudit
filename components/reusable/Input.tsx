@@ -120,7 +120,7 @@ export const Input: React.FC<FormInputProps> = ({
         <div className={`flex items-center ${labelSpacingClass}`}>
           <label
             htmlFor={inputId}
-            className="text-sm font-medium text-brand-dark dark:text-dark-body truncate"
+            className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate"
           >
             {label}
             {required && <span className="text-brand-red"> *</span>}

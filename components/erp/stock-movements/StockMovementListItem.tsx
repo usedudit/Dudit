@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Checkbox, Badge, Button } from "@/components/reusable"
+import { Badge, Button } from "@/components/reusable"
 import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
 import { ThreeDotsIcon, RotateIcon, ChevronUpIcon, ChevronDownIcon } from "@/lib/icons"
 
@@ -16,8 +16,6 @@ interface ColumnDef {
 interface StockMovementListItemProps {
   movement: any
   columns: ColumnDef[]
-  selected: boolean
-  onSelect: (id: string) => void
   onUndo: (id: string) => void
   onDetails: (id: string) => void
 }
@@ -26,8 +24,6 @@ const StockMovementListItem = React.memo(
   ({
     movement,
     columns,
-    selected,
-    onSelect,
     onUndo,
     onDetails,
   }: StockMovementListItemProps) => {
@@ -117,7 +113,7 @@ const StockMovementListItem = React.memo(
                 trigger={
                   <Button
                     variant="outline"
-                    className="w-[34px] h-[34px] rounded-full border-brand-border hover:bg-white dark:hover:bg-dark-surface p-0 flex items-center justify-center"
+                    className="w-[40px] h-[40px] p-0 flex items-center justify-center font-bold"
                   >
                     <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
                   </Button>
@@ -149,10 +145,10 @@ const StockMovementListItem = React.memo(
         onClick={() => onDetails(movement.id)}
       >
         <td
-          className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12"
+          className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-10"
           onClick={(e) => e.stopPropagation()}
         >
-          <Checkbox checked={selected} onChange={() => onSelect(movement.id)} />
+          {/* Removed Checkbox */}
         </td>
 
         {columns.map((col) => (
@@ -168,7 +164,6 @@ const StockMovementListItem = React.memo(
   },
   (prev, next) =>
     prev.movement === next.movement &&
-    prev.selected === next.selected &&
     prev.columns === next.columns
 )
 

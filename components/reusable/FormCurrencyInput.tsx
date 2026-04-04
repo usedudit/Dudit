@@ -61,7 +61,7 @@ export function FormCurrencyInput({
     <div className="flex-1 w-full">
       <label
         htmlFor={id || name}
-        className="text-sm font-medium text-brand-dark/80 dark:text-dark-body mb-1.5 truncate"
+        className="text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate block"
       >
         {label}
         {required && <span className="text-brand-red ml-1">*</span>}

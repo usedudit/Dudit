@@ -220,7 +220,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                 }`}
                                                         >
                                                             <div className="flex items-center gap-4">
-                                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${type === 'in' ? 'bg-brand-green text-white' : 'bg-brand-gray dark:bg-gray-800 text-brand-inactive-text'
+                                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${type === 'in' ? 'bg-brand-green text-white' : 'bg-brand-slate bg-dark-border/50 text-brand-inactive-text'
                                                                     }`}>
                                                                     <ChevronDownIcon size={22} strokeWidth={2.5} />
                                                                 </div>
@@ -239,7 +239,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                 }`}
                                                         >
                                                             <div className="flex items-center gap-4">
-                                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${type === 'out' ? 'bg-brand-red text-white' : 'bg-brand-gray dark:bg-gray-800 text-brand-inactive-text'
+                                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${type === 'out' ? 'bg-brand-red text-white' : 'bg-brand-slate bg-dark-border/50 text-brand-inactive-text'
                                                                     }`}>
                                                                     <ChevronUpIcon size={22} strokeWidth={2.5} />
                                                                 </div>
@@ -298,7 +298,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                                             setSearchQuery('');
                                                                                         }}
                                                                                     >
-                                                                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-gray-800 overflow-hidden flex-shrink-0 border border-brand-border dark:border-dark-border">
+                                                                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden flex-shrink-0 border border-brand-border dark:border-dark-border">
                                                                                             <img src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={product.name} className="w-full h-full object-cover rounded-full mix-blend-multiply dark:mix-blend-normal" />
                                                                                         </div>
                                                                                         <div className="flex-1 min-w-0">
@@ -343,7 +343,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
 
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                             <Input
-                                                                label="Quantidade *"
+                                                                label="Quantidade"
                                                                 name="quantity"
                                                                 type="number"
                                                                 placeholder="Ex: 10"

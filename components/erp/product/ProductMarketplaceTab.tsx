@@ -183,13 +183,11 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
 
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="link"
                     onClick={addAttribute}
                     disabled={!isEditing}
-                    className="text-sm font-bold text-brand-dark dark:text-dark-heading underline decoration-gray-300 dark:decoration-gray-600 underline-offset-4 hover:bg-transparent px-0"
                   >
-                    <PlusIcon className="w-3.5 h-3.5 mr-1 stroke-[3px] pointer-events-none" />
-                    Adicionar atributo
+                    + Adicionar atributo
                   </Button>
                 </>
               )}

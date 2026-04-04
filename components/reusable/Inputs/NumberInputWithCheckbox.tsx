@@ -61,7 +61,7 @@ export const NumberInputWithCheckbox: React.FC<
         <div className="flex items-center gap-2 mb-1.5">
           <label
             htmlFor={inputId}
-            className="text-sm font-medium text-brand-dark dark:text-dark-body"
+            className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate"
           >
             {label}
             {required && <span className="text-brand-red"> *</span>}

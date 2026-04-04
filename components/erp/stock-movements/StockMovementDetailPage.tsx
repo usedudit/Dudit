@@ -2,20 +2,19 @@
 
 import React, { useState } from 'react';
 import {
-    ChevronLeftIcon,
-    ChevronUpIcon,
-    ChevronDownIcon,
-    CheckCircleIcon,
     DownloadIcon,
-    ArrowRightIcon
+    ArrowRightIcon,
+    UserIcon,
+    ThreeDotsIcon,
+    RotateIcon,
+    ChevronLeftIcon
 } from '@/lib/icons';
-import { Button, InfoCard, ThreeDotsLoader, Dropdown, DropdownItem, AlertModal, Input } from '@/components/reusable';
+import { Button, ThreeDotsLoader, Dropdown, DropdownItem, AlertModal, Input } from '@/components/reusable';
 import { Badge } from '@/components/reusable/Badge';
 import { useNotification } from '@/hooks/use-notification';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import { motion } from 'framer-motion';
 import { undoStockMovementAction } from '@/app/actions/erp/stock-movements';
-import { ThreeDotsIcon, RotateIcon } from '@/lib/icons';
 
 interface StockMovement {
     id: string;
@@ -92,71 +91,78 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
             <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
                 {/* Sticky Header */}
-                <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300">
-                    <div className="max-w-[1400px] mx-auto relative px-4 md:px-8 py-4 md:py-6">
+                <div className={`sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 ${isScrolled ? "py-2" : "py-4 md:py-6"}`}>
+                    <div className="max-w-[1400px] mx-auto relative px-4 md:px-8">
+
+                        {/* Back button — desktop only (XL style) */}
+                        <div className={`absolute -left-4 top-1/2 -translate-y-1/2 hidden xl:flex transition-all duration-300 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                            <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center shadow-sm">
+                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                            </Button>
+                        </div>
 
                         {/* Header Content */}
-                        <div className="flex items-start justify-between">
-                            <div className="flex items-start gap-4 overflow-hidden min-w-0">
-                                {/* Back Button */}
-                                <Button
-                                    variant="filled"
-                                    onClick={onBack}
-                                    className="w-10 h-10 p-0 flex items-center justify-center"
-                                >
-                                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                </Button>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4 overflow-hidden min-w-0">
+                                {/* Back Button — mobile and md */}
+                                <div className="xl:hidden">
+                                    <Button
+                                        variant="filled"
+                                        onClick={onBack}
+                                        className="w-10 h-10 p-0 flex items-center justify-center shadow-sm"
+                                    >
+                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                    </Button>
+                                </div>
 
-                                {/* Title row */}
-                                <div className="hidden md:flex items-start justify-between">
-                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0 mb-6">
-                                        <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-300 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                            <span className="truncate">Detalhes da Movimentação</span>
+                                {/* Title column */}
+                                <div className="flex flex-col gap-0.5 overflow-hidden min-w-0">
+                                    <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-300 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                        <span className="truncate">{data.reason}</span>
+                                        <Badge
+                                            variant={isIn ? "green" : "red"}
+                                            className="w-fit whitespace-nowrap hidden sm:inline-flex"
+                                        >
+                                            {isIn ? "Entrada" : "Saída"}
+                                        </Badge>
+                                    </h1>
 
-                                            <div className="flex items-center gap-2 flex-shrink-0">
-                                                <Badge
-                                                    variant={isIn ? "green" : "red"}
-                                                    icon={isIn ? <ChevronDownIcon /> : <ChevronUpIcon />}
-                                                    className="w-fit whitespace-nowrap"
-                                                >
-                                                    {isIn ? "Entrada" : "Saída"}
-                                                </Badge>
-                                            </div>
-                                        </h1>
-
-                                        {/* Metadata - Hide on scroll for smaller text */}
-                                        <div className={`overflow-hidden transition-all duration-300 ${isScrolled ? 'max-h-0 opacity-0' : 'max-h-20 opacity-100 mt-1'}`}>
-                                            <div className="flex flex-wrap items-center gap-2 text-[15px] text-brand-inactive-text dark:text-dark-body font-medium">
-                                                <span className="flex items-center gap-1">Data: {data.date}</span>
-                                                <span className="text-brand-inactive-text dark:text-gray-600 mx-1">•</span>
-                                                <span className="flex items-center gap-1">{data.user}</span>
-                                            </div>
+                                    {/* Metadata - Hide on scroll or same as Product Page */}
+                                    <div className={`overflow-hidden transition-all duration-300 ${isScrolled ? 'max-h-0 opacity-0' : 'max-h-20 opacity-100 mt-0.5'}`}>
+                                        <div className="flex flex-wrap items-center gap-2 text-[14px] md:text-[15px] text-brand-inactive-text dark:text-dark-body font-medium">
+                                            <span>SKU {data.product.sku}</span>
+                                            <span className="text-gray-300 dark:text-gray-600">•</span>
+                                            <span>{data.date}</span>
                                         </div>
                                     </div>
-
-                                    {/* Desktop Actions */}
-                                    <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
-                                        <Dropdown
-                                            align="right"
-                                            trigger={
-                                                <Button className="px-6 h-[42px] flex items-center">
-                                                    Ações
-                                                    <ChevronDownIcon className="w-4 h-4 ml-2" />
-                                                </Button>
-                                            }
-                                        >
-                                            <DropdownItem onClick={() => { /* Implement PDF export if needed */ }}>
-                                                <DownloadIcon className="w-4 h-4 mr-2" /> Exportar PDF
-                                            </DropdownItem>
-                                            <DropdownItem
-                                                onClick={() => setIsUndoModalOpen(true)}
-                                                className="text-brand-dark dark:text-dark-heading"
-                                            >
-                                                <RotateIcon className="w-4 h-4 mr-2" /> Desfazer movimentação
-                                            </DropdownItem>
-                                        </Dropdown>
-                                    </div>
                                 </div>
+                            </div>
+
+                            {/* Desktop Actions */}
+                            <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
+                                <Button variant="outline" className="h-[42px] px-6" onClick={() => { /* PDF Logic */ }}>
+                                    <DownloadIcon className="w-4 h-4 mr-2" /> PDF
+                                </Button>
+                                
+                                <Dropdown
+                                    align="right"
+                                    showChevron={false}
+                                    trigger={
+                                        <Button
+                                            variant="outline"
+                                            className="w-[42px] h-[42px] p-0 flex items-center justify-center"
+                                        >
+                                            <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
+                                        </Button>
+                                    }
+                                >
+                                    <DropdownItem
+                                        onClick={() => setIsUndoModalOpen(true)}
+                                        className="text-brand-dark dark:text-dark-heading"
+                                    >
+                                        <RotateIcon className="w-4 h-4 mr-2" /> Desfazer movimentação
+                                    </DropdownItem>
+                                </Dropdown>
                             </div>
                         </div>
                     </div>
@@ -164,25 +170,25 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
 
                 {/* Scrollable Content */}
                 <div className="max-w-[1400px] mx-auto p-4 md:p-8 pt-6">
-                    <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                    <div className="grid grid-cols-12 gap-y-8 xl:gap-y-0">
 
                         {/* LEFT COLUMN - MAIN INFO */}
                         <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
 
                             {/* Movement Details Card */}
-                            <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
+                            <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8 shadow-sm">
                                 {/* Top: Info (Gray) */}
-                                <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
-                                    <div className="flex justify-between items-start">
+                                <div className="bg-brand-gray dark:bg-dark-border/30 p-6 border-b border-brand-border dark:border-dark-border">
+                                    <div className="flex justify-between items-center">
                                         <div className="flex flex-col gap-1">
-                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Motivo da Movimentação</span>
-                                            <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-[15px]">
-                                                {data.reason}
+                                            <span className="text-xs uppercase tracking-wider font-bold text-brand-inactive-text dark:text-dark-body">Resumo da Operação</span>
+                                            <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-[16px]">
+                                                {isIn ? "Entrada Manual" : "Saída Manual"}
                                             </div>
                                         </div>
-                                        <div className="text-sm text-brand-inactive-text dark:text-dark-body text-right">
-                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Quantidade</span><br />
-                                            <strong className={`font-bold text-lg ${isIn ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{isIn ? '+' : '-'}{data.quantity}</strong>
+                                        <div className="text-right">
+                                            <span className="text-xs uppercase tracking-wider font-bold text-brand-inactive-text dark:text-dark-body">Quantidade</span><br />
+                                            <strong className={`font-bold text-2xl ${isIn ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{isIn ? '+' : '-'}{data.quantity}</strong>
                                         </div>
                                     </div>
                                 </div>
@@ -190,7 +196,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                 {/* Bottom: Product Info (White) */}
                                 <div className="bg-white dark:bg-dark-surface p-6">
                                     <div className="flex flex-col md:flex-row md:items-center gap-6">
-                                        <div className="flex items-start gap-4 flex-1">
+                                        <div className="flex items-start gap-5 flex-1">
                                             <div className="w-20 h-20 rounded-full border border-brand-border dark:border-dark-border overflow-hidden flex-shrink-0 bg-brand-gray dark:bg-dark-border/20">
                                                 <img
                                                     src={getR2ImageUrl(data.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
@@ -200,34 +206,34 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                             </div>
 
                                             <div className="flex-1 min-w-0">
-                                                <div className="flex justify-between items-start mb-1">
-                                                    <h4 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate pr-4">{data.product.name}</h4>
-                                                </div>
-
-                                                <div className="flex items-center gap-2 mt-2">
-                                                    <div className="text-sm text-brand-dark dark:text-dark-body">{data.product.sku}</div>
-                                                    <span className="text-brand-inactive-text dark:text-dark-body">•</span>
-                                                    <div className="text-sm text-brand-dark dark:text-dark-body">{data.product.category}</div>
+                                                <h4 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate mb-1">{data.product.name}</h4>
+                                                
+                                                <div className="flex items-center gap-2">
+                                                    <Badge variant="gray" className="text-[11px] uppercase tracking-wider font-bold px-1.5">{data.product.sku}</Badge>
+                                                    <span className="text-gray-300 dark:text-gray-600">•</span>
+                                                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{data.product.category}</span>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        {/* Separator for mobile, Divider for desktop */}
-                                        <div className="w-full h-px md:w-px md:h-12 bg-brand-border dark:bg-dark-border flex-shrink-0 md:mx-2"></div>
+                                        {/* Desktop Divider */}
+                                        <div className="hidden md:block w-px h-12 bg-brand-border dark:bg-dark-border mx-2"></div>
+                                        {/* Mobile Divider */}
+                                        <div className="md:hidden w-full h-px bg-brand-border dark:bg-dark-border"></div>
 
-                                        <div className="flex items-center justify-between md:justify-start gap-4 md:gap-6 min-w-fit">
-                                            <div>
-                                                <div className="text-xs text-brand-inactive-text dark:text-dark-body">Anterior</div>
-                                                <div className="text-sm font-medium text-brand-dark dark:text-dark-heading">{data.product.previousStock} un</div>
+                                        <div className="flex items-center justify-between md:justify-start gap-4 md:gap-8 min-w-fit px-2 md:px-0">
+                                            <div className="text-center md:text-left">
+                                                <div className="text-[10px] uppercase tracking-wider font-bold text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Anterior</div>
+                                                <div className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">{data.product.previousStock} un</div>
                                             </div>
 
-                                            <div className="flex items-center justify-center text-brand-inactive-text mt-4">
-                                                <ArrowRightIcon />
+                                            <div className="flex items-center justify-center text-gray-300 dark:text-gray-600">
+                                                <ArrowRightIcon size={18} />
                                             </div>
 
-                                            <div>
-                                                <div className="text-xs text-brand-inactive-text dark:text-dark-body">Atual</div>
-                                                <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{data.product.currentStock} un</div>
+                                            <div className="text-center md:text-left">
+                                                <div className="text-[10px] uppercase tracking-wider font-bold text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Pós-Mov.</div>
+                                                <div className="text-[15px] font-bold text-brand-green">{data.product.currentStock} un</div>
                                             </div>
                                         </div>
                                     </div>
@@ -237,15 +243,30 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                         </div>
 
                         {/* RIGHT COLUMN - SIDEBAR */}
-                        <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-l-0 xl:border-l border-brand-border dark:border-dark-border mt-8 xl:mt-0 space-y-6">
+                        <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-l-0 xl:border-l border-brand-border dark:border-dark-border space-y-8">
+                            
+                            {/* Additional Info Section - User Card */}
+                            <div>
+                                <h3 className="text-[13px] font-bold uppercase tracking-wider text-brand-dark dark:text-dark-heading mb-4">Informações Adicionais</h3>
+                                <div className="flex items-center gap-3 p-4 rounded-2xl bg-brand-gray/50 dark:bg-dark-border/20 border border-brand-border dark:border-dark-border">
+                                    <div className="w-12 h-12 rounded-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex items-center justify-center flex-shrink-0">
+                                        <UserIcon className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
+                                    </div>
+                                    <div className="flex flex-col min-w-0">
+                                        <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body">Registrado por</span>
+                                        <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate">{data.user}</span>
+                                    </div>
+                                </div>
+                            </div>
 
                             {/* Notes Section */}
                             {data.notes && (
-                                <InfoCard
-                                    color="gray"
-                                    title="Observações"
-                                    message={data.notes}
-                                />
+                                <div>
+                                    <h3 className="text-[13px] font-bold uppercase tracking-wider text-brand-dark dark:text-dark-heading mb-4">Observações</h3>
+                                    <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border italic text-sm text-brand-dark dark:text-dark-body leading-relaxed">
+                                        "{data.notes}"
+                                    </div>
+                                </div>
                             )}
                         </div>
                     </div>

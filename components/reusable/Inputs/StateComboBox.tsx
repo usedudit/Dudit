@@ -50,15 +50,14 @@ export const StateComboBox: React.FC<StateComboBoxProps> = ({
     className
 }) => {
     return (
-        <div className={className}>
-            {label && <label className="text-sm font-medium text-brand-dark dark:text-dark-body truncate">{label}</label>}
-            <Combobox
-                options={STATE_OPTIONS}
-                value={value}
-                onChange={onChange}
-                placeholder={placeholder}
-                disabled={disabled}
-            />
-        </div>
+        <Combobox
+            label={label}
+            options={STATE_OPTIONS}
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder}
+            disabled={disabled}
+            className={className}
+        />
     )
 }

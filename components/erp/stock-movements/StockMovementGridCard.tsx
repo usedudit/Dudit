@@ -2,14 +2,12 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Checkbox, Badge, Button } from "@/components/reusable"
+import { Badge, Button } from "@/components/reusable"
 import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
 import { ThreeDotsIcon, RotateIcon, ChevronDownIcon, ChevronUpIcon } from "@/lib/icons"
 
 interface StockMovementGridCardProps {
   movement: any
-  selected: boolean
-  onSelect: () => void
   onUndo: (id: string) => void
   onDetails: (id: string) => void
 }
@@ -17,8 +15,6 @@ interface StockMovementGridCardProps {
 const StockMovementGridCard = React.memo(
   ({
     movement,
-    selected,
-    onSelect,
     onUndo,
     onDetails
   }: StockMovementGridCardProps) => {
@@ -44,8 +40,7 @@ const StockMovementGridCard = React.memo(
           </div>
 
           <div className="flex-1 min-w-0 flex flex-col justify-center">
-            {/* Linha 1: Nome + Badge Checkbox */}
-            <div className="flex justify-between items-start gap-1">
+              {/* Linha 1: Nome + Badge */}
               <div className="flex items-center gap-2 min-w-0 pr-1">
                 <h3
                   className="flex-1 min-w-0 font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate"
@@ -53,25 +48,20 @@ const StockMovementGridCard = React.memo(
                 >
                   {movement.product.name}
                 </h3>
-
-                <Badge
-                  variant={movement.type === 'in' ? "green" : "red"}
-                  icon={movement.type === 'in' ? <ChevronDownIcon /> : <ChevronUpIcon />}
-                  className="whitespace-nowrap"
-                >
-                  {movement.type === 'in' ? "Entrada" : "Saída"}
-                </Badge>
               </div>
 
-              {/* Checkbox com stopPropagation */}
-              <div className="flex-shrink-0 -mt-1 -mr-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                <Checkbox checked={selected} onChange={onSelect} />
+            {/* Linha 2: SKU + Badge */}
+            <div className="flex items-center justify-between mt-1">
+              <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate">
+                <span>SKU {movement.product.sku || "N/A"}</span>
               </div>
-            </div>
-
-            {/* Linha 2: SKU */}
-            <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate mt-1">
-              <span>SKU {movement.product.sku || "N/A"}</span>
+              <Badge
+                variant={movement.type === 'in' ? "green" : "red"}
+                icon={movement.type === 'in' ? <ChevronDownIcon /> : <ChevronUpIcon />}
+                className="whitespace-nowrap scale-90 origin-right"
+              >
+                {movement.type === 'in' ? "Entrada" : "Saída"}
+              </Badge>
             </div>
           </div>
         </div>
@@ -113,7 +103,7 @@ const StockMovementGridCard = React.memo(
                 trigger={
                   <Button
                     variant="outline"
-                    className="w-[34px] h-[34px] p-0 flex items-center justify-center"
+                    className="w-[40px] h-[40px] p-0 flex items-center justify-center font-bold"
                   >
                     <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
                   </Button>
@@ -130,7 +120,6 @@ const StockMovementGridCard = React.memo(
     )
   },
   (prev, next) =>
-    prev.selected === next.selected &&
     prev.movement === next.movement
 )
 

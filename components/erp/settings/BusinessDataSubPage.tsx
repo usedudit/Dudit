@@ -106,7 +106,7 @@ export const BusinessDataSubPage = ({
     const [search, setSearch] = useState("")
     const [debouncedSearch, setDebouncedSearch] = useState("")
     const [filteredMethods, setFilteredMethods] = useState<any[]>(paymentMethods || [])
-    
+
     useEffect(() => {
         const handler = setTimeout(() => setDebouncedSearch(search), 300)
         return () => clearTimeout(handler)
@@ -118,8 +118,8 @@ export const BusinessDataSubPage = ({
             return
         }
         const term = debouncedSearch.toLowerCase()
-        setFilteredMethods(methods.filter(m => 
-            m.name?.toLowerCase().includes(term) || 
+        setFilteredMethods(methods.filter(m =>
+            m.name?.toLowerCase().includes(term) ||
             m.payment_type?.toLowerCase().includes(term) ||
             m.card_brand?.toLowerCase().includes(term)
         ))
@@ -823,7 +823,7 @@ export const BusinessDataSubPage = ({
                                         <div className="flex justify-between items-center mb-4">
                                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Métodos de Pagamento ({methods.length})</h3>
                                             <Button variant="link" className="flex items-center hidden md:flex" onClick={() => { setEditingPayment(null); setPaymentModalOpen(true) }}>
-                                                <PlusIcon className="w-4 h-4" /> Adicionar Método
+                                                + Adicionar Método
                                             </Button>
                                         </div>
 

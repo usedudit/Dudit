@@ -30,6 +30,8 @@ interface ComboboxProps {
   disabled?: boolean
   actionItem?: ComboboxActionItem
   width?: string
+  label?: string
+  required?: boolean
 }
 
 export function Combobox({
@@ -43,6 +45,8 @@ export function Combobox({
   disabled = false,
   actionItem,
   width = "w-full",
+  label,
+  required,
 }: ComboboxProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
@@ -251,6 +255,12 @@ export function Combobox({
   return (
     <>
       <div ref={triggerRef} className={cn("relative", width, className)}>
+        {label && (
+          <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">
+            {label}
+            {required && <span className="text-brand-red ml-1">*</span>}
+          </label>
+        )}
         <button
           type="button"
           disabled={disabled}
