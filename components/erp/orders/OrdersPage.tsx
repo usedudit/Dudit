@@ -136,10 +136,10 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     statusLabel: statusInfo.label,
                     statusColor: statusInfo.color,
                     isUnfulfilled: (o.situation === "pending" || o.situation === "in_process"),
-                    formattedDate: new Date(o.created_at).toLocaleDateString('pt-BR'),
+                    formattedDate: new Date(o.order_date || o.created_at).toLocaleDateString('pt-BR'),
                     store_name: o.stores?.name || "Loja Principal",
                     items_count: o.order_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || o.quantity || 0,
-                    created_at_time: new Date(o.created_at).getTime(),
+                    created_at_time: new Date(o.order_date || o.created_at).getTime(),
                     situation: o.situation
                 }
             })

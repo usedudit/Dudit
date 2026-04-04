@@ -1,6 +1,6 @@
 "use server"
 
-import { revalidateTag } from "next/cache"
+import { revalidateTag, revalidatePath } from "next/cache"
 import { TAGS } from "./revalidation-tags"
 import { redis } from "@/lib/redis"
 
@@ -39,8 +39,14 @@ export async function revalidateOrders(partnerId: string) {
   if (partnerId) {
     safeRevalidateTag(TAGS.orders(partnerId))
     safeRevalidateTag(partnerId)
+    safeRevalidateTag(`partner-${partnerId}-orders`)
   }
   safeRevalidateTag("orders")
+  
+  // Clear router cache for relevant pages
+  revalidatePath("/erp/orders")
+  revalidatePath("/my-orders")
+  revalidatePath("/", "layout")
 }
 
 /**

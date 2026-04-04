@@ -230,6 +230,7 @@ export default function CreateOrder({ onBack, partnerId }: CreateOrderProps) {
         setIsPaymentModalOpen(false)
         if (wasSaleSuccessful) {
             resetForm()
+            router.refresh()
             setWasSaleSuccessful(false)
         }
     }
@@ -280,6 +281,7 @@ export default function CreateOrder({ onBack, partnerId }: CreateOrderProps) {
 
             if (result.success) {
                 notifySuccess(`Pedido ${result.orderNumber} criado com sucesso!`)
+                router.refresh()
                 setWasSaleSuccessful(true)
                 return { success: true, orderNumber: result.orderNumber }
             } else {
