@@ -339,7 +339,7 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId }:
                             handleStartProcessing();
                         }
                     }}
-                    className="w-full h-[52px] text-lg font-bold"
+                    className="w-full h-[52px]"
                 >
                     {disabled ? 'Verifique os valores' : confirmText}
                 </Button>
@@ -546,7 +546,7 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId }:
                                                 <CompactPaymentStatusAlert totalPaid={totalPaidCalculated} totalNeed={total} />
                                                 <Input label="Valor a Receber" name="pixAmount" prefix="R$" value={amountPaid} onChange={handleManualInput} className="font-bold text-lg" />
                                                 {!isPixGenerated ? (
-                                                    <Button variant="filled" className="w-full h-12 text-base" onClick={() => setIsPixGenerated(true)}>Gerar QR Code</Button>
+                                                    <Button variant="filled" className="w-full h-12" onClick={() => setIsPixGenerated(true)}>Gerar QR Code</Button>
                                                 ) : (
                                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={standardTransition} className="flex flex-col items-center">
                                                         <div className="bg-white p-6 rounded-3xl border border-brand-border mb-8 shadow-sm">

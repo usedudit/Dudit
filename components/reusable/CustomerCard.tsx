@@ -29,32 +29,30 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, showMap 
     return (
         <div className={`bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors ${className}`}>
             <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
-            
+
             {/* Top Part: Customer Identity */}
             <div className="p-6 pb-0">
-                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading mb-4 mt-1 text-left">
+                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">
                     Cliente
                 </h3>
-                
+
                 <div className="flex items-start justify-between mb-6">
                     <div className="flex gap-3 text-left">
                         <div className="relative">
-                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-gray-800 flex items-center justify-center text-lg font-bold text-brand-dark dark:text-dark-heading border border-white dark:border-dark-border overflow-hidden text-brand-inactive-text">
+                            <div className="w-10 h-10 rounded-full bg-brand-slate dark:bg-dark-border flex items-center justify-center text-lg font-bold text-brand-dark dark:text-dark-heading border border-white dark:border-dark-border overflow-hidden uppercase text-brand-inactive-text">
                                 {customer?.name?.charAt(0) || 'C'}
                             </div>
-                            <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white dark:border-dark-surface rounded-full"></div>
                         </div>
                         <div className="min-w-0">
-                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading uppercase truncate">{customer?.name || "Consumidor Final"}</h4>
-                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Cliente Ativo</span>
+                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{customer?.name || "Consumidor Final"}</h4>
                         </div>
                     </div>
 
                     {onRemove && (
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="w-8 h-8 text-brand-red hover:bg-red-50 rounded-full" 
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="w-8 h-8 text-brand-red hover:bg-red-50 rounded-full"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 onRemove();
@@ -65,9 +63,9 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, showMap 
                     )}
                 </div>
             </div>
-            
+
             <div className="border-t border-brand-border dark:border-dark-border w-full"></div>
-            
+
             {/* Bottom Part: Shipping Address */}
             <div className="p-6 text-left">
                 <div className="flex justify-between items-center mb-4">
@@ -105,12 +103,12 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, showMap 
                         </p>
                     </div>
                 )}
-                
+
                 <div className="mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">Informações de Contato</h3>
                     </div>
-                    
+
                     {hasContact ? (
                         <div className="space-y-3">
                             {customer?.email && (
