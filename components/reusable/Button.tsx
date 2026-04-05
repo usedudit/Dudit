@@ -5,7 +5,7 @@ import { Spinner } from "@/components/reusable/Spinner"
 import { Slot } from "@radix-ui/react-slot"
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-    variant?: "default" | "outline" | "outlinered" | "destructive" | "ghost" | "filled" | "link"
+    variant?: "default" | "outline" | "outlinered" | "destructive" | "warning" | "ghost" | "filled" | "link"
     size?: "default" | "sm" | "lg" | "icon"
     asChild?: boolean
     isLoading?: boolean
@@ -31,6 +31,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         const variants = {
             default:
                 "bg-brand-green text-white hover:bg-brand-green/90 focus-visible:ring-brand-green/50 dark:bg-brand-green dark:hover:bg-brand-green/90",
+            warning:
+                "bg-yellow-500 text-white hover:bg-yellow-600 focus-visible:ring-yellow-500/50 dark:bg-yellow-600 dark:hover:bg-yellow-700",
             outline:
                 "bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border focus-visible:ring-brand-border",
             outlinered:

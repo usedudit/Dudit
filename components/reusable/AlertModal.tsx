@@ -43,7 +43,7 @@ const VARIANT_STYLES = {
   warning: {
     bgLight: "bg-yellow-100 dark:bg-yellow-900/30",
     text: "text-yellow-700 dark:text-yellow-400",
-    button: "default" as const,
+    button: "warning" as const,
     defaultIcon: <AlertTriangleIcon className="h-8 w-8" />,
   },
   info: {
@@ -166,7 +166,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
     </>
   ) : (
     <Button
-      variant={effectiveVariant === "danger" ? "destructive" : "default"}
+      variant={styles.button}
       onClick={() => handleButtonClick(handleClose)}
       className="transition-all duration-200"
       disabled={disabled}
@@ -212,7 +212,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
               </>
             ) : (
               <Button
-                variant={styles.button === "destructive" ? "destructive" : "default"}
+                variant={styles.button}
                 onClick={() => handleButtonClick(handleClose)}
                 className="w-full"
               >

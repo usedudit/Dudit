@@ -112,7 +112,7 @@ const ProductCard = ({ item, partner }: { item: any; partner: any }) => {
     : (item.promotional_price || item.price)
 
   return (
-    <Link href={getProductUrl(item, partner)} prefetch={false} className="group cursor-pointer">
+    <Link href={getProductUrl(item, partner)} prefetch={true} className="group cursor-pointer">
       <div className="relative mb-3 overflow-hidden rounded-[16px]">
         <div className="relative w-full aspect-square">
           <img

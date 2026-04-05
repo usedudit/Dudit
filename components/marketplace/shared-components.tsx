@@ -6,6 +6,8 @@ import Link from "next/link"
 import { createSlug } from "@/lib/utils/slugify"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getProductUrl } from "@/lib/utils/url-generator"
+import { useSmartPrefetch } from "@/hooks/use-smart-prefetch"
+import { getMarketplaceProductAction } from "@/app/actions/marketplace/client-loaders"
 
 const HOME_BANNERS = [
   { id: 1, src: 'https://img.dudit.com.br/static/banners/Banner-1.png', alt: 'Venda aqui' },
@@ -128,7 +130,7 @@ export const CategoryList: React.FC = () => {
 
       <div className="flex overflow-x-auto gap-4 md:gap-8 px-4 lg:px-0 scrollbar-hide pb-4">
         {HOME_CATEGORIES.map((cat) => (
-          <Link href={`/search?q=${cat.name}`} key={cat.name} prefetch={false} className="flex flex-col gap-3 min-w-[100px] items-center text-center group">
+          <Link href={`/explorar?q=${cat.name}`} key={cat.name} prefetch={true} className="flex flex-col gap-3 min-w-[100px] items-center text-center group">
             <div className="w-[100px] h-[100px] md:w-[120px] md:h-[120px] rounded-full overflow-hidden border border-gray-100 shadow-sm group-hover:shadow-md transition-all">
               <img
                 src={cat.image || "https://img.dudit.com.br/static/Placeholder.png"}
@@ -195,11 +197,22 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product }) => {
   const imageUrl = getProductImageUrl(product.images)
   const slug = createSlug(product.name)
 
+  const { ref, onMouseEnter, onMouseLeave } = useSmartPrefetch({
+    queryKey: ['marketplace-product', product.id],
+    queryFn: () => getMarketplaceProductAction(product.id).then(res => res.data),
+    staleTime: 60000
+  });
+
   return (
-    <div className="w-[160px] md:w-[220px] relative group/card h-full shrink-0">
+    <div 
+      ref={ref} 
+      onMouseEnter={onMouseEnter} 
+      onMouseLeave={onMouseLeave}
+      className="w-[160px] md:w-[220px] relative group/card h-full shrink-0"
+    >
       <Link
         href={getProductUrl(product, product.partners)}
-        prefetch={false}
+        prefetch={true}
         className="block h-full flex-col hover:no-underline"
       >
         <div className="relative mb-3 overflow-hidden rounded-[16px] border border-gray-100 bg-brand-gray aspect-square">
@@ -278,7 +291,7 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
         </div>
         <Link
           href={seeMoreLink}
-          prefetch={false}
+          prefetch={true}
           className="hidden md:flex font-bold text-brand-green hover:underline text-sm mb-1 items-center gap-1"
         >
           Exibir mais <ChevronRight size={16} />

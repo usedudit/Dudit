@@ -389,6 +389,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                         setWrapperMode(null)
                         setActiveQuote(null)
                     }}
+                    onEditQuote={handleEditQuote}
                 />
             )
         }

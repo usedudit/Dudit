@@ -210,22 +210,22 @@ const QuotePreview = ({
                                         <tbody>
                                             {page.items.map((item, idx) => (
                                                 <tr key={idx} className="bg-white">
-                                                    <td className="py-4 pl-6 pr-4 border-b border-gray-50">
+                                                    <td className="py-2 pl-6 pr-4 border-b border-gray-50">
                                                         <span className="font-bold text-[13px] text-black block truncate max-w-[250px]">
                                                             {item.name || 'Produto sem nome'}
                                                         </span>
                                                     </td>
-                                                    <td className="py-4 px-4 border-b border-gray-50 text-center">
+                                                    <td className="py-2 px-4 border-b border-gray-50 text-center">
                                                         <span className="text-[13px] font-medium text-gray-600">
                                                             {item.qty}
                                                         </span>
                                                     </td>
-                                                    <td className="py-4 px-4 border-b border-gray-50 text-right">
+                                                    <td className="py-2 px-4 border-b border-gray-50 text-right">
                                                         <span className="text-[13px] font-medium text-gray-600">
                                                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price).replace('R$', '$')}
                                                         </span>
                                                     </td>
-                                                    <td className="py-4 pl-4 pr-6 border-b border-gray-50 text-right">
+                                                    <td className="py-2 pl-4 pr-6 border-b border-gray-50 text-right">
                                                         <span className="text-[13px] font-bold text-black">
                                                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price * item.qty).replace('R$', '$')}
                                                         </span>

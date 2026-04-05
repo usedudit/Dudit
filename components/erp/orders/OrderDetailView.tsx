@@ -120,7 +120,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                             <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                 <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                     <span className="hidden md:inline truncate">{pageTitle}</span>
-                                    <Badge variant={statusInfo.variant} className="text-sm font-normal h-fit whitespace-nowrap px-2 py-0.5">
+                                    <Badge variant={statusInfo.variant}>
                                         {statusInfo.label}
                                     </Badge>
                                 </h1>
@@ -145,20 +145,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                             </div>
                         </div>
 
-                        {/* Mobile Title */}
-                        <div className="md:hidden flex items-center justify-between py-4 px-2">
-                            <div className="flex flex-col gap-1 min-w-0">
-                                <h1 className="text-xl font-bold text-brand-dark dark:text-dark-heading truncate pr-4">
-                                    {pageTitle}
-                                </h1>
-                                <div className="text-xs text-brand-inactive-text font-medium">
-                                    {order.order_source || "Manual"}
-                                </div>
-                            </div>
-                            <Badge variant={statusInfo.variant}>
-                                {statusInfo.label}
-                            </Badge>
-                        </div>
+                        {/* Mobile Title - Removed per user request */}
 
                         <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"} pb-4`}>
                         </div>
@@ -190,7 +177,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                 <div className="bg-white dark:bg-dark-surface px-12 pt-6 pb-16">
                                     <div className="relative px-4">
-                                        <div className="relative h-1.5 w-full bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-between">
+                                        <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
                                             <div
                                                 className={`absolute left-0 h-full rounded-full transition-all duration-500 ${order.delivery_status === 'delivery_failed' ? 'bg-brand-red' : 'bg-brand-dark dark:bg-dark-heading'}`}
                                                 style={{ width: `${(timelineSteps.filter(s => s.active).length - 1) * 33.33}%` }}
@@ -198,18 +185,22 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                             {timelineSteps.map((step, idx) => (
                                                 <div key={idx} className="relative flex flex-col items-center">
+                                                    <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
+                                                        <span className={`text-xs font-medium ${step.active ? (order.delivery_status === 'delivery_failed' && idx === 3 ? 'text-brand-red' : 'text-brand-dark dark:text-dark-heading') : 'text-gray-400 dark:text-dark-body'}`}>
+                                                            {step.label}
+                                                        </span>
+                                                    </div>
                                                     <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (order.delivery_status === 'delivery_failed' && idx === 3 ? 'bg-brand-red border-red-500' : 'bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading') : 'bg-white dark:bg-dark-surface border-gray-300 dark:border-gray-600'}`}>
                                                         {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
                                                     </div>
                                                     <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
-                                                        <span className={`text-xs font-bold mb-1 ${step.active ? (order.delivery_status === 'delivery_failed' && idx === 3 ? 'text-brand-red' : 'text-brand-dark dark:text-dark-heading') : 'text-gray-300 dark:text-dark-body'}`}>
-                                                            {step.label}
-                                                        </span>
-                                                        {step.active && step.date && (
+                                                        {step.date ? (
                                                             <div className="flex items-center gap-1 text-xs text-brand-inactive-text">
                                                                 <span>{step.date}</span>
                                                                 {step.time && <span>{step.time}</span>}
                                                             </div>
+                                                        ) : (
+                                                            <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
                                                         )}
                                                     </div>
                                                 </div>
@@ -226,7 +217,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                 <div className="space-y-4">
                                     {(order.order_items || []).map((item: any) => (
                                         <div key={item.id} className="flex items-start gap-4 p-3 rounded-2xl hover:bg-brand-gray/20 transition-colors group">
-                                            <div className="w-16 h-16 rounded-xl bg-brand-gray/50 dark:bg-gray-800 border border-brand-border dark:border-dark-border overflow-hidden flex-shrink-0 p-1">
+                                            <div className="w-16 h-16 rounded-xl bg-brand-gray/50 dark:bg-dark-border/50 border border-brand-border dark:border-dark-border overflow-hidden flex-shrink-0 p-1">
                                                 <img
                                                     src={item.image || "https://img.dudit.com.br/static/Placeholder.png"}
                                                     className="w-full h-full object-cover rounded-xl"
@@ -318,6 +309,17 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {/* Mobile Bottom Action Bar */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
+                <Button variant="outline" className="flex-1" onClick={onBack}>
+                    Voltar
+                </Button>
+                <Button onClick={() => onEditOrder(order)} className="flex-1 whitespace-nowrap">
+                    <EditIcon className="w-4 h-4 mr-2" />
+                    Editar Venda
+                </Button>
             </div>
         </div>
     )

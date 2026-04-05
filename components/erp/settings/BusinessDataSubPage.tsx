@@ -1011,7 +1011,7 @@ export const BusinessDataSubPage = ({
                                 })}
                                 disabled={isSavingPayment}
                             >
-                                {isSavingPayment ? "Salvando..." : "Salvar Alterações"}
+                                {isSavingPayment ? "Salvando..." : "Salvar"}
                             </Button>
                             <Button
                                 variant="outline"

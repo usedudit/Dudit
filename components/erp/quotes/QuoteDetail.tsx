@@ -26,11 +26,12 @@ interface QuoteDetailProps {
     quoteId: string;
     partnerId: string;
     onBack: () => void;
+    onEditQuote?: (quote: any) => void;
 }
 
 
 
-const QuoteDetail = ({ quoteId, partnerId, onBack }: QuoteDetailProps) => {
+const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote }: QuoteDetailProps) => {
     const [isScrolled, setIsScrolled] = useState(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [quote, setQuote] = useState<any>(null);
@@ -132,6 +133,38 @@ const QuoteDetail = ({ quoteId, partnerId, onBack }: QuoteDetailProps) => {
         ? new Date(quote.expiration_date + 'T12:00:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' })
         : '—';
 
+    const getTimelineSteps = (status: string) => {
+        const baseDateObj = quote.created_at ? new Date(quote.created_at) : (quote.issue_date ? new Date(quote.issue_date + 'T12:00:00') : new Date());
+        const baseDate = baseDateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        const baseTime = baseDateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+        const steps = [
+            { label: 'Criado', date: baseDate, time: baseTime, active: true },
+            { label: 'Enviado', date: '', time: '', active: ['sent', 'approved', 'rejected'].includes(status) },
+            { label: 'Aprovação', date: '', time: '', active: ['approved', 'rejected'].includes(status) }
+        ];
+
+        if (status !== 'draft') {
+            steps[1].date = baseDate;
+        }
+
+        if (status === 'approved') {
+            steps[2].label = 'Aprovado';
+        } else if (status === 'rejected') {
+            steps[2].label = 'Recusado';
+        }
+
+        if (['approved', 'rejected'].includes(status)) {
+            const updatedDateObj = quote.updated_at ? new Date(quote.updated_at) : new Date();
+            steps[2].date = updatedDateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+            steps[2].time = updatedDateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        return steps;
+    };
+
+    const timelineSteps = getTimelineSteps(quote.status);
+
     return (
         <div className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300 relative">
             <div
@@ -145,7 +178,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack }: QuoteDetailProps) => {
 
                         {/* Back button — desktop only */}
                         <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                            <Button variant="ghost" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center bg-brand-gray dark:bg-dark-border">
+                            <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                 <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                             </Button>
                         </div>
@@ -156,7 +189,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack }: QuoteDetailProps) => {
                                 <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                     {/* Title hidden on mobile, shown on md+ */}
                                     <span className="hidden md:inline truncate">{pageTitle}</span>
-                                    <Badge variant={statusInfo.variant} className="text-sm font-normal h-fit whitespace-nowrap px-2 py-0.5 hidden md:inline-flex">
+                                    <Badge variant={statusInfo.variant}>
                                         {statusInfo.label}
                                     </Badge>
                                 </h1>
@@ -176,22 +209,14 @@ const QuoteDetail = ({ quoteId, partnerId, onBack }: QuoteDetailProps) => {
                                     onDuplicate={() => { }}
                                 />
 
-                                <Button onClick={() => { }} className="whitespace-nowrap">
+                                <Button onClick={() => onEditQuote && onEditQuote(quote)} className="whitespace-nowrap">
                                     <EditIcon className="w-[18px] h-[18px] mr-2" />
                                     Editar orçamento
                                 </Button>
                             </div>
                         </div>
 
-                        {/* Mobile Title - dynamic */}
-                        <div className="md:hidden flex items-center justify-between py-4">
-                            <h1 className="text-xl font-bold text-brand-dark dark:text-dark-heading truncate pr-4">
-                                {pageTitle}
-                            </h1>
-                            <Badge variant={statusInfo.variant}>
-                                {statusInfo.label}
-                            </Badge>
-                        </div>
+                        {/* Mobile Title - Removed per user request to only show on desktop */}
 
                         {/* Tabs space matching AddProductPage */}
                         <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"} pb-4`}>
@@ -243,138 +268,149 @@ const QuoteDetail = ({ quoteId, partnerId, onBack }: QuoteDetailProps) => {
                                     </div>
                                 </div>
 
-                                <div className="bg-white dark:bg-dark-surface p-6">
-                                    <div className="flex items-center justify-between text-sm">
-                                        <div className="flex flex-col items-center gap-2">
-                                            <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white"><CheckCircle2 size={16} /></div>
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-[13px]">Criado</span>
-                                            <span className="text-xs text-brand-inactive-text font-medium">{formattedIssueDate}</span>
-                                        </div>
-                                        <div className={`flex-1 h-0.5 mx-2 mb-6 ${quote.status !== 'draft' ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'}`}></div>
-                                        <div className="flex flex-col items-center gap-2">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${quote.status !== 'draft' ? 'bg-green-500 text-white' : 'border-2 border-gray-300 dark:border-gray-600 text-gray-400'}`}>
-                                                <UploadIcon size={16} />
-                                            </div>
-                                            <span className={`text-[13px] ${quote.status !== 'draft' ? 'font-bold text-brand-dark dark:text-dark-heading' : 'font-medium text-gray-500'}`}>Enviado</span>
-                                            <span className="text-xs text-brand-inactive-text font-medium">{quote.status !== 'draft' ? formattedIssueDate : '—'}</span>
-                                        </div>
-                                        <div className={`flex-1 h-0.5 mx-2 mb-6 ${quote.status === 'approved' ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'}`}></div>
-                                        <div className="flex flex-col items-center gap-2">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${quote.status === 'approved' ? 'bg-green-500 text-white' :
-                                                quote.status === 'rejected' ? 'bg-red-500 text-white' :
-                                                    'border-2 border-gray-300 dark:border-gray-600 text-gray-400'
-                                                }`}>
-                                                {quote.status === 'approved' ? <CheckCircle2 size={16} /> :
-                                                    quote.status === 'rejected' ? <XCircle size={16} /> :
-                                                        <ClockIcon size={16} />}
-                                            </div>
-                                            <span className={`text-[13px] ${(quote.status === 'approved' || quote.status === 'rejected') ? 'font-bold text-brand-dark dark:text-dark-heading' : 'font-medium text-gray-500'}`}>
-                                                {quote.status === 'rejected' ? 'Recusado' : 'Aprovação'}
-                                            </span>
-                                            <span className="text-xs text-brand-inactive-text font-medium">—</span>
+                                <div className="bg-white dark:bg-dark-surface px-12 pt-6 pb-16">
+                                    <div className="relative px-4">
+                                        <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
+                                            <div
+                                                className={`absolute left-0 h-full rounded-full transition-all duration-500 ${quote.status === 'rejected' ? 'bg-brand-red' : 'bg-brand-dark dark:bg-dark-heading'}`}
+                                                style={{ width: `${(timelineSteps.filter(s => s.active).length - 1) * 50}%` }}
+                                            ></div>
+
+                                            {timelineSteps.map((step, idx) => (
+                                                <div key={idx} className="relative flex flex-col items-center">
+                                                    <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
+                                                        <span className={`text-xs font-medium ${step.active ? (quote.status === 'rejected' && idx === 2 ? 'text-brand-red' : 'text-brand-dark dark:text-dark-heading') : 'text-gray-400 dark:text-dark-body'}`}>
+                                                            {step.label}
+                                                        </span>
+                                                    </div>
+                                                    <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (quote.status === 'rejected' && idx === 2 ? 'bg-brand-red border-red-500' : 'bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading') : 'bg-white dark:bg-dark-surface border-gray-300 dark:border-gray-600'}`}>
+                                                        {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
+                                                    </div>
+                                                    <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
+                                                        {step.date ? (
+                                                            <div className="flex items-center gap-1 text-xs text-brand-inactive-text">
+                                                                <span>{step.date}</span>
+                                                                {step.time && <span>{step.time}</span>}
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Items List */}
-                            <div className="mb-8">
-                                <div className="flex items-center justify-between mb-4 border-b border-brand-border dark:border-dark-border pb-3">
-                                    <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Itens da Proposta</h3>
-                                </div>
-
-                                <div className="space-y-0">
-                                    {quote.items?.map((item: any) => (
-                                        <QuoteItem
-                                            key={item.id}
-                                            image={item.products?.images?.[0] || "https://img.dudit.com.br/static/Placeholder.png"}
-                                            name={item.custom_name || item.products?.name || "Produto sem nome"}
-                                            sku={item.products?.sku || "N/A"}
-                                            qty={item.quantity}
-                                            price={Number(item.unit_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                            total={Number(item.quantity * item.unit_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                        />
-                                    ))}
-                                </div>
+                            <div className="mt-8">
+                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Itens da Proposta</h3>
                             </div>
 
-                            {/* Financial Summary */}
-                            <div className="flex justify-end pr-2">
-                                <div className="w-full max-w-xs space-y-3">
-                                    <div className="flex justify-between items-center text-sm font-medium">
-                                        <span className="text-brand-inactive-text dark:text-dark-body text-left">Subtotal</span>
-                                        <span className="text-brand-dark dark:text-dark-heading font-bold">R$ {subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-sm font-medium">
-                                        <span className="text-brand-inactive-text dark:text-dark-body text-left">Desconto</span>
-                                        <span className="text-brand-dark dark:text-dark-heading">R$ {discount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-sm font-medium">
-                                        <span className="text-brand-inactive-text dark:text-dark-body text-left">Frete</span>
-                                        <span className="text-brand-dark dark:text-dark-heading">R$ {shipping.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-sm font-medium">
-                                        <span className="text-brand-inactive-text dark:text-dark-body text-left">Outros Custos</span>
-                                        <span className="text-brand-dark dark:text-dark-heading">R$ {additional.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-2">
-                                        <span className="font-bold text-[18px] text-brand-dark dark:text-dark-heading text-left tracking-tight">Total</span>
-                                        <span className="font-bold text-[22px] text-brand-dark dark:text-dark-heading tracking-tight">R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                    </div>
-                                </div>
+                            <div className="space-y-0">
+                                {quote.items?.map((item: any) => (
+                                    <QuoteItem
+                                        key={item.id}
+                                        image={item.products?.images?.[0] || "https://img.dudit.com.br/static/Placeholder.png"}
+                                        name={item.custom_name || item.products?.name || "Produto sem nome"}
+                                        sku={item.products?.sku || "N/A"}
+                                        qty={item.quantity}
+                                        price={Number(item.unit_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        total={Number(item.quantity * item.unit_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    />
+                                ))}
                             </div>
                         </div>
 
-                        {/* RIGHT COLUMN - SIDEBAR */}
-                        <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-10 border-l-0 xl:border-l border-brand-border dark:border-dark-border mt-8 xl:mt-0 space-y-6">
-
-                            {/* Status Management Card */}
-                            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 relative overflow-hidden transition-colors text-left">
-                                <div className="absolute top-0 left-0 w-full h-1 bg-brand-green dark:bg-brand-green/30"></div>
-                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading mb-4 mt-1">Status do Orçamento</h3>
-                                <div className="flex flex-col gap-1.5">
-                                    <FormDropdown
-                                        value={quote.status}
-                                        setValue={handleStatusChange}
-                                        options={[
-                                            { value: 'draft', label: 'Rascunho' },
-                                            { value: 'sent', label: 'Enviado' },
-                                            { value: 'approved', label: 'Aprovado' },
-                                            { value: 'rejected', label: 'Rejeitado' }
-                                        ]}
-                                    />
+                        {/* Financial Summary */}
+                        <div className="flex justify-end pr-2">
+                            <div className="w-full max-w-xs space-y-3">
+                                <div className="flex justify-between items-center text-sm font-medium">
+                                    <span className="text-brand-inactive-text dark:text-dark-body text-left">Subtotal</span>
+                                    <span className="text-brand-dark dark:text-dark-heading font-bold">R$ {subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                 </div>
-                            </div>
-
-                            {/* Customer Card Reusable Component */}
-                            <CustomerCard
-                                customer={quote.customers}
-                                address={null} // Address mapping would go here if available in DB
-                            />
-
-                            {/* Terms/Notes Card */}
-                            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 text-left relative overflow-hidden">
-                                <div className="absolute top-0 left-0 w-full h-1 bg-brand-gray dark:bg-dark-border"></div>
-                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading mb-3 mt-1">Observações da Proposta</h3>
-                                <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-wrap">
-                                    {quote.notes || "Nenhuma observação ou termo adicional vinculado a este orçamento."}
-                                </p>
+                                <div className="flex justify-between items-center text-sm font-medium">
+                                    <span className="text-brand-inactive-text dark:text-dark-body text-left">Desconto</span>
+                                    <span className="text-brand-dark dark:text-dark-heading">R$ {discount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm font-medium">
+                                    <span className="text-brand-inactive-text dark:text-dark-body text-left">Frete</span>
+                                    <span className="text-brand-dark dark:text-dark-heading">R$ {shipping.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm font-medium">
+                                    <span className="text-brand-inactive-text dark:text-dark-body text-left">Outros Custos</span>
+                                    <span className="text-brand-dark dark:text-dark-heading">R$ {additional.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                                <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-2">
+                                    <span className="font-bold text-[18px] text-brand-dark dark:text-dark-heading text-left tracking-tight">Total</span>
+                                    <span className="font-bold text-[22px] text-brand-dark dark:text-dark-heading tracking-tight">R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <AlertModal
-                    isOpen={showDeleteModal}
-                    onClose={() => setShowDeleteModal(false)}
-                    onConfirm={handleDelete}
-                    title="Excluir Orçamento"
-                    description={`Você tem certeza que deseja excluir o orçamento #${quote.quote_number}? Esta ação não pode ser desfeita.`}
-                    confirmText="Excluir"
-                    cancelText="Cancelar"
-                    variant="danger"
-                    isLoading={isDeleting}
-                />
+                    {/* RIGHT COLUMN - SIDEBAR */}
+                    <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-10 border-l-0 xl:border-l border-brand-border dark:border-dark-border mt-8 xl:mt-0 space-y-6">
+
+                        {/* Status Management Card */}
+                        <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 relative overflow-hidden transition-colors text-left">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-brand-green dark:bg-brand-green/30"></div>
+                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading mb-4 mt-1">Status do Orçamento</h3>
+                            <div className="flex flex-col gap-1.5">
+                                <FormDropdown
+                                    value={quote.status}
+                                    setValue={handleStatusChange}
+                                    options={[
+                                        { value: 'draft', label: 'Rascunho' },
+                                        { value: 'sent', label: 'Enviado' },
+                                        { value: 'approved', label: 'Aprovado' },
+                                        { value: 'rejected', label: 'Rejeitado' }
+                                    ]}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Customer Card Reusable Component */}
+                        <CustomerCard
+                            customer={quote.customers}
+                            address={null} // Address mapping would go here if available in DB
+                        />
+
+                        {/* Terms/Notes Card */}
+                        <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 text-left relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-brand-gray dark:bg-dark-border"></div>
+                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading mb-3 mt-1">Observações da Proposta</h3>
+                            <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-wrap">
+                                {quote.notes || "Nenhuma observação ou termo adicional vinculado a este orçamento."}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <AlertModal
+                isOpen={showDeleteModal}
+                onClose={() => setShowDeleteModal(false)}
+                onConfirm={handleDelete}
+                title="Excluir Orçamento"
+                description={`Você tem certeza que deseja excluir o orçamento #${quote.quote_number}? Esta ação não pode ser desfeita.`}
+                confirmText="Excluir"
+                cancelText="Cancelar"
+                variant="danger"
+                isLoading={isDeleting}
+            />
+
+            {/* Mobile Bottom Action Bar */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
+                <Button variant="outline" className="flex-1" onClick={onBack}>
+                    Voltar
+                </Button>
+                <Button onClick={() => onEditQuote && onEditQuote(quote)} className="flex-1 whitespace-nowrap">
+                    <EditIcon className="w-4 h-4 mr-2" />
+                    Editar orçamento
+                </Button>
             </div>
         </div>
     );
@@ -382,7 +418,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack }: QuoteDetailProps) => {
 
 const QuoteItem = ({ image, name, sku, qty, price, total }: any) => (
     <div className="flex items-start gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0 hover:bg-brand-gray/20 transition-colors px-2 rounded-xl text-left group">
-        <div className="w-16 h-16 rounded-xl bg-brand-gray/50 dark:bg-gray-800 border border-brand-border dark:border-dark-border overflow-hidden flex-shrink-0 flex items-center justify-center p-1">
+        <div className="w-16 h-16 rounded-xl bg-brand-gray/50 dark:bg-dark-border/50 border border-brand-border dark:border-dark-border overflow-hidden flex-shrink-0 flex items-center justify-center p-1">
             <img
                 src={image}
                 className="w-full h-full object-cover mix-blend-multiply dark:mix-blend-normal rounded-lg transition-transform group-hover:scale-105"
@@ -392,11 +428,11 @@ const QuoteItem = ({ image, name, sku, qty, price, total }: any) => (
         </div>
         <div className="flex-1 min-w-0">
             <div className="flex justify-between items-start mb-1 gap-2">
-                <h4 className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">{name}</h4>
-                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading whitespace-nowrap">R$ {total}</span>
+                <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{name}</h4>
+                <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">R$ {total}</span>
             </div>
-            <div className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body mb-2 tracking-wider">{sku}</div>
-            <div className="flex items-center gap-2 text-[11px] text-brand-inactive-text dark:text-dark-body font-bold">
+            <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">{sku}</div>
+            <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
                 <span>{qty} un. • R$ {price} / un.</span>
             </div>
         </div>

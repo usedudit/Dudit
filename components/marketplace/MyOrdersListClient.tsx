@@ -165,7 +165,7 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                                 : "https://img.dudit.com.br/static/Placeholder.png";
 
                                                         return (
-                                                            <Link href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)} prefetch={false} key={item.id} className="flex gap-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/50 p-2 -mx-2 rounded-lg transition-colors">
+                                                            <Link href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)} prefetch={true} key={item.id} className="flex gap-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/50 p-2 -mx-2 rounded-lg transition-colors">
                                                                 <div className="w-16 h-16 bg-white border border-brand-border dark:border-dark-border rounded-[8px] flex items-center justify-center p-1 flex-shrink-0">
                                                                     <img src={itemImage} alt={item.products?.name || item.product_name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
                                                                 </div>

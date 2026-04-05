@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { SkeletonLoader } from "@/components/reusable/SkeletonLoader"
 import { ChevronDown, ChevronLeft } from "lucide-react"
 import { searchMarketplace } from "@/app/actions/marketplace/search"
+import { useInfiniteQuery, keepPreviousData } from "@tanstack/react-query"
 
 interface ExplorarPageClientProps {
   initialResults?: any[]
@@ -34,82 +35,59 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
   const [sortBy, setSortBy] = useState<SortOption>("relevancia")
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
 
-  // INFINITE SCROLL STATE
-  const [items, setItems] = useState<any[]>(initialResults)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [hasMore, setHasMore] = useState(initialResults.length >= 20)
   const observerTarget = useRef<HTMLDivElement>(null)
-  const loadingMoreRef = useRef(false) // HARD GUARD against concurrent requests
-  const MAX_ITEMS = 300 // Memory cap — prevents mobile lag
+  const MAX_ITEMS = 300 // Memory cap
 
-  useEffect(() => {
-    setIsNavigating(false)
-    setItems(initialResults)
-    setHasMore(initialResults.length >= 20)
-    loadingMoreRef.current = false
-  }, [initialResults, query, type])
-
-  const loadMore = useCallback(async () => {
-    // HARD GUARD: Prevent concurrent requests (ref > state because state can be stale in closures)
-    if (loadingMoreRef.current || !hasMore) return
-    loadingMoreRef.current = true
-    setLoadingMore(true)
-    try {
-      let currentListings = items.filter(i => i.itemType !== 'loja')
-      if (currentType === 'vitrines') {
-        currentListings = items.filter(i => i.itemType === 'loja')
-      } else if (currentType === 'produtos') {
-        currentListings = items.filter(i => i.itemType === 'produto')
-      } else if (currentType === 'servicos') {
-        currentListings = items.filter(i => i.itemType === 'servico')
-      }
-      const lastItem = currentListings[currentListings.length - 1]
-
-      const cursor = lastItem?.created_at ? new Date(lastItem.created_at).getTime() : undefined
-      const lastId = lastItem?.id
-
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ['explore', query, currentType],
+    initialPageParam: null as any,
+    queryFn: async ({ pageParam }) => {
+      // If we are given no pageParam but we have initialResults and it's the very first render,
+      // React Query uses initialData. Wait, we are passing initialData, so this is for NEXT pages.
       let limits: any = { geral: 40 }
       if (currentType === 'produtos') limits = { produtos: 40 }
       else if (currentType === 'servicos') limits = { servicos: 40 }
       else if (currentType === 'vitrines') limits = { vitrines: 40 }
 
-      const nextBatch = await searchMarketplace(query, currentType, { ...limits, cursor, lastId })
-
-      if (!nextBatch || nextBatch.length === 0) {
-        setHasMore(false)
-      } else {
-        setItems(prev => {
-          const seen = new Set(prev.map(p => p.id))
-          const pureNew = nextBatch.filter(p => !seen.has(p.id))
-
-          if (pureNew.length === 0) {
-            setHasMore(false)
-            return prev
-          }
-
-          const merged = [...prev, ...pureNew]
-          // MEMORY CAP: Discard oldest items if exceeding limit
-          if (merged.length > MAX_ITEMS) {
-            return merged.slice(merged.length - MAX_ITEMS)
-          }
-          return merged
-        })
+      const nextBatch = await searchMarketplace(query, currentType, { 
+        ...limits, 
+        cursor: pageParam?.cursor, 
+        lastId: pageParam?.lastId 
+      })
+      return nextBatch || []
+    },
+    getNextPageParam: (lastPage) => {
+      if (!lastPage || lastPage.length === 0) return undefined;
+      const lastItem = lastPage[lastPage.length - 1];
+      return {
+        cursor: lastItem.created_at ? new Date(lastItem.created_at).getTime() : undefined,
+        lastId: lastItem.id
       }
-    } catch (e) {
-      console.error("[Infinite Scroll Failed]", e)
-    } finally {
-      loadingMoreRef.current = false
-      setLoadingMore(false)
-    }
-  }, [items, hasMore, query, currentType])
+    },
+    initialData: () => {
+      // Only set initial data if it matches what the server sent to this prop
+      return { pages: [initialResults], pageParams: [null] }
+    },
+    placeholderData: keepPreviousData,
+    staleTime: 60000
+  })
 
-  // HARDENED IntersectionObserver — disconnects while loading, single trigger
+  const rawItems = useMemo(() => {
+    const all = data ? data.pages.flat() : initialResults
+    // MEMORY CAP: Discard oldest items if exceeding limit
+    if (all.length > MAX_ITEMS) {
+      return all.slice(0, MAX_ITEMS)
+    }
+    return all
+  }, [data, initialResults])
+
+  // HARDENED IntersectionObserver — single trigger
   useEffect(() => {
-    if (!hasMore || loadingMore) return
+    if (!hasNextPage || isFetchingNextPage) return
 
     const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && !loadingMoreRef.current) {
-        loadMore()
+      if (entries[0].isIntersecting) {
+        fetchNextPage()
       }
     }, {
       rootMargin: "600px"
@@ -118,11 +96,10 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
     if (observerTarget.current) observer.observe(observerTarget.current)
 
     return () => observer.disconnect()
-  }, [hasMore, loadingMore, loadMore])
-
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   const normalizedInitialResults = useMemo(() => {
-    return items.map((item) => {
+    return rawItems.map((item: any) => {
       if (item.itemType === 'loja') return item
       const hasOwnImages = item.images && item.images.length > 0
       const images = hasOwnImages ? item.images : (item.fallback_variant_image ? [item.fallback_variant_image] : item.images)
@@ -136,7 +113,7 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
         partners: Array.isArray(item.partners) ? item.partners[0] : item.partners,
       }
     })
-  }, [items])
+  }, [rawItems])
 
   const { vitrinesDestaque, dataToFilter } = useMemo(() => {
     if (currentType === 'vitrines') {
@@ -225,7 +202,6 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
   const handleTypeChange = (newType: string) => {
     if (newType === currentType) return
     setCurrentType(newType as any)
-    setHasMore(true) // Permite carregar mais itens do novo tipo, se houver
   }
 
   const toggleCategory = (cat: string) => setSelectedCategories((prev) => (prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]))
@@ -412,7 +388,7 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
                         <h2 className="text-[18px] font-bold text-brand-dark mb-4 opacity-80 tracking-widest text-xs uppercase">Vitrines relacionadas</h2>
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                           {vitrinesDestaque.map((item) => (
-                            <Link key={`vitrine-${item.id}`} href={getPartnerUrl(item.partners)} prefetch={false} className="border border-brand-border p-4 rounded-xl flex flex-col items-center text-center hover:border-brand-green transition-colors group">
+                            <Link key={`vitrine-${item.id}`} href={getPartnerUrl(item.partners)} prefetch={true} className="border border-brand-border p-4 rounded-xl flex flex-col items-center text-center hover:border-brand-green transition-colors group">
                               <img src={item.images[0]} alt={item.name} className="w-20 h-20 rounded-full object-cover mb-3" />
                               <h3 className="font-bold text-brand-dark truncate w-full group-hover:text-brand-green transition-colors">{item.name}</h3>
                               <p className="text-xs text-brand-inactive-text truncate w-full mb-3">{item.partners?.city} - {item.partners?.state}</p>
@@ -423,7 +399,7 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
                       </div>
                     )}
 
-                    {filteredResults.length === 0 && vitrinesDestaque.length === 0 && !hasMore ? (
+                    {filteredResults.length === 0 && vitrinesDestaque.length === 0 && !hasNextPage ? (
                       <IconPlaceholder
                         placeholderType="image"
                         imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
@@ -436,7 +412,7 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
                         {filteredResults.map((item) => {
                           if (item.itemType === 'loja') {
                             return (
-                              <Link key={`loja-${item.id}`} href={getPartnerUrl(item.partners)} prefetch={false} className="border border-brand-border p-4 rounded-xl flex flex-col items-center text-center hover:border-brand-green transition-colors group">
+                              <Link key={`loja-${item.id}`} href={getPartnerUrl(item.partners)} prefetch={true} className="border border-brand-border p-4 rounded-xl flex flex-col items-center text-center hover:border-brand-green transition-colors group">
                                 <img src={item.images[0]} alt={item.name} className="w-20 h-20 rounded-full object-cover mb-4 shadow-sm" />
                                 <h3 className="font-bold text-brand-dark truncate w-full group-hover:text-brand-green transition-colors">{item.name}</h3>
                                 <p className="text-xs text-brand-inactive-text truncate w-full mb-4">{item.partners?.city} - {item.partners?.state}</p>
@@ -450,14 +426,18 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
                         {/* 
                           INFINITE SCROLL LOADER (IntersectionObserver Target) 
                         */}
-                        {hasMore && (
+                        {hasNextPage && (
                           <div
                             ref={observerTarget}
                             className="col-span-full py-12 flex items-center justify-center min-h-[100px]"
                           >
                             <div className="flex flex-col items-center gap-2">
-                              <SkeletonLoader height={24} width={180} />
-                              <span className="text-[12px] text-brand-inactive-text animate-pulse">Carregando mais...</span>
+                              {isFetchingNextPage ? (
+                                <>
+                                  <SkeletonLoader height={24} width={180} />
+                                  <span className="text-[12px] text-brand-inactive-text animate-pulse">Carregando mais...</span>
+                                </>
+                              ) : null}
                             </div>
                           </div>
                         )}

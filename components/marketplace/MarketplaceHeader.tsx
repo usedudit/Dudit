@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef, useEffect, useMemo, memo, useCallback } from "react"
+import { useState, useRef, useEffect, useMemo, memo, useCallback, useTransition } from "react"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import {
@@ -41,7 +41,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serverUserProfile, cartCount: serverCartCount }) => {
   const { user, supabase, isLoading: isSupabaseLoading } = useSupabase()
-  
+
   const serverSessionData = useMemo(() => {
     if (serverUserProfile !== undefined || serverCartCount !== undefined) {
       return {
@@ -67,6 +67,7 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
   const [isMobileUserMenuOpen, setIsMobileUserMenuOpen] = useState(false)
   const [isMobileCategoryMenuOpen, setIsMobileCategoryMenuOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
+  const [isPending, startTransition] = useTransition()
 
   // DERIVED VALUES — useMemo instead of useState+useEffect to avoid extra re-render
   const { userName, fullName } = useMemo(() => {
@@ -170,7 +171,9 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
     const trimmed = query.trim()
     if (!trimmed) return
     setIsSearchInputFocused(false)
-    router.push(`/explorar?q=${encodeURIComponent(trimmed)}`)
+    startTransition(() => {
+      router.push(`/explorar?q=${encodeURIComponent(trimmed)}`)
+    })
   }, [searchValue, router])
 
   const handleSignOut = useCallback(async () => {
@@ -194,7 +197,7 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
       <header className="lg:hidden w-full bg-brand-dark fixed top-0 left-0 right-0 z-50 transition-all duration-300">
         {isHome && (
           <div className={`flex items-center justify-between px-4 overflow-hidden transition-all duration-300 ease-in-out ${isScrolled ? "h-0 opacity-0" : "h-[50px] opacity-100 pt-3 pb-1"}`}>
-            <Link href="/" prefetch={false} className="cursor-pointer">
+            <Link href="/" prefetch={true} className="cursor-pointer">
               <img
                 src="https://img.dudit.com.br/static/Logo.png"
                 alt="Dudit"
@@ -249,7 +252,7 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
                 />
               </div>
             </div>
-            <Link href="/cart" prefetch={false} className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
+            <Link href="/cart" prefetch={true} className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
               <ShoppingBag size={24} strokeWidth={2} />
               {cartCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 bg-brand-orange text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border border-brand-dark">
@@ -291,22 +294,30 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
 
           <div className="py-2">
             {[
-              { label: "Seu perfil", action: () => router.push("/profile") },
-              { label: "Seus pedidos", action: () => router.push("/my-orders") },
+              { label: "Seu perfil", href: "/profile" },
+              { label: "Seus pedidos", href: "/my-orders" },
               { label: "Lojas favoritas", action: () => setView?.("vendor") },
-              { label: "Central do Parceiro", action: () => { window.location.href = "/erp/switch" } },
-            ].map((item, idx) => (
-              <div
-                key={idx}
-                className="px-6 py-3 hover:bg-brand-gray cursor-pointer transition-colors"
-                onClick={() => {
-                  item.action()
-                  setIsMobileUserMenuOpen(false)
-                }}
-              >
-                <span className="text-[15px] font-normal text-brand-inactive-text hover:text-brand-dark">{item.label}</span>
-              </div>
-            ))}
+              { label: "Central do Parceiro", href: "/erp/switch" },
+            ].map((item, idx) => {
+              const ItemWrapper: any = item.href && item.href !== "/erp/switch" ? Link : "div";
+              const wrapProps = item.href && item.href !== "/erp/switch"
+                ? { href: item.href, prefetch: true }
+                : { onClick: item.action || (() => { if (item.href) window.location.href = item.href; }) };
+
+              return (
+                <ItemWrapper
+                  key={idx}
+                  {...wrapProps}
+                  className="px-6 py-3 hover:bg-brand-gray cursor-pointer transition-colors block w-full text-left"
+                  onClick={() => {
+                    if (wrapProps.onClick) wrapProps.onClick();
+                    setIsMobileUserMenuOpen(false);
+                  }}
+                >
+                  <span className="text-[15px] font-normal text-brand-inactive-text hover:text-brand-dark">{item.label}</span>
+                </ItemWrapper>
+              )
+            })}
           </div>
 
           <div className="border-t border-gray-100 py-2 mt-2">
@@ -330,7 +341,7 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
             <Link
               key={link.label}
               href={link.href}
-              prefetch={false}
+              prefetch={true}
               onClick={() => setIsMobileCategoryMenuOpen(false)}
               className="px-6 py-3 text-[15px] font-normal text-brand-inactive-text hover:bg-brand-gray hover:text-brand-dark transition-colors"
             >
@@ -400,7 +411,7 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
             </div>
 
             {showSearchDropdown && (
-              <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white rounded-[16px] shadow-xl border border-gray-100 overflow-hidden animate-fade-in pb-2 z-120">
+              <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white rounded-[16px] shadow-xl border border-gray-100 overflow-hidden animate-fade-in z-120">
                 {filteredSuggestions.map((suggestion, index) => (
                   <div
                     key={index}
@@ -465,22 +476,30 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
 
                   <div className="py-2">
                     {[
-                      { label: "Seu perfil", action: () => router.push("/profile") },
-                      { label: "Seus pedidos", action: () => router.push("/my-orders") },
+                      { label: "Seu perfil", href: "/profile" },
+                      { label: "Seus pedidos", href: "/my-orders" },
                       { label: "Lojas favoritas", action: () => setView?.("vendor") },
-                      { label: "Central do Parceiro", action: () => { window.location.href = "/erp/switch" } },
-                    ].map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="px-6 py-2.5 hover:bg-brand-gray cursor-pointer transition-colors"
-                        onClick={() => {
-                          item.action()
-                          setIsUserMenuOpen(false)
-                        }}
-                      >
-                        <span className="text-[14px] font-normal text-brand-inactive-text hover:text-brand-dark">{item.label}</span>
-                      </div>
-                    ))}
+                      { label: "Central do Parceiro", href: "/erp/switch" },
+                    ].map((item, idx) => {
+                      const ItemWrapper: any = item.href && item.href !== "/erp/switch" ? Link : "div";
+                      const wrapProps = item.href && item.href !== "/erp/switch"
+                        ? { href: item.href, prefetch: true }
+                        : { onClick: item.action || (() => { if (item.href) window.location.href = item.href; }) };
+
+                      return (
+                        <ItemWrapper
+                          key={idx}
+                          {...wrapProps}
+                          className="px-6 py-2.5 hover:bg-brand-gray cursor-pointer transition-colors block w-full text-left"
+                          onClick={() => {
+                            if (wrapProps.onClick) wrapProps.onClick();
+                            setIsUserMenuOpen(false)
+                          }}
+                        >
+                          <span className="text-[14px] font-normal text-brand-inactive-text hover:text-brand-dark">{item.label}</span>
+                        </ItemWrapper>
+                      )
+                    })}
                   </div>
 
                   <div className="border-t border-gray-100 py-2 mt-auto">
@@ -519,12 +538,12 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
             {[
               { label: "Ofertas do Dia", href: "/explorar?q=oferta" },
               { label: "Produtos", href: "/explorar?type=produtos" },
-              { label: "Serviços", href: "/services" },
+              { label: "Serviços", href: "/explorar?type=servicos" },
             ].map((link) => (
               <Link
                 key={link.label}
                 href={link.href}
-                prefetch={false}
+                prefetch={true}
                 className="px-3 py-1.5 whitespace-nowrap rounded-full hover:bg-white/10 transition-all font-normal"
               >
                 {link.label}

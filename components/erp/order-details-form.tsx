@@ -115,7 +115,7 @@ export function OrderDetailsForm({ order }: { order: any }) {
 
             <div className="flex gap-2">
               <Button type="submit" disabled={loading}>
-                {loading ? "Salvando..." : "Salvar Alterações"}
+                {loading ? "Salvando..." : "Salvar"}
               </Button>
               <Button type="button" variant="destructive" onClick={handleDelete} disabled={loading}>
                 Excluir Pedido

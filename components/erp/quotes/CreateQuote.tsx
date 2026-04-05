@@ -1,7 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Tabs, TabsList, TabsTrigger, Badge, Button, AlertModal } from '@/components/reusable';
 import { FadeIn } from '@/components/animations/FadeIn';
 import { ChevronLeftIcon, SaveIcon } from '@/lib/icons';
@@ -482,7 +481,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                                     <h1 className={`font-bold transition-all duration-300 ease-in-out flex items-center gap-3 ${isScrolled ? "text-lg" : "text-xl md:text-2xl"}`}>
                                                         <span className="truncate">{pageTitle}</span>
                                                         {mode === "edit" && (
-                                                            <Badge variant="gray" className="text-sm font-normal h-fit whitespace-nowrap px-2 py-0.5 hidden md:inline-flex">
+                                                            <Badge variant="gray">
                                                                 Editando
                                                             </Badge>
                                                         )}
@@ -503,7 +502,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                                 </Button>
                                                 <Button onClick={handleSave} disabled={isSaving} isLoading={isSaving} className={isScrolled ? "h-9 px-4 text-xs" : ""}>
                                                     {!isSaving && <SaveIcon className={`${isScrolled ? "w-3.5 h-3.5" : "w-[18px] h-[18px]"} mr-2`} />}
-                                                    {mode === 'edit' ? "Salvar Alterações" : "Salvar Orçamento"}
+                                                    {mode === 'edit' ? "Salvar" : "Salvar"}
                                                 </Button>
                                             </div>
                                         </div>
@@ -612,7 +611,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                 isLoading={isSaving}
                                 className="flex-1 h-12"
                             >
-                                {mode === 'edit' ? "Salvar Alterações" : "Salvar Orçamento"}
+                                {mode === 'edit' ? "Salvar" : "Salvar"}
                             </Button>
                         )}
                     </div>

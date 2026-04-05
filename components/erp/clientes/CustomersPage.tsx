@@ -126,7 +126,7 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
                 const nameMatch = (c.name || "").toLowerCase().includes(term)
                 const emailMatch = (c.email || "").toLowerCase().includes(term)
                 const phoneMatch = (c.phone || "").includes(debouncedSearch)
-                
+
                 return nameMatch || emailMatch || phoneMatch
             })
             .filter((c: any) => {

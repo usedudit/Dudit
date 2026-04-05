@@ -4,9 +4,9 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     PlusIcon,
-    FileIcon,
     ArrowUpDownIcon,
-    ArrowRightIcon
+    ArrowRightIcon,
+    ExportFileIcon
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button, IconPlaceholder, Input, Badge, AlertModal } from '@/components/reusable';
@@ -294,7 +294,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
 
                     <div className="flex items-center gap-3">
                         <Button variant="outline" onClick={() => { }}>
-                            <FileIcon className="w-[18px] h-[18px]" /> Exportar
+                            <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
                         </Button>
 
                         <Button onClick={() => setIsCreating(true)}>

@@ -3,6 +3,7 @@
 import { useState, useRef } from "react"
 import { useSupabase } from "@/providers/supabase-provider"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { getPartnerUrl, getProductUrl } from "@/lib/utils/url-generator"
 import { MinusIcon, PlusIcon, TrashIcon, ChevronLeftIcon, ChevronUpIcon, ChevronDownIcon } from "@/lib/icons"
 import { AnimatePresence, motion } from "framer-motion"
@@ -375,21 +376,23 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                         />
                                       </div>
 
-                                      <div
-                                        className="w-[72px] h-[72px] rounded-[8px] overflow-hidden border border-brand-border shrink-0 cursor-pointer"
-                                        onClick={() => router.push(getProductUrl({ ...item.products, id: item.product_id }, data.partner))}
+                                      <Link
+                                        href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
+                                        prefetch={true}
+                                        className="w-[72px] h-[72px] rounded-[8px] overflow-hidden border border-brand-border shrink-0 cursor-pointer block"
                                       >
                                         <img src={getItemImage(item)} alt={item.products.name} className="w-full h-full object-cover" />
-                                      </div>
+                                      </Link>
 
                                       <div className="flex-1 min-w-0">
                                         <div className="flex items-start justify-between gap-2">
-                                          <h4
+                                          <Link
+                                            href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
+                                            prefetch={true}
                                             className="text-[14px] font-medium text-brand-dark line-clamp-2 cursor-pointer hover:text-brand-green leading-snug"
-                                            onClick={() => router.push(getProductUrl({ ...item.products, id: item.product_id }, data.partner))}
                                           >
                                             {item.products.name}
-                                          </h4>
+                                          </Link>
                                           <button
                                             onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
                                             className="text-brand-red p-1 hover:bg-brand-red/15 rounded-full transition-colors shrink-0"
@@ -428,20 +431,22 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                       </div>
 
                                       <div className="flex-1 flex md:justify-between md:items-center gap-4">
-                                        <div
-                                          className="w-[80px] h-[80px] rounded-[8px] overflow-hidden border border-brand-border shrink-0 cursor-pointer"
-                                          onClick={() => router.push(getProductUrl({ ...item.products, id: item.product_id }, data.partner))}
+                                        <Link
+                                          href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
+                                          prefetch={true}
+                                          className="w-[80px] h-[80px] rounded-[8px] overflow-hidden border border-brand-border shrink-0 cursor-pointer block"
                                         >
                                           <img src={getItemImage(item)} alt={item.products.name} className="w-full h-full object-cover" />
-                                        </div>
+                                        </Link>
 
                                         <div className="flex-1">
-                                          <h4
-                                            className="text-[16px] font-medium text-brand-dark mb-1 line-clamp-2 cursor-pointer hover:text-brand-green"
-                                            onClick={() => router.push(getProductUrl({ ...item.products, id: item.product_id }, data.partner))}
+                                          <Link
+                                            href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
+                                            prefetch={true}
+                                            className="text-[16px] font-medium text-brand-dark mb-1 line-clamp-2 cursor-pointer hover:text-brand-green block"
                                           >
                                             {item.products.name}
-                                          </h4>
+                                          </Link>
                                           {item.variant_id && item.product_variants && (
                                             <p className="text-[13px] text-brand-inactive-text mb-1">
                                               {item.product_variants.variant_type}: <span className="font-medium text-brand-dark">{item.product_variants.variant_name}</span>
@@ -491,12 +496,13 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
                               {/* Desktop: "Escolher mais itens" abaixo do separator */}
                               <div className="hidden md:block mt-4 pt-4 border-t border-brand-border">
-                                <button
-                                  onClick={() => router.push(getPartnerUrl(data.partner))}
+                                <Link
+                                  href={getPartnerUrl(data.partner)}
+                                  prefetch={true}
                                   className="flex items-center gap-2 text-brand-green hover:underline font-medium text-[14px]"
                                 >
                                   <ChevronLeftIcon size={16} />Escolher mais itens
-                                </button>
+                                </Link>
                               </div>
                             </div>
                           </motion.div>
@@ -559,12 +565,13 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
               })}
 
               {/* Mobile: "Voltar para as compras" abaixo de tudo */}
-              <button
-                onClick={() => router.push("/")}
+              <Link
+                href="/"
+                prefetch={true}
                 className="flex items-center gap-2 text-brand-green hover:underline font-medium text-[14px] mt-2 md:hidden"
               >
                 <ChevronLeftIcon size={18} />Voltar para as compras
-              </button>
+              </Link>
 
             </div>
           </div>

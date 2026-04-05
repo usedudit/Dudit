@@ -314,7 +314,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             <div className="px-6 py-4 border-b border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-emerald-900/10 font-bold text-brand-dark dark:text-dark-heading">
                                 Vendedor
                             </div>
-                            <Link href={getPartnerUrl({ ...order.partners, id: order.partner_id })} prefetch={false} className="p-6 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors block cursor-pointer">
+                            <Link href={getPartnerUrl({ ...order.partners, id: order.partner_id })} prefetch={true} className="p-6 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors block cursor-pointer">
                                 <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border flex-shrink-0">
                                     <img src={storeImage} alt={sellerName} className="w-full h-full object-cover" />
                                 </div>
@@ -362,7 +362,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                         const itemTotal = Number(item.subtotal || item.product_price * item.quantity).toFixed(2);
 
                                         return (
-                                            <Link href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)} prefetch={false} key={item.id} className="group flex flex-row items-center gap-4 cursor-pointer p-2 -mx-2 rounded-lg">
+                                            <Link href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)} prefetch={true} key={item.id} className="group flex flex-row items-center gap-4 cursor-pointer p-2 -mx-2 rounded-lg">
                                                 <div className="w-14 h-14 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center flex-shrink-0">
                                                     <img src={itemImage} alt={item.products?.name || item.product_name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
                                                 </div>

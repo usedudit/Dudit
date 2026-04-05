@@ -156,3 +156,101 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
     if (error) return { error: error.message }
     return { success: true, data }
 }
+
+export async function updateERPOrderAction(orderId: string, data: {
+    partnerId: string
+    customerId?: string
+    customerName?: string
+    deliveryMethod: 'delivery' | 'pickup'
+    paymentStatus: 'paid' | 'partially_paid' | 'unpaid'
+    deliveryStatus: 'not_sent' | 'preparing' | 'sent' | 'delivered' | 'pickup_available' | 'delivery_failed'
+    items: Array<{
+        productId: string | null
+        customName?: string
+        quantity: number
+        unitPrice: number
+        sortOrder: number
+    }>
+    subtotal: number
+    discountValue: number
+    discountType: 'fixed' | 'percentage'
+    shippingCost: number
+    additionalCosts: number
+    totalAmount: number
+    notes?: string
+    paymentMethod: string
+    address?: {
+        zipCode: string
+        street: string
+        number: string
+        complement?: string
+        neighborhood: string
+        city: string
+        state: string
+    }
+    csrf_token?: string
+}) {
+    await requireRateLimit(RateLimitCategory.ORDER_CREATE)
+
+    const user = await requireUser()
+    if (!user) return { error: "Não autenticado" }
+    
+    await requirePartnerAccess(data.partnerId)
+
+    const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
+    const csrfValidation = await requireCSRF(data.csrf_token)
+    if (!csrfValidation.valid) return { error: csrfValidation.error || "Token CSRF inválido" }
+
+    const supabase = await getSupabaseServerClient()
+
+    let deliveryAddressStr = ""
+    if (data.deliveryMethod === 'delivery' && data.address) {
+        if (data.address.street && data.address.number) {
+            const { street, number, neighborhood, city, state, zipCode, complement } = data.address
+            deliveryAddressStr = `${street}, ${number}${complement ? ` (${complement})` : ''}, ${neighborhood}, ${city} - ${state}, ${zipCode}`
+        }
+    }
+
+    // Update order
+    const { error: orderError } = await supabase
+        .from("orders")
+        .update({
+            buyer_id: data.customerId || null,
+            customer_name: data.customerName || null,
+            order_source: data.deliveryMethod === 'pickup' ? 'Balcão' : 'Entrega',
+            delivery_type: data.deliveryMethod,
+            situation: data.paymentStatus === 'paid' ? 'paid' : (data.paymentStatus === 'partially_paid' ? 'partially_paid' : 'pending'),
+            delivery_status: data.deliveryStatus,
+            total_amount: data.totalAmount,
+            discount_value: data.discountValue,
+            discount_type: data.discountType,
+            shipping_cost: data.shippingCost,
+            additional_costs: data.additionalCosts,
+            notes: data.notes || null,
+            payment_method: data.paymentMethod,
+            ...(deliveryAddressStr ? { delivery_address: deliveryAddressStr } : {})
+        })
+        .eq("id", orderId)
+        .eq("partner_id", data.partnerId)
+
+    if (orderError) return { error: orderError.message }
+
+    // Re-insert items for simplicity (delete all and insert new)
+    await supabase.from("order_items").delete().eq("order_id", orderId)
+
+    const itemsToInsert = data.items.map(item => ({
+        order_id: orderId,
+        product_id: item.productId,
+        product_name: item.customName || null,
+        product_price: item.unitPrice,
+        quantity: item.quantity,
+        subtotal: item.unitPrice * item.quantity,
+        sort_order: item.sortOrder
+    }))
+
+    const { error: itemsError } = await supabase.from("order_items").insert(itemsToInsert)
+    if (itemsError) return { error: itemsError.message }
+
+    await revalidateOrders(data.partnerId)
+    return { success: true }
+}

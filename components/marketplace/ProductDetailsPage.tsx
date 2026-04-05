@@ -584,7 +584,7 @@ export function ProductDetailsPageClient({
       {/* Store */}
       <div className="bg-brand-gray rounded-xl p-5 border border-brand-border">
         <div className="flex items-center justify-between mb-4">
-          <Link href={getPartnerUrl(partner)} prefetch={false} className="flex items-center gap-3 group">
+          <Link href={getPartnerUrl(partner)} prefetch={true} className="flex items-center gap-3 group">
             <div className="w-12 h-12 rounded-full overflow-hidden border border-white bg-white shrink-0">
               <img src={getR2ImageUrl(partner.profile_image_url) || "https://img.dudit.com.br/static/Placeholder.png"} alt="Loja"
                 className="w-full h-full object-cover" />
@@ -604,10 +604,10 @@ export function ProductDetailsPageClient({
           </Link>
         </div>
         <div className="flex items-center gap-4 text-xs font-bold text-brand-dark mb-4 px-1">
-          <Link href={`/explorar?q=${partner.city}&type=lojas`} prefetch={false} className="flex items-center gap-1 cursor-pointer hover:text-brand-green transition-colors">
+          <Link href={`/explorar?q=${partner.city}&type=lojas`} prefetch={true} className="flex items-center gap-1 cursor-pointer hover:text-brand-green transition-colors">
             Lojas em {partner.city} <ChevronRightIcon size={10} />
           </Link>
-          <Link href={`/explorar?q=${partner.city}&type=produtos`} prefetch={false} className="flex items-center gap-1 cursor-pointer hover:text-brand-green transition-colors">
+          <Link href={`/explorar?q=${partner.city}&type=produtos`} prefetch={true} className="flex items-center gap-1 cursor-pointer hover:text-brand-green transition-colors">
             Produtos em {partner.city} <ChevronRightIcon size={10} />
           </Link>
         </div>
@@ -797,9 +797,9 @@ export function ProductDetailsPageClient({
         <div className="container mx-auto px-4 lg:px-6 max-w-[1300px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
           {/* Breadcrumb */}
           <div className="hidden lg:flex items-center gap-2 text-sm text-brand-inactive-text mb-8">
-            <Link href="/" prefetch={false} className="hover:text-brand-dark transition-colors">Início</Link>
+            <Link href="/" prefetch={true} className="hover:text-brand-dark transition-colors">Início</Link>
             <ChevronRightIcon size={10} />
-            <Link href="/explorar?type=produtos" prefetch={false} className="hover:text-brand-dark transition-colors">Produtos</Link>
+            <Link href="/explorar?type=produtos" prefetch={true} className="hover:text-brand-dark transition-colors">Produtos</Link>
             <ChevronRightIcon size={10} />
             <span className="text-brand-inactive-text truncate max-w-[300px]">{product.name}</span>
           </div>

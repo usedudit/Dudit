@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useCallback, useRef, useMemo } from "react"
+import { useState, useCallback, useRef, useMemo, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
-import { Tabs, TabsList, TabsTrigger, TabsContent, Button, AlertModal } from "@/components/reusable"
+import { Tabs, TabsList, TabsTrigger, TabsContent, Button, AlertModal, ThreeDotsLoader } from "@/components/reusable"
 import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
 import { useToast } from "@/components/ui/use-toast"
 import { useNotification } from "@/hooks/use-notification"
-import { createERPOrderAction } from "@/app/actions/erp/orders"
+import { createERPOrderAction, getOrderDetailsAction, updateERPOrderAction } from "@/app/actions/erp/orders"
 import SelectCustomerSheet from "../clientes/SelectCustomerSheet"
 import SelectVariantSheet from "../quotes/SelectVariantSheet"
 import { searchProductsForQuote } from "@/app/actions/erp/quotes"
@@ -22,15 +22,17 @@ import { OrderObservationsTab } from "./OrderObservationsTab"
 interface CreateOrderProps {
     onBack: () => void
     partnerId: string
+    editOrderId?: string
 }
 
-export default function CreateOrder({ onBack, partnerId }: CreateOrderProps) {
+export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOrderProps) {
     const { toast } = useToast()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const router = useRouter()
     const csrfToken = useCSRFToken()
 
     // --- State ---
+    const [isLoadingData, setIsLoadingData] = useState(!!editOrderId)
     const [activeTab, setActiveTab] = useState("general")
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -93,6 +95,57 @@ export default function CreateOrder({ onBack, partnerId }: CreateOrderProps) {
     const totalAmount = useMemo(() => {
         return subtotal - discountAmount + parseFloat(shippingFee || "0") + parseFloat(otherCosts || "0")
     }, [subtotal, discountAmount, shippingFee, otherCosts])
+
+    // --- Effects ---
+    useEffect(() => {
+        if (!editOrderId) return
+        async function load() {
+            setIsLoadingData(true)
+            const res = await getOrderDetailsAction(editOrderId!, partnerId)
+            if (res.success && res.data) {
+                const order = res.data
+                setSelectedCustomer(order.buyer_id ? { id: order.buyer_id, name: order.customer_name } : null)
+                setOrderDate(order.created_at.split('T')[0])
+                setSalesChannel(order.order_source || "Direct Sales")
+                setDeliveryMethod(order.delivery_type as any || "pickup")
+                setPaymentStatus(order.situation === "paid" ? "paid" : order.situation === "partially_paid" ? "partially_paid" : "unpaid")
+                setDeliveryStatus(order.delivery_status || "not_sent")
+                setNotes(order.notes || "")
+                setShippingFee((order.shipping_cost || 0).toString())
+                setOtherCosts((order.additional_costs || 0).toString())
+                setDiscountValue(order.discount_value || 0)
+                setDiscountType(order.discount_type || "fixed")
+                
+                if (order.order_items) {
+                    setItems(order.order_items.map((item: any) => ({
+                        id: item.id || Math.random().toString(36).substr(2, 9),
+                        productId: item.product_id,
+                        name: item.product_name,
+                        unitPrice: Number(item.product_price),
+                        quantity: Number(item.quantity),
+                        image: item.image || item.product?.image || null,
+                        sku: item.sku || item.product?.sku || "", 
+                        isEditing: false
+                    })))
+                }
+
+                if (order.delivery_address) {
+                    // try to parse if possible, or just dump to street, but complex logic can be brittle.
+                    // string format: "street, number (complement), neighborhood, city - state, zipcode"
+                    // we'll leave it empty for forms right now as splitting perfectly is hard and might overwrite
+                    const addressParts = order.delivery_address.split(',')
+                    if (addressParts.length >= 4) {
+                        setStreet(addressParts[0].trim())
+                        // rudimentary extraction just so fields aren't completely blank
+                    }
+                }
+            } else {
+                notifyError("Erro ao carregar pedido", res.error)
+            }
+            setIsLoadingData(false)
+        }
+        load()
+    }, [editOrderId, partnerId, notifyError])
 
     // --- Handlers ---
     const handleScroll = useCallback(() => {
@@ -243,7 +296,7 @@ export default function CreateOrder({ onBack, partnerId }: CreateOrderProps) {
 
         setIsSaving(true)
         try {
-            const result = await createERPOrderAction({
+            const payload = {
                 partnerId,
                 customerId: selectedCustomer?.id,
                 customerName: selectedCustomer ? selectedCustomer.name : "Consumidor final",
@@ -269,19 +322,28 @@ export default function CreateOrder({ onBack, partnerId }: CreateOrderProps) {
                 })),
                 subtotal,
                 discountValue: discountAmount,
-                discountType: 'fixed',
+                discountType: 'fixed' as const,
                 shippingCost: parseFloat(shippingFee || "0"),
                 additionalCosts: parseFloat(otherCosts || "0"),
                 totalAmount,
                 notes,
                 csrf_token: csrfToken || undefined
-            })
+            }
+
+            let result;
+            if (editOrderId) {
+                result = await updateERPOrderAction(editOrderId, payload)
+            } else {
+                result = await createERPOrderAction(payload)
+            }
 
             if (result.success) {
-                notifySuccess(`Pedido ${result.orderNumber} criado com sucesso!`)
+                notifySuccess(editOrderId ? `Pedido atualizado com sucesso!` : `Pedido criado com sucesso!`)
                 router.refresh()
                 setWasSaleSuccessful(true)
-                return { success: true, orderNumber: result.orderNumber }
+                // updateERPOrderAction does not return orderNumber, so we default to an empty string if undefined to fix TS error
+                const returnedOrderNumber = 'orderNumber' in result ? result.orderNumber : undefined;
+                return { success: true, orderNumber: returnedOrderNumber }
             } else {
                 notifyError(result.error || "Erro ao criar pedido")
                 return { error: result.error }
@@ -329,6 +391,14 @@ export default function CreateOrder({ onBack, partnerId }: CreateOrderProps) {
         { value: "delivery_failed", label: "Entrega não realizada" }
     ]
 
+    if (isLoadingData) {
+        return (
+            <div className="w-full h-full min-h-[500px] flex justify-center items-center">
+                <ThreeDotsLoader />
+            </div>
+        )
+    }
+
     return (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-screen bg-white dark:bg-dark-background overflow-hidden relative">
             <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-10">
@@ -348,10 +418,10 @@ export default function CreateOrder({ onBack, partnerId }: CreateOrderProps) {
                         <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
                             <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                 <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                    <span className="hidden md:inline truncate">Novo Pedido</span>
+                                    <span className="hidden md:inline truncate">{editOrderId ? "Editar Pedido" : "Novo Pedido"}</span>
                                 </h1>
                                 <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                    Preencha as informações da nova venda
+                                    {editOrderId ? "Atualize as informações da venda" : "Preencha as informações da nova venda"}
                                 </div>
                             </div>
 
