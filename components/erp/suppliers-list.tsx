@@ -19,8 +19,20 @@ interface Supplier {
   cnpj: string | null
 }
 
-export function SuppliersList({ suppliers }: { suppliers: Supplier[] }) {
+export function SuppliersList({ suppliers: initialSuppliers, partnerId }: { suppliers: Supplier[], partnerId: string }) {
   const router = useRouter()
+  const { useERPData } = require("./hooks")
+  const { fetchERPSuppliersClient } = require("@/app/actions/erp/client-loaders")
+  const { useQueryClient } = require("@tanstack/react-query")
+  const queryClient = useQueryClient()
+
+  const { data: rawSuppliers, isLoading: isQueryLoading } = useERPData(
+      ['erp', 'suppliers', partnerId],
+      () => fetchERPSuppliersClient()
+  )
+
+  const suppliers: Supplier[] = rawSuppliers ?? initialSuppliers
+
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [supplierToDelete, setSupplierToDelete] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -39,8 +51,9 @@ export function SuppliersList({ suppliers }: { suppliers: Supplier[] }) {
       if (result.error) {
         toast.error(result.error)
       } else {
+        queryClient.invalidateQueries({ queryKey: ['erp', 'suppliers', partnerId] })
         toast.success("Fornecedor deletado com sucesso!")
-        // No router.refresh() needed - revalidation will update
+        // No router.refresh() needed - React Query handles it
       }
     } catch (error) {
       toast.error("Erro ao deletar fornecedor")
@@ -83,7 +96,7 @@ export function SuppliersList({ suppliers }: { suppliers: Supplier[] }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {suppliers.map((supplier) => (
+              {suppliers.map((supplier: Supplier) => (
                 <TableRow key={supplier.id}>
                   <TableCell className="font-medium">{supplier.name}</TableCell>
                   <TableCell>{supplier.email || "-"}</TableCell>

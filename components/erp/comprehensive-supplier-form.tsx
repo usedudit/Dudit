@@ -16,6 +16,7 @@ import type { PersonType } from "@/lib/types/person-type"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
 import { CSRFTokenInput } from "@/components/security/csrf-token-input"
+import { useQueryClient } from "@tanstack/react-query"
 
 interface ComprehensiveSupplierFormProps {
   partnerId: string
@@ -46,6 +47,7 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
   const [personType, setPersonType] = useState(supplier?.person_type || ("pf" as PersonType))
   const [cnpjLoading, setCnpjLoading] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
+  const queryClient = useQueryClient()
   const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
   const [formData, setFormData] = useState({
@@ -193,6 +195,7 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
       if (result.error) {
         setError(result.error)
       } else {
+        queryClient.invalidateQueries({ queryKey: ['erp', 'suppliers', partnerId] })
         router.push("/erp/suppliers")
         // No router.refresh() needed - push already navigates
       }

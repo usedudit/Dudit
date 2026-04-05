@@ -89,11 +89,30 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({ key: 'date', direction: 'desc' })
 
-    const isLoading = storeLoading && rawOrders === undefined
+    const { useERPData } = require("../../hooks")
+    const { fetchERPOrdersClient } = require("@/app/actions/erp/client-loaders")
+    const { useQueryClient } = require("@tanstack/react-query")
+    const queryClient = useQueryClient()
+
+    const { data: queryOrders, isLoading: isQueryLoading } = useERPData(
+        ['erp', 'orders', partnerId],
+        () => fetchERPOrdersClient(),
+        { initialData: rawOrders, isCritical: true }
+    )
+
+    const effectiveOrders = queryOrders ?? rawOrders
+    const isLoading = storeLoading || isQueryLoading
+
     const itemsPerPage = 12
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
+
+    const invalidateAndRefresh = () => {
+        setWrapperMode(null)
+        setSelectedOrderId(null)
+        queryClient.invalidateQueries({ queryKey: ['erp', 'orders', partnerId] })
+    }
 
     useEffect(() => {
         const t = setTimeout(() => setDebouncedSearch(search), 500)
@@ -113,19 +132,19 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
         checkScroll()
         window.addEventListener("resize", checkScroll)
         return () => window.removeEventListener("resize", checkScroll)
-    }, [checkScroll, effectiveViewMode, rawOrders])
+    }, [checkScroll, effectiveViewMode, effectiveOrders])
 
     const filterSections: FilterSectionConfig[] = [
         { id: "status", title: "Status", type: "checkbox-list", options: ["Pago", "Pendente", "Enviado", "Cancelado", "Em análise"] },
-        { id: "channel", title: "Canal", type: "checkbox-list", options: Array.from(new Set(rawOrders?.map(o => o.stores?.name || "Loja Principal") || [])) as string[] },
+        { id: "channel", title: "Canal", type: "checkbox-list", options: Array.from(new Set(effectiveOrders?.map((o: any) => o.stores?.name || "Loja Principal") || [])) as string[] },
     ]
 
     const filteredOrders: Order[] = useMemo(() => {
-        if (!rawOrders) return []
+        if (!effectiveOrders) return []
 
         const term = debouncedSearch.toLowerCase()
 
-        const result = rawOrders
+        const result = effectiveOrders
             .map((o: any): Order => {
                 const statusMap: Record<string, { label: string; color: string }> = {
                     paid: { label: "Pago", color: "green" },
@@ -203,7 +222,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
     const paginated = filteredOrders.slice((page - 1) * itemsPerPage, page * itemsPerPage)
 
     const hasActiveFilters = filters.status.length > 0 || filters.channel.length > 0 || debouncedSearch.length > 0
-    const hasOrders = (rawOrders?.length || 0) > 0
+    const hasOrders = (effectiveOrders?.length || 0) > 0
 
     // Handlers
     const handleAddOrder = () => {
@@ -261,11 +280,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                         <OrderDetailView
                             orderId={selectedOrderId}
                             partnerId={partnerId}
-                            onBack={() => {
-                                setWrapperMode(null)
-                                setSelectedOrderId(null)
-                                router.refresh()
-                            }}
+                            onBack={invalidateAndRefresh}
                             onEditOrder={(order: any) => {
                                 setSelectedOrderId(order.id)
                                 setWrapperMode('edit')
@@ -284,11 +299,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                         <CreateOrder
                             partnerId={partnerId}
                             editOrderId={selectedOrderId}
-                            onBack={() => {
-                                setWrapperMode(null)
-                                setSelectedOrderId(null)
-                                router.refresh()
-                            }}
+                            onBack={invalidateAndRefresh}
                         />
                     </motion.div>
                 ) : wrapperMode === 'create' ? (
@@ -302,10 +313,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     >
                         <CreateOrder
                             partnerId={partnerId}
-                            onBack={() => {
-                                setWrapperMode(null)
-                                router.refresh()
-                            }}
+                            onBack={invalidateAndRefresh}
                         />
                     </motion.div>
                 ) : (

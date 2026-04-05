@@ -9,6 +9,7 @@ import { Button } from "@/components/reusable"
 import Dropdown, { DropdownItem } from "../reusable/Dropdown"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { StoreSwitcher } from "../store-switcher"
 import { getUserInitials, getAvatarColor } from "@/lib/utils/user-profile-image"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -316,9 +317,11 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
               </div>
 
               <div className="py-2">
-                <DropdownItem onClick={() => router.push("/profile")}>
-                  <UserIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                  <span className="text-[14px] font-normal text-brand-inactive-text hover:text-brand-dark">Meu perfil</span>
+                <DropdownItem>
+                  <Link href="/profile" prefetch={true} className="flex items-center gap-3 w-full">
+                    <UserIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                    <span className="text-[14px] font-normal text-brand-inactive-text hover:text-brand-dark">Meu perfil</span>
+                  </Link>
                 </DropdownItem>
                 <DropdownItem onClick={() => { }}>
                   <CreditCardIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
@@ -392,16 +395,15 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
               </button>
             </div>
 
-            <button
-              onClick={() => {
-                router.push("/profile")
-                setIsProfileOpen(false)
-              }}
+            <Link
+              href="/profile"
+              onClick={() => setIsProfileOpen(false)}
+              prefetch={true}
               className="flex items-center gap-4 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-all w-full text-left"
             >
               <UserIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
               <span className="text-[16px] font-medium text-brand-dark dark:text-dark-heading">Meu perfil</span>
-            </button>
+            </Link>
 
             <button
               onClick={() => setIsProfileOpen(false)}

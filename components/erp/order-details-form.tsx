@@ -12,8 +12,10 @@ import { updateOrderAction, deleteOrderAction } from "@/app/actions/orders"
 import AlertModal from "../reusable/AlertModal"
 import { toast } from "sonner"
 import { TrashIcon } from "@/lib/icons"
+import { useQueryClient } from "@tanstack/react-query"
 
 export function OrderDetailsForm({ order }: { order: any }) {
+  const queryClient = useQueryClient()
   const router = useRouter()
   const [situation, setSituation] = useState(order.situation || "pending")
   const [internalNotes, setInternalNotes] = useState(order.internal_notes || "")
@@ -33,6 +35,7 @@ export function OrderDetailsForm({ order }: { order: any }) {
       if (result?.error) {
         toast.error(result.error)
       } else {
+        queryClient.invalidateQueries({ queryKey: ['erp', 'orders'] })
         toast.success("Pedido atualizado com sucesso!")
         router.push("/erp/orders")
       }
@@ -57,6 +60,7 @@ export function OrderDetailsForm({ order }: { order: any }) {
       if (result?.error) {
         toast.error(result.error)
       } else {
+        queryClient.invalidateQueries({ queryKey: ['erp', 'orders'] })
         toast.success("Pedido excluído com sucesso!")
         router.push("/erp/orders")
       }

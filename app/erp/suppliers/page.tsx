@@ -30,7 +30,7 @@ export default async function SuppliersPage() {
           </div>
         </div>
 
-        <SuppliersList suppliers={suppliers || []} />
+        <SuppliersList suppliers={suppliers || []} partnerId={context.partnerId} />
       </div>
     </div>
   )

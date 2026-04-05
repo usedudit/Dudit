@@ -3,17 +3,9 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/reusable/Button';
-import { 
-  ServiceIcon, 
-  ShoppingBag, 
-  HomeIcon, 
-  FileIcon, 
-  ClockIcon, 
-  Store, 
-  CheckCircleIcon,
-  Package,
-  MoneyIcon,
-  SparklesIcon,
+import {
+  FileIcon,
+  ClockIcon,
   PhoneIcon
 } from '@/lib/icons';
 import { GridLines, SectionHeader, CTA, Navbar, Footer } from '@/components/InstitucionalShared';
@@ -188,7 +180,7 @@ const SegmentsHero = () => (
           transition={{ duration: 0.6 }}
         >
           <div className="inline-flex items-center gap-2 border border-brand-border rounded-full px-4 py-1.5 text-xs text-brand-dark mb-8 bg-brand-gray tracking-wider font-bold">
-             SEGMENTOS
+            SEGMENTOS
           </div>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-brand-dark leading-[1.1] mb-6">
             A Dudit funciona para o seu estilo de negócio
@@ -202,53 +194,23 @@ const SegmentsHero = () => (
           </div>
         </motion.div>
 
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: 50 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          className="relative h-[400px] flex items-center justify-center pt-20"
+          className="relative h-[400px] lg:h-[500px] flex items-center justify-center"
         >
-          <div className="absolute inset-0 bg-brand-gray rounded-3xl transform rotate-3"></div>
-          <div className="absolute inset-0 bg-brand-green/10 rounded-3xl transform -rotate-3"></div>
-          
-          <div className="relative z-10 w-[240px] h-[440px] bg-white rounded-[2.5rem] border-[8px] border-brand-dark overflow-hidden flex flex-col shadow-2xl">
-            <div className="absolute top-0 inset-x-0 h-6 bg-brand-dark rounded-b-xl w-24 mx-auto z-20"></div>
-            <div className="bg-brand-green pt-10 pb-4 px-4 text-center">
-              <div className="w-12 h-12 bg-white rounded-full mx-auto mb-2 flex items-center justify-center shadow-sm">
-                <Store size={24} className="text-brand-dark" />
-              </div>
-              <h3 className="text-xs font-bold text-brand-dark uppercase tracking-wider">Sua Vitrine</h3>
-            </div>
-            <div className="flex-1 bg-brand-gray p-4 space-y-3 overflow-hidden">
-               <div className="bg-white p-3 rounded-xl flex items-center gap-3 border border-brand-border/50">
-                  <Store size={20} className="text-pink-500" />
-                  <div className="h-2 w-20 bg-brand-gray rounded-full"></div>
-               </div>
-               <div className="bg-white p-3 rounded-xl flex items-center gap-3 border border-brand-border/50">
-                  <ServiceIcon size={20} className="text-blue-500" />
-                  <div className="h-2 w-24 bg-brand-gray rounded-full"></div>
-               </div>
-               <div className="bg-white p-3 rounded-xl flex items-center gap-3 border border-brand-border/50">
-                  <ServiceIcon size={20} className="text-orange-500" />
-                  <div className="h-2 w-16 bg-brand-gray rounded-full"></div>
-               </div>
-               <div className="bg-white p-3 rounded-xl flex items-center gap-3 border border-brand-border/50">
-                  <ShoppingBag size={20} className="text-purple-500" />
-                  <div className="h-2 w-20 bg-brand-gray rounded-full"></div>
-               </div>
-            </div>
+          <div className="relative z-10 w-full max-w-[500px]">
+            <img
+              src="https://img.dudit.com.br/static/mascots/Segmentos.png"
+              alt="Mascote Segmentos Dudit"
+              className="w-full h-auto"
+            />
           </div>
 
-          {/* Floating Icons */}
-          <motion.div animate={{ y: [0, -10, 0] }} transition={{ repeat: Infinity, duration: 3 }} className="absolute top-0 left-0 bg-white p-3 rounded-2xl z-20 shadow-lg border border-brand-border">
-            <Store size={24} className="text-pink-500" />
-          </motion.div>
-          <motion.div animate={{ y: [0, 10, 0] }} transition={{ repeat: Infinity, duration: 4 }} className="absolute bottom-10 right-0 bg-white p-3 rounded-2xl z-20 shadow-lg border border-brand-border">
-            <ServiceIcon size={24} className="text-orange-500" />
-          </motion.div>
-          <motion.div animate={{ x: [0, 10, 0] }} transition={{ repeat: Infinity, duration: 3.5 }} className="absolute top-1/2 -right-10 bg-white p-3 rounded-2xl z-20 shadow-lg border border-brand-border">
-            <ServiceIcon size={24} className="text-blue-500" />
-          </motion.div>
+          {/* Decorative backgrounds */}
+          <div className="absolute inset-0 bg-brand-gray/50 rounded-[4rem] transform rotate-6 scale-90 -z-10"></div>
+          <div className="absolute inset-0 bg-brand-green/5 rounded-[4rem] transform -rotate-3 scale-95 -z-10"></div>
         </motion.div>
       </div>
     </div>
@@ -259,9 +221,9 @@ const SegmentsGrid = () => (
   <section className="py-24 bg-white relative border-t border-brand-border">
     <GridLines />
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-      <SectionHeader 
+      <SectionHeader
         subtitle="SEM TELAS COMPLICADAS"
-        title="Organize o que realmente traz lucro" 
+        title="Organize o que realmente traz lucro"
       />
       <p className="text-brand-inactive-text max-w-2xl mb-16 text-lg -mt-8">
         O essencial para o seu negócio rodar liso, sem precisar de cursos para entender o sistema.
@@ -293,7 +255,7 @@ const SegmentsGrid = () => (
 
 export default function SegmentsPage() {
   const router = useRouter();
-  
+
   const onNavigate = (page: string) => {
     if (page === 'home') router.push('/institucional/inicio');
     else if (page === 'segments') router.push('/institucional/segmentos');

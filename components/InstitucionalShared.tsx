@@ -194,17 +194,17 @@ export const CTA = () => {
       <section className="py-24 px-4 bg-white relative">
          <GridLines />
          <div className="max-w-7xl mx-auto relative z-10">
-            <div className="bg-brand-dark rounded-3xl p-12 md:p-24 text-center overflow-hidden relative">
+            <div className="bg-brand-dark rounded-3xl p-16 text-center overflow-hidden relative">
                {/* Background decorative faint rings */}
                <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-white rounded-full"></div>
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] border border-white rounded-full"></div>
                </div>
 
-               <h2 className="text-4xl md:text-6xl font-bold text-white mb-6">
+               <h2 className="text-5xl font-bold text-white mb-6">
                   Pare de pagar comissão <br />para vender o que é seu
                </h2>
-               <h3 className="text-brand-inactive-text mb-10 max-w-xl mx-auto">
+               <h3 className="text-2xl text-gray-300 mb-10 max-w-xl mx-auto">
                   Organize seu negócio. Venda online. Mantenha sua margem.
                </h3>
 

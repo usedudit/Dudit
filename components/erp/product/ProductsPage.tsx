@@ -181,17 +181,31 @@ export default function ProductsPage({
     const { selectedStore } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
 
-    // State
-    const [data, setData] = useState({ products: initialProducts, search: "", debouncedSearch: "", page: 1 })
+    const { useERPData } = require("../../hooks")
+    const { fetchERPProductsClient } = require("@/app/actions/erp/client-loaders")
+    const { useQueryClient } = require("@tanstack/react-query")
+    const queryClient = useQueryClient()
 
-    // Update state when initialProducts changes (e.g. after server action revalidation)
-    const prevProductsRef = useRef(initialProducts)
+    const { data: queryProducts, isLoading: isQueryLoading } = useERPData(
+        ['erp', 'products', partnerId],
+        () => fetchERPProductsClient(),
+        { initialData: initialProducts, isCritical: true }
+    )
+
+    const effectiveBaseProducts = queryProducts ?? initialProducts
+
+    // State
+    const [data, setData] = useState<{ products: Product[], search: string, debouncedSearch: string, page: number }>({ products: effectiveBaseProducts, search: "", debouncedSearch: "", page: 1 })
+
+    // Update state when server/query data changes (e.g. after background refresh)
+    const prevProductsRef = useRef(effectiveBaseProducts)
     useEffect(() => {
-        if (prevProductsRef.current !== initialProducts) {
-            setData(prev => ({ ...prev, products: initialProducts }))
-            prevProductsRef.current = initialProducts
+        if (prevProductsRef.current !== effectiveBaseProducts) {
+            // Only update if array actually changed references (RQ does this automatically if data is different)
+            setData(prev => ({ ...prev, products: effectiveBaseProducts }))
+            prevProductsRef.current = effectiveBaseProducts
         }
-    }, [initialProducts])
+    }, [effectiveBaseProducts])
 
     const [selection, setSelection] = useState({ ids: new Set<string>(), product: null as Product | null, delete: null as Product | null, duplicate: null as Partial<Product> | null, loadingDetails: false })
     const [actionModal, setActionModal] = useState<{ open: boolean; text: string }>({ open: false, text: "" })
@@ -404,6 +418,7 @@ export default function ProductsPage({
             const res = await action(payload)
             if (res.success) {
                 toast({ title: "Sucesso" })
+                queryClient.invalidateQueries({ queryKey: ['erp', 'products', partnerId] })
 
                 // Fecha form IMEDIATAMENTE — sem esperar refresh
                 setUi((p) => ({ ...p, pageState: "list", isSaving: false }))
@@ -441,6 +456,7 @@ export default function ProductsPage({
             const result = await deleteProductAction(deleteId)
             setActionModal({ open: false, text: "" })
             if (result.success) {
+                queryClient.invalidateQueries({ queryKey: ['erp', 'products', partnerId] })
                 setData((p) => ({ ...p, products: p.products.filter((prod) => prod.id !== deleteId) }))
                 toast({ title: "Excluído" })
             } else {
@@ -469,6 +485,7 @@ export default function ProductsPage({
                     variant: "destructive",
                 })
             } else {
+                queryClient.invalidateQueries({ queryKey: ['erp', 'products', partnerId] })
                 const idSet = new Set(ids)
                 setData((p) => ({ ...p, products: p.products.filter((prod) => !idSet.has(prod.id)) }))
                 toast({ title: "Excluído" })
@@ -478,6 +495,7 @@ export default function ProductsPage({
             setActionModal({ open: true, text: "Atualizando status..." })
             const allInactive = data.products.filter((p) => selection.ids.has(p.id)).every((p) => !p.is_active)
             await toggleProductsStatusAction(ids, allInactive)
+            queryClient.invalidateQueries({ queryKey: ['erp', 'products', partnerId] })
             setActionModal({ open: false, text: "" })
             const idSet = new Set(ids)
             setData((p) => ({
@@ -503,6 +521,7 @@ export default function ProductsPage({
             if (payload.type === 'delete') {
                 const result = await deleteProductsInBatchAction(ids)
                 if (result.success) {
+                    queryClient.invalidateQueries({ queryKey: ['erp', 'products', partnerId] })
                     setData(p => ({ ...p, products: p.products.filter(prod => !selection.ids.has(prod.id)) }))
                     setSelection(p => ({ ...p, ids: new Set() }))
                     toast({ title: "Sucesso", description: `${ids.length} produtos excluídos` })
@@ -566,6 +585,7 @@ export default function ProductsPage({
             if (updates.length > 0) {
                 const result = await batchUpdateProductsAction(updates)
                 if (result.success) {
+                    queryClient.invalidateQueries({ queryKey: ['erp', 'products', partnerId] })
                     const updatesMap = new Map(updates.map(u => [u.id, u]))
                     setData(p => ({
                         ...p,

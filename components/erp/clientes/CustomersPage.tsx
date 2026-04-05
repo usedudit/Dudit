@@ -85,8 +85,17 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
     })
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
 
-    const { customers: rawCustomers, customersLoading, customersError } = useStoreData(partnerId, { includeCustomers: true })
-    const isLoading = customersLoading && (rawCustomers === undefined || rawCustomers === null)
+    const { useERPData } = require("../../hooks")
+    const { fetchERPCustomersClient } = require("@/app/actions/erp/client-loaders")
+    const { useQueryClient } = require("@tanstack/react-query")
+    const queryClient = useQueryClient()
+    
+    const { data: rawCustomers, isLoading: isQueryLoading, isError: customersError } = useERPData(
+        ['erp', 'customers', partnerId, selectedStore?.id || 'all'],
+        () => fetchERPCustomersClient(selectedStore?.id || null)
+    )
+
+    const isLoading = storeLoading || (isQueryLoading && !rawCustomers)
     const itemsPerPage = 12
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
@@ -239,6 +248,7 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
                 onBack={() => setUi({ pageState: "list", selectedId: null })}
                 onSuccess={(msg) => {
                     toast({ title: "Sucesso", description: msg })
+                    queryClient.invalidateQueries({ queryKey: ['erp', 'customers', partnerId, selectedStore?.id || 'all'] })
                     setUi({ pageState: "list", selectedId: null })
                 }}
                 onError={(msg) => toast({ title: "Erro", description: msg, variant: "destructive" })}
