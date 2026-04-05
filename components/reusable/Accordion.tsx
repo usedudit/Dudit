@@ -10,7 +10,7 @@ import {
   DuplicateIcon,
   TrashIcon,
   EyeIcon,
-  RotateIcon,
+  ReloadIcon,
   ShareIcon,
   PrinterIcon,
   MailIcon,
@@ -86,9 +86,9 @@ interface ActionsDropdownProps {
   children?: React.ReactNode
 }
 
-export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({ 
-  onEdit, 
-  onDuplicate, 
+export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
+  onEdit,
+  onDuplicate,
   onDelete,
   onView,
   onUndo,
@@ -128,7 +128,7 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
     )}
     {onUndo && (
       <DropdownItem onClick={onUndo}>
-        <RotateIcon className="w-4 h-4" /> Desfazer
+        <ReloadIcon className="w-4 h-4" /> Desfazer
       </DropdownItem>
     )}
     {onShare && (

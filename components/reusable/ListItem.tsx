@@ -31,7 +31,7 @@ export const ListItem: React.FC<ListItemProps> = ({
     return (
         <div
             onClick={onClick}
-            className={`group flex items-center gap-4 p-5 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-dark-border/90 transition-all cursor-pointer h-full ${className}`}
+            className={`group flex items-center gap-4 p-5 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-dark/90 transition-all cursor-pointer h-full ${className}`}
         >
             {left && <div className="flex-shrink-0">{left}</div>}
 

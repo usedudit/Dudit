@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useStore } from "@/lib/store-context"
 
 // Components
-import { Button, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import OrderListItem from "./OrderListItem"
@@ -20,7 +20,8 @@ import OrderDetailView from "./OrderDetailView"
 import {
     PlusIcon,
     ExportFileIcon,
-    ShoppingCart
+    ShoppingCart,
+    ArrowUpDownIcon
 } from "@/lib/icons"
 import { useRouter } from "next/navigation"
 
@@ -46,6 +47,9 @@ interface FilterState {
     status: string[]
     channel: string[]
 }
+
+type SortKey = "order_id" | "total" | "status" | "customer" | "date" | "channel";
+type SortDirection = "asc" | "desc";
 
 const INITIAL_FILTERS: FilterState = {
     status: [],
@@ -79,6 +83,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
     const [selection, setSelection] = useState({ ids: new Set<string>() })
     const [wrapperMode, setWrapperMode] = useState<'create' | 'edit' | 'view' | null>(null)
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({ key: 'date', direction: 'desc' })
 
     const isLoading = storeLoading && rawOrders === undefined
     const itemsPerPage = 12
@@ -116,7 +121,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
 
         const term = debouncedSearch.toLowerCase()
 
-        return rawOrders
+        const result = rawOrders
             .map((o: any): Order => {
                 const statusMap: Record<string, { label: string; color: string }> = {
                     paid: { label: "Pago", color: "green" },
@@ -164,8 +169,31 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
 
                 return tabMatch && statusFilterMatch && channelFilterMatch
             })
-            .sort((a, b) => b.created_at_time - a.created_at_time)
-    }, [rawOrders, debouncedSearch, activeTab, filters])
+
+        let sortedResult = result
+        if (sortConfig) {
+            sortedResult = [...result].sort((a, b) => {
+                let aVal: any
+                let bVal: any
+
+                switch (sortConfig.key) {
+                    case "order_id": aVal = a.displayId; bVal = b.displayId; break
+                    case "total": aVal = a.total_amount; bVal = b.total_amount; break
+                    case "status": aVal = a.statusLabel; bVal = b.statusLabel; break
+                    case "customer": aVal = a.customer_name; bVal = b.customer_name; break
+                    case "date": aVal = a.created_at_time; bVal = b.created_at_time; break
+                    case "channel": aVal = a.store_name; bVal = b.store_name; break
+                    default: return 0
+                }
+
+                if (aVal === bVal) return 0
+                const comparison = aVal < bVal ? -1 : 1
+                return sortConfig.direction === "asc" ? comparison : -comparison
+            })
+        }
+
+        return sortedResult
+    }, [rawOrders, debouncedSearch, activeTab, filters, sortConfig])
 
     const totalPages = Math.ceil(filteredOrders.length / itemsPerPage)
     const paginated = filteredOrders.slice((page - 1) * itemsPerPage, page * itemsPerPage)
@@ -320,7 +348,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                     <motion.div key="empty-results" className="w-full h-full flex items-center justify-center min-h-[500px]">
                                         <IconPlaceholder
                                             placeholderType="image"
-                                            imageSrc="https://img.dudit.com.br/static/mascots/clientes/NaoEncontrado.png"
+                                            imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
                                             imageAlt="Nenhum pedido encontrado"
                                             title="Nenhum pedido encontrado"
                                             subtitle="Tente ajustar seus filtros ou termos de busca."
@@ -365,28 +393,46 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                                             <tr className="bg-brand-gray dark:bg-dark-border/50">
                                                                 <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
                                                                     <div className="flex items-center">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            className="w-4 h-4 rounded border-brand-border"
+                                                                        <Checkbox
                                                                             checked={selection.ids.size === paginated.length && paginated.length > 0}
-                                                                            onChange={(e) => {
-                                                                                const checked = e.target.checked
+                                                                            onChange={(checked) => {
                                                                                 setSelection({ ids: checked ? new Set(paginated.map((x: Order) => x.originalId)) : new Set() })
                                                                             }}
+                                                                            className="bg-white dark:bg-dark-background"
                                                                         />
                                                                     </div>
                                                                 </th>
-                                                                {COLUMNS.map((col, idx) => (
-                                                                    <th
-                                                                        key={col.id}
-                                                                        className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""}`}
-                                                                        style={{ width: col.width }}
-                                                                    >
-                                                                        <div className={`flex items-center gap-1 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
-                                                                            {col.label}
-                                                                        </div>
-                                                                    </th>
-                                                                ))}
+                                                                {COLUMNS.map((col, idx) => {
+                                                                    const isSortable = col.id !== 'actions';
+                                                                    const isSorted = sortConfig?.key === col.id;
+                                                                    const isLast = idx === COLUMNS.length - 1;
+
+                                                                    return (
+                                                                        <th
+                                                                            key={col.id}
+                                                                            className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isLast ? "rounded-r-lg" : ""}`}
+                                                                            style={{ width: col.width }}
+                                                                            onClick={() => {
+                                                                                if (!isSortable) return
+                                                                                setSortConfig(prev => ({
+                                                                                    key: col.id as SortKey,
+                                                                                    direction: prev?.key === col.id && prev.direction === 'asc' ? 'desc' : 'asc'
+                                                                                }))
+                                                                            }}
+                                                                        >
+                                                                            <div className={`flex items-center gap-1.5 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
+                                                                                {col.label}
+                                                                                {isSortable && (
+                                                                                    <ArrowUpDownIcon
+                                                                                        size={14}
+                                                                                        className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100' : 'text-brand-inactive-text opacity-0 group-hover:opacity-40'
+                                                                                            } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
+                                                                                    />
+                                                                                )}
+                                                                            </div>
+                                                                        </th>
+                                                                    )
+                                                                })}
                                                             </tr>
                                                         </thead>
                                                         <tbody>

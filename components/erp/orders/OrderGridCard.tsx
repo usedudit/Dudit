@@ -30,28 +30,27 @@ const OrderGridCard = React.memo(
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
-        className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-dark-border/90 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
+        className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-dark/90 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
         onClick={onDetails}
       >
         <div className="flex gap-4 mb-2">
           {/* Order Visual Indicator */}
-          <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center">
-             <StoreIcon className="w-6 h-6 text-brand-dark dark:text-dark-heading" />
+          <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+            <StoreIcon className="w-6 h-6 text-brand-dark dark:text-dark-heading" />
           </div>
 
-          <div className="flex-1 min-w-0 flex flex-col justify-center">
-            {/* ID + Checkbox */}
+          <div className="flex-1 min-w-0">
+            {/* Row 1: ID + Badge + Checkbox */}
             <div className="flex justify-between items-start gap-1">
-              <div className="flex flex-col min-w-0 pr-1 gap-1">
+              <div className="flex items-center gap-2 min-w-0 pr-1">
                 <h3
-                  className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate"
+                  className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate shrink-0"
                   title={order.displayId}
                 >
-                  <span className="truncate">{order.displayId}</span>
+                  {order.displayId}
                 </h3>
-               
-                <div className="flex items-center gap-1.5 flex-wrap">
-                   <Badge
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Badge
                     variant={order.statusColor}
                     className="text-[9px] h-4 px-1 py-3 flex-shrink-0 w-max"
                   >
@@ -66,69 +65,66 @@ const OrderGridCard = React.memo(
               </div>
 
               {/* Checkbox */}
-              <div className="flex-shrink-0 -mt-1 -mr-1" onClick={(e) => e.stopPropagation()}>
+              <div className="flex-shrink-0 -mt-0.5 -mr-1" onClick={(e) => e.stopPropagation()}>
                 <Checkbox checked={selected} onChange={onSelect} />
               </div>
+            </div>
+
+            {/* Row 2: Stats (Items • Total) */}
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+                {order.items_count} {order.items_count === 1 ? 'item' : 'itens'}
+              </span>
+              <span className="text-gray-300 dark:text-dark-border">•</span>
+              <span className="text-[12px] font-bold text-brand-primary">
+                R$ {Number(order.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
             </div>
           </div>
         </div>
 
         {/* Info Rows */}
         <div className="mt-4 flex flex-col gap-3">
-           <div className="flex flex-col gap-0.5">
+          {/* Row 1: Cliente & Data */}
+          <div className="flex justify-between items-end gap-2">
+            <div className="flex flex-col gap-0.5 min-w-0">
               <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Cliente</span>
               <div className="flex items-center gap-1.5 min-w-0">
                 <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
                   {order.customer_name}
                 </span>
                 {order.customer_id && (
-                  <Badge variant="gray" className="text-[9px] h-3.5 px-0.5">
+                  <Badge variant="gray" className="text-[9px] h-3.5 px-0.5 truncate max-w-[60px]">
                     {order.customer_id}
                   </Badge>
                 )}
               </div>
             </div>
 
-            <div className="flex flex-col gap-0.5">
-               <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Canal</span>
-               <div className="flex items-center gap-1.5">
-                 <StoreIcon size={12} className="text-brand-inactive-text" />
-                 <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
-                   {order.store_name || "Loja"}
-                 </span>
-               </div>
-            </div>
-        </div>
-
-        {/* Footer Area */}
-        <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
-          {/* Stats Row */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-0.5">
-               <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Total</span>
-               <span className="text-[14px] font-bold text-brand-primary">
-                 R$ {Number(order.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-               </span>
-            </div>
-
-            <div className="flex flex-col gap-0.5 items-end">
-               <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Data</span>
-               <div className="flex items-center gap-1 justify-end">
-                 <ClockIcon size={12} className="text-brand-inactive-text" />
-                 <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                   {order.formattedDate}
-                 </span>
-               </div>
+            <div className="flex flex-col gap-0.5 items-end shrink-0">
+              <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body text-right">Data</span>
+              <div className="flex items-center gap-1 justify-end">
+                <ClockIcon size={12} className="text-brand-inactive-text" />
+                <span className="text-[12px] font-bold text-brand-dark dark:text-dark-heading">
+                  {order.formattedDate}
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-between mt-1">
-             <div className="text-xs text-brand-inactive-text italic">
-                {order.items_count} {order.items_count === 1 ? 'item' : 'itens'}
-             </div>
+          {/* Row 2: Canal & Actions */}
+          <div className="flex justify-between items-end gap-2">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Canal</span>
+              <div className="flex items-center gap-1.5">
+                <StoreIcon size={12} className="text-brand-inactive-text" />
+                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate max-w-[120px]">
+                  {order.store_name || "Loja"}
+                </span>
+              </div>
+            </div>
 
-            {/* Dropdown Button */}
+            {/* Actions button at same height as Channel info */}
             <div
               className="flex-shrink-0"
               onClick={(e) => e.stopPropagation()}

@@ -24,7 +24,7 @@ const StockMovementGridCard = React.memo(
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
-        className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-dark-border/90 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
+        className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-dark/90 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
         onClick={() => onDetails(movement.id)}
       >
         <div className="flex gap-4 mb-2">
@@ -39,15 +39,15 @@ const StockMovementGridCard = React.memo(
           </div>
 
           <div className="flex-1 min-w-0 flex flex-col justify-center">
-              {/* Linha 1: Nome + Badge */}
-              <div className="flex items-center gap-2 min-w-0 pr-1">
-                <h3
-                  className="flex-1 min-w-0 font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate"
-                  title={movement.product.name}
-                >
-                  {movement.product.name}
-                </h3>
-              </div>
+            {/* Linha 1: Nome + Badge */}
+            <div className="flex items-center gap-2 min-w-0 pr-1">
+              <h3
+                className="flex-1 min-w-0 font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate"
+                title={movement.product.name}
+              >
+                {movement.product.name}
+              </h3>
+            </div>
 
             {/* Linha 2: SKU + Badge */}
             <div className="flex items-center justify-between mt-1">

@@ -325,7 +325,7 @@ export default function ProductsPage({
     const totalPages = Math.ceil(sortedProducts.length / itemsPerPage)
     const paginated = useMemo(() =>
         sortedProducts.slice((data.page - 1) * itemsPerPage, data.page * itemsPerPage),
-    [sortedProducts, data.page, itemsPerPage])
+        [sortedProducts, data.page, itemsPerPage])
 
     // --- Handlers ---
 
@@ -603,7 +603,7 @@ export default function ProductsPage({
 
     const selectedProds = useMemo(() =>
         data.products.filter((p) => selection.ids.has(p.id)),
-    [data.products, selection.ids])
+        [data.products, selection.ids])
 
     if (ui.pageState === "form") {
         return (

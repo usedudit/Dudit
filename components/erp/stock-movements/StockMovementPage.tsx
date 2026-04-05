@@ -16,12 +16,13 @@ import CreateStockMovement from './CreateStockMovement';
 import StockMovementDetailPage from './StockMovementDetailPage';
 import StockMovementPageControls from './StockMovementPageControls';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
-import { getStockMovementDetails, deleteStockMovementAction, undoStockMovementAction } from '@/app/actions/erp/stock-movements';
+import { getStockMovementDetails, undoStockMovementAction } from '@/app/actions/erp/stock-movements';
 import { useNotification } from '@/hooks/use-notification';
 import { useMediaQuery } from '@/components/erp/hooks';
 import { useStoreData } from "@/lib/use-store-data";
 import StockMovementListItem from './StockMovementListItem';
 import StockMovementGridCard from './StockMovementGridCard';
+import { FadeIn } from '@/components/animations/FadeIn';
 
 interface StockMovementPageProps {
     partnerId: string;
@@ -269,12 +270,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
     }
 
     return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.2 }}
-            className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
-        >
+        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
             <style>{`
                .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
@@ -377,7 +373,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                                             {mov.type === 'in' ? 'Entrada' : 'Saída'}
                                                         </Badge>
                                                     </div>
-                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium mb-2">ID: {mov.displayId}</div>
+                                                    <div className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">{mov.product.sku}</div>
                                                     <div className="flex items-center gap-2 text-[14px]">
                                                         <span className={`font-bold ${mov.type === 'in' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                                             {mov.type === 'in' ? '+' : '-'}{mov.quantity}
@@ -412,9 +408,6 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                             <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
                                                 <thead>
                                                     <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                        <th className="py-3 px-2 w-4 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
-                                                            {/* Empty spacer for alignment if needed, or just remove */}
-                                                        </th>
                                                         {columns.map(col => {
                                                             const isSortable = col.id !== 'actions';
                                                             const isSorted = sortConfig?.key === col.id;
@@ -507,7 +500,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                 variant="warning"
                 isLoading={isUndoing}
             />
-        </motion.div >
+        </FadeIn >
     );
 };
 

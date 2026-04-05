@@ -407,7 +407,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
     }
 
     return (
-        <FadeIn className="flex flex-col h-[calc(100vh-64px)] md:h-[calc(100vh-72px)] bg-white dark:bg-dark-background transition-colors duration-300 overflow-hidden relative">
+        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
             <style>{`
                 .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
@@ -576,6 +576,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                                                                     onChange={(checked) => {
                                                                         setSelection({ ids: checked ? new Set(paginated.map((x: Quote) => x.originalId)) : new Set() })
                                                                     }}
+                                                                    className="bg-white dark:bg-dark-background"
                                                                 />
                                                             </div>
                                                         </th>
@@ -684,20 +685,20 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                 onApply={handleBulkEditApply}
             />
 
-            <FloatingActionBar 
-                selectedCount={selection.ids.size} 
+            <FloatingActionBar
+                selectedCount={selection.ids.size}
                 onClearSelection={() => setSelection({ ids: new Set() })}
             >
-                <Button 
-                    variant="ghost" 
+                <Button
+                    variant="ghost"
                     className="h-9 px-3 gap-2 font-bold text-brand-primary"
                     onClick={() => setBulkEditModalOpen(true)}
                 >
                     <EditIcon className="w-4 h-4" />
                     Ações em massa
                 </Button>
-                <Button 
-                    variant="ghost" 
+                <Button
+                    variant="ghost"
                     className="h-9 px-3 gap-2 font-bold text-brand-red"
                     onClick={() => setConfirmations(prev => ({ ...prev, bulkDelete: true }))}
                 >

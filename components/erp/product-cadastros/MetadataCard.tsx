@@ -15,8 +15,8 @@ interface MetadataCardProps {
 }
 
 const MetadataCard = React.memo(({ item, type, categories, onEdit, onDelete }: MetadataCardProps) => {
-    const parentCategory = type === "subcategories" && categories 
-        ? categories.find(c => c.id === item.parent_id)?.name 
+    const parentCategory = type === "subcategories" && categories
+        ? categories.find(c => c.id === item.parent_id)?.name
         : null
 
     return (
@@ -25,7 +25,7 @@ const MetadataCard = React.memo(({ item, type, categories, onEdit, onDelete }: M
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-dark-border/90 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
+            className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-dark/90 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
             onClick={onEdit}
         >
             <div className="flex gap-4 mb-2">
@@ -41,7 +41,7 @@ const MetadataCard = React.memo(({ item, type, categories, onEdit, onDelete }: M
                             <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
                                 {item.name}
                             </h3>
-                            <Badge 
+                            <Badge
                                 variant={item.is_active ? "green" : "red"}
                                 className="text-[9px] h-4 px-1 py-3 flex-shrink-0"
                             >
@@ -74,7 +74,7 @@ const MetadataCard = React.memo(({ item, type, categories, onEdit, onDelete }: M
                 </div>
 
                 <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                    <ActionsDropdown 
+                    <ActionsDropdown
                         onEdit={onEdit}
                         onDelete={onDelete}
                     />

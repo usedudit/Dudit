@@ -63,7 +63,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         switch (s) {
             case 'paid': return { label: 'Pago', variant: 'green' as const, color: 'bg-green-500' }
             case 'partially_paid': return { label: 'Parcialmente Pago', variant: 'orange' as const, color: 'bg-yellow-500' }
-            case 'cancelled': return { label: 'Cancelado', variant: 'red' as const, color: 'bg-red-500' }
+            case 'cancelled': return { label: 'Cancelado', variant: 'red' as const, color: 'bg-brand-red' }
             case 'pending': return { label: 'Pendente', variant: 'gray' as const, color: 'bg-gray-400' }
             default: return { label: s, variant: 'gray' as const, color: 'bg-gray-400' }
         }
@@ -174,7 +174,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                             {/* Progress / Status Card */}
                             <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
-                                <div className="bg-[#F9FAFB] dark:bg-gray-800/50 p-6 border-b border-brand-border dark:border-dark-border">
+                                <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
                                     <div className="flex justify-between items-center">
                                         <div className="flex items-center gap-2">
                                             <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Local:</span>
@@ -188,25 +188,25 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                     </div>
                                 </div>
 
-                                <div className="bg-white dark:bg-dark-surface p-8 pb-12">
+                                <div className="bg-white dark:bg-dark-surface px-12 pt-6 pb-16">
                                     <div className="relative px-4">
                                         <div className="relative h-1.5 w-full bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-between">
                                             <div
-                                                className={`absolute left-0 h-full rounded-full transition-all duration-500 ${order.delivery_status === 'delivery_failed' ? 'bg-red-500' : 'bg-brand-dark dark:bg-dark-heading'}`}
+                                                className={`absolute left-0 h-full rounded-full transition-all duration-500 ${order.delivery_status === 'delivery_failed' ? 'bg-brand-red' : 'bg-brand-dark dark:bg-dark-heading'}`}
                                                 style={{ width: `${(timelineSteps.filter(s => s.active).length - 1) * 33.33}%` }}
                                             ></div>
 
                                             {timelineSteps.map((step, idx) => (
                                                 <div key={idx} className="relative flex flex-col items-center">
-                                                    <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (order.delivery_status === 'delivery_failed' && idx === 3 ? 'bg-red-500 border-red-500' : 'bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading') : 'bg-white dark:bg-dark-surface border-gray-300 dark:border-gray-600'}`}>
+                                                    <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (order.delivery_status === 'delivery_failed' && idx === 3 ? 'bg-brand-red border-red-500' : 'bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading') : 'bg-white dark:bg-dark-surface border-gray-300 dark:border-gray-600'}`}>
                                                         {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
                                                     </div>
                                                     <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
-                                                        <span className={`text-[12px] md:text-[13px] font-bold mb-1 ${step.active ? (order.delivery_status === 'delivery_failed' && idx === 3 ? 'text-red-500' : 'text-brand-dark dark:text-dark-heading') : 'text-gray-300 dark:text-gray-600'}`}>
+                                                        <span className={`text-xs font-bold mb-1 ${step.active ? (order.delivery_status === 'delivery_failed' && idx === 3 ? 'text-brand-red' : 'text-brand-dark dark:text-dark-heading') : 'text-gray-300 dark:text-dark-body'}`}>
                                                             {step.label}
                                                         </span>
                                                         {step.active && step.date && (
-                                                            <div className="flex items-center gap-1 text-[10px] text-brand-inactive-text font-bold">
+                                                            <div className="flex items-center gap-1 text-xs text-brand-inactive-text">
                                                                 <span>{step.date}</span>
                                                                 {step.time && <span>{step.time}</span>}
                                                             </div>
@@ -220,15 +220,16 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                             </div>
 
                             {/* Products List */}
-                            <div className="mb-10">
-                                <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading mb-6 border-b border-brand-border dark:border-dark-border pb-3">Itens do Pedido</h3>
+                            <div className="mt-8">
+                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Itens do Pedido</h3>
                                 <div className="space-y-4">
                                     {(order.order_items || []).map((item: any) => (
                                         <div key={item.id} className="flex items-start gap-4 p-3 rounded-2xl hover:bg-brand-gray/20 transition-colors group">
                                             <div className="w-16 h-16 rounded-xl bg-brand-gray/50 dark:bg-gray-800 border border-brand-border dark:border-dark-border overflow-hidden flex-shrink-0 p-1">
                                                 <img
                                                     src={item.image || "https://img.dudit.com.br/static/Placeholder.png"}
-                                                    className="w-full h-full object-cover rounded-lg group-hover:scale-105 transition-transform"
+                                                    className="w-full h-full object-cover rounded-xl"
                                                     alt={item.product_name}
                                                     onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }}
                                                 />
@@ -238,8 +239,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                     <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.product_name || "Produto sem nome"}</h4>
                                                     <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">R$ {Number(item.subtotal || item.product_price * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                                 </div>
-                                                <div className="text-[10px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider mb-2">SKU: {item.sku || "N/A"}</div>
-                                                <div className="flex items-center gap-2 text-[11px] md:text-[12px] text-brand-inactive-text dark:text-dark-body font-bold">
+                                                <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "N/A"}</div>
+                                                <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
                                                     <span>{item.quantity} un. • R$ {Number(item.product_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / un.</span>
                                                 </div>
                                             </div>
@@ -263,7 +264,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                     {(order.discount_value || 0) > 0 && (
                                         <div className="flex justify-between items-center text-[14px]">
                                             <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto</span>
-                                            <span className="text-red-500 font-bold text-sm">- R$ {Number(order.discount_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                            <span className="text-brand-red font-bold text-sm">- R$ {Number(order.discount_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                         </div>
                                     )}
                                     <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">

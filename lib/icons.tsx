@@ -91,7 +91,8 @@ import {
   Link02Icon,
   PrinterIcon as Printer,
   TextUnderlineIcon,
-  MinusSignIcon
+  MinusSignIcon,
+  ReloadIcon as ReloadIcon01
 } from "@hugeicons/core-free-icons"
 
 interface IconProps {
@@ -196,6 +197,7 @@ export const CameraIcon = createIcon(Camera01Icon)
 export const ZoomInIcon = createIcon(ZoomInAreaIcon)
 export const ZoomOutIcon = createIcon(ZoomOutAreaIcon)
 export const RotateIcon = createIcon(RotateCropIcon)
+export const ReloadIcon = createIcon(ReloadIcon01)
 
 
 // ============================

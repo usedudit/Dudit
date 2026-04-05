@@ -5,7 +5,6 @@ import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getStockStatus, formatCurrency } from "./product-utils"
-import { ThreeDotsIcon } from "@/lib/icons"
 import type { Product } from "@/lib/types/product"
 
 interface ColumnDef {
