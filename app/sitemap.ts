@@ -11,7 +11,7 @@ const MAX_SITEMAP_URLS = 130
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const supabase = await getSupabaseServerClient()
-    // URLs base irremovÃ­veis (Institucional/Index)
+    // URLs base irremovíveis (Institucional/Index)
     const staticUrls: MetadataRoute.Sitemap = [
         { url: 'https://dudit.com.br', lastModified: new Date(), changeFrequency: 'daily', priority: 1 },
         { url: 'https://dudit.com.br/explorar', lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
@@ -63,12 +63,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             priority: 0.7,
         }))
 
-        // Juntamos e limitamos para validar o conceito: Crescimento OrgÃ¢nico Simples sem IndexaÃ§Ã£o Lixo
+        // Juntamos e limitamos para validar o conceito: Crescimento Orgânico Simples sem Indexação Lixo
         const completeSitemap = [...staticUrls, ...partnersSitemap, ...productsSitemap]
 
         return completeSitemap.slice(0, MAX_SITEMAP_URLS)
     } catch (error) {
-        console.error("Erro gerando Sitemap orgÃ¢nico", error)
+        console.error("Erro gerando Sitemap orgânico", error)
         return staticUrls
     }
 }

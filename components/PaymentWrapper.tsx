@@ -68,7 +68,7 @@ export function PaymentWrapper({
     const [isClosing, setIsClosing] = useState(false)
     const notification = useNotification()
 
-    const [step, setStep] = useState<"brick" | "pix" | "boleto" | "success" | "error">(
+    const [step, setStep] = useState<"brick" | "pix" | "boleto" | "success" | "error" | "mp_redirect">(
         useMercadoPago && !initialPixData && !initialBoletoData ? "brick" : (initialPixData ? "pix" : initialBoletoData ? "boleto" : "success")
     )
     const [fatalError, setFatalError] = useState<string | null>(null)
@@ -255,10 +255,22 @@ export function PaymentWrapper({
         setIsProcessingBrick(true)
         setBrickError(null)
         try {
+            // Detect redirect-based MP methods (Mercado Pago wallet, Linha de Crédito, etc.)
+            // These methods open a new tab on MP's site and don't return a payment_method_id
+            const resolvedFormData = formData.formData || formData
+            const paymentMethodId = resolvedFormData?.payment_method_id
+            const isRedirectMethod = !paymentMethodId || ["account_money", "consumer_credits", "mercadopago"].includes(paymentMethodId)
+
+            if (isRedirectMethod) {
+                setStep("mp_redirect")
+                setIsProcessingBrick(false)
+                return
+            }
+
             const responseData = await fetchJSONWithCSRF<any>("/api/mercadopago/process-payment", {
                 method: "POST",
                 body: {
-                    paymentFormData: formData.formData || formData,
+                    paymentFormData: resolvedFormData,
                     items: orderDetails.items,
                     partnerId,
                     buyerId,
@@ -703,6 +715,40 @@ export function PaymentWrapper({
                                         Ver Meus Pedidos
                                     </Link>
                                 </Button>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {step === "mp_redirect" && (
+                        <motion.div
+                            key="mp-redirect"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="bg-transparent overflow-hidden px-4 sm:px-0 flex flex-col items-center"
+                        >
+                            <IconPlaceholder
+                                placeholderType="image"
+                                imageSrc="https://img.dudit.com.br/static/mascots/Aguarde.png"
+                                imageAlt="Aguarde"
+                                title="Finalize o pagamento pelo Mercado Pago"
+                                subtitle="Uma nova aba foi aberta para você concluir o pagamento com segurança pelo Mercado Pago. Assim que tudo estiver certo, seu pedido será confirmado automaticamente!"
+                            />
+
+                            <div className="w-full max-w-md flex flex-col gap-4 mt-6">
+                                <Button asChild className="w-full h-12">
+                                    <Link href="/my-orders" prefetch={false}>
+                                        Acompanhar meus Pedidos
+                                    </Link>
+                                </Button>
+                                <Separator />
+                                <button
+                                    onClick={handleClose}
+                                    className="w-full text-brand-inactive-text font-semibold hover:text-brand-dark transition-colors"
+                                >
+                                    Voltar
+                                </button>
                             </div>
                         </motion.div>
                     )}

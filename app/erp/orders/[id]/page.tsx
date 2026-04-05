@@ -8,10 +8,10 @@ import Link from "next/link"
 import dynamic from "next/dynamic"
 import { useSupabase } from "@/providers/supabase-provider"
 
-// ImportaÃ§Ã£o estÃ¡tica (Leve, carregamento imediato)
+// Importação estática (Leve, carregamento imediato)
 import AuthView from "@/components/auth/AuthView"
 
-// ImportaÃ§Ãµes DinÃ¢micas (Code Splitting - SÃ³ carrega se precisar)
+// Importações Dinâmicas (Code Splitting - Só carrega se precisar)
 const PartnerVisuals = dynamic(
   () => import("@/components/auth/PartnerVisuals").then(mod => mod.PartnerVisuals),
   { ssr: false }
@@ -30,13 +30,13 @@ function AuthContent() {
   const searchParams = useSearchParams()
   const hasCheckedUser = useRef(false)
 
-  // Estado para controlar se o usuÃ¡rio jÃ¡ estÃ¡ logado
+  // Estado para controlar se o usuário já está logado
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false)
 
   const rawModeParam = searchParams.get("mode")
   const verifiedParam = searchParams.get("verified")
 
-  // Estado principal de navegaÃ§Ã£o
+  // Estado principal de navegação
   const [pageMode, setPageMode] = useState<PageMode>(() => {
     if (verifiedParam === "true" && rawModeParam === "partner") {
       // Direct redirect to ERP handled in useEffect to avoid render-phase navigation
@@ -53,14 +53,14 @@ function AuthContent() {
     }
   }, [verifiedParam, rawModeParam, router])
 
-  // Checa sessÃ£o do usuÃ¡rio ao carregar
+  // Checa sessão do usuário ao carregar
   useEffect(() => {
     if (user) {
       setIsUserLoggedIn(true)
     }
   }, [user])
 
-  // ForÃ§a tema light no modo parceiro
+  // Força tema light no modo parceiro
   useEffect(() => {
     if (pageMode === "partner") {
       document.documentElement.classList.remove("dark")
@@ -68,12 +68,12 @@ function AuthContent() {
     }
   }, [pageMode])
 
-  // Layout especÃ­fico do Modo Parceiro (VISUAL ORIGINAL MANTIDO)
+  // Layout específico do Modo Parceiro (VISUAL ORIGINAL MANTIDO)
   const PartnerLayout = () => (
     <div className="flex h-screen w-full bg-[#022C2B] p-4 md:p-6 items-stretch overflow-hidden font-sans relative">
       <div className="absolute inset-0 opacity-5 pointer-events-none" />
 
-      {/* Esquerda: FormulÃ¡rio / Wizard */}
+      {/* Esquerda: Formulário / Wizard */}
       <div className="w-full lg:w-[45%] xl:w-[40%] bg-white rounded-2xl flex flex-col p-6 overflow-hidden z-20 shadow-2xl relative">
         <div className="flex justify-between items-center mb-4 px-2 shrink-0">
           <Link href="/" prefetch={false}>
@@ -104,7 +104,7 @@ function AuthContent() {
 
         {/* Footer Mobile */}
         <div className="lg:hidden mt-8 text-center text-xs text-gray-400">
-          Â© {new Date().getFullYear()} Dudit Inc.{" "}
+          © {new Date().getFullYear()} Dudit Inc.{" "}
           <Link href="/institucional/termos" prefetch={false} className="hover:underline ml-2">Termos</Link>{" "}
           &bull;{" "}
           <Link href="/institucional/privacidade" prefetch={false} className="hover:underline">Privacidade</Link>

@@ -14,37 +14,37 @@ const colorMap: Record<InfoCardColor, { bg: string; text: string; bar: string; b
     bg: "bg-brand-orange/10",
     text: "text-brand-orange",
     bar: "bg-brand-orange",
-    border: "border-brand-orange"
+    border: "border-brand-border"
   },
   green: {
     bg: "bg-brand-green/10",
     text: "text-brand-green",
     bar: "bg-brand-green",
-    border: "border-brand-green"
+    border: "border-brand-border"
   },
   gray: {
-    bg: "bg-brand-gray dark:bg-brand-gray/10",
+    bg: "bg-brand-gray dark:bg-brand-border/50",
     text: "text-brand-dark dark:text-dark-heading",
     bar: "bg-brand-border dark:bg-dark-border/50",
-    border: "border-brand-border/10 dark:border-dark-border/10"
+    border: "border-brand-border dark:border-dark-border"
   },
   red: {
-    bg: "bg-brand-red/10",
+    bg: "bg-brand-red/10 dark:bg-brand-red-light",
     text: "text-brand-red",
     bar: "bg-brand-red",
-    border: "border-brand-red"
+    border: "border-brand-border"
   },
   yellow: {
     bg: "bg-brand-yellow/10",
     text: "text-brand-yellow",
     bar: "bg-brand-yellow",
-    border: "border-brand-yellow"
+    border: "border-brand-border"
   },
   blue: {
     bg: "bg-blue-500/10",
     text: "text-blue-600",
     bar: "bg-blue-600",
-    border: "border-blue-600"
+    border: "border-brand-border"
   },
 }
 

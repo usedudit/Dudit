@@ -38,10 +38,10 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
             <div>
               <h4 className="text-white font-semibold mb-6 uppercase tracking-wider text-xs">Institucional</h4>
               <ul className="space-y-4">
-                <li><Link href="/institucional/inicio" prefetch={true} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Conheça mais</Link></li>
-                <li><Link href="/institucional/sobre" prefetch={true} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Sobre a Dudit</Link></li>
-                <li><Link href="/institucional/segmentos" prefetch={true} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Segmentos</Link></li>
-                <li><Link href="/institucional/planos" prefetch={true} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Nossos Planos</Link></li>
+                <li><Link href="/institucional/inicio" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Conheça mais</Link></li>
+                <li><Link href="/institucional/sobre" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Sobre a Dudit</Link></li>
+                <li><Link href="/institucional/segmentos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Segmentos</Link></li>
+                <li><Link href="/institucional/planos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Nossos Planos</Link></li>
               </ul>
             </div>
 
@@ -49,9 +49,9 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
             <div>
               <h4 className="text-white font-semibold mb-6 uppercase tracking-wider text-xs">Para Lojistas</h4>
               <ul className="space-y-4">
-                <li><Link href="/erp/vender" prefetch={true} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Como Vender</Link></li>
-                <li><Link href="/erp/dashboard" prefetch={true} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Painel de Gestão</Link></li>
-                <li><Link href="/auth/login" prefetch={true} className="text-sm text-gray-400 hover:text-brand-green transition-colors font-bold text-brand-green">Cadastrar minha Loja</Link></li>
+                <li><Link href="/erp/vender" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Como Vender</Link></li>
+                <li><Link href="/erp/dashboard" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Painel de Gestão</Link></li>
+                <li><Link href="/auth/login" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors font-bold text-brand-green">Cadastrar minha Loja</Link></li>
               </ul>
             </div>
 
@@ -59,10 +59,10 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
             <div>
               <h4 className="text-white font-semibold mb-6 uppercase tracking-wider text-xs">Suporte</h4>
               <ul className="space-y-4">
-                <li><Link href="/ajuda" prefetch={true} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Central de Ajuda</Link></li>
-                <li><Link href="/contato" prefetch={true} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Fale Conosco</Link></li>
-                <li><Link href="/status" prefetch={true} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Status do Sistema</Link></li>
-                <li><Link href="/faq" prefetch={true} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Perguntas Frequentes</Link></li>
+                <li><Link href="/ajuda" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Central de Ajuda</Link></li>
+                <li><Link href="/contato" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Fale Conosco</Link></li>
+                <li><Link href="/status" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Status do Sistema</Link></li>
+                <li><Link href="/faq" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Perguntas Frequentes</Link></li>
               </ul>
             </div>
           </div>
@@ -72,8 +72,8 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
         <div className="flex flex-col md:flex-row justify-between items-center gap-6 border-t border-white/10 pt-8">
           <div className="text-center md:text-left order-2 md:order-1">
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-6 gap-y-2 mb-3 text-sm text-gray-400">
-              <Link href="/institucional/termos" prefetch={true} className="hover:text-brand-green transition-colors">Termos de Uso</Link>
-              <Link href="/institucional/privacidade" prefetch={true} className="hover:text-brand-green transition-colors">Política de Privacidade</Link>
+              <Link href="/institucional/termos" prefetch={false} className="hover:text-brand-green transition-colors">Termos de Uso</Link>
+              <Link href="/institucional/privacidade" prefetch={false} className="hover:text-brand-green transition-colors">Política de Privacidade</Link>
             </div>
             <p className="text-gray-500 text-xs">
               © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os direitos reservados.

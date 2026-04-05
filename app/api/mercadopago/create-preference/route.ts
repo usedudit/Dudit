@@ -33,9 +33,9 @@ async function handler(request: NextRequest) {
     const user = await getCurrentUser()
     const supabase = await getSupabaseServerClient()
 
-    // SEGURANÃ‡A: Verificar que o usuÃ¡rio estÃ¡ autenticado
+    // SEGURANÃ‡A: Verificar que o usuário está autenticado
     if (!user?.id) {
-      return NextResponse.json({ error: "NÃ£o autenticado" }, { status: 401 })
+      return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
     }
 
     // Normalizar items (podem vir como 'products' ou 'items')
@@ -72,7 +72,7 @@ async function handler(request: NextRequest) {
     }
 
     if (!partnerId) {
-      return NextResponse.json({ error: "Vendedor nÃ£o identificado" }, { status: 400 })
+      return NextResponse.json({ error: "Vendedor não identificado" }, { status: 400 })
     }
 
     const adminClient = createAdminClient()
@@ -89,7 +89,7 @@ async function handler(request: NextRequest) {
 
     if (!partner) {
       console.error("[v0] Partner not found for ID:", partnerId)
-      return NextResponse.json({ error: "Vendedor nÃ£o encontrado" }, { status: 400 })
+      return NextResponse.json({ error: "Vendedor não encontrado" }, { status: 400 })
     }
 
     let mpAccessToken: string
@@ -97,11 +97,11 @@ async function handler(request: NextRequest) {
       mpAccessToken = await getValidMercadoPagoAccessToken(partnerId)
     } catch (err: any) {
       SecureLogger.error("Failed to obtain valid MP token", { partnerId, error: err.message })
-      return NextResponse.json({ error: "SessÃ£o do Mercado Pago invÃ¡lida ou expirada" }, { status: 400 })
+      return NextResponse.json({ error: "Sessão do Mercado Pago inválida ou expirada" }, { status: 400 })
     }
 
-    // SEGURANÃ‡A: SEMPRE validar preÃ§os no banco (nunca confiar em body.amount ou item.price)
-    // OtimizaÃ§Ã£o: Buscar todos os produtos e variantes de uma vez para evitar N+1 queries
+    // SEGURANÃ‡A: SEMPRE validar preços no banco (nunca confiar em body.amount ou item.price)
+    // Otimização: Buscar todos os produtos e variantes de uma vez para evitar N+1 queries
     const productIds = items.filter(i => !i.variant_id).map(i => i.id)
     const variantIds = items.map(i => i.variant_id || i.id).filter(Boolean) as string[]
 
@@ -125,7 +125,7 @@ async function handler(request: NextRequest) {
     for (const item of items) {
       // Validar quantidade
       if (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 9999) {
-        return NextResponse.json({ error: `Quantidade invÃ¡lida para ${item.name}` }, { status: 400 })
+        return NextResponse.json({ error: `Quantidade inválida para ${item.name}` }, { status: 400 })
       }
 
       let resolvedPrice: number
@@ -155,14 +155,14 @@ async function handler(request: NextRequest) {
           resolvedPartnerId = product.partner_id
           resolvedName = product.name
         } else {
-          return NextResponse.json({ error: `Produto/Variante ${item.id} nÃ£o encontrado` }, { status: 400 })
+          return NextResponse.json({ error: `Produto/Variante ${item.id} não encontrado` }, { status: 400 })
         }
       }
 
       // Verificar que o produto pertence ao parceiro
       if (resolvedPartnerId !== partnerId) {
         SecureLogger.error("Product partner mismatch in preference", { productId: item.id })
-        return NextResponse.json({ error: "Produto nÃ£o pertence a este vendedor" }, { status: 400 })
+        return NextResponse.json({ error: "Produto não pertence a este vendedor" }, { status: 400 })
       }
 
       // Verificar estoque
@@ -185,10 +185,10 @@ async function handler(request: NextRequest) {
     // SEGURANÃ‡A: Validar total
     if (totalAmount <= 0 || totalAmount > 999999) {
       SecureLogger.error("Invalid preference total amount", { totalAmount })
-      return NextResponse.json({ error: "Valor total invÃ¡lido" }, { status: 400 })
+      return NextResponse.json({ error: "Valor total inválido" }, { status: 400 })
     }
 
-    // Criar preferÃªncia no Mercado Pago
+    // Criar preferência no Mercado Pago
     const preferencePayload: Record<string, any> = {
       items: preferenceItems,
       payer: {
@@ -205,7 +205,7 @@ async function handler(request: NextRequest) {
       auto_return: "approved",
     }
 
-    // Adicionar expiraÃ§Ã£o de 30 minutos (1800 segundos) para PIX
+    // Adicionar expiração de 30 minutos (1800 segundos) para PIX
     // Isso cria um deadline para o pagamento PIX
     const thirtyMinutesFromNow = new Date(Date.now() + 30 * 60 * 1000)
     preferencePayload.expiration_date_from = new Date().toISOString()
@@ -223,7 +223,7 @@ async function handler(request: NextRequest) {
     console.log("[v0] MP Response status:", mpResponse.status)
 
     if (!mpResponse.ok) {
-      let errorMessage = "Erro ao criar preferÃªncia de pagamento"
+      let errorMessage = "Erro ao criar preferência de pagamento"
       let mpErrorData: any = null
       try {
         mpErrorData = await mpResponse.json()
@@ -268,7 +268,7 @@ async function handler(request: NextRequest) {
     console.error("[v0] Error stack:", error?.stack)
     SecureLogger.error("Failed to create preference", { error: error?.message })
     return NextResponse.json(
-      { error: error?.message || "Erro interno ao criar preferÃªncia" },
+      { error: error?.message || "Erro interno ao criar preferência" },
       { status: 500 }
     )
   }

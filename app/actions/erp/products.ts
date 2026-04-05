@@ -77,8 +77,8 @@ const verifyBatchOwnership = async (productIds: string[], resolvedUser?: any) =>
     const { sanitizeUUID } = await import("@/lib/security/input-sanitizer")
     const sanitized = productIds.map(sanitizeUUID).filter((id): id is string => id !== null)
 
-    if (!sanitized.length) throw new Error("Nenhum ID vÃ¡lido")
-    if (sanitized.length > 100) throw new Error("MÃ¡ximo: 100 produtos")
+    if (!sanitized.length) throw new Error("Nenhum ID válido")
+    if (sanitized.length > 100) throw new Error("Máximo: 100 produtos")
 
     const admin = getAdminClient()
 
@@ -89,7 +89,7 @@ const verifyBatchOwnership = async (productIds: string[], resolvedUser?: any) =>
     
     const { data } = dataRes
 
-    if (!data || data.length !== sanitized.length) throw new Error("Produtos nÃ£o encontrados")
+    if (!data || data.length !== sanitized.length) throw new Error("Produtos não encontrados")
 
     // All products must belong to the same partner
     const partnerId = data[0]?.partner_id
@@ -250,7 +250,7 @@ export async function createProductComprehensiveAction(data: {
             validateCSRF(data as Record<string, unknown>),
             verifyAuth(),
         ])
-        if (!csrf.valid) return errorResponse(csrf.error || "CSRF invÃ¡lido")
+        if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
 
         // â”€â”€ SERVER-SIDE CONTEXT FALLBACK â”€â”€
         let finalPartnerId = data.partnerId
@@ -258,12 +258,12 @@ export async function createProductComprehensiveAction(data: {
             const { getCurrentPartnerContext } = await import("@/lib/auth/partner-context")
             const ctx = await getCurrentPartnerContext(_user)
             if (ctx?.partnerId) finalPartnerId = ctx.partnerId
-            else throw new Error("Acesso negado: ID do Parceiro nÃ£o pÃ´de ser resolvido.")
+            else throw new Error("Acesso negado: ID do Parceiro não pôde ser resolvido.")
         }
 
         const supabase = await getSupabaseServerClient()
 
-        // 3. Permission + Store em paralelo (moderaÃ§Ã£o agora Ã© assÃ­ncrona)
+        // 3. Permission + Store em paralelo (moderação agora é assíncrona)
         const [_access, storeResult] = await Promise.all([
             requirePartnerAccessWithPermission(finalPartnerId, "products", "create", _user),
             (async () => {
@@ -301,7 +301,7 @@ export async function createProductComprehensiveAction(data: {
             data.featured = false
         }
 
-        // SKU: funÃ§Ã£o pura (zero queries), unicidade garantida pelo banco
+        // SKU: função pura (zero queries), unicidade garantida pelo banco
         const sku = data.sku?.trim() || generateSKUBase(data.name)
 
         const productData = {
@@ -319,7 +319,7 @@ export async function createProductComprehensiveAction(data: {
             condition: data.condition || "Novo",
             unit: data.unit || null,
             brand_id: (data as any).brandId || null,
-            product_type: data.productType || "FÃ­sico",
+            product_type: data.productType || "Físico",
             location: data.location || null,
             location_id: data.locationId || null,
             cost_price: data.costPrice || 0,
@@ -340,7 +340,7 @@ export async function createProductComprehensiveAction(data: {
             technical_specs: data.technicalSpecs || {},
             delivery_format: data.deliveryFormat || null,
             show_in_marketplace: data.showInMarketplace !== false,
-            // ModeraÃ§Ã£o assÃ­ncrona ou status de bloqueio do enviador
+            // Moderação assíncrona ou status de bloqueio do enviador
             moderation_status: data.requiresManualModeration ? 'pending_moderation' : 'approved',
             tags: data.tags || [],
             allow_sell_without_stock: data.allow_sell_without_stock || false,
@@ -520,7 +520,7 @@ export async function updateProductComprehensiveAction(productId: string, data: 
             validateCSRF(data as Record<string, unknown>),
             fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, images, sku, name, description, moderation_status"),
         ])
-        if (!csrf.valid) return errorResponse(csrf.error || "CSRF invÃ¡lido")
+        if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
 
         const supabase = await getSupabaseServerClient()
         const payload: any = { updated_at: getBrasiliaTime() }
@@ -589,7 +589,7 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         if (data.fciCode !== undefined) fiscalPayload.fci_code = data.fciCode
         if (data.allow_sell_without_stock !== undefined) payload.allow_sell_without_stock = data.allow_sell_without_stock
 
-        // Campos promocionais e de preÃ§o
+        // Campos promocionais e de preço
         if (data.costPrice !== undefined) payload.cost_price = data.costPrice
         if (data.promotionalPrice !== undefined) payload.promotional_price = data.promotionalPrice
         if (data.isOnPromotion !== undefined) payload.is_on_promotion = data.isOnPromotion
@@ -608,12 +608,12 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         if (data.tags !== undefined) payload.tags = data.tags
         if (data.showInMarketplace !== undefined) payload.show_in_marketplace = data.showInMarketplace
 
-        // ModeraÃ§Ã£o de TEXTO: cria job para cron processar (nÃ£o altera moderation_status)
+        // Moderação de TEXTO: cria job para cron processar (não altera moderation_status)
         const needsTextRemoderation =
             (data.name !== undefined && data.name !== product.name) ||
             (data.description !== undefined && data.description !== product.description)
 
-        // ModeraÃ§Ã£o de IMAGEM: simples â€” bloqueou algo? pending. NÃ£o bloqueou? approved.
+        // Moderação de IMAGEM: simples â€” bloqueou algo? pending. Não bloqueou? approved.
         payload.moderation_status = data.requiresManualModeration ? 'pending_moderation' : 'approved'
 
         const { data: updatedProduct, error: transactionError } = await supabase.rpc(
@@ -856,7 +856,7 @@ export async function deleteProductVariantAction(variantId: string): Promise<Act
         await verifyAuth()
         const supabase = await getSupabaseServerClient()
         const { data: variant } = await supabase.from("product_variants").select("product_id, variant_options").eq("id", variantId).single()
-        if (!variant) return errorResponse("Variante nÃ£o encontrada")
+        if (!variant) return errorResponse("Variante não encontrada")
 
         const product = await fetchProductAndVerifyOwnership(variant.product_id, "edit")
         const { error } = await supabase.from("product_variants").delete().eq("id", variantId)
@@ -884,7 +884,7 @@ export async function updateProductVariantAction(variantId: string, data: {
         const supabase = await getSupabaseServerClient()
 
         const { data: variant } = await supabase.from("product_variants").select("product_id, variant_options").eq("id", variantId).single()
-        if (!variant) return errorResponse("Variante nÃ£o encontrada")
+        if (!variant) return errorResponse("Variante não encontrada")
 
         const product = await fetchProductAndVerifyOwnership(variant.product_id, "edit")
 
@@ -923,7 +923,7 @@ export async function batchDeleteVariantsAction(variantIds: string[]): Promise<A
             .select("id, product_id, variant_options, products!inner(partner_id, partners!inner(user_id))")
             .in("id", variantIds)
 
-        if (!variants || variants.length === 0) return errorResponse("Variantes nÃ£o encontradas")
+        if (!variants || variants.length === 0) return errorResponse("Variantes não encontradas")
 
         // Check access via partner_users first, then fallback to partners.user_id
         const productPartnerId = variants[0]?.products?.partner_id
@@ -942,7 +942,7 @@ export async function batchDeleteVariantsAction(variantIds: string[]): Promise<A
                     .eq("id", productPartnerId)
                     .single()
                 if (!partner || partner.user_id !== user?.id) {
-                    return errorResponse("Sem permissÃ£o")
+                    return errorResponse("Sem permissão")
                 }
             }
         }
@@ -977,7 +977,7 @@ export async function batchUpdateVariantsAction(updates: Array<{ id: string; pri
             .select("id, product_id, variant_options, products!inner(partner_id, partners!inner(user_id))")
             .in("id", variantIds)
 
-        if (!variants) return errorResponse("Variantes nÃ£o encontradas")
+        if (!variants) return errorResponse("Variantes não encontradas")
 
         // Check access via partner_users first, then fallback to partners.user_id
         const productPartnerId = (variants[0] as any)?.products?.partner_id
@@ -996,7 +996,7 @@ export async function batchUpdateVariantsAction(updates: Array<{ id: string; pri
                     .eq("id", productPartnerId)
                     .single()
                 if (!partner || partner.user_id !== user?.id) {
-                    return errorResponse("Sem permissÃ£o")
+                    return errorResponse("Sem permissão")
                 }
             }
         }
@@ -1174,7 +1174,7 @@ export async function duplicateProductsAction(productIds: string[]) {
         const supabase = await getSupabaseServerClient()
         const { data: products } = await supabase.from("products").select("*").in("id", productIds)
 
-        if (!products?.length) return { success: false, error: "Produtos nÃ£o encontrados" }
+        if (!products?.length) return { success: false, error: "Produtos não encontrados" }
         await requirePartnerAccessWithPermission(products[0].partner_id, "products", "create")
 
         // SKU puro (zero queries) â€” unicidade pelo banco
@@ -1183,7 +1183,7 @@ export async function duplicateProductsAction(productIds: string[]) {
             const { id, created_at, updated_at, ...data } = p
             return {
                 ...data,
-                name: `${data.name} (CÃ³pia)`,
+                name: `${data.name} (Cópia)`,
                 sku: generateSKUBase(`${data.name} Copy`),
             }
         })
@@ -1197,7 +1197,7 @@ export async function duplicateProductsAction(productIds: string[]) {
             if (attempt > 0) {
                 // Regenerar SKUs com sufixo para evitar collision
                 duplicated.forEach((d: any) => {
-                    d.sku = generateSKUWithSuffix(generateSKUBase(d.name.replace(' (CÃ³pia)', '') + ' Copy'), attempt)
+                    d.sku = generateSKUWithSuffix(generateSKUBase(d.name.replace(' (Cópia)', '') + ' Copy'), attempt)
                 })
             }
 

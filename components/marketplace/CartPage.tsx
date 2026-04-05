@@ -379,7 +379,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                       <Link
                                         href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
                                         prefetch={true}
-                                        className="w-[72px] h-[72px] rounded-[8px] overflow-hidden border border-brand-border shrink-0 cursor-pointer block"
+                                        className="w-[68px] h-[68px] rounded-[8px] overflow-hidden border border-brand-border shrink-0 cursor-pointer block"
                                       >
                                         <img src={getItemImage(item)} alt={item.products.name} className="w-full h-full object-cover" />
                                       </Link>
@@ -434,7 +434,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                         <Link
                                           href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
                                           prefetch={true}
-                                          className="w-[80px] h-[80px] rounded-[8px] overflow-hidden border border-brand-border shrink-0 cursor-pointer block"
+                                          className="w-[68px] h-[68px] rounded-[8px] overflow-hidden border border-brand-border shrink-0 cursor-pointer block"
                                         >
                                           <img src={getItemImage(item)} alt={item.products.name} className="w-full h-full object-cover" />
                                         </Link>

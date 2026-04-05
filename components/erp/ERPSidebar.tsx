@@ -275,7 +275,7 @@ export function ERPSidebar() {
         )}
       >
         <div className="h-[65px] flex items-center px-3 overflow-hidden shrink-0 relative transition-all duration-300">
-          <Link href="/" prefetch={false} className="flex items-center gap-3 w-full h-full relative">
+          <Link href="/erp/dashboard" prefetch={true} className="flex items-center gap-3 w-full h-full relative">
             <div className="flex items-center justify-center shrink-0 w-[44px]">
               <img
                 src="https://img.dudit.com.br/static/Icon.png"

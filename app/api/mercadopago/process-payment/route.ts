@@ -24,15 +24,15 @@ interface ProcessPaymentRequest {
 }
 
 /**
- * Gera uma chave de idempotÃªncia determinÃ­stica baseada nos itens, comprador e parceiro.
- * Garante que requisiÃ§Ãµes duplicadas (double-click) nÃ£o criem pagamentos duplicados.
+ * Gera uma chave de idempotência determinística baseada nos itens, comprador e parceiro.
+ * Garante que requisições duplicadas (double-click) não criem pagamentos duplicados.
  */
 function generateIdempotencyKey(buyerId: string, partnerId: string, items: Array<{ id: string; quantity: number }>): string {
   const itemsHash = items
     .map(i => `${i.id}:${i.quantity}`)
     .sort()
     .join("|")
-  // Janela temporal de 30 segundos para permitir compras legÃ­timas repetidas
+  // Janela temporal de 30 segundos para permitir compras legítimas repetidas
   const timeWindow = Math.floor(Date.now() / 30000)
   const payload = `${buyerId}_${partnerId}_${itemsHash}_${timeWindow}`
   return createHash("sha256").update(payload).digest("hex").substring(0, 48)
@@ -49,9 +49,9 @@ async function handler(request: NextRequest) {
     const body: ProcessPaymentRequest = await request.json()
     const { paymentFormData, items, partnerId, buyerId, deliveryType, deliveryAddress, notes, cartItemIds } = body
 
-    // SEGURANÃ‡A: ValidaÃ§Ã£o de campos obrigatÃ³rios ANTES de qualquer operaÃ§Ã£o
+    // SEGURANÃ‡A: Validação de campos obrigatórios ANTES de qualquer operação
     if (!paymentFormData?.payment_method_id) {
-      return NextResponse.json({ error: "MÃ©todo de pagamento nÃ£o informado" }, { status: 400 })
+      return NextResponse.json({ error: "Método de pagamento não informado" }, { status: 400 })
     }
 
     if (!items || items.length === 0) {
@@ -64,18 +64,18 @@ async function handler(request: NextRequest) {
 
     const user = await getCurrentUser()
     if (!user) {
-      return NextResponse.json({ error: "NÃ£o autenticado" }, { status: 401 })
+      return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
     }
 
     const supabase = await getSupabaseServerClient()
 
-    // SEGURANÃ‡A: Verificar que o buyerId corresponde ao usuÃ¡rio logado
+    // SEGURANÃ‡A: Verificar que o buyerId corresponde ao usuário logado
     if (buyerId !== user.id) {
       SecureLogger.warn("Buyer ID mismatch attempt", { buyerId, userId: user.id })
       return NextResponse.json({ error: "Acesso negado" }, { status: 403 })
     }
 
-    // SEGURANÃ‡A: Validar parceiro e token MP (usa admin client para bypass RLS â€” dados sensÃ­veis)
+    // SEGURANÃ‡A: Validar parceiro e token MP (usa admin client para bypass RLS â€” dados sensíveis)
     const adminClient = createAdminClient()
     const { data: partner, error: partnerError } = await adminClient
       .from("partners")
@@ -85,7 +85,7 @@ async function handler(request: NextRequest) {
 
     if (partnerError || !partner) {
       SecureLogger.error("Partner not found", { partnerId })
-      return NextResponse.json({ error: "Vendedor nÃ£o encontrado" }, { status: 400 })
+      return NextResponse.json({ error: "Vendedor não encontrado" }, { status: 400 })
     }
 
     let mpAccessToken: string
@@ -94,11 +94,11 @@ async function handler(request: NextRequest) {
     } catch (err: any) {
       SecureLogger.warn("Failed to obtain valid MP token for partner", { partnerId, error: err.message })
       return NextResponse.json({
-        error: "SessÃ£o do Mercado Pago invÃ¡lida ou expirada. O vendedor precisa reconectar."
+        error: "Sessão do Mercado Pago inválida ou expirada. O vendedor precisa reconectar."
       }, { status: 400 })
     }
 
-    // SEGURANÃ‡A: Validar e recalcular preÃ§os (NUNCA confiar no frontend)
+    // SEGURANÃ‡A: Validar e recalcular preços (NUNCA confiar no frontend)
     let totalAmount = 0
     const validatedItems = []
 
@@ -109,12 +109,12 @@ async function handler(request: NextRequest) {
 
       // Validar formato do ID
       if (!item.id || typeof item.id !== "string") {
-        return NextResponse.json({ error: "ID de produto invÃ¡lido" }, { status: 400 })
+        return NextResponse.json({ error: "ID de produto inválido" }, { status: 400 })
       }
 
       // Validar quantidade
       if (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 9999) {
-        return NextResponse.json({ error: `Quantidade invÃ¡lida para ${item.name || item.id}` }, { status: 400 })
+        return NextResponse.json({ error: `Quantidade inválida para ${item.name || item.id}` }, { status: 400 })
       }
 
       // Primeiro tentar buscar como variante se houver ID de variante
@@ -134,7 +134,7 @@ async function handler(request: NextRequest) {
 
         if (!variant) {
           if (isDev) console.error("[v0] ERROR: Variant not found:", item.variant_id)
-          return NextResponse.json({ error: `Variante ${item.variant_id} nÃ£o encontrada` }, { status: 400 })
+          return NextResponse.json({ error: `Variante ${item.variant_id} não encontrada` }, { status: 400 })
         }
 
         const parentProduct = variant.products as any
@@ -146,7 +146,7 @@ async function handler(request: NextRequest) {
         resolvedProductId = variant.product_id // Use product_id from variant
         resolvedVariantId = variant.id
       } else {
-        // Se nÃ£o houver variant_id, buscar como produto padrÃ£o
+        // Se não houver variant_id, buscar como produto padrão
         const { data: product } = await adminClient
           .from("products")
           .select("id, price, promotional_price, stock_quantity, partner_id")
@@ -154,7 +154,7 @@ async function handler(request: NextRequest) {
           .single()
 
         if (product) {
-          // Produto encontrado â€” usar preÃ§o promocional se disponÃ­vel
+          // Produto encontrado â€” usar preço promocional se disponível
           const basePrice = Number(product.price)
           const promoPrice = product.promotional_price ? Number(product.promotional_price) : 0
           resolvedPrice = (promoPrice > 0 && promoPrice < basePrice) ? promoPrice : basePrice
@@ -164,7 +164,7 @@ async function handler(request: NextRequest) {
         } else {
           // Nenhum dos dois funcionou
           SecureLogger.warn("Product not found during payment", { productId: item.id })
-          return NextResponse.json({ error: `Produto ${item.id} nÃ£o encontrado` }, { status: 400 })
+          return NextResponse.json({ error: `Produto ${item.id} não encontrado` }, { status: 400 })
         }
       }
 
@@ -172,7 +172,7 @@ async function handler(request: NextRequest) {
       // Prevents payment redirection attack by ensuring all items belong to the stated partner
       if (resolvedPartnerId !== partnerId) {
         SecureLogger.error("Product partner mismatch â€” possible payment redirection attack", { productId: item.id, expectedPartner: partnerId, actualPartner: resolvedPartnerId })
-        return NextResponse.json({ error: "Produto nÃ£o pertence a este vendedor" }, { status: 400 })
+        return NextResponse.json({ error: "Produto não pertence a este vendedor" }, { status: 400 })
       }
 
       // SEGURANÃ‡A: Verificar estoque
@@ -197,13 +197,13 @@ async function handler(request: NextRequest) {
 
     if (isDev) console.log("[v0] All items validated. Total amount:", totalAmount)
 
-    // SEGURANÃ‡A: Validar que o total Ã© positivo e razoÃ¡vel
+    // SEGURANÃ‡A: Validar que o total é positivo e razoável
     if (totalAmount <= 0 || totalAmount > 999999) {
       SecureLogger.error("Invalid total amount calculated", { totalAmount })
-      return NextResponse.json({ error: "Valor total invÃ¡lido" }, { status: 400 })
+      return NextResponse.json({ error: "Valor total inválido" }, { status: 400 })
     }
 
-    // Buscar dados do usuÃ¡rio para pegar o nome completo
+    // Buscar dados do usuário para pegar o nome completo
     const { data: userProfile } = await supabase
       .from("user_profiles")
       .select("full_name")
@@ -215,9 +215,9 @@ async function handler(request: NextRequest) {
     const payerFirstName = customerNameParts[0] || "Cliente"
     const payerLastName = customerNameParts.slice(1).join(" ") || "Comprador"
 
-    // SEGURANÃ‡A: Montar requisiÃ§Ã£o para API do MP usando totalAmount do SERVIDOR
+    // SEGURANÃ‡A: Montar requisição para API do MP usando totalAmount do SERVIDOR
     const mpPaymentRequest: Record<string, any> = {
-      transaction_amount: totalAmount, // âœ… Valor calculado pelo servidor, nÃ£o do frontend
+      transaction_amount: totalAmount, // âœ… Valor calculado pelo servidor, não do frontend
       payment_method_id: paymentFormData.payment_method_id,
       payer: {
         email: paymentFormData.payer?.email || user.email,
@@ -241,7 +241,7 @@ async function handler(request: NextRequest) {
       description: `Pedido de ${customerName}`,
     }
 
-    // Adicionar token se for cartÃ£o de crÃ©dito
+    // Adicionar token se for cartão de crédito
     if (paymentFormData.token) {
       mpPaymentRequest.token = paymentFormData.token
     }
@@ -252,32 +252,32 @@ async function handler(request: NextRequest) {
       mpPaymentRequest.issuer_id = paymentFormData.issuer_id
     }
 
-    // BACEN: Para boleto registrado, endereÃ§o do pagador Ã© obrigatÃ³rio em additional_info
-    // federal_unit deve ser a SIGLA do estado (ex: "SP"), nÃ£o o nome completo
+    // BACEN: Para boleto registrado, endereço do pagador é obrigatório em additional_info
+    // federal_unit deve ser a SIGLA do estado (ex: "SP"), não o nome completo
     if (paymentFormData.payment_method_id === "bolbradesco") {
       const stateNameToAbbr: Record<string, string> = {
-        "acre": "AC", "alagoas": "AL", "amapÃ¡": "AP", "amazonas": "AM",
-        "bahia": "BA", "cearÃ¡": "CE", "distrito federal": "DF", "espÃ­rito santo": "ES",
-        "goiÃ¡s": "GO", "maranhÃ£o": "MA", "mato grosso": "MT", "mato grosso do sul": "MS",
-        "minas gerais": "MG", "parÃ¡": "PA", "paraÃ­ba": "PB", "paranÃ¡": "PR",
-        "pernambuco": "PE", "piauÃ­": "PI", "rio de janeiro": "RJ",
-        "rio grande do norte": "RN", "rio grande do sul": "RS", "rondÃ´nia": "RO",
-        "roraima": "RR", "santa catarina": "SC", "sÃ£o paulo": "SP",
+        "acre": "AC", "alagoas": "AL", "amapá": "AP", "amazonas": "AM",
+        "bahia": "BA", "ceará": "CE", "distrito federal": "DF", "espírito santo": "ES",
+        "goiás": "GO", "maranhão": "MA", "mato grosso": "MT", "mato grosso do sul": "MS",
+        "minas gerais": "MG", "pará": "PA", "paraíba": "PB", "paraná": "PR",
+        "pernambuco": "PE", "piauí": "PI", "rio de janeiro": "RJ",
+        "rio grande do norte": "RN", "rio grande do sul": "RS", "rondônia": "RO",
+        "roraima": "RR", "santa catarina": "SC", "são paulo": "SP",
         "sergipe": "SE", "tocantins": "TO",
       }
 
       const rawFederalUnit = mpPaymentRequest.payer?.address?.federal_unit || ""
-      // Se jÃ¡ for sigla (2 letras), usar diretamente; caso contrÃ¡rio, converter
+      // Se já for sigla (2 letras), usar diretamente; caso contrário, converter
       const federalUnitAbbr = rawFederalUnit.length === 2
         ? rawFederalUnit.toUpperCase()
         : (stateNameToAbbr[rawFederalUnit.toLowerCase()] || rawFederalUnit)
 
-      // Corrigir a sigla no payer.address tambÃ©m
+      // Corrigir a sigla no payer.address também
       if (mpPaymentRequest.payer?.address) {
         mpPaymentRequest.payer.address.federal_unit = federalUnitAbbr
       }
 
-      // additional_info.payer.address Ã© OBRIGATÃ“RIO para boleto desde BACEN Set/2024
+      // additional_info.payer.address é OBRIGATÓRIO para boleto desde BACEN Set/2024
       mpPaymentRequest.additional_info = {
         payer: {
           first_name: mpPaymentRequest.payer.first_name,
@@ -293,10 +293,10 @@ async function handler(request: NextRequest) {
 
     console.log("[MP PAYMENT REQUEST PAYLOAD]:", JSON.stringify(mpPaymentRequest, null, 2))
 
-    // SEGURANÃ‡A: Idempotency key determinÃ­stica (protege contra double-click)
+    // SEGURANÃ‡A: Idempotency key determinística (protege contra double-click)
     const idempotencyKey = generateIdempotencyKey(buyerId, partnerId, validatedItems.map(i => ({ id: i.product_id, quantity: i.quantity })))
 
-    // Fazer requisiÃ§Ã£o Ã  API do Mercado Pago
+    // Fazer requisição Ã  API do Mercado Pago
     const mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
       method: "POST",
       headers: {
@@ -333,7 +333,7 @@ async function handler(request: NextRequest) {
         errorText: mpErrorText
       })
 
-      // SEGURANÃ‡A: Logar detalhes internamente, retornar mensagem genÃ©rica ao frontend
+      // SEGURANÃ‡A: Logar detalhes internamente, retornar mensagem genérica ao frontend
       SecureLogger.error("MP API payment creation failed", {
         status: mpResponse.status,
         errorData: mpErrorData,
@@ -349,11 +349,11 @@ async function handler(request: NextRequest) {
     // Extrair o ID do pagamento da resposta da API
     const mpPaymentId = mpPaymentResponse.id
 
-    // GUARD: Se MP nÃ£o retornou ID, tratar como erro (nÃ£o criar order Ã³rfÃ£)
+    // GUARD: Se MP não retornou ID, tratar como erro (não criar order órfã)
     if (!mpPaymentId) {
       SecureLogger.error("MP returned no payment ID", { status: mpPaymentResponse.status })
       return NextResponse.json({
-        error: "Erro ao processar pagamento â€” ID nÃ£o retornado. Tente novamente."
+        error: "Erro ao processar pagamento â€” ID não retornado. Tente novamente."
       }, { status: 500 })
     }
 
@@ -373,7 +373,7 @@ async function handler(request: NextRequest) {
     if (paymentFormData.payment_method_id === "bolbradesco") {
       const externalUrl = mpPaymentResponse.transaction_details?.external_resource_url || mpPaymentResponse.point_of_interaction?.transaction_data?.ticket_url;
       const barcode = mpPaymentResponse.barcode?.content || mpPaymentResponse.point_of_interaction?.transaction_data?.barcode;
-      
+
       if (externalUrl || barcode) {
         boletoData = {
           ticketUrl: externalUrl,
@@ -393,7 +393,7 @@ async function handler(request: NextRequest) {
     } else if (paymentFormData.payment_method_id === "bolbradesco") {
       paymentMethodDisplayName = "Boleto"
     } else {
-      paymentMethodDisplayName = "CrÃ©dito"
+      paymentMethodDisplayName = "Crédito"
     }
 
     // CRIAR ORDER NO BANCO
@@ -448,11 +448,11 @@ async function handler(request: NextRequest) {
       return NextResponse.json({ error: "Erro ao criar itens do pedido" }, { status: 500 })
     }
 
-    // NOTA: O decrement_stock agora Ã© feito automaticamente pelo trigger no banco
+    // NOTA: O decrement_stock agora é feito automaticamente pelo trigger no banco
     // quando o status da order mudar para 'paid' ou 'approved'
-    // Isso evita duplicaÃ§Ã£o com webhook/sync-payment-status
+    // Isso evita duplicação com webhook/sync-payment-status
 
-    // Criar transaction de receita se pagamento jÃ¡ aprovado
+    // Criar transaction de receita se pagamento já aprovado
     if (paymentStatus === "approved") {
       try {
         const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
@@ -482,7 +482,7 @@ async function handler(request: NextRequest) {
       revalidateMarketplace()
     }
 
-    // 3. Revalidar carrinho do usuÃ¡rio (SEMPRE, independente do status)
+    // 3. Revalidar carrinho do usuário (SEMPRE, independente do status)
     // Isso garante que o carrinho limpe visualmente
     await revalidateCart(buyerId)
 
@@ -497,7 +497,7 @@ async function handler(request: NextRequest) {
       }
     }
 
-    // Retornar sucesso (sem informaÃ§Ãµes internas)
+    // Retornar sucesso (sem informações internas)
     const successResponse = {
       success: true,
       orderId: newOrder.id,

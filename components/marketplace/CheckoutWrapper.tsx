@@ -449,7 +449,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                                 <div>
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                         <ListItem
-                                                            className={`transition-all ${formData.deliveryType === "delivery" ? "border-brand-green hover:border-brand-green" : "border-brand-border hover:border-brand-dark/30"}`}
+                                                            className={`transition-all p-0 gap-0 h-[68px] ${formData.deliveryType === "delivery" ? "border-brand-green hover:border-brand-green" : "border-brand-border hover:border-brand-dark/30"}`}
                                                             title="Entrega"
                                                             titleClassName="text-md font-bold text-brand-dark dark:text-dark-heading truncate"
                                                             description="Receba em casa"
@@ -465,7 +465,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                                             }
                                                         />
                                                         <ListItem
-                                                            className={`transition-all ${isPickup ? "border-brand-green hover:border-brand-green" : "border-brand-border hover:border-brand-dark/30"}`}
+                                                            className={`transition-all p-0 gap-0 h-[68px] ${isPickup ? "border-brand-green hover:border-brand-green" : "border-brand-border hover:border-brand-dark/30"}`}
                                                             title="Retirada no local"
                                                             titleClassName="text-md font-bold text-brand-dark dark:text-dark-heading truncate"
                                                             description="Retire imediatamente"
@@ -589,7 +589,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                                     <>
                                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                                                             <ListItem
-                                                                className={`transition-all ${paymentOption === "mercadopago" ? "border-brand-green hover:border-brand-green" : "border-brand-border hover:border-brand-dark/30"}`}
+                                                                className={`transition-all p-0 gap-0 h-[68px] ${paymentOption === "mercadopago" ? "border-brand-green hover:border-brand-green" : "border-brand-border hover:border-brand-dark/30"}`}
                                                                 title="Mercado Pago"
                                                                 titleClassName="text-md font-bold text-brand-dark dark:text-dark-heading truncate"
                                                                 description="Pague com cartão, Pix ou saldo MP."
@@ -606,7 +606,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                                             />
                                                             {(!isPickup || !partnerInfo.mpConnected) && (
                                                                 <ListItem
-                                                                    className={`transition-all ${paymentOption === "traditional" ? "border-brand-green hover:border-brand-green" : "border-brand-border hover:border-brand-dark/30"}`}
+                                                                    className={`transition-all p-0 gap-0 h-[68px] ${paymentOption === "traditional" ? "border-brand-green hover:border-brand-green" : "border-brand-border hover:border-brand-dark/30"}`}
                                                                     title={traditionalPaymentLabel}
                                                                     titleClassName="text-md font-bold text-brand-dark dark:text-dark-heading truncate"
                                                                     description="Combine o pagamento na entrega ou retirada."
