@@ -42,7 +42,7 @@ export default async function AdminLayout({
             <div className="flex h-screen bg-[var(--brand-page-bg)] dark:bg-[var(--brand-page-bg)] text-[var(--brand-dark)] dark:text-white transition-colors duration-200">
                 <AdminSidebar initialExpanded={initialExpanded} />
                 <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-                    {/* Note: AdminHeader is rendered dynamically by the pages, or we can just render it here but pages need to set the title. let's put it on the layout and maybe pass a generic title, or render it inside the pages like erp does. ERP renders erp-header inside the layout? Wait, let's check erp/layout.tsx */}
+                    {/* Note: AdminHeader is rendered dynamically by the pages, or we can just render it here but pages need to set the title. let's put it on the layout and maybe pass a generic title, or render it inside the pages like erp does. ERP renders ERPHeader inside the layout? Wait, let's check erp/layout.tsx */}
                     {/* Wait, erp/layout.tsx doesn't render ERpHeader, it renders only sidebar. The header is in the page wrappers. */}
                     <Suspense fallback={<SkeletonLoader />}>{children}</Suspense>
                 </div>

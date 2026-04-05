@@ -23,6 +23,7 @@ export const metadata: Metadata = {
 }
 
 import { SupabaseProvider } from "@/providers/supabase-provider"
+import { QueryProvider } from "@/providers/query-provider"
 import { getCurrentUser } from "@/lib/auth/server-user"
 
 export default async function RootLayout({
@@ -81,10 +82,12 @@ export default async function RootLayout({
       </head>
       <body className="font-sans">
         <SupabaseProvider initialUser={user} initialSessionData={null}>
-          <PreventSamePageNavigation />
-          <NotificationProvider>
-            {children}
-          </NotificationProvider>
+          <QueryProvider>
+            <PreventSamePageNavigation />
+            <NotificationProvider>
+              {children}
+            </NotificationProvider>
+          </QueryProvider>
         </SupabaseProvider>
       </body>
     </html>

@@ -724,7 +724,7 @@ export default function ProductsPage({
                             </motion.div>
                         ) : (
                             <motion.div
-                                key="product-list"
+                                key={activeTab + effectiveViewMode}
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}

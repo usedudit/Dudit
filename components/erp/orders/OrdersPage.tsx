@@ -355,11 +355,24 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                         <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-8 px-4 md:px-8">
                             <AnimatePresence mode="wait">
                                 {isLoading ? (
-                                    <div key="loading" className="flex-1 flex items-center justify-center p-8">
+                                    <motion.div 
+                                        key="loading" 
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        className="flex-1 flex items-center justify-center p-8"
+                                    >
                                         <ThreeDotsLoader />
-                                    </div>
+                                    </motion.div>
                                 ) : !hasOrders ? (
-                                    <motion.div key="empty-no-data" className="w-full h-full flex items-center justify-center min-h-[500px]">
+                                    <motion.div 
+                                        key="empty-no-data" 
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        transition={{ duration: 0.4, ease: "easeOut" }}
+                                        className="w-full h-full flex items-center justify-center min-h-[500px]"
+                                    >
                                         <IconPlaceholder
                                             placeholderType="image"
                                             imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
@@ -369,7 +382,14 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                         />
                                     </motion.div>
                                 ) : paginated.length === 0 ? (
-                                    <motion.div key="empty-results" className="w-full h-full flex items-center justify-center min-h-[500px]">
+                                    <motion.div 
+                                        key="empty-results" 
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        transition={{ duration: 0.4, ease: "easeOut" }}
+                                        className="w-full h-full flex items-center justify-center min-h-[500px]"
+                                    >
                                         <IconPlaceholder
                                             placeholderType="image"
                                             imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
@@ -385,7 +405,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                     </motion.div>
                                 ) : (
                                     <motion.div
-                                        key={isMobile ? "mobile" : effectiveViewMode}
+                                        key={activeTab + (isMobile ? "mobile" : effectiveViewMode)}
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         exit={{ opacity: 0 }}

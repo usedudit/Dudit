@@ -469,7 +469,14 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                                 <QuoteSkeleton count={5} viewMode={viewMode} />
                             </motion.div>
                         ) : !hasQuotes ? (
-                            <motion.div key="empty-no-data" className="w-full h-full flex items-center justify-center min-h-[500px]">
+                            <motion.div 
+                                key="empty-no-data" 
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                transition={{ duration: 0.4, ease: "easeOut" }}
+                                className="w-full h-full flex items-center justify-center min-h-[500px]"
+                            >
                                 <IconPlaceholder
                                     placeholderType="image"
                                     imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
@@ -479,7 +486,14 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                                 />
                             </motion.div>
                         ) : paginated.length === 0 ? (
-                            <motion.div key="empty-results" className="w-full h-full flex items-center justify-center min-h-[500px]">
+                            <motion.div 
+                                key="empty-results" 
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                transition={{ duration: 0.4, ease: "easeOut" }}
+                                className="w-full h-full flex items-center justify-center min-h-[500px]"
+                            >
                                 <IconPlaceholder
                                     placeholderType="image"
                                     imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
@@ -495,7 +509,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                             </motion.div>
                         ) : (
                             <motion.div
-                                key={viewMode}
+                                key={activeTab + viewMode}
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
