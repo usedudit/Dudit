@@ -181,7 +181,7 @@ export default function ProductsPage({
     const { selectedStore } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
 
-    const { useERPData } = require("../../hooks")
+    const { useERPData } = require("../hooks")
     const { fetchERPProductsClient } = require("@/app/actions/erp/client-loaders")
     const { useQueryClient } = require("@tanstack/react-query")
     const queryClient = useQueryClient()

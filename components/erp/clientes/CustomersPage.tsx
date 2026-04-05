@@ -85,11 +85,11 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
     })
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
 
-    const { useERPData } = require("../../hooks")
+    const { useERPData } = require("../hooks")
     const { fetchERPCustomersClient } = require("@/app/actions/erp/client-loaders")
     const { useQueryClient } = require("@tanstack/react-query")
     const queryClient = useQueryClient()
-    
+
     const { data: rawCustomers, isLoading: isQueryLoading, isError: customersError } = useERPData(
         ['erp', 'customers', partnerId, selectedStore?.id || 'all'],
         () => fetchERPCustomersClient(selectedStore?.id || null)

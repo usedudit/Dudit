@@ -89,7 +89,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({ key: 'date', direction: 'desc' })
 
-    const { useERPData } = require("../../hooks")
+    const { useERPData } = require("../hooks")
     const { fetchERPOrdersClient } = require("@/app/actions/erp/client-loaders")
     const { useQueryClient } = require("@tanstack/react-query")
     const queryClient = useQueryClient()
