@@ -3,13 +3,15 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-import { useMediaQuery } from "../hooks"
+import { useMediaQuery, useERPData } from "../hooks"
 import { useStore } from "@/lib/store-context"
 import { generateSKUBase } from "@/lib/utils/code-generators"
 import type { Product } from "@/lib/types/product"
 import { motion, AnimatePresence } from "framer-motion"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { UNITS } from "@/lib/constants/product-constants"
+import { fetchERPProductsClient } from "@/app/actions/erp/client-loaders"
+import { useQueryClient } from "@tanstack/react-query"
 
 // Actions
 import {
@@ -181,9 +183,6 @@ export default function ProductsPage({
     const { selectedStore } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
 
-    const { useERPData } = require("../hooks")
-    const { fetchERPProductsClient } = require("@/app/actions/erp/client-loaders")
-    const { useQueryClient } = require("@tanstack/react-query")
     const queryClient = useQueryClient()
 
     const { data: queryProducts, isLoading: isQueryLoading } = useERPData(

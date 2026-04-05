@@ -2,10 +2,12 @@
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { useMediaQuery } from "../hooks"
+import { useMediaQuery, useERPData } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useStore } from "@/lib/store-context"
 import { useStoreData } from "@/lib/use-store-data"
+import { fetchERPCustomersClient } from "@/app/actions/erp/client-loaders"
+import { useQueryClient } from "@tanstack/react-query"
 
 // Components
 import { Button, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
@@ -85,9 +87,6 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
     })
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
 
-    const { useERPData } = require("../hooks")
-    const { fetchERPCustomersClient } = require("@/app/actions/erp/client-loaders")
-    const { useQueryClient } = require("@tanstack/react-query")
     const queryClient = useQueryClient()
 
     const { data: rawCustomers, isLoading: isQueryLoading, isError: customersError } = useERPData(

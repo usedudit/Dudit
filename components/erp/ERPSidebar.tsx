@@ -55,9 +55,9 @@ const navItems: NavItem[] = [
     submenu: [
       { label: "Pedidos e Vendas", href: "/erp/orders" },
       { label: "Orçamentos", href: "/erp/quotes" },
-      { label: "PDV (Frente de Caixa)", href: "/erp/pos" },
-      { label: "Devoluções", href: "/erp/returns" },
-      { label: "Expedição e Entregas", href: "/erp/logistics" },
+      { label: "PDV (Frente de Caixa)", href: "/" },
+      { label: "Devoluções", href: "/" },
+      { label: "Expedição e Entregas", href: "/" },
     ],
   },
   {
@@ -66,8 +66,8 @@ const navItems: NavItem[] = [
     submenu: [
       { label: "Catálogo de Produtos", href: "/erp/products" },
       { label: "Movimentação de Estoque", href: "/erp/stock-movements" },
-      { label: "Notas de Entrada", href: "/erp/import-notes" },
-      { label: "Fornecedores", href: "/erp/suppliers" },
+      { label: "Notas de Entrada", href: "/" },
+      { label: "Fornecedores", href: "/" },
       { label: "Cadastros de Produtos", href: "/erp/products/cadastros" },
     ],
   },
@@ -75,10 +75,10 @@ const navItems: NavItem[] = [
     icon: WrenchIcon,
     label: "Serviços",
     submenu: [
-      { label: "Agendamentos", href: "/erp/appointments" },
-      { label: "Ordens de Serviço", href: "/erp/service-orders" },
-      { label: "Catálogo de Serviços", href: "/erp/services" },
-      { label: "Categorias de Serviços", href: "/erp/services/categories" },
+      { label: "Agendamentos", href: "/" },
+      { label: "Ordens de Serviço", href: "/" },
+      { label: "Catálogo de Serviços", href: "/" },
+      { label: "Categorias de Serviços", href: "/" },
     ],
   },
   {
@@ -90,10 +90,10 @@ const navItems: NavItem[] = [
     icon: MoneyIcon,
     label: "Financeiro",
     submenu: [
-      { label: "Transações", href: "/erp/financial/transactions" },
-      { label: "Fluxo de Caixa", href: "/erp/financial/dashboard" },
-      { label: "DRE Gerencial", href: "/erp/financial/dre" },
-      { label: "Categorias Financeiras", href: "/erp/financial/categories" },
+      { label: "Transações", href: "/" },
+      { label: "Fluxo de Caixa", href: "/" },
+      { label: "DRE Gerencial", href: "/" },
+      { label: "Categorias Financeiras", href: "/" },
     ],
   },
   {
@@ -105,17 +105,17 @@ const navItems: NavItem[] = [
     icon: MegaphoneIcon,
     label: "Marketing",
     submenu: [
-      { label: "Cupons de Desconto", href: "/erp/marketing/coupons" },
-      { label: "Campanhas e Promoções", href: "/erp/marketing/campaigns" },
+      { label: "Cupons de Desconto", href: "/" },
+      { label: "Campanhas e Promoções", href: "/" },
     ],
   },
   {
     icon: StoreIcon,
     label: "Minha Vitrine",
     submenu: [
-      { label: "Personalizar Perfil", href: "/erp/store-profile/customize" },
-      { label: "Avaliações e Reputação", href: "/erp/store-profile/reviews" },
-      { label: "QR Code e Compartilhar", href: "/erp/store-profile/qrcode" },
+      { label: "Personalizar Perfil", href: "/" },
+      { label: "Avaliações e Reputação", href: "/" },
+      { label: "QR Code e Compartilhar", href: "/" },
     ],
   },
   {

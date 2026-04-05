@@ -130,13 +130,6 @@ const StockMovementListItem = React.memo(
         className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
         onClick={() => onDetails(movement.id)}
       >
-        <td
-          className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-10"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Removed Checkbox */}
-        </td>
-
         {columns.map((col) => (
           <td
             key={col.id}

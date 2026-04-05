@@ -2,9 +2,11 @@
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { useMediaQuery } from "../hooks"
+import { useMediaQuery, useERPData } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useStore } from "@/lib/store-context"
+import { fetchERPOrdersClient } from "@/app/actions/erp/client-loaders"
+import { useQueryClient } from "@tanstack/react-query"
 
 // Components
 import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Badge } from "@/components/reusable"
@@ -89,9 +91,6 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({ key: 'date', direction: 'desc' })
 
-    const { useERPData } = require("../hooks")
-    const { fetchERPOrdersClient } = require("@/app/actions/erp/client-loaders")
-    const { useQueryClient } = require("@tanstack/react-query")
     const queryClient = useQueryClient()
 
     const { data: queryOrders, isLoading: isQueryLoading } = useERPData(

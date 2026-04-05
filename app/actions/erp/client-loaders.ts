@@ -3,6 +3,7 @@
 import { getPartnerOrdersCached } from "@/lib/data/orders"
 import { checkPartnerPermission, getCurrentUser } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { getPartnerSuppliersCached } from "@/lib/data/suppliers"
 
 export async function fetchERPOrdersClient() {
   const user = await getCurrentUser()
@@ -46,6 +47,5 @@ export async function fetchERPSuppliersClient() {
   const { allowed } = await checkPartnerPermission(partnerId, "suppliers", "view")
   if (!allowed) throw new Error("Forbidden")
 
-  const { getPartnerSuppliersCached } = require("@/lib/data/suppliers")
   return getPartnerSuppliersCached(partnerId)
 }

@@ -10,6 +10,9 @@ import { toast } from "sonner"
 import AlertModal from "../reusable/AlertModal"
 import { TrashIcon } from "@/lib/icons"
 import Link from "next/link"
+import { useERPData } from "./hooks"
+import { fetchERPSuppliersClient } from "@/app/actions/erp/client-loaders"
+import { useQueryClient } from "@tanstack/react-query"
 
 interface Supplier {
   id: string
@@ -21,9 +24,6 @@ interface Supplier {
 
 export function SuppliersList({ suppliers: initialSuppliers, partnerId }: { suppliers: Supplier[], partnerId: string }) {
   const router = useRouter()
-  const { useERPData } = require("./hooks")
-  const { fetchERPSuppliersClient } = require("@/app/actions/erp/client-loaders")
-  const { useQueryClient } = require("@tanstack/react-query")
   const queryClient = useQueryClient()
 
   const { data: rawSuppliers, isLoading: isQueryLoading } = useERPData(

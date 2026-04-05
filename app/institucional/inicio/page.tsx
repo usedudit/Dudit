@@ -34,11 +34,10 @@ const Hero = () => {
                   transition={{ duration: 0.6 }}
                >
                   <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-brand-dark leading-[1.1] mb-6">
-                     Venda qualquer coisa online. Sem taxa, sem comissão, 100% seu.
+                     Venda produtos, agende serviços e gerencie tudo em um só lugar.
                   </h1>
-
                   <p className="text-brand-dark text-lg md:text-xl font-medium mb-8 max-w-lg leading-tight">
-                     Organize seu negócio, publique online em minutos e mantenha <span className="text-brand-green">100% da sua venda</span> com você.
+                     Sua vitrine digital com <span className="text-brand-green">0% de comissão</span>. Publique online em minutos e mantenha 100% da sua venda com você.
                   </p>
 
                   <div className="flex flex-wrap gap-4">
