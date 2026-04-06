@@ -16,7 +16,7 @@ export const getPartnerOrdersCached = cache(async (partnerId: string) => {
                 .from("orders")
                 .select(`
                     *,
-                    order_items(quantity, product_name),
+                    order_items(*),
                     stores(name)
                 `)
                 .eq("partner_id", partnerId)

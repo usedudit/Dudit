@@ -278,7 +278,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                                         }}
                                                                                     >
                                                                                         <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden flex-shrink-0 border border-brand-border dark:border-dark-border">
-                                                                                            <img src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={product.name} className="w-full h-full object-cover rounded-full mix-blend-multiply dark:mix-blend-normal" />
+                                                                                            <img src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={product.name} className="w-full h-full object-cover rounded-full bg-brand-slate dark:bg-dark-border border border-brand-border dark:border-dark-border" />
                                                                                         </div>
                                                                                         <div className="flex-1 min-w-0">
                                                                                             <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
@@ -300,7 +300,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                             ) : (
                                                                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/30 flex items-center gap-4 relative group">
                                                                     <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 border border-brand-border dark:border-dark-border flex-shrink-0 overflow-hidden">
-                                                                        <img src={getR2ImageUrl(selectedProduct.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={selectedProduct.name} className="w-full h-full object-cover rounded-full mix-blend-multiply dark:mix-blend-normal" />
+                                                                        <img src={getR2ImageUrl(selectedProduct.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={selectedProduct.name} className="w-full h-full object-cover rounded-full bg-brand-slate dark:bg-dark-border border border-brand-border dark:border-dark-border" />
                                                                     </div>
                                                                     <div className="flex-1 min-w-0 pr-8">
                                                                         <div className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate mb-0.5">{selectedProduct.name}</div>

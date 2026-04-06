@@ -30,81 +30,81 @@ const QuoteGridCard = React.memo(
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className={`group relative bg-white dark:bg-dark-surface rounded-2xl border transition-all duration-300 cursor-pointer overflow-hidden flex flex-col h-full ${selected ? 'border-brand-primary ring-1 ring-brand-primary' : 'border-brand-border dark:border-dark-border hover:border-brand-primary/50'}`}
+                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-dark/90 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
                 onClick={onClick}
             >
-                <div className="absolute top-0 left-0 w-full h-1 bg-brand-primary"></div>
-
-                <div className="flex gap-4 mb-2 p-4 pb-0 pt-5">
+                <div className="flex gap-4 mb-2">
                     {/* Visual Indicator */}
-                    <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border flex-shrink-0 flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                         <FileIcon className="w-6 h-6 text-brand-dark dark:text-dark-heading" />
                     </div>
 
-                    <div className="flex-1 min-w-0 flex flex-col justify-center">
-                        {/* ID + Checkbox */}
+                    <div className="flex-1 min-w-0">
+                        {/* Row 1: ID + Badge + Checkbox */}
                         <div className="flex justify-between items-start gap-1">
-                            <div className="flex flex-col min-w-0 pr-1 gap-1">
+                            {/* Nome do Item (ID) e Badge Lado a Lado */}
+                            <div className="flex items-center gap-2 min-w-0 pr-1 flex-nowrap">
                                 <h3
-                                    className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate"
+                                    className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate shrink-0"
                                     title={quote.displayId}
                                 >
-                                    <span className="truncate">{quote.displayId}</span>
+                                    {quote.displayId}
                                 </h3>
-
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                    <Badge variant={quote.statusColor} className="fwhitespace-nowrap scale-90 shrink-0">
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                    <Badge
+                                        variant={quote.statusColor}
+                                        className="text-[9px] h-4 px-1 py-3 flex-shrink-0 w-max"
+                                    >
                                         {quote.statusLabel}
                                     </Badge>
                                 </div>
                             </div>
 
                             {/* Checkbox */}
-                            <div className="flex-shrink-0 -mt-1 -mr-1" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex-shrink-0 -mt-0.5 -mr-1" onClick={(e) => e.stopPropagation()}>
                                 <Checkbox checked={selected} onChange={onSelect} />
                             </div>
+                        </div>
+
+                        {/* Row 2: Stats (Items • Total) */}
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                {quote.items_count || 0} {quote.items_count === 1 ? 'item' : 'itens'}
+                            </span>
+                            <span className="text-brand-inactive-text dark:text-dark-body">•</span>
+                            <span className="text-sm font-bold text-brand-primary">
+                                R$ {Number(quote.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
                         </div>
                     </div>
                 </div>
 
                 {/* Info Rows */}
-                <div className="mt-4 flex flex-col gap-3 px-4">
-                    <div className="flex flex-col gap-0.5 text-left">
-                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Cliente</span>
-                        <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
+                <div className="mt-auto pt-4 border-t border-brand-border dark:border-dark-border flex flex-col gap-3">
+                    {/* Row 1: Cliente & Emissão */}
+                    <div className="flex justify-between items-start gap-2">
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body uppercase tracking-wider text-[10px]">Cliente</span>
+                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
                                 {quote.customer_name}
                             </span>
                         </div>
-                    </div>
-                </div>
 
-                {/* Footer Area */}
-                <div className="mt-auto pt-3 px-4 pb-4 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
-                    {/* Stats Row */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="flex flex-col gap-0.5 text-left">
-                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Total</span>
-                            <span className="text-[14px] font-bold text-brand-primary">
-                                R$ {Number(quote.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        <div className="flex flex-col gap-0.5 items-end shrink-0">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body text-right uppercase tracking-wider text-[10px]">Emissão</span>
+                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                {quote.formattedIssueDate}
                             </span>
                         </div>
-
-                        <div className="flex flex-col gap-0.5 items-end">
-                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Emissão</span>
-                            <div className="flex items-center gap-1 justify-end">
-                                <ClockIcon size={12} className="text-brand-inactive-text" />
-                                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                                    {quote.formattedIssueDate}
-                                </span>
-                            </div>
-                        </div>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex items-center justify-between mt-1">
-                        <div className="text-xs text-brand-inactive-text italic">
-                            {quote.formattedExpirationDate ? `Validade: ${quote.formattedExpirationDate}` : ""}
+                    {/* Row 2: Validade & Actions */}
+                    <div className="flex justify-between items-end gap-2">
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body uppercase tracking-wider text-[10px]">Validade</span>
+                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                {quote.formattedExpirationDate || "Não definida"}
+                            </span>
                         </div>
 
                         {/* Botão de Ações */}

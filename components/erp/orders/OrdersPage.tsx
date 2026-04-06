@@ -22,11 +22,7 @@ import OrderDetailView from "./OrderDetailView"
 import {
     PlusIcon,
     ExportFileIcon,
-    ShoppingCart,
     ArrowUpDownIcon,
-    StoreIcon,
-    ClockIcon,
-    ArrowRightIcon
 } from "@/lib/icons"
 import { useRouter } from "next/navigation"
 
@@ -284,6 +280,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                 setSelectedOrderId(order.id)
                                 setWrapperMode('edit')
                             }}
+                            initialOrder={effectiveOrders?.find((o: any) => o.id === selectedOrderId) || undefined}
                         />
                     </motion.div>
                 ) : wrapperMode === 'edit' && selectedOrderId ? (

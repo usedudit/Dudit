@@ -120,7 +120,7 @@ const SelectCustomerSheet = ({ isOpen, onClose, onSelect, partnerId }: SelectCus
 
             {/* Footer */}
             <footer className="p-6 border-t border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface shrink-0">
-                <Button variant="outline" className="w-full h-12 text-[15px] shadow-sm rounded-full" onClick={onClose}>
+                <Button variant="outline" className="w-full h-12" onClick={onClose}>
                     Cancelar
                 </Button>
             </footer>

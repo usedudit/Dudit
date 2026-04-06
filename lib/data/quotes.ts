@@ -24,7 +24,8 @@ export const getPartnerQuotesCached = cache(async (partnerId: string, limit: num
                     customer_id,
                     created_at,
                     updated_at,
-                    customers (id, name, email)
+                    customers (id, name, email),
+                    items_count:quote_items(count)
                 `, { count: 'exact' })
                 .eq("partner_id", partnerId)
                 .order("created_at", { ascending: false })
@@ -73,7 +74,13 @@ export const getQuoteWithItemsCached = cache(async (quoteId: string, partnerId: 
                 .from("quotes")
                 .select(`
                     *,
-                    customers (id, name, email, phone)
+                    customers (
+                        id, 
+                        name, 
+                        email, 
+                        phone,
+                        addresses (*)
+                    )
                 `)
                 .eq("id", quoteId)
                 .eq("partner_id", partnerId)

@@ -16,7 +16,7 @@ import CreateStockMovement from './CreateStockMovement';
 import StockMovementDetailPage from './StockMovementDetailPage';
 import StockMovementPageControls from './StockMovementPageControls';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
-import { getStockMovementDetails, undoStockMovementAction } from '@/app/actions/erp/stock-movements';
+import { undoStockMovementAction } from '@/app/actions/erp/stock-movements';
 import { useNotification } from '@/hooks/use-notification';
 import { useMediaQuery } from '@/components/erp/hooks';
 import { useStoreData } from "@/lib/use-store-data";
@@ -53,8 +53,6 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
     // State
     const [isCreating, setIsCreating] = useState(false);
     const [selectedMovementId, setSelectedMovementId] = useState<string | null>(null);
-    const [selectedMovementDetails, setSelectedMovementDetails] = useState<any | null>(null);
-    const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
     const [activeTab, setActiveTab] = useState<TabType>('all');
     const [searchTerm, setSearchTerm] = useState('');
@@ -102,17 +100,8 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
     const hasActiveFilters = filters.movement_type.length > 0;
     const isFiltered = searchTerm !== "" || hasActiveFilters;
 
-    const handleViewDetails = async (id: string) => {
+    const handleViewDetails = (id: string) => {
         setSelectedMovementId(id);
-        setIsLoadingDetails(true);
-        const res = await getStockMovementDetails(id);
-        if (res.success) {
-            setSelectedMovementDetails(res.data);
-        } else {
-            notifyError('Erro ao carregar detalhes.');
-            setSelectedMovementId(null);
-        }
-        setIsLoadingDetails(false);
     };
 
     const handleUndoClick = (id: string) => {
@@ -166,6 +155,8 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                     image: (mov.products?.images && mov.products.images.length > 0)
                         ? getR2ImageUrl(mov.products.images[0], "thumbnail")
                         : 'https://img.dudit.com.br/static/Placeholder.png',
+                    category: mov.products?.category || 'Sem Categoria',
+                    previousStock: mov.previous_quantity || 0,
                     currentStock: mov.new_quantity,
                 },
                 type: (mov.quantity > 0 ? 'in' : 'out') as 'in' | 'out',
@@ -173,6 +164,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                 reason,
                 user: mov.created_by ? mov.created_by.split('@')[0] : 'Sistema',
                 reference: mov.reference_name || mov.reference_type || "-",
+                notes: mov.notes || '',
             };
         });
     }, [initialMovements]);
@@ -260,11 +252,12 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
     }
 
     if (selectedMovementId) {
+        const movementData = formattedMovements.find(m => m.id === selectedMovementId) || null;
         return (
             <StockMovementDetailPage
-                movement={selectedMovementDetails}
-                isLoading={isLoadingDetails}
-                onBack={() => { setSelectedMovementId(null); setSelectedMovementDetails(null); }}
+                movement={movementData}
+                isLoading={false}
+                onBack={() => { setSelectedMovementId(null); }}
             />
         );
     }

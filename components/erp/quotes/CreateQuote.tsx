@@ -114,7 +114,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                         sku: item.products?.sku || 'N/A',
                         price: Number(item.unit_price),
                         qty: Number(item.quantity),
-                        image: item.products?.images?.[0] || 'https://img.dudit.com.br/static/mascots/Box.png',
+                        image: item.products?.images?.[0] || 'https://img.dudit.com.br/static/Placeholder.png',
                         isEditing: false
                     }));
 

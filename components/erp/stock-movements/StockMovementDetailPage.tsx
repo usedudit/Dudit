@@ -143,7 +143,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                 <Button variant="outline" className="h-[42px] px-6" onClick={() => { /* PDF Logic */ }}>
                                     <DownloadIcon className="w-4 h-4 mr-2" /> PDF
                                 </Button>
-                                
+
                                 <ActionsDropdown
                                     onUndo={() => setIsUndoModalOpen(true)}
                                     className="w-[42px] h-[42px]"
@@ -185,14 +185,14 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                             <div className="w-20 h-20 rounded-full border border-brand-border dark:border-dark-border overflow-hidden flex-shrink-0 bg-brand-gray dark:bg-dark-border/20">
                                                 <img
                                                     src={getR2ImageUrl(data.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
-                                                    className="w-full h-full object-cover rounded-full mix-blend-multiply dark:mix-blend-normal"
+                                                    className="w-full h-full object-cover rounded-full bg-brand-slate dark:bg-dark-border border border-brand-border dark:border-dark-border"
                                                     alt={data.product.name}
                                                 />
                                             </div>
 
                                             <div className="flex-1 min-w-0">
                                                 <h4 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate mb-1">{data.product.name}</h4>
-                                                
+
                                                 <div className="flex items-center gap-2">
                                                     <Badge variant="gray" className="text-[11px] uppercase tracking-wider font-bold px-1.5">{data.product.sku}</Badge>
                                                     <span className="text-gray-300 dark:text-gray-600">•</span>
@@ -229,7 +229,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
 
                         {/* RIGHT COLUMN - SIDEBAR */}
                         <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-l-0 xl:border-l border-brand-border dark:border-dark-border space-y-8">
-                            
+
                             {/* Additional Info Section - User Card */}
                             <div>
                                 <h3 className="text-[13px] font-bold uppercase tracking-wider text-brand-dark dark:text-dark-heading mb-4">Informações Adicionais</h3>

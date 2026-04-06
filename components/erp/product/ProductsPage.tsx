@@ -665,7 +665,7 @@ export default function ProductsPage({
                     <div className="flex flex-col gap-2 pt-1">
                         <div className="flex items-center gap-3">
                             <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                                Inventário
+                                Produtos
                             </h1>
                         </div>
                         <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">

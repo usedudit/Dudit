@@ -31,7 +31,7 @@ export default function IconPlaceholder({
   imageAlt = "",
   title,
   subtitle,
-  containerSize = "w-16 h-16 mb-4",
+  containerSize = "w-16 h-16 mb-2",
   iconSize = "w-6 h-6",
   imageClass,
   titleClass = "text-xl font-bold text-brand-dark dark:text-dark-heading mb-2",

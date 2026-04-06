@@ -7,7 +7,6 @@ import { PlusIcon, ShoppingBag } from "@/lib/icons"
 import ProductImagesSection from "./ProductImagesSection"
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from "recharts"
 import { Combobox } from "@/components/reusable"
-import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 const FormCombobox = ({
   label,

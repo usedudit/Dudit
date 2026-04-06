@@ -28,7 +28,7 @@ export const getStockMovementsCached = cache(async (partnerId: string) => {
               notes,
               created_at,
               created_by,
-              products(id, name, sku, stock_quantity, images),
+              products(id, name, sku, stock_quantity, images, category),
               orders(id, order_number)
             `)
                 .eq("partner_id", partnerId)

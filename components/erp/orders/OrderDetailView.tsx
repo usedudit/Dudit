@@ -24,13 +24,14 @@ interface OrderDetailViewProps {
     partnerId: string
     onBack: () => void
     onEditOrder: (order: any) => void
+    initialOrder?: any
 }
 
-export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrder }: OrderDetailViewProps) {
+export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrder, initialOrder }: OrderDetailViewProps) {
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
-    const [order, setOrder] = useState<any>(null)
-    const [loading, setLoading] = useState(true)
+    const [order, setOrder] = useState<any>(initialOrder || null)
+    const [loading, setLoading] = useState(!initialOrder)
     const { success: notifySuccess, error: notifyError } = useNotification()
     const router = useRouter()
 
@@ -40,20 +41,21 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         }
     }, [])
 
+    // Fetch full details in background (for complete order_items with prices)
     useEffect(() => {
         async function load() {
-            setLoading(true)
+            if (!initialOrder) setLoading(true)
             const res = await getOrderDetailsAction(orderId, partnerId)
             if (res.success) {
                 setOrder(res.data)
-            } else {
+            } else if (!initialOrder) {
                 notifyError("Erro", res.error)
                 onBack()
             }
             setLoading(false)
         }
         load()
-    }, [orderId, partnerId, onBack])
+    }, [orderId, partnerId])
 
     if (loading) return <div className="h-full flex items-center justify-center bg-white dark:bg-dark-surface min-h-[400px]"><ThreeDotsLoader /></div>
     if (!order) return null
@@ -283,14 +285,9 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                 />
                             )}
 
-                            {/* Customer Section */}
                             <CustomerCard
-                                customer={{
-                                    name: order.customer_name || "Cliente Balcão",
-                                    email: order.buyer_email || "-", // Fallback as joins are gone
-                                    phone: "-" // Fallback as joins are gone
-                                }}
-                                address={order.delivery_address ? { street: order.delivery_address } : null}
+                                customer={order.customers}
+                                address={order.customers?.addresses?.find((a: any) => a.is_default) || order.customers?.addresses?.[0] || (order.delivery_address ? { street: order.delivery_address } : null)}
                             />
 
                             {/* Seller Info */}

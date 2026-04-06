@@ -34,26 +34,19 @@ const StockMovementGridCard = React.memo(
               src={movement.product.image || "https://img.dudit.com.br/static/Placeholder.png"}
               alt=""
               loading="lazy"
-              className="w-full h-full object-cover rounded-full mix-blend-multiply dark:mix-blend-normal"
+              className="w-full h-full object-cover rounded-full bg-brand-slate dark:bg-dark-border border border-brand-border dark:border-dark-border"
             />
           </div>
 
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             {/* Linha 1: Nome + Badge */}
-            <div className="flex items-center gap-2 min-w-0 pr-1">
+            <div className="flex items-start justify-between gap-2 min-w-0 pr-1">
               <h3
                 className="flex-1 min-w-0 font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate"
                 title={movement.product.name}
               >
                 {movement.product.name}
               </h3>
-            </div>
-
-            {/* Linha 2: SKU + Badge */}
-            <div className="flex items-center justify-between mt-1">
-              <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate">
-                <span>SKU {movement.product.sku || "N/A"}</span>
-              </div>
               <Badge
                 variant={movement.type === 'in' ? "green" : "red"}
                 icon={movement.type === 'in' ? <ChevronDownIcon /> : <ChevronUpIcon />}
@@ -61,6 +54,13 @@ const StockMovementGridCard = React.memo(
               >
                 {movement.type === 'in' ? "Entrada" : "Saída"}
               </Badge>
+            </div>
+
+            {/* Linha 2: SKU */}
+            <div className="flex items-center mt-1">
+              <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate">
+                <span>SKU {movement.product.sku || "N/A"}</span>
+              </div>
             </div>
           </div>
         </div>

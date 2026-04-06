@@ -524,7 +524,7 @@ export async function searchProductsForQuote(query: string) {
             price: p.price,
             image: p.images && p.images.length > 0
                 ? p.images[0]
-                : "https://img.dudit.com.br/static/mascots/Box.png",
+                : "https://img.dudit.com.br/static/Placeholder.png",
         }))
     } catch (err) {
         console.error("[searchProductsForQuote] Error:", err)
@@ -605,7 +605,7 @@ export async function searchProductsForQuotes(query: string) {
             stock: p.stock_quantity || 0,
             price: p.price || 0,
             unit: p.unit || 'un',
-            image: p.images && p.images.length > 0 ? p.images[0] : 'https://img.dudit.com.br/static/mascots/Box.png',
+            image: p.images && p.images.length > 0 ? p.images[0] : 'https://img.dudit.com.br/static/Placeholder.png',
             variants: p.variants ? p.variants.map((v: any) => ({
                 id: v.id,
                 name: v.variant_name,
@@ -703,7 +703,7 @@ export async function batchDeleteQuotesAction(quoteIds: string[]) {
 
             // Update usage counter (estimate)
             for (let i = 0; i < quoteIds.length; i++) {
-                decrement_usage_counter(ctx.partnerId, "quotes_month_count").catch(console.error).catch(() => {})
+                decrement_usage_counter(ctx.partnerId, "quotes_month_count").catch(console.error).catch(() => { })
             }
 
             return successResponse({ count: quoteIds.length })

@@ -32,7 +32,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             default:
                 "bg-brand-green text-white hover:bg-brand-green/90 focus-visible:ring-brand-green/50 dark:bg-brand-green dark:hover:bg-brand-green/90",
             warning:
-                "bg-yellow-500 text-white hover:bg-yellow-600 focus-visible:ring-yellow-500/50 dark:bg-yellow-600 dark:hover:bg-yellow-700",
+                "bg-brand-yellow text-white hover:bg-brand-yellow/90 focus-visible:ring-brand-yellow/50 dark:bg-brand-yellow dark:hover:bg-brand-yellow/90",
             outline:
                 "bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border focus-visible:ring-brand-border",
             outlinered:

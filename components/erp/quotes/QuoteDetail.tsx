@@ -16,7 +16,7 @@ import {
     EditIcon,
     ThreeDotsIcon
 } from '@/lib/icons';
-import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, Tooltip, AlertModal } from '@/components/reusable';
+import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, Tooltip, AlertModal, InfoCard } from '@/components/reusable';
 import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction } from '@/app/actions/erp/quotes';
 import { useNotification } from "@/hooks/use-notification";
 import CustomerCard from '@/components/reusable/CustomerCard';
@@ -28,15 +28,16 @@ interface QuoteDetailProps {
     partnerId: string;
     onBack: () => void;
     onEditQuote?: (quote: any) => void;
+    initialQuote?: any;
 }
 
 
 
-const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote }: QuoteDetailProps) => {
+const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: QuoteDetailProps) => {
     const [isScrolled, setIsScrolled] = useState(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const [quote, setQuote] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const [quote, setQuote] = useState<any>(initialQuote || null);
+    const [loading, setLoading] = useState(!initialQuote);
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -50,19 +51,21 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote }: QuoteDetailPro
         }
     }, []);
 
+    // Fetch full details (with items) in background
     useEffect(() => {
         async function load() {
+            if (!initialQuote) setLoading(true);
             const res = await getQuoteDetailsAction(quoteId, partnerId);
             if (res.success) {
                 setQuote(res.data);
-            } else {
+            } else if (!initialQuote) {
                 notifyError("Erro", res.error);
                 onBack();
             }
             setLoading(false);
         }
         load();
-    }, [quoteId, partnerId, notifyError, onBack]);
+    }, [quoteId, partnerId]);
 
     const handleStatusChange = async (newStatus: any) => {
         const res = await updateQuoteStatusAction({ quoteId, partnerId, status: newStatus });
@@ -225,10 +228,10 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote }: QuoteDetailPro
 
                 {/* CONTENT */}
                 <div className="max-w-[1300px] mx-auto p-4 md:p-6 pt-6">
-                    <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                    <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
 
-                        {/* LEFT COLUMN - MAIN INFO */}
-                        <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-10">
+                        {/* LEFT COLUMN */}
+                        <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
 
                             {/* Quote Status Card */}
                             <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
@@ -321,37 +324,38 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote }: QuoteDetailPro
                                     />
                                 ))}
                             </div>
-                        </div>
 
-                        {/* Financial Summary */}
-                        <div className="flex justify-end pr-2">
-                            <div className="w-full max-w-xs space-y-3">
-                                <div className="flex justify-between items-center text-sm font-medium">
-                                    <span className="text-brand-inactive-text dark:text-dark-body text-left">Subtotal</span>
-                                    <span className="text-brand-dark dark:text-dark-heading font-bold">R$ {subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm font-medium">
-                                    <span className="text-brand-inactive-text dark:text-dark-body text-left">Desconto</span>
-                                    <span className="text-brand-dark dark:text-dark-heading">R$ {discount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm font-medium">
-                                    <span className="text-brand-inactive-text dark:text-dark-body text-left">Frete</span>
-                                    <span className="text-brand-dark dark:text-dark-heading">R$ {shipping.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm font-medium">
-                                    <span className="text-brand-inactive-text dark:text-dark-body text-left">Outros Custos</span>
-                                    <span className="text-brand-dark dark:text-dark-heading">R$ {additional.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                </div>
-                                <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-2">
-                                    <span className="font-bold text-[18px] text-brand-dark dark:text-dark-heading text-left tracking-tight">Total</span>
-                                    <span className="font-bold text-[22px] text-brand-dark dark:text-dark-heading tracking-tight">R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                            {/* Financial Summary */}
+                            <div className="bg-[#F9FAFB] dark:bg-gray-800/20 rounded-2xl p-6 border border-brand-border dark:border-dark-border">
+                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading mb-4 border-b border-brand-border dark:border-dark-border pb-3">Resumo Financeiro</h3>
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center text-[14px]">
+                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Subtotal ({quote.items?.length || 0} itens)</span>
+                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">R$ {subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-[14px]">
+                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto</span>
+                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">R$ {discount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-[14px]">
+                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Frete</span>
+                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">R$ {shipping.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-[14px]">
+                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Outros Custos</span>
+                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">R$ {additional.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
+                                        <span className="font-bold text-base md:text-lg text-brand-dark dark:text-dark-heading">Total do Orçamento</span>
+                                        <span className="font-bold text-xl md:text-2xl text-brand-dark dark:text-dark-heading tracking-tight text-right">R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     {/* RIGHT COLUMN - SIDEBAR */}
-                    <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-10 border-l-0 xl:border-l border-brand-border dark:border-dark-border mt-8 xl:mt-0 space-y-6">
+                    <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-10 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
 
                         {/* Status Management Card */}
                         <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 relative overflow-hidden transition-colors text-left">
@@ -371,20 +375,17 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote }: QuoteDetailPro
                             </div>
                         </div>
 
-                        {/* Customer Card Reusable Component */}
                         <CustomerCard
                             customer={quote.customers}
-                            address={null} // Address mapping would go here if available in DB
+                            address={quote.customers?.addresses?.find((a: any) => a.is_default) || quote.customers?.addresses?.[0]}
                         />
 
-                        {/* Terms/Notes Card */}
-                        <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 text-left relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-full h-1 bg-brand-gray dark:bg-dark-border"></div>
-                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading mb-3 mt-1">Observações da Proposta</h3>
-                            <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-wrap">
-                                {quote.notes || "Nenhuma observação ou termo adicional vinculado a este orçamento."}
-                            </p>
-                        </div>
+                        {/* Terms/Notes Card using InfoCard */}
+                        <InfoCard
+                            title="Observações da Proposta"
+                            message={<span className="whitespace-pre-wrap">{quote.notes || "Nenhuma observação ou termo adicional vinculado a este orçamento."}</span>}
+                            color="gray"
+                        />
                     </div>
                 </div>
             </div>

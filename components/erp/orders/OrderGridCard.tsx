@@ -35,7 +35,7 @@ const OrderGridCard = React.memo(
       >
         <div className="flex gap-4 mb-2">
           {/* Order Visual Indicator */}
-          <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+          <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
             <StoreIcon className="w-6 h-6 text-brand-dark dark:text-dark-heading" />
           </div>
 
@@ -57,7 +57,7 @@ const OrderGridCard = React.memo(
                     {order.statusLabel}
                   </Badge>
                   {order.isUnfulfilled && (
-                    <Badge variant="gray" className="text-[9px] h-4 px-1 py-3 opacity-70">
+                    <Badge variant="gray" className="whitespace-nowrap scale-90 shrink-0">
                       Pendente
                     </Badge>
                   )}
@@ -71,12 +71,12 @@ const OrderGridCard = React.memo(
             </div>
 
             {/* Row 2: Stats (Items • Total) */}
-            <div className="flex items-center gap-1.5 mt-1">
-              <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                 {order.items_count} {order.items_count === 1 ? 'item' : 'itens'}
               </span>
-              <span className="text-gray-300 dark:text-dark-border">•</span>
-              <span className="text-[12px] font-bold text-brand-primary">
+              <span className="text-brand-inactive-text dark:text-dark-body">•</span>
+              <span className="text-sm font-bold text-brand-primary">
                 R$ {Number(order.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </span>
             </div>
@@ -84,28 +84,22 @@ const OrderGridCard = React.memo(
         </div>
 
         {/* Info Rows */}
-        <div className="mt-4 flex flex-col gap-3">
+        <div className="mt-auto pt-4 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
           {/* Row 1: Cliente & Data */}
           <div className="flex justify-between items-end gap-2">
             <div className="flex flex-col gap-0.5 min-w-0">
-              <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Cliente</span>
+              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Cliente</span>
               <div className="flex items-center gap-1.5 min-w-0">
-                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
+                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
                   {order.customer_name}
                 </span>
-                {order.customer_id && (
-                  <Badge variant="gray" className="whitespace-nowrap scale-90 shrink-0">
-                    {order.customer_id}
-                  </Badge>
-                )}
               </div>
             </div>
 
             <div className="flex flex-col gap-0.5 items-end shrink-0">
-              <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body text-right">Data</span>
+              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body text-right">Data</span>
               <div className="flex items-center gap-1 justify-end">
-                <ClockIcon size={12} className="text-brand-inactive-text" />
-                <span className="text-[12px] font-bold text-brand-dark dark:text-dark-heading">
+                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
                   {order.formattedDate}
                 </span>
               </div>
@@ -115,10 +109,9 @@ const OrderGridCard = React.memo(
           {/* Row 2: Canal & Actions */}
           <div className="flex justify-between items-end gap-2">
             <div className="flex flex-col gap-0.5">
-              <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Canal</span>
+              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Canal</span>
               <div className="flex items-center gap-1.5">
-                <StoreIcon size={12} className="text-brand-inactive-text" />
-                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate max-w-[120px]">
+                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate max-w-[120px]">
                   {order.store_name || "Loja"}
                 </span>
               </div>

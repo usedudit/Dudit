@@ -3,13 +3,11 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useMediaQuery } from "../hooks"
-import { useToast } from "@/hooks/use-toast"
 import { useStore } from "@/lib/store-context"
 
 // Components
-import { Button, IconPlaceholder, AlertModal, Separator, Badge, Checkbox } from "@/components/reusable"
+import { Button, IconPlaceholder, AlertModal, Badge, Checkbox } from "@/components/reusable"
 import QuoteSkeleton from "./QuoteSkeleton"
-import { FileIcon } from "@/lib/icons"
 import { deleteQuoteAction, batchDeleteQuotesAction, batchUpdateQuotesStatusAction } from "@/app/actions/erp/quotes"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
@@ -30,7 +28,6 @@ import {
     ArrowUpDownIcon,
     TrashIcon,
     EditIcon,
-    CheckIcon
 } from "@/lib/icons"
 import { useRouter } from "next/navigation"
 
@@ -46,6 +43,7 @@ interface Quote {
     statusColor: any;
     formattedIssueDate: string;
     formattedExpirationDate: string | null;
+    items_count: number;
     created_at_time: number;
     status: string;
     user_profiles?: { full_name: string } | null;
@@ -176,6 +174,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                     displayId: q.quote_number || `#${q.id.substring(0, 8)}`,
                     customer_name: q.customers?.name || "Cliente sem nome",
                     customer_id: q.customers?.id ? `CST-${q.customers.id.substring(0, 4).toUpperCase()}` : null,
+                    items_count: q.items_count?.[0]?.count || 0,
                     total_amount: Number(q.total),
                     statusLabel: statusInfo.label,
                     statusColor: statusInfo.color,
@@ -390,6 +389,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                         setActiveQuote(null)
                     }}
                     onEditQuote={handleEditQuote}
+                    initialQuote={activeQuote}
                 />
             )
         }

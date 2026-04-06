@@ -124,7 +124,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                     <img src={product.image} className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 object-cover border border-brand-border dark:border-dark-border" />
                                                     <div className="flex-1">
                                                         <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</div>
-                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body">SKU: {product.sku}</div>
+                                                        <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">SKU: {product.sku}</div>
                                                     </div>
                                                     <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">R$ {product.price}</div>
                                                     {product.variants && product.variants.length > 0 && (

@@ -135,7 +135,6 @@ export async function createERPOrderAction(data: {
 }
 
 export async function getOrderDetailsAction(orderId: string, partnerId: string) {
-    await requireRateLimit(RateLimitCategory.DEFAULT)
     const user = await requireUser()
     if (!user) return { error: "Não autenticado" }
 
@@ -147,7 +146,16 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         .select(`
             *,
             order_items(*),
-            stores(name)
+            stores(name),
+            customers:buyer_id (
+                id,
+                name,
+                email,
+                phone,
+                addresses (
+                    *
+                )
+            )
         `)
         .eq("id", orderId)
         .eq("partner_id", partnerId)

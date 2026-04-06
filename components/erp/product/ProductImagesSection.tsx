@@ -99,7 +99,7 @@ function ProductImagesSection({
           <label className={`w-48 h-48 ${dropzoneClasses}`}>
             <IconPlaceholder
               icon={UploadIcon}
-              iconSize="w-12 h-12 mb-2"
+              iconSize="w-8 h-8"
               title="Upload de Imagem"
               titleClass="text-md"
               subtitle="Clique para adicionar imagens"

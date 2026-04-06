@@ -134,16 +134,12 @@ export async function getStockMovementDetails(id: string) {
 
         if (!data) return errorResponse("Movimentação não encontrada")
 
-        // Resolve user name separately since there's no FK from stock_movements to user_profiles
-        let userName = 'Sistema'
-        if (data.created_by) {
-            const { data: profile } = await supabase
-                .from("user_profiles")
-                .select("full_name")
-                .eq("id", data.created_by)
-                .single()
-            userName = profile?.full_name || data.created_by
-        }
+        // Resolve user name in parallel — fire immediately, await later
+        const userNamePromise = data.created_by
+            ? supabase.from("user_profiles").select("full_name").eq("id", data.created_by).single().then((r: any) => r.data?.full_name || data.created_by)
+            : Promise.resolve('Sistema')
+        
+        const userName = await userNamePromise
 
         let reason = data.reason || data.movement_type;
         if (!data.reason && data.reference_name) {

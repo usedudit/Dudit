@@ -1,15 +1,15 @@
 "use client"
 
-import React from "react"
+import React, { useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
     Input, Button, FormDropdown, FormCurrencyInput,
-    CustomerCard, IconPlaceholder, DatePicker
+    CustomerCard, IconPlaceholder, DatePicker, Pagination
 } from "@/components/reusable"
 import {
     SearchIcon, PlusIcon, TagIcon, TrashIcon,
-    CheckIcon, EditIcon, ClockIcon, UserIcon
+    CheckCircleIcon, EditIcon, UserIcon
 } from "@/lib/icons"
 import QuantitySelector from "@/components/reusable/QuantitySelector"
 
@@ -77,17 +77,41 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     setOrderDate, setSalesChannel, setDeliveryMethod, setPaymentStatus, setDeliveryStatus, handleSaveOrder,
     salesChannelOptions, deliveryMethodOptions, statusOptions, deliveryStatusOptions
 }) => {
+    const searchRef = useRef<HTMLDivElement>(null);
+    const ITEMS_PER_PAGE = 8;
+    const [currentPage, setCurrentPage] = React.useState(1);
+    const [nameErrors, setNameErrors] = React.useState<Record<number, boolean>>({});
+
+    const totalPages = Math.ceil(items.length / ITEMS_PER_PAGE);
+    const paginatedItems = items.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+    useEffect(() => {
+        if (currentPage > totalPages && totalPages > 0) {
+            setCurrentPage(totalPages);
+        }
+    }, [items.length, totalPages, currentPage]);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+                setIsProductSearchOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [setIsProductSearchOpen]);
+
     return (
         <FadeIn>
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <div className="lg:col-span-8 flex flex-col gap-8">
+            <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                     {/* 1. PRODUCT SEARCH & TABLE */}
                     <section>
                         <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading mb-6 flex items-center gap-2">
                             Itens do Pedido
                         </h3>
 
-                        <div className="relative mb-6">
+                        <div ref={searchRef} className="relative mb-6">
                             <Input
                                 label=""
                                 name="productSearch"
@@ -127,12 +151,14 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                     }}
                                                     className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0"
                                                 >
-                                                    <img src={product.image} className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 object-cover border border-brand-border dark:border-dark-border" />
+                                                    <img src={product.image || 'https://img.dudit.com.br/static/Placeholder.png'} className={`w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 border border-brand-border dark:border-dark-border ${!product.image ? 'object-contain p-1.5' : 'object-cover'}`} />
                                                     <div className="flex-1">
                                                         <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</div>
                                                         <div className="text-xs text-brand-inactive-text dark:text-dark-body">SKU: {product.sku}</div>
                                                     </div>
-                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">R$ {product.price}</div>
+                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.price)}
+                                                    </div>
                                                 </div>
                                             ))
                                         ) : (
@@ -156,45 +182,53 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {items.map((item, index) => (
+                                    {paginatedItems.map((item, paginatedIndex) => {
+                                        const index = (currentPage - 1) * ITEMS_PER_PAGE + paginatedIndex;
+                                        return (
                                         <tr key={index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
                                             <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
-                                                        {item.image ? (
-                                                            <img src={item.image} className="w-full h-full object-cover" alt="" />
-                                                        ) : (
-                                                            <span className="text-xs font-bold text-brand-inactive-text">P</span>
-                                                        )}
+                                                        <img src={item.image || 'https://img.dudit.com.br/static/Placeholder.png'} className={`w-full h-full ${!item.image ? 'object-contain p-1.5' : 'object-cover'}`} alt="" />
                                                     </div>
                                                     <div className="flex flex-col text-left flex-1 min-w-0">
                                                         {item.isEditing ? (
-                                                            <input
-                                                                type="text"
-                                                                value={item.name}
-                                                                onChange={(e) => updateItemField(index, 'name', e.target.value)}
-                                                                placeholder="Nome do produto..."
-                                                                className="w-full h-8 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[13px] focus:ring-1 focus:ring-brand-primary outline-none transition-all mb-1"
-                                                            />
+                                                            <div className="mb-0">
+                                                                <Input
+                                                                    name={`item-name-${index}`}
+                                                                    value={item.name}
+                                                                    onChange={(e: any) => {
+                                                                        updateItemField(index, 'name', e.target.value);
+                                                                        if (nameErrors[index]) {
+                                                                            setNameErrors(prev => ({ ...prev, [index]: false }));
+                                                                        }
+                                                                    }}
+                                                                    placeholder="Nome do produto..."
+                                                                    error={nameErrors[index]}
+                                                                    errorMessage="Nome obrigatório"
+                                                                    className="mb-0"
+                                                                />
+                                                            </div>
                                                         ) : (
                                                             <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[250px]">
                                                                 {item.name || 'Produto sem nome'}
                                                             </span>
                                                         )}
                                                         <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                                            {item.sku || 'Sem SKU'}
+                                                            {item.isEditing ? (item.sku || '') : (item.sku || 'Sem SKU')}
                                                         </span>
                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                <div className="flex items-center">
-                                                    <span className="text-[13px] font-medium text-brand-inactive-text mr-1">R$</span>
-                                                    <input
+                                                <div className="w-[140px]">
+                                                    <Input
+                                                        name={`item-price-${index}`}
                                                         type="number"
+                                                        prefix="R$"
                                                         value={item.unitPrice}
-                                                        onChange={(e) => updateItemPrice(index, parseFloat(e.target.value) || 0)}
-                                                        className="w-full h-9 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[13px] focus:ring-1 focus:ring-brand-primary outline-none transition-all"
+                                                        onChange={(e: any) => updateItemPrice(index, parseFloat(e.target.value) || 0)}
+                                                        className="mb-0"
                                                     />
                                                 </div>
                                             </td>
@@ -212,11 +246,17 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                 <div className="flex justify-center gap-2">
                                                     {item.isEditing ? (
                                                         <button
-                                                            onClick={() => toggleItemEdit(index, false)}
+                                                            onClick={() => {
+                                                                if (!item.name || item.name.trim() === '') {
+                                                                    setNameErrors(prev => ({ ...prev, [index]: true }));
+                                                                } else {
+                                                                    toggleItemEdit(index, false);
+                                                                }
+                                                            }}
                                                             className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-green-50 dark:hover:bg-green-900/10 text-green-600 transition-colors"
                                                             title="Salvar nome"
                                                         >
-                                                            <CheckIcon size={18} />
+                                                            <CheckCircleIcon size={18} />
                                                         </button>
                                                     ) : (
                                                         <button
@@ -237,32 +277,39 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                 </div>
                                             </td>
                                         </tr>
-                                    ))}
+                                    )})}
                                 </tbody>
                             </table>
                         </div>
 
                         {/* --- ITEMS LIST (Mobile/Tablet) --- */}
                         <div className="block md:hidden space-y-2 mb-6">
-                            {items.map((item, index) => (
+                            {paginatedItems.map((item, paginatedIndex) => {
+                                const index = (currentPage - 1) * ITEMS_PER_PAGE + paginatedIndex;
+                                return (
                                 <div key={index} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
                                     <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
-                                        {item.image ? (
-                                            <img src={item.image} className="w-full h-full object-cover" alt="" />
-                                        ) : (
-                                            <span className="text-xs font-bold text-brand-inactive-text">P</span>
-                                        )}
+                                        <img src={item.image || 'https://img.dudit.com.br/static/Placeholder.png'} className={`w-full h-full ${!item.image ? 'object-contain p-1.5' : 'object-cover'}`} alt="" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex justify-between items-start mb-0.5">
                                             {item.isEditing ? (
-                                                <input
-                                                    type="text"
-                                                    value={item.name}
-                                                    onChange={(e) => updateItemField(index, 'name', e.target.value)}
-                                                    placeholder="Nome do produto..."
-                                                    className="flex-1 h-8 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[13px] focus:ring-1 focus:ring-brand-primary outline-none transition-all mr-2"
-                                                />
+                                                <div className="flex-1 mr-2">
+                                                    <Input
+                                                        name={`item-name-mobile-${index}`}
+                                                        value={item.name}
+                                                        onChange={(e: any) => {
+                                                            updateItemField(index, 'name', e.target.value);
+                                                            if (nameErrors[index]) {
+                                                                setNameErrors(prev => ({ ...prev, [index]: false }));
+                                                            }
+                                                        }}
+                                                        placeholder="Nome do produto..."
+                                                        error={nameErrors[index]}
+                                                        errorMessage="Nome obrigatório"
+                                                        className="mb-0"
+                                                    />
+                                                </div>
                                             ) : (
                                                 <h4 className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate pr-2">
                                                     {item.name || 'Produto sem nome'}
@@ -274,9 +321,30 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <p className="text-[11px] font-medium text-brand-inactive-text pr-2 truncate">
-                                                {item.sku || 'Sem SKU'} • {item.quantity} un • {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unitPrice)}
+                                                {item.isEditing ? (item.sku ? `${item.sku} • ` : '') : `${item.sku || 'Sem SKU'} • `}{item.quantity} un • {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unitPrice)}
                                             </p>
                                             <div className="flex items-center gap-1">
+                                                {item.isEditing ? (
+                                                    <button
+                                                        onClick={() => {
+                                                            if (!item.name || item.name.trim() === '') {
+                                                                setNameErrors(prev => ({ ...prev, [index]: true }));
+                                                            } else {
+                                                                toggleItemEdit(index, false);
+                                                            }
+                                                        }}
+                                                        className="w-8 h-8 flex items-center justify-center text-green-600 hover:bg-green-50 dark:hover:bg-green-900/10 rounded-full transition-colors"
+                                                    >
+                                                        <CheckCircleIcon size={14} />
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => toggleItemEdit(index, true)}
+                                                        className="w-8 h-8 flex items-center justify-center text-brand-inactive-text hover:bg-brand-gray dark:hover:bg-dark-border rounded-full transition-colors"
+                                                    >
+                                                        <EditIcon size={14} />
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => removeItem(index)}
                                                     className="w-8 h-8 flex items-center justify-center text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full transition-colors"
@@ -288,19 +356,20 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
                                         <div className="flex items-center gap-4 mt-2">
                                             <QuantitySelector value={item.quantity} onChange={(val) => updateItemQty(index, val)} size="sm" />
-                                            <div className="flex items-center flex-1 max-w-[120px]">
-                                                <span className="text-[11px] font-medium text-brand-inactive-text mr-1">R$</span>
-                                                <input
+                                            <div className="flex-1 max-w-[140px]">
+                                                <Input
+                                                    name={`item-price-mobile-${index}`}
                                                     type="number"
+                                                    prefix="R$"
                                                     value={item.unitPrice}
-                                                    onChange={(e) => updateItemPrice(index, parseFloat(e.target.value) || 0)}
-                                                    className="w-full h-8 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[11px] focus:ring-1 focus:ring-brand-primary outline-none"
+                                                    onChange={(e: any) => updateItemPrice(index, parseFloat(e.target.value) || 0)}
+                                                    className="mb-0"
                                                 />
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            ))}
+                            )})}
                         </div>
 
                         {/* Add Item Link */}
@@ -312,6 +381,14 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             <PlusIcon size={14} strokeWidth={3} />
                             Adicionar item manual
                         </button>
+
+                        <div className="mt-2">
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onPageChange={(page) => setCurrentPage(page)}
+                            />
+                        </div>
                     </section>
 
                     <div className="h-px bg-brand-border dark:bg-dark-border w-full my-4" />
@@ -383,7 +460,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                     </section>
                 </div>
 
-                <div className="lg:col-span-4 flex flex-col gap-8">
+                <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
                     {/* --- 1. CUSTOMER CARD --- */}
                     <div>
                         {selectedCustomer ? (
