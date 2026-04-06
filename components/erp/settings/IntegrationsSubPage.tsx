@@ -130,7 +130,7 @@ export const IntegrationsSubPage = ({
         <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
           {/* Sticky Header */}
-          <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+          <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
 
               {/* Back button — desktop only */}
@@ -141,13 +141,13 @@ export const IntegrationsSubPage = ({
               </div>
 
               {/* Title row */}
-              <div className="hidden md:flex items-start justify-between pb-4">
+              <div className="hidden md:flex items-start justify-between">
                 <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                  <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-300 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                    <span className="truncate">Integrações</span>
+                  <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                    <span className="truncate">Dados do Negócio</span>
                   </h1>
 
-                  <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-1"}`}>
+                  <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                     Conecte seu negócio com ferramentas externas e meios de pagamento.
                   </div>
                 </div>
@@ -202,7 +202,7 @@ export const IntegrationsSubPage = ({
           <Button
             variant="outline"
             onClick={onBack}
-            className="flex-1 h-[48px] font-bold"
+            className="flex-1 h-[48px]"
           >
             Voltar
           </Button>

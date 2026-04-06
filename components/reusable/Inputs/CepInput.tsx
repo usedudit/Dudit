@@ -28,7 +28,7 @@ export const CepInput: React.FC<CepInputProps> = ({
     ...props
 }) => {
     const [loading, setLoading] = useState(false)
-    const [lastFetchedCep, setLastFetchedCep] = useState("")
+    const [lastFetchedCep, setLastFetchedCep] = useState(value?.replace(/\D/g, "") || "")
     const fetchingCepRef = useRef("")
 
     // Formata o CEP enquando o usuário digita

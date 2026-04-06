@@ -4,6 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
 import { ThreeDotsIcon } from "@/lib/icons"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 interface CustomerGridCardProps {
   customer: any
@@ -35,14 +36,10 @@ const CustomerGridCard = React.memo(
       >
         <div className="flex gap-4 mb-2">
           {/* Avatar do Cliente */}
-          <div className="w-20 h-20 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden">
-            <img
-              src={customer.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name || 'C')}&background=random`}
-              alt={customer.name}
-              loading="lazy"
-              className="w-full h-full object-cover rounded-full"
-            />
-          </div>
+          <UserProfileImage 
+            fullName={customer.name || "Cliente"} 
+            className="w-20 h-20 text-[24px]"
+          />
 
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             {/* Linha 1: Nome + Badge Status + Checkbox */}

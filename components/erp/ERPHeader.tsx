@@ -8,10 +8,10 @@ import { MenuIcon, MoonIcon, LogoutIcon, NotificationIcon, ChevronDownIcon, Chev
 import { Button } from "@/components/reusable"
 import Dropdown, { DropdownItem } from "../reusable/Dropdown"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import { StoreSwitcher } from "../store-switcher"
-import { getUserInitials, getAvatarColor } from "@/lib/utils/user-profile-image"
+import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { useSidebar } from "@/lib/sidebar-context"
 import { useUserProfile } from "@/hooks/use-user-profile"
 import { cn } from "@/lib/utils"
@@ -67,6 +67,7 @@ interface ERPHeaderProps {
 export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHref, onBack, isSubPage, userProfile }: ERPHeaderProps) {
   const { theme, setTheme } = useTheme()
   const router = useRouter()
+  const pathname = usePathname()
   const [isTransitioning, setIsTransitioning] = useState(false)
   const { profile, isLoading: isProfileLoading } = useUserProfile(userProfile ? { full_name: userProfile.fullName, address: null } : null)
 
@@ -166,11 +167,14 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
     router.push("/")
   }
 
+  const segments = pathname.split("/").filter(Boolean)
+  const isAutoInnerPage = segments.length > 2
+
   const displayTitle = headerOverride?.title || pageTitle || "Painel"
   const displayBackHref = headerOverride?.backHref || backHref
   const displayOnBack = headerOverride?.onBack || onBack
   const displayIsSubPage = headerOverride?.isSubPage || isSubPage
-  const showBackButton = !!(displayBackHref || displayOnBack || displayIsSubPage)
+  const showBackButton = !!(displayBackHref || displayOnBack || displayIsSubPage || isAutoInnerPage)
 
   return (
     <header className="sticky top-0 bg-brand-page-bg dark:bg-dark-background z-30 border-b border-brand-border dark:border-dark-border">

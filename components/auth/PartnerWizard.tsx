@@ -302,13 +302,13 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
 
             {step === 2 && (
               <div className="space-y-5">
-                <div className="flex items-center gap-4 p-3 border rounded-xl bg-brand-gray/50 border-dashed border-gray-200">
-                  <div onClick={() => fileInputRef.current?.click()} className="h-16 w-16 bg-white border rounded-lg flex items-center justify-center cursor-pointer hover:border-brand-green relative overflow-hidden shadow-sm">
-                    {imagePreview ? <img src={imagePreview} alt="Logo" className="object-cover w-full h-full" /> : <Upload className="text-gray-400 w-5 h-5" />}
+                <div className="flex items-center gap-4 dark:bg-dark-background/50">
+                  <div onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-slate dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                    {imagePreview ? <img src={imagePreview} alt="Logo" className="object-cover w-full h-full rounded-full" /> : <Upload className="text-brand-inactive-text w-5 h-5" />}
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-gray-900">Logo da Loja</p>
-                    <p className="text-xs text-gray-500">Max 3MB</p>
+                    <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Selecione uma imagem</p>
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Máx 3MB (PNG, JPG, WEBP)</p>
                   </div>
                   <input ref={fileInputRef} type="file" hidden accept="image/*" onChange={handleImageChange} />
                 </div>

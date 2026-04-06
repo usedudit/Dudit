@@ -33,29 +33,3 @@ export const SettingsCard = ({
     />
   </div>
 )
-
-// ─── Sub-page header ──────────────────────────────────────────────────────────
-
-export const SubPageHeader = ({
-  title,
-  description,
-  onBack,
-}: {
-  title: string
-  description: string
-  onBack: () => void
-}) => (
-  <div className="flex items-center gap-4 mb-8">
-    <button
-      type="button"
-      onClick={onBack}
-      className="h-10 w-10 p-0 rounded-full border border-brand-border dark:border-dark-border flex items-center justify-center hover:bg-gray-100 dark:hover:bg-dark-border/60 transition-colors flex-shrink-0"
-    >
-      <ChevronLeftIcon size={20} className="text-brand-dark dark:text-dark-heading" />
-    </button>
-    <div>
-      <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading leading-tight">{title}</h2>
-      <p className="text-sm text-brand-inactive-text dark:text-dark-body">{description}</p>
-    </div>
-  </div>
-)

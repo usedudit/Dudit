@@ -8,7 +8,7 @@ import { MenuIcon, MoonIcon, LogoutIcon, NotificationIcon, ChevronDownIcon } fro
 import { Button } from "@/components/reusable"
 import Dropdown, { DropdownItem } from "../reusable/Dropdown"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
-import { getUserInitials, getAvatarColor } from "@/lib/utils/user-profile-image"
+import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { ShieldAlert } from "lucide-react"
 
 const ChevronRight = ({ className }: { className?: string }) => (

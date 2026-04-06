@@ -17,7 +17,7 @@ import {
 import { useSupabase } from "@/providers/supabase-provider"
 import { Button } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
-import { getUserInitials, getAvatarColor } from "@/lib/utils/user-profile-image"
+import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { getSearchSuggestionsBucket } from "@/app/actions/marketplace/suggestions"
 import { useUserSession } from "@/hooks/use-user-session"
 

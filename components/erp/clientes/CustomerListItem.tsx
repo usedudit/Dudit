@@ -3,6 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 interface ColumnDef {
   id: string
@@ -36,16 +37,12 @@ const CustomerListItem = React.memo(
       switch (colId) {
         case "name":
           return (
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden">
-                <img
-                  src={customer.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name || 'C')}&background=random`}
-                  alt=""
-                  className="w-full h-full object-cover rounded-full"
-                  loading="lazy"
-                />
-              </div>
-              <div className="flex flex-col text-left">
+            <div className="flex items-center gap-3 text-left">
+              <UserProfileImage 
+                fullName={customer.name || "Cliente"} 
+                className="w-10 h-10 text-[14px]"
+              />
+              <div className="flex flex-col">
                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[200px] xl:max-w-[300px]">
                   {customer.name}
                 </span>

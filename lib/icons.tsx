@@ -20,7 +20,7 @@ import {
   CheckmarkCircle01Icon,
   PackageIcon,
   PackageDeliveredIcon,
-  PackageReceiveIcon,
+  PackageReceiveIcon as PackageReceiveIcon01,
   PackageRemoveIcon,
   DashboardSquare01Icon,
   Chart03Icon,
@@ -240,8 +240,9 @@ export const BoxIcon = createIcon(DeliveryBox01Icon)
 
 export const AllProductsIcon = createIcon(PackageIcon)
 export const NormalProductsIcon = createIcon(PackageDeliveredIcon)
-export const LowProductsIcon = createIcon(PackageReceiveIcon)
+export const LowProductsIcon = createIcon(PackageReceiveIcon01)
 export const OutProductsIcon = createIcon(PackageRemoveIcon)
+export const PackageReceiveIcon = createIcon(PackageReceiveIcon01)
 
 export const CreditCardIcon = createIcon(CreditCard)
 export const TruckIcon = createIcon(ShippingTruck01Icon)

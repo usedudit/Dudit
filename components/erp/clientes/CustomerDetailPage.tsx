@@ -234,7 +234,7 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                                                 <IconPlaceholder
                                                     title="Nenhum pedido encontrado"
                                                     subtitle="Este cliente ainda não realizou nenhum pedido."
-                                                    imageSrc="https://img.dudit.com.br/static/mascots/Pedidos.png"
+                                                    imageSrc="https://img.dudit.com.br/static/mascots/SacolaVazia.png"
                                                     imageAlt='Nenhum pedido encontrado'
                                                     placeholderType="image"
                                                 />
@@ -280,72 +280,144 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                                     </section>
                                 )}
 
-                                {/* Detalhes e Contato */}
+                                {/* Detalhes e Contato no modelo CustomerCard */}
                                 <section>
                                     <h3 className="text-[17px] font-bold text-brand-dark dark:text-dark-heading mb-6">Detalhes</h3>
-                                    <div className="w-full bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border shadow-sm overflow-hidden flex flex-col">
+                                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors shadow-sm">
+                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
 
-                                        {/* Informações da Entidade (Tipo e Data Base) */}
-                                        <div className="p-5 flex flex-col gap-1.5">
-                                            <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-dark-border/50">
-                                                <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">Cliente desde</span>
-                                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
-                                                    {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('pt-BR', { month: 'short', day: 'numeric', year: 'numeric' }).replace(' de ', ', ') : '-'}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-dark-border/50">
-                                                <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">Tipo de Pessoa</span>
-                                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{customer.personType === 'pj' || customer.cnpj ? 'Pessoa Jurídica' : 'Pessoa Física'}</span>
-                                            </div>
-
-                                            {(customer.personType === 'pj' || customer.cnpj) ? (
-                                                <>
-                                                    {customer.cnpj && (
-                                                        <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-dark-border/50">
-                                                            <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">CNPJ</span>
-                                                            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{customer.cnpj}</span>
-                                                        </div>
-                                                    )}
-                                                    {customer.nomeFantasia && (
-                                                        <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-dark-border/50">
-                                                            <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">Nome Fantasia</span>
-                                                            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading text-right max-w-[50%] truncate">{customer.nomeFantasia}</span>
-                                                        </div>
-                                                    )}
-                                                    <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-dark-border/50">
-                                                        <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">Inscrição Estadual</span>
-                                                        <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading text-right">{customer.inscricaoEstadual || 'Isento'}</span>
+                                        {/* Top Part: Customer Identity */}
+                                        <div className="p-6 text-left">
+                                            <div className="flex items-center gap-4 mb-6 mt-2">
+                                                <div className="relative">
+                                                    <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border flex items-center justify-center text-xl font-bold text-brand-dark dark:text-dark-heading border border-white dark:border-dark-border overflow-hidden uppercase text-brand-inactive-text">
+                                                        {customer.avatar ? (
+                                                            <img src={customer.avatar} alt={customer.name} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            customer?.name?.charAt(0) || 'C'
+                                                        )}
                                                     </div>
-                                                    <div className="flex justify-between items-center py-2.5 border-gray-100 dark:border-dark-border/50">
-                                                        <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">Inscrição Municipal</span>
-                                                        <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{customer.inscricaoMunicipal || 'Isento'}</span>
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <h4 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">{customer.name}</h4>
+                                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">#{customer.id}</p>
+                                                </div>
+                                            </div>
+
+                                            {/* Informações Gerais (Cliente desde, Tipo) */}
+                                            <div className="space-y-3">
+                                                <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-dark-border/50">
+                                                    <span className="text-[13px] text-brand-inactive-text dark:text-dark-body font-semibold uppercase tracking-wider">Cliente desde</span>
+                                                    <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
+                                                        {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('pt-BR', { month: 'short', day: 'numeric', year: 'numeric' }).replace(' de ', ', ') : '-'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-center py-2.5">
+                                                    <span className="text-[13px] text-brand-inactive-text dark:text-dark-body font-semibold uppercase tracking-wider">Tipo de Pessoa</span>
+                                                    <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{customer.personType === 'pj' || customer.cnpj ? 'Pessoa Jurídica' : 'Pessoa Física'}</span>
+                                                </div>
+
+                                                {(customer.personType === 'pj' || customer.cnpj) ? (
+                                                    <div className="mt-2 pt-2 border-t border-gray-100 dark:border-dark-border/50 space-y-2.5">
+                                                        {customer.cnpj && (
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-[13px] text-brand-inactive-text dark:text-dark-body font-medium">CNPJ</span>
+                                                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{customer.cnpj}</span>
+                                                            </div>
+                                                        )}
+                                                        {customer.nomeFantasia && (
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-[13px] text-brand-inactive-text dark:text-dark-body font-medium">Fantasia</span>
+                                                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading text-right max-w-[60%] truncate">{customer.nomeFantasia}</span>
+                                                            </div>
+                                                        )}
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-[13px] text-brand-inactive-text dark:text-dark-body font-medium">Insc. Est.</span>
+                                                            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading text-right">{customer.inscricaoEstadual || 'Isento'}</span>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        {customer.cpf && (
+                                                            <div className="mt-2 pt-2 border-t border-gray-100 dark:border-dark-border/50 flex justify-between items-center">
+                                                                <span className="text-[13px] text-brand-inactive-text dark:text-dark-body font-medium">CPF</span>
+                                                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{customer.cpf}</span>
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="border-t border-brand-border dark:border-dark-border w-full"></div>
+
+                                        {/* Bottom Part: Shipping Address */}
+                                        <div className="p-6 text-left">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading uppercase tracking-wide">
+                                                    Endereço
+                                                </h3>
+                                            </div>
+
+                                            {customer.address ? (
+                                                <>
+                                                    {/* Map Placeholder */}
+                                                    <div className="w-full h-24 bg-blue-50 dark:bg-gray-800 rounded-lg mb-4 overflow-hidden relative border border-blue-100 dark:border-gray-700 group cursor-pointer">
+                                                        <img src="https://img.dudit.com.br/static/maps/MapSample.png" className="w-full h-full object-cover opacity-60" alt="Map" />
+                                                        <div className="absolute inset-0 flex items-center justify-center">
+                                                            <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white">
+                                                                <div className="w-2 h-2 bg-white rounded-full"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="mb-0">
+                                                        <div className="flex justify-between items-start mb-1">
+                                                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate pr-2">Endereço Principal</h4>
+                                                            <a href="#" className="text-xs font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark dark:decoration-dark-heading flex-shrink-0">Ver Mapa</a>
+                                                        </div>
+                                                        <p className="text-[14px] text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                                                            {customer.address}
+                                                        </p>
                                                     </div>
                                                 </>
                                             ) : (
-                                                <>
-                                                    {customer.cpf && (
-                                                        <div className="flex justify-between items-center py-2.5 border-gray-100 dark:border-dark-border/50">
-                                                            <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">CPF</span>
-                                                            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{customer.cpf}</span>
-                                                        </div>
-                                                    )}
-                                                </>
+                                                <div className="bg-brand-gray/30 dark:bg-dark-border/30 rounded-lg p-4 text-center">
+                                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body italic">
+                                                        Nenhum endereço cadastrado.
+                                                    </p>
+                                                </div>
                                             )}
-                                        </div>
 
-                                        {/* Informações de Contato e Endereço */}
-                                        <div className="p-5 border-t border-brand-border dark:border-dark-border bg-gray-50/50 dark:bg-dark-border/20 flex flex-col gap-1.5">
-                                            <div className="flex justify-between items-center py-2.5 border-b border-gray-200 dark:border-dark-border/50">
-                                                <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">E-mail</span>
-                                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate max-w-[60%] text-right">{customer.email || '-'}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center py-2.5 border-b border-gray-200 dark:border-dark-border/50">
-                                                <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">Telefone</span>
-                                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading text-right">{customer.phone || customer.mobile || '-'}</span>
-                                            </div>
-                                            <div className="flex justify-between items-start pt-2.5">
-                                                <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium pt-0.5">Endereço Principal</span>
-                                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading text-right max-w-[60%] leading-relaxed">{customer.address || '-'}</span>
+                                            <div className="mt-6 pt-6 border-t border-brand-border dark:border-dark-border">
+                                                <div className="flex justify-between items-center mb-4">
+                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading uppercase tracking-wide">Contato</h3>
+                                                </div>
+
+                                                {(customer.email || customer.phone || customer.mobile) ? (
+                                                    <div className="space-y-3">
+                                                        {customer.email && (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-sm font-medium text-[#1e40af] dark:text-[#60a5fa] bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/30 truncate w-full">
+                                                                    {customer.email}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {(customer.phone || customer.mobile) && (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-sm font-medium text-[#1e40af] dark:text-[#60a5fa] bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/30 w-fit">
+                                                                    {customer.phone || customer.mobile}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className="bg-brand-gray/30 dark:bg-dark-border/30 rounded-lg p-4 text-center">
+                                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body italic">
+                                                            Nenhum contato disponível.
+                                                        </p>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
