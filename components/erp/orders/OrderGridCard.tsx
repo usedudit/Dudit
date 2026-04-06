@@ -94,7 +94,7 @@ const OrderGridCard = React.memo(
                   {order.customer_name}
                 </span>
                 {order.customer_id && (
-                  <Badge variant="gray" className="text-[9px] h-3.5 px-0.5 truncate max-w-[60px]">
+                  <Badge variant="gray" className="whitespace-nowrap scale-90 shrink-0">
                     {order.customer_id}
                   </Badge>
                 )}

@@ -118,7 +118,7 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                             {/* Main Column */}
                             <div className={`col-span-12 lg:col-span-8 pr-0 lg:pr-12 ${isInformationTab ? 'hidden lg:block' : 'block'}`}>
                                 <TabsContent value="Purchase History" className="mt-0">
-                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
                                         {/* Unified Stats Card */}
                                         <div className="w-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-sm overflow-hidden mb-10 transition-all duration-300 hover:shadow-md">
                                             <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-gray-200 dark:divide-dark-border">
@@ -234,7 +234,8 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                                                 <IconPlaceholder
                                                     title="Nenhum pedido encontrado"
                                                     subtitle="Este cliente ainda não realizou nenhum pedido."
-                                                    imageSrc="https://img.dudit.com.br/static/mascots/orders_empty.png"
+                                                    imageSrc="https://img.dudit.com.br/static/mascots/Pedidos.png"
+                                                    imageAlt='Nenhum pedido encontrado'
                                                     placeholderType="image"
                                                 />
                                             </div>
@@ -286,10 +287,6 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
 
                                         {/* Informações da Entidade (Tipo e Data Base) */}
                                         <div className="p-5 flex flex-col gap-1.5">
-                                            <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-dark-border/50">
-                                                <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">Tipo do Cliente</span>
-                                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{customer.personType === 'pj' || customer.cnpj ? 'B2B' : 'B2C'}</span>
-                                            </div>
                                             <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-dark-border/50">
                                                 <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">Cliente desde</span>
                                                 <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">

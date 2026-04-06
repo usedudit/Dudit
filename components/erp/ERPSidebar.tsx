@@ -275,7 +275,7 @@ export function ERPSidebar() {
         )}
       >
         <div className="h-[65px] flex items-center px-3 overflow-hidden shrink-0 relative transition-all duration-300">
-          <Link href="/erp/dashboard" prefetch={true} className="flex items-center gap-3 w-full h-full relative">
+          <Link href="/" prefetch={true} className="flex items-center gap-3 w-full h-full relative">
             <div className="flex items-center justify-center shrink-0 w-[44px]">
               <img
                 src="https://img.dudit.com.br/static/Icon.png"
@@ -292,13 +292,13 @@ export function ERPSidebar() {
               <img
                 src="https://img.dudit.com.br/static/Logo.png"
                 alt="Dudit Logo"
-                className="h-7 w-auto object-contain brightness-0 invert"
+                className="h-8 w-auto object-contain"
               />
             </div>
           </Link>
 
           <button className="md:hidden absolute right-2" onClick={() => setIsMobileOpen(false)}>
-            <X className="w-6 h-6 text-gray-400" />
+            <X className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
           </button>
         </div>
 
@@ -315,7 +315,7 @@ export function ERPSidebar() {
           )}
         >
           <ChevronRightIcon
-            className={cn("w-3 h-3 transition-transform duration-300 text-gray-400", isCollapsed ? "rotate-0" : "rotate-180")}
+            className={cn("w-3 h-3 transition-transform duration-300 text-brand-inactive-text dark:text-dark-body", isCollapsed ? "rotate-0" : "rotate-180")}
           />
         </button>
 

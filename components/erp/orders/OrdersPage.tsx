@@ -443,7 +443,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                                                     )}
                                                                 </div>
                                                             </div>
-                                                            <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
+                                                            <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mb-1">
                                                                 {o.customer_name} • {o.formattedDate}
                                                             </div>
                                                             <div className="flex items-center gap-2 text-[14px]">
