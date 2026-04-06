@@ -38,8 +38,8 @@ const CustomerListItem = React.memo(
         case "name":
           return (
             <div className="flex items-center gap-3 text-left">
-              <UserProfileImage 
-                fullName={customer.name || "Cliente"} 
+              <UserProfileImage
+                fullName={customer.name || "Cliente"}
                 className="w-10 h-10 text-[14px]"
               />
               <div className="flex flex-col">
@@ -66,9 +66,9 @@ const CustomerListItem = React.memo(
               {customer.totalOrderValue ? `R$ ${customer.totalOrderValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
             </span>
           )
-        
+
         case "store_credit":
-           return (
+          return (
             <span className={`text-[13px] font-bold ${customer.storeCredit > 0 ? 'text-brand-primary' : 'text-brand-inactive-text'}`}>
               {customer.storeCredit ? `R$ ${customer.storeCredit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
             </span>
@@ -76,8 +76,8 @@ const CustomerListItem = React.memo(
 
         case "status":
           return (
-            <Badge variant={customer.status === 'Active' ? "green" : customer.status === 'Inactive' ? "gray" : "red"}>
-              {customer.status === 'Active' ? "Ativo" : customer.status === 'Inactive' ? "Inativo" : "Bloqueado"}
+            <Badge variant={customer.status === 'ativo' ? "green" : customer.status === 'inativo' ? "gray" : "red"}>
+              {customer.status === 'ativo' ? "Ativo" : customer.status === 'inativo' ? "Inativo" : "Bloqueado"}
             </Badge>
           )
 

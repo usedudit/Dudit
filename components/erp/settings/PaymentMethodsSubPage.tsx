@@ -1,9 +1,9 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useTransition, useRef } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { Button, Input as FormInput, Checkbox as FormCheckbox, Badge, Spinner, DefaultModal, ActionsDropdown, FormDropdown, MoneyInput, AlertModal, IconPlaceholder } from "@/components/reusable"
-import { SearchIcon, PlusIcon, ThreeDotsIcon, CreditCardIcon, MoneyIcon, QRCodeIcon, ChevronLeftIcon, SaveIcon } from "@/lib/icons"
+import { SearchIcon, PlusIcon, ThreeDotsIcon, CreditCardIcon, MoneyIcon, QRCodeIcon, ChevronLeftIcon } from "@/lib/icons"
 import { createPaymentMethodAction, updatePaymentMethodAction, deletePaymentMethodAction } from "@/app/actions/payment-methods"
 import { useNotification } from "@/hooks/use-notification"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -21,15 +21,15 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
   const [filteredMethods, setFilteredMethods] = useState<any[]>(paymentMethods || [])
-  
+
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
   const [editingPayment, setEditingPayment] = useState<any | null>(null)
   const [isSavingPayment, setIsSavingPayment] = useState(false)
-  
+
   const [isTogglingStatus, setIsTogglingStatus] = useState<Set<string>>(new Set())
   const [isDeletingMethod, setIsDeletingMethod] = useState<Set<string>>(new Set())
   const [methodToDelete, setMethodToDelete] = useState<any>(null)
-  
+
   const [isScrolled, setIsScrolled] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
@@ -290,12 +290,12 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
     <FadeIn>
       <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
         <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
-          
           {/* Sticky Header */}
-          <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+          <div className={`sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out ${isScrolled ? "py-2 md:py-3 shadow-sm" : ""}`}>
             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+
               {/* Back button — desktop only */}
-              <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+              <div className={`absolute -left-12 top-1/2 -translate-y-1/2 h-full hidden xl:flex items-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                 <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
                   <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                 </Button>
@@ -307,7 +307,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                   <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                     <span className="truncate">Formas de Pagamento</span>
                     <Badge variant="gray" className="text-sm font-normal h-fit whitespace-nowrap px-2 py-0.5 ml-2">
-                       {methods.length}
+                      {methods.length}
                     </Badge>
                   </h1>
 
@@ -318,7 +318,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
 
                 {/* Desktop action buttons */}
                 <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
-                   <Button variant="outline" onClick={() => { setEditingPayment(null); setPaymentModalOpen(true) }}>
+                  <Button onClick={() => { setEditingPayment(null); setPaymentModalOpen(true) }}>
                     <PlusIcon className="w-5 h-5 mr-2" />
                     Novo Método
                   </Button>
@@ -330,7 +330,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
           {/* Content Body */}
           <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
             {/* Search & Filter Row */}
-            <div className="flex flex-col md:flex-row gap-3 mb-6">
+            <div className="flex flex-col md:flex-row mb-6">
               <FormInput
                 name="searchPayment"
                 placeholder="Buscar método..."
@@ -541,6 +541,22 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
           isDestructive
           isLoading={isDeletingMethod.has(methodToDelete?.id)}
         />
+        {/* Mobile Bottom Action Bar */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
+          <Button
+            variant="outline"
+            onClick={onBack}
+            className="flex-1 h-[48px] font-bold"
+          >
+            Voltar
+          </Button>
+          <Button
+            onClick={() => { setEditingPayment(null); setPaymentModalOpen(true) }}
+            className="flex-1 h-[48px] font-bold"
+          >
+            Novo Método
+          </Button>
+        </div>
       </div>
     </FadeIn>
   )

@@ -69,7 +69,7 @@ export async function createComprehensiveCustomerAction(data: {
     regime_tributario: data.regimeTributario || null,
     contribuinte_icms: data.contribuinteIcms || null,
     store_credit: data.store_credit ?? 0,
-    status: data.status || "Active",
+    status: data.status || "ativo",
   }).select().single()
 
   if (error) {
@@ -131,6 +131,7 @@ export async function createCustomerAction(data: {
     phone: data.phone || null,
     address: data.address || null,
     notes: data.notes || null,
+    status: "ativo",
   })
 
   if (error) {
@@ -288,7 +289,7 @@ export async function updateComprehensiveCustomerAction(data: {
       state: data.state || null,
       municipio_codigo_ibge: data.municipioCodigoIbge || null,
       store_credit: data.store_credit,
-      status: data.status || "Active",
+      status: data.status || "ativo",
     })
     .eq("id", data.customerId)
     .eq("partner_id", data.partnerId) // Defense in depth
@@ -423,7 +424,7 @@ export async function toggleCustomersStatusAction(customerIds: string[], isActiv
 
   const { error } = await supabase
     .from("customers")
-    .update({ status: isActive ? "Active" : "Inactive" })
+    .update({ status: isActive ? "ativo" : "inativo" })
     .in("id", customerIds)
 
   if (error) {

@@ -69,8 +69,8 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                                 <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                     <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                         <span className="truncate">{customer.name}</span>
-                                        <Badge variant={customer.status === 'Active' ? 'green' : customer.status === 'Inactive' ? 'gray' : 'red'} className="whitespace-nowrap scale-90 shrink-0 mt-0.5">
-                                            {customer.status === 'Active' ? 'Ativo' : customer.status === 'Inactive' ? 'Inativo' : 'Bloqueado'}
+                                        <Badge variant={customer.status === 'ativo' ? 'green' : customer.status === 'inativo' ? 'gray' : 'red'} className="whitespace-nowrap scale-90 shrink-0 mt-0.5">
+                                            {customer.status === 'ativo' ? 'Ativo' : customer.status === 'inativo' ? 'Inativo' : 'Bloqueado'}
                                         </Badge>
                                     </h1>
 

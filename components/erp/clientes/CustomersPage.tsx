@@ -146,7 +146,7 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
                 return nameMatch || emailMatch || phoneMatch
             })
             .filter((c: any) => {
-                const statusLabel = c.status === 'Blocked' ? "Bloqueado" : (c.is_active !== false ? "Ativo" : "Inativo")
+                const statusLabel = c.status === 'bloqueado' ? "Bloqueado" : (c.status === 'inativo' ? "Inativo" : "Ativo")
 
                 let tabMatch = true
                 if (activeTab === "Ativo") tabMatch = statusLabel === "Ativo"
@@ -165,7 +165,7 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
                 orders: c.orders_count || 0,
                 totalOrderValue: c.total_spent || 0.00,
                 avgOrderValue: 0.00,
-                status: c.status || (c.is_active !== false ? 'Active' : 'Inactive'),
+                status: c.status || 'ativo',
                 lastOrderDate: c.last_order_at ? new Date(c.last_order_at).toLocaleDateString('pt-BR') : '-',
                 rawLastOrderDate: c.last_order_at ? new Date(c.last_order_at).getTime() : 0,
                 storeCredit: c.store_credit || 0,
@@ -281,6 +281,7 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
         return (
             <NewCustomerPage
                 partnerId={partnerId}
+                customerId={ui.selectedId || undefined}
                 onBack={() => setUi({ pageState: "list", selectedId: null })}
                 onSuccess={(msg) => {
                     toast({ title: "Sucesso", description: msg })
@@ -441,8 +442,8 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
                                                                 {c.id !== '-' ? c.id : "Cliente"}
                                                             </span>
                                                         </div>
-                                                        <Badge variant={c.status === 'Active' ? 'green' : c.status === 'Inactive' ? 'gray' : 'red'} className="flex-shrink-0 text-[10px] h-5 px-1.5">
-                                                            {c.status === 'Active' ? "Ativo" : c.status === 'Inactive' ? "Inativo" : "Bloqueado"}
+                                                        <Badge variant={c.status === 'ativo' ? 'green' : c.status === 'inativo' ? 'gray' : 'red'} className="flex-shrink-0 text-[10px] h-5 px-1.5">
+                                                            {c.status === 'ativo' ? "Ativo" : c.status === 'inativo' ? "Inativo" : "Bloqueado"}
                                                         </Badge>
                                                     </div>
                                                     <div className="flex justify-between items-center mt-1">
@@ -601,7 +602,7 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
                     className="text-brand-dark dark:text-dark-heading gap-2 font-bold px-3 hover:bg-gray-100 dark:hover:bg-dark-border"
                     onClick={() => setConfirmations((p) => ({ ...p, bulkInactive: true }))}
                 >
-                    {(rawCustomers || []).filter((c: any) => selection.ids.has(c.id)).every((c: any) => c.is_active === false) ? (
+                    {(rawCustomers || []).filter((c: any) => selection.ids.has(c.id)).every((c: any) => c.status === 'inativo') ? (
                         <>
                             <CheckCircleIcon size={16} className="text-brand-green" /> Ativar
                         </>

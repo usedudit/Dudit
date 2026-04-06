@@ -52,10 +52,10 @@ const CustomerGridCard = React.memo(
                   <span className="truncate">{customer.name}</span>
                 </h3>
                 <Badge
-                  variant={customer.status === 'Active' ? "green" : customer.status === 'Inactive' ? "gray" : "red"}
+                  variant={customer.status === 'ativo' ? "green" : customer.status === 'inativo' ? "gray" : "red"}
                   className="whitespace-nowrap scale-90 shrink-0"
                 >
-                  {customer.status === 'Active' ? "Ativo" : customer.status === 'Inactive' ? "Inativo" : "Bloqueado"}
+                  {customer.status === 'ativo' ? "Ativo" : customer.status === 'inativo' ? "Inativo" : "Bloqueado"}
                 </Badge>
               </div>
 

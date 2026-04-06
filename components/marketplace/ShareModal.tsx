@@ -96,7 +96,7 @@ export function ShareModal({
               />
               <Button
                 variant="outline"
-                className="shrink-0 h-[42px] w-[42px] p-0"
+                className="shrink-0 h-[42px] w-[42px] p-0 mb-1"
                 onClick={() => {
                   navigator.clipboard.writeText(url)
                   setIsLinkCopied(true)

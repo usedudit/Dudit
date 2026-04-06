@@ -268,7 +268,6 @@ export const BusinessDataSubPage = ({
                                         <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                                             {/* Identificação */}
                                             <div className="mb-8">
-                                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
                                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Identificação</h3>
                                                 <div className="grid grid-cols-12 gap-5">
                                                     <div className="col-span-12 md:col-span-6">
@@ -555,7 +554,7 @@ export const BusinessDataSubPage = ({
                     </Button>
                     <Button
                         onClick={handleSubmit}
-                        className="flex-[2] h-[48px]"
+                        className="flex-1 h-[48px]"
                         disabled={isLoading}
                         isLoading={isLoading}
                     >

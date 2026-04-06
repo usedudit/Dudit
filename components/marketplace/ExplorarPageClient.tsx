@@ -5,7 +5,8 @@ import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { ItemCard } from "./shared-components"
 import { Switch } from "@/components/reusable/Switch"
-import { IconPlaceholder, RadioButton, Dropdown, DropdownItem, Button } from "@/components/reusable"
+import { IconPlaceholder, RadioButton, Dropdown, DropdownItem, Button, FormDropdown } from "@/components/reusable"
+import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import Link from "next/link"
 import { getPartnerUrl } from "@/lib/utils/url-generator"
@@ -49,10 +50,10 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
       else if (currentType === 'servicos') limits = { servicos: 40 }
       else if (currentType === 'vitrines') limits = { vitrines: 40 }
 
-      const nextBatch = await searchMarketplace(query, currentType, { 
-        ...limits, 
-        cursor: pageParam?.cursor, 
-        lastId: pageParam?.lastId 
+      const nextBatch = await searchMarketplace(query, currentType, {
+        ...limits,
+        cursor: pageParam?.cursor,
+        lastId: pageParam?.lastId
       })
       return nextBatch || []
     },
@@ -144,8 +145,8 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
   const [promoOn, setPromoOn] = useState(false)
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [selectedRegions, setSelectedRegions] = useState<string[]>([])
-  const [minPrice, setMinPrice] = useState("")
-  const [maxPrice, setMaxPrice] = useState("")
+  const [minPrice, setMinPrice] = useState<number | string>("")
+  const [maxPrice, setMaxPrice] = useState<number | string>("")
 
   const { categories, regions } = useMemo(() => {
     return {
@@ -158,8 +159,8 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
     let filtered = [...dataToFilter]
     if (selectedCategories.length > 0) filtered = filtered.filter((p) => selectedCategories.includes(p.category))
     if (selectedRegions.length > 0) filtered = filtered.filter((p) => selectedRegions.includes(p.partners?.state))
-    if (minPrice) filtered = filtered.filter((p) => p.price && p.price >= Number.parseFloat(minPrice))
-    if (maxPrice) filtered = filtered.filter((p) => p.price && p.price <= Number.parseFloat(maxPrice))
+    if (minPrice) filtered = filtered.filter((p) => p.price && p.price >= Number(minPrice))
+    if (maxPrice) filtered = filtered.filter((p) => p.price && p.price <= Number(maxPrice))
     if (promoOn) filtered = filtered.filter((p) => p.originalPrice !== undefined)
 
     // Ordenação
@@ -265,13 +266,19 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
           <div className="mb-8 border-t border-brand-border pt-6">
             <h3 className="text-[15px] font-bold text-brand-dark mb-4">Faixa de preço</h3>
             <div className="flex gap-3 mb-3">
-              <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-brand-inactive-text">R$</span>
-                <input type="number" placeholder="Mínimo" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} className="w-full h-[40px] border border-brand-border rounded-[8px] pl-9 pr-2 text-[14px] outline-none focus:border-brand-green" />
+              <div className="flex-1">
+                <MoneyInput
+                  placeholder="Mínimo"
+                  value={minPrice}
+                  onChange={(val) => setMinPrice(val || "")}
+                />
               </div>
-              <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-brand-inactive-text">R$</span>
-                <input type="number" placeholder="Máximo" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} className="w-full h-[40px] border border-brand-border rounded-[8px] pl-9 pr-2 text-[14px] outline-none focus:border-brand-green" />
+              <div className="flex-1">
+                <MoneyInput
+                  placeholder="Máximo"
+                  value={maxPrice}
+                  onChange={(val) => setMaxPrice(val || "")}
+                />
               </div>
             </div>
           </div>
@@ -297,24 +304,22 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
         {/* TOP BAR - MOBILE ONLY */}
         <div className="lg:hidden bg-white border-b border-gray-100 z-30 sticky top-[60px]">
           <div className="container mx-auto px-4 h-[60px] flex items-center gap-3">
-            <Dropdown
-              className="flex-1"
-              trigger={
-                <div className="h-10 border border-brand-border rounded-[10px] px-4 flex items-center justify-between bg-white cursor-pointer hover:border-brand-green transition-colors">
-                  <span className="text-[14px] font-medium text-brand-dark truncate">{sortLabel}</span>
-                  <ChevronDown className="w-4 h-4 text-brand-inactive-text ml-2 shrink-0" />
-                </div>
-              }
-            >
-              <DropdownItem onClick={() => setSortBy("relevancia")}>Relevância</DropdownItem>
-              <DropdownItem onClick={() => setSortBy("preco_menor")}>Menor Preço</DropdownItem>
-              <DropdownItem onClick={() => setSortBy("preco_maior")}>Maior Preço</DropdownItem>
-              <DropdownItem onClick={() => setSortBy("recentes")}>Mais Recentes</DropdownItem>
-            </Dropdown>
+            <div className="flex-1 w-full max-w-[200px]">
+              <FormDropdown
+                value={sortBy}
+                setValue={(val) => setSortBy(val as any)}
+                options={[
+                  { value: "relevancia", label: "Relevância" },
+                  { value: "preco_menor", label: "Menor Preço" },
+                  { value: "preco_maior", label: "Maior Preço" },
+                  { value: "recentes", label: "Mais Recentes" }
+                ]}
+              />
+            </div>
 
-            <button
+            <Button
               onClick={() => setIsFilterSheetOpen(true)}
-              className="h-10 px-6 border border-brand-border rounded-[10px] flex items-center justify-center gap-2 bg-white hover:border-brand-green transition-colors"
+              className="h-10 px-6 flex items-center justify-center gap-2"
             >
               <span className="text-[14px] font-bold text-brand-dark">Filtrar</span>
               {activeFiltersCount > 0 && (
@@ -322,7 +327,7 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
                   {activeFiltersCount}
                 </div>
               )}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -342,20 +347,19 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
 
               {/* DESKTOP SORT */}
               <div className="hidden lg:block mt-4 lg:mt-0">
-                <Dropdown
-                  trigger={
-                    <div className="h-10 border border-brand-border rounded-[10px] px-6 flex items-center gap-4 bg-white cursor-pointer hover:border-brand-green transition-colors min-w-[200px]">
-                      <span className="text-[14px] font-medium text-brand-dark shrink-0">Ordenar por:</span>
-                      <span className="text-[14px] font-bold text-brand-dark truncate">{sortLabel}</span>
-                      <ChevronDown className="w-4 h-4 text-brand-inactive-text ml-auto" />
-                    </div>
-                  }
-                >
-                  <DropdownItem onClick={() => setSortBy("relevancia")}>Relevância</DropdownItem>
-                  <DropdownItem onClick={() => setSortBy("preco_menor")}>Menor Preço</DropdownItem>
-                  <DropdownItem onClick={() => setSortBy("preco_maior")}>Maior Preço</DropdownItem>
-                  <DropdownItem onClick={() => setSortBy("recentes")}>Mais Recentes</DropdownItem>
-                </Dropdown>
+                <div className="min-w-[200px]">
+                  <FormDropdown
+                    label="Ordenar por"
+                    value={sortBy}
+                    setValue={(val) => setSortBy(val as any)}
+                    options={[
+                      { value: "relevancia", label: "Relevância" },
+                      { value: "preco_menor", label: "Menor Preço" },
+                      { value: "preco_maior", label: "Maior Preço" },
+                      { value: "recentes", label: "Mais Recentes" }
+                    ]}
+                  />
+                </div>
               </div>
             </div>
 
@@ -475,7 +479,8 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
 
             <footer className="p-6 bg-white border-t border-gray-100 flex flex-col gap-4 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
               <Button onClick={() => setIsFilterSheetOpen(false)} variant="default" className="w-full h-12 text-sm rounded-[12px] font-bold bg-brand-green text-white">Ver resultados</Button>
-              <button
+              <Button
+                variant="outline"
                 onClick={() => {
                   setSelectedCategories([])
                   setSelectedRegions([])
@@ -483,10 +488,10 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
                   setMaxPrice("")
                   setPromoOn(false)
                 }}
-                className="w-full h-10 text-sm font-bold text-brand-inactive-text hover:text-brand-dark transition-colors"
+                className="w-full h-10"
               >
                 Limpar filtros
-              </button>
+              </Button>
             </footer>
           </motion.div>
         )}

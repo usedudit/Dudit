@@ -24,17 +24,18 @@ import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useNotification } from "@/hooks/use-notification"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
-import { createComprehensiveCustomerAction } from "@/app/actions/erp/customers"
+import { createComprehensiveCustomerAction, updateComprehensiveCustomerAction, getPartnerCustomersAction } from "@/app/actions/erp/customers"
 import { consultarCNPJ } from "@/lib/nuvem-fiscal"
 
 interface NewCustomerPageProps {
     onBack: () => void;
     partnerId: string;
+    customerId?: string;
     onSuccess?: (msg: string) => void;
     onError?: (msg: string) => void;
 }
 
-const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSuccess, onError }) => {
+const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customerId, onSuccess, onError }) => {
     const { success: notifySuccess, error: notifyError } = useNotification()
     const [activeTab, setActiveTab] = useState("general")
     const [isScrolled, setIsScrolled] = useState(false)
@@ -95,8 +96,53 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
 
     const { showConfirmDialog: unsavedChangesDialogOpen, confirmNavigation: handleUnsavedChangesConfirm, cancelNavigation: handleUnsavedChangesDialogClose } = useUnsavedChanges(isDirty)
 
-    const [showAlertModal, setShowAlertModal] = useState(false)
     const [nextAction, setNextAction] = useState<(() => void) | null>(null)
+    const [showAlertModal, setShowAlertModal] = useState(false)
+    const [isLoadingData, setIsLoadingData] = useState(false)
+
+    // Fetch customer data for editing
+    useEffect(() => {
+        if (customerId) {
+            const fetchData = async () => {
+                setIsLoadingData(true)
+                try {
+                    const res = await getPartnerCustomersAction(partnerId)
+                    if (res.customers) {
+                        const c = res.customers.find((x: any) => x.id === customerId)
+                        if (c) {
+                            setCustomerName(c.name || "")
+                            setPersonType(c.person_type === "pj" ? "Pessoa Jurídica" : "Pessoa Física")
+                            setFantasia(c.nome_fantasia || "")
+                            setCnpj(c.cnpj || "")
+                            setIe(c.inscricao_estadual || "")
+                            setCpf(c.cpf || "")
+                            // ... other fields
+                            setEmail(c.email || "")
+                            setMobile(c.phone || "")
+                            setStoreCredit(c.store_credit || 0)
+                            setStatus(c.status === "ativo" ? "Ativo" : c.status === "inativo" ? "Inativo" : "Bloqueado")
+                            setContribuinte(c.contribuinte || "9")
+                            
+                            // Address
+                            setCep(c.zip_code || "")
+                            setStreet(c.street || "")
+                            setNumber(c.number || "")
+                            setComplement(c.complement || "")
+                            setNeighborhood(c.neighborhood || "")
+                            setCity(c.city || "")
+                            setUf(c.state || "SP")
+                            setNoNumber(c.number === "S/N")
+                        }
+                    }
+                } catch (e) {
+                    console.error("Erro ao carregar dados para edição:", e)
+                } finally {
+                    setIsLoadingData(false)
+                }
+            }
+            fetchData()
+        }
+    }, [customerId, partnerId])
 
     const handleAttemptNav = useCallback((action: () => void) => {
         if (isDirty) { setNextAction(() => action); setShowAlertModal(true) }
@@ -155,8 +201,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
             setIsSaving(true)
             const pType = personType === "Pessoa Jurídica" ? "pj" : "pf"
             const token = await getCsrfToken()
-
-            const res = await createComprehensiveCustomerAction({
+            
+            const payload = {
                 partnerId,
                 name: customerName,
                 email: email,
@@ -176,8 +222,12 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                 state: uf,
                 csrf_token: token,
                 store_credit: storeCredit,
-                status: status === "Ativo" ? "Active" : status === "Inativo" ? "Inactive" : "Blocked"
-            })
+                status: status === "Ativo" ? "ativo" : status === "Inativo" ? "inativo" : "bloqueado"
+            }
+
+            const res = customerId 
+                ? await updateComprehensiveCustomerAction({ ...payload, customerId })
+                : await createComprehensiveCustomerAction(payload)
 
             if (res.error) {
                 notifyError("Erro ao salvar: " + res.error)
@@ -193,7 +243,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
         }
     }
 
-    const pageTitle = "Novo Cliente"
+    const pageTitle = customerId ? "Editar Cliente" : "Novo Cliente"
 
     return (
         <FadeIn>
@@ -294,17 +344,17 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                                                             <div className="flex gap-8">
                                                                 <RadioButton
                                                                     name="personType"
-                                                                    value="Pessoa Jurídica"
-                                                                    checked={personType === "Pessoa Jurídica"}
-                                                                    onChange={() => setPersonType("Pessoa Jurídica")}
-                                                                    label="Pessoa Jurídica"
-                                                                />
-                                                                <RadioButton
-                                                                    name="personType"
                                                                     value="Pessoa Física"
                                                                     checked={personType === "Pessoa Física"}
                                                                     onChange={() => setPersonType("Pessoa Física")}
                                                                     label="Pessoa Física"
+                                                                />
+                                                                <RadioButton
+                                                                    name="personType"
+                                                                    value="Pessoa Jurídica"
+                                                                    checked={personType === "Pessoa Jurídica"}
+                                                                    onChange={() => setPersonType("Pessoa Jurídica")}
+                                                                    label="Pessoa Jurídica"
                                                                 />
                                                             </div>
                                                         </div>

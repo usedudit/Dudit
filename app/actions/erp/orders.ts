@@ -146,23 +146,27 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         .select(`
             *,
             order_items(*),
-            stores(name),
-            customers:buyer_id (
-                id,
-                name,
-                email,
-                phone,
-                addresses (
-                    *
-                )
-            )
+            stores(name)
         `)
         .eq("id", orderId)
         .eq("partner_id", partnerId)
         .single()
 
     if (error) return { error: error.message }
-    return { success: true, data }
+    if (!data) return { error: "Pedido não encontrado" }
+
+    // Fetch customer data separately if buyer_id exists (no FK in schema)
+    let customers = null
+    if (data.buyer_id) {
+        const { data: customerData } = await supabase
+            .from("customers")
+            .select("id, name, email, phone, addresses(*)")
+            .eq("id", data.buyer_id)
+            .single()
+        customers = customerData
+    }
+
+    return { success: true, data: { ...data, customers } }
 }
 
 export async function updateERPOrderAction(orderId: string, data: {

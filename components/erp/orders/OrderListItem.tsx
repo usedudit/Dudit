@@ -75,16 +75,9 @@ const OrderListItem = React.memo(
 
         case "customer":
           return (
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[180px]">
-                {order.customer_name}
-              </span>
-              {order.customer_id && (
-                <Badge variant="gray" className="text-[10px] h-4 px-1">
-                  {order.customer_id}
-                </Badge>
-              )}
-            </div>
+            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[180px]">
+              {order.customer_name}
+            </span>
           )
 
         case "date":
