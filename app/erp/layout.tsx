@@ -1,5 +1,4 @@
 import type React from "react"
-import { Suspense } from "react"
 import type { Metadata } from "next"
 import { ERPSidebar } from "@/components/erp/ERPSidebar"
 import { ERPHeader } from "@/components/erp/ERPHeader"
@@ -17,7 +16,6 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic"
 
-import SkeletonLoader from "@/components/erp/skeleton-loader"
 import { ThemeProvider } from "@/components/theme-provider"
 import { StoreProvider } from "@/lib/store-context"
 import { PermissionProvider } from "@/lib/permission-context"
@@ -103,7 +101,7 @@ export default async function ERPLayout({
                 <ERPSidebar />
                 <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
                   <ERPHeader userProfile={userProfile} />
-                  <Suspense fallback={<SkeletonLoader />}>{children}</Suspense>
+                  {children}
                 </div>
               </div>
             </SidebarProvider>

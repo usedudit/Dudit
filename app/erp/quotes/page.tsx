@@ -1,4 +1,3 @@
-import { Suspense } from "react"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import QuotesPage from "@/components/erp/quotes/QuotesPage"
 import { getPartnerQuotesCached } from "@/lib/data/quotes"
@@ -6,7 +5,6 @@ import { checkPartnerPermission, getCurrentUser } from "@/lib/auth/authorization
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
-import QuotesLoading from "./loading"
 
 export const dynamic = "force-dynamic"
 
@@ -33,15 +31,13 @@ export default async function QuotesPageServer({ searchParams }: { searchParams:
         <>
             <ERPPageHeader title="Orçamentos" />
             <FadeIn className="p-4">
-                <Suspense fallback={<QuotesLoading />}>
-                    <QuotesPage
-                        quotes={quotes || []}
-                        totalQuotes={total}
-                        currentPage={page}
-                        limit={limit}
-                        partnerId={partnerId}
-                    />
-                </Suspense>
+                <QuotesPage
+                    quotes={quotes || []}
+                    totalQuotes={total}
+                    currentPage={page}
+                    limit={limit}
+                    partnerId={partnerId}
+                />
             </FadeIn>
         </>
     )

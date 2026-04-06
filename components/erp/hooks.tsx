@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
-import { useQueryClient, useQuery, UseQueryOptions, UseQueryResult } from "@tanstack/react-query"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { useQueryClient, useQuery, keepPreviousData, UseQueryOptions, UseQueryResult } from "@tanstack/react-query"
 
 export function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(false)
@@ -77,12 +77,73 @@ export function useERPData<TData = any, TError = Error>(
   return useQuery({
     queryKey,
     queryFn,
-    staleTime: isCritical ? 3000 : 15000, // Shorter stale time for critical data (3s) vs normal lists (15s)
-    refetchOnWindowFocus: true, // Silently refetches when user returns to app
+    staleTime: isCritical ? 3000 : 15000,
+    refetchOnWindowFocus: true,
     refetchOnReconnect: true,
-    // Critical data always triggers a background refetch on mount, while UI immediately shows cached data.
-    // Non-critical data trusts the default 'true' behavior (only refetches if stale).
     refetchOnMount: isCritical ? 'always' : true,
+    // Keep showing previous data during background refetch to avoid loading flash
+    placeholderData: keepPreviousData,
     ...restOptions
   })
 }
+
+// ─── PRODUCT BUCKET (instant client-side search) ────────────────────────────
+
+export interface ProductBucketItem {
+  id: string
+  name: string
+  sku: string
+  price: number
+  stock: number
+  image: string | null
+  has_variants: boolean
+}
+
+/**
+ * Hook that loads ALL partner products on first interaction and filters them
+ * instantly on the client. Eliminates the slow debounced server roundtrip.
+ * 
+ * Pattern: loads bucket on first focus → filters with useMemo → instant results
+ */
+export function useProductBucket(loadFn: () => Promise<ProductBucketItem[]>) {
+  const [bucket, setBucket] = useState<ProductBucketItem[]>([])
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+
+  const loadBucket = useCallback(async () => {
+    if (isLoaded || isLoading) return
+    setIsLoading(true)
+    try {
+      const data = await loadFn()
+      setBucket(data)
+      setIsLoaded(true)
+    } catch (err) {
+      console.error("[useProductBucket] Error loading bucket:", err)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [loadFn, isLoaded, isLoading])
+
+  const filteredResults = useMemo(() => {
+    if (!searchQuery.trim()) return []
+    const search = searchQuery.toLowerCase().trim()
+    return bucket
+      .filter(
+        (item) =>
+          item.name.toLowerCase().includes(search) ||
+          item.sku.toLowerCase().includes(search)
+      )
+      .slice(0, 12)
+  }, [bucket, searchQuery])
+
+  return {
+    searchQuery,
+    setSearchQuery,
+    filteredResults,
+    isLoading: isLoading && !isLoaded,
+    isLoaded,
+    loadBucket,
+  }
+}
+

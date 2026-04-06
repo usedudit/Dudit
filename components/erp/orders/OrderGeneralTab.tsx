@@ -40,7 +40,8 @@ interface OrderGeneralTabProps {
     // Handlers
     setSearchQuery: (val: string) => void
     setIsProductSearchOpen: (val: boolean) => void
-    handleSearchProduct: (term: string) => void
+    handleSearchProduct?: (term: string) => void  // deprecated, kept for compat
+    onSearchFocus?: () => void
     addProductToOrder: (product: any) => void
     updateItemField: (index: number, field: string, value: any) => void
     updateItemPrice: (index: number, price: number) => void
@@ -70,7 +71,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     items, searchQuery, isProductSearchOpen, isSearching, searchResults,
     subtotal, discountAmount, shippingFee, otherCosts, totalAmount,
     selectedCustomer, orderDate, salesChannel, deliveryMethod, paymentStatus, deliveryStatus, isSaving,
-    setSearchQuery, setIsProductSearchOpen, handleSearchProduct, addProductToOrder,
+    setSearchQuery, setIsProductSearchOpen, handleSearchProduct, onSearchFocus, addProductToOrder,
     updateItemField, updateItemPrice, updateItemQty, toggleItemEdit, removeItem, addBlankItem,
     setShippingFee, setOtherCosts, setSelectedCustomer, setIsCustomerSheetOpen,
     setOrderDate, setSalesChannel, setDeliveryMethod, setPaymentStatus, setDeliveryStatus, handleSaveOrder,
@@ -96,9 +97,13 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 onChange={(e: any) => {
                                     setSearchQuery(e.target.value);
                                     setIsProductSearchOpen(true);
-                                    handleSearchProduct(e.target.value);
+                                    // Legacy support: if handleSearchProduct is provided, call it
+                                    if (handleSearchProduct) handleSearchProduct(e.target.value);
                                 }}
-                                onFocus={() => setIsProductSearchOpen(true)}
+                                onFocus={() => {
+                                    setIsProductSearchOpen(true);
+                                    onSearchFocus?.();
+                                }}
                                 className="mb-0"
                             />
 

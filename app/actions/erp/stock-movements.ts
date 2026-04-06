@@ -114,9 +114,6 @@ export async function getStockMovementDetails(id: string) {
                 reason,
                 notes,
                 created_by,
-                user_profiles:created_by (
-                    full_name
-                ),
                 products (
                     name,
                     sku,
@@ -134,6 +131,17 @@ export async function getStockMovementDetails(id: string) {
         }
 
         if (!data) return errorResponse("Movimentação não encontrada")
+
+        // Resolve user name separately since there's no FK from stock_movements to user_profiles
+        let userName = 'Sistema'
+        if (data.created_by) {
+            const { data: profile } = await supabase
+                .from("user_profiles")
+                .select("full_name")
+                .eq("id", data.created_by)
+                .single()
+            userName = profile?.full_name || data.created_by
+        }
 
         let reason = data.reason || data.movement_type;
         if (!data.reason && data.reference_name) {
@@ -168,7 +176,7 @@ export async function getStockMovementDetails(id: string) {
             type: data.quantity > 0 ? 'in' : 'out',
             quantity: Math.abs(data.quantity),
             reason: reason,
-            user: data.user_profiles?.full_name || data.created_by || 'Sistema',
+            user: userName,
             notes: data.notes || '',
         });
 

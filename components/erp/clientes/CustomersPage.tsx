@@ -362,7 +362,7 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
                             <motion.div key="empty-results" className="w-full h-full flex items-center justify-center min-h-[500px]">
                                 <IconPlaceholder
                                     placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/clientes/naoencontrado.png"
+                                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
                                     imageAlt="Nenhum cliente encontrado"
                                     title="Nenhum cliente encontrado"
                                     subtitle="Tente ajustar seus filtros ou termos de busca."

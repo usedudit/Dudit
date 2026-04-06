@@ -9,7 +9,8 @@ import { useNotification } from "@/hooks/use-notification"
 import { createERPOrderAction, getOrderDetailsAction, updateERPOrderAction } from "@/app/actions/erp/orders"
 import SelectCustomerSheet from "../clientes/SelectCustomerSheet"
 import SelectVariantSheet from "../quotes/SelectVariantSheet"
-import { searchProductsForQuote } from "@/app/actions/erp/quotes"
+import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
+import { useProductBucket, type ProductBucketItem } from "../hooks"
 import { useRouter } from "next/navigation"
 import PaymentModal from "./PaymentModal"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
@@ -48,10 +49,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
     // items
     const [items, setItems] = useState<any[]>([])
-    const [searchQuery, setSearchQuery] = useState("")
+
+    // Instant product search (client-side bucket)
+    const productBucket = useProductBucket(fetchPartnerProductsBucket)
     const [isProductSearchOpen, setIsProductSearchOpen] = useState(false)
-    const [isSearching, setIsSearching] = useState(false)
-    const [searchResults, setSearchResults] = useState<any[]>([])
 
     // Financial
     const [shippingFee, setShippingFee] = useState("0")
@@ -160,22 +161,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         }
     }
 
-    const handleSearchProduct = async (term: string) => {
-        setSearchQuery(term)
-        if (term.length < 2) {
-            setSearchResults([])
-            return
-        }
-        setIsSearching(true)
-        try {
-            const results = await searchProductsForQuote(term)
-            setSearchResults(results)
-        } catch (error) {
-            console.error(error)
-        } finally {
-            setIsSearching(false)
-        }
-    }
+
 
     const addProductToOrder = (product: any) => {
         if (product.has_variants) {
@@ -193,8 +179,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 isEditing: false
             }
             setItems([...items, newItem])
-            setSearchQuery("")
-            setSearchResults([])
+            productBucket.setSearchQuery("")
         }
     }
 
@@ -220,8 +205,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             setItems([...items, ...newItems])
         }
         setIsVariantSheetOpen(false)
-        setSearchQuery("")
-        setSearchResults([])
+        productBucket.setSearchQuery("")
     }
 
     const updateItemField = (index: number, field: string, value: any) => {
@@ -451,10 +435,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     <TabsContent value="general" className="mt-0">
                         <OrderGeneralTab
                             items={items}
-                            searchQuery={searchQuery}
+                            searchQuery={productBucket.searchQuery}
                             isProductSearchOpen={isProductSearchOpen}
-                            isSearching={isSearching}
-                            searchResults={searchResults}
+                            isSearching={productBucket.isLoading}
+                            searchResults={productBucket.filteredResults}
                             subtotal={subtotal}
                             discountAmount={discountAmount}
                             shippingFee={shippingFee}
@@ -467,9 +451,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             paymentStatus={paymentStatus}
                             deliveryStatus={deliveryStatus}
                             isSaving={isSaving}
-                            setSearchQuery={setSearchQuery}
+                            setSearchQuery={productBucket.setSearchQuery}
                             setIsProductSearchOpen={setIsProductSearchOpen}
-                            handleSearchProduct={handleSearchProduct}
+                            onSearchFocus={productBucket.loadBucket}
                             addProductToOrder={addProductToOrder}
                             updateItemField={updateItemField}
                             updateItemPrice={updateItemPrice}

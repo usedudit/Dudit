@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } from 'react';
+import React, { useState, useCallback, useRef, useMemo, type FC } from 'react';
 import {
     ChevronLeftIcon,
     SaveIcon,
@@ -18,27 +18,20 @@ import {
     TabsList,
     TabsTrigger,
     TabsContent,
-    Badge,
     FormDropdown,
     AlertModal,
-    Separator,
     Spinner,
     IconPlaceholder
 } from '@/components/reusable';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
-import { searchProductsForMovement, createStockMovementAction } from '@/app/actions/erp/stock-movements';
+import { createStockMovementAction } from '@/app/actions/erp/stock-movements';
+import { fetchPartnerProductsBucket } from '@/app/actions/erp/client-loaders';
 import { useNotification } from '@/hooks/use-notification';
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
 
-interface ProductSearchResult {
-    id: string;
-    name: string;
-    sku: string;
-    stock: number;
-    image: string;
-}
+import { useProductBucket, type ProductBucketItem } from '../hooks'
 
 interface CreateStockMovementProps {
     onBack: () => void;
@@ -61,31 +54,16 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     const [quantity, setQuantity] = useState<number | ''>('');
     const [reason, setReason] = useState('Selecione um motivo...');
 
-    // Search State
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedProduct, setSelectedProduct] = useState<ProductSearchResult | null>(null);
-    const [searchResults, setSearchResults] = useState<ProductSearchResult[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
+    // Instant product search (client-side bucket)
+    const productBucket = useProductBucket(fetchPartnerProductsBucket);
+    const [selectedProduct, setSelectedProduct] = useState<ProductBucketItem | null>(null);
     const [isSaving, setIsSaving] = useState(false);
-
-    // Debounced search
-    useEffect(() => {
-        const timer = setTimeout(async () => {
-            if (searchQuery.trim().length >= 2 && !selectedProduct) {
-                setIsSearching(true);
-                const results = await searchProductsForMovement(searchQuery);
-                setSearchResults(results);
-                setIsSearching(false);
-            } else {
-                setSearchResults([]);
-            }
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [searchQuery, selectedProduct]);
 
     const isDirty = useMemo(() => {
         return (selectedProduct !== null) || (quantity !== '' && quantity !== 0) || (notes !== '') || (reason !== 'Selecione um motivo...');
     }, [selectedProduct, quantity, notes, reason]);
+
+    const showSearchDropdown = productBucket.searchQuery.length > 0 && !selectedProduct;
 
     const { showConfirmDialog: unsavedChangesDialogOpen, confirmNavigation: handleUnsavedChangesConfirm, cancelNavigation: handleUnsavedChangesDialogClose } = useUnsavedChanges(isDirty)
 
@@ -266,8 +244,9 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                         <Input
                                                                             type="text"
                                                                             placeholder="Buscar por nome ou SKU..."
-                                                                            value={searchQuery}
-                                                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                                                            value={productBucket.searchQuery}
+                                                                            onChange={(e) => productBucket.setSearchQuery(e.target.value)}
+                                                                            onFocus={productBucket.loadBucket}
                                                                             prefix={
                                                                                 <SearchIcon
                                                                                     size={18}
@@ -277,25 +256,25 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                         />
                                                                     </div>
 
-                                                                    {searchQuery.length > 0 && (
+                                                                    {showSearchDropdown && (
                                                                         <motion.div
                                                                             initial={{ opacity: 0, y: 5 }}
                                                                             animate={{ opacity: 1, y: 0 }}
                                                                             className="absolute z-50 top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl overflow-hidden max-h-72 overflow-y-auto"
                                                                         >
-                                                                            {isSearching ? (
+                                                                            {productBucket.isLoading ? (
                                                                                 <div className="p-8 text-center text-sm text-brand-inactive-text flex flex-col items-center gap-2">
                                                                                     <Spinner size={16} />
                                                                                     Carregando produtos...
                                                                                 </div>
-                                                                            ) : searchResults.length > 0 ? (
-                                                                                searchResults.map(product => (
+                                                                            ) : productBucket.filteredResults.length > 0 ? (
+                                                                                productBucket.filteredResults.map(product => (
                                                                                     <div
                                                                                         key={product.id}
                                                                                         className="flex items-center gap-4 p-3.5 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0 transition-colors"
                                                                                         onClick={() => {
                                                                                             setSelectedProduct(product);
-                                                                                            setSearchQuery('');
+                                                                                            productBucket.setSearchQuery('');
                                                                                         }}
                                                                                     >
                                                                                         <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden flex-shrink-0 border border-brand-border dark:border-dark-border">
@@ -333,7 +312,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                     </div>
                                                                     <button
                                                                         className="absolute top-1/2 -translate-y-1/2 right-4 p-2 text-brand-inactive-text hover:text-brand-red transition-all rounded-full"
-                                                                        onClick={() => { setSelectedProduct(null); setSearchQuery(''); }}
+                                                                        onClick={() => { setSelectedProduct(null); productBucket.setSearchQuery(''); }}
                                                                     >
                                                                         <PlusIcon size={18} className="rotate-45" />
                                                                     </button>
@@ -390,7 +369,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                             <motion.div key="Anexos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
                                                 <div className="p-6 border-b border-brand-border dark:border-dark-border flex justify-between items-center bg-gray-50/50 dark:bg-dark-surface">
                                                     <h3 className="font-bold text-brand-dark dark:text-dark-heading">Gerenciar Anexos</h3>
-                                                    <Button variant="outline" className="h-9 text-xs font-bold">
+                                                    <Button variant="outline" className="h-9">
                                                         <PlusIcon size={14} className="mr-2" />
                                                         Adicionar Arquivo
                                                     </Button>
@@ -471,14 +450,14 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                             variant="outline"
                             onClick={handleBack}
                             disabled={isSaving}
-                            className="flex-1 h-[48px] font-bold"
+                            className="flex-1 h-[48px]"
                         >
                             Cancelar
                         </Button>
                         <Button
                             onClick={handleSave}
                             disabled={isSaving}
-                            className={`flex-1 h-[48px] font-bold ${type === 'in' ? 'bg-brand-green hover:bg-brand-green/90' : 'bg-brand-red hover:bg-red-600'}`}
+                            className={`flex-1 h-[48px] ${type === 'in' ? 'bg-brand-green hover:bg-brand-green/90' : 'bg-brand-red hover:bg-brand-red/90'}`}
                         >
                             <SaveIcon className="w-4 h-4 mr-2" />
                             {isSaving ? "Salvando..." : "Salvar"}

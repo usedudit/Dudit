@@ -1,11 +1,9 @@
-import { Suspense } from "react"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import ProductsPage from "@/components/erp/product/ProductsPage"
 import { getERPProductsPageData } from "@/app/actions/erp/products"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { AccessDenied } from "@/components/erp/access-denied"
-import ProductsLoading from "./loading"
 
 export const dynamic = "force-dynamic"
 
@@ -21,13 +19,11 @@ export default async function ProductsPageServer() {
         <>
             <ERPPageHeader title="Produtos" />
             <FadeIn className="p-4">
-                <Suspense fallback={<ProductsLoading />}>
-                    <ProductsPage
-                        products={data.products}
-                        partnerId={partnerId}
-                        suppliers={[]}
-                    />
-                </Suspense>
+                <ProductsPage
+                    products={data.products}
+                    partnerId={partnerId}
+                    suppliers={[]}
+                />
             </FadeIn>
         </>
     )

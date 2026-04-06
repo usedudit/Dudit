@@ -215,7 +215,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
         }
 
         return sortedResult
-    }, [rawOrders, debouncedSearch, activeTab, filters, sortConfig])
+    }, [effectiveOrders, debouncedSearch, activeTab, filters, sortConfig])
 
     const totalPages = Math.ceil(filteredOrders.length / itemsPerPage)
     const paginated = filteredOrders.slice((page - 1) * itemsPerPage, page * itemsPerPage)

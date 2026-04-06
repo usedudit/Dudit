@@ -1,4 +1,3 @@
-import { Suspense } from "react"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import StockMovementPageContent from "@/components/erp/stock-movements/StockMovementPage"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -7,7 +6,6 @@ import { getStockMovementsCached } from "@/lib/data/stock-movements"
 import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { AccessDenied } from "@/components/erp/access-denied"
-import StockMovementsLoading from "./loading"
 
 export default async function StockMovementsPage() {
   const user = await getCurrentUser()
@@ -25,12 +23,10 @@ export default async function StockMovementsPage() {
     <>
       <ERPPageHeader title="Movimentação de Estoque" />
       <FadeIn className="p-4">
-        <Suspense fallback={<StockMovementsLoading />}>
-          <StockMovementPageContent
-            partnerId={partner.id}
-            movements={movements || []}
-          />
-        </Suspense>
+        <StockMovementPageContent
+          partnerId={partner.id}
+          movements={movements || []}
+        />
       </FadeIn>
     </>
   )
