@@ -10,21 +10,26 @@ import { fetchERPCustomersClient } from "@/app/actions/erp/client-loaders"
 import { useQueryClient } from "@tanstack/react-query"
 
 // Components
-import { Button, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
+import { Button, IconPlaceholder, ThreeDotsLoader, Checkbox, Badge, AlertModal } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
+import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import CustomerListItem from "./CustomerListItem"
 import CustomerGridCard from "./CustomerGridCard"
 import CustomerPageControls from "./CustomerPageControls"
 import CustomerDetailPage from "./CustomerDetailPage"
 import NewCustomerPage from "./NewCustomerPage"
+import { deleteCustomersInBatchAction, toggleCustomersStatusAction } from "@/app/actions/erp/customers"
 
 // Icons
 import {
     PlusIcon,
     ExportFileIcon,
     Users,
-    ArrowUpDownIcon
+    ArrowUpDownIcon,
+    TrashIcon,
+    BlockedIcon,
+    CheckCircleIcon
 } from "@/lib/icons"
 
 // --- TYPES & INTERFACES ---
@@ -67,7 +72,7 @@ const COLUMNS = [
     { id: "actions", label: "Ações", align: "center" as const, width: "80px" },
 ]
 
-export default function CustomersPage({ partnerId }: { partnerId: string }) {
+export default function CustomersPage({ partnerId, initialCustomers = [] }: { partnerId: string; initialCustomers?: any[] }) {
     const { toast } = useToast()
     const { selectedStore, isLoading: storeLoading } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
@@ -86,12 +91,15 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
         selectedId: null
     })
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
+    const [confirmations, setConfirmations] = useState({ bulkDelete: false, bulkInactive: false })
+    const [isProcessingBulk, setIsProcessingBulk] = useState(false)
 
     const queryClient = useQueryClient()
 
     const { data: rawCustomers, isLoading: isQueryLoading, isError: customersError } = useERPData(
         ['erp', 'customers', partnerId, selectedStore?.id || 'all'],
-        () => fetchERPCustomersClient(selectedStore?.id || null)
+        () => fetchERPCustomersClient(selectedStore?.id || null),
+        { initialData: initialCustomers.length > 0 ? initialCustomers : undefined }
     )
 
     const isLoading = storeLoading || (isQueryLoading && !rawCustomers)
@@ -240,6 +248,35 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
         setActiveTab("Todos")
     }
 
+    const confirmBulk = async (action: "delete" | "inactive") => {
+        const ids = Array.from(selection.ids)
+        if (ids.length === 0) return
+
+        setIsProcessingBulk(true)
+        if (action === "delete") {
+            const result = await deleteCustomersInBatchAction(ids)
+            if (result.success) {
+                queryClient.invalidateQueries({ queryKey: ['erp', 'customers', partnerId, selectedStore?.id || 'all'] })
+                toast({ title: "Excluído com sucesso" })
+            } else {
+                toast({ title: "Erro", description: result.error, variant: "destructive" })
+            }
+            setConfirmations(p => ({ ...p, bulkDelete: false }))
+        } else {
+            const allInactive = (rawCustomers || []).filter((c: any) => selection.ids.has(c.id)).every((c: any) => c.is_active === false)
+            const result = await toggleCustomersStatusAction(ids, allInactive)
+            if (result.success) {
+                queryClient.invalidateQueries({ queryKey: ['erp', 'customers', partnerId, selectedStore?.id || 'all'] })
+                toast({ title: "Status atualizado" })
+            } else {
+                toast({ title: "Erro", description: result.error, variant: "destructive" })
+            }
+            setConfirmations(p => ({ ...p, bulkInactive: false }))
+        }
+        setIsProcessingBulk(false)
+        setSelection(p => ({ ...p, ids: new Set() }))
+    }
+
     if (ui.pageState === "form") {
         return (
             <NewCustomerPage
@@ -382,7 +419,50 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
                                 transition={{ duration: 0.2 }}
                                 className="w-full"
                             >
-                                {viewMode === "grid" ? (
+                                {isMobile ? (
+                                    <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
+                                        {paginated.map((c: Customer) => (
+                                            <div
+                                                key={c.originalId}
+                                                className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex items-center gap-4"
+                                                onClick={() => handleDetailsCustomer(c)}
+                                            >
+                                                <div className="w-14 h-14 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden bg-brand-slate dark:bg-dark-border">
+                                                    <img src={c.avatar} alt={c.name} className="w-full h-full object-cover" />
+                                                </div>
+
+                                                <div className="flex-1 min-w-0 flex flex-col gap-1">
+                                                    <div className="flex justify-between items-start">
+                                                        <div className="flex flex-col min-w-0 pr-1">
+                                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                {c.name}
+                                                            </h3>
+                                                            <span className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
+                                                                {c.id !== '-' ? c.id : "Cliente"}
+                                                            </span>
+                                                        </div>
+                                                        <Badge variant={c.status === 'Active' ? 'green' : c.status === 'Inactive' ? 'gray' : 'red'} className="flex-shrink-0 text-[10px] h-5 px-1.5">
+                                                            {c.status === 'Active' ? "Ativo" : c.status === 'Inactive' ? "Inativo" : "Bloqueado"}
+                                                        </Badge>
+                                                    </div>
+                                                    <div className="flex justify-between items-center mt-1">
+                                                        <span className="text-[14px] font-bold text-brand-primary">
+                                                            {c.totalOrderValue ? `R$ ${c.totalOrderValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
+                                                        </span>
+                                                        <div className="flex items-center gap-4">
+                                                            <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                {c.orders} pedido{c.orders !== 1 && 's'}
+                                                            </span>
+                                                            <div onClick={(e) => { e.stopPropagation(); handleSelectRow(c.originalId); }}>
+                                                                <Checkbox checked={selection.ids.has(c.originalId)} onChange={() => handleSelectRow(c.originalId)} />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : viewMode === "grid" ? (
                                     <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                         {paginated.map((c: Customer) => (
                                             <CustomerGridCard
@@ -491,6 +571,55 @@ export default function CustomersPage({ partnerId }: { partnerId: string }) {
                 setFilters={setFilters as any}
                 onClear={() => setFilters(INITIAL_FILTERS)}
             />
+
+            <AlertModal
+                isOpen={confirmations.bulkDelete}
+                onClose={() => setConfirmations((p) => ({ ...p, bulkDelete: false }))}
+                title="Excluir clientes"
+                description={`Tem certeza que deseja excluir ${selection.ids.size} cliente(s)? Esta ação não pode ser desfeita e removerá os clientes do banco de dados.`}
+                confirmText="Sim, excluir"
+                variant="danger"
+                onConfirm={() => confirmBulk("delete")}
+                isLoading={isProcessingBulk}
+            />
+
+            <AlertModal
+                isOpen={confirmations.bulkInactive}
+                onClose={() => setConfirmations((p) => ({ ...p, bulkInactive: false }))}
+                title="Alterar status"
+                description={`Tem certeza que deseja alterar o status de ${selection.ids.size} cliente(s)?`}
+                confirmText="Confirmar"
+                variant="info"
+                onConfirm={() => confirmBulk("inactive")}
+                isLoading={isProcessingBulk}
+            />
+
+            <FloatingActionBar selectedCount={selection.ids.size} onClearSelection={() => setSelection((p) => ({ ...p, ids: new Set() }))}>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-brand-dark dark:text-dark-heading gap-2 font-bold px-3 hover:bg-gray-100 dark:hover:bg-dark-border"
+                    onClick={() => setConfirmations((p) => ({ ...p, bulkInactive: true }))}
+                >
+                    {(rawCustomers || []).filter((c: any) => selection.ids.has(c.id)).every((c: any) => c.is_active === false) ? (
+                        <>
+                            <CheckCircleIcon size={16} className="text-brand-green" /> Ativar
+                        </>
+                    ) : (
+                        <>
+                            <BlockedIcon size={16} className="text-brand-inactive-text" /> Desativar
+                        </>
+                    )}
+                </Button>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-brand-red gap-2 font-bold px-3 hover:bg-red-50 hover:text-brand-red dark:hover:bg-red-900/20"
+                    onClick={() => setConfirmations((p) => ({ ...p, bulkDelete: true }))}
+                >
+                    <TrashIcon size={16} /> Excluir
+                </Button>
+            </FloatingActionBar>
         </motion.div>
     )
 }

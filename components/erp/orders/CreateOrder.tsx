@@ -10,7 +10,7 @@ import { createERPOrderAction, getOrderDetailsAction, updateERPOrderAction } fro
 import SelectCustomerSheet from "../clientes/SelectCustomerSheet"
 import SelectVariantSheet from "../quotes/SelectVariantSheet"
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
-import { useProductBucket, type ProductBucketItem } from "../hooks"
+import { useProductBucket } from "../hooks"
 import { useRouter } from "next/navigation"
 import PaymentModal from "./PaymentModal"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
@@ -116,7 +116,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setOtherCosts((order.additional_costs || 0).toString())
                 setDiscountValue(order.discount_value || 0)
                 setDiscountType(order.discount_type || "fixed")
-                
+
                 if (order.order_items) {
                     setItems(order.order_items.map((item: any) => ({
                         id: item.id || Math.random().toString(36).substr(2, 9),
@@ -125,7 +125,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         unitPrice: Number(item.product_price),
                         quantity: Number(item.quantity),
                         image: item.image || item.product?.image || null,
-                        sku: item.sku || item.product?.sku || "", 
+                        sku: item.sku || item.product?.sku || "",
                         isEditing: false
                     })))
                 }
@@ -550,6 +550,26 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     />
                 )}
             </AnimatePresence>
+
+            {/* Mobile Bottom Action Bar */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
+                <Button
+                    variant="outline"
+                    onClick={handleBack}
+                    disabled={isSaving}
+                    className="flex-1"
+                >
+                    Cancelar
+                </Button>
+                <Button
+                    onClick={handleSaveOrder}
+                    disabled={isSaving}
+                    className="flex-1"
+                >
+                    <SaveIcon className="w-4 h-4 mr-2" />
+                    {isSaving ? "Salvando..." : "Salvar"}
+                </Button>
+            </div>
         </Tabs>
     )
 }

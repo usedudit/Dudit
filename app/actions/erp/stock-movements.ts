@@ -8,6 +8,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
+import { revalidateStockMovements } from "@/lib/utils/revalidation"
 
 export async function searchProductsForMovement(query: string) {
     if (!query || query.trim().length < 2) return []
@@ -83,6 +84,7 @@ export async function createStockMovementAction(data: {
             return errorResponse(error.message)
         }
 
+        revalidateStockMovements(partnerId)
         revalidatePath('/erp/stock-movements')
         revalidatePath('/erp/products')
         await invalidateProductCache(data.productId, partnerId, 'update', { silent: true })
@@ -206,6 +208,7 @@ export async function deleteStockMovementAction(id: string) {
             return errorResponse(error.message)
         }
 
+        revalidateStockMovements(ctx.partnerId)
         revalidatePath('/erp/stock-movements')
         revalidatePath('/erp/products')
 
@@ -263,6 +266,7 @@ export async function undoStockMovementAction(id: string, customReason?: string)
             return errorResponse(error.message)
         }
 
+        revalidateStockMovements(partnerId)
         revalidatePath('/erp/stock-movements')
         revalidatePath('/erp/products')
 

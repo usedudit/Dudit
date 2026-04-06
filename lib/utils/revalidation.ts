@@ -61,6 +61,16 @@ export async function revalidateQuotes(partnerId: string) {
 }
 
 /**
+ * Revalida dados de CLIENTES
+ */
+export async function revalidateCustomers(partnerId: string) {
+  if (partnerId) {
+    safeRevalidateTag(TAGS.customers(partnerId))
+  }
+  safeRevalidateTag("customers")
+}
+
+/**
  * Revalida dados de MARKETPLACE e CATEGORIAS
  */
 export async function revalidateMarketplace() {
@@ -76,6 +86,16 @@ export async function revalidateSuppliers(partnerId: string) {
     safeRevalidateTag(TAGS.suppliers(partnerId))
   }
   safeRevalidateTag("suppliers")
+}
+
+/**
+ * Revalida dados de MOVIMENTAÇÕES DE ESTOQUE
+ */
+export async function revalidateStockMovements(partnerId: string) {
+  if (partnerId) {
+    safeRevalidateTag(TAGS.stockMovements(partnerId))
+  }
+  safeRevalidateTag("stock-movements")
 }
 
 /**

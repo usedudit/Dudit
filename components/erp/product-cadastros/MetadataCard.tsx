@@ -38,7 +38,7 @@ const MetadataCard = React.memo(({ item, type, categories, onEdit, onDelete }: M
                     {/* Title + Status */}
                     <div className="flex justify-between items-start gap-1">
                         <div className="flex items-center gap-2 min-w-0 pr-1">
-                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                            <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading leading-tight truncate pr-1 flex items-center gap-1.5">
                                 {item.name}
                             </h3>
                             <Badge
@@ -51,7 +51,7 @@ const MetadataCard = React.memo(({ item, type, categories, onEdit, onDelete }: M
                     </div>
 
                     {/* Subtitle / Details */}
-                    <div className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate mt-1">
+                    <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mt-1">
                         {type === "categories" && "Categoria Principal"}
                         {type === "subcategories" && (
                             <span className="flex items-center gap-1">

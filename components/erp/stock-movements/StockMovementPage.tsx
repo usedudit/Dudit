@@ -362,7 +362,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                                 className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none"
                                                 onClick={() => handleViewDetails(mov.id)}
                                             >
-                                                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/20 flex-shrink-0 overflow-hidden border border-brand-border dark:border-dark-border">
+                                                <div className="w-20 h-20 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border flex-shrink-0 overflow-hidden">
                                                     <img src={mov.product.image} alt="" className="w-full h-full object-cover rounded-full" />
                                                 </div>
 
@@ -373,12 +373,12 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                                             {mov.type === 'in' ? 'Entrada' : 'Saída'}
                                                         </Badge>
                                                     </div>
-                                                    <div className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">{mov.product.sku}</div>
-                                                    <div className="flex items-center gap-2 text-[14px]">
+                                                    <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mb-2">{mov.product.sku}</div>
+                                                    <div className="flex items-center gap-2 text-md">
                                                         <span className={`font-bold ${mov.type === 'in' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                                             {mov.type === 'in' ? '+' : '-'}{mov.quantity}
                                                         </span>
-                                                        <ArrowRightIcon className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600" />
+                                                        <ArrowRightIcon className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body" />
                                                         <span className="font-bold text-brand-dark dark:text-dark-heading">
                                                             {mov.product.currentStock}
                                                         </span>

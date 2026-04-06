@@ -469,8 +469,8 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                                 <QuoteSkeleton count={5} viewMode={viewMode} />
                             </motion.div>
                         ) : !hasQuotes ? (
-                            <motion.div 
-                                key="empty-no-data" 
+                            <motion.div
+                                key="empty-no-data"
                                 initial={{ opacity: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
@@ -486,8 +486,8 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                                 />
                             </motion.div>
                         ) : paginated.length === 0 ? (
-                            <motion.div 
-                                key="empty-results" 
+                            <motion.div
+                                key="empty-results"
                                 initial={{ opacity: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
@@ -524,18 +524,14 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                                                     className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex items-center gap-4"
                                                     onClick={() => handleViewQuote(q)}
                                                 >
-                                                    <div className="w-14 h-14 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border flex-shrink-0 flex items-center justify-center">
-                                                        <FileIcon className="w-6 h-6 text-brand-dark dark:text-dark-heading" />
-                                                    </div>
-
                                                     <div className="flex-1 min-w-0 flex flex-col gap-1">
                                                         <div className="flex justify-between items-start">
                                                             <div className="flex flex-col min-w-0 pr-1">
                                                                 <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
                                                                     {q.displayId}
                                                                 </h3>
-                                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                                                    {q.customer_name}
+                                                                <span className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
+                                                                    {q.customer_name} • {q.formattedIssueDate}
                                                                 </span>
                                                             </div>
                                                             <Badge variant={q.statusColor} className="flex-shrink-0 text-[10px] h-5 px-1.5">
@@ -547,9 +543,6 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                                                                 R$ {q.total_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                                             </span>
                                                             <div className="flex items-center gap-4">
-                                                                <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                    {q.formattedIssueDate}
-                                                                </span>
                                                                 <div onClick={(e) => { e.stopPropagation(); handleSelectRow(q.originalId); }}>
                                                                     <Checkbox checked={selection.ids.has(q.originalId)} />
                                                                 </div>

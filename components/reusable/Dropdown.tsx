@@ -231,7 +231,7 @@ export const DropdownItem: React.FC<DropdownItemProps> = ({ children, onClick, c
     <button
       type="button"
       onClick={handleClick}
-      className={`flex items-center gap-3 w-full text-left px-3 py-2 text-sm text-brand-dark dark:text-dark-heading hover:bg-gray-100 dark:hover:bg-dark-border rounded-md transition-colors duration-150 ${className}`}
+      className={`flex items-center gap-3 w-full text-left px-3 py-2 text-md lg:text-sm text-brand-dark dark:text-dark-heading hover:bg-gray-100 dark:hover:bg-dark-border rounded-md transition-colors duration-150 ${className}`}
       role="menuitem"
     >
       {children}

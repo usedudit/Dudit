@@ -2,6 +2,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { revalidatePath } from "next/cache"
+import { revalidateCustomers } from "@/lib/utils/revalidation"
 import { redirect } from "next/navigation"
 import { requireUser, requirePartnerAccessWithPermission, requireCustomerOwnership } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -31,6 +32,7 @@ export async function createComprehensiveCustomerAction(data: {
   state: string
   municipioCodigoIbge?: string | null
   store_credit?: number
+  status?: string
   csrf_token?: string
 }) {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -59,7 +61,7 @@ export async function createComprehensiveCustomerAction(data: {
     email: data.email || null,
     phone: data.phone || null,
     person_type: data.personType,
-    cpf: data.cpf ? data.cpf.replace(/\D/g, "") : null,
+    cpf: data.cpf ? await (await import("@/lib/crypto")).encryptCPF(data.cpf.replace(/\D/g, "")) : null,
     contribuinte: data.contribuinte || null,
     cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
     nome_fantasia: data.nomeFantasia || null,
@@ -67,6 +69,8 @@ export async function createComprehensiveCustomerAction(data: {
     regime_tributario: data.regimeTributario || null,
     contribuinte_icms: data.contribuinteIcms || null,
     store_credit: data.store_credit ?? 0,
+    status: data.status || "Active",
+    is_active: data.status ? data.status === "Active" : true,
   }).select().single()
 
   if (error) {
@@ -92,6 +96,7 @@ export async function createComprehensiveCustomerAction(data: {
     })
   }
 
+  revalidateCustomers(data.partnerId)
   revalidatePath("/erp/customers")
   return { success: true }
 }
@@ -133,6 +138,7 @@ export async function createCustomerAction(data: {
     return { error: error.message }
   }
 
+  revalidateCustomers(data.partnerId)
   revalidatePath("/erp/customers")
 
   redirect("/erp/customers")
@@ -179,6 +185,7 @@ export async function updateCustomerAction(
     return { error: error.message }
   }
 
+  revalidateCustomers("")
   revalidatePath("/erp/customers")
 
   redirect("/erp/customers")
@@ -205,6 +212,7 @@ export async function deleteCustomerAction(customerId: string, csrf_token?: stri
     return { error: error.message }
   }
 
+  revalidateCustomers("")
   revalidatePath("/erp/customers")
 
   redirect("/erp/customers")
@@ -234,6 +242,7 @@ export async function updateComprehensiveCustomerAction(data: {
   state: string
   municipioCodigoIbge?: string | null
   store_credit?: number
+  status?: string
   csrf_token?: string
 }) {
   // Validate CSRF token
@@ -263,7 +272,7 @@ export async function updateComprehensiveCustomerAction(data: {
         .filter(Boolean)
         .join(", "),
       person_type: data.personType,
-      cpf: data.cpf ? data.cpf.replace(/\D/g, "") : null,
+      cpf: data.cpf ? await (await import("@/lib/crypto")).encryptCPF(data.cpf.replace(/\D/g, "")) : null,
       contribuinte: data.contribuinte || null,
       cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
       nome_fantasia: data.nomeFantasia || null,
@@ -280,6 +289,8 @@ export async function updateComprehensiveCustomerAction(data: {
       state: data.state || null,
       municipio_codigo_ibge: data.municipioCodigoIbge || null,
       store_credit: data.store_credit,
+      status: data.status || "Active",
+      is_active: data.status ? data.status === "Active" : true,
     })
     .eq("id", data.customerId)
     .eq("partner_id", data.partnerId) // Defense in depth
@@ -288,6 +299,7 @@ export async function updateComprehensiveCustomerAction(data: {
     return { error: error.message }
   }
 
+  revalidateCustomers(data.partnerId)
   revalidatePath("/erp/customers")
   return { success: true }
 }
@@ -359,6 +371,17 @@ export async function getPartnerCustomersAction(partnerId: string, currentStoreI
 
     let result = customers || []
 
+    const { decryptCPF } = await import("@/lib/crypto")
+    for (const c of result) {
+      if (c.cpf && c.cpf.startsWith("v")) {
+        try {
+          c.cpf = await decryptCPF(c.cpf)
+        } catch (e) {
+          // Ignore if decryption fails
+        }
+      }
+    }
+
     // Prioritize: current store customers first, then others
     if (currentStoreId) {
       result = [...result].sort((a: any, b: any) => {
@@ -373,4 +396,42 @@ export async function getPartnerCustomersAction(partnerId: string, currentStoreI
     console.error("[getPartnerCustomersAction] Error:", err)
     return { error: err.message || "Erro interno ao buscar clientes" }
   }
+}
+
+export async function deleteCustomersInBatchAction(customerIds: string[]) {
+  const user = await requireUser()
+  if (!user) return { error: "Não autenticado" }
+
+  const supabase = await getSupabaseServerClient()
+
+  const { error } = await supabase
+    .from("customers")
+    .delete()
+    .in("id", customerIds)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  revalidatePath("/erp/customers")
+  return { success: true }
+}
+
+export async function toggleCustomersStatusAction(customerIds: string[], isActive: boolean) {
+  const user = await requireUser()
+  if (!user) return { error: "Não autenticado" }
+
+  const supabase = await getSupabaseServerClient()
+
+  const { error } = await supabase
+    .from("customers")
+    .update({ is_active: isActive, status: isActive ? "Active" : "Inactive" })
+    .in("id", customerIds)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  revalidatePath("/erp/customers")
+  return { success: true }
 }

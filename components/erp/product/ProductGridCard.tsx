@@ -79,7 +79,7 @@ const ProductGridCard = React.memo(
                 </h3>
                 <Badge
                   variant={product.is_active ? "green" : "red"}
-                  className="text-[9px] h-4 px-1 py-3 flex-shrink-0"
+                  className="whitespace-nowrap scale-90"
                 >
                   {product.is_active ? "Ativo" : "Inativo"}
                 </Badge>
@@ -124,7 +124,7 @@ const ProductGridCard = React.memo(
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-0.5">
               <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Visibilidade</span>
-              <Badge variant={product.show_in_marketplace ? "green" : "gray"} className="h-4 text-[9px] px-1 py-3">
+              <Badge variant={product.show_in_marketplace ? "green" : "gray"} className="whitespace-nowrap scale-90">
                 {product.show_in_marketplace ? "Visível" : "Oculto"}
               </Badge>
             </div>
@@ -144,7 +144,7 @@ const ProductGridCard = React.memo(
               <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Estoque</span>
               <div className="flex items-center gap-2.5">
                 <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{stock}</span>
-                <Badge variant={status.variant} className="h-4 text-[9px] px-1 py-3">
+                <Badge variant={status.variant} className="whitespace-nowrap scale-90">
                   {status.label}
                 </Badge>
               </div>

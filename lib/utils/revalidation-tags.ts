@@ -10,6 +10,7 @@ export const TAGS = {
   customers: (partnerId?: string) => partnerId ? `partner-${partnerId}-customers` : 'customers',
   suppliers: (partnerId?: string) => partnerId ? `partner-${partnerId}-suppliers` : 'suppliers',
   quotes: (partnerId?: string) => partnerId ? `partner-${partnerId}-quotes` : 'quotes',
+  stockMovements: (partnerId?: string) => partnerId ? `partner-${partnerId}-stock-movements` : 'stock-movements',
   marketplace: 'marketplace',
   categories: 'marketplace-categories',
 

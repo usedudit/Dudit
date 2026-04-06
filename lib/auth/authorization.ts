@@ -108,10 +108,10 @@ export async function requirePartner(resolvedUser?: User | any): Promise<{ id: s
  * Check if a user has access to a partner via partner_users OR as the legacy owner.
  * Returns the access record if found, or null if no access.
  */
-async function checkPartnerAccess(
+const checkPartnerAccess = cache(async (
   partnerId: string,
   userId: string
-): Promise<{ role: string; permissions: any } | null> {
+): Promise<{ role: string; permissions: any } | null> => {
   const admin = getAdminClient()
 
   // 1. Check partner_users first (invited users + owners who have records)
@@ -149,7 +149,7 @@ async function checkPartnerAccess(
   }
 
   return null
-}
+})
 
 // ─── Soft Ownership Verification (backward-compatible) ──────────────────────
 // These return boolean. PREFER the require*() variants in new code.
@@ -478,15 +478,24 @@ export async function requirePartnerAccessWithPermission(
  * Checks if the partner has a specific business capability based on their business_info.
  * Returns boolean indicating whether they possess the required capability.
  */
-export async function hasBusinessCapability(
+export const hasBusinessCapability = cache(async (
   partnerId: string,
   capability: "products" | "services" | "online" | "pdv"
-): Promise<boolean> {
-  const admin = getAdminClient()
-  const { data: partner } = await admin.from("partners").select("business_info").eq("id", partnerId).single()
-  const info = typeof partner?.business_info === "string" 
-    ? JSON.parse(partner.business_info) 
-    : (partner?.business_info || { sells: ["products"], channels: ["online"] })
+): Promise<boolean> => {
+  // Try to get business_info from cached partner context first (avoids extra DB query)
+  const { getCurrentPartnerContext: getCtx } = await import("@/lib/auth/partner-context")
+  const ctx = await getCtx()
+  let info: any = null
+
+  if (ctx && ctx.partnerId === partnerId && ctx.businessInfo) {
+    info = ctx.businessInfo
+  } else {
+    const admin = getAdminClient()
+    const { data: partner } = await admin.from("partners").select("business_info").eq("id", partnerId).single()
+    info = typeof partner?.business_info === "string" 
+      ? JSON.parse(partner.business_info) 
+      : (partner?.business_info || { sells: ["products"], channels: ["online"] })
+  }
 
   const sells = info.sells || []
   const channels = info.channels || []
@@ -497,7 +506,7 @@ export async function hasBusinessCapability(
   if (capability === "pdv" && !channels.includes("pdv")) return false
 
   return true
-}
+})
 
 /**
  * Non-throwing permission check for page-level inline access control.

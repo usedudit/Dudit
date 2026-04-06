@@ -362,8 +362,8 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                         <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-8 px-4 md:px-8">
                             <AnimatePresence mode="wait">
                                 {isLoading ? (
-                                    <motion.div 
-                                        key="loading" 
+                                    <motion.div
+                                        key="loading"
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         exit={{ opacity: 0 }}
@@ -372,8 +372,8 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                         <ThreeDotsLoader />
                                     </motion.div>
                                 ) : !hasOrders ? (
-                                    <motion.div 
-                                        key="empty-no-data" 
+                                    <motion.div
+                                        key="empty-no-data"
                                         initial={{ opacity: 0, scale: 0.95 }}
                                         animate={{ opacity: 1, scale: 1 }}
                                         exit={{ opacity: 0, scale: 0.95 }}
@@ -389,8 +389,8 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                         />
                                     </motion.div>
                                 ) : paginated.length === 0 ? (
-                                    <motion.div 
-                                        key="empty-results" 
+                                    <motion.div
+                                        key="empty-results"
                                         initial={{ opacity: 0, scale: 0.95 }}
                                         animate={{ opacity: 1, scale: 1 }}
                                         exit={{ opacity: 0, scale: 0.95 }}
@@ -427,10 +427,6 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                                         className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none cursor-pointer"
                                                         onClick={() => handleDetailsOrder(o)}
                                                     >
-                                                        <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border/20 border border-brand-border dark:border-dark-border flex-shrink-0 flex items-center justify-center overflow-hidden">
-                                                            <StoreIcon className="w-6 h-6 text-brand-dark dark:text-dark-heading" />
-                                                        </div>
-
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex justify-between items-start mb-0.5">
                                                                 <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate pr-2">
@@ -447,25 +443,21 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                                                     )}
                                                                 </div>
                                                             </div>
-                                                            <div className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate mb-1">
-                                                                {o.customer_name} • {o.store_name || "Loja"}
+                                                            <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
+                                                                {o.customer_name} • {o.formattedDate}
                                                             </div>
                                                             <div className="flex items-center gap-2 text-[14px]">
                                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">
                                                                     {o.items_count} {o.items_count === 1 ? 'item' : 'itens'}
                                                                 </span>
-                                                                <ArrowRightIcon className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600" />
+                                                                <span className="text-gray-300 dark:text-gray-600 font-medium font-bold">•</span>
                                                                 <span className="font-bold text-brand-primary">
                                                                     R$ {Number(o.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                                                 </span>
-                                                                
+
                                                                 <div className="flex-none ml-auto -mb-1" onClick={(e) => e.stopPropagation()}>
                                                                     <Checkbox checked={selection.ids.has(o.originalId)} onChange={() => handleSelectRow(o.originalId)} />
                                                                 </div>
-                                                            </div>
-                                                            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-brand-inactive-text">
-                                                                <ClockIcon size={12} />
-                                                                <span>{o.formattedDate}</span>
                                                             </div>
                                                         </div>
                                                     </div>

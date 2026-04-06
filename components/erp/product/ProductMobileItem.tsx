@@ -60,7 +60,7 @@ const ProductMobileItem = React.memo(
             </div>
 
             {/* Linha 2: SKU • Cat • Marca */}
-            <div className="flex items-center text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate">
+            <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
               <span>{product.sku || "N/A"}</span>
               {product.category && (
                 <>
@@ -79,11 +79,11 @@ const ProductMobileItem = React.memo(
             {/* Linha 3: Preço • Estoque • Badge + Checkbox */}
             <div className="flex items-end justify-between gap-2 mt-0.5">
               <div className="flex items-center flex-wrap gap-y-1">
-                <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
+                <span className="text-md font-bold text-brand-dark dark:text-dark-heading">
                   {formatCurrency(product.price)}
                 </span>
                 <span className="mx-2 text-brand-inactive-text dark:text-dark-border">•</span>
-                <span className="text-[14px] font-medium text-brand-inactive-text dark:text-dark-body">
+                <span className="text-md font-medium text-brand-inactive-text dark:text-dark-body">
                   {stock} un
                 </span>
                 <span className="mx-2"></span>

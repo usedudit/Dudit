@@ -175,7 +175,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, onSucces
                 city: city,
                 state: uf,
                 csrf_token: token,
-                store_credit: storeCredit
+                store_credit: storeCredit,
+                status: status === "Ativo" ? "Active" : status === "Inativo" ? "Inactive" : "Blocked"
             })
 
             if (res.error) {

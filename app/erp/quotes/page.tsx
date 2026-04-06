@@ -1,7 +1,7 @@
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import QuotesPage from "@/components/erp/quotes/QuotesPage"
 import { getPartnerQuotesCached } from "@/lib/data/quotes"
-import { checkPartnerPermission, getCurrentUser } from "@/lib/auth/authorization"
+import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -9,23 +9,22 @@ import { FadeIn } from "@/components/animations/FadeIn"
 export const dynamic = "force-dynamic"
 
 export default async function QuotesPageServer({ searchParams }: { searchParams: { page?: string } }) {
-    const user = await getCurrentUser()
-    if (!user) return <AccessDenied />
-
     // Layout already guarantees auth + valid context
     const context = await getCurrentPartnerContext()
     if (!context) return <AccessDenied />
 
     const partnerId = context.partnerId
-
-    const { allowed } = await checkPartnerPermission(partnerId, "quotes", "view")
-    if (!allowed) return <AccessDenied />
-
     const page = Number(searchParams?.page) || 1
     const limit = 50
     const offset = (page - 1) * limit
 
-    const { data: quotes, total } = await getPartnerQuotesCached(partnerId, limit, offset)
+    // Parallelize permission check and data fetch
+    const [{ allowed }, { data: quotes, total }] = await Promise.all([
+        checkPartnerPermission(partnerId, "quotes", "view"),
+        getPartnerQuotesCached(partnerId, limit, offset),
+    ])
+
+    if (!allowed) return <AccessDenied />
 
     return (
         <>

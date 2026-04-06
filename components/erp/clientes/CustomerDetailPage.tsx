@@ -1,16 +1,14 @@
 "use client"
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { SearchIcon, ChevronDownIcon, EditIcon, PlusIcon, SparklesIcon, CheckCircleIcon, MoreHorizontalIcon, ArchiveIcon, ShareIcon, StarIcon, Package, CreditCardIcon, CopyIcon, ChevronLeftIcon, ChevronRightIcon, FileIcon, StoreIcon, ThreeDotsIcon, TrashIcon, ClockIcon, MapPin } from '@/lib/icons';
-import { Button, Badge, Input as FormInput, Checkbox as FormCheckbox, Tabs, TabsList, TabsTrigger, TabsContent, ActionsDropdown } from '@/components/reusable';
+import { motion } from 'framer-motion';
+import { EditIcon, SparklesIcon, CheckCircleIcon, ChevronLeftIcon, ThreeDotsIcon, ClockIcon } from '@/lib/icons';
+import { Button, Badge, Checkbox, Tabs, TabsList, TabsTrigger, TabsContent, ActionsDropdown, InfoCard } from '@/components/reusable';
+import Pagination from '@/components/reusable/Pagination';
 import { useNotification } from '@/hooks/use-notification';
 import IconPlaceholder from '@/components/reusable/IconPlaceholder';
 import { getCustomerOrdersAction } from '@/app/actions/erp/customers';
 
 interface Props { customer: any; onBack: () => void; }
-
-// Sub-components
-
 
 export const CustomerDetailPage = ({ customer, onBack }: Props) => {
     const { success: notifySuccess, error: notifyError } = useNotification();
@@ -24,6 +22,11 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
 
     const [fetchedOrders, setFetchedOrders] = useState<any[]>([]);
     const [isLoadingOrders, setIsLoadingOrders] = useState(true);
+
+    // Pagination and Selection
+    const [page, setPage] = useState(1);
+    const itemsPerPage = 8;
+    const [selection, setSelection] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         const fetchOrders = async () => {
@@ -41,64 +44,64 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
     }, [customer.originalId]);
 
     const isInformationTab = activeTab === 'Information';
-    const displayedOrders = fetchedOrders;
+
+    const totalPages = Math.ceil(fetchedOrders.length / itemsPerPage);
+    const paginatedOrders = fetchedOrders.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
     return (
-        <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-300">
+        <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
-                <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
+                <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth custom-scrollbar">
 
                     {/* Sticky Header */}
-                    <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300">
-                        <div className="max-w-[1400px] mx-auto relative px-4 md:px-8 md:pt-6">
+                    <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
                             {/* Back button — desktop only */}
-                            <div className={`absolute -left-12 top-8 h-full hidden xl:flex justify-center transition-all duration-300 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                <Button variant="ghost" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-dark-border">
+                            <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                     <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                 </Button>
                             </div>
 
                             {/* Title row */}
                             <div className="hidden md:flex items-start justify-between">
-                                <div className="flex flex-col gap-1 overflow-hidden min-w-0 mb-6">
-                                    <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-300 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                    <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                         <span className="truncate">{customer.name}</span>
-                                        <Badge variant="green" className="text-[10px] uppercase tracking-wider">Ativo</Badge>
+                                        <Badge variant={customer.status === 'Active' ? 'green' : customer.status === 'Inactive' ? 'gray' : 'red'} className="whitespace-nowrap scale-90 shrink-0 mt-0.5">
+                                            {customer.status === 'Active' ? 'Ativo' : customer.status === 'Inactive' ? 'Inativo' : 'Bloqueado'}
+                                        </Badge>
                                     </h1>
 
-                                    <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-1"}`}>
-                                        {customer.email || 'Sem e-mail cadastrado'} • {customer.createdAt ? `Cliente desde ${new Date(customer.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}` : '-'}
+                                    <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                        ID {customer.id} • {customer.email || 'Sem e-mail'}
                                     </div>
                                 </div>
 
                                 {/* Desktop action buttons */}
-                                <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
+                                <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3 mt-1">
                                     <ActionsDropdown
                                         onShare={() => { }}
                                         onArchive={() => { }}
                                         onDelete={() => { }}
                                     />
-                                    <Button className="px-6 h-[42px] flex items-center gap-2">
-                                        <EditIcon className="w-4.5 h-4.5" />
+                                    <Button>
+                                        <EditIcon className="w-4 h-4 mr-2" />
                                         Editar Cliente
                                     </Button>
                                 </div>
                             </div>
 
-                            {/* Mobile Title Row */}
-                            <div className="md:hidden flex items-center gap-3 py-4">
-                                <button onClick={onBack} className="p-2 -ml-2 text-brand-inactive-text">
-                                    <ChevronLeftIcon size={24} />
-                                </button>
-                                <div className="flex flex-col min-w-0">
-                                    <h1 className="text-xl font-bold text-brand-dark dark:text-dark-heading truncate">{customer.name}</h1>
-                                    <span className="text-[10px] font-bold uppercase tracking-tight text-brand-green">Ativo</span>
-                                </div>
-                            </div>
+                            {/* Mobile Title Row is hidden entirely, except for Tabs */}
 
-                            {/* Tabs Trigger */}
-                            <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                            <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"} pt-4 md:pt-0 pb-0 flex items-center`}>
+                                {/* Tiny mobile back button to preserve navigation since title logic was removed */}
+                                <div className="md:hidden mr-4">
+                                    <button onClick={onBack} className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-50 dark:bg-dark-border text-brand-dark dark:text-dark-heading border border-gray-200 dark:border-dark-border">
+                                        <ChevronLeftIcon className="w-4 h-4" />
+                                    </button>
+                                </div>
                                 <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                     <TabsTrigger value="Purchase History">Histórico</TabsTrigger>
                                     <TabsTrigger value="Review">Avaliações</TabsTrigger>
@@ -116,51 +119,127 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                             <div className={`col-span-12 lg:col-span-8 pr-0 lg:pr-12 ${isInformationTab ? 'hidden lg:block' : 'block'}`}>
                                 <TabsContent value="Purchase History" className="mt-0">
                                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                                        {/* Purchase Summary Cards */}
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-                                            {[
-                                                { label: 'Total Gasto', value: customer.totalOrderValue ? `R$ ${customer.totalOrderValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-", icon: PlusIcon, color: 'brand-green' },
-                                                { label: 'Pedidos', value: customer.orders ?? "-", icon: Package, color: 'brand-dark' },
-                                                { label: 'Crédito em Loja', value: customer.storeCredit ? `R$ ${customer.storeCredit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-", icon: CreditCardIcon, color: 'brand-primary' },
-                                                { label: 'Última Compra', value: customer.lastOrderDate || '-', icon: ClockIcon, color: 'brand-inactive-text' }
-                                            ].map((stat, i) => (
-                                                <div key={i} className="bg-white dark:bg-dark-surface p-5 rounded-2xl border border-brand-border dark:border-dark-border shadow-sm group hover:shadow-md transition-all duration-300">
-                                                    <span className="text-[11px] font-bold text-brand-inactive-text uppercase tracking-widest block mb-2">{stat.label}</span>
-                                                    <div className="flex items-end justify-between">
-                                                        <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{stat.value}</span>
+                                        {/* Unified Stats Card */}
+                                        <div className="w-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-sm overflow-hidden mb-10 transition-all duration-300 hover:shadow-md">
+                                            <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-gray-200 dark:divide-dark-border">
+                                                <div className="p-6 flex flex-col justify-center">
+                                                    <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mb-1.5">Pedidos</span>
+                                                    <div className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                                        {customer.orders || 0}
                                                     </div>
                                                 </div>
-                                            ))}
+                                                <div className="p-6 flex flex-col justify-center">
+                                                    <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mb-1.5">Total Gasto</span>
+                                                    <div className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                                        {customer.totalOrderValue ? `$${customer.totalOrderValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
+                                                    </div>
+                                                </div>
+                                                <div className="p-6 flex flex-col justify-center">
+                                                    <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mb-1.5">Valor médio dos pedidos</span>
+                                                    <div className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                                        {customer.orders && customer.totalOrderValue ? `$${(customer.totalOrderValue / customer.orders).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
+                                                    </div>
+                                                </div>
+                                                <div className="p-6 flex flex-col justify-center">
+                                                    <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mb-1.5">Última Compra</span>
+                                                    <div className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                                        {customer.lastOrderDate || '-'}
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
 
-                                        <div className="w-full overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border shadow-sm">
-                                            <table className="w-full text-left border-collapse">
-                                                <thead>
-                                                    <tr className="bg-gray-50 dark:bg-dark-surface border-b border-brand-border dark:border-dark-border text-[11px] font-bold text-brand-inactive-text uppercase tracking-widest">
-                                                        <th className="py-4 px-6">Pedido</th>
-                                                        <th className="py-4 px-6">Data</th>
-                                                        <th className="py-4 px-6">Itens</th>
-                                                        <th className="py-4 px-6">Status</th>
-                                                        <th className="py-4 px-6 text-right">Total</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {isLoadingOrders ? (
-                                                        <tr>
-                                                            <td colSpan={5} className="py-20 text-center"><div className="w-8 h-8 border-2 border-brand-green border-t-transparent rounded-full animate-spin mx-auto" /></td>
+                                        {/* Orders List / Table */}
+                                        <div className="w-full bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border shadow-sm overflow-hidden hidden md:block mt-6">
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left">
+                                                    <thead>
+                                                        <tr className="bg-gray-50 dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
+                                                            <th className="py-4 px-4 w-12 pl-6 relative">
+                                                                <div className="flex items-center">
+                                                                    <Checkbox
+                                                                        checked={selection.size === paginatedOrders.length && paginatedOrders.length > 0}
+                                                                        onChange={(e) => {
+                                                                            if (selection.size === paginatedOrders.length) {
+                                                                                setSelection(new Set());
+                                                                            } else {
+                                                                                setSelection(new Set(paginatedOrders.map((o: any) => o.id)));
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            </th>
+                                                            <th className="py-4 px-2 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Pedido</th>
+                                                            <th className="py-4 px-2 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Data</th>
+                                                            <th className="py-4 px-2 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Itens</th>
+                                                            <th className="py-4 px-2 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body text-center">Status</th>
+                                                            <th className="py-4 px-2 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body text-right pr-6">Total</th>
                                                         </tr>
-                                                    ) : fetchedOrders.map(order => (
-                                                        <tr key={order.id} className="border-b border-brand-border dark:border-dark-border hover:bg-gray-50/50 dark:hover:bg-dark-border/30 transition-colors">
-                                                            <td className="py-4 px-6 font-bold text-brand-dark dark:text-dark-heading text-sm">{order.id}</td>
-                                                            <td className="py-4 px-6 text-brand-inactive-text text-sm">{order.date}</td>
-                                                            <td className="py-4 px-6 text-brand-inactive-text text-sm">{order.items} it{order.items > 1 ? 'ens' : 'em'}</td>
-                                                            <td className="py-4 px-6"><Badge variant={order.status === 'Paid' ? 'green' : 'orange'}>{order.status === 'Paid' ? 'PAGO' : 'PENDENTE'}</Badge></td>
-                                                            <td className="py-4 px-6 text-right font-bold text-brand-dark dark:text-dark-heading text-sm">R$ {order.total.toLocaleString('pt-BR')}</td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
+                                                    </thead>
+                                                    <tbody>
+                                                        {isLoadingOrders ? (
+                                                            <tr>
+                                                                <td colSpan={6} className="py-20 text-center"><div className="w-8 h-8 border-2 border-brand-green border-t-transparent rounded-full animate-spin mx-auto" /></td>
+                                                            </tr>
+                                                        ) : paginatedOrders.map(order => (
+                                                            <tr key={order.id} className="border-b border-brand-border dark:border-dark-border hover:bg-gray-50/50 dark:hover:bg-dark-border/30 transition-colors group">
+                                                                <td className="py-4 px-4 w-12 pl-6">
+                                                                    <Checkbox
+                                                                        checked={selection.has(order.id)}
+                                                                        onChange={() => {
+                                                                            setSelection(prev => {
+                                                                                const newSet = new Set(prev);
+                                                                                if (newSet.has(order.id)) newSet.delete(order.id);
+                                                                                else newSet.add(order.id);
+                                                                                return newSet;
+                                                                            });
+                                                                        }}
+                                                                    />
+                                                                </td>
+                                                                <td className="py-4 px-2 font-bold text-brand-dark dark:text-dark-heading text-[14.5px]">
+                                                                    {order.id}
+                                                                </td>
+                                                                <td className="py-4 px-2 text-brand-inactive-text dark:text-dark-body text-[14.5px]">
+                                                                    {order.date}
+                                                                </td>
+                                                                <td className="py-4 px-2 text-brand-inactive-text dark:text-dark-body text-[14.5px]">
+                                                                    {order.items} item(s)
+                                                                </td>
+                                                                <td className="py-4 px-2 text-center">
+                                                                    <Badge variant={order.status === 'Paid' ? 'green' : 'orange'} className="scale-90 whitespace-nowrap px-3 py-1 text-[11px] font-bold">
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            {order.status === 'Paid' ? <CheckCircleIcon className="w-3 h-3" /> : <ClockIcon className="w-3 h-3" />}
+                                                                            {order.status === 'Paid' ? 'Paid' : 'Pending'}
+                                                                        </div>
+                                                                    </Badge>
+                                                                </td>
+                                                                <td className="py-4 px-2 text-right font-bold text-brand-dark dark:text-dark-heading text-[14.5px] pr-6">
+                                                                    ${order.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
                                         </div>
+
+                                        {totalPages > 1 && (
+                                            <div className="flex justify-center mt-6 w-full hidden md:flex">
+                                                <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+                                            </div>
+                                        )}
+
+                                        {!isLoadingOrders && paginatedOrders.length === 0 && (
+                                            <div className="py-12 border border-brand-border dark:border-dark-border rounded-xl mt-6 hidden md:block">
+                                                <IconPlaceholder
+                                                    title="Nenhum pedido encontrado"
+                                                    subtitle="Este cliente ainda não realizou nenhum pedido."
+                                                    imageSrc="https://img.dudit.com.br/static/mascots/orders_empty.png"
+                                                    placeholderType="image"
+                                                />
+                                            </div>
+                                        )}
+
                                     </motion.div>
                                 </TabsContent>
 
@@ -179,7 +258,6 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                                                 </p>
                                             </div>
                                         </div>
-                                        {/* ... (rest of review logic could be standardized or kept as is) */}
                                     </motion.div>
                                 </TabsContent>
                             </div>
@@ -187,52 +265,95 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                             {/* Sidebar Column */}
                             <div className="col-span-12 lg:col-span-4 border-l border-brand-border dark:border-dark-border lg:pl-12 space-y-10">
 
-                                <section>
-                                    <div className="flex items-center justify-between mb-6">
-                                        <h3 className="text-[17px] font-bold text-brand-dark dark:text-dark-heading">Observações</h3>
-                                        <Button variant="ghost" size="icon" className="w-8 h-8 hover:bg-brand-orange/10 hover:text-brand-orange transition-colors"><EditIcon size={16} /></Button>
-                                    </div>
-                                    <div className="bg-brand-orange/5 dark:bg-brand-orange/10 p-5 rounded-2xl border-2 border-dashed border-brand-orange/20 relative group">
-                                        <div className="absolute top-0 left-0 w-1 h-full bg-brand-orange rounded-full opacity-50" />
-                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed font-medium">
-                                            {customer.notes || "Nenhuma observação interna registrada para este cliente."}
-                                        </p>
-                                    </div>
-                                </section>
-
-                                <div className="h-px bg-brand-border dark:bg-dark-border w-full" />
-
-                                <section>
-                                    <h3 className="text-[17px] font-bold text-brand-dark dark:text-dark-heading mb-6">Contato e Endereço</h3>
-                                    <div className="space-y-6">
-                                        <div className="flex items-center gap-4 group">
-                                            <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-dark-surface flex items-center justify-center border border-brand-border dark:border-dark-border group-hover:border-brand-dark transition-all duration-300">
-                                                <ShareIcon size={18} className="text-brand-inactive-text" />
-                                            </div>
-                                            <div>
-                                                <span className="text-[11px] font-bold text-brand-inactive-text uppercase tracking-widest block mb-0.5">E-mail</span>
-                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.email || "Sem e-mail"}</span>
-                                            </div>
+                                {/* Observações utilizando o InfoCard, apenas se tiver notas */}
+                                {customer.notes && (
+                                    <section>
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h3 className="text-[17px] font-bold text-brand-dark dark:text-dark-heading">Observações</h3>
                                         </div>
-                                        <div className="flex items-center gap-4 group">
-                                            <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-dark-surface flex items-center justify-center border border-brand-border dark:border-dark-border group-hover:border-brand-dark transition-all duration-300">
-                                                <MapPin size={18} className="text-brand-inactive-text" />
+                                        <InfoCard
+                                            title="Anotação Interna"
+                                            message={customer.notes}
+                                            color="orange"
+                                        />
+                                    </section>
+                                )}
+
+                                {/* Detalhes e Contato */}
+                                <section>
+                                    <h3 className="text-[17px] font-bold text-brand-dark dark:text-dark-heading mb-6">Detalhes</h3>
+                                    <div className="w-full bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border shadow-sm overflow-hidden flex flex-col">
+
+                                        {/* Informações da Entidade (Tipo e Data Base) */}
+                                        <div className="p-5 flex flex-col gap-1.5">
+                                            <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-dark-border/50">
+                                                <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">Tipo do Cliente</span>
+                                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{customer.personType === 'pj' || customer.cnpj ? 'B2B' : 'B2C'}</span>
                                             </div>
-                                            <div>
-                                                <span className="text-[11px] font-bold text-brand-inactive-text uppercase tracking-widest block mb-0.5">Endereço Principal</span>
-                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading leading-tight block truncate max-w-[200px]">
-                                                    {customer.address || "-"}
+                                            <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-dark-border/50">
+                                                <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">Cliente desde</span>
+                                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
+                                                    {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('pt-BR', { month: 'short', day: 'numeric', year: 'numeric' }).replace(' de ', ', ') : '-'}
                                                 </span>
                                             </div>
+                                            <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-dark-border/50">
+                                                <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">Tipo de Pessoa</span>
+                                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{customer.personType === 'pj' || customer.cnpj ? 'Pessoa Jurídica' : 'Pessoa Física'}</span>
+                                            </div>
+
+                                            {(customer.personType === 'pj' || customer.cnpj) ? (
+                                                <>
+                                                    {customer.cnpj && (
+                                                        <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-dark-border/50">
+                                                            <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">CNPJ</span>
+                                                            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{customer.cnpj}</span>
+                                                        </div>
+                                                    )}
+                                                    {customer.nomeFantasia && (
+                                                        <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-dark-border/50">
+                                                            <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">Nome Fantasia</span>
+                                                            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading text-right max-w-[50%] truncate">{customer.nomeFantasia}</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-dark-border/50">
+                                                        <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">Inscrição Estadual</span>
+                                                        <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading text-right">{customer.inscricaoEstadual || 'Isento'}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center py-2.5 border-gray-100 dark:border-dark-border/50">
+                                                        <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">Inscrição Municipal</span>
+                                                        <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{customer.inscricaoMunicipal || 'Isento'}</span>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    {customer.cpf && (
+                                                        <div className="flex justify-between items-center py-2.5 border-gray-100 dark:border-dark-border/50">
+                                                            <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">CPF</span>
+                                                            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{customer.cpf}</span>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+
+                                        {/* Informações de Contato e Endereço */}
+                                        <div className="p-5 border-t border-brand-border dark:border-dark-border bg-gray-50/50 dark:bg-dark-border/20 flex flex-col gap-1.5">
+                                            <div className="flex justify-between items-center py-2.5 border-b border-gray-200 dark:border-dark-border/50">
+                                                <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">E-mail</span>
+                                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate max-w-[60%] text-right">{customer.email || '-'}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center py-2.5 border-b border-gray-200 dark:border-dark-border/50">
+                                                <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium">Telefone</span>
+                                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading text-right">{customer.phone || customer.mobile || '-'}</span>
+                                            </div>
+                                            <div className="flex justify-between items-start pt-2.5">
+                                                <span className="text-[14px] text-brand-inactive-text dark:text-dark-body font-medium pt-0.5">Endereço Principal</span>
+                                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading text-right max-w-[60%] leading-relaxed">{customer.address || '-'}</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </section>
 
-                                <div className="mt-8 pt-8 border-t border-brand-border dark:border-dark-border">
-                                    <p className="text-[11px] text-brand-inactive-text italic leading-relaxed">
-                                        * Cliente cadastrado em {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('pt-BR') : '-'}. Última movimentação em {customer.lastOrderDate || '-'}.
-                                    </p>
-                                </div>
                             </div>
                         </div>
                     </div>

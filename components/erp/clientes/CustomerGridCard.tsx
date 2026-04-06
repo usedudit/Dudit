@@ -47,7 +47,7 @@ const CustomerGridCard = React.memo(
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             {/* Linha 1: Nome + Badge Status + Checkbox */}
             <div className="flex justify-between items-start gap-1">
-              <div className="flex flex-col min-w-0 pr-1 gap-1">
+              <div className="flex items-center min-w-0 pr-1 gap-2">
                 <h3
                   className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate"
                   title={customer.name}
@@ -56,7 +56,7 @@ const CustomerGridCard = React.memo(
                 </h3>
                 <Badge
                   variant={customer.status === 'Active' ? "green" : customer.status === 'Inactive' ? "gray" : "red"}
-                  className="text-[9px] h-4 px-1 py-3 flex-shrink-0 w-max"
+                  className="whitespace-nowrap scale-90 shrink-0"
                 >
                   {customer.status === 'Active' ? "Ativo" : customer.status === 'Inactive' ? "Inativo" : "Bloqueado"}
                 </Badge>

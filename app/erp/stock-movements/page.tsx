@@ -1,30 +1,25 @@
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import StockMovementPageContent from "@/components/erp/stock-movements/StockMovementPage"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { getCurrentPartner } from "@/lib/auth/authorization"
 import { getStockMovementsCached } from "@/lib/data/stock-movements"
 import { redirect } from "next/navigation"
-import { getCurrentUser } from "@/lib/auth/authorization"
+import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { AccessDenied } from "@/components/erp/access-denied"
 
 export default async function StockMovementsPage() {
-  const user = await getCurrentUser()
-  if (!user) return <AccessDenied />
+  // Layout already guarantees auth + valid context — just read cached data
+  const context = await getCurrentPartnerContext()
+  if (!context) redirect("")
 
-  const partner = await getCurrentPartner()
-
-  if (!partner) {
-    redirect("")
-  }
-
-  const movements = await getStockMovementsCached(partner.id)
+  const partnerId = context.partnerId
+  const movements = await getStockMovementsCached(partnerId)
 
   return (
     <>
       <ERPPageHeader title="Movimentação de Estoque" />
       <FadeIn className="p-4">
         <StockMovementPageContent
-          partnerId={partner.id}
+          partnerId={partnerId}
           movements={movements || []}
         />
       </FadeIn>

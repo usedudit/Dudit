@@ -13,7 +13,8 @@ import {
     AlertTriangleIcon,
     ArrowRightIcon,
     UploadIcon,
-    EditIcon
+    EditIcon,
+    ThreeDotsIcon
 } from '@/lib/icons';
 import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, Tooltip, AlertModal } from '@/components/reusable';
 import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction } from '@/app/actions/erp/quotes';
@@ -216,8 +217,6 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote }: QuoteDetailPro
                             </div>
                         </div>
 
-                        {/* Mobile Title - Removed per user request to only show on desktop */}
-
                         {/* Tabs space matching AddProductPage */}
                         <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"} pb-4`}>
                         </div>
@@ -268,7 +267,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote }: QuoteDetailPro
                                     </div>
                                 </div>
 
-                                <div className="bg-white dark:bg-dark-surface px-12 pt-6 pb-16">
+                                <div className="bg-white dark:bg-dark-surface px-12 pt-12 pb-12">
                                     <div className="relative px-4">
                                         <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
                                             <div
@@ -283,7 +282,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote }: QuoteDetailPro
                                                             {step.label}
                                                         </span>
                                                     </div>
-                                                    <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (quote.status === 'rejected' && idx === 2 ? 'bg-brand-red border-red-500' : 'bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading') : 'bg-white dark:bg-dark-surface border-gray-300 dark:border-gray-600'}`}>
+                                                    <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (quote.status === 'rejected' && idx === 2 ? 'bg-brand-red border-red-500' : 'bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading') : 'bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border'}`}>
                                                         {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
                                                     </div>
                                                     <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
@@ -404,9 +403,22 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote }: QuoteDetailPro
 
             {/* Mobile Bottom Action Bar */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
-                <Button variant="outline" className="flex-1" onClick={onBack}>
-                    Voltar
-                </Button>
+                <ActionsDropdown
+                    onPrint={() => { }}
+                    onEmail={() => { }}
+                    onShare={() => { }}
+                    onDelete={() => setShowDeleteModal(true)}
+                    onDuplicate={() => { }}
+                    trigger={
+                        <Button
+                            variant="outline"
+                            className="flex-1"
+                        >
+                            <ThreeDotsIcon className="w-4 h-4 mr-2" />
+                            Opções
+                        </Button>
+                    }
+                />
                 <Button onClick={() => onEditQuote && onEditQuote(quote)} className="flex-1 whitespace-nowrap">
                     <EditIcon className="w-4 h-4 mr-2" />
                     Editar orçamento
