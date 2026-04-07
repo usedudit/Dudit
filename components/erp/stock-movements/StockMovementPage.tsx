@@ -1,27 +1,29 @@
 "use client"
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+
 import {
     PlusIcon,
     ArrowUpDownIcon,
     ArrowRightIcon,
-    ExportFileIcon
+    ExportFileIcon,
+    RotateIcon,
+    Package
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, IconPlaceholder, Input, Badge, AlertModal } from '@/components/reusable';
+import { Button, Checkbox, IconPlaceholder, Input, Badge, AlertModal } from '@/components/reusable';
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet";
 import Pagination from "@/components/reusable/Pagination";
+import FloatingActionBar from "@/components/reusable/FloatingActionBar";
 import CreateStockMovement from './CreateStockMovement';
 import StockMovementDetailPage from './StockMovementDetailPage';
 import StockMovementPageControls from './StockMovementPageControls';
-import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
-import { undoStockMovementAction } from '@/app/actions/erp/stock-movements';
-import { useNotification } from '@/hooks/use-notification';
-import { useMediaQuery } from '@/components/erp/hooks';
-import { useStoreData } from "@/lib/use-store-data";
 import StockMovementListItem from './StockMovementListItem';
 import StockMovementGridCard from './StockMovementGridCard';
+import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
+import { undoStockMovementAction, undoBatchStockMovementsAction, getStockMovementDetails } from '@/app/actions/erp/stock-movements';
+import { useNotification } from '@/hooks/use-notification';
+import { useMediaQuery } from '@/components/erp/hooks';
 import { FadeIn } from '@/components/animations/FadeIn';
 
 interface StockMovementPageProps {
@@ -30,7 +32,7 @@ interface StockMovementPageProps {
 }
 
 type TabType = 'all' | 'in' | 'out';
-type SortKey = 'product' | 'quantity' | 'currentStock' | 'reason' | 'reference' | 'date' | 'type';
+type SortKey = 'movement' | 'reason' | 'reference' | 'date' | 'type';
 type SortDirection = 'asc' | 'desc';
 
 const ITEMS_PER_PAGE = 8;
@@ -45,14 +47,14 @@ const MOVEMENT_TYPE_LABELS: Record<string, string> = {
 };
 
 const StockMovementPageContent = ({ partnerId, movements: initialMovements }: StockMovementPageProps) => {
-    const router = useRouter();
     const { error: notifyError, success: notifySuccess } = useNotification();
-    const { selectedStore } = useStoreData(partnerId);
     const isMobile = useMediaQuery("(max-width: 768px)");
 
     // State
     const [isCreating, setIsCreating] = useState(false);
     const [selectedMovementId, setSelectedMovementId] = useState<string | null>(null);
+    const [detailedMovement, setDetailedMovement] = useState<any | null>(null);
+    const [isDetailLoading, setIsDetailLoading] = useState(false);
 
     const [activeTab, setActiveTab] = useState<TabType>('all');
     const [searchTerm, setSearchTerm] = useState('');
@@ -64,11 +66,15 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
     const [modals, setModals] = useState({
         filter: false,
         undo: false,
+        bulkUndo: false,
     });
     const [undoingId, setUndoingId] = useState<string | null>(null);
     const [undoReason, setUndoReason] = useState('');
     const [isUndoing, setIsUndoing] = useState(false);
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
+
+    // Selection state
+    const [selection, setSelection] = useState({ ids: new Set<string>() });
 
     const tableContainerRef = useRef<HTMLDivElement>(null);
     const [scrollState, setScrollState] = useState({ left: false, right: false });
@@ -100,8 +106,21 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
     const hasActiveFilters = filters.movement_type.length > 0;
     const isFiltered = searchTerm !== "" || hasActiveFilters;
 
-    const handleViewDetails = (id: string) => {
+    const handleViewDetails = async (id: string) => {
         setSelectedMovementId(id);
+        setIsDetailLoading(true);
+        try {
+            const res = await getStockMovementDetails(id);
+            if (res.success) {
+                setDetailedMovement(res.data);
+            } else {
+                notifyError(res.error || "Erro ao carregar detalhes");
+            }
+        } catch (err) {
+            notifyError("Erro de conexão ao carregar detalhes");
+        } finally {
+            setIsDetailLoading(false);
+        }
     };
 
     const handleUndoClick = (id: string) => {
@@ -129,6 +148,35 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
         }
     };
 
+    const confirmBulkUndo = async () => {
+        const ids = Array.from(selection.ids);
+        if (ids.length === 0) return;
+        setIsUndoing(true);
+        try {
+            const res = await undoBatchStockMovementsAction(ids, undoReason);
+            if (res.success) {
+                notifySuccess(`${ids.length} movimentações desfeitas com sucesso.`);
+                setSelection({ ids: new Set() });
+            } else {
+                notifyError(res.error || 'Erro ao desfazer movimentações.');
+            }
+        } catch (err) {
+            notifyError('Erro de conexão.');
+        } finally {
+            setIsUndoing(false);
+            setModals(prev => ({ ...prev, bulkUndo: false }));
+            setUndoReason('');
+        }
+    };
+
+    const handleSelectRow = (id: string) => {
+        setSelection(prev => {
+            const s = new Set(prev.ids);
+            s.has(id) ? s.delete(id) : s.add(id);
+            return { ids: s };
+        });
+    };
+
     const handleTabChange = (tab: TabType) => {
         setActiveTab(tab);
         setPage(1);
@@ -144,11 +192,15 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                 reason += ` (${mov.reference_name})`;
             }
 
+            // Count items from child records or fallback to 1
+            const items_count = mov.stock_movement_items?.length || 1;
+
             return {
                 id: mov.id,
                 displayId: `${mov.id.split('-')[0].toUpperCase()}-${mov.id.slice(-4).toUpperCase()}`,
                 date: `${dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}, ${dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
                 rawDate: dateObj.getTime(),
+                items_count,
                 product: {
                     name: mov.products?.name || 'Produto Excluído',
                     sku: mov.products?.sku || 'N/A',
@@ -194,17 +246,13 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                 let bVal: any;
 
                 switch (sortConfig.key) {
-                    case 'product':
-                        aVal = a.product.name;
-                        bVal = b.product.name;
+                    case 'movement':
+                        aVal = a.displayId;
+                        bVal = b.displayId;
                         break;
                     case 'date':
                         aVal = a.rawDate;
                         bVal = b.rawDate;
-                        break;
-                    case 'currentStock':
-                        aVal = a.product.currentStock;
-                        bVal = b.product.currentStock;
                         break;
                     default:
                         aVal = a[sortConfig.key];
@@ -231,15 +279,13 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
         setFilters({ movement_type: [] });
     };
 
-    const columns = [
-        { id: "product", label: "Produto", align: "left" as const },
-        { id: "quantity", label: "Quantidade", align: "right" as const, width: "120px" },
-        { id: "currentStock", label: "Estoque Final", align: "right" as const, width: "160px" },
-        { id: "reason", label: "Motivo", align: "left" as const },
-        { id: "reference", label: "Referência", align: "left" as const },
-        { id: "date", label: "Data", align: "left" as const, width: "160px" },
-        { id: "type", label: "Tipo", align: "center" as const, width: "120px" },
-        { id: "actions", label: "Ações", align: "center" as const, width: "80px" },
+    const columns: { id: string; label: string; align: "left" | "center" | "right"; width?: string }[] = [
+        { id: "movement", label: "Movimentação", align: "left", width: "200px" },
+        { id: "reason", label: "Motivo", align: "left" },
+        { id: "reference", label: "Referência", align: "left" },
+        { id: "date", label: "Data", align: "left", width: "160px" },
+        { id: "type", label: "Tipo", align: "center", width: "120px" },
+        { id: "actions", label: "Ações", align: "center", width: "80px" },
     ];
 
     if (isCreating) {
@@ -252,12 +298,17 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
     }
 
     if (selectedMovementId) {
-        const movementData = formattedMovements.find(m => m.id === selectedMovementId) || null;
+        const localData = formattedMovements.find(m => m.id === selectedMovementId) || null;
+        const movementToShow = detailedMovement?.id === selectedMovementId ? detailedMovement : localData;
+
         return (
             <StockMovementDetailPage
-                movement={movementData}
-                isLoading={false}
-                onBack={() => { setSelectedMovementId(null); }}
+                movement={movementToShow}
+                isLoading={isDetailLoading && !movementToShow}
+                onBack={() => {
+                    setSelectedMovementId(null);
+                    setDetailedMovement(null);
+                }}
             />
         );
     }
@@ -360,27 +411,25 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                                 className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none"
                                                 onClick={() => handleViewDetails(mov.id)}
                                             >
-                                                <div className="w-20 h-20 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border flex-shrink-0 overflow-hidden">
-                                                    <img src={mov.product.image} alt="" className="w-full h-full object-cover rounded-full" />
+                                                <div className="w-14 h-14 rounded-full bg-brand-slate dark:bg-dark-border border border-brand-border dark:border-dark-border flex-shrink-0 flex items-center justify-center">
+                                                    <Package className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
                                                 </div>
 
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex justify-between items-start mb-0.5">
-                                                        <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate pr-2">{mov.product.name}</h3>
+                                                        <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate pr-2">{mov.displayId}</h3>
                                                         <Badge variant={mov.type === 'in' ? 'green' : 'red'}>
                                                             {mov.type === 'in' ? 'Entrada' : 'Saída'}
                                                         </Badge>
                                                     </div>
-                                                    <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mb-2">{mov.product.sku}</div>
+                                                    <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mb-2">
+                                                        {mov.items_count} {mov.items_count === 1 ? 'item' : 'itens'} • {mov.reason}
+                                                    </div>
                                                     <div className="flex items-center gap-2 text-md">
-                                                        <span className={`font-bold ${mov.type === 'in' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                                            {mov.type === 'in' ? '+' : '-'}{mov.quantity}
-                                                        </span>
-                                                        <ArrowRightIcon className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body" />
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                            {mov.product.currentStock}
-                                                        </span>
-                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium ml-auto">{mov.date.split(',')[0]}</span>
+                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">{mov.date.split(',')[0]}</span>
+                                                        <div className="flex-none ml-auto -mb-1" onClick={(e) => e.stopPropagation()}>
+                                                            <Checkbox checked={selection.ids.has(mov.id)} onChange={() => handleSelectRow(mov.id)} />
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -392,6 +441,8 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                             <StockMovementGridCard
                                                 key={mov.id}
                                                 movement={mov}
+                                                selected={selection.ids.has(mov.id)}
+                                                onSelect={handleSelectRow}
                                                 onUndo={handleUndoClick}
                                                 onDetails={handleViewDetails}
                                             />
@@ -403,17 +454,29 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                         <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
 
                                         <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
+                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                                                 <thead>
                                                     <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                        {columns.map(col => {
+                                                        <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
+                                                            <div className="flex items-center">
+                                                                <Checkbox
+                                                                    checked={selection.ids.size === paginatedMovements.length && paginatedMovements.length > 0}
+                                                                    onChange={(checked) => {
+                                                                        setSelection({ ids: checked ? new Set(paginatedMovements.map(x => x.id)) : new Set() })
+                                                                    }}
+                                                                    className="bg-white dark:bg-dark-background"
+                                                                />
+                                                            </div>
+                                                        </th>
+                                                        {columns.map((col, idx) => {
                                                             const isSortable = col.id !== 'actions';
                                                             const isSorted = sortConfig?.key === col.id;
+                                                            const isLast = idx === columns.length - 1;
 
                                                             return (
                                                                 <th
                                                                     key={col.id}
-                                                                    className={`py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'} ${isSortable ? 'cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors' : ''}`}
+                                                                    className={`py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'} ${isSortable ? 'cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors' : ''} ${isLast ? 'rounded-r-lg' : ''}`}
                                                                     style={{ width: col.width }}
                                                                     onClick={() => {
                                                                         if (!isSortable) return;
@@ -444,6 +507,8 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                                             key={mov.id}
                                                             movement={mov}
                                                             columns={columns}
+                                                            selected={selection.ids.has(mov.id)}
+                                                            onSelect={handleSelectRow}
                                                             onUndo={handleUndoClick}
                                                             onDetails={handleViewDetails}
                                                         />
@@ -458,14 +523,12 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                     </AnimatePresence>
                 </div>
 
-                {filteredMovements.length > ITEMS_PER_PAGE && (
-                    <div className="flex justify-center mb-8 mt-4">
-                        <Pagination
-                            currentPage={page}
-                            totalPages={totalPages}
-                            onPageChange={setPage}
-                        />
-                    </div>
+                {filteredMovements.length > 0 && (
+                    <Pagination
+                        currentPage={page}
+                        totalPages={totalPages}
+                        onPageChange={setPage}
+                    />
                 )}
             </div>
 
@@ -478,6 +541,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                 onClear={() => setFilters({ movement_type: [] })}
             />
 
+            {/* Single undo modal */}
             <AlertModal
                 isOpen={modals.undo}
                 onClose={() => setModals(prev => ({ ...prev, undo: false }))}
@@ -498,6 +562,48 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                 variant="warning"
                 isLoading={isUndoing}
             />
+
+            {/* Bulk undo modal */}
+            <AlertModal
+                isOpen={modals.bulkUndo}
+                onClose={() => setModals(prev => ({ ...prev, bulkUndo: false }))}
+                onConfirm={confirmBulkUndo}
+                title="Desfazer movimentações?"
+                message={
+                    <div className="flex flex-col gap-4 mt-2 text-left">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                            Esta ação criará movimentações inversas para estornar {selection.ids.size} movimentações selecionadas. Deseja continuar?
+                        </p>
+                        <Input
+                            label="Motivo do estorno (opcional)"
+                            placeholder="Ex: Erro de preenchimento"
+                            value={undoReason}
+                            onChange={(e) => setUndoReason(e.target.value)}
+                        />
+                    </div>
+                }
+                confirmText={isUndoing ? "Desfazendo..." : "Desfazer Todos"}
+                variant="warning"
+                isLoading={isUndoing}
+            />
+
+            {/* Floating Action Bar */}
+            <FloatingActionBar
+                selectedCount={selection.ids.size}
+                onClearSelection={() => setSelection({ ids: new Set() })}
+            >
+                <Button
+                    variant="ghost"
+                    onClick={() => {
+                        setUndoReason('');
+                        setModals(prev => ({ ...prev, bulkUndo: true }));
+                    }}
+                    leftIcon={<RotateIcon className="w-4 h-4" />}
+                    className="h-10 px-3 text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-surface"
+                >
+                    Desfazer
+                </Button>
+            </FloatingActionBar>
         </motion.div >
     );
 };

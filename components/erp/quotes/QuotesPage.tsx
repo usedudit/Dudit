@@ -105,7 +105,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
     const [confirmations, setConfirmations] = useState({ bulkDelete: false })
 
     const isLoading = storeLoading && rawQuotes === undefined
-    const itemsPerPage = 12
+    const itemsPerPage = 8
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
@@ -660,14 +660,12 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                     </AnimatePresence>
                 </div>
 
-                {!isLoading && (isServerPaginated ? totalPages > 1 : filteredQuotes.length > itemsPerPage) && (
-                    <div className="flex justify-center mb-8 mt-4">
-                        <Pagination
-                            currentPage={isServerPaginated ? currentPage : page}
-                            totalPages={totalPages}
-                            onPageChange={handlePageChange}
-                        />
-                    </div>
+                {(isServerPaginated ? totalPages > 0 : paginated.length > 0) && (
+                    <Pagination
+                        currentPage={isServerPaginated ? currentPage : page}
+                        totalPages={totalPages}
+                        onPageChange={handlePageChange}
+                    />
                 )}
                 </div>
                 )}

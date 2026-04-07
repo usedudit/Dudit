@@ -38,7 +38,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
     const [activeTab, setActiveTab] = useState<"categories" | "subcategories" | "brands" | "locations">("categories")
     const [search, setSearch] = useState("")
     const [page, setPage] = useState(1)
-    const ITEMS_PER_PAGE = 12
+    const ITEMS_PER_PAGE = 8
 
     const [modal, setModal] = useState<{
         isOpen: boolean
@@ -280,7 +280,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                 </div>
 
                 {/* Pagination - Identical position */}
-                {totalPages > 1 && (
+                {paginatedItems.length > 0 && (
                     <Pagination
                         currentPage={page}
                         totalPages={totalPages}

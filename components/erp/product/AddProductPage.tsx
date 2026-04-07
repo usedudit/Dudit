@@ -188,9 +188,9 @@ const AddProductPage: FC<AddProductPageProps> = ({
         if (partnerId) await refreshMetadata(partnerId)
     }, [partnerId, refreshMetadata])
 
-    const categoryOptions = useMemo(() => 
+    const categoryOptions = useMemo(() =>
         metadata.categories.filter(c => !c.parent_id).map(c => ({ value: c.id, label: c.name })),
-    [metadata.categories])
+        [metadata.categories])
 
     const subCategoryOptions = useMemo(() => {
         if (!productData.category_id) return []
@@ -199,13 +199,13 @@ const AddProductPage: FC<AddProductPageProps> = ({
             .map(c => ({ value: c.id, label: c.name }))
     }, [metadata.categories, productData.category_id])
 
-    const brandOptions = useMemo(() => 
+    const brandOptions = useMemo(() =>
         metadata.brands.map(b => ({ value: b.id, label: b.name })),
-    [metadata.brands])
+        [metadata.brands])
 
-    const locationOptions = useMemo(() => 
+    const locationOptions = useMemo(() =>
         metadata.locations.map(l => ({ value: l.id, label: l.name })),
-    [metadata.locations])
+        [metadata.locations])
 
     // State for metadata creation
     const [metadataModal, setMetadataModal] = useState<{
@@ -229,7 +229,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
     const handleSaveMetadata = async () => {
         if (!metadataModal.name.trim() || !partnerId) return
         setMetadataModal(prev => ({ ...prev, isSaving: true }))
-        
+
         let result: any
         try {
             switch (metadataModal.type) {
@@ -275,10 +275,10 @@ const AddProductPage: FC<AddProductPageProps> = ({
             if (BOOLEAN_FIELDS.has(name)) return { ...prev, [name]: value === true || value === "true" }
             if (NUMERIC_FIELDS.has(name)) return { ...prev, [name]: value === "" || value === null ? prev[name] : Number(value) }
             if (name === "ncm") queueMicrotask(() => handleNcmChange(String(value)))
-            
+
             // Special handling for category change to reset subcategory
             if (name === "category_id") return { ...prev, [name]: value, subcategory_id: "" }
-            
+
             return { ...prev, [name]: value }
         })
     }, [handleNcmChange])
@@ -652,48 +652,60 @@ const AddProductPage: FC<AddProductPageProps> = ({
 
                         {/* Tab Content */}
                         <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                            {isLoadingDetails ? (
-                                <div className="flex flex-col items-center justify-center pt-24 pb-32">
-                                    <Spinner size={36} className="text-brand-primary" />
-                                    <p className="mt-4 text-[15px] text-brand-dark dark:text-dark-heading font-medium">Carregando detalhes do produto...</p>
-                                </div>
-                            ) : (
-                                <>
-                                    <div className={activeTab === "general" ? "block" : "hidden"}>
-                                        <FadeIn key="general" className="block">
-                                            <ProductGeneralTab
-                                                productData={productData} handleInputChange={handleInputChange}
-                                                categories={categoryOptions} subCategories={subCategoryOptions} brands={brandOptions} locations={locationOptions}
-                                                unidadesMedida={unidadesMedida} isEditing={isEditing && !isSavingProduct}
-                                                images={productData.images || []} onImageUpload={handleImageUpload}
-                                                onRemoveImage={handleRemoveImage} onSetPrimaryImage={handleSetPrimaryImage}
-                                                fieldErrors={fieldErrors} onFieldChange={handleFieldChange}
-                                                uploadingImages={uploadingImages} mode={internalMode === "duplicate" ? "add" : internalMode}
-                                                blockedImages={blockedImages} isSaving={isSavingProduct}
-                                                sellsOnline={sellsOnline}
-                                                generateRandomCode={() => { }}
-                                                openAddItemModal={handleOpenMetadataModal}
-                                            />
-                                        </FadeIn>
+                            <div className={activeTab === "general" ? "block" : "hidden"}>
+                                <FadeIn key="general" className="block">
+                                    <ProductGeneralTab
+                                        productData={productData} handleInputChange={handleInputChange}
+                                        categories={categoryOptions} subCategories={subCategoryOptions} brands={brandOptions} locations={locationOptions}
+                                        unidadesMedida={unidadesMedida} isEditing={isEditing && !isSavingProduct}
+                                        images={productData.images || []} onImageUpload={handleImageUpload}
+                                        onRemoveImage={handleRemoveImage} onSetPrimaryImage={handleSetPrimaryImage}
+                                        fieldErrors={fieldErrors} onFieldChange={handleFieldChange}
+                                        uploadingImages={uploadingImages} mode={internalMode === "duplicate" ? "add" : internalMode}
+                                        blockedImages={blockedImages} isSaving={isSavingProduct}
+                                        sellsOnline={sellsOnline}
+                                        generateRandomCode={() => { }}
+                                        openAddItemModal={handleOpenMetadataModal}
+                                    />
+                                </FadeIn>
+                            </div>
+                            <div className={activeTab === "variations" ? "block" : "hidden"}>
+                                {isLoadingDetails ? (
+                                    <div className="flex flex-col items-center justify-center pt-24 pb-32">
+                                        <Spinner size={36} className="text-brand-primary" />
+                                        <p className="mt-4 text-[15px] text-brand-dark dark:text-dark-heading font-medium">Carregando variações...</p>
                                     </div>
-                                    <div className={activeTab === "variations" ? "block" : "hidden"}>
-                                        <FadeIn key="variations" className="block">
-                                            <ProductVariationsTab isEditing={isEditing} productData={productData} onSavePendingVariants={handleSavePendingVariants} />
-                                        </FadeIn>
+                                ) : (
+                                    <FadeIn key="variations" className="block">
+                                        <ProductVariationsTab isEditing={isEditing} productData={productData} onSavePendingVariants={handleSavePendingVariants} />
+                                    </FadeIn>
+                                )}
+                            </div>
+                            <div className={activeTab === "suppliers" ? "block" : "hidden"}>
+                                {isLoadingDetails ? (
+                                    <div className="flex flex-col items-center justify-center pt-24 pb-32">
+                                        <Spinner size={36} className="text-brand-primary" />
+                                        <p className="mt-4 text-[15px] text-brand-dark dark:text-dark-heading font-medium">Carregando fornecedores...</p>
                                     </div>
-                                    <div className={activeTab === "suppliers" ? "block" : "hidden"}>
-                                        <FadeIn key="suppliers" className="block">
-                                            <ProductSuppliersTab isEditing={isEditing} productData={productData} />
-                                        </FadeIn>
-                                    </div>
-                                    {productData.show_in_marketplace && (
-                                        <div className={activeTab === "marketplace" ? "block" : "hidden"}>
-                                            <FadeIn key="marketplace" className="block">
-                                                <ProductMarketplaceTab productData={productData} handleInputChange={handleInputChange} isEditing={isEditing} />
-                                            </FadeIn>
+                                ) : (
+                                    <FadeIn key="suppliers" className="block">
+                                        <ProductSuppliersTab isEditing={isEditing} productData={productData} />
+                                    </FadeIn>
+                                )}
+                            </div>
+                            {productData.show_in_marketplace && (
+                                <div className={activeTab === "marketplace" ? "block" : "hidden"}>
+                                    {isLoadingDetails ? (
+                                        <div className="flex flex-col items-center justify-center pt-24 pb-32">
+                                            <Spinner size={36} className="text-brand-primary" />
+                                            <p className="mt-4 text-[15px] text-brand-dark dark:text-dark-heading font-medium">Carregando marketplace...</p>
                                         </div>
+                                    ) : (
+                                        <FadeIn key="marketplace" className="block">
+                                            <ProductMarketplaceTab productData={productData} handleInputChange={handleInputChange} isEditing={isEditing} />
+                                        </FadeIn>
                                     )}
-                                </>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -825,7 +837,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                 />
                             </div>
                         )}
-                        
+
                         <div className="space-y-1.5">
                             <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Nome</label>
                             <Input

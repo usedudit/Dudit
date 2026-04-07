@@ -398,18 +398,17 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
                         {/* --- Empty State --- */}
                         {items.length === 0 && (
-                            <div className="w-full flex-col flex items-center justify-center py-10 px-4 border-2 border-dashed border-brand-border dark:border-dark-border rounded-xl bg-brand-gray/20 dark:bg-dark-border/10 mb-8">
-                                <div className="w-12 h-12 bg-white dark:bg-dark-surface shadow-sm border border-brand-border dark:border-dark-border rounded-full flex items-center justify-center mb-4">
-                                    <SearchIcon size={20} className="text-brand-inactive-text" />
-                                </div>
-                                <h4 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-1.5">Nenhum produto adicionado</h4>
-                                <p className="text-[13px] font-medium text-brand-inactive-text text-center max-w-xs mb-5">
-                                    Busque produtos no campo acima ou cadastre um item avulso manualmente.
-                                </p>
-                                <Button onClick={addBlankItem} variant="outline" className="h-9 bg-white dark:bg-dark-surface shadow-sm">
-                                    <PlusIcon size={16} className="mr-2" />
-                                    Adicionar item manual
-                                </Button>
+                            <div className="w-full flex-col flex items-center justify-center">
+                                <IconPlaceholder
+                                    icon={SearchIcon}
+                                    title="Nenhum produto adicionado"
+                                    subtitle="Busque produtos no campo acima ou cadastre um item avulso manualmente."
+                                    itemButton={{
+                                        text: "Adicionar item manual",
+                                        action: addBlankItem,
+                                        variant: "outline",
+                                    }}
+                                />
                             </div>
                         )}
 

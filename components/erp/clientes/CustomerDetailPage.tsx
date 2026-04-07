@@ -2,11 +2,11 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EditIcon, SparklesIcon, CheckCircleIcon, ChevronLeftIcon, ThreeDotsIcon, ClockIcon, ArrowUpDownIcon } from '@/lib/icons';
-import { Button, Badge, Checkbox, Tabs, TabsList, TabsTrigger, TabsContent, ActionsDropdown, InfoCard, ThreeDotsLoader } from '@/components/reusable';
+import { Button, Badge, Checkbox, Tabs, TabsList, TabsTrigger, TabsContent, ActionsDropdown, InfoCard, ThreeDotsLoader, AlertModal } from '@/components/reusable';
 import Pagination from '@/components/reusable/Pagination';
 import { useNotification } from '@/hooks/use-notification';
 import IconPlaceholder from '@/components/reusable/IconPlaceholder';
-import { getCustomerOrdersAction } from '@/app/actions/erp/customers';
+import { getCustomerOrdersAction, deleteCustomerAction } from '@/app/actions/erp/customers';
 import { getAddressesAction } from '@/app/actions/shared/addresses';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { useMediaQuery } from '../hooks';
@@ -41,6 +41,8 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const [isLoadingOrders, setIsLoadingOrders] = useState(true);
     const [customerAddress, setCustomerAddress] = useState<string | null>(null);
     const [billingAddress, setBillingAddress] = useState<string | null>(null);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Pagination and Selection
     const router = useRouter();
@@ -84,7 +86,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                 if (res.addresses && res.addresses.length > 0) {
                     const primaryAddr = res.addresses.find((a: any) => a.address_type === "primary" || a.is_default) || res.addresses[0];
                     const billingAddr = res.addresses.find((a: any) => a.address_type === "billing");
-                    
+
                     const format = (addr: any) => [
                         addr.street,
                         addr.number,
@@ -171,6 +173,30 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         router.push(`/erp/orders?id=${order.originalId}`)
     }
 
+    const handleDelete = async () => {
+        try {
+            setIsDeleting(true)
+            const token = await (await fetch("/api/csrf-token")).json().then((r: any) => r.token)
+            const res = await deleteCustomerAction(customer.originalId, token)
+            if (res?.error) {
+                notifyError("Erro ao excluir: " + res.error)
+            } else {
+                notifySuccess("Cliente excluído com sucesso!")
+                onBack()
+            }
+        } catch (e: any) {
+            // redirect from server action throws NEXT_REDIRECT, which is expected
+            if (e?.digest?.includes?.('NEXT_REDIRECT')) {
+                notifySuccess("Cliente excluído com sucesso!")
+                return
+            }
+            notifyError("Erro ao excluir o cliente.")
+        } finally {
+            setIsDeleting(false)
+            setShowDeleteModal(false)
+        }
+    }
+
     return (
         <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
@@ -192,7 +218,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                 <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                     <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                         <span className="truncate">{customer.name}</span>
-                                        <Badge variant={customer.status === 'ativo' ? 'green' : customer.status === 'inativo' ? 'gray' : 'red'} className="whitespace-nowrap scale-90 shrink-0 mt-0.5">
+                                        <Badge variant={customer.status === 'ativo' ? 'green' : customer.status === 'inativo' ? 'gray' : 'red'} className="whitespace-nowrap scale-90 shrink-0">
                                             {customer.status === 'ativo' ? 'Ativo' : customer.status === 'inativo' ? 'Inativo' : 'Bloqueado'}
                                         </Badge>
                                     </h1>
@@ -203,11 +229,11 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                 </div>
 
                                 {/* Desktop action buttons */}
-                                <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3 mt-1">
+                                <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
                                     <ActionsDropdown
                                         onShare={() => { }}
                                         onArchive={() => { }}
-                                        onDelete={() => { }}
+                                        onDelete={() => setShowDeleteModal(true)}
                                     />
                                     <Button className='whitespace-nowrap' onClick={() => onEdit?.(customer)}>
                                         <EditIcon className="w-4 h-4 mr-2" />
@@ -453,7 +479,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                     <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
                                         <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
 
-                                        <div className="px-6 py-5">
+                                        <div className="px-6 pt-5">
                                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Detalhes</h3>
                                         </div>
 
@@ -526,7 +552,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                     Endereço
                                                 </h3>
                                             </div>
- 
+
                                             {customerAddress ? (
                                                 <div className="space-y-6">
                                                     <div>
@@ -535,11 +561,11 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                             <img src="https://img.dudit.com.br/static/maps/MapSample.png" className="w-full h-full object-cover opacity-60" alt="Map" />
                                                             <div className="absolute inset-0 flex items-center justify-center">
                                                                 <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white">
-                                                                     <div className="w-2 h-2 bg-white rounded-full"></div>
+                                                                    <div className="w-2 h-2 bg-white rounded-full"></div>
                                                                 </div>
                                                             </div>
                                                         </div>
-    
+
                                                         <div className="mb-0">
                                                             <div className="flex justify-between items-start mb-1">
                                                                 <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate pr-2">Endereço Principal</h4>
@@ -614,7 +640,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                     <ActionsDropdown
                         onShare={() => { }}
                         onArchive={() => { }}
-                        onDelete={() => { }}
+                        onDelete={() => setShowDeleteModal(true)}
                         trigger={
                             <Button variant="outline" className="flex-1 h-[48px] font-bold">
                                 <ThreeDotsIcon className="w-4 h-4 mr-2" />
@@ -631,6 +657,16 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                     </Button>
                 </div>
             </Tabs >
+
+            <AlertModal
+                isOpen={showDeleteModal}
+                onClose={() => setShowDeleteModal(false)}
+                onConfirm={handleDelete}
+                title="Excluir cliente?"
+                description={`Tem certeza que deseja excluir ${customer.name}? Esta ação não pode ser desfeita.`}
+                confirmText={isDeleting ? "Excluindo..." : "Excluir"}
+                variant="danger"
+            />
         </div >
     );
 };

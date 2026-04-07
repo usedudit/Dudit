@@ -103,7 +103,7 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
     )
 
     const isLoading = storeLoading || (isQueryLoading && !rawCustomers)
-    const itemsPerPage = 12
+    const itemsPerPage = 8
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
@@ -552,14 +552,12 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
                     </AnimatePresence>
                 </div>
 
-                {!isLoading && filteredCustomers.length > itemsPerPage && (
-                    <div className="flex justify-center mb-8 mt-4">
-                        <Pagination
-                            currentPage={page}
-                            totalPages={totalPages}
-                            onPageChange={setPage}
-                        />
-                    </div>
+                {hasCustomers && paginated.length > 0 && (
+                    <Pagination
+                        currentPage={page}
+                        totalPages={totalPages}
+                        onPageChange={setPage}
+                    />
                 )}
             </div>
 

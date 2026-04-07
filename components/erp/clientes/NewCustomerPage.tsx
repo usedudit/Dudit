@@ -25,6 +25,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
 import { createComprehensiveCustomerAction, updateComprehensiveCustomerAction, getPartnerCustomersAction } from "@/app/actions/erp/customers"
+import { getAddressesAction } from "@/app/actions/shared/addresses"
 import { consultarCNPJ } from "@/lib/nuvem-fiscal"
 
 interface NewCustomerPageProps {
@@ -123,20 +124,43 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                             setStoreCredit(c.store_credit || 0)
                             setStatus(c.status === "ativo" ? "Ativo" : c.status === "inativo" ? "Inativo" : "Bloqueado")
                             setContribuinte(c.contribuinte || "9")
-                            
-                            // Address
-                            setCep(c.zip_code || "")
-                            setStreet(c.street || "")
-                            setNumber(c.number || "")
-                            setComplement(c.complement || "")
-                            setNeighborhood(c.neighborhood || "")
-                            setCity(c.city || "")
-                            setUf(c.state || "SP")
-                            setNoNumber(c.number === "S/N")
                             setObservacoes(c.notes || "")
                             setWebsite(c.website || "")
                             setRg(c.rg || "")
                             if (c.phone_fixed) setPhone(c.phone_fixed)
+
+                            // Fetch addresses from the addresses table
+                            try {
+                                const addrRes = await getAddressesAction(customerId, "customer")
+                                if (addrRes.addresses && addrRes.addresses.length > 0) {
+                                    const primary = addrRes.addresses.find((a: any) => a.address_type === "primary" || a.is_default) || addrRes.addresses[0]
+                                    if (primary) {
+                                        setCep(primary.zip_code || "")
+                                        setStreet(primary.street || "")
+                                        setNumber(primary.number || "")
+                                        setComplement(primary.complement || "")
+                                        setNeighborhood(primary.neighborhood || "")
+                                        setCity(primary.city || "")
+                                        setUf(primary.state || "SP")
+                                        setNoNumber(primary.number === "S/N")
+                                    }
+
+                                    const billing = addrRes.addresses.find((a: any) => a.address_type === "billing")
+                                    if (billing) {
+                                        setHasDifferentBillingAddress(true)
+                                        setBillingCep(billing.zip_code || "")
+                                        setBillingStreet(billing.street || "")
+                                        setBillingNumber(billing.number || "")
+                                        setBillingComplement(billing.complement || "")
+                                        setBillingNeighborhood(billing.neighborhood || "")
+                                        setBillingCity(billing.city || "")
+                                        setBillingUf(billing.state || "SP")
+                                        setBillingNoNumber(billing.number === "S/N")
+                                    }
+                                }
+                            } catch (addrErr) {
+                                console.error("Erro ao carregar endereços:", addrErr)
+                            }
                         }
                     }
                 } catch (e) {

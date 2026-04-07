@@ -46,6 +46,7 @@ export async function searchProductsForMovement(query: string) {
     }
 }
 
+// Legacy single-item action — preserved for backward compat (undo, triggers)
 export async function createStockMovementAction(data: {
     productId: string
     variantId?: string | null
@@ -57,7 +58,6 @@ export async function createStockMovementAction(data: {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
     try {
-        // requirePartner resolve tanto o usuário quanto o parceiro em uma única árvore de cache
         const partner = await requirePartner()
         const partnerId = partner.id
         const userId = partner.user_id
@@ -96,6 +96,66 @@ export async function createStockMovementAction(data: {
     }
 }
 
+// New batch action for multi-item movements
+export async function createBatchStockMovementAction(data: {
+    type: 'in' | 'out'
+    reason: string
+    notes: string
+    items: { productId: string; variantId?: string | null; quantity: number }[]
+}) {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+
+    try {
+        const partner = await requirePartner()
+        const partnerId = partner.id
+        const userId = partner.user_id
+
+        if (!data.items || data.items.length === 0) return errorResponse("Adicione pelo menos um item")
+        if (!data.reason) return errorResponse("Motivo é obrigatório")
+
+        for (const item of data.items) {
+            if (!item.productId) return errorResponse("Produto inválido em um dos itens")
+            if (item.quantity <= 0) return errorResponse("Quantidade deve ser maior que zero em todos os itens")
+        }
+
+        const supabase = await getSupabaseServerClient()
+
+        const itemsPayload = data.items.map(item => ({
+            product_id: item.productId,
+            variant_id: item.variantId || null,
+            quantity: item.quantity,
+        }))
+
+        const { data: movementRecord, error } = await supabase.rpc('create_batch_stock_movement', {
+            p_partner_id: partnerId,
+            p_movement_type: data.type,
+            p_reason: data.reason,
+            p_notes: data.notes,
+            p_created_by: userId,
+            p_items: JSON.stringify(itemsPayload)
+        })
+
+        if (error) {
+            console.error("createBatchStockMovementAction RPC error:", error)
+            return errorResponse(error.message)
+        }
+
+        revalidateStockMovements(partnerId)
+        revalidatePath('/erp/stock-movements')
+        revalidatePath('/erp/products')
+
+        // Invalidate cache for all products
+        for (const item of data.items) {
+            await invalidateProductCache(item.productId, partnerId, 'update', { silent: true })
+        }
+
+        return successResponse(movementRecord)
+    } catch (err: any) {
+        console.error("createBatchStockMovementAction error:", err)
+        return errorResponse("Erro interno ao processar a movimentação")
+    }
+}
+
 export async function getStockMovementDetails(id: string) {
     try {
         const ctx = await getCurrentPartnerContext()
@@ -112,6 +172,7 @@ export async function getStockMovementDetails(id: string) {
                 quantity,
                 previous_quantity,
                 new_quantity,
+                product_id,
                 reference_name,
                 reason,
                 notes,
@@ -134,7 +195,27 @@ export async function getStockMovementDetails(id: string) {
 
         if (!data) return errorResponse("Movimentação não encontrada")
 
-        // Resolve user name in parallel — fire immediately, await later
+        // Fetch child items from stock_movement_items
+        const { data: itemsData } = await supabase
+            .from("stock_movement_items")
+            .select(`
+                id,
+                product_id,
+                variant_id,
+                quantity,
+                previous_quantity,
+                new_quantity,
+                products (
+                    name,
+                    sku,
+                    images,
+                    category
+                )
+            `)
+            .eq("movement_id", id)
+            .order("created_at", { ascending: true })
+
+        // Resolve user name
         const userNamePromise = data.created_by
             ? supabase.from("user_profiles").select("full_name").eq("id", data.created_by).single().then((r: any) => r.data?.full_name || data.created_by)
             : Promise.resolve('Sistema')
@@ -159,23 +240,50 @@ export async function getStockMovementDetails(id: string) {
             timeZone: 'America/Sao_Paulo'
         });
 
+        // If we have child items, use them. Otherwise, build from the parent (backward compat).
+        const hasChildItems = itemsData && itemsData.length > 0;
+
+        const items = hasChildItems
+            ? itemsData.map((item: any) => ({
+                id: item.id,
+                product: {
+                    name: item.products?.name || 'Produto Excluído',
+                    sku: item.products?.sku || 'N/A',
+                    image: (item.products?.images && item.products.images.length > 0) ? item.products.images[0] : null,
+                    category: item.products?.category || 'Sem Categoria',
+                    previousStock: item.previous_quantity || 0,
+                    currentStock: item.new_quantity || 0,
+                },
+                quantity: Math.abs(item.quantity),
+                type: item.quantity > 0 ? 'in' : 'out',
+            }))
+            : [{
+                id: data.id + '-legacy',
+                product: {
+                    name: data.products?.name || 'Produto Excluído',
+                    sku: data.products?.sku || 'N/A',
+                    image: (data.products?.images && data.products.images.length > 0) ? data.products.images[0] : null,
+                    category: data.products?.category || 'Sem Categoria',
+                    previousStock: data.previous_quantity || 0,
+                    currentStock: data.new_quantity || 0,
+                },
+                quantity: Math.abs(data.quantity),
+                type: data.quantity > 0 ? 'in' : 'out',
+            }];
+
         return successResponse({
             id: data.id,
             displayId: data.id.split('-')[0].toUpperCase() + '-' + data.id.slice(-4).toUpperCase(),
             date: `${dateStr}, ${timeStr}`,
-            product: {
-                name: data.products?.name || 'Produto Excluído',
-                sku: data.products?.sku || 'N/A',
-                image: (data.products?.images && data.products.images.length > 0) ? data.products.images[0] : null,
-                category: data.products?.category || 'Sem Categoria',
-                previousStock: data.previous_quantity || 0,
-                currentStock: data.new_quantity || 0,
-            },
+            items,
+            items_count: items.length,
             type: data.quantity > 0 ? 'in' : 'out',
             quantity: Math.abs(data.quantity),
             reason: reason,
             user: userName,
             notes: data.notes || '',
+            // Legacy single product for backward compat
+            product: items[0]?.product || null,
         });
 
     } catch (err: any) {
@@ -219,16 +327,15 @@ export async function undoStockMovementAction(id: string, customReason?: string)
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
     try {
-        // Single partner resolution (previously called getCurrentPartnerContext + requirePartner = 2x DB)
         const partner = await requirePartner()
         const partnerId = partner.id
         const userId = partner.user_id
         const supabase = await getSupabaseServerClient()
 
-        // 1. Buscar a movimentação original para saber o que inverter
+        // 1. Fetch the original movement
         const { data: original, error: fetchError } = await supabase
             .from("stock_movements")
-            .select("product_id, variant_id, quantity")
+            .select("id, product_id, variant_id, quantity")
             .eq("id", id)
             .eq("partner_id", partnerId)
             .single()
@@ -238,41 +345,103 @@ export async function undoStockMovementAction(id: string, customReason?: string)
             return errorResponse("Movimentação original não encontrada")
         }
 
-        // 2. Determinar o tipo inverso e o motivo
-        // Se a original era > 0 (entrada), o estorno é saida ('out')
-        // Se a original era < 0 (saida), o estorno é entrada ('in')
+        // 2. Check for child items
+        const { data: childItems } = await supabase
+            .from("stock_movement_items")
+            .select("product_id, variant_id, quantity")
+            .eq("movement_id", id)
+
+        const hasChildItems = childItems && childItems.length > 0;
         const invertedType = original.quantity > 0 ? 'out' : 'in'
         const reason = customReason || "Movimentação desfeita"
         const notes = `Estorno da movimentação ID: ${id.split('-')[0].toUpperCase()}`
 
-        // 3. Criar a nova movimentação usando o RPC existente
-        const { data: movementRecord, error } = await supabase.rpc('create_manual_stock_movement', {
-            p_partner_id: partnerId,
-            p_product_id: original.product_id,
-            p_movement_type: invertedType,
-            p_quantity: Math.abs(original.quantity), // A quantidade é sempre positiva para o RPC
-            p_reason: customReason || "Estorno",
-            p_notes: notes,
-            p_created_by: userId,
-            p_variant_id: original.variant_id || null
-        })
+        if (hasChildItems) {
+            // Undo multi-item: create a batch reversal
+            const itemsPayload = childItems.map((item: any) => ({
+                product_id: item.product_id,
+                variant_id: item.variant_id || null,
+                quantity: Math.abs(item.quantity),
+            }))
 
-        if (error) {
-            console.error("undoStockMovementAction RPC error:", error)
-            return errorResponse(error.message)
+            const { data: movementRecord, error } = await supabase.rpc('create_batch_stock_movement', {
+                p_partner_id: partnerId,
+                p_movement_type: invertedType,
+                p_reason: customReason || "Estorno",
+                p_notes: notes,
+                p_created_by: userId,
+                p_items: JSON.stringify(itemsPayload)
+            })
+
+            if (error) {
+                console.error("undoStockMovementAction batch RPC error:", error)
+                return errorResponse(error.message)
+            }
+
+            revalidateStockMovements(partnerId)
+            revalidatePath('/erp/stock-movements')
+            revalidatePath('/erp/products')
+
+            for (const item of childItems) {
+                await invalidateProductCache(item.product_id, partnerId, 'update', { silent: true })
+            }
+
+            return successResponse(movementRecord)
+        } else {
+            // Undo single-item (legacy)
+            const { data: movementRecord, error } = await supabase.rpc('create_manual_stock_movement', {
+                p_partner_id: partnerId,
+                p_product_id: original.product_id,
+                p_movement_type: invertedType,
+                p_quantity: Math.abs(original.quantity),
+                p_reason: customReason || "Estorno",
+                p_notes: notes,
+                p_created_by: userId,
+                p_variant_id: original.variant_id || null
+            })
+
+            if (error) {
+                console.error("undoStockMovementAction RPC error:", error)
+                return errorResponse(error.message)
+            }
+
+            revalidateStockMovements(partnerId)
+            revalidatePath('/erp/stock-movements')
+            revalidatePath('/erp/products')
+            await invalidateProductCache(original.product_id, partnerId, 'update', { silent: true })
+
+            return successResponse(movementRecord)
         }
-
-        revalidateStockMovements(partnerId)
-        revalidatePath('/erp/stock-movements')
-        revalidatePath('/erp/products')
-
-        // Sync estorno change to Redis/Marketplace (silent avoids thundering herd)
-        await invalidateProductCache(original.product_id, partnerId, 'update', { silent: true })
-
-        return successResponse(movementRecord)
 
     } catch (err: any) {
         console.error("undoStockMovementAction error:", err)
         return errorResponse("Erro interno ao desfazer movimentação")
+    }
+}
+
+// Batch undo for multiple movements at once
+export async function undoBatchStockMovementsAction(ids: string[], customReason?: string) {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+
+    try {
+        const partner = await requirePartner()
+        const partnerId = partner.id
+
+        const results = []
+        for (const id of ids) {
+            const result = await undoStockMovementAction(id, customReason)
+            results.push({ id, ...result })
+        }
+
+        const allSuccess = results.every(r => r.success)
+        if (!allSuccess) {
+            const failed = results.filter(r => !r.success)
+            return errorResponse(`Falha ao desfazer ${failed.length} de ${ids.length} movimentações`)
+        }
+
+        return successResponse({ count: ids.length })
+    } catch (err: any) {
+        console.error("undoBatchStockMovementsAction error:", err)
+        return errorResponse("Erro interno ao desfazer movimentações em lote")
     }
 }

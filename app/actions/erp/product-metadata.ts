@@ -2,11 +2,6 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
-import { revalidateTag } from "next/cache"
-
-const CACHE_TAGS = {
-  metadata: (partnerId: string) => `partner-${partnerId}-product-metadata`,
-}
 
 interface MetadataResponse {
   categories: any[]

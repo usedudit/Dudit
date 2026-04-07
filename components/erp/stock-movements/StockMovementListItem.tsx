@@ -2,8 +2,8 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge, ActionsDropdown } from "@/components/reusable"
-import { ThreeDotsIcon, ChevronUpIcon, ChevronDownIcon } from "@/lib/icons"
+import { Badge, ActionsDropdown, Checkbox } from "@/components/reusable"
+import { ThreeDotsIcon, ChevronUpIcon, ChevronDownIcon, Package } from "@/lib/icons"
 
 interface ColumnDef {
   id: string
@@ -15,55 +15,42 @@ interface ColumnDef {
 interface StockMovementListItemProps {
   movement: any
   columns: ColumnDef[]
+  selected: boolean
+  onSelect: (id: string) => void
   onUndo: (id: string) => void
   onDetails: (id: string) => void
+  showCheckbox?: boolean
 }
 
 const StockMovementListItem = React.memo(
   ({
     movement,
     columns,
+    selected,
+    onSelect,
     onUndo,
     onDetails,
+    showCheckbox = true,
   }: StockMovementListItemProps) => {
 
     const renderCellContent = (colId: string) => {
       switch (colId) {
 
-        case "product":
+        case "movement":
           return (
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden">
-                <img
-                  src={movement.product.image || "https://img.dudit.com.br/static/Placeholder.png"}
-                  alt=""
-                  className="w-full h-full object-cover rounded-full"
-                  loading="lazy"
-                />
+              <div className="w-10 h-10 rounded-full bg-brand-slate dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                <Package className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
               </div>
               <div className="flex flex-col text-left min-w-0">
-                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[200px] xl:max-w-[300px]">
-                  {movement.product.name}
+                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[150px] leading-tight mb-0.5">
+                  {movement.displayId}
                 </span>
-                <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                  {movement.product.sku}
+                <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+                  {movement.items_count} {movement.items_count === 1 ? 'item' : 'itens'}
                 </span>
               </div>
             </div>
-          )
-
-        case "quantity":
-          return (
-            <span className={`text-[13px] font-bold ${movement.type === 'in' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-              {movement.type === 'in' ? "+" : "-"}{movement.quantity}
-            </span>
-          )
-
-        case "currentStock":
-          return (
-            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-              {movement.product.currentStock}
-            </span>
           )
 
         case "reason":
@@ -130,6 +117,15 @@ const StockMovementListItem = React.memo(
         className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
         onClick={() => onDetails(movement.id)}
       >
+        {showCheckbox && (
+          <td
+            className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Checkbox checked={selected} onChange={() => onSelect(movement.id)} />
+          </td>
+        )}
+
         {columns.map((col) => (
           <td
             key={col.id}
@@ -143,6 +139,7 @@ const StockMovementListItem = React.memo(
   },
   (prev, next) =>
     prev.movement === next.movement &&
+    prev.selected === next.selected &&
     prev.columns === next.columns
 )
 

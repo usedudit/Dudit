@@ -9,7 +9,9 @@ import {
     ChevronUpIcon,
     Package,
     FileIcon,
-    PlusIcon
+    PlusIcon,
+    TrashIcon,
+    ArrowRightIcon
 } from '@/lib/icons';
 import {
     Button,
@@ -23,8 +25,9 @@ import {
     Spinner,
     IconPlaceholder
 } from '@/components/reusable';
+import QuantitySelector from '@/components/reusable/QuantitySelector';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
-import { createStockMovementAction } from '@/app/actions/erp/stock-movements';
+import { createBatchStockMovementAction } from '@/app/actions/erp/stock-movements';
 import { fetchPartnerProductsBucket } from '@/app/actions/erp/client-loaders';
 import { useNotification } from '@/hooks/use-notification';
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
@@ -32,6 +35,11 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
 
 import { useProductBucket, type ProductBucketItem } from '../hooks'
+
+interface MovementItem {
+    product: ProductBucketItem;
+    quantity: number;
+}
 
 interface CreateStockMovementProps {
     onBack: () => void;
@@ -51,20 +59,21 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     // Form State
     const [type, setType] = useState<'in' | 'out'>('in');
     const [notes, setNotes] = useState('');
-    const [quantity, setQuantity] = useState<number | ''>('');
     const [reason, setReason] = useState('Selecione um motivo...');
+
+    // Multi-item state
+    const [items, setItems] = useState<MovementItem[]>([]);
 
     // Instant product search (client-side bucket)
     const productBucket = useProductBucket(fetchPartnerProductsBucket);
-    const [selectedProduct, setSelectedProduct] = useState<ProductBucketItem | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set());
 
     const isDirty = useMemo(() => {
-        return (selectedProduct !== null) || (quantity !== '' && quantity !== 0) || (notes !== '') || (reason !== 'Selecione um motivo...');
-    }, [selectedProduct, quantity, notes, reason]);
+        return items.length > 0 || notes !== '' || reason !== 'Selecione um motivo...';
+    }, [items, notes, reason]);
 
-    const showSearchDropdown = productBucket.searchQuery.length > 0 && !selectedProduct;
+    const showSearchDropdown = productBucket.searchQuery.length > 0;
 
     const { showConfirmDialog: unsavedChangesDialogOpen, confirmNavigation: handleUnsavedChangesConfirm, cancelNavigation: handleUnsavedChangesDialogClose } = useUnsavedChanges(isDirty)
 
@@ -83,20 +92,49 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
         setShowAlertModal(false)
     }, [nextAction])
 
+    const addProduct = useCallback((product: ProductBucketItem) => {
+        // Check if product is already in the list
+        const exists = items.find(item => item.product.id === product.id);
+        if (exists) {
+            notifyError("Este produto já foi adicionado.");
+            return;
+        }
+        setItems(prev => [...prev, { product, quantity: 1 }]);
+        productBucket.setSearchQuery('');
+        setFieldErrors(prev => {
+            const next = new Set(prev);
+            next.delete('items');
+            return next;
+        });
+    }, [items, productBucket, notifyError]);
+
+    const updateItemQty = useCallback((index: number, qty: number) => {
+        setItems(prev => prev.map((item, i) => i === index ? { ...item, quantity: Math.max(1, qty) } : item));
+    }, []);
+
+    const removeItem = useCallback((index: number) => {
+        setItems(prev => prev.filter((_, i) => i !== index));
+    }, []);
+
     const handleSave = async () => {
         const errors = new Set<string>();
 
-        if (!selectedProduct) {
-            errors.add('product');
-            notifyError("Selecione um produto.");
-        }
-        if (!quantity || Number(quantity) <= 0) {
-            errors.add('quantity');
-            notifyError("Informe uma quantidade válida maior que zero.");
+        if (items.length === 0) {
+            errors.add('items');
+            notifyError("Adicione pelo menos um produto.");
         }
         if (reason === 'Selecione um motivo...') {
             errors.add('reason');
             notifyError("Selecione um motivo para a movimentação.");
+        }
+
+        // Validate individual quantities
+        for (const item of items) {
+            if (item.quantity <= 0) {
+                errors.add('items');
+                notifyError("Todas as quantidades devem ser maiores que zero.");
+                break;
+            }
         }
 
         if (errors.size > 0) {
@@ -107,12 +145,14 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
 
         setIsSaving(true);
         try {
-            const res = await createStockMovementAction({
-                productId: selectedProduct!.id,
+            const res = await createBatchStockMovementAction({
                 type,
-                quantity: Number(quantity),
                 reason,
                 notes,
+                items: items.map(item => ({
+                    productId: item.product.id,
+                    quantity: item.quantity,
+                })),
             });
 
             if (!res || !res.success) {
@@ -171,8 +211,6 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                         </Button>
                                     </div>
                                 </div>
-
-                                {/* Tabs container - ensured alignment */}
 
                                 {/* Tabs */}
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
@@ -241,138 +279,192 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
 
                                                 <div className="h-px bg-brand-border dark:bg-dark-border w-full" />
 
-                                                {/* Detalhes do Produto */}
+                                                {/* Itens da Movimentação */}
                                                 <section>
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Detalhes da Movimentação</h3>
+                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Itens da Movimentação</h3>
                                                     <div className="space-y-6">
 
+                                                        {/* Product Search */}
                                                         <div className="relative">
-                                                            {!selectedProduct ? (
-                                                                <div className="relative">
-                                                                    <div className="relative flex items-center w-full">
-                                                                        <Input
-                                                                            type="text"
-                                                                            placeholder="Buscar por nome ou SKU..."
-                                                                            value={productBucket.searchQuery}
-                                                                            onChange={(e) => {
-                                                                                productBucket.setSearchQuery(e.target.value);
-                                                                                setFieldErrors(prev => {
-                                                                                    const next = new Set(prev);
-                                                                                    next.delete('product');
-                                                                                    return next;
-                                                                                });
-                                                                            }}
-                                                                            onFocus={productBucket.loadBucket}
-                                                                            prefix={
-                                                                                <SearchIcon
-                                                                                    size={18}
-                                                                                    className="text-brand-inactive-text flex-shrink-0"
-                                                                                />
-                                                                            }
-                                                                            error={fieldErrors.has('product')}
-                                                                            errorMessage={fieldErrors.has('product') ? "Selecione um produto" : undefined}
+                                                            <div className="relative flex items-center w-full">
+                                                                <Input
+                                                                    type="text"
+                                                                    placeholder="Buscar por nome ou SKU para adicionar..."
+                                                                    value={productBucket.searchQuery}
+                                                                    onChange={(e) => {
+                                                                        productBucket.setSearchQuery(e.target.value);
+                                                                        setFieldErrors(prev => {
+                                                                            const next = new Set(prev);
+                                                                            next.delete('items');
+                                                                            return next;
+                                                                        });
+                                                                    }}
+                                                                    onFocus={productBucket.loadBucket}
+                                                                    prefix={
+                                                                        <SearchIcon
+                                                                            size={18}
+                                                                            className="text-brand-inactive-text flex-shrink-0"
                                                                         />
-                                                                    </div>
+                                                                    }
+                                                                    error={fieldErrors.has('items') && items.length === 0}
+                                                                    errorMessage={fieldErrors.has('items') && items.length === 0 ? "Adicione pelo menos um produto" : undefined}
+                                                                />
+                                                            </div>
 
-                                                                    {showSearchDropdown && (
-                                                                        <motion.div
-                                                                            initial={{ opacity: 0, y: 5 }}
-                                                                            animate={{ opacity: 1, y: 0 }}
-                                                                            className="absolute z-50 top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl overflow-hidden max-h-72 overflow-y-auto"
-                                                                        >
-                                                                            {productBucket.isLoading ? (
-                                                                                <div className="p-8 text-center text-sm text-brand-inactive-text flex flex-col items-center gap-2">
-                                                                                    <Spinner size={16} />
-                                                                                    Carregando produtos...
-                                                                                </div>
-                                                                            ) : productBucket.filteredResults.length > 0 ? (
-                                                                                productBucket.filteredResults.map(product => (
-                                                                                    <div
-                                                                                        key={product.id}
-                                                                                        className="flex items-center gap-4 p-3.5 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0 transition-colors"
-                                                                                        onClick={() => {
-                                                                                            setSelectedProduct(product);
-                                                                                            productBucket.setSearchQuery('');
-                                                                                        }}
-                                                                                    >
-                                                                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden flex-shrink-0 border border-brand-border dark:border-dark-border">
-                                                                                            <img src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={product.name} className="w-full h-full object-cover rounded-full bg-brand-slate dark:bg-dark-border border border-brand-border dark:border-dark-border" />
-                                                                                        </div>
-                                                                                        <div className="flex-1 min-w-0">
-                                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
-                                                                                            <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase">{product.sku}</div>
-                                                                                        </div>
-                                                                                        <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
-                                                                                            {product.stock} em estoque
-                                                                                        </div>
-                                                                                    </div>
-                                                                                ))
-                                                                            ) : (
-                                                                                <div className="p-8 text-center text-sm text-brand-inactive-text">
-                                                                                    Nenhum produto encontrado.
-                                                                                </div>
-                                                                            )}
-                                                                        </motion.div>
-                                                                    )}
-                                                                </div>
-                                                            ) : (
-                                                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/30 flex items-center gap-4 relative group">
-                                                                    <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 border border-brand-border dark:border-dark-border flex-shrink-0 overflow-hidden">
-                                                                        <img src={getR2ImageUrl(selectedProduct.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={selectedProduct.name} className="w-full h-full object-cover rounded-full bg-brand-slate dark:bg-dark-border border border-brand-border dark:border-dark-border" />
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0 pr-8">
-                                                                        <div className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate mb-0.5">{selectedProduct.name}</div>
-                                                                        <div className="text-[13px] text-brand-inactive-text dark:text-dark-body flex items-center gap-2 font-medium">
-                                                                            <span>{selectedProduct.sku}</span>
-                                                                            <span className="w-1 h-1 rounded-full bg-brand-inactive-text opacity-40"></span>
-                                                                            <span>Estoque atual: <strong className="text-brand-dark dark:text-dark-heading font-bold">{selectedProduct.stock} un</strong></span>
+                                                            {showSearchDropdown && (
+                                                                <motion.div
+                                                                    initial={{ opacity: 0, y: 5 }}
+                                                                    animate={{ opacity: 1, y: 0 }}
+                                                                    className="absolute z-50 top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl overflow-hidden max-h-72 overflow-y-auto shadow-xl"
+                                                                >
+                                                                    {productBucket.isLoading ? (
+                                                                        <div className="p-8 text-center text-sm text-brand-inactive-text flex flex-col items-center gap-2">
+                                                                            <Spinner size={16} />
+                                                                            Carregando produtos...
                                                                         </div>
-                                                                    </div>
-                                                                    <button
-                                                                        className="absolute top-1/2 -translate-y-1/2 right-4 p-2 text-brand-inactive-text hover:text-brand-red transition-all rounded-full"
-                                                                        onClick={() => { setSelectedProduct(null); productBucket.setSearchQuery(''); }}
-                                                                    >
-                                                                        <PlusIcon size={18} className="rotate-45" />
-                                                                    </button>
+                                                                    ) : productBucket.filteredResults.length > 0 ? (
+                                                                        productBucket.filteredResults.map(product => {
+                                                                            const alreadyAdded = items.some(item => item.product.id === product.id);
+                                                                            return (
+                                                                                <div
+                                                                                    key={product.id}
+                                                                                    className={`flex items-center gap-4 p-3.5 border-b border-brand-border dark:border-dark-border last:border-0 transition-colors ${alreadyAdded ? 'opacity-40 cursor-default' : 'hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer'}`}
+                                                                                    onClick={() => !alreadyAdded && addProduct(product)}
+                                                                                >
+                                                                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden flex-shrink-0 border border-brand-border dark:border-dark-border">
+                                                                                        <img src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={product.name} className="w-full h-full object-cover rounded-full bg-brand-slate dark:bg-dark-border border border-brand-border dark:border-dark-border" />
+                                                                                    </div>
+                                                                                    <div className="flex-1 min-w-0">
+                                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
+                                                                                        <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase">{product.sku}</div>
+                                                                                    </div>
+                                                                                    <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
+                                                                                        {product.stock} em estoque
+                                                                                    </div>
+                                                                                </div>
+                                                                            )
+                                                                        })
+                                                                    ) : (
+                                                                        <div className="p-8 text-center text-sm text-brand-inactive-text">
+                                                                            Nenhum produto encontrado.
+                                                                        </div>
+                                                                    )}
                                                                 </motion.div>
                                                             )}
                                                         </div>
 
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                            <Input
-                                                                label="Quantidade"
-                                                                name="quantity"
-                                                                type="number"
-                                                                placeholder="Ex: 10"
-                                                                value={quantity}
-                                                                onChange={(e) => {
-                                                                    setQuantity(e.target.value === '' ? '' : Number(e.target.value));
-                                                                    setFieldErrors(prev => {
-                                                                        const next = new Set(prev);
-                                                                        next.delete('quantity');
-                                                                        return next;
-                                                                    });
-                                                                }}
-                                                                error={fieldErrors.has('quantity')}
-                                                                errorMessage={fieldErrors.has('quantity') ? "Quantidade inválida" : undefined}
-                                                            />
+                                                        {/* Items List — Desktop Table */}
+                                                        {items.length > 0 && (
+                                                            <div className="hidden md:block w-full overflow-x-auto pb-4 custom-scrollbar">
+                                                                <table className="w-full text-left border-separate border-spacing-0">
+                                                                    <thead>
+                                                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                            <th className="py-3 pl-6 pr-4 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg">Produto</th>
+                                                                            <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36">Qtd.</th>
+                                                                            <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-24 rounded-r-lg">Ações</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {items.map((item, index) => (
+                                                                            <tr key={item.product.id} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+                                                                                <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
+                                                                                    <div className="flex items-center gap-3">
+                                                                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
+                                                                                            <img src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className={`w-full h-full ${!item.product.image ? 'object-contain p-1.5' : 'object-cover'}`} alt="" />
+                                                                                        </div>
+                                                                                        <div className="flex flex-col text-left flex-1 min-w-0">
+                                                                                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[250px]">
+                                                                                                {item.product.name}
+                                                                                            </span>
+                                                                                            <div className="flex items-center gap-2">
+                                                                                                <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">{item.product.sku}</span>
+                                                                                                <span className="w-1 h-1 rounded-full bg-brand-inactive-text opacity-40"></span>
+                                                                                                <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">Estoque: <strong className="text-brand-dark dark:text-dark-heading font-bold">{item.product.stock}</strong></span>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                                                    <div className="flex justify-center">
+                                                                                        <QuantitySelector value={item.quantity} onChange={(val) => updateItemQty(index, val)} size="sm" />
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                                                    <div className="flex justify-center">
+                                                                                        <button
+                                                                                            onClick={() => removeItem(index)}
+                                                                                            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
+                                                                                            title="Remover item"
+                                                                                        >
+                                                                                            <TrashIcon size={18} />
+                                                                                        </button>
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>
+                                                                        ))}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        )}
 
-                                                            <FormDropdown
-                                                                label="Motivo"
-                                                                value={reason}
-                                                                setValue={setReason}
-                                                                options={type === 'in' ? [
-                                                                    { value: 'Compra de Fornecedor', label: 'Compra de Fornecedor' },
-                                                                    { value: 'Devolução de Cliente', label: 'Devolução de Cliente' },
-                                                                    { value: 'Ajuste de Estoque', label: 'Ajuste de Estoque' }
-                                                                ] : [
-                                                                    { value: 'Avaria / Perda', label: 'Avaria / Perda' },
-                                                                    { value: 'Ajuste de Estoque', label: 'Ajuste de Estoque' },
-                                                                    { value: 'Uso Interno', label: 'Uso Interno' }
-                                                                ]}
-                                                            />
-                                                        </div>
+                                                        {/* Items List — Mobile */}
+                                                        {items.length > 0 && (
+                                                            <div className="block md:hidden space-y-2">
+                                                                {items.map((item, index) => (
+                                                                    <div key={item.product.id} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
+                                                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
+                                                                            <img src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className={`w-full h-full ${!item.product.image ? 'object-contain p-1.5' : 'object-cover'}`} alt="" />
+                                                                        </div>
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <div className="flex justify-between items-start mb-0.5">
+                                                                                <h4 className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate pr-2">
+                                                                                    {item.product.name}
+                                                                                </h4>
+                                                                                <button
+                                                                                    onClick={() => removeItem(index)}
+                                                                                    className="w-8 h-8 flex items-center justify-center text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full transition-colors flex-shrink-0"
+                                                                                >
+                                                                                    <TrashIcon size={14} />
+                                                                                </button>
+                                                                            </div>
+                                                                            <p className="text-[11px] font-medium text-brand-inactive-text pr-2 truncate mb-2">
+                                                                                {item.product.sku} • Estoque: {item.product.stock}
+                                                                            </p>
+                                                                            <QuantitySelector value={item.quantity} onChange={(val) => updateItemQty(index, val)} size="sm" />
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
 
+                                                        {/* Empty State */}
+                                                        {items.length === 0 && (
+                                                            <div className="w-full flex-col flex items-center justify-center">
+                                                                <IconPlaceholder
+                                                                    icon={Package}
+                                                                    title="Nenhum produto adicionado"
+                                                                    subtitle="Busque e adicione produtos no campo acima."
+                                                                />
+                                                            </div>
+                                                        )}
+
+                                                        <div className="h-px bg-brand-border dark:bg-dark-border w-full" />
+
+                                                        {/* Reason Dropdown */}
+                                                        <FormDropdown
+                                                            label="Motivo"
+                                                            value={reason}
+                                                            setValue={setReason}
+                                                            options={type === 'in' ? [
+                                                                { value: 'Compra de Fornecedor', label: 'Compra de Fornecedor' },
+                                                                { value: 'Devolução de Cliente', label: 'Devolução de Cliente' },
+                                                                { value: 'Ajuste de Estoque', label: 'Ajuste de Estoque' }
+                                                            ] : [
+                                                                { value: 'Avaria / Perda', label: 'Avaria / Perda' },
+                                                                { value: 'Ajuste de Estoque', label: 'Ajuste de Estoque' },
+                                                                { value: 'Uso Interno', label: 'Uso Interno' }
+                                                            ]}
+                                                        />
                                                     </div>
                                                 </section>
                                             </motion.div>
@@ -415,7 +507,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                     </AnimatePresence>
                                 </div>
 
-                                {/* Sidebar Column */}
+                                {/* Sidebar Column — Projeção de Estoque */}
                                 {activeTab === 'Geral' && (
                                     <div className="hidden lg:block col-span-12 lg:col-span-4 border-l border-brand-border dark:border-dark-border pl-12 space-y-8">
                                         <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-all duration-300">
@@ -423,30 +515,40 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Projeção de Estoque</h3>
 
                                             <AnimatePresence mode="wait">
-                                                {selectedProduct ? (
+                                                {items.length > 0 ? (
                                                     <motion.div
                                                         key="projection-data"
                                                         initial={{ opacity: 0 }}
                                                         animate={{ opacity: 1 }}
                                                         exit={{ opacity: 0 }}
-                                                        className="space-y-4"
+                                                        className="space-y-0"
                                                     >
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="text-[13px] text-brand-inactive-text font-medium">Estoque Atual:</span>
-                                                            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
-                                                                {selectedProduct.stock} <span className="text-[11px] font-medium opacity-60">un</span>
-                                                            </span>
-                                                        </div>
+                                                        {items.map((item, index) => {
+                                                            const newStock = type === 'in'
+                                                                ? item.product.stock + item.quantity
+                                                                : Math.max(0, item.product.stock - item.quantity);
 
-                                                        <div className="flex items-center justify-between pt-4 border-t border-brand-border/40 dark:border-dark-border/40">
-                                                            <span className="text-[13px] text-brand-inactive-text font-medium">Novo Estoque:</span>
-                                                            <span className={`text-lg font-bold ${type === 'in' ? 'text-brand-green' : 'text-brand-red'}`}>
-                                                                {type === 'in'
-                                                                    ? (selectedProduct.stock + (Number(quantity) || 0))
-                                                                    : (selectedProduct.stock - (Number(quantity) || 0))}
-                                                                <span className="text-xs ml-1 font-bold">un</span>
-                                                            </span>
-                                                        </div>
+                                                            return (
+                                                                <div key={item.product.id} className={`py-4 ${index > 0 ? 'border-t border-brand-border/40 dark:border-dark-border/40' : ''}`}>
+                                                                    <div className="flex items-center gap-3 mb-3">
+                                                                        <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden flex-shrink-0 border border-brand-border dark:border-dark-border">
+                                                                            <img src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className="w-full h-full object-cover rounded-full" alt="" />
+                                                                        </div>
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <div className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">{item.product.name}</div>
+                                                                            <div className="text-[10px] font-medium text-brand-inactive-text uppercase tracking-wider">{item.product.sku}</div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-3 pl-11">
+                                                                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{item.product.stock} <span className="text-[10px] font-medium opacity-60">un</span></span>
+                                                                        <ArrowRightIcon size={14} className="text-brand-inactive-text" />
+                                                                        <span className={`text-[15px] font-bold ${type === 'in' ? 'text-brand-green' : 'text-brand-red'}`}>
+                                                                            {newStock} <span className="text-xs font-bold">un</span>
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            )
+                                                        })}
                                                     </motion.div>
                                                 ) : (
                                                     <motion.div

@@ -2,11 +2,13 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge, ActionsDropdown } from "@/components/reusable"
-import { ThreeDotsIcon, ChevronDownIcon, ChevronUpIcon } from "@/lib/icons"
+import { Badge, ActionsDropdown, Checkbox } from "@/components/reusable"
+import { ThreeDotsIcon, ChevronDownIcon, ChevronUpIcon, Package } from "@/lib/icons"
 
 interface StockMovementGridCardProps {
   movement: any
+  selected?: boolean
+  onSelect?: (id: string) => void
   onUndo: (id: string) => void
   onDetails: (id: string) => void
 }
@@ -14,6 +16,8 @@ interface StockMovementGridCardProps {
 const StockMovementGridCard = React.memo(
   ({
     movement,
+    selected,
+    onSelect,
     onUndo,
     onDetails
   }: StockMovementGridCardProps) => {
@@ -28,24 +32,19 @@ const StockMovementGridCard = React.memo(
         onClick={() => onDetails(movement.id)}
       >
         <div className="flex gap-4 mb-2">
-          {/* Imagem do Produto */}
-          <div className="w-20 h-20 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border flex-shrink-0 overflow-hidden">
-            <img
-              src={movement.product.image || "https://img.dudit.com.br/static/Placeholder.png"}
-              alt=""
-              loading="lazy"
-              className="w-full h-full object-cover rounded-full bg-brand-slate dark:bg-dark-border border border-brand-border dark:border-dark-border"
-            />
+          {/* Movement Icon */}
+          <div className="w-14 h-14 rounded-full bg-brand-slate dark:bg-dark-border border border-brand-border dark:border-dark-border flex-shrink-0 flex items-center justify-center">
+            <Package className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
           </div>
 
           <div className="flex-1 min-w-0 flex flex-col justify-center">
-            {/* Linha 1: Nome + Badge */}
+            {/* Linha 1: ID + Badge */}
             <div className="flex items-start justify-between gap-2 min-w-0 pr-1">
               <h3
                 className="flex-1 min-w-0 font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate"
-                title={movement.product.name}
+                title={movement.displayId}
               >
-                {movement.product.name}
+                {movement.displayId}
               </h3>
               <Badge
                 variant={movement.type === 'in' ? "green" : "red"}
@@ -56,49 +55,46 @@ const StockMovementGridCard = React.memo(
               </Badge>
             </div>
 
-            {/* Linha 2: SKU */}
+            {/* Linha 2: Items count */}
             <div className="flex items-center mt-1">
               <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate">
-                <span>SKU {movement.product.sku || "N/A"}</span>
+                <span>{movement.items_count} {movement.items_count === 1 ? 'item' : 'itens'}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Área do Rodapé */}
+        {/* Footer */}
         <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
-          {/* Linha A: Stats */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Quantidade</span>
-              <span className={`text-[14px] font-bold ${movement.type === 'in' ? 'text-brand-green' : 'text-brand-red'}`}>
-                {movement.type === 'in' ? '+' : '-'}{movement.quantity}
-              </span>
-            </div>
-
-            <div className="flex flex-col gap-0.5 items-end">
-              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Estoque Final</span>
-              <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
-                {movement.product.currentStock}
-              </span>
-            </div>
+          {/* Motivo */}
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Motivo</span>
+            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
+              {movement.reason || '-'}
+            </span>
           </div>
 
-          {/* Linha B: Data e Ações */}
+          {/* Data e Ações */}
           <div className="flex items-end justify-between mt-1">
             <div className="flex flex-col">
               <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{movement.date.split(',')[0]}</span>
               <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{movement.date.split(',')[1]}</span>
             </div>
 
-            {/* Botão de Ações */}
-            <div
-              className="flex-shrink-0"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <ActionsDropdown
-                onUndo={() => onUndo(movement.id)}
-              />
+            <div className="flex items-center gap-2">
+              {onSelect && (
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Checkbox checked={selected || false} onChange={() => onSelect(movement.id)} />
+                </div>
+              )}
+              <div
+                className="flex-shrink-0"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <ActionsDropdown
+                  onUndo={() => onUndo(movement.id)}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -106,7 +102,8 @@ const StockMovementGridCard = React.memo(
     )
   },
   (prev, next) =>
-    prev.movement === next.movement
+    prev.movement === next.movement &&
+    prev.selected === next.selected
 )
 
 StockMovementGridCard.displayName = "StockMovementGridCard"

@@ -115,7 +115,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
     const effectiveOrders = queryOrders ?? rawOrders
     const isLoading = storeLoading || isQueryLoading
 
-    const itemsPerPage = 12
+    const itemsPerPage = 8
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
@@ -655,14 +655,12 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                             </AnimatePresence>
                         </div>
 
-                        {!isLoading && filteredOrders.length > itemsPerPage && (
-                            <div className="flex justify-center mb-8 mt-4">
-                                <Pagination
-                                    currentPage={page}
-                                    totalPages={totalPages}
-                                    onPageChange={setPage}
-                                />
-                            </div>
+                        {hasOrders && paginated.length > 0 && (
+                            <Pagination
+                                currentPage={page}
+                                totalPages={totalPages}
+                                onPageChange={setPage}
+                            />
                         )}
                     </div>
                 )}

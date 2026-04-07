@@ -91,6 +91,24 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     // Persistence State (for isDirty)
     const [originalQuoteData, setOriginalQuoteData] = useState<any>(null);
 
+    // Pre-populate immediately from existingQuote (basic data from list) before background fetch
+    const prePopulatedRef = useRef(false);
+    useEffect(() => {
+        if (prePopulatedRef.current || mode === 'create' || !existingQuote) return;
+        prePopulatedRef.current = true;
+
+        // Set basic data immediately from the list object
+        if (existingQuote.customers) setSelectedCustomer(existingQuote.customers);
+        if (existingQuote.notes) setInternalNote(existingQuote.notes);
+        if (existingQuote.issue_date) setQuoteDate(existingQuote.issue_date);
+        if (existingQuote.expiration_date) setExpiryDate(existingQuote.expiration_date);
+        if (existingQuote.status) setStatus(existingQuote.status);
+        if (existingQuote.discount_value) setDiscount(existingQuote.discount_value.toString());
+        if (existingQuote.discount_type) setDiscountType(existingQuote.discount_type === 'percentage' ? '%' : 'R$');
+        if (existingQuote.shipping_cost) setShippingFee(existingQuote.shipping_cost.toString());
+        if (existingQuote.additional_costs) setOtherCosts(existingQuote.additional_costs.toString());
+    }, [existingQuote, mode]);
+
     // 1. Fetch Full Quote Details if existingQuote is provided
     useEffect(() => {
         const fetchDetails = async () => {

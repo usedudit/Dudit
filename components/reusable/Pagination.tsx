@@ -31,7 +31,7 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
               disabled={currentPage === 1}
               className="w-9 h-9 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-border hover:text-brand-dark dark:hover:text-dark-heading transition-colors disabled:opacity-50 p-0"
             >
-              <ChevronLeftIcon className="w-5 h-5" />
+              <ChevronLeftIcon className="w-6 h-6" />
             </Button>
 
             {getPaginationGroup().map((page) => (
@@ -39,7 +39,7 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
                 key={page}
                 variant="ghost"
                 onClick={() => onPageChange(page)}
-                className={`w-9 h-9 ${currentPage === page ? "bg-brand-gray dark:bg-dark-border text-brand-dark dark:text-dark-heading border-brand-border dark:border-dark-border shadow-sm" : "bg-transparent text-brand-inactive-text dark:text-dark-body border-transparent hover:bg-brand-gray dark:hover:bg-dark-border"}`}
+                className={`w-9 h-9 ${currentPage === page ? "bg-brand-gray dark:bg-dark-border text-brand-dark dark:text-dark-heading border-brand-border dark:border-dark-border" : "bg-transparent text-brand-inactive-text dark:text-dark-body border-transparent hover:bg-brand-gray dark:hover:bg-dark-border"}`}
               >
                 {page}
               </Button>
@@ -51,7 +51,7 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
               disabled={currentPage === totalPages}
               className="w-9 h-9 text-brand-inactive-text hover:bg-brand-gray dark:hover:bg-dark-border hover:text-brand-dark dark:hover:text-dark-heading transition-colors disabled:opacity-50 p-0"
             >
-              <ChevronRightIcon className="w-5 h-5" />
+              <ChevronRightIcon className="w-6 h-6" />
             </Button>
           </motion.div>
         )}
