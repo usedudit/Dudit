@@ -1,7 +1,7 @@
 "use client"
 
 import { motion, AnimatePresence } from "framer-motion"
-import { MapPin } from "@/lib/icons"
+import { MapPinIcon } from "@/lib/icons"
 import { Button, Input, CepInput, StateComboBox } from "@/components/reusable"
 import { SectionCard, DisplayRow, Feedback, PageHeader, fade, View, EditField } from "./profile-shared"
 
@@ -36,7 +36,7 @@ export const AddressView = ({
       <AnimatePresence mode="wait">
         {!editing.address ? (
           <motion.div key="addr-display" {...fade}>
-            <DisplayRow icon={MapPin} value={formattedAddress()} description="Seu endereço de entrega ou cobrança." onEdit={() => setEdit("address", true)} />
+            <DisplayRow icon={MapPinIcon} value={formattedAddress()} description="Seu endereço de entrega ou cobrança." onEdit={() => setEdit("address", true)} />
           </motion.div>
         ) : (
           <motion.div key="addr-edit" {...fade} className="space-y-4">

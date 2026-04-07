@@ -160,7 +160,15 @@ export function ERPSidebar() {
   const triggerRef = useRef<HTMLButtonElement>(null)
 
   const isActivePath = useCallback((href: string) => {
-    return pathname === href || pathname?.startsWith(href + "/")
+    if (!pathname) return false;
+    if (pathname === href) return true;
+    
+    // Exception for the Submenu of Products: "Catálogo de Produtos" should not be marked active if currently in "Cadastros de Produtos"
+    if (href === "/erp/products" && pathname.startsWith("/erp/products/cadastros")) {
+      return false;
+    }
+    
+    return pathname.startsWith(href + "/");
   }, [pathname])
 
   // Filter navItems by permissions

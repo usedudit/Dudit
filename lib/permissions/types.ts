@@ -66,6 +66,7 @@ export type RouteKey =
     | "marketing_coupons"
     | "cadastros_marketing"
     // Configurações
+    | "settings"
     | "settings_business"
     | "settings_integrations"
     | "settings_team"

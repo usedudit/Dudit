@@ -42,7 +42,7 @@ const OrderListItem = React.memo(
         case "order_id":
           return (
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-brand-slate dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+              <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                 <StoreIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
               </div>
               <div className="flex flex-col text-left min-w-0">

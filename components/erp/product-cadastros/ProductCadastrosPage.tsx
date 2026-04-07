@@ -302,6 +302,19 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                 }
             >
                 <div className="flex flex-col gap-4 p-4">
+                    <Combobox
+                        label="Tipo de Cadastro"
+                        options={[
+                            { value: "category", label: "Categoria" },
+                            { value: "subcategory", label: "Subcategoria" },
+                            { value: "brand", label: "Marca" },
+                            { value: "location", label: "Localização" }
+                        ]}
+                        value={modal.type}
+                        onChange={(val: string) => setModal(prev => ({ ...prev, type: val as any, item: { ...prev.item, parentId: null } }))}
+                        disabled={modal.mode === "edit"}
+                    />
+
                     <Input
                         label="Nome"
                         placeholder="Ex: Eletrônicos, Nike, Prateleira A1"

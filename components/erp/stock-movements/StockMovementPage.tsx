@@ -5,7 +5,6 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
     PlusIcon,
     ArrowUpDownIcon,
-    ArrowRightIcon,
     ExportFileIcon,
     RotateIcon,
     Package
@@ -20,7 +19,6 @@ import StockMovementDetailPage from './StockMovementDetailPage';
 import StockMovementPageControls from './StockMovementPageControls';
 import StockMovementListItem from './StockMovementListItem';
 import StockMovementGridCard from './StockMovementGridCard';
-import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import { undoStockMovementAction, undoBatchStockMovementsAction, getStockMovementDetails } from '@/app/actions/erp/stock-movements';
 import { useNotification } from '@/hooks/use-notification';
 import { useMediaQuery } from '@/components/erp/hooks';
@@ -195,24 +193,23 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
             // Count items from child records or fallback to 1
             const items_count = mov.stock_movement_items?.length || 1;
 
+            // Extract searchable content from child items
+            const childProductNames = mov.stock_movement_items?.map((i: any) => i.products?.name).join(' ') || '';
+            const childProductSkus = mov.stock_movement_items?.map((i: any) => i.products?.sku).join(' ') || '';
+
+            // Calculate total quantity from child items
+            const totalQuantity = mov.stock_movement_items?.reduce((sum: number, i: any) => sum + Math.abs(i.quantity), 0) || 0;
+
             return {
                 id: mov.id,
                 displayId: `${mov.id.split('-')[0].toUpperCase()}-${mov.id.slice(-4).toUpperCase()}`,
                 date: `${dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}, ${dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
                 rawDate: dateObj.getTime(),
                 items_count,
-                product: {
-                    name: mov.products?.name || 'Produto Excluído',
-                    sku: mov.products?.sku || 'N/A',
-                    image: (mov.products?.images && mov.products.images.length > 0)
-                        ? getR2ImageUrl(mov.products.images[0], "thumbnail")
-                        : 'https://img.dudit.com.br/static/Placeholder.png',
-                    category: mov.products?.category || 'Sem Categoria',
-                    previousStock: mov.previous_quantity || 0,
-                    currentStock: mov.new_quantity,
-                },
-                type: (mov.quantity > 0 ? 'in' : 'out') as 'in' | 'out',
-                quantity: Math.abs(mov.quantity),
+                childProductNames,
+                childProductSkus,
+                type: mov.movement_type as 'in' | 'out',
+                quantity: totalQuantity,
                 reason,
                 user: mov.created_by ? mov.created_by.split('@')[0] : 'Sistema',
                 reference: mov.reference_name || mov.reference_type || "-",
@@ -229,8 +226,8 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
         if (searchTerm) {
             const lower = searchTerm.toLowerCase();
             result = result.filter(mov =>
-                mov.product.name.toLowerCase().includes(lower) ||
-                mov.product.sku.toLowerCase().includes(lower) ||
+                mov.childProductNames.toLowerCase().includes(lower) ||
+                mov.childProductSkus.toLowerCase().includes(lower) ||
                 mov.reason.toLowerCase().includes(lower) ||
                 mov.displayId.toLowerCase().includes(lower)
             );
@@ -411,7 +408,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                                 className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none"
                                                 onClick={() => handleViewDetails(mov.id)}
                                             >
-                                                <div className="w-14 h-14 rounded-full bg-brand-slate dark:bg-dark-border border border-brand-border dark:border-dark-border flex-shrink-0 flex items-center justify-center">
+                                                <div className="w-14 h-14 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border flex-shrink-0 flex items-center justify-center">
                                                     <Package className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
                                                 </div>
 

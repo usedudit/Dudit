@@ -58,7 +58,7 @@ const ProductGridCard = React.memo(
               src={imageUrl}
               alt={product.name}
               loading="lazy"
-              className="w-full h-full object-cover rounded-full bg-brand-slate dark:bg-dark-border border border-brand-border dark:border-dark-border"
+              className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"
             />
           </div>
 

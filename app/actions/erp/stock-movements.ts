@@ -169,20 +169,10 @@ export async function getStockMovementDetails(id: string) {
                 id,
                 created_at,
                 movement_type,
-                quantity,
-                previous_quantity,
-                new_quantity,
-                product_id,
                 reference_name,
                 reason,
                 notes,
-                created_by,
-                products (
-                    name,
-                    sku,
-                    images,
-                    category
-                )
+                created_by
             `)
             .eq("id", id)
             .eq("partner_id", ctx.partnerId)
@@ -240,36 +230,19 @@ export async function getStockMovementDetails(id: string) {
             timeZone: 'America/Sao_Paulo'
         });
 
-        // If we have child items, use them. Otherwise, build from the parent (backward compat).
-        const hasChildItems = itemsData && itemsData.length > 0;
-
-        const items = hasChildItems
-            ? itemsData.map((item: any) => ({
-                id: item.id,
-                product: {
-                    name: item.products?.name || 'Produto Excluído',
-                    sku: item.products?.sku || 'N/A',
-                    image: (item.products?.images && item.products.images.length > 0) ? item.products.images[0] : null,
-                    category: item.products?.category || 'Sem Categoria',
-                    previousStock: item.previous_quantity || 0,
-                    currentStock: item.new_quantity || 0,
-                },
-                quantity: Math.abs(item.quantity),
-                type: item.quantity > 0 ? 'in' : 'out',
-            }))
-            : [{
-                id: data.id + '-legacy',
-                product: {
-                    name: data.products?.name || 'Produto Excluído',
-                    sku: data.products?.sku || 'N/A',
-                    image: (data.products?.images && data.products.images.length > 0) ? data.products.images[0] : null,
-                    category: data.products?.category || 'Sem Categoria',
-                    previousStock: data.previous_quantity || 0,
-                    currentStock: data.new_quantity || 0,
-                },
-                quantity: Math.abs(data.quantity),
-                type: data.quantity > 0 ? 'in' : 'out',
-            }];
+        const items = itemsData.map((item: any) => ({
+            id: item.id,
+            product: {
+                name: item.products?.name || 'Produto Excluído',
+                sku: item.products?.sku || 'N/A',
+                image: (item.products?.images && item.products.images.length > 0) ? item.products.images[0] : null,
+                category: item.products?.category || 'Sem Categoria',
+                previousStock: item.previous_quantity || 0,
+                currentStock: item.new_quantity || 0,
+            },
+            quantity: Math.abs(item.quantity),
+            type: item.quantity > 0 ? 'in' : 'out',
+        }))
 
         return successResponse({
             id: data.id,
@@ -335,7 +308,7 @@ export async function undoStockMovementAction(id: string, customReason?: string)
         // 1. Fetch the original movement
         const { data: original, error: fetchError } = await supabase
             .from("stock_movements")
-            .select("id, product_id, variant_id, quantity")
+            .select("id, movement_type")
             .eq("id", id)
             .eq("partner_id", partnerId)
             .single()
@@ -345,73 +318,50 @@ export async function undoStockMovementAction(id: string, customReason?: string)
             return errorResponse("Movimentação original não encontrada")
         }
 
-        // 2. Check for child items
+        // 2. Fetch all items
         const { data: childItems } = await supabase
             .from("stock_movement_items")
             .select("product_id, variant_id, quantity")
             .eq("movement_id", id)
 
-        const hasChildItems = childItems && childItems.length > 0;
-        const invertedType = original.quantity > 0 ? 'out' : 'in'
+        if (!childItems || childItems.length === 0) {
+            return errorResponse("Itens da movimentação não encontrados")
+        }
+
+        const invertedType = original.movement_type === 'in' ? 'out' : 'in'
         const reason = customReason || "Movimentação desfeita"
         const notes = `Estorno da movimentação ID: ${id.split('-')[0].toUpperCase()}`
 
-        if (hasChildItems) {
-            // Undo multi-item: create a batch reversal
-            const itemsPayload = childItems.map((item: any) => ({
-                product_id: item.product_id,
-                variant_id: item.variant_id || null,
-                quantity: Math.abs(item.quantity),
-            }))
+        // Undo multi-item: create a batch reversal
+        const itemsPayload = childItems.map((item: any) => ({
+            product_id: item.product_id,
+            variant_id: item.variant_id || null,
+            quantity: Math.abs(item.quantity),
+        }))
 
-            const { data: movementRecord, error } = await supabase.rpc('create_batch_stock_movement', {
-                p_partner_id: partnerId,
-                p_movement_type: invertedType,
-                p_reason: customReason || "Estorno",
-                p_notes: notes,
-                p_created_by: userId,
-                p_items: itemsPayload
-            })
+        const { data: movementRecord, error } = await supabase.rpc('create_batch_stock_movement', {
+            p_partner_id: partnerId,
+            p_movement_type: invertedType,
+            p_reason: customReason || "Estorno",
+            p_notes: notes,
+            p_created_by: userId,
+            p_items: itemsPayload
+        })
 
-            if (error) {
-                console.error("undoStockMovementAction batch RPC error:", error)
-                return errorResponse(error.message)
-            }
-
-            revalidateStockMovements(partnerId)
-            revalidatePath('/erp/stock-movements')
-            revalidatePath('/erp/products')
-
-            for (const item of childItems) {
-                await invalidateProductCache(item.product_id, partnerId, 'update', { silent: true })
-            }
-
-            return successResponse(movementRecord)
-        } else {
-            // Undo single-item (legacy)
-            const { data: movementRecord, error } = await supabase.rpc('create_manual_stock_movement', {
-                p_partner_id: partnerId,
-                p_product_id: original.product_id,
-                p_movement_type: invertedType,
-                p_quantity: Math.abs(original.quantity),
-                p_reason: customReason || "Estorno",
-                p_notes: notes,
-                p_created_by: userId,
-                p_variant_id: original.variant_id || null
-            })
-
-            if (error) {
-                console.error("undoStockMovementAction RPC error:", error)
-                return errorResponse(error.message)
-            }
-
-            revalidateStockMovements(partnerId)
-            revalidatePath('/erp/stock-movements')
-            revalidatePath('/erp/products')
-            await invalidateProductCache(original.product_id, partnerId, 'update', { silent: true })
-
-            return successResponse(movementRecord)
+        if (error) {
+            console.error("undoStockMovementAction batch RPC error:", error)
+            return errorResponse(error.message)
         }
+
+        revalidateStockMovements(partnerId)
+        revalidatePath('/erp/stock-movements')
+        revalidatePath('/erp/products')
+
+        for (const item of childItems) {
+            await invalidateProductCache(item.product_id, partnerId, 'update', { silent: true })
+        }
+
+        return successResponse(movementRecord)
 
     } catch (err: any) {
         console.error("undoStockMovementAction error:", err)

@@ -5,6 +5,9 @@ import {
     SearchIcon,
     PlusIcon,
     Package,
+    SubcategoryIcon,
+    TagIcon,
+    MapsIcon,
 } from "@/lib/icons"
 
 interface CadastrosPageControlsProps {
@@ -35,13 +38,13 @@ const CadastrosPageControls: React.FC<CadastrosPageControlsProps> = ({
                         <TabsTrigger value="categories" icon={Package}>
                             Categorias
                         </TabsTrigger>
-                        <TabsTrigger value="subcategories" icon={Package}>
+                        <TabsTrigger value="subcategories" icon={SubcategoryIcon}>
                             Subcategorias
                         </TabsTrigger>
-                        <TabsTrigger value="brands" icon={Package}>
+                        <TabsTrigger value="brands" icon={TagIcon}>
                             Marcas
                         </TabsTrigger>
-                        <TabsTrigger value="locations" icon={Package}>
+                        <TabsTrigger value="locations" icon={MapsIcon}>
                             Localização
                         </TabsTrigger>
                     </TabsList>

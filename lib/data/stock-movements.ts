@@ -16,21 +16,16 @@ export const getStockMovementsCached = cache(async (partnerId: string) => {
                 .select(`
               id,
               partner_id,
-              product_id,
               order_id,
               movement_type,
-              quantity,
-              previous_quantity,
-              new_quantity,
               reference_type,
               reference_name,
               reason,
               notes,
               created_at,
               created_by,
-              products(id, name, sku, stock_quantity, images, category),
               orders(id, order_number),
-              stock_movement_items(id, product_id, quantity, previous_quantity, new_quantity)
+              stock_movement_items(id, product_id, quantity, previous_quantity, new_quantity, products(name, sku))
             `)
                 .eq("partner_id", partnerId)
                 .order("created_at", { ascending: false })

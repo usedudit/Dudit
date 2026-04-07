@@ -199,7 +199,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                                         <div className="w-12 h-12 rounded-full border border-brand-border dark:border-dark-border overflow-hidden flex-shrink-0 bg-brand-gray dark:bg-dark-border/20">
                                                             <img
                                                                 src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
-                                                                className="w-full h-full object-cover rounded-full bg-brand-slate dark:bg-dark-border border border-brand-border dark:border-dark-border"
+                                                                className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"
                                                                 alt={item.product.name}
                                                             />
                                                         </div>

@@ -32,6 +32,8 @@ import {
   Location01Icon,
   InstagramIcon as InstagramIcon01,
   NewTwitterIcon,
+  SubnodeAddIcon,
+  MapsIcon as MapsIcon01,
   Menu01Icon,
   Moon02Icon,
   Flag01Icon,
@@ -198,7 +200,8 @@ export const ZoomInIcon = createIcon(ZoomInAreaIcon)
 export const ZoomOutIcon = createIcon(ZoomOutAreaIcon)
 export const RotateIcon = createIcon(RotateCropIcon)
 export const ReloadIcon = createIcon(ReloadIcon01)
-
+export const MapsIcon = createIcon(MapsIcon01)
+export const SubcategoryIcon = createIcon(SubnodeAddIcon)
 
 // ============================
 // SEARCH / FILTER
@@ -285,7 +288,7 @@ export const Moon = createIcon(Moon02Icon)
 export const MoonIcon = createIcon(Moon02Icon)
 
 export const ClockIcon = createIcon(Clock01Icon)
-export const MapPin = createIcon(Location01Icon)
+export const MapPinIcon = createIcon(Location01Icon)
 
 export const QRCodeIcon = createIcon(QrCodeIcon)
 

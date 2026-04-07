@@ -303,7 +303,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
             {step === 2 && (
               <div className="space-y-5">
                 <div className="flex items-center gap-4 dark:bg-dark-background/50">
-                  <div onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-slate dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                  <div onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray  dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                     {imagePreview ? <img src={imagePreview} alt="Logo" className="object-cover w-full h-full rounded-full" /> : <Upload className="text-brand-inactive-text w-5 h-5" />}
                   </div>
                   <div className="flex-1">

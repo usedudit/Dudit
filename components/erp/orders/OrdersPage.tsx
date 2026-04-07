@@ -73,7 +73,7 @@ const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; 
     { id: "customer", label: "Cliente", align: "left", width: "250px" },
     { id: "date", label: "Data", align: "center", width: "150px" },
     { id: "channel", label: "Canal", align: "left", width: "150px" },
-    { id: "status", label: "Status", align: "center", width: "220px" },
+    { id: "status", label: "Status", align: "center", width: "100px" },
     { id: "actions", label: "Ações", align: "center", width: "80px" },
 ]
 
@@ -102,7 +102,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
     const [selection, setSelection] = useState({ ids: new Set<string>() })
     const [wrapperMode, setWrapperMode] = useState<'create' | 'edit' | 'view' | null>(null)
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
-    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({ key: 'date', direction: 'desc' })
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
 
     const queryClient = useQueryClient()
 

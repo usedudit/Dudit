@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-    MapPin, PlusIcon, Package, TagIcon, X, ChevronUpIcon, ChevronDownIcon,
+    MapPinIcon, PlusIcon, Package, TagIcon, X, ChevronUpIcon, ChevronDownIcon,
 } from "@/lib/icons"
 import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
@@ -551,7 +551,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                                                 <div className="flex flex-col items-center border-t border-brand-border pt-6">
                                                                     <div className="flex flex-col items-center border-t border-brand-border pt-6">
                                                                         <IconPlaceholder
-                                                                            icon={MapPin}
+                                                                            icon={MapPinIcon}
                                                                             title="Nenhum endereço cadastrado"
                                                                             subtitle="Adicione um endereço para receber sua entrega."
                                                                             itemButton={{

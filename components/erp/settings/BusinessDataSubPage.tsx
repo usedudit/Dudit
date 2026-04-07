@@ -7,7 +7,7 @@ import { CpfCnpjInput, CepInput, StateComboBox, MoneyInput, PhoneInput, ListItem
 import { Switch } from "@/components/reusable/Switch"
 import { BusinessHoursSelector } from "@/components/business-hours-selector"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
-import { ChevronLeftIcon, SaveIcon, Store, ShoppingBag, HomeIcon, MapPin, WrenchIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, Store, ShoppingBag, HomeIcon, WrenchIcon } from "@/lib/icons"
 import { useNotification } from "@/hooks/use-notification"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
@@ -392,7 +392,7 @@ export const BusinessDataSubPage = ({
                                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Logo do Negócio</h3>
 
                                                 <div className="flex items-center gap-4 dark:bg-dark-background/50">
-                                                    <div onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-slate dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                    <div onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                                                         {imagePreview ? (
                                                             <img src={imagePreview} alt="Logo" className="object-cover w-full h-full rounded-full" />
                                                         ) : (
@@ -507,6 +507,7 @@ export const BusinessDataSubPage = ({
                                                         <img
                                                             alt="Satelite Map"
                                                             className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                                                            src="https://img.dudit.com.br/static/MapLarge.png"
                                                             onError={(e) => { e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" fill="rgb(229,231,235)"><rect width="100%" height="100%"/></svg>' }}
                                                         />
                                                         <div className="absolute inset-0 flex items-center justify-center">

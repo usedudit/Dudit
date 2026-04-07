@@ -66,7 +66,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
                 <div className="flex items-start justify-between mb-6">
                     <div className="flex gap-3 text-left">
                         <div className="relative">
-                            <div className="w-10 h-10 rounded-full bg-brand-slate dark:bg-dark-border flex items-center justify-center text-lg font-bold text-brand-dark dark:text-dark-heading border border-white dark:border-dark-border overflow-hidden uppercase text-brand-inactive-text">
+                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex items-center justify-center text-lg font-bold text-brand-dark dark:text-dark-heading border border-white dark:border-dark-border overflow-hidden uppercase text-brand-inactive-text">
                                 {customer?.name?.charAt(0) || 'C'}
                             </div>
                         </div>

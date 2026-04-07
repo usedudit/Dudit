@@ -33,7 +33,7 @@ const StockMovementGridCard = React.memo(
       >
         <div className="flex gap-4 mb-2">
           {/* Movement Icon */}
-          <div className="w-14 h-14 rounded-full bg-brand-slate dark:bg-dark-border border border-brand-border dark:border-dark-border flex-shrink-0 flex items-center justify-center">
+          <div className="w-14 h-14 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border flex-shrink-0 flex items-center justify-center">
             <Package className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
           </div>
 

@@ -88,7 +88,7 @@ export async function createComprehensiveCustomerAction(data: {
 
   // Criar endereço na tabela addresses
   if (data.street || data.city) {
-    await createAddressAction({
+    const addressResult = await createAddressAction({
       entityId: newCustomer.id,
       entityType: "customer",
       zipCode: data.zipCode || "",
@@ -104,11 +104,15 @@ export async function createComprehensiveCustomerAction(data: {
       isDefault: true,
       csrf_token: data.csrf_token,
     })
+    
+    if (addressResult && addressResult.error) {
+      console.error("[createComprehensiveCustomerAction] Erro ao salvar endereço principal:", addressResult.error)
+    }
   }
 
   // Criar endereço de cobrança se for diferente
   if (data.hasDifferentBillingAddress && (data.billingStreet || data.billingCity)) {
-    await createAddressAction({
+    const billingResult = await createAddressAction({
       entityId: newCustomer.id,
       entityType: "customer",
       zipCode: data.billingZipCode || "",
@@ -123,6 +127,10 @@ export async function createComprehensiveCustomerAction(data: {
       isDefault: false,
       csrf_token: data.csrf_token,
     })
+    
+    if (billingResult && billingResult.error) {
+      console.error("[createComprehensiveCustomerAction] Erro ao salvar endereço de cobrança:", billingResult.error)
+    }
   }
 
   revalidateCustomers(data.partnerId)
@@ -246,7 +254,7 @@ export async function updateComprehensiveCustomerAction(data: {
       .limit(1)
 
     if (existingAddresses && existingAddresses.length > 0) {
-      await supabase.from("addresses").update({
+      const { error: addressUpdateError } = await supabase.from("addresses").update({
         zip_code: data.zipCode,
         street: data.street,
         number: data.number,
@@ -257,8 +265,12 @@ export async function updateComprehensiveCustomerAction(data: {
         country: data.country || "BR",
         municipio_codigo_ibge: data.municipioCodigoIbge || null,
       }).eq("id", existingAddresses[0].id)
+      
+      if (addressUpdateError) {
+        console.error("[updateComprehensiveCustomerAction] Erro ao atualizar endereço principal:", addressUpdateError.message)
+      }
     } else {
-      await createAddressAction({
+      const addressResult = await createAddressAction({
         entityId: data.customerId,
         entityType: "customer",
         zipCode: data.zipCode || "",
@@ -274,6 +286,10 @@ export async function updateComprehensiveCustomerAction(data: {
         isDefault: true,
         csrf_token: data.csrf_token,
       })
+      
+      if (addressResult && addressResult.error) {
+        console.error("[updateComprehensiveCustomerAction] Erro ao criar novo endereço principal:", addressResult.error)
+      }
     }
   }
 
@@ -287,7 +303,7 @@ export async function updateComprehensiveCustomerAction(data: {
       .limit(1)
 
     if (existingBilling && existingBilling.length > 0) {
-      await supabase.from("addresses").update({
+      const { error: billingUpdateError } = await supabase.from("addresses").update({
         zip_code: data.billingZipCode,
         street: data.billingStreet,
         number: data.billingNumber,
@@ -297,8 +313,12 @@ export async function updateComprehensiveCustomerAction(data: {
         state: data.billingState,
         country: data.country || "BR",
       }).eq("id", existingBilling[0].id)
+      
+      if (billingUpdateError) {
+        console.error("[updateComprehensiveCustomerAction] Erro ao atualizar endereço de cobrança:", billingUpdateError.message)
+      }
     } else {
-      await createAddressAction({
+      const billingResult = await createAddressAction({
         entityId: data.customerId,
         entityType: "customer",
         zipCode: data.billingZipCode || "",
@@ -313,6 +333,10 @@ export async function updateComprehensiveCustomerAction(data: {
         isDefault: false,
         csrf_token: data.csrf_token,
       })
+      
+      if (billingResult && billingResult.error) {
+        console.error("[updateComprehensiveCustomerAction] Erro ao criar novo endereço de cobrança:", billingResult.error)
+      }
     }
   } else if (!data.hasDifferentBillingAddress) {
     // Se não tiver mais endereço de cobrança diferente, remover existente se houver

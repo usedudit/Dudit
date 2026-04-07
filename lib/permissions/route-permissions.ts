@@ -114,6 +114,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
     cadastros_marketing: { key: "cadastros_marketing", path: "/erp/cadastros-marketing", label: "Cadastros", category: "Marketing" },
 
     // ── Configurações
+    settings: { key: "settings", path: "/erp/settings", label: "Configurações", category: "Configurações" },
     settings_business: {
         key: "settings_business", path: "/erp/settings/business", label: "Dados do Negócio", category: "Configurações",
         specificPermissions: ["can_edit_business_data"],
@@ -214,6 +215,7 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
     marketing_coupons: full,
     cadastros_marketing: full,
     // Configurações
+    settings: full,
     settings_business: withSpecific(full, { can_edit_business_data: true }),
     settings_integrations: withSpecific(full, { can_manage_integrations: true }),
     settings_team: withSpecific(full, { can_invite: true, can_remove_member: true, can_manage_team: true }),
@@ -225,6 +227,7 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
 const ADMIN_PERMISSIONS: PartnerRoutePermissions = {
     ...OWNER_PERMISSIONS,
     // ADMIN cannot change subscription
+    settings: full,
     settings_subscription: viewOnly,
     // ADMIN cannot manage integrations estratégicas (optional, can be overridden)
     settings_integrations: withSpecific(full, { can_manage_integrations: true }),
@@ -274,6 +277,7 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     marketing_coupons: full,
     cadastros_marketing: full,
     // Config — limited team management, no integrations/subscription
+    settings: viewOnly,
     settings_business: withSpecific(viewOnly, { can_edit_business_data: true }),
     settings_integrations: noAccess,
     settings_team: withSpecific(viewOnly, { can_invite: true, can_remove_member: false, can_manage_team: true }),
@@ -322,6 +326,7 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     marketing_coupons: noAccess,
     cadastros_marketing: noAccess,
     // Config — no access
+    settings: noAccess,
     settings_business: noAccess,
     settings_integrations: noAccess,
     settings_team: noAccess,
@@ -369,6 +374,7 @@ const DELIVERY_PERMISSIONS: PartnerRoutePermissions = {
     marketing_coupons: noAccess,
     cadastros_marketing: noAccess,
     // Config — no access
+    settings: noAccess,
     settings_business: noAccess,
     settings_integrations: noAccess,
     settings_team: noAccess,
@@ -402,6 +408,7 @@ const VIEWER_PERMISSIONS: PartnerRoutePermissions = {
     store_reviews: noAccess,
     marketing_coupons: noAccess,
     cadastros_marketing: noAccess,
+    settings: noAccess,
     settings_business: noAccess,
     settings_integrations: noAccess,
     settings_team: noAccess,

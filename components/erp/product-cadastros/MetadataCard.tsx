@@ -4,7 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Badge } from "@/components/reusable"
 import { ActionsDropdown } from "@/components/reusable/Accordion"
-import { Package } from "@/lib/icons"
+import { Package, SubcategoryIcon, TagIcon, MapsIcon } from "@/lib/icons"
 
 interface MetadataCardProps {
     item: any
@@ -19,6 +19,11 @@ const MetadataCard = React.memo(({ item, type, categories, onEdit, onDelete }: M
         ? categories.find(c => c.id === item.parent_id)?.name
         : null
 
+    const IconComponent = type === "subcategories" ? SubcategoryIcon 
+        : type === "brands" ? TagIcon 
+        : type === "locations" ? MapsIcon 
+        : Package
+
     return (
         <motion.div
             initial={{ opacity: 0 }}
@@ -30,8 +35,8 @@ const MetadataCard = React.memo(({ item, type, categories, onEdit, onDelete }: M
         >
             <div className="flex gap-4 mb-2">
                 {/* Icon Placeholder - matching ProductGridCard image size/shape */}
-                <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                    <Package className="w-6 h-6 text-brand-dark dark:text-dark-heading" />
+                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                    <IconComponent className="w-6 h-6 text-brand-dark dark:text-dark-heading" />
                 </div>
 
                 <div className="flex-1 min-w-0 flex flex-col justify-center">
@@ -43,7 +48,7 @@ const MetadataCard = React.memo(({ item, type, categories, onEdit, onDelete }: M
                             </h3>
                             <Badge
                                 variant={item.is_active ? "green" : "red"}
-                                className="text-[9px] h-4 px-1 py-3 flex-shrink-0"
+                                className="whitespace-nowrap scale-90 shrink-0"
                             >
                                 {item.is_active ? "Ativo" : "Inativo"}
                             </Badge>
@@ -58,7 +63,7 @@ const MetadataCard = React.memo(({ item, type, categories, onEdit, onDelete }: M
                                 Subcategoria de <span className="font-bold text-brand-green">{parentCategory || "Carregando..."}</span>
                             </span>
                         )}
-                        {type === "brands" && "Marca registrada"}
+                        {type === "brands" && "Marca do produto"}
                         {type === "locations" && "Localização de estoque"}
                     </div>
                 </div>

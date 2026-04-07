@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useTransition, useRef, useCallback } from "react"
 import cn from "classnames"
-import { Button, IconPlaceholder, InfoCard, ThreeDotsLoader } from "@/components/reusable"
+import { Button, IconPlaceholder, InfoCard, Input, ThreeDotsLoader } from "@/components/reusable"
 import { TrashIcon, MailIcon, MoreHorizontalIcon, CheckCircleIcon, ChevronLeftIcon } from "@/lib/icons"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -191,14 +191,14 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                       className="flex items-center justify-between p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
                     >
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-brand-slate dark:bg-gray-800 flex items-center justify-center font-bold text-brand-dark dark:text-dark-heading">
+                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-gray-800 flex items-center justify-center font-bold text-brand-dark dark:text-dark-heading">
                           {member.fullName?.[0]?.toUpperCase() || "U"}
                         </div>
                         <div>
                           <p className="font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
                             {member.fullName}
                             {member.userId === currentUserId ? (
-                              <span className="text-[10px] bg-brand-slate dark:bg-gray-800 px-1.5 py-0.5 rounded text-brand-dark dark:text-dark-heading">VOCÊ</span>
+                              <span className="text-[10px] bg-brand-gray dark:bg-gray-800 px-1.5 py-0.5 rounded text-brand-dark dark:text-dark-heading">VOCÊ</span>
                             ) : null}
                           </p>
                           <p className="text-sm text-brand-inactive-text dark:text-dark-body">{member.email}</p>
@@ -226,7 +226,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                                   <DropdownMenuItem
                                     key={role}
                                     onClick={() => handleUpdateRole(member.userId, role)}
-                                    className={member.role === role ? "bg-brand-slate font-bold" : ""}
+                                    className={member.role === role ? "bg-brand-gray font-bold" : ""}
                                   >
                                     Alterar para {ROLE_LABELS[role]}
                                   </DropdownMenuItem>
@@ -262,7 +262,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                             <div>
                               <p className="font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
                                 {inv.email}
-                                <span className="text-[10px] bg-brand-slate dark:bg-gray-800 px-1.5 py-0.5 rounded text-brand-dark dark:text-dark-heading uppercase tracking-tighter">PENDENTE</span>
+                                <span className="text-[10px] bg-brand-gray dark:bg-gray-800 px-1.5 py-0.5 rounded text-brand-dark dark:text-dark-heading uppercase tracking-tighter">PENDENTE</span>
                               </p>
                               <p className="text-sm text-brand-inactive-text dark:text-dark-body">Função: {ROLE_LABELS[inv.role as PartnerRole]}</p>
                             </div>
@@ -307,11 +307,10 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
           {!inviteUrl ? (
             <form onSubmit={handleInvite} className="space-y-4">
               <div>
-                <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Email do convidado</label>
-                <input
+                <Input
+                  label="Email do convidado"
                   type="email"
                   required
-                  className="w-full px-4 py-2 rounded-xl border border-brand-border dark:border-dark-border bg-brand-slate/50 dark:bg-gray-800 dark:text-dark-heading focus:ring-2 focus:ring-brand-dark/20 transition-all outline-none"
                   placeholder="exemplo@email.com"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
@@ -358,7 +357,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                 </p>
               </div>
 
-              <div className="p-4 bg-brand-slate dark:bg-gray-800 rounded-xl border border-brand-border dark:border-dark-border flex items-center justify-between gap-4">
+              <div className="p-4 bg-brand-gray dark:bg-gray-800 rounded-xl border border-brand-border dark:border-dark-border flex items-center justify-between gap-4">
                 <p className="text-xs font-mono text-brand-dark dark:text-dark-heading truncate flex-1 text-left">
                   {inviteUrl}
                 </p>

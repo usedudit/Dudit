@@ -124,7 +124,7 @@ export const ProfileCard = ({
     onClick={onClick}
     className="group flex items-center gap-4 p-5 rounded-2xl border bg-white dark:bg-dark-surface border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-dark-heading/30 transition-all cursor-pointer h-full"
   >
-    <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-gray-800 group-hover:bg-gray-200 dark:group-hover:bg-gray-700 flex items-center justify-center flex-shrink-0 transition-colors">
+    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-gray-800 group-hover:bg-gray-200 dark:group-hover:bg-gray-700 flex items-center justify-center flex-shrink-0 transition-colors">
       <Icon size={20} className="text-brand-dark dark:text-dark-heading" />
     </div>
     <div className="flex-1">

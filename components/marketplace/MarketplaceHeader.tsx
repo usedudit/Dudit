@@ -6,7 +6,7 @@ import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import {
   ShoppingBag,
-  MapPin,
+  MapPinIcon,
   ChevronDownIcon,
   SearchIcon,
   ChevronRightIcon,
@@ -263,7 +263,7 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
           </div>
           {(!isScrolled && showDeliveryInfo) && (
             <div className="flex items-center gap-1.5 px-1 mt-2.5 text-brand-inactive-text cursor-pointer w-full overflow-hidden">
-              <MapPin size={14} className="shrink-0 text-white" />
+              <MapPinIcon size={14} className="shrink-0 text-white" />
               <span className="text-[12px] font-normal truncate leading-tight ml-0.5 text-white">
                 {userLocation ? `Enviar para ${userLocation}` : "Informe o endereço"}
               </span>
@@ -382,7 +382,7 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
               </span>
             ) : null}
             <div className="flex items-center gap-1">
-              <MapPin size={16} className="text-white shrink-0" strokeWidth={2.5} />
+              <MapPinIcon size={16} className="text-white shrink-0" strokeWidth={2.5} />
               <span className="text-[13px] font-bold leading-none truncate max-w-[160px]">
                 {userLocation || "Informe o endereço"}
               </span>

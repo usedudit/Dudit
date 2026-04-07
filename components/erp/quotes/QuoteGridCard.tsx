@@ -35,7 +35,7 @@ const QuoteGridCard = React.memo(
             >
                 <div className="flex gap-4 mb-2">
                     {/* Visual Indicator */}
-                    <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                         <FileIcon className="w-6 h-6 text-brand-dark dark:text-dark-heading" />
                     </div>
 

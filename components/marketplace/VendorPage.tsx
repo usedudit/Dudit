@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
-import { Search, StarIcon, ArrowLeftIcon, MapPin, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check } from "@/lib/icons"
+import { Search, StarIcon, ArrowLeftIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check } from "@/lib/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -220,9 +220,9 @@ const MapboxMap = ({ lat, lng, name, address }: { lat?: number; lng?: number; na
           `
           const popup = new mapboxgl.Popup({ offset: 35, closeButton: false })
             .setHTML(popupContent)
-          
+
           marker.setPopup(popup)
-          
+
           // Abre o popup por padrão em telas maiores para facilitar a localização
           if (window.innerWidth > 1024) {
             marker.togglePopup()
@@ -290,7 +290,7 @@ const InfoTab = ({ partner, stats }: any) => {
       <div>
         <h3 className="text-[18px] font-semibold text-brand-dark mb-4">Endereço</h3>
         <div className="flex items-start gap-3 mb-5">
-          <MapPin size={20} className="text-brand-inactive-text mt-1 shrink-0" />
+          <MapPinIcon size={20} className="text-brand-inactive-text mt-1 shrink-0" />
           <div>
             <p className="text-[15px] text-brand-inactive-text">{partner.street}, {partner.number}</p>
             <p className="text-[15px] text-brand-inactive-text">{partner.city} - {partner.state}</p>
@@ -298,9 +298,9 @@ const InfoTab = ({ partner, stats }: any) => {
           </div>
         </div>
         <div className="w-full h-[150px] lg:h-[260px] rounded-[12px] overflow-hidden bg-gray-100 shrink-0">
-          <MapboxMap 
-            lat={partner.lat} 
-            lng={partner.lng} 
+          <MapboxMap
+            lat={partner.lat}
+            lng={partner.lng}
             name={partner.storeName}
             address={`${partner.street}, ${partner.number}, ${partner.city}/${partner.state}, CEP: ${partner.zipCode}`}
           />
