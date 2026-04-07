@@ -22,6 +22,7 @@ import { useNotification } from "@/hooks/use-notification";
 import CustomerCard from '@/components/reusable/CustomerCard';
 import { useSidebar } from "@/lib/sidebar-context";
 import { useRouter } from "next/navigation";
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 
 interface QuoteDetailProps {
     quoteId: string;
@@ -315,7 +316,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                                 {quote.items?.map((item: any) => (
                                     <QuoteItem
                                         key={item.id}
-                                        image={item.products?.images?.[0] || "https://img.dudit.com.br/static/Placeholder.png"}
+                                        image={getR2ImageUrl(item.products?.images?.[0] || item.product?.image, "thumbnail")}
                                         name={item.custom_name || item.products?.name || "Produto sem nome"}
                                         sku={item.products?.sku || "N/A"}
                                         qty={item.quantity}

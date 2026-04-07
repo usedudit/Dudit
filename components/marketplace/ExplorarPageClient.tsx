@@ -5,7 +5,7 @@ import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { ItemCard } from "./shared-components"
 import { Switch } from "@/components/reusable/Switch"
-import { IconPlaceholder, RadioButton, Dropdown, DropdownItem, Button, FormDropdown } from "@/components/reusable"
+import { IconPlaceholder, FormRadioGroup, Dropdown, DropdownItem, Button, FormDropdown } from "@/components/reusable"
 import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import Link from "next/link"
@@ -63,7 +63,10 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
       }
     },
     initialData: () => {
-      return { pages: [initialResults], pageParams: [null] }
+      if (currentType === type) {
+        return { pages: [initialResults], pageParams: [null] }
+      }
+      return undefined
     },
     placeholderData: keepPreviousData,
     staleTime: 60000,
@@ -72,13 +75,14 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
   })
 
   const rawItems = useMemo(() => {
+    if (currentType !== type && !data) return []
     const all = data ? data.pages.flat() : initialResults
     // MEMORY CAP: Discard oldest items if exceeding limit
     if (all.length > MAX_ITEMS) {
       return all.slice(0, MAX_ITEMS)
     }
     return all
-  }, [data, initialResults])
+  }, [data, initialResults, currentType, type])
 
   // HARDENED IntersectionObserver — single trigger with double-fire protection
   const isFetchingRef = useRef(false)
@@ -204,6 +208,11 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
   const handleTypeChange = (newType: string) => {
     if (newType === currentType) return
     setCurrentType(newType as any)
+    setSelectedCategories([])
+    setSelectedRegions([])
+    setMinPrice("")
+    setMaxPrice("")
+    setPromoOn(false)
   }
 
   const toggleCategory = (cat: string) => setSelectedCategories((prev) => (prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]))
@@ -229,23 +238,17 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
 
       <div className="mb-8">
         <h3 className="text-[15px] font-bold text-brand-dark mb-4">Tipo de Item</h3>
-        <div className="flex flex-col">
-          {[
+        <FormRadioGroup
+          name="item_type"
+          value={currentType}
+          onChange={handleTypeChange}
+          options={[
             { value: 'tudo', label: 'Ver Tudo' },
             { value: 'produtos', label: 'Produtos' },
             { value: 'servicos', label: 'Serviços' },
             { value: 'vitrines', label: 'Vitrines de Lojas' }
-          ].map((item) => (
-            <RadioButton
-              key={item.value}
-              name="item_type"
-              value={item.value}
-              checked={currentType === item.value}
-              onChange={() => handleTypeChange(item.value)}
-              label={item.label}
-            />
-          ))}
-        </div>
+          ]}
+        />
       </div>
 
       {currentType !== 'vitrines' && categories.length > 0 && (
@@ -310,10 +313,10 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
                 value={sortBy}
                 setValue={(val) => setSortBy(val as any)}
                 options={[
-                  { value: "relevancia", label: "Relevância" },
-                  { value: "preco_menor", label: "Menor Preço" },
-                  { value: "preco_maior", label: "Maior Preço" },
-                  { value: "recentes", label: "Mais Recentes" }
+                  { value: "relevancia", label: "Ordenar por: Relevância" },
+                  { value: "preco_menor", label: "Ordenar por: Menor Preço" },
+                  { value: "preco_maior", label: "Ordenar por: Maior Preço" },
+                  { value: "recentes", label: "Ordenar por: Mais Recentes" }
                 ]}
               />
             </div>
@@ -350,14 +353,13 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
               <div className="hidden lg:block mt-4 lg:mt-0">
                 <div className="min-w-[200px]">
                   <FormDropdown
-                    label="Ordenar por"
                     value={sortBy}
                     setValue={(val) => setSortBy(val as any)}
                     options={[
-                      { value: "relevancia", label: "Relevância" },
-                      { value: "preco_menor", label: "Menor Preço" },
-                      { value: "preco_maior", label: "Maior Preço" },
-                      { value: "recentes", label: "Mais Recentes" }
+                      { value: "relevancia", label: "Ordenar por: Relevância" },
+                      { value: "preco_menor", label: "Ordenar por: Menor Preço" },
+                      { value: "preco_maior", label: "Ordenar por: Maior Preço" },
+                      { value: "recentes", label: "Ordenar por: Mais Recentes" }
                     ]}
                   />
                 </div>
@@ -373,65 +375,65 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
                 transition={{ duration: 0.2 }}
               >
                 <>
-                    {vitrinesDestaque.length > 0 && (
-                      <div className="mb-10">
-                        <h2 className="text-[18px] font-bold text-brand-dark mb-4 opacity-80 tracking-widest text-xs uppercase">Vitrines relacionadas</h2>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                          {vitrinesDestaque.map((item) => (
-                            <Link key={`vitrine-${item.id}`} href={getPartnerUrl(item.partners)} prefetch={false} className="border border-brand-border p-4 rounded-xl flex flex-col items-center text-center hover:border-brand-green transition-colors group">
-                              <img src={item.images[0]} alt={item.name} className="w-20 h-20 rounded-full object-cover mb-3" />
+                  {vitrinesDestaque.length > 0 && (
+                    <div className="mb-10">
+                      <h2 className="text-[18px] font-bold text-brand-dark mb-4 opacity-80 tracking-widest text-xs uppercase">Vitrines relacionadas</h2>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {vitrinesDestaque.map((item) => (
+                          <Link key={`vitrine-${item.id}`} href={getPartnerUrl(item.partners)} prefetch={false} className="border border-brand-border p-4 rounded-xl flex flex-col items-center text-center hover:border-brand-green transition-colors group">
+                            <img src={item.images[0]} alt={item.name} className="w-20 h-20 rounded-full object-cover mb-3" />
+                            <h3 className="font-bold text-brand-dark truncate w-full group-hover:text-brand-green transition-colors">{item.name}</h3>
+                            <p className="text-xs text-brand-inactive-text truncate w-full mb-3">{item.partners?.city} - {item.partners?.state}</p>
+                            <span className="text-[11px] font-bold text-brand-green mt-auto bg-green-50 px-3 py-1 rounded-full uppercase tracking-wider">Ver Vitrine</span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {filteredResults.length === 0 && vitrinesDestaque.length === 0 && !hasNextPage ? (
+                    <IconPlaceholder
+                      placeholderType="image"
+                      imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                      imageAlt="O Dino revirou tudo e não achou!"
+                      title="O Dino revirou tudo e não achou!"
+                      subtitle="Não encontramos nada com esses filtros. Que tal tentar uma busca diferente ou limpar os filtros?"
+                    />
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                      {filteredResults.map((item) => {
+                        if (item.itemType === 'loja') {
+                          return (
+                            <Link key={`loja-${item.id}`} href={getPartnerUrl(item.partners)} prefetch={false} className="border border-brand-border p-4 rounded-xl flex flex-col items-center text-center hover:border-brand-green transition-colors group">
+                              <img src={item.images[0]} alt={item.name} className="w-20 h-20 rounded-full object-cover mb-4 shadow-sm" />
                               <h3 className="font-bold text-brand-dark truncate w-full group-hover:text-brand-green transition-colors">{item.name}</h3>
-                              <p className="text-xs text-brand-inactive-text truncate w-full mb-3">{item.partners?.city} - {item.partners?.state}</p>
-                              <span className="text-[11px] font-bold text-brand-green mt-auto bg-green-50 px-3 py-1 rounded-full uppercase tracking-wider">Ver Vitrine</span>
+                              <p className="text-xs text-brand-inactive-text truncate w-full mb-4">{item.partners?.city} - {item.partners?.state}</p>
+                              <span className="text-sm font-bold text-brand-green mt-auto uppercase tracking-wide">Explorar Loja</span>
                             </Link>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                          )
+                        }
+                        return <ItemCard key={item.id} product={item as any} />
+                      })}
 
-                    {filteredResults.length === 0 && vitrinesDestaque.length === 0 && !hasNextPage ? (
-                      <IconPlaceholder
-                        placeholderType="image"
-                        imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                        imageAlt="O Dino revirou tudo e não achou!"
-                        title="O Dino revirou tudo e não achou!"
-                        subtitle="Não encontramos nada com esses filtros. Que tal tentar uma busca diferente ou limpar os filtros?"
-                      />
-                    ) : (
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-                        {filteredResults.map((item) => {
-                          if (item.itemType === 'loja') {
-                            return (
-                              <Link key={`loja-${item.id}`} href={getPartnerUrl(item.partners)} prefetch={false} className="border border-brand-border p-4 rounded-xl flex flex-col items-center text-center hover:border-brand-green transition-colors group">
-                                <img src={item.images[0]} alt={item.name} className="w-20 h-20 rounded-full object-cover mb-4 shadow-sm" />
-                                <h3 className="font-bold text-brand-dark truncate w-full group-hover:text-brand-green transition-colors">{item.name}</h3>
-                                <p className="text-xs text-brand-inactive-text truncate w-full mb-4">{item.partners?.city} - {item.partners?.state}</p>
-                                <span className="text-sm font-bold text-brand-green mt-auto uppercase tracking-wide">Explorar Loja</span>
-                              </Link>
-                            )
-                          }
-                          return <ItemCard key={item.id} product={item as any} />
-                        })}
-
-                        {/* INFINITE SCROLL LOADER */}
-                        {hasNextPage && (
-                          <div
-                            ref={observerTarget}
-                            className="col-span-full py-12 flex items-center justify-center min-h-[100px]"
-                          >
-                            <div className="flex flex-col items-center gap-2">
-                              {isFetchingNextPage ? (
-                                <>
-                                  <SkeletonLoader height={24} width={180} />
-                                  <span className="text-[12px] text-brand-inactive-text animate-pulse">Carregando mais...</span>
-                                </>
-                              ) : null}
-                            </div>
+                      {/* INFINITE SCROLL LOADER */}
+                      {hasNextPage && (
+                        <div
+                          ref={observerTarget}
+                          className="col-span-full py-12 flex items-center justify-center min-h-[100px]"
+                        >
+                          <div className="flex flex-col items-center gap-2">
+                            {isFetchingNextPage ? (
+                              <>
+                                <SkeletonLoader height={24} width={180} />
+                                <span className="text-[12px] text-brand-inactive-text animate-pulse">Carregando mais...</span>
+                              </>
+                            ) : null}
                           </div>
-                        )}
-                      </div>
-                    )}
-                  </>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
               </motion.div>
             </AnimatePresence>
           </div>

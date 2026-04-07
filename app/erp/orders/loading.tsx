@@ -1,52 +1,76 @@
-import { Skeleton } from "@/components/ui/skeleton"
-import { Card } from "@/components/ui/card"
-
-export default function OrdersLoading() {
+export default function ERPPageLoading() {
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
-      <div className="space-y-6">
-        {/* Title and Button Skeleton (Desktop) */}
-        <div className="hidden md:flex justify-between items-center">
-          <div className="space-y-2">
-            <Skeleton className="h-9 w-48" />
-            <Skeleton className="h-4 w-64" />
+    <div className="animate-in fade-in-0 duration-200 ease-out flex flex-col h-full bg-white dark:bg-dark-background">
+      <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+
+        {/* Header skeleton */}
+        <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+          <div className="flex flex-col gap-2 pt-1">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-40 bg-gray-200 dark:bg-dark-border rounded-md animate-pulse" />
+            </div>
+            <div className="h-5 w-64 bg-gray-200 dark:bg-dark-border rounded-md animate-pulse" />
           </div>
-          <div className="flex gap-3">
-            <Skeleton className="h-10 w-32" />
-            <Skeleton className="h-10 w-40" />
+
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-[96px] bg-gray-200 dark:bg-dark-border rounded-full animate-pulse" />
+            <div className="h-10 w-[140px] bg-gray-200 dark:bg-dark-border rounded-full animate-pulse" />
           </div>
         </div>
 
-        {/* Search and Filters Skeleton */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Skeleton className="h-[42px] flex-1 max-w-sm rounded-full" />
-          <Skeleton className="h-[42px] w-32 rounded-full" />
-          <div className="flex-1" />
-          <Skeleton className="h-[42px] w-20 rounded-full" />
+        {/* Tabs skeleton */}
+        <div className="mb-6 px-4 md:px-8">
+          <div className="flex items-center gap-6 border-b border-gray-200 dark:border-dark-border pb-[1px]">
+            <div className="h-6 w-16 bg-gray-200 dark:bg-dark-border rounded animate-pulse mb-3" />
+            <div className="h-6 w-20 bg-gray-200 dark:bg-dark-border rounded animate-pulse mb-3" />
+            <div className="h-6 w-16 bg-gray-200 dark:bg-dark-border rounded animate-pulse mb-3" />
+            <div className="h-6 w-24 bg-gray-200 dark:bg-dark-border rounded animate-pulse mb-3" />
+          </div>
         </div>
 
-        {/* Table/Grid Skeleton */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-            <Card key={i} className="p-4 space-y-4">
-              <div className="flex gap-3">
-                <Skeleton className="h-12 w-12 rounded-xl" />
+        {/* Controls Bar skeleton */}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
+          {/* Mobile controls */}
+          <div className="md:hidden flex flex-row items-center gap-2 w-full">
+            <div className="flex-1 h-[42px] bg-gray-200 dark:bg-dark-border rounded-full animate-pulse" />
+            <div className="h-[42px] w-[42px] bg-gray-200 dark:bg-dark-border rounded-full animate-pulse" />
+            <div className="h-[42px] w-[42px] bg-gray-200 dark:bg-dark-border rounded-full animate-pulse" />
+            <div className="h-[42px] w-[42px] bg-gray-200 dark:bg-dark-border rounded-full animate-pulse" />
+          </div>
+
+          {/* Desktop controls */}
+          <div className="hidden md:flex items-center w-full gap-4">
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <div className="h-[42px] w-80 bg-gray-200 dark:bg-dark-border rounded-full animate-pulse" />
+              <div className="h-[42px] w-[90px] bg-gray-200 dark:bg-dark-border rounded-full animate-pulse" />
+            </div>
+
+            <div className="flex-1" />
+
+            <div className="h-[42px] w-[74px] bg-gray-200 dark:bg-dark-border rounded-full animate-pulse flex-shrink-0" />
+          </div>
+        </div>
+
+        {/* Table/List skeleton */}
+        <div className="flex-1 overflow-hidden px-4 md:px-8">
+          <div className="space-y-3 p-4">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="flex items-center gap-6 py-3" style={{ animationDelay: `${i * 50}ms` }}>
+                <div className="h-4 w-4 bg-gray-200 dark:bg-dark-border rounded animate-pulse" />
+                <div className="h-10 w-10 bg-gray-200 dark:bg-dark-border rounded-lg animate-pulse" />
                 <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-3 w-16" />
+                  <div className="h-4 w-1/4 bg-gray-200 dark:bg-dark-border rounded animate-pulse" />
+                  <div className="h-3 w-32 bg-gray-200 dark:bg-dark-border rounded animate-pulse" />
                 </div>
+                <div className="h-4 w-24 bg-gray-200 dark:bg-dark-border rounded animate-pulse" />
+                <div className="h-4 w-20 bg-gray-200 dark:bg-dark-border rounded animate-pulse" />
+                <div className="h-4 w-32 bg-gray-200 dark:bg-dark-border rounded animate-pulse" />
+                <div className="h-4 w-[60px] bg-gray-200 dark:bg-dark-border rounded-full animate-pulse" />
               </div>
-              <div className="space-y-2">
-                <Skeleton className="h-3 w-full" />
-                <Skeleton className="h-3 w-2/3" />
-              </div>
-              <div className="pt-2 border-t flex justify-between">
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-4 w-16" />
-              </div>
-            </Card>
-          ))}
+            ))}
+          </div>
         </div>
+
       </div>
     </div>
   )

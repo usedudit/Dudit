@@ -14,8 +14,9 @@ import {
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import QuantitySelector from '@/components/reusable/QuantitySelector';
-import { Button, Input as FormInput, Dropdown, DropdownItem, TabsContent, FormCurrencyInput, FormDropdown, MoneyInput, PercentageInput, DatePicker } from '@/components/reusable';
+import { Button, Input as FormInput, Dropdown, DropdownItem, TabsContent, FormCurrencyInput, FormDropdown, MoneyInput, PercentageInput, DatePicker, ThreeDotsLoader } from '@/components/reusable';
 import IconPlaceholder from '@/components/reusable/IconPlaceholder';
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 
 interface QuoteEditorProps {
     searchQuery: string;
@@ -113,7 +114,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                         className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-xl z-20 max-h-60 overflow-y-auto"
                                     >
                                         {props.isSearching ? (
-                                            <div className="p-4 text-center text-sm text-brand-inactive-text">Buscando produtos...</div>
+                                            <ThreeDotsLoader />
                                         ) : props.filteredProducts.length > 0 ? (
                                             props.filteredProducts.map(product => (
                                                 <div
@@ -121,7 +122,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                     onClick={() => props.handleProductClick(product)}
                                                     className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0"
                                                 >
-                                                    <img src={product.image} className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 object-cover border border-brand-border dark:border-dark-border" />
+                                                    <img src={getR2ImageUrl(product.image, "thumbnail")} className={`w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border ${!product.image ? 'object-contain' : 'object-cover'}`} />
                                                     <div className="flex-1">
                                                         <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</div>
                                                         <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">SKU: {product.sku}</div>
@@ -160,11 +161,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                             <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
-                                                        {item.image ? (
-                                                            <img src={item.image} className="w-full h-full object-cover" alt="" />
-                                                        ) : (
-                                                            <span className="text-xs font-bold text-brand-inactive-text">P</span>
-                                                        )}
+                                                        <img src={getR2ImageUrl(item.image, "thumbnail")} className="w-full h-full object-cover" alt="" />
                                                     </div>
                                                     <div className="flex flex-col text-left flex-1 min-w-0">
                                                         {item.isEditing ? (
@@ -249,11 +246,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 <div key={index} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
                                     {/* Left side: Avatar/Image */}
                                     <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
-                                        {item.image ? (
-                                            <img src={item.image} className="w-full h-full object-cover" alt="" />
-                                        ) : (
-                                            <span className="text-xs font-bold text-brand-inactive-text">P</span>
-                                        )}
+                                        <img src={getR2ImageUrl(item.image, "thumbnail")} className="w-full h-full object-cover" alt="" />
                                     </div>
 
                                     {/* Middle: Content */}

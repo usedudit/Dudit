@@ -7,9 +7,10 @@ import { useToast } from "@/hooks/use-toast"
 import { useStore } from "@/lib/store-context"
 import { fetchERPOrdersClient } from "@/app/actions/erp/client-loaders"
 import { useQueryClient } from "@tanstack/react-query"
+import { useUserProfile } from "@/hooks/use-user-profile"
 
 // Components
-import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Badge } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Badge, Input } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import OrderListItem from "./OrderListItem"
@@ -23,8 +24,17 @@ import {
     PlusIcon,
     ExportFileIcon,
     ArrowUpDownIcon,
+    EditIcon,
+    TrashIcon,
+    BlockedIcon
 } from "@/lib/icons"
 import { useRouter } from "next/navigation"
+
+import FloatingActionBar from "@/components/reusable/FloatingActionBar"
+import AlertModal from "../../reusable/AlertModal"
+import DefaultModal from "@/components/reusable/DefaultModal"
+import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
+import { deleteOrdersInBatchAction, updateOrdersStatusInBatchAction } from "@/app/actions/erp/orders"
 
 // --- TYPES & INTERFACES ---
 
@@ -72,6 +82,8 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
     const router = useRouter()
     const { selectedStore, isLoading: storeLoading } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
+    const { profile: userProfile } = useUserProfile()
+    const currentUserName = userProfile?.full_name || "Usuário"
 
     // State
     const [search, setSearch] = useState("")
@@ -82,6 +94,11 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
     const [page, setPage] = useState(1)
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
     const [modals, setModals] = useState({ filter: false })
+    const [bulkEditModal, setBulkEditModal] = useState({ isOpen: false })
+    const [confirmations, setConfirmations] = useState({ bulkDelete: false, bulkCancel: false })
+    const [actionModal, setActionModal] = useState<{ open: boolean; text: string }>({ open: false, text: "" })
+    const [cancelReason, setCancelReason] = useState("")
+    const [singleCancelId, setSingleCancelId] = useState<string | null>(null)
     const [selection, setSelection] = useState({ ids: new Set<string>() })
     const [wrapperMode, setWrapperMode] = useState<'create' | 'edit' | 'view' | null>(null)
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
@@ -145,7 +162,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     paid: { label: "Pago", color: "green" },
                     shipped: { label: "Enviado", color: "blue" },
                     delivered: { label: "Entregue", color: "green" },
-                    cancelled: { label: "Cancelado", color: "red" },
+                    cancelled: { label: "Cancelado", color: "gray" },
                     in_process: { label: "Em análise", color: "yellow" },
                     pending: { label: "Pendente", color: "gray" },
                 }
@@ -239,6 +256,86 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
         })
     }
 
+    const handleBulkEditApply = async (payload: BulkActionPayload) => {
+        const ids = Array.from(selection.ids)
+        if (ids.length === 0) return
+
+        setActionModal({ open: true, text: "Aplicando alterações..." })
+
+        try {
+            if (payload.type === 'delete') {
+                const result = await deleteOrdersInBatchAction(ids, partnerId)
+                if (result.success) {
+                    queryClient.invalidateQueries({ queryKey: ['erp', 'orders', partnerId] })
+                    setSelection({ ids: new Set() })
+                    toast({ title: "Sucesso", description: `${ids.length} pedidos excluídos` })
+                    setBulkEditModal({ isOpen: false })
+                } else {
+                    toast({ title: "Erro", description: result.error, variant: "destructive" })
+                }
+            } else if (payload.type === 'order_payment' || payload.type === 'order_delivery') {
+                const actionType = payload.type === 'order_payment' ? 'payment_status' : 'delivery_status'
+                const result = await updateOrdersStatusInBatchAction({
+                    orderIds: ids,
+                    partnerId,
+                    actionType,
+                    statusValue: payload.orderStatus
+                })
+                if (result.success) {
+                    queryClient.invalidateQueries({ queryKey: ['erp', 'orders', partnerId] })
+                    setSelection({ ids: new Set() })
+                    toast({ title: "Sucesso", description: "Status alterado com sucesso" })
+                    setBulkEditModal({ isOpen: false })
+                } else {
+                    toast({ title: "Erro", description: result.error, variant: "destructive" })
+                }
+            }
+        } catch (error) {
+            console.error(error)
+            toast({ title: "Erro", description: "Falha ao aplicar ação em massa", variant: "destructive" })
+        } finally {
+            setActionModal({ open: false, text: "" })
+        }
+    }
+
+    const confirmBulk = async (action: 'delete' | 'cancel') => {
+        const ids = singleCancelId ? [singleCancelId] : Array.from(selection.ids)
+        if (ids.length === 0) return
+
+        setActionModal({ open: true, text: action === 'delete' ? "Excluindo pedidos..." : "Cancelando pedidos..." })
+        
+        try {
+            let result;
+            if (action === 'delete') {
+                result = await deleteOrdersInBatchAction(ids, partnerId)
+            } else {
+                result = await updateOrdersStatusInBatchAction({
+                    orderIds: ids,
+                    partnerId,
+                    actionType: 'cancel',
+                    cancelReason: cancelReason.trim() || undefined,
+                    userName: currentUserName
+                })
+            }
+
+            if (result.success) {
+                queryClient.invalidateQueries({ queryKey: ['erp', 'orders', partnerId] })
+                if (!singleCancelId) setSelection({ ids: new Set() })
+                toast({ title: "Sucesso", description: action === 'delete' ? "Pedidos excluídos" : "Pedidos cancelados" })
+            } else {
+                toast({ title: "Erro", description: result.error, variant: "destructive" })
+            }
+        } catch (error) {
+            console.error(error)
+            toast({ title: "Erro", description: "Ocorreu um erro.", variant: "destructive" })
+        } finally {
+            setConfirmations(p => ({ ...p, bulkDelete: false, bulkCancel: false }))
+            setSingleCancelId(null)
+            setCancelReason("")
+            setActionModal({ open: false, text: "" })
+        }
+    }
+
     const handleClearFilters = () => {
         setSearch("")
         setFilters(INITIAL_FILTERS)
@@ -286,9 +383,9 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                 ) : wrapperMode === 'edit' && selectedOrderId ? (
                     <motion.div
                         key="edit-order"
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 20 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
                         transition={{ duration: 0.2 }}
                         className="w-full h-full bg-white dark:bg-dark-background"
                     >
@@ -301,9 +398,9 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                 ) : wrapperMode === 'create' ? (
                     <motion.div
                         key="create-order"
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 20 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
                         transition={{ duration: 0.2 }}
                         className="w-full h-full bg-white dark:bg-dark-background"
                     >
@@ -471,6 +568,10 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                                         onDetails={() => handleDetailsOrder(o)}
                                                         onEdit={() => handleEditOrder(o)}
                                                         onDelete={() => { }}
+                                                        onCancel={() => {
+                                                            setSingleCancelId(o.originalId)
+                                                            setConfirmations(p => ({ ...p, bulkCancel: true }))
+                                                        }}
                                                     />
                                                 ))}
                                             </div>
@@ -517,7 +618,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                                                                 {isSortable && (
                                                                                     <ArrowUpDownIcon
                                                                                         size={14}
-                                                                                        className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100' : 'text-brand-inactive-text opacity-0 group-hover:opacity-40'
+                                                                                        className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
                                                                                             } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
                                                                                     />
                                                                                 )}
@@ -537,6 +638,10 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                                                     onSelect={handleSelectRow}
                                                                     onEdit={handleEditOrder}
                                                                     onDelete={() => { }}
+                                                                    onCancel={() => {
+                                                                        setSingleCancelId(o.originalId)
+                                                                        setConfirmations(p => ({ ...p, bulkCancel: true }))
+                                                                    }}
                                                                     onDetails={handleDetailsOrder}
                                                                 />
                                                             ))}
@@ -571,6 +676,95 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                 setFilters={setFilters as any}
                 onClear={() => setFilters(INITIAL_FILTERS)}
             />
+
+            <FloatingActionBar
+                selectedCount={selection.ids.size}
+                onClearSelection={() => setSelection({ ids: new Set() })}
+            >
+                <Button
+                    variant="ghost"
+                    onClick={() => setBulkEditModal({ isOpen: true })}
+                    leftIcon={<EditIcon className="w-4 h-4" />}
+                    className="h-10 px-3"
+                >
+                    Ações em massa
+                </Button>
+
+                <Button
+                    variant="ghost"
+                    onClick={() => setConfirmations((p) => ({ ...p, bulkCancel: true }))}
+                    leftIcon={<BlockedIcon className="w-4 h-4" />}
+                    className="h-10 px-3 text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-surface"
+                >
+                    Cancelar
+                </Button>
+
+                <Button
+                    variant="ghost"
+                    onClick={() => setConfirmations((p) => ({ ...p, bulkDelete: true }))}
+                    leftIcon={<TrashIcon className="w-4 h-4" />}
+                    className="h-10 px-3 text-brand-red hover:text-brand-red/90 dark:text-brand-red dark:hover:text-brand-red/90 hover:bg-brand-red/5"
+                >
+                    Excluir
+                </Button>
+            </FloatingActionBar>
+
+            <AlertModal
+                isOpen={confirmations.bulkDelete}
+                onClose={() => setConfirmations((p) => ({ ...p, bulkDelete: false }))}
+                onConfirm={() => confirmBulk("delete")}
+                title="Excluir Pedidos"
+                message={`Tem certeza que deseja excluir ${selection.ids.size} pedido(s)? Esta ação não pode ser desfeita e pode afetar as estatísticas.`}
+                confirmText="Excluir"
+                variant="danger"
+            />
+
+            <AlertModal
+                isOpen={confirmations.bulkCancel}
+                onClose={() => {
+                    setConfirmations((p) => ({ ...p, bulkCancel: false }))
+                    setSingleCancelId(null)
+                    setCancelReason("")
+                }}
+                onConfirm={() => confirmBulk("cancel")}
+                title={singleCancelId ? "Cancelar Pedido" : "Cancelar Pedidos"}
+                message={
+                    <div className="flex flex-col gap-4">
+                        <p>Tem certeza que deseja cancelar {singleCancelId ? "este pedido" : `${selection.ids.size} pedido(s)`}?</p>
+                        <div className="text-left space-y-1.5">
+                            <label className="text-xs font-semibold text-brand-dark dark:text-dark-heading">Motivo do cancelamento (opcional)</label>
+                            <Input
+                                placeholder="Descreva o motivo..."
+                                value={cancelReason}
+                                onChange={(e) => setCancelReason(e.target.value)}
+                                className="bg-brand-gray dark:bg-dark-border/40"
+                            />
+                        </div>
+                    </div>
+                }
+                confirmText="Cancelar Pedidos"
+                variant="danger"
+            />
+
+            <BulkEditActionsModal
+                isOpen={bulkEditModal.isOpen}
+                onClose={() => setBulkEditModal({ isOpen: false })}
+                selectedCount={selection.ids.size}
+                targetType="order"
+                onApply={handleBulkEditApply}
+            />
+
+            <DefaultModal
+                isOpen={actionModal.open}
+                onClose={() => { }}
+                title=""
+                hideHeader
+            >
+                <div className="flex flex-col items-center justify-center p-6 gap-6 h-full mt-4">
+                    <img src="https://img.dudit.com.br/static/mascots/Aguarde.png" alt="Aguarde" className="w-36 h-36 object-contain" />
+                    <p className="text-lg font-semibold text-brand-dark dark:text-dark-heading text-center leading-tight">{actionModal.text}</p>
+                </div>
+            </DefaultModal>
         </motion.div>
     )
 }

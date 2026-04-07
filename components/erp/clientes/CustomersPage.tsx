@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useMediaQuery, useERPData } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useStore } from "@/lib/store-context"
-import { useStoreData } from "@/lib/use-store-data"
 import { fetchERPCustomersClient } from "@/app/actions/erp/client-loaders"
 import { useQueryClient } from "@tanstack/react-query"
 
@@ -20,6 +19,7 @@ import CustomerPageControls from "./CustomerPageControls"
 import CustomerDetailPage from "./CustomerDetailPage"
 import NewCustomerPage from "./NewCustomerPage"
 import { deleteCustomersInBatchAction, toggleCustomersStatusAction } from "@/app/actions/erp/customers"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 // Icons
 import {
@@ -300,6 +300,7 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
             <CustomerDetailPage
                 customer={selectedCustomer}
                 onBack={() => setUi({ pageState: "list", selectedId: null })}
+                onEdit={handleEditCustomer}
             />
         )
     }
@@ -428,9 +429,10 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
                                                 className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex items-center gap-4"
                                                 onClick={() => handleDetailsCustomer(c)}
                                             >
-                                                <div className="w-14 h-14 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden bg-brand-slate dark:bg-dark-border">
-                                                    <img src={c.avatar} alt={c.name} className="w-full h-full object-cover" />
-                                                </div>
+                                                <UserProfileImage
+                                                    fullName={c.name || "Cliente"}
+                                                    className="w-14 h-14 text-xl"
+                                                />
 
                                                 <div className="flex-1 min-w-0 flex flex-col gap-1">
                                                     <div className="flex justify-between items-start">
@@ -488,12 +490,9 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
                                                     <tr className="bg-brand-gray dark:bg-dark-border/50">
                                                         <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
                                                             <div className="flex items-center">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    className="w-4 h-4 rounded border-brand-border"
+                                                                <Checkbox
                                                                     checked={selection.ids.size === paginated.length && paginated.length > 0}
-                                                                    onChange={(e) => {
-                                                                        const checked = e.target.checked
+                                                                    onChange={(checked) => {
                                                                         setSelection({ ids: checked ? new Set(paginated.map((x: Customer) => x.originalId)) : new Set() })
                                                                     }}
                                                                 />
@@ -520,7 +519,7 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
                                                                         {isSortable && (
                                                                             <ArrowUpDownIcon
                                                                                 size={14}
-                                                                                className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100' : 'text-brand-inactive-text opacity-0 group-hover:opacity-40'
+                                                                                className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
                                                                                     } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
                                                                             />
                                                                         )}
@@ -576,8 +575,8 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
             <AlertModal
                 isOpen={confirmations.bulkDelete}
                 onClose={() => setConfirmations((p) => ({ ...p, bulkDelete: false }))}
-                title="Excluir clientes"
-                description={`Tem certeza que deseja excluir ${selection.ids.size} cliente(s)? Esta ação não pode ser desfeita e removerá os clientes do banco de dados.`}
+                title="Excluir Clientes"
+                description={`Tem certeza que deseja excluir ${selection.ids.size} cliente(s)? Esta ação não pode ser desfeita.`}
                 confirmText="Sim, excluir"
                 variant="danger"
                 onConfirm={() => confirmBulk("delete")}
@@ -590,7 +589,7 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
                 title="Alterar status"
                 description={`Tem certeza que deseja alterar o status de ${selection.ids.size} cliente(s)?`}
                 confirmText="Confirmar"
-                variant="info"
+                variant="warning"
                 onConfirm={() => confirmBulk("inactive")}
                 isLoading={isProcessingBulk}
             />

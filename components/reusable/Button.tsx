@@ -32,13 +32,13 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             default:
                 "bg-brand-green text-white hover:bg-brand-green/90 focus-visible:ring-brand-green/50 dark:bg-brand-green dark:hover:bg-brand-green/90",
             warning:
-                "bg-brand-yellow text-white hover:bg-brand-yellow/90 focus-visible:ring-brand-yellow/50 dark:bg-brand-yellow dark:hover:bg-brand-yellow/90",
+                "bg-brand-yellow text-white hover:bg-brand-yellow/90 focus-visible:ring-brand-yellow/50 dark:bg-[#dfcf00] dark:hover:bg-[#dfcf00e6]",
             outline:
                 "bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border focus-visible:ring-brand-border",
             outlinered:
                 "border border-brand-red/20 text-brand-red hover:bg-brand-red/5 hover:border-brand-red/50 dark:text-brand-red dark:border-brand-red/20 dark:hover:bg-brand-red/10 dark:hover:bg-brand-red/5 dark:hover:border-brand-red/50",
             destructive:
-                "bg-brand-red text-white hover:bg-brand-red/90 focus-visible:ring-brand-red/50 dark:bg-brand-red/30 dark:text-white dark:hover:bg-brand-red/40",
+                "bg-brand-red text-white hover:bg-brand-red/90 focus-visible:ring-brand-red/50 dark:bg-brand-red/70 dark:text-white dark:hover:bg-brand-red/80",
             ghost:
                 "bg-transparent text-brand-dark dark:text-dark-heading hover:bg-gray-100 dark:hover:bg-dark-border focus-visible:ring-gray-300 dark:focus-visible:ring-dark-border",
             filled:

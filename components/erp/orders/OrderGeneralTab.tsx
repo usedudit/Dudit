@@ -5,13 +5,15 @@ import { motion, AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
     Input, Button, FormDropdown, FormCurrencyInput,
-    CustomerCard, IconPlaceholder, DatePicker, Pagination
+    CustomerCard, IconPlaceholder, DatePicker, Pagination,
+    ThreeDotsLoader
 } from "@/components/reusable"
 import {
     SearchIcon, PlusIcon, TagIcon, TrashIcon,
     CheckCircleIcon, EditIcon, UserIcon
 } from "@/lib/icons"
 import QuantitySelector from "@/components/reusable/QuantitySelector"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 interface OrderGeneralTabProps {
     // Items state
@@ -140,7 +142,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                         className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-xl z-[60] max-h-60 overflow-y-auto custom-scrollbar"
                                     >
                                         {isSearching ? (
-                                            <div className="p-4 text-center text-sm text-brand-inactive-text">Buscando produtos...</div>
+                                            <ThreeDotsLoader />
                                         ) : searchResults.length > 0 ? (
                                             searchResults.map(product => (
                                                 <div
@@ -151,7 +153,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                     }}
                                                     className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0"
                                                 >
-                                                    <img src={product.image || 'https://img.dudit.com.br/static/Placeholder.png'} className={`w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 border border-brand-border dark:border-dark-border ${!product.image ? 'object-contain p-1.5' : 'object-cover'}`} />
+                                                    <img src={getR2ImageUrl(product.image, "thumbnail")} className={`w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border ${!product.image ? 'object-contain' : 'object-cover'}`} />
                                                     <div className="flex-1">
                                                         <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</div>
                                                         <div className="text-xs text-brand-inactive-text dark:text-dark-body">SKU: {product.sku}</div>
@@ -185,99 +187,100 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     {paginatedItems.map((item, paginatedIndex) => {
                                         const index = (currentPage - 1) * ITEMS_PER_PAGE + paginatedIndex;
                                         return (
-                                        <tr key={index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
-                                            <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
-                                                        <img src={item.image || 'https://img.dudit.com.br/static/Placeholder.png'} className={`w-full h-full ${!item.image ? 'object-contain p-1.5' : 'object-cover'}`} alt="" />
-                                                    </div>
-                                                    <div className="flex flex-col text-left flex-1 min-w-0">
-                                                        {item.isEditing ? (
-                                                            <div className="mb-0">
-                                                                <Input
-                                                                    name={`item-name-${index}`}
-                                                                    value={item.name}
-                                                                    onChange={(e: any) => {
-                                                                        updateItemField(index, 'name', e.target.value);
-                                                                        if (nameErrors[index]) {
-                                                                            setNameErrors(prev => ({ ...prev, [index]: false }));
-                                                                        }
-                                                                    }}
-                                                                    placeholder="Nome do produto..."
-                                                                    error={nameErrors[index]}
-                                                                    errorMessage="Nome obrigatório"
-                                                                    className="mb-0"
-                                                                />
-                                                            </div>
-                                                        ) : (
-                                                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[250px]">
-                                                                {item.name || 'Produto sem nome'}
+                                            <tr key={index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+                                                <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
+                                                            <img src={getR2ImageUrl(item.image, "thumbnail")} className={`w-full h-full ${!item.image ? 'object-contain p-1.5' : 'object-cover'}`} alt="" />
+                                                        </div>
+                                                        <div className="flex flex-col text-left flex-1 min-w-0">
+                                                            {item.isEditing ? (
+                                                                <div className="mb-0">
+                                                                    <Input
+                                                                        name={`item-name-${index}`}
+                                                                        value={item.name}
+                                                                        onChange={(e: any) => {
+                                                                            updateItemField(index, 'name', e.target.value);
+                                                                            if (nameErrors[index]) {
+                                                                                setNameErrors(prev => ({ ...prev, [index]: false }));
+                                                                            }
+                                                                        }}
+                                                                        placeholder="Nome do produto..."
+                                                                        error={nameErrors[index]}
+                                                                        errorMessage="Nome obrigatório"
+                                                                        className="mb-0"
+                                                                    />
+                                                                </div>
+                                                            ) : (
+                                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[250px]">
+                                                                    {item.name || 'Produto sem nome'}
+                                                                </span>
+                                                            )}
+                                                            <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                                {item.isEditing ? (item.sku || '') : (item.sku || 'Sem SKU')}
                                                             </span>
-                                                        )}
-                                                        <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                                            {item.isEditing ? (item.sku || '') : (item.sku || 'Sem SKU')}
-                                                        </span>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </td>
-                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                <div className="w-[140px]">
-                                                    <Input
-                                                        name={`item-price-${index}`}
-                                                        type="number"
-                                                        prefix="R$"
-                                                        value={item.unitPrice}
-                                                        onChange={(e: any) => updateItemPrice(index, parseFloat(e.target.value) || 0)}
-                                                        className="mb-0"
-                                                    />
-                                                </div>
-                                            </td>
-                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                <div className="flex justify-center">
-                                                    <QuantitySelector value={item.quantity} onChange={(val) => updateItemQty(index, val)} size="sm" />
-                                                </div>
-                                            </td>
-                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right">
-                                                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unitPrice * item.quantity)}
-                                                </span>
-                                            </td>
-                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                <div className="flex justify-center gap-2">
-                                                    {item.isEditing ? (
+                                                </td>
+                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                    <div className="w-[140px]">
+                                                        <Input
+                                                            name={`item-price-${index}`}
+                                                            type="number"
+                                                            prefix="R$"
+                                                            value={item.unitPrice}
+                                                            onChange={(e: any) => updateItemPrice(index, parseFloat(e.target.value) || 0)}
+                                                            className="mb-0"
+                                                        />
+                                                    </div>
+                                                </td>
+                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                    <div className="flex justify-center">
+                                                        <QuantitySelector value={item.quantity} onChange={(val) => updateItemQty(index, val)} size="sm" />
+                                                    </div>
+                                                </td>
+                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right">
+                                                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unitPrice * item.quantity)}
+                                                    </span>
+                                                </td>
+                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                    <div className="flex justify-center gap-2">
+                                                        {item.isEditing ? (
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (!item.name || item.name.trim() === '') {
+                                                                        setNameErrors(prev => ({ ...prev, [index]: true }));
+                                                                    } else {
+                                                                        toggleItemEdit(index, false);
+                                                                    }
+                                                                }}
+                                                                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-green-50 dark:hover:bg-green-900/10 text-brand-green transition-colors"
+                                                                title="Salvar nome"
+                                                            >
+                                                                <CheckCircleIcon size={18} />
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => toggleItemEdit(index, true)}
+                                                                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                                title="Editar nome"
+                                                            >
+                                                                <EditIcon size={18} />
+                                                            </button>
+                                                        )}
                                                         <button
-                                                            onClick={() => {
-                                                                if (!item.name || item.name.trim() === '') {
-                                                                    setNameErrors(prev => ({ ...prev, [index]: true }));
-                                                                } else {
-                                                                    toggleItemEdit(index, false);
-                                                                }
-                                                            }}
-                                                            className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-green-50 dark:hover:bg-green-900/10 text-green-600 transition-colors"
-                                                            title="Salvar nome"
+                                                            onClick={() => removeItem(index)}
+                                                            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
+                                                            title="Remover item"
                                                         >
-                                                            <CheckCircleIcon size={18} />
+                                                            <TrashIcon size={18} />
                                                         </button>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() => toggleItemEdit(index, true)}
-                                                            className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark transition-colors"
-                                                            title="Editar nome"
-                                                        >
-                                                            <EditIcon size={18} />
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        onClick={() => removeItem(index)}
-                                                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
-                                                        title="Remover item"
-                                                    >
-                                                        <TrashIcon size={18} />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )})}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -287,100 +290,100 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             {paginatedItems.map((item, paginatedIndex) => {
                                 const index = (currentPage - 1) * ITEMS_PER_PAGE + paginatedIndex;
                                 return (
-                                <div key={index} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
-                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
-                                        <img src={item.image || 'https://img.dudit.com.br/static/Placeholder.png'} className={`w-full h-full ${!item.image ? 'object-contain p-1.5' : 'object-cover'}`} alt="" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex justify-between items-start mb-0.5">
-                                            {item.isEditing ? (
-                                                <div className="flex-1 mr-2">
+                                    <div key={index} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
+                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
+                                            <img src={getR2ImageUrl(item.image, "thumbnail")} className={`w-full h-full ${!item.image ? 'object-contain p-1.5' : 'object-cover'}`} alt="" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between items-start mb-0.5">
+                                                {item.isEditing ? (
+                                                    <div className="flex-1 mr-2">
+                                                        <Input
+                                                            name={`item-name-mobile-${index}`}
+                                                            value={item.name}
+                                                            onChange={(e: any) => {
+                                                                updateItemField(index, 'name', e.target.value);
+                                                                if (nameErrors[index]) {
+                                                                    setNameErrors(prev => ({ ...prev, [index]: false }));
+                                                                }
+                                                            }}
+                                                            placeholder="Nome do produto..."
+                                                            error={nameErrors[index]}
+                                                            errorMessage="Nome obrigatório"
+                                                            className="mb-0"
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <h4 className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate pr-2">
+                                                        {item.name || 'Produto sem nome'}
+                                                    </h4>
+                                                )}
+                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading flex-shrink-0">
+                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unitPrice * item.quantity)}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-[11px] font-medium text-brand-inactive-text pr-2 truncate">
+                                                    {item.isEditing ? (item.sku ? `${item.sku} • ` : '') : `${item.sku || 'Sem SKU'} • `}{item.quantity} un • {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unitPrice)}
+                                                </p>
+                                                <div className="flex items-center gap-1">
+                                                    {item.isEditing ? (
+                                                        <button
+                                                            onClick={() => {
+                                                                if (!item.name || item.name.trim() === '') {
+                                                                    setNameErrors(prev => ({ ...prev, [index]: true }));
+                                                                } else {
+                                                                    toggleItemEdit(index, false);
+                                                                }
+                                                            }}
+                                                            className="w-8 h-8 flex items-center justify-center text-green-600 hover:bg-green-50 dark:hover:bg-green-900/10 rounded-full transition-colors"
+                                                        >
+                                                            <CheckCircleIcon size={14} />
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => toggleItemEdit(index, true)}
+                                                            className="w-8 h-8 flex items-center justify-center text-brand-inactive-text hover:bg-brand-gray dark:hover:bg-dark-border rounded-full transition-colors"
+                                                        >
+                                                            <EditIcon size={14} />
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => removeItem(index)}
+                                                        className="w-8 h-8 flex items-center justify-center text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full transition-colors"
+                                                    >
+                                                        <TrashIcon size={14} />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-4 mt-2">
+                                                <QuantitySelector value={item.quantity} onChange={(val) => updateItemQty(index, val)} size="sm" />
+                                                <div className="flex-1 max-w-[140px]">
                                                     <Input
-                                                        name={`item-name-mobile-${index}`}
-                                                        value={item.name}
-                                                        onChange={(e: any) => {
-                                                            updateItemField(index, 'name', e.target.value);
-                                                            if (nameErrors[index]) {
-                                                                setNameErrors(prev => ({ ...prev, [index]: false }));
-                                                            }
-                                                        }}
-                                                        placeholder="Nome do produto..."
-                                                        error={nameErrors[index]}
-                                                        errorMessage="Nome obrigatório"
+                                                        name={`item-price-mobile-${index}`}
+                                                        type="number"
+                                                        prefix="R$"
+                                                        value={item.unitPrice}
+                                                        onChange={(e: any) => updateItemPrice(index, parseFloat(e.target.value) || 0)}
                                                         className="mb-0"
                                                     />
                                                 </div>
-                                            ) : (
-                                                <h4 className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate pr-2">
-                                                    {item.name || 'Produto sem nome'}
-                                                </h4>
-                                            )}
-                                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading flex-shrink-0">
-                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unitPrice * item.quantity)}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center justify-between">
-                                            <p className="text-[11px] font-medium text-brand-inactive-text pr-2 truncate">
-                                                {item.isEditing ? (item.sku ? `${item.sku} • ` : '') : `${item.sku || 'Sem SKU'} • `}{item.quantity} un • {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unitPrice)}
-                                            </p>
-                                            <div className="flex items-center gap-1">
-                                                {item.isEditing ? (
-                                                    <button
-                                                        onClick={() => {
-                                                            if (!item.name || item.name.trim() === '') {
-                                                                setNameErrors(prev => ({ ...prev, [index]: true }));
-                                                            } else {
-                                                                toggleItemEdit(index, false);
-                                                            }
-                                                        }}
-                                                        className="w-8 h-8 flex items-center justify-center text-green-600 hover:bg-green-50 dark:hover:bg-green-900/10 rounded-full transition-colors"
-                                                    >
-                                                        <CheckCircleIcon size={14} />
-                                                    </button>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => toggleItemEdit(index, true)}
-                                                        className="w-8 h-8 flex items-center justify-center text-brand-inactive-text hover:bg-brand-gray dark:hover:bg-dark-border rounded-full transition-colors"
-                                                    >
-                                                        <EditIcon size={14} />
-                                                    </button>
-                                                )}
-                                                <button
-                                                    onClick={() => removeItem(index)}
-                                                    className="w-8 h-8 flex items-center justify-center text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full transition-colors"
-                                                >
-                                                    <TrashIcon size={14} />
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-4 mt-2">
-                                            <QuantitySelector value={item.quantity} onChange={(val) => updateItemQty(index, val)} size="sm" />
-                                            <div className="flex-1 max-w-[140px]">
-                                                <Input
-                                                    name={`item-price-mobile-${index}`}
-                                                    type="number"
-                                                    prefix="R$"
-                                                    value={item.unitPrice}
-                                                    onChange={(e: any) => updateItemPrice(index, parseFloat(e.target.value) || 0)}
-                                                    className="mb-0"
-                                                />
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            )})}
+                                )
+                            })}
                         </div>
 
                         {/* Add Item Link */}
-                        <button
-                            type="button"
-                            className="text-sm font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-border dark:decoration-dark-border underline-offset-4 hover:opacity-80 transition-opacity flex items-center gap-1 mb-8"
+                        <Button
+                            variant="link"
                             onClick={addBlankItem}
                         >
                             <PlusIcon size={14} strokeWidth={3} />
                             Adicionar item manual
-                        </button>
+                        </Button>
 
                         <div className="mt-2">
                             <Pagination
@@ -470,7 +473,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             />
                         ) : (
                             <div
-                                className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-8 flex flex-col items-center justify-center text-center relative overflow-hidden"
+                                className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-8 flex flex-col items-center justify-center text-center relative overflow-hidden mb-6"
                                 onClick={() => setIsCustomerSheetOpen(true)}
                             >
                                 <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>

@@ -161,8 +161,6 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         }
     }
 
-
-
     const addProductToOrder = (product: any) => {
         if (product.has_variants) {
             setSelectedProductForVariant(product)

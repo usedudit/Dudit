@@ -53,7 +53,7 @@ const QuoteGridCard = React.memo(
                                 <div className="flex items-center gap-1.5 shrink-0">
                                     <Badge
                                         variant={quote.statusColor}
-                                        className="text-[9px] h-4 px-1 py-3 flex-shrink-0 w-max"
+                                        className="whitespace-nowrap scale-90 shrink-0"
                                     >
                                         {quote.statusLabel}
                                     </Badge>
@@ -84,14 +84,14 @@ const QuoteGridCard = React.memo(
                     {/* Row 1: Cliente & Emissão */}
                     <div className="flex justify-between items-start gap-2">
                         <div className="flex flex-col gap-0.5 min-w-0">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body uppercase tracking-wider text-[10px]">Cliente</span>
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Cliente</span>
                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
                                 {quote.customer_name}
                             </span>
                         </div>
 
                         <div className="flex flex-col gap-0.5 items-end shrink-0">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body text-right uppercase tracking-wider text-[10px]">Emissão</span>
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body text-right">Emissão</span>
                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
                                 {quote.formattedIssueDate}
                             </span>
@@ -101,7 +101,7 @@ const QuoteGridCard = React.memo(
                     {/* Row 2: Validade & Actions */}
                     <div className="flex justify-between items-end gap-2">
                         <div className="flex flex-col gap-0.5 min-w-0">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body uppercase tracking-wider text-[10px]">Validade</span>
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Validade</span>
                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
                                 {quote.formattedExpirationDate || "Não definida"}
                             </span>

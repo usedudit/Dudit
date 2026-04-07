@@ -33,8 +33,7 @@ export const getPartnerOrdersCached = cache(async (partnerId: string) => {
         },
         [TAGS.orders(partnerId)],
         {
-            tags: [TAGS.orders(partnerId)],
-            revalidate: 5
+            tags: [TAGS.orders(partnerId)]
         }
     )()
 })

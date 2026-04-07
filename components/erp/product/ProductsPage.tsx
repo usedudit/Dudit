@@ -824,7 +824,7 @@ export default function ProductsPage({
                                                                             {isSortable && (
                                                                                 <ArrowUpDownIcon
                                                                                     size={14}
-                                                                                    className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100' : 'text-brand-inactive-text opacity-0 group-hover:opacity-40'
+                                                                                    className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
                                                                                         } ${isSorted && ui.sort?.direction === 'desc' ? 'rotate-180' : ''}`}
                                                                                 />
                                                                             )}
@@ -900,7 +900,7 @@ export default function ProductsPage({
                     variant="ghost"
                     onClick={() => setConfirmations((p) => ({ ...p, bulkDelete: true }))}
                     leftIcon={<TrashIcon className="w-4 h-4" />}
-                    className="h-10 px-3 text-brand-red hover:text-brand-red/90 dark:text-brand-red hover:text-brand-red/90"
+                    className="h-10 px-3 text-brand-red hover:text-brand-red/90 dark:text-brand-red dark:hover:text-brand-red/90"
                 >
                     Excluir
                 </Button>
@@ -929,8 +929,8 @@ export default function ProductsPage({
                 isOpen={confirmations.bulkDelete}
                 onClose={() => setConfirmations((p) => ({ ...p, bulkDelete: false }))}
                 onConfirm={() => confirmBulk("delete")}
-                title="Excluir Seleção"
-                message={`Tem certeza que deseja excluir ${selection.ids.size} produtos?`}
+                title="Excluir Produtos"
+                message={`Tem certeza que deseja excluir ${selection.ids.size} produtos? Esta ação não pode ser desfeita.`}
                 confirmText="Excluir"
                 variant="danger"
             />
@@ -947,8 +947,9 @@ export default function ProductsPage({
                 onClose={() => setConfirmations((p) => ({ ...p, bulkInactive: false }))}
                 onConfirm={() => confirmBulk("inactive")}
                 title="Atualizar Status"
-                message="Confirmar alteração de status em massa?"
+                message={`Tem certeza que deseja alterar o status de ${selection.ids.size} produtos(s)?`}
                 confirmText="Confirmar"
+                variant="warning"
             />
             <ImportXmlModal
                 isOpen={modals.import}

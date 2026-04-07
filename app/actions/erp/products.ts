@@ -1261,7 +1261,7 @@ export const getCachedProducts = async (partnerId: string) => {
             return data || []
         },
         [TAGS.products(partnerId)],
-        { tags: [TAGS.products(partnerId)], revalidate: 5 }
+        { tags: [TAGS.products(partnerId)] }
     )()
 }
 
@@ -1278,7 +1278,7 @@ export const getCachedProductById = async (productId: string) => {
             return product
         },
         [`product-details-${productId}`],
-        { tags: [TAGS.product(productId)], revalidate: 5 }
+        { tags: [TAGS.product(productId)] }
     )()
 }
 

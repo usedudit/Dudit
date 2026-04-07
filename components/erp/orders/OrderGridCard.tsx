@@ -3,7 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
-import { StoreIcon, ClockIcon } from "@/lib/icons"
+import { StoreIcon } from "@/lib/icons"
 
 interface OrderGridCardProps {
   order: any
@@ -11,6 +11,7 @@ interface OrderGridCardProps {
   onSelect: () => void
   onEdit: () => void
   onDelete: () => void
+  onCancel: () => void
   onDetails: () => void
 }
 
@@ -21,6 +22,7 @@ const OrderGridCard = React.memo(
     onSelect,
     onEdit,
     onDelete,
+    onCancel,
     onDetails
   }: OrderGridCardProps) => {
 
@@ -52,12 +54,12 @@ const OrderGridCard = React.memo(
                 <div className="flex items-center gap-1.5 shrink-0">
                   <Badge
                     variant={order.statusColor}
-                    className="text-[9px] h-4 px-1 py-3 flex-shrink-0 w-max"
+                    className="whitespace-nowrap scale-90"
                   >
                     {order.statusLabel}
                   </Badge>
                   {order.isUnfulfilled && (
-                    <Badge variant="gray" className="whitespace-nowrap scale-90 shrink-0">
+                    <Badge variant="gray" className="whitespace-nowrap scale-90">
                       Pendente
                     </Badge>
                   )}
@@ -123,9 +125,9 @@ const OrderGridCard = React.memo(
               onClick={(e) => e.stopPropagation()}
             >
               <ActionsDropdown
-                onView={onDetails}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                onCancel={onCancel}
               />
             </div>
           </div>

@@ -14,7 +14,8 @@ import {
   ShareIcon,
   PrinterIcon,
   MailIcon,
-  ArchiveIcon
+  ArchiveIcon,
+  BlockedIcon
 } from "@/lib/icons"
 
 interface AccordionProps {
@@ -81,6 +82,7 @@ interface ActionsDropdownProps {
   onPrint?: () => void
   onEmail?: () => void
   onArchive?: () => void
+  onCancel?: () => void
   trigger?: React.ReactElement
   className?: string
   children?: React.ReactNode
@@ -96,6 +98,7 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
   onPrint,
   onEmail,
   onArchive,
+  onCancel,
   trigger,
   className,
   children
@@ -147,13 +150,18 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
       </DropdownItem>
     )}
     {onArchive && (
-      <DropdownItem onClick={onArchive} className="text-brand-orange">
+      <DropdownItem onClick={onArchive} className="text-brand-orange dark:text-brand-orange">
         <ArchiveIcon className="w-4 h-4" /> Arquivar
       </DropdownItem>
     )}
     {onDelete && (
-      <DropdownItem onClick={onDelete} className="text-brand-red">
+      <DropdownItem onClick={onDelete} className="text-brand-red dark:text-brand-red">
         <TrashIcon className="w-4 h-4" /> Excluir
+      </DropdownItem>
+    )}
+    {onCancel && (
+      <DropdownItem onClick={onCancel} className="text-brand-red dark:text-brand-red">
+        <BlockedIcon className="w-4 h-4" /> Cancelar
       </DropdownItem>
     )}
     {children}

@@ -299,10 +299,10 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
               { label: "Lojas favoritas", action: () => setView?.("vendor") },
               { label: "Central do Parceiro", href: "/erp/switch" },
             ].map((item, idx) => {
-              const ItemWrapper: any = item.href && item.href !== "/erp/switch" ? Link : "div";
-              const wrapProps = item.href && item.href !== "/erp/switch"
+              const ItemWrapper: any = item.href ? Link : "div";
+              const wrapProps = item.href
                 ? { href: item.href, prefetch: true }
-                : { onClick: item.action || (() => { if (item.href) window.location.href = item.href; }) };
+                : { onClick: item.action };
 
               return (
                 <ItemWrapper
@@ -349,16 +349,15 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
             </Link>
           ))}
           <div className="border-t border-gray-100 mt-2 pt-2">
-            <div
-              onClick={() => {
-                setIsMobileCategoryMenuOpen(false)
-                router.push("/auth/login?mode=partner")
-              }}
+            <Link
+              href="/auth/login?mode=partner"
+              prefetch={true}
+              onClick={() => setIsMobileCategoryMenuOpen(false)}
               className="px-6 py-3 font-bold text-brand-orange hover:bg-brand-gray cursor-pointer text-[15px] flex items-center gap-1 transition-colors"
             >
               <span>Começar a vender</span>
               <ChevronRightIcon size={16} />
-            </div>
+            </Link>
           </div>
         </div>
       </BottomSheet>
@@ -481,10 +480,10 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
                       { label: "Lojas favoritas", action: () => setView?.("vendor") },
                       { label: "Central do Parceiro", href: "/erp/switch" },
                     ].map((item, idx) => {
-                      const ItemWrapper: any = item.href && item.href !== "/erp/switch" ? Link : "div";
-                      const wrapProps = item.href && item.href !== "/erp/switch"
+                      const ItemWrapper: any = item.href ? Link : "div";
+                      const wrapProps = item.href
                         ? { href: item.href, prefetch: true }
-                        : { onClick: item.action || (() => { if (item.href) window.location.href = item.href; }) };
+                        : { onClick: item.action };
 
                       return (
                         <ItemWrapper
@@ -551,13 +550,14 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
             ))}
           </div>
 
-          <div
-            onClick={() => router.push("/auth/login?mode=partner")}
+          <Link
+            href="/auth/login?mode=partner"
+            prefetch={true}
             className="ml-auto font-bold text-brand-orange hover:text-brand-orange/70 cursor-pointer text-[13px] flex items-center gap-1 py-1"
           >
             <span>Começar a vender</span>
             <ChevronRightIcon size={14} />
-          </div>
+          </Link>
         </div>
       </header>
     </>

@@ -36,9 +36,9 @@ const CustomerGridCard = React.memo(
       >
         <div className="flex gap-4 mb-2">
           {/* Avatar do Cliente */}
-          <UserProfileImage 
-            fullName={customer.name || "Cliente"} 
-            className="w-20 h-20 text-[24px]"
+          <UserProfileImage
+            fullName={customer.name || "Cliente"}
+            className="w-12 h-12 text-[24px]"
           />
 
           <div className="flex-1 min-w-0 flex flex-col justify-center">

@@ -39,8 +39,7 @@ export const getStockMovementsCached = cache(async (partnerId: string) => {
         },
         [TAGS.stockMovements(partnerId)],
         {
-            tags: [TAGS.stockMovements(partnerId)],
-            revalidate: 5
+            tags: [TAGS.stockMovements(partnerId)]
         }
     )()
 })

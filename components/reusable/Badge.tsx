@@ -1,5 +1,5 @@
 import React from "react"
-import { CheckCircleIcon, CancelCircleIcon, AlertTriangleIcon } from "@/lib/icons"
+import { CheckCircleIcon, CancelCircleIcon, AlertTriangleIcon, BlockedIcon } from "@/lib/icons"
 
 type BadgeVariant =
   | "green"
@@ -38,12 +38,14 @@ const defaultIcons: Partial<Record<BadgeVariant, React.ElementType>> = {
   green: CheckCircleIcon,
   red: CancelCircleIcon,
   orange: AlertTriangleIcon,
+  gray: BlockedIcon,
 }
 
 const defaultIconStyles: Partial<Record<BadgeVariant, string>> = {
   green: "text-green-600 dark:text-green-400 fill-green-600/10",
   red: "text-brand-red dark:text-red-400 fill-red-600/10",
   orange: "text-brand-orange dark:text-orange-400 fill-orange-600/10",
+  gray: "text-brand-inactive-text dark:text-dark-body",
 }
 
 export const Badge: React.FC<BadgeProps> = ({

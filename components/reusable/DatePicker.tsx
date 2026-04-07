@@ -34,11 +34,12 @@ function CalendarDayButton({ className, day, modifiers, ...props }: React.Compon
   const ref = React.useRef<HTMLButtonElement>(null)
 
   React.useEffect(() => {
-    if (modifiers.focused) ref.current?.focus()
-  }, [modifiers.focused])
+    if (modifiers?.focused) ref.current?.focus()
+  }, [modifiers?.focused])
 
-  const isSelected = modifiers.selected && !modifiers.range_middle
-  const isToday = modifiers.today
+  const isSelected = modifiers?.selected || props['aria-selected'] === true || props['aria-selected'] === "true" || ('data-selected' in props)
+  const isRangeMiddle = modifiers?.range_middle || ('data-range-middle' in props)
+  const isToday = modifiers?.today || props['aria-current'] === "date"
 
   return (
     <Button
@@ -49,10 +50,12 @@ function CalendarDayButton({ className, day, modifiers, ...props }: React.Compon
         "relative flex aspect-square size-auto w-full min-w-[32px] flex-col gap-1 leading-none font-normal transition-all duration-200 rounded-md",
         "hover:bg-brand-slate hover:text-brand-dark",
         isToday && "bg-brand-gray text-brand-dark font-bold border border-brand-border",
-        isSelected && "bg-brand-green text-white hover:bg-brand-green/90",
-        modifiers.range_middle && "bg-brand-gray text-brand-dark rounded-none",
-        modifiers.outside && "text-brand-inactive-text opacity-50",
-        modifiers.disabled && "text-brand-inactive-text opacity-30 cursor-not-allowed",
+        isSelected && !isRangeMiddle && "!bg-brand-green !text-white hover:!bg-brand-green/90 hover:!text-white",
+        isRangeMiddle && "bg-brand-gray text-brand-dark rounded-none",
+        modifiers?.outside && "text-brand-inactive-text opacity-50",
+        modifiers?.disabled && "text-brand-inactive-text opacity-30 cursor-not-allowed",
+        "aria-[selected=true]:!bg-brand-green aria-[selected=true]:!text-white aria-[selected=true]:hover:!bg-brand-green/90 aria-[selected=true]:hover:!text-white",
+        "data-[selected]:!bg-brand-green data-[selected]:!text-white data-[selected]:hover:!bg-brand-green/90 data-[selected]:hover:!text-white",
         className
       )}
       {...props}

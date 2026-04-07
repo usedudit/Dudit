@@ -609,7 +609,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                                                                         {isSortable && (
                                                                             <ArrowUpDownIcon
                                                                                 size={14}
-                                                                                className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100' : 'text-brand-inactive-text opacity-0 group-hover:opacity-40'
+                                                                                className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
                                                                                     } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
                                                                             />
                                                                         )}

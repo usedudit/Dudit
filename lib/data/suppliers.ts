@@ -21,8 +21,7 @@ export const getPartnerSuppliersCached = cache(async (partnerId: string) => {
         },
         [TAGS.suppliers(partnerId)],
         {
-            tags: [TAGS.suppliers(partnerId)],
-            revalidate: 5
+            tags: [TAGS.suppliers(partnerId)]
         }
     )()
 })

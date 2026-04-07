@@ -266,3 +266,77 @@ export async function updateERPOrderAction(orderId: string, data: {
     await revalidateOrders(data.partnerId)
     return { success: true }
 }
+
+export async function deleteOrdersInBatchAction(orderIds: string[], partnerId: string) {
+    const user = await requireUser()
+    if (!user) return { error: "Não autenticado" }
+    
+    await requirePartnerAccess(partnerId)
+    const supabase = await getSupabaseServerClient()
+
+    // order_items normally cascade, if not need to delete first. Let's assume cascade or we delete first.
+    await supabase.from("order_items").delete().in("order_id", orderIds)
+
+    const { error } = await supabase.from("orders").delete().in("id", orderIds).eq("partner_id", partnerId)
+
+    if (error) return { error: error.message }
+
+    await revalidateOrders(partnerId)
+    return { success: true }
+}
+
+export async function updateOrdersStatusInBatchAction(payload: {
+    orderIds: string[]
+    partnerId: string
+    actionType: 'payment_status' | 'delivery_status' | 'cancel'
+    statusValue?: string
+    cancelReason?: string
+    userName?: string
+}) {
+    const user = await requireUser()
+    if (!user) return { error: "Não autenticado" }
+    
+    await requirePartnerAccess(payload.partnerId)
+    const supabase = await getSupabaseServerClient()
+
+    let updateData: any = {}
+    if (payload.actionType === 'payment_status') {
+        updateData.situation = payload.statusValue
+    } else if (payload.actionType === 'delivery_status') {
+        updateData.delivery_status = payload.statusValue
+    } else if (payload.actionType === 'cancel') {
+        updateData.situation = 'cancelled'
+        
+        if (payload.cancelReason && payload.userName) {
+            // We need to fetch existing notes first to append or just set if we don't care about overwriting.
+            // But usually we append. For simplicity and performance in batch, let's see. 
+            // The user said "salva na observação", usually implying a log.
+            
+            const { data: currentOrders } = await supabase
+                .from("orders")
+                .select("id, notes")
+                .in("id", payload.orderIds)
+
+            if (currentOrders) {
+                for (const order of currentOrders) {
+                    const timestamp = new Date().toLocaleString('pt-BR')
+                    const log = `\n\nPedido cancelado por: ${payload.userName} às ${timestamp} - : ${payload.cancelReason}`
+                    const newNotes = (order.notes || "") + log
+                    
+                    await supabase.from("orders").update({ notes: newNotes }).eq("id", order.id)
+                }
+            }
+        }
+    }
+
+    const { error } = await supabase
+        .from("orders")
+        .update(updateData)
+        .in("id", payload.orderIds)
+        .eq("partner_id", payload.partnerId)
+
+    if (error) return { error: error.message }
+
+    await revalidateOrders(payload.partnerId)
+    return { success: true }
+}

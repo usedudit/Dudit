@@ -12,7 +12,7 @@ import {
 import DefaultModal from "./DefaultModal"
 
 // --- Tipagens ---
-export type BulkActionType = 'price' | 'stock' | 'visibility' | 'image' | 'remove_image' | 'delete' | 'status'
+export type BulkActionType = 'price' | 'stock' | 'visibility' | 'image' | 'remove_image' | 'delete' | 'status' | 'order_payment' | 'order_delivery'
 
 export interface BulkActionPayload {
   type: BulkActionType
@@ -25,13 +25,14 @@ export interface BulkActionPayload {
   visibilityMode?: 'publish' | 'hide'
   imageFile?: File | null
   status?: 'draft' | 'sent' | 'approved' | 'rejected' | 'expired'
+  orderStatus?: string
 }
 
 interface BulkEditActionsModalProps {
   isOpen: boolean
   onClose: () => void
   selectedCount: number
-  targetType: 'product' | 'variation' | 'quote'
+  targetType: 'product' | 'variation' | 'quote' | 'order'
   onApply: (payload: BulkActionPayload) => Promise<void>
 }
 
@@ -99,6 +100,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
   const [stockConfig, setStockConfig] = useState({ mode: 'add', value: 0, ignoreNegative: false })
   const [visConfig, setVisConfig] = useState<'publish' | 'hide'>('publish')
   const [statusConfig, setStatusConfig] = useState<'draft' | 'sent' | 'approved' | 'rejected' | 'expired'>('sent')
+  const [orderStatusConfig, setOrderStatusConfig] = useState<string>('')
   const [imageState, setImageState] = useState<{ file: File | null, preview: string | null }>({ file: null, preview: null })
 
   // UI Helpers
@@ -130,6 +132,8 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
         payload.visibilityMode = visConfig
       } else if (view === 'status') {
         payload.status = statusConfig
+      } else if (view === 'order_payment' || view === 'order_delivery') {
+        payload.orderStatus = orderStatusConfig
       } else if (view === 'image') {
         payload.imageFile = imageState.file
       }
@@ -165,13 +169,13 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
     } catch (error) { console.error("Erro ao processar imagem", error) }
   }
 
-  const targetLabel = targetType === 'product' ? 'produtos' : targetType === 'variation' ? 'variantes' : 'orçamentos'
-  const singularTargetLabel = targetType === 'product' ? 'produto' : targetType === 'variation' ? 'variante' : 'orçamento'
+  const targetLabel = targetType === 'product' ? 'produtos' : targetType === 'variation' ? 'variantes' : targetType === 'order' ? 'pedidos' : 'orçamentos'
+  const singularTargetLabel = targetType === 'product' ? 'produto' : targetType === 'variation' ? 'variante' : targetType === 'order' ? 'pedido' : 'orçamento'
 
   const viewTitles: Record<string, string> = {
     menu: '', price: 'Alterar Preço', stock: 'Ajustar Estoque',
     visibility: 'Visibilidade', image: 'Aplicar Imagem', remove_image: 'Remover Imagem',
-    status: 'Alterar Status',
+    status: 'Alterar Status', order_payment: 'Status de Pagamento', order_delivery: 'Status de Envio',
     delete: `Excluir ${targetLabel.charAt(0).toUpperCase() + targetLabel.slice(1)}`
   }
 
@@ -180,7 +184,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
       case 'menu':
         return (
           <div className="grid grid-cols-2 gap-4 pt-2">
-            {targetType !== 'quote' && (
+            {targetType !== 'quote' && targetType !== 'order' && (
               <>
                 <BulkActionCard icon={MoneyIcon} label="Alterar Preço" onClick={() => setView('price')} />
                 <BulkActionCard icon={Package} label="Ajustar Estoque" onClick={() => setView('stock')} />
@@ -191,6 +195,12 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
             )}
             {targetType === 'quote' && (
               <BulkActionCard icon={CheckIcon} label="Alterar Status" onClick={() => setView('status')} />
+            )}
+            {targetType === 'order' && (
+              <>
+                <BulkActionCard icon={MoneyIcon} label="Status de Pagamento" onClick={() => { setView('order_payment'); setOrderStatusConfig('paid') }} />
+                <BulkActionCard icon={Package} label="Status de Envio" onClick={() => { setView('order_delivery'); setOrderStatusConfig('preparing') }} />
+              </>
             )}
             <BulkActionCard icon={TrashIcon} label="Excluir" onClick={() => setView('delete')} danger />
           </div>
@@ -355,6 +365,42 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                     onChange={() => setStatusConfig(s.value!)}
                     name="statusM"
                     value={s.value!}
+                  />
+                }
+              />
+            ))}
+          </div>
+        )
+      case 'order_payment':
+      case 'order_delivery':
+        const orderStatuses = view === 'order_payment' ? [
+            { value: 'pending', label: 'Pendente' },
+            { value: 'paid', label: 'Pago' },
+            { value: 'partially_paid', label: 'Parcialmente Pago' },
+            { value: 'refunded', label: 'Reembolsado' },
+            { value: 'cancelled', label: 'Cancelado' }
+        ] : [
+            { value: 'not_sent', label: 'Não enviado' },
+            { value: 'preparing', label: 'Preparando' },
+            { value: 'sent', label: 'Enviado' },
+            { value: 'delivered', label: 'Entregue' },
+            { value: 'pickup_available', label: 'Pronto para retirada' },
+            { value: 'delivery_failed', label: 'Falha na entrega' }
+        ]
+        return (
+          <div className="space-y-1 pt-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+            {orderStatuses.map((s) => (
+              <ListItem
+                key={s.value}
+                title={s.label}
+                onClick={() => setOrderStatusConfig(s.value)}
+                className="cursor-pointer px-4"
+                right={
+                  <RadioButton
+                    checked={orderStatusConfig === s.value}
+                    onChange={() => setOrderStatusConfig(s.value)}
+                    name="orderStatusM"
+                    value={s.value}
                   />
                 }
               />

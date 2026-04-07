@@ -6,8 +6,6 @@ import { parseMarketplaceType } from "@/lib/types/marketplace"
 import { getUserSessionData } from "@/lib/data/user"
 import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
-import { Suspense } from "react"
-import { ThreeDotsLoader } from "@/components/reusable"
 
 export const metadata: Metadata = {
     title: "Explorar | Vitrine Digital Dudit",
@@ -15,29 +13,6 @@ export const metadata: Metadata = {
     alternates: {
         canonical: "https://dudit.com.br/explorar",
     },
-}
-
-
-
-
-async function ExploreResultsWrapper({ query, type, userProfile, cartCount }: any) {
-    const t0 = performance.now()
-
-    const products = await getCachedExploreProducts(query, type)
-
-    const tEnd = performance.now()
-    console.log(`[SSR] Explorar (Feed Payload) | Time: ${(tEnd - t0).toFixed(2)}ms`)
-
-    return (
-        <ExplorarPageClient
-            initialResults={products}
-            query={query}
-            type={type}
-            userProfile={userProfile}
-            cartCount={cartCount}
-            hideHeaderAndFooter={true}
-        />
-    )
 }
 
 export default async function ExplorarPage({
@@ -52,13 +27,15 @@ export default async function ExplorarPage({
     const query = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : ""
     const type = parseMarketplaceType(resolvedSearchParams.type)
 
-    const user = await getCurrentUser()
+    // Fetch user and products in parallel
+    const [user, products] = await Promise.all([
+        getCurrentUser(),
+        getCachedExploreProducts(query, type),
+    ])
 
-    const sessionDataPromise = user
-        ? getUserSessionData(user.id)
-        : Promise.resolve(null)
-
-    const sessionData = await sessionDataPromise
+    const sessionData = user
+        ? await getUserSessionData(user.id)
+        : null
 
     const userProfile = sessionData?.profile
         ? {
@@ -72,26 +49,20 @@ export default async function ExplorarPage({
     const cartCount = sessionData?.cartCount || 0
 
     const tEnd = performance.now()
-    console.log(`[SSR] Explorar (Header) | Time: ${(tEnd - t0).toFixed(2)}ms | Query: ${query} | Type: ${type}`)
+    console.log(`[SSR] Explorar | Time: ${(tEnd - t0).toFixed(2)}ms | Query: ${query} | Type: ${type}`)
 
     return (
         <div className="bg-white min-h-screen font-sans text-[#003d32] flex flex-col pt-[110px] lg:pt-[108px]">
             <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />
 
-            <Suspense
-                fallback={
-                    <div className="flex items-center justify-center min-h-[50vh] w-full pt-10">
-                        <ThreeDotsLoader />
-                    </div>
-                }
-            >
-                <ExploreResultsWrapper
-                    query={query}
-                    type={type}
-                    userProfile={userProfile}
-                    cartCount={cartCount}
-                />
-            </Suspense>
+            <ExplorarPageClient
+                initialResults={products}
+                query={query}
+                type={type}
+                userProfile={userProfile}
+                cartCount={cartCount}
+                hideHeaderAndFooter={true}
+            />
 
             <MarketplaceFooter />
         </div>

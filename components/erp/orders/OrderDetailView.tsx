@@ -18,6 +18,7 @@ import {
 import { getOrderDetailsAction } from "@/app/actions/erp/orders"
 import { useNotification } from "@/hooks/use-notification"
 import { useRouter } from "next/navigation"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 interface OrderDetailViewProps {
     orderId: string
@@ -99,6 +100,13 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     }
 
     const timelineSteps = getTimelineSteps(order.delivery_status)
+
+    const PaymentRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
+        <div className="flex justify-between items-start text-[14px]">
+            <span className="text-brand-inactive-text dark:text-dark-body font-medium">{label}</span>
+            <div className="text-right">{value}</div>
+        </div>
+    )
 
     return (
         <div className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300 relative">
@@ -222,7 +230,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                         <div key={item.id} className="flex items-start gap-4 p-3">
                                             <div className="w-16 h-16 overflow-hidden flex-shrink-0">
                                                 <img
-                                                    src={item.image || "https://img.dudit.com.br/static/Placeholder.png"}
+                                                    src={getR2ImageUrl(item.image, "thumbnail")}
                                                     className="w-full h-full object-cover rounded-xl"
                                                     alt={item.product_name}
                                                     onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }}
@@ -244,34 +252,75 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                             </div>
 
                             {/* Payment Summary */}
-                            <div className="bg-[#F9FAFB] dark:bg-gray-800/20 rounded-2xl p-6 border border-brand-border dark:border-dark-border">
-                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading mb-4 border-b border-brand-border dark:border-dark-border pb-3">Resumo Financeiro</h3>
+                            <div className="bg-[#F9FAFB] dark:bg-gray-800/20 rounded-2xl p-6 border border-brand-border dark:border-dark-border animate-in fade-in slide-in-from-bottom-2 duration-700">
+                                <div className="flex items-center justify-between mb-4 border-b border-brand-border dark:border-dark-border pb-3">
+                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">Detalhes do Pagamento</h3>
+                                    <Badge variant={statusInfo.variant}>
+                                        {statusInfo.label}
+                                    </Badge>
+                                </div>
+
                                 <div className="space-y-3">
-                                    <div className="flex justify-between items-center text-[14px]">
-                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Subtotal ({order.order_items?.length} itens)</span>
-                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">R$ {Number(order.total_amount - (order.shipping_cost || 0) - (order.additional_costs || 0) + (order.discount_value || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-[14px]">
-                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Frete / Entrega</span>
-                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">R$ {Number(order.shipping_cost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                    </div>
-                                    {(order.discount_value || 0) > 0 && (
-                                        <div className="flex justify-between items-center text-[14px]">
-                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto</span>
-                                            <span className="text-brand-red font-bold text-sm">- R$ {Number(order.discount_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                        </div>
+                                    <PaymentRow 
+                                        label="Método de Pagamento" 
+                                        value={(() => {
+                                            const m = order.payment_method?.toLowerCase() || ""
+                                            let brand = ""
+                                            if (m.includes("visa")) brand = "VISA"
+                                            else if (m.includes("master")) brand = "MASTERCARD"
+                                            else if (m.includes("elo")) brand = "ELO"
+                                            else if (m.includes("hiper")) brand = "HIPERCARD"
+                                            else if (m.includes("pix")) brand = "PIX"
+                                            else if (m.includes("dinheiro")) brand = "DINHEIRO"
+                                            
+                                            if (brand === "PIX") return <div className="flex items-center gap-2"><div className="border border-brand-border dark:border-dark-border px-1.5 py-0.5 rounded bg-white dark:bg-dark-surface text-[10px] font-bold text-teal-600 dark:text-teal-400">PIX</div> <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">Pagamento Instantâneo</span></div>
+                                            if (brand === "DINHEIRO") return <div className="flex items-center gap-2"><div className="border border-brand-border dark:border-dark-border px-1.5 py-0.5 rounded bg-white dark:bg-dark-surface text-[10px] font-bold text-green-600 dark:text-green-400">CASH</div> <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">Dinheiro</span></div>
+                                            if (brand) return <div className="flex items-center gap-2"><div className="border border-brand-border dark:border-dark-border px-1.5 py-0.5 rounded bg-white dark:bg-dark-surface text-[10px] font-bold text-blue-800 dark:text-blue-400">{brand}</div> <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{order.payment_method}</span></div>
+                                            return <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{order.payment_method || "Não informado"}</span>
+                                        })()} 
+                                    />
+                                    
+                                    <PaymentRow 
+                                        label="Subtotal" 
+                                        value={`${order.order_items?.length || 0} itens · R$ ${Number(order.total_amount - (order.shipping_cost || 0) - (order.additional_costs || 0) + (order.discount_value || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
+                                    />
+
+                                    <PaymentRow 
+                                        label="Tipo de Entrega" 
+                                        value={
+                                            <div className="text-right">
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
+                                                    {order.delivery_type === 'pickup' ? 'Retirada no Balcão' : 'Entrega no Endereço'}
+                                                </span>
+                                                <div className="text-brand-inactive-text dark:text-dark-body font-bold text-[11px]">
+                                                    (R$ {Number(order.shipping_cost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+                                                </div>
+                                            </div>
+                                        } 
+                                    />
+
+                                    {Number(order.additional_costs || 0) > 0 && (
+                                        <PaymentRow 
+                                            label="Custos Adicionais" 
+                                            value={`R$ ${Number(order.additional_costs).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
+                                        />
                                     )}
+
+                                    {Number(order.discount_value || 0) > 0 && (
+                                        <PaymentRow 
+                                            label="Desconto" 
+                                            value={<span className="text-brand-red font-bold">- R$ {Number(order.discount_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>} 
+                                        />
+                                    )}
+
                                     <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
-                                        <span className="font-bold text-base md:text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>
-                                        <span className="font-bold text-xl md:text-2xl text-brand-dark dark:text-dark-heading tracking-tight text-right">R$ {Number(order.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
-                                        <CreditCardIcon size={14} className="text-brand-inactive-text" />
-                                        <span className="text-[12px] font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wide">Método: {order.payment_method || "Não informado"}</span>
+                                        <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>
+                                        <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">R$ {Number(order.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
+
 
                         {/* RIGHT COLUMN */}
                         <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-10 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
@@ -286,7 +335,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                             )}
 
                             <CustomerCard
-                                customer={order.customers || (order.customer_name ? { name: order.customer_name, email: order.buyer_email || "-", phone: "-" } : null)}
+                                customer={order.customers || (order.customer_name ? { name: order.customer_name, email: order.buyer_email || null, phone: null } : null)}
                                 address={order.customers?.addresses?.find((a: any) => a.is_default) || order.customers?.addresses?.[0] || (order.delivery_address ? { street: order.delivery_address } : null)}
                             />
 

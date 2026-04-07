@@ -132,6 +132,10 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                             setCity(c.city || "")
                             setUf(c.state || "SP")
                             setNoNumber(c.number === "S/N")
+                            setObservacoes(c.notes || "")
+                            setWebsite(c.website || "")
+                            setRg(c.rg || "")
+                            if (c.phone_fixed) setPhone(c.phone_fixed)
                         }
                     }
                 } catch (e) {
@@ -222,7 +226,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                 state: uf,
                 csrf_token: token,
                 store_credit: storeCredit,
-                status: status === "Ativo" ? "ativo" : status === "Inativo" ? "inativo" : "bloqueado"
+                status: status === "Ativo" ? "ativo" : status === "Inativo" ? "inativo" : "bloqueado",
+                notes: observacoes
             }
 
             const res = customerId 

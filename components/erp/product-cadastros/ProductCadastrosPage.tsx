@@ -332,7 +332,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                 isOpen={deleteModal.isOpen}
                 onClose={() => setDeleteModal({ isOpen: false, item: null, isDeleting: false })}
                 onConfirm={confirmDelete}
-                title="Excluir Permanentemente"
+                title="Excluir Item"
                 description={`Tem certeza que deseja excluir "${deleteModal.item?.name}"? Esta ação não pode ser desfeita.`}
                 isDestructive
                 isLoading={deleteModal.isDeleting}

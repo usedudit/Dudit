@@ -7,6 +7,7 @@ import Portal from "@/components/Portal";
 import BottomSheet from "@/components/BottomSheet";
 import { useMediaQuery } from "@/components/erp/hooks";
 import { CloseIcon } from "@/lib/icons";
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 
 interface Variant {
     id: string | number;
@@ -79,7 +80,7 @@ const SelectVariantSheet = ({ isOpen, onClose, product, onConfirm }: SelectVaria
                 {/* Product Info */}
                 <div className="flex gap-4 mb-8 pt-2">
                     <div className="w-16 h-16 rounded-2xl bg-brand-gray dark:bg-gray-800 flex-shrink-0 overflow-hidden border border-brand-border dark:border-dark-border flex items-center justify-center">
-                        <img src={product.image} className="w-full h-full object-cover mix-blend-multiply dark:mix-blend-normal p-2" alt={product.name} />
+                        <img src={getR2ImageUrl(product.image, "thumbnail")} className="w-full h-full object-cover mix-blend-multiply dark:mix-blend-normal p-2" alt={product.name} />
                     </div>
                     <div className="flex flex-col justify-center">
                         <h4 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading mb-0.5 leading-snug">{product.name}</h4>

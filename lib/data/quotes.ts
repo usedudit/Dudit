@@ -55,8 +55,7 @@ export const getPartnerQuotesCached = cache(async (partnerId: string, limit: num
         },
         [TAGS.quotes(partnerId), String(limit), String(offset)],
         {
-            tags: [TAGS.quotes(partnerId)],
-            revalidate: 5
+            tags: [TAGS.quotes(partnerId)]
         }
     )()
 })
@@ -111,8 +110,7 @@ export const getQuoteWithItemsCached = cache(async (quoteId: string, partnerId: 
         },
         [`quote-${quoteId}`],
         {
-            tags: [TAGS.quotes(partnerId), `quote-${quoteId}`],
-            revalidate: 5
+            tags: [TAGS.quotes(partnerId), `quote-${quoteId}`]
         }
     )()
 })

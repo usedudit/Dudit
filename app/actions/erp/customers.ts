@@ -33,6 +33,7 @@ export async function createComprehensiveCustomerAction(data: {
   municipioCodigoIbge?: string | null
   store_credit?: number
   status?: string
+  notes?: string | null
   csrf_token?: string
 }) {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -70,6 +71,7 @@ export async function createComprehensiveCustomerAction(data: {
     contribuinte_icms: data.contribuinteIcms || null,
     store_credit: data.store_credit ?? 0,
     status: data.status || "ativo",
+    notes: data.notes || null,
   }).select().single()
 
   if (error) {
@@ -243,6 +245,7 @@ export async function updateComprehensiveCustomerAction(data: {
   municipioCodigoIbge?: string | null
   store_credit?: number
   status?: string
+  notes?: string | null
   csrf_token?: string
 }) {
   // Validate CSRF token
@@ -290,6 +293,7 @@ export async function updateComprehensiveCustomerAction(data: {
       municipio_codigo_ibge: data.municipioCodigoIbge || null,
       store_credit: data.store_credit,
       status: data.status || "ativo",
+      notes: data.notes || null,
     })
     .eq("id", data.customerId)
     .eq("partner_id", data.partnerId) // Defense in depth
@@ -337,10 +341,13 @@ export async function getCustomerOrdersAction(customerId: string) {
 
     return {
       id: o.order_number || o.id.substring(0, 8),
+      originalId: o.id,
       date: dateStr,
       total: o.total_amount,
       status: status,
-      items: o.order_items ? o.order_items.length : 0
+      situation: o.situation,
+      items: o.order_items ? o.order_items.length : 0,
+      createdAt: o.created_at
     }
   })
 

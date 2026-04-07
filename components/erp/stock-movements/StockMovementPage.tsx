@@ -263,7 +263,12 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
     }
 
     return (
-        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
+            className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
+        >
             <style>{`
                .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
@@ -423,7 +428,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                                                         {isSortable && (
                                                                             <ArrowUpDownIcon
                                                                                 size={14}
-                                                                                className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100' : 'text-brand-inactive-text opacity-0 group-hover:opacity-40'
+                                                                                className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
                                                                                     } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
                                                                             />
                                                                         )}
@@ -493,7 +498,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                 variant="warning"
                 isLoading={isUndoing}
             />
-        </FadeIn >
+        </motion.div >
     );
 };
 

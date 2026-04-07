@@ -1,16 +1,31 @@
 "use client"
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion } from 'framer-motion';
-import { EditIcon, SparklesIcon, CheckCircleIcon, ChevronLeftIcon, ThreeDotsIcon, ClockIcon } from '@/lib/icons';
-import { Button, Badge, Checkbox, Tabs, TabsList, TabsTrigger, TabsContent, ActionsDropdown, InfoCard } from '@/components/reusable';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { EditIcon, SparklesIcon, CheckCircleIcon, ChevronLeftIcon, ThreeDotsIcon, ClockIcon, ArrowUpDownIcon } from '@/lib/icons';
+import { Button, Badge, Checkbox, Tabs, TabsList, TabsTrigger, TabsContent, ActionsDropdown, InfoCard, ThreeDotsLoader } from '@/components/reusable';
 import Pagination from '@/components/reusable/Pagination';
 import { useNotification } from '@/hooks/use-notification';
 import IconPlaceholder from '@/components/reusable/IconPlaceholder';
 import { getCustomerOrdersAction } from '@/app/actions/erp/customers';
+import { UserProfileImage } from '@/lib/utils/UserProfileImage';
+import OrderListItem from '../orders/OrderListItem';
+import { useRouter } from 'next/navigation';
 
-interface Props { customer: any; onBack: () => void; }
+const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
+    { id: "order_id", label: "Pedido", align: "left", width: "200px" },
+    { id: "total", label: "Total", align: "left", width: "150px" },
+    { id: "status", label: "Status", align: "left", width: "220px" },
+    { id: "date", label: "Data", align: "left", width: "150px" },
+    { id: "actions", label: "Ações", align: "center", width: "120px" },
+]
 
-export const CustomerDetailPage = ({ customer, onBack }: Props) => {
+interface Props {
+    customer: any;
+    onBack: () => void;
+    onEdit?: (customer: any) => void;
+}
+
+export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const { success: notifySuccess, error: notifyError } = useNotification();
     const [activeTab, setActiveTab] = useState('Purchase History');
     const [isScrolled, setIsScrolled] = useState(false);
@@ -24,9 +39,28 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
     const [isLoadingOrders, setIsLoadingOrders] = useState(true);
 
     // Pagination and Selection
+    const router = useRouter();
     const [page, setPage] = useState(1);
     const itemsPerPage = 8;
-    const [selection, setSelection] = useState<Set<string>>(new Set());
+    const [selection, setSelection] = useState({ ids: new Set<string>() });
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>({ key: 'date', direction: 'desc' });
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+    const [scrollState, setScrollState] = useState({ left: false, right: false });
+
+    const checkScroll = useCallback(() => {
+        if (!tableContainerRef.current) return
+        const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
+        setScrollState({
+            left: scrollLeft > 0,
+            right: scrollLeft < scrollWidth - clientWidth - 2,
+        })
+    }, []);
+
+    useEffect(() => {
+        checkScroll()
+        window.addEventListener("resize", checkScroll)
+        return () => window.removeEventListener("resize", checkScroll)
+    }, [checkScroll, fetchedOrders]);
 
     useEffect(() => {
         const fetchOrders = async () => {
@@ -45,8 +79,68 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
 
     const isInformationTab = activeTab === 'Information';
 
-    const totalPages = Math.ceil(fetchedOrders.length / itemsPerPage);
-    const paginatedOrders = fetchedOrders.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+    const formattedOrders = useMemo(() => {
+        let result = fetchedOrders.map((o: any) => {
+            const statusMap: Record<string, { label: string; color: string }> = {
+                paid: { label: "Pago", color: "green" },
+                shipped: { label: "Enviado", color: "blue" },
+                delivered: { label: "Entregue", color: "green" },
+                cancelled: { label: "Cancelado", color: "gray" },
+                in_process: { label: "Em análise", color: "yellow" },
+                pending: { label: "Pendente", color: "gray" },
+            }
+            const statusInfo = statusMap[o.situation] || { label: o.status, color: "gray" }
+
+            return {
+                originalId: o.originalId,
+                displayId: o.id,
+                customer_name: customer.name,
+                total_amount: o.total,
+                statusLabel: statusInfo.label,
+                statusColor: statusInfo.color,
+                isUnfulfilled: (o.situation === "pending" || o.situation === "in_process"),
+                formattedDate: o.date,
+                items_count: o.items,
+                created_at_time: new Date(o.createdAt).getTime(),
+                situation: o.situation
+            }
+        })
+
+        if (sortConfig) {
+            result = [...result].sort((a, b) => {
+                let aVal: any
+                let bVal: any
+
+                switch (sortConfig.key) {
+                    case "order_id": aVal = a.displayId; bVal = b.displayId; break
+                    case "total": aVal = a.total_amount; bVal = b.total_amount; break
+                    case "status": aVal = a.statusLabel; bVal = b.statusLabel; break
+                    case "date": aVal = a.created_at_time; bVal = b.created_at_time; break
+                    default: return 0
+                }
+
+                if (aVal === bVal) return 0
+                const comparison = aVal < bVal ? -1 : 1
+                return sortConfig.direction === "asc" ? comparison : -comparison
+            })
+        }
+        return result
+    }, [fetchedOrders, customer.name, sortConfig])
+
+    const totalPages = Math.ceil(formattedOrders.length / itemsPerPage);
+    const paginatedOrders = formattedOrders.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+
+    const handleSelectRow = (id: string) => {
+        setSelection((p: { ids: Set<string> }) => {
+            const s = new Set<string>(p.ids)
+            s.has(id) ? s.delete(id) : s.add(id)
+            return { ids: s }
+        })
+    }
+
+    const handleDetailsOrder = (order: any) => {
+        router.push(`/erp/orders?id=${order.originalId}`)
+    }
 
     return (
         <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
@@ -86,7 +180,7 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                                         onArchive={() => { }}
                                         onDelete={() => { }}
                                     />
-                                    <Button>
+                                    <Button className='whitespace-nowrap' onClick={() => onEdit?.(customer)}>
                                         <EditIcon className="w-4 h-4 mr-2" />
                                         Editar Cliente
                                     </Button>
@@ -121,7 +215,7 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
                                         {/* Unified Stats Card */}
                                         <div className="w-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-sm overflow-hidden mb-10 transition-all duration-300 hover:shadow-md">
-                                            <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-gray-200 dark:divide-dark-border">
+                                            <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-gray-200 dark:divide-dark-border">
                                                 <div className="p-6 flex flex-col justify-center">
                                                     <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mb-1.5">Pedidos</span>
                                                     <div className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
@@ -150,77 +244,85 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                                         </div>
 
                                         {/* Orders List / Table */}
-                                        <div className="w-full bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border shadow-sm overflow-hidden hidden md:block mt-6">
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-left">
-                                                    <thead>
-                                                        <tr className="bg-gray-50 dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
-                                                            <th className="py-4 px-4 w-12 pl-6 relative">
-                                                                <div className="flex items-center">
-                                                                    <Checkbox
-                                                                        checked={selection.size === paginatedOrders.length && paginatedOrders.length > 0}
-                                                                        onChange={(e) => {
-                                                                            if (selection.size === paginatedOrders.length) {
-                                                                                setSelection(new Set());
-                                                                            } else {
-                                                                                setSelection(new Set(paginatedOrders.map((o: any) => o.id)));
-                                                                            }
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                            </th>
-                                                            <th className="py-4 px-2 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Pedido</th>
-                                                            <th className="py-4 px-2 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Data</th>
-                                                            <th className="py-4 px-2 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Itens</th>
-                                                            <th className="py-4 px-2 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body text-center">Status</th>
-                                                            <th className="py-4 px-2 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body text-right pr-6">Total</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {isLoadingOrders ? (
-                                                            <tr>
-                                                                <td colSpan={6} className="py-20 text-center"><div className="w-8 h-8 border-2 border-brand-green border-t-transparent rounded-full animate-spin mx-auto" /></td>
-                                                            </tr>
-                                                        ) : paginatedOrders.map(order => (
-                                                            <tr key={order.id} className="border-b border-brand-border dark:border-dark-border hover:bg-gray-50/50 dark:hover:bg-dark-border/30 transition-colors group">
-                                                                <td className="py-4 px-4 w-12 pl-6">
-                                                                    <Checkbox
-                                                                        checked={selection.has(order.id)}
-                                                                        onChange={() => {
-                                                                            setSelection(prev => {
-                                                                                const newSet = new Set(prev);
-                                                                                if (newSet.has(order.id)) newSet.delete(order.id);
-                                                                                else newSet.add(order.id);
-                                                                                return newSet;
-                                                                            });
-                                                                        }}
-                                                                    />
-                                                                </td>
-                                                                <td className="py-4 px-2 font-bold text-brand-dark dark:text-dark-heading text-[14.5px]">
-                                                                    {order.id}
-                                                                </td>
-                                                                <td className="py-4 px-2 text-brand-inactive-text dark:text-dark-body text-[14.5px]">
-                                                                    {order.date}
-                                                                </td>
-                                                                <td className="py-4 px-2 text-brand-inactive-text dark:text-dark-body text-[14.5px]">
-                                                                    {order.items} item(s)
-                                                                </td>
-                                                                <td className="py-4 px-2 text-center">
-                                                                    <Badge variant={order.status === 'Paid' ? 'green' : 'orange'} className="scale-90 whitespace-nowrap px-3 py-1 text-[11px] font-bold">
-                                                                        <div className="flex items-center gap-1.5">
-                                                                            {order.status === 'Paid' ? <CheckCircleIcon className="w-3 h-3" /> : <ClockIcon className="w-3 h-3" />}
-                                                                            {order.status === 'Paid' ? 'Paid' : 'Pending'}
-                                                                        </div>
-                                                                    </Badge>
-                                                                </td>
-                                                                <td className="py-4 px-2 text-right font-bold text-brand-dark dark:text-dark-heading text-[14.5px] pr-6">
-                                                                    ${order.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
+                                        <div className="mt-6">
+                                            <AnimatePresence mode="wait">
+                                                {isLoadingOrders ? (
+                                                    <div className="flex-1 flex items-center justify-center p-8 py-20">
+                                                        <ThreeDotsLoader />
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-full overflow-hidden rounded-xl relative">
+                                                        <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                                        <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                                                        <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                                                <thead>
+                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                        <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
+                                                                            <div className="flex items-center">
+                                                                                <Checkbox
+                                                                                    checked={selection.ids.size === paginatedOrders.length && paginatedOrders.length > 0}
+                                                                                    onChange={(checked) => {
+                                                                                        setSelection({ ids: checked ? new Set(paginatedOrders.map((x: any) => x.originalId)) : new Set() })
+                                                                                    }}
+                                                                                    className="bg-white dark:bg-dark-background"
+                                                                                />
+                                                                            </div>
+                                                                        </th>
+                                                                        {COLUMNS.map((col, idx) => {
+                                                                            const isSortable = col.id !== 'actions';
+                                                                            const isSorted = sortConfig?.key === col.id;
+                                                                            const isLast = idx === COLUMNS.length - 1;
+
+                                                                            return (
+                                                                                <th
+                                                                                    key={col.id}
+                                                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isLast ? "rounded-r-lg" : ""}`}
+                                                                                    style={{ width: col.width }}
+                                                                                    onClick={() => {
+                                                                                        if (!isSortable) return
+                                                                                        setSortConfig((prev: any) => ({
+                                                                                            key: col.id,
+                                                                                            direction: prev?.key === col.id && prev.direction === 'asc' ? 'desc' : 'asc'
+                                                                                        }))
+                                                                                    }}
+                                                                                >
+                                                                                    <div className={`flex items-center gap-1.5 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
+                                                                                        {col.label}
+                                                                                        {isSortable && (
+                                                                                            <ArrowUpDownIcon
+                                                                                                size={14}
+                                                                                                className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
+                                                                                                    } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
+                                                                                            />
+                                                                                        )}
+                                                                                    </div>
+                                                                                </th>
+                                                                            )
+                                                                        })}
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {paginatedOrders.map((o: any) => (
+                                                                        <OrderListItem
+                                                                            key={o.originalId}
+                                                                            order={o}
+                                                                            columns={COLUMNS}
+                                                                            selected={selection.ids.has(o.originalId)}
+                                                                            onSelect={handleSelectRow}
+                                                                            onEdit={() => { router.push(`/erp/orders/edit/${o.originalId}`) }}
+                                                                            onDelete={() => { }}
+                                                                            onCancel={() => { }}
+                                                                            onDetails={handleDetailsOrder}
+                                                                        />
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </AnimatePresence>
                                         </div>
 
                                         {totalPages > 1 && (
@@ -230,7 +332,7 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                                         )}
 
                                         {!isLoadingOrders && paginatedOrders.length === 0 && (
-                                            <div className="py-12 border border-brand-border dark:border-dark-border rounded-xl mt-6 hidden md:block">
+                                            <div className="mt-6 hidden md:block">
                                                 <IconPlaceholder
                                                     title="Nenhum pedido encontrado"
                                                     subtitle="Este cliente ainda não realizou nenhum pedido."
@@ -282,21 +384,21 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
 
                                 {/* Detalhes e Contato no modelo CustomerCard */}
                                 <section>
-                                    <h3 className="text-[17px] font-bold text-brand-dark dark:text-dark-heading mb-6">Detalhes</h3>
                                     <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors shadow-sm">
                                         <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
+
+                                        <div className="px-6 py-5 border-b border-brand-border dark:border-dark-border bg-gray-50/50 dark:bg-dark-border/20">
+                                            <h3 className="text-[17px] font-bold text-brand-dark dark:text-dark-heading">Detalhes</h3>
+                                        </div>
 
                                         {/* Top Part: Customer Identity */}
                                         <div className="p-6 text-left">
                                             <div className="flex items-center gap-4 mb-6 mt-2">
                                                 <div className="relative">
-                                                    <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border flex items-center justify-center text-xl font-bold text-brand-dark dark:text-dark-heading border border-white dark:border-dark-border overflow-hidden uppercase text-brand-inactive-text">
-                                                        {customer.avatar ? (
-                                                            <img src={customer.avatar} alt={customer.name} className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            customer?.name?.charAt(0) || 'C'
-                                                        )}
-                                                    </div>
+                                                    <UserProfileImage
+                                                        fullName={customer.name || "Cliente"}
+                                                        className="w-12 h-12 text-xl"
+                                                    />
                                                 </div>
                                                 <div className="min-w-0">
                                                     <h4 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">{customer.name}</h4>
@@ -306,42 +408,42 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
 
                                             {/* Informações Gerais (Cliente desde, Tipo) */}
                                             <div className="space-y-3">
-                                                <div className="flex justify-between items-center py-2.5 border-b border-gray-100 dark:border-dark-border/50">
-                                                    <span className="text-[13px] text-brand-inactive-text dark:text-dark-body font-semibold uppercase tracking-wider">Cliente desde</span>
+                                                <div className="flex justify-between items-center py-2.5 border-b border-brand-border dark:border-dark-border">
+                                                    <span className="text-[13px] text-brand-inactive-text dark:text-dark-body font-semibold tracking-wider">Cliente desde</span>
                                                     <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
                                                         {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('pt-BR', { month: 'short', day: 'numeric', year: 'numeric' }).replace(' de ', ', ') : '-'}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between items-center py-2.5">
-                                                    <span className="text-[13px] text-brand-inactive-text dark:text-dark-body font-semibold uppercase tracking-wider">Tipo de Pessoa</span>
-                                                    <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{customer.personType === 'pj' || customer.cnpj ? 'Pessoa Jurídica' : 'Pessoa Física'}</span>
+                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold tracking-wider">Tipo de Pessoa</span>
+                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.personType === 'pj' || customer.cnpj ? 'Pessoa Jurídica' : 'Pessoa Física'}</span>
                                                 </div>
 
                                                 {(customer.personType === 'pj' || customer.cnpj) ? (
                                                     <div className="mt-2 pt-2 border-t border-gray-100 dark:border-dark-border/50 space-y-2.5">
                                                         {customer.cnpj && (
                                                             <div className="flex justify-between items-center">
-                                                                <span className="text-[13px] text-brand-inactive-text dark:text-dark-body font-medium">CNPJ</span>
-                                                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{customer.cnpj}</span>
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">CNPJ</span>
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.cnpj}</span>
                                                             </div>
                                                         )}
                                                         {customer.nomeFantasia && (
                                                             <div className="flex justify-between items-center">
-                                                                <span className="text-[13px] text-brand-inactive-text dark:text-dark-body font-medium">Fantasia</span>
-                                                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading text-right max-w-[60%] truncate">{customer.nomeFantasia}</span>
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Fantasia</span>
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading text-right max-w-[60%] truncate">{customer.nomeFantasia}</span>
                                                             </div>
                                                         )}
                                                         <div className="flex justify-between items-center">
-                                                            <span className="text-[13px] text-brand-inactive-text dark:text-dark-body font-medium">Insc. Est.</span>
-                                                            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading text-right">{customer.inscricaoEstadual || 'Isento'}</span>
+                                                            <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Insc. Est.</span>
+                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading text-right">{customer.inscricaoEstadual || 'Isento'}</span>
                                                         </div>
                                                     </div>
                                                 ) : (
                                                     <>
                                                         {customer.cpf && (
-                                                            <div className="mt-2 pt-2 border-t border-gray-100 dark:border-dark-border/50 flex justify-between items-center">
-                                                                <span className="text-[13px] text-brand-inactive-text dark:text-dark-body font-medium">CPF</span>
-                                                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{customer.cpf}</span>
+                                                            <div className="mt-2 pt-2 border-t border-b border-brand-border dark:border-dark-border flex justify-between items-center">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">CPF</span>
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.cpf}</span>
                                                             </div>
                                                         )}
                                                     </>
@@ -354,7 +456,7 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                                         {/* Bottom Part: Shipping Address */}
                                         <div className="p-6 text-left">
                                             <div className="flex justify-between items-center mb-4">
-                                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading uppercase tracking-wide">
+                                                <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">
                                                     Endereço
                                                 </h3>
                                             </div>
@@ -384,14 +486,14 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                                             ) : (
                                                 <div className="bg-brand-gray/30 dark:bg-dark-border/30 rounded-lg p-4 text-center">
                                                     <p className="text-sm text-brand-inactive-text dark:text-dark-body italic">
-                                                        Nenhum endereço cadastrado.
+                                                        Nenhum endereço cadastrado para este cliente.
                                                     </p>
                                                 </div>
                                             )}
 
                                             <div className="mt-6 pt-6 border-t border-brand-border dark:border-dark-border">
                                                 <div className="flex justify-between items-center mb-4">
-                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading uppercase tracking-wide">Contato</h3>
+                                                    <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Contato</h3>
                                                 </div>
 
                                                 {(customer.email || customer.phone || customer.mobile) ? (
@@ -414,7 +516,7 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                                                 ) : (
                                                     <div className="bg-brand-gray/30 dark:bg-dark-border/30 rounded-lg p-4 text-center">
                                                         <p className="text-sm text-brand-inactive-text dark:text-dark-body italic">
-                                                            Nenhum contato disponível.
+                                                            Nenhuma informação de contato disponível.
                                                         </p>
                                                     </div>
                                                 )}
@@ -443,13 +545,14 @@ export const CustomerDetailPage = ({ customer, onBack }: Props) => {
                     />
                     <Button
                         className="flex-1 h-[48px] font-bold"
+                        onClick={() => onEdit?.(customer)}
                     >
                         <EditIcon className="w-4 h-4 mr-2" />
                         Editar
                     </Button>
                 </div>
-            </Tabs>
-        </div>
+            </Tabs >
+        </div >
     );
 };
 

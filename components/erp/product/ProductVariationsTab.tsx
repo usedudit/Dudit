@@ -852,7 +852,7 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
                                                         return (
                                                             <th
                                                                 key={idx}
-                                                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body relative bg-brand-gray dark:bg-dark-border/50 ${isLast ? "rounded-r-lg" : ""} ${col.sortable ? "cursor-pointer hover:bg-gray-200 dark:hover:bg-dark-border transition-colors select-none" : ""}`}
+                                                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body relative bg-brand-gray dark:bg-dark-border/50 ${isLast ? "rounded-r-lg" : ""} ${col.sortable ? "cursor-pointer hover:bg-gray-200 dark:hover:bg-dark-border transition-colors select-none group" : ""}`}
                                                                 style={{ width: col.width }}
                                                                 onClick={() => col.sortable && col.key && handleSort(col.key)}
                                                             >
@@ -862,7 +862,7 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
                                                                     </span>
                                                                     {col.sortable && (
                                                                         <div className="flex flex-col items-center">
-                                                                            <ArrowUpDownIcon className={`w-3.5 h-3.5 transition-colors ${isSorted ? "text-brand-primary" : "text-gray-400"}`} />
+                                                                            <ArrowUpDownIcon className={`w-3.5 h-3.5 transition-all duration-200 ${isSorted ? "text-brand-primary block" : "text-gray-400 hidden group-hover:block opacity-40"}`} />
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -933,9 +933,9 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
                 onApply={handleBulkEditApply}
             />
 
-            <AlertModal isOpen={modalState.delete} onClose={() => setModalState(p => ({ ...p, delete: false }))} onConfirm={handleDelete} title="Excluir variante?" description="Ação irreversível." confirmText="Excluir" variant="danger" icon={<TrashIcon />} />
-            <AlertModal isOpen={modalState.bulkDelete} onClose={() => setModalState(p => ({ ...p, bulkDelete: false }))} onConfirm={() => handleBulkEditApply({ type: 'delete' })} title={`Excluir ${selectedIds.size} variantes?`} description="Ação irreversível." confirmText="Excluir Seleção" variant="danger" />
-            <AlertModal isOpen={modalState.bulkStatus} onClose={() => setModalState(p => ({ ...p, bulkStatus: false }))} onConfirm={() => handleBulkEditApply({ type: 'visibility', visibilityMode: variations.filter(v => selectedIds.has(v.id)).every(v => !v.status) ? 'publish' : 'hide' })} title="Atualizar Status" message="Confirmar alteração de status em massa?" confirmText="Confirmar" />
+            <AlertModal isOpen={modalState.delete} onClose={() => setModalState(p => ({ ...p, delete: false }))} onConfirm={handleDelete} title="Excluir variante?" message={`Tem certeza que deseja excluir ${selectedIds.size} produtos? Esta ação não pode ser desfeita.`} confirmText="Excluir" variant="danger" icon={<TrashIcon />} />
+            <AlertModal isOpen={modalState.bulkDelete} onClose={() => setModalState(p => ({ ...p, bulkDelete: false }))} onConfirm={() => handleBulkEditApply({ type: 'delete' })} title="Excluir variantes" description="Ação irreversível." confirmText="Excluir Seleção" variant="danger" />
+            <AlertModal isOpen={modalState.bulkStatus} onClose={() => setModalState(p => ({ ...p, bulkStatus: false }))} onConfirm={() => handleBulkEditApply({ type: 'visibility', visibilityMode: variations.filter(v => selectedIds.has(v.id)).every(v => !v.status) ? 'publish' : 'hide' })} title="Atualizar Status" message={`Tem certeza que deseja alterar o status de ${selectedIds.size} variante(s)?`} confirmText="Confirmar" variant="warning" />
         </>
     )
 }

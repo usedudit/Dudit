@@ -19,6 +19,7 @@ interface OrderListItemProps {
   onSelect: (id: string) => void
   onEdit: (order: any) => void
   onDelete: (order: any) => void
+  onCancel: (order: any) => void
   onDetails: (order: any) => void
 }
 
@@ -30,6 +31,7 @@ const OrderListItem = React.memo(
     onSelect,
     onEdit,
     onDelete,
+    onCancel,
     onDetails,
   }: OrderListItemProps) => {
 
@@ -104,9 +106,9 @@ const OrderListItem = React.memo(
               onClick={(e) => e.stopPropagation()}
             >
               <ActionsDropdown
-                onView={() => onDetails(order)}
                 onEdit={() => onEdit(order)}
                 onDelete={() => onDelete(order)}
+                onCancel={() => onCancel(order)}
               />
             </div>
           )
