@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo, useRef, useCallback } from "react"
+import { useEffect, useState, useMemo, useRef } from "react"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { ItemCard } from "./shared-components"
@@ -32,7 +32,6 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
   const searchParams = useSearchParams()
 
   const [currentType, setCurrentType] = useState(type)
-  const [isNavigating, setIsNavigating] = useState(false)
   const [sortBy, setSortBy] = useState<SortOption>("relevancia")
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
 
@@ -43,8 +42,6 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
     queryKey: ['explore', query, currentType],
     initialPageParam: null as any,
     queryFn: async ({ pageParam }) => {
-      // If we are given no pageParam but we have initialResults and it's the very first render,
-      // React Query uses initialData. Wait, we are passing initialData, so this is for NEXT pages.
       let limits: any = { geral: 40 }
       if (currentType === 'produtos') limits = { produtos: 40 }
       else if (currentType === 'servicos') limits = { servicos: 40 }
@@ -66,11 +63,12 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
       }
     },
     initialData: () => {
-      // Only set initial data if it matches what the server sent to this prop
       return { pages: [initialResults], pageParams: [null] }
     },
     placeholderData: keepPreviousData,
-    staleTime: 60000
+    staleTime: 60000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   })
 
   const rawItems = useMemo(() => {
@@ -82,16 +80,19 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
     return all
   }, [data, initialResults])
 
-  // HARDENED IntersectionObserver — single trigger
+  // HARDENED IntersectionObserver — single trigger with double-fire protection
+  const isFetchingRef = useRef(false)
   useEffect(() => {
     if (!hasNextPage || isFetchingNextPage) return
+    isFetchingRef.current = false
 
     const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) {
+      if (entries[0].isIntersecting && !isFetchingRef.current) {
+        isFetchingRef.current = true
         fetchNextPage()
       }
     }, {
-      rootMargin: "600px"
+      rootMargin: "200px"
     })
 
     if (observerTarget.current) observer.observe(observerTarget.current)
@@ -371,28 +372,13 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
               >
-                {isNavigating ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {[...Array(8)].map((_, i) => (
-                      <div key={`skeleton-${i}`} className="border border-brand-border p-4 rounded-xl flex flex-col gap-4">
-                        <SkeletonLoader height={160} />
-                        <SkeletonLoader height={20} width="80%" />
-                        <SkeletonLoader height={15} width="60%" />
-                        <div className="mt-auto flex justify-between items-end">
-                          <SkeletonLoader height={25} width="40%" />
-                          <SkeletonLoader height={15} width="30%" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <>
+                <>
                     {vitrinesDestaque.length > 0 && (
                       <div className="mb-10">
                         <h2 className="text-[18px] font-bold text-brand-dark mb-4 opacity-80 tracking-widest text-xs uppercase">Vitrines relacionadas</h2>
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                           {vitrinesDestaque.map((item) => (
-                            <Link key={`vitrine-${item.id}`} href={getPartnerUrl(item.partners)} prefetch={true} className="border border-brand-border p-4 rounded-xl flex flex-col items-center text-center hover:border-brand-green transition-colors group">
+                            <Link key={`vitrine-${item.id}`} href={getPartnerUrl(item.partners)} prefetch={false} className="border border-brand-border p-4 rounded-xl flex flex-col items-center text-center hover:border-brand-green transition-colors group">
                               <img src={item.images[0]} alt={item.name} className="w-20 h-20 rounded-full object-cover mb-3" />
                               <h3 className="font-bold text-brand-dark truncate w-full group-hover:text-brand-green transition-colors">{item.name}</h3>
                               <p className="text-xs text-brand-inactive-text truncate w-full mb-3">{item.partners?.city} - {item.partners?.state}</p>
@@ -416,7 +402,7 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
                         {filteredResults.map((item) => {
                           if (item.itemType === 'loja') {
                             return (
-                              <Link key={`loja-${item.id}`} href={getPartnerUrl(item.partners)} prefetch={true} className="border border-brand-border p-4 rounded-xl flex flex-col items-center text-center hover:border-brand-green transition-colors group">
+                              <Link key={`loja-${item.id}`} href={getPartnerUrl(item.partners)} prefetch={false} className="border border-brand-border p-4 rounded-xl flex flex-col items-center text-center hover:border-brand-green transition-colors group">
                                 <img src={item.images[0]} alt={item.name} className="w-20 h-20 rounded-full object-cover mb-4 shadow-sm" />
                                 <h3 className="font-bold text-brand-dark truncate w-full group-hover:text-brand-green transition-colors">{item.name}</h3>
                                 <p className="text-xs text-brand-inactive-text truncate w-full mb-4">{item.partners?.city} - {item.partners?.state}</p>
@@ -427,9 +413,7 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
                           return <ItemCard key={item.id} product={item as any} />
                         })}
 
-                        {/* 
-                          INFINITE SCROLL LOADER (IntersectionObserver Target) 
-                        */}
+                        {/* INFINITE SCROLL LOADER */}
                         {hasNextPage && (
                           <div
                             ref={observerTarget}
@@ -448,7 +432,6 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
                       </div>
                     )}
                   </>
-                )}
               </motion.div>
             </AnimatePresence>
           </div>

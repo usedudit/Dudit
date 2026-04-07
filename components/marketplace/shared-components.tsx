@@ -6,8 +6,6 @@ import Link from "next/link"
 import { createSlug } from "@/lib/utils/slugify"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getProductUrl } from "@/lib/utils/url-generator"
-import { useSmartPrefetch } from "@/hooks/use-smart-prefetch"
-import { getMarketplaceProductAction } from "@/app/actions/marketplace/client-loaders"
 
 const HOME_BANNERS = [
   { id: 1, src: 'https://img.dudit.com.br/static/banners/Banner-1.png', alt: 'Venda aqui' },
@@ -197,22 +195,13 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product }) => {
   const imageUrl = getProductImageUrl(product.images)
   const slug = createSlug(product.name)
 
-  const { ref, onMouseEnter, onMouseLeave } = useSmartPrefetch({
-    queryKey: ['marketplace-product', product.id],
-    queryFn: () => getMarketplaceProductAction(product.id).then(res => res.data),
-    staleTime: 60000
-  });
-
   return (
     <div 
-      ref={ref} 
-      onMouseEnter={onMouseEnter} 
-      onMouseLeave={onMouseLeave}
       className="w-[160px] md:w-[220px] relative group/card h-full shrink-0"
     >
       <Link
         href={getProductUrl(product, product.partners)}
-        prefetch={true}
+        prefetch={false}
         className="block h-full flex-col hover:no-underline"
       >
         <div className="relative mb-3 overflow-hidden rounded-[16px] border border-gray-100 bg-brand-gray aspect-square">
