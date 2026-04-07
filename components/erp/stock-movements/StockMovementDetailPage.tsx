@@ -126,7 +126,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                         <div className="hidden md:flex items-start justify-between mb-4">
                             <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                 <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                    <span className="truncate">{data.reason}</span>
+                                    <span className="truncate">{data.displayId}</span>
                                     <Badge
                                         variant={isIn ? "green" : "red"}
                                         className="whitespace-nowrap scale-90 shrink-0"
@@ -136,7 +136,11 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                 </h1>
 
                                 <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                    <span>{data.date}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span>{data.date}</span>
+                                        <span className="text-brand-inactive-text dark:text-dark-body opacity-50">•</span>
+                                        <span>Registrado por <strong className="font-semibold text-brand-dark dark:text-dark-heading">{data.user}</strong></span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -252,9 +256,9 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                 <InfoCard
                                     color="gray"
                                     message={
-                                        <div className="flex flex-col">
-                                            <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body">Registrado por</span>
-                                            <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate">{data.user}</span>
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body">Motivo</span>
+                                            <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate">{data.reason || "-"}</span>
                                         </div>
                                     }
                                 />
@@ -263,10 +267,15 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                             {/* Notes Section */}
                             {data.notes && (
                                 <div>
-                                    <h3 className="text-[13px] font-bold uppercase tracking-wider text-brand-dark dark:text-dark-heading mb-4">Observações</h3>
-                                    <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border italic text-sm text-brand-dark dark:text-dark-body leading-relaxed">
-                                        "{data.notes}"
-                                    </div>
+                                    <InfoCard
+                                        color="orange"
+                                        message={
+                                            <div className="flex flex-col">
+                                                <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body">Observações</span>
+                                                <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading truncate">{data.notes}</span>
+                                            </div>
+                                        }
+                                    />
                                 </div>
                             )}
                         </div>

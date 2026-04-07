@@ -132,7 +132,7 @@ export async function createBatchStockMovementAction(data: {
             p_reason: data.reason,
             p_notes: data.notes,
             p_created_by: userId,
-            p_items: JSON.stringify(itemsPayload)
+            p_items: itemsPayload
         })
 
         if (error) {
@@ -217,9 +217,9 @@ export async function getStockMovementDetails(id: string) {
 
         // Resolve user name
         const userNamePromise = data.created_by
-            ? supabase.from("user_profiles").select("full_name").eq("id", data.created_by).single().then((r: any) => r.data?.full_name || data.created_by)
+            ? supabase.from("user_profiles").select("full_name").eq("user_id", data.created_by).single().then((r: any) => r.data?.full_name || data.created_by)
             : Promise.resolve('Sistema')
-        
+
         const userName = await userNamePromise
 
         let reason = data.reason || data.movement_type;
@@ -228,14 +228,14 @@ export async function getStockMovementDetails(id: string) {
         }
 
         const dateObj = new Date(data.created_at);
-        const dateStr = dateObj.toLocaleDateString("pt-BR", { 
-            day: '2-digit', 
-            month: 'short', 
+        const dateStr = dateObj.toLocaleDateString("pt-BR", {
+            day: '2-digit',
+            month: 'short',
             year: 'numeric',
             timeZone: 'America/Sao_Paulo'
         });
-        const timeStr = dateObj.toLocaleTimeString("pt-BR", { 
-            hour: '2-digit', 
+        const timeStr = dateObj.toLocaleTimeString("pt-BR", {
+            hour: '2-digit',
             minute: '2-digit',
             timeZone: 'America/Sao_Paulo'
         });
@@ -370,7 +370,7 @@ export async function undoStockMovementAction(id: string, customReason?: string)
                 p_reason: customReason || "Estorno",
                 p_notes: notes,
                 p_created_by: userId,
-                p_items: JSON.stringify(itemsPayload)
+                p_items: itemsPayload
             })
 
             if (error) {
