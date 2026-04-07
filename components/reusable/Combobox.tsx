@@ -98,7 +98,7 @@ export function Combobox({
       const styles: React.CSSProperties = {
         position: "fixed",
         width: `${rect.width}px`,
-        zIndex: 50,
+        zIndex: 9999,
       }
 
       if (shouldOpenUpward) {
@@ -300,7 +300,7 @@ export function Combobox({
           style={position}
           className={cn(
             "rounded-md shadow-lg bg-white dark:bg-dark-surface ring-1 ring-black ring-opacity-5 ring-border dark:ring-dark-border overflow-hidden",
-            "transition-all ease-out duration-200 z-50",
+            "transition-all ease-out duration-200 z-[9999]",
             isOpen ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none",
           )}
         >

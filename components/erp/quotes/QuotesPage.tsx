@@ -18,7 +18,6 @@ import QuoteGridCard from "./QuoteGridCard"
 import QuotePageControls from "./QuotePageControls"
 import CreateQuote from "./CreateQuote"
 import QuoteDetail from "./QuoteDetail"
-import { FadeIn } from "@/components/animations/FadeIn"
 import { useNotification } from "@/hooks/use-notification"
 
 // Icons
@@ -377,38 +376,14 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
         }
     }, [isServerPaginated, router])
 
-    // Unified Sub-page render pattern
-    if (wrapperMode !== null) {
-        if (wrapperMode === 'view' && activeQuote) {
-            return (
-                <QuoteDetail
-                    partnerId={partnerId}
-                    quoteId={activeQuote.id}
-                    onBack={() => {
-                        setWrapperMode(null)
-                        setActiveQuote(null)
-                    }}
-                    onEditQuote={handleEditQuote}
-                    initialQuote={activeQuote}
-                />
-            )
-        }
-
-        return (
-            <CreateQuote
-                partnerId={partnerId}
-                existingQuote={activeQuote}
-                mode={wrapperMode}
-                onBack={() => {
-                    setWrapperMode(null)
-                    setActiveQuote(null)
-                }}
-            />
-        )
-    }
 
     return (
-        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
+            className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
+        >
             <style>{`
                 .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
@@ -418,6 +393,48 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                 .hide-scrollbar::-webkit-scrollbar { display: none; }
                 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
+
+            <AnimatePresence mode="wait">
+                {wrapperMode === 'view' && activeQuote ? (
+                    <motion.div
+                        key="view-quote"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="w-full h-full"
+                    >
+                        <QuoteDetail
+                            partnerId={partnerId}
+                            quoteId={activeQuote.id}
+                            onBack={() => {
+                                setWrapperMode(null)
+                                setActiveQuote(null)
+                            }}
+                            onEditQuote={handleEditQuote}
+                            initialQuote={activeQuote}
+                        />
+                    </motion.div>
+                ) : wrapperMode !== null ? (
+                    <motion.div
+                        key="create-quote"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="w-full h-full"
+                    >
+                        <CreateQuote
+                            partnerId={partnerId}
+                            existingQuote={activeQuote}
+                            mode={wrapperMode}
+                            onBack={() => {
+                                setWrapperMode(null)
+                                setActiveQuote(null)
+                            }}
+                        />
+                    </motion.div>
+                ) : (
 
             <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
                 {/* Desktop Header */}
@@ -652,8 +669,9 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                         />
                     </div>
                 )}
-            </div>
-
+                </div>
+                )}
+            </AnimatePresence>
             <FilterSheet
                 isOpen={modals.filter}
                 onClose={() => setModals(prev => ({ ...prev, filter: false }))}
@@ -714,6 +732,6 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                     Excluir
                 </Button>
             </FloatingActionBar>
-        </FadeIn>
+        </motion.div>
     )
 }

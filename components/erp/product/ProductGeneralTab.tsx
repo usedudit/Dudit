@@ -105,7 +105,16 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
         <div className="space-y-6">
           <div className="grid grid-cols-12 gap-6">
             <div className="col-span-12">
-              <Input label="Nome do Produto" name="name" value={productData.name} onChange={handleFieldChange} disabled={!isEditing} required />
+              <Input 
+                label="Nome do Produto" 
+                name="name" 
+                value={productData.name} 
+                onChange={handleFieldChange} 
+                disabled={!isEditing} 
+                required 
+                error={fieldErrors?.has("name")}
+                errorMessage={fieldErrors?.has("name") ? "Nome é obrigatório" : undefined}
+              />
             </div>
 
             <div className={`col-span-12 sm:col-span-6`}>
@@ -141,7 +150,16 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6">
             <MoneyInput label="Preço de Custo" name="costPrice" value={productData.costPrice || ""} onChange={(val) => handleFieldChange({ target: { name: "costPrice", value: val } })} disabled={!isEditing || !showPrice} />
-            <MoneyInput label="Preço de Venda" name="price" value={productData.price || ""} onChange={(val) => handleFieldChange({ target: { name: "price", value: val } })} disabled={!isEditing || !showPrice} required />
+            <MoneyInput 
+              label="Preço de Venda" 
+              name="price" 
+              value={productData.price || ""} 
+              onChange={(val) => handleFieldChange({ target: { name: "price", value: val } })} 
+              disabled={!isEditing || !showPrice} 
+              required 
+              error={fieldErrors?.has("price")}
+              errorMessage={fieldErrors?.has("price") ? "Preço de venda é obrigatório" : undefined}
+            />
             <MoneyInput label="Preço Promocional" name="promotional_price" value={productData.promotional_price || ""} onChange={(val) => handleFieldChange({ target: { name: "promotional_price", value: val } })} disabled={!isEditing || !showPrice} />
           </div>
 

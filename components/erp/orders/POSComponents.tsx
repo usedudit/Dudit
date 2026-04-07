@@ -90,7 +90,7 @@ export const SplitPaymentCard: React.FC<SplitPaymentCardProps> = ({ icon: Icon, 
     </div>
 );
 
-export const ReceiptContent = ({ cart, subTotal, tax, total, itemCount, customerName }: any) => (
+export const ReceiptContent = ({ cart, subTotal, shippingFee = 0, otherCosts = 0, discountAmount = 0, total, itemCount, customerName }: any) => (
     <div className="bg-[#F8F9FA] dark:bg-dark-surface/50 rounded-t-2xl p-6 pb-12 flex flex-col relative h-full border border-brand-border dark:border-dark-border border-b-0">
         {/* Receipt Header */}
         <div className="mb-6 flex justify-between items-center">
@@ -128,19 +128,46 @@ export const ReceiptContent = ({ cart, subTotal, tax, total, itemCount, customer
         {/* Summary Footer */}
         <div className="mt-auto pt-4 border-t border-dashed border-gray-300 dark:border-gray-700">
             <div className="space-y-2 mb-6">
+                <div className="flex justify-between items-center text-[14px]">
+                    <span className="text-gray-500 dark:text-gray-400 font-medium">Itens ({itemCount})</span>
+                    <span className="font-bold text-brand-dark dark:text-dark-heading">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subTotal)}
+                    </span>
+                </div>
+
+                {discountAmount > 0 && (
                     <div className="flex justify-between items-center text-[14px]">
-                        <span className="text-gray-500 dark:text-gray-400 font-medium">Itens ({itemCount})</span>
-                        <span className="font-bold text-brand-dark dark:text-dark-heading">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subTotal)}
+                        <span className="text-gray-500 dark:text-gray-400 font-medium">Desconto</span>
+                        <span className="font-bold text-brand-red">
+                            -{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(discountAmount)}
                         </span>
                     </div>
+                )}
+
+                {shippingFee > 0 && (
+                    <div className="flex justify-between items-center text-[14px]">
+                        <span className="text-gray-500 dark:text-gray-400 font-medium">Frete</span>
+                        <span className="font-bold text-brand-dark dark:text-dark-heading">
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(shippingFee)}
+                        </span>
+                    </div>
+                )}
+
+                {otherCosts > 0 && (
+                    <div className="flex justify-between items-center text-[14px]">
+                        <span className="text-gray-500 dark:text-gray-400 font-medium">Outros Custos</span>
+                        <span className="font-bold text-brand-dark dark:text-dark-heading">
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(otherCosts)}
+                        </span>
+                    </div>
+                )}
             </div>
             
             <div className="flex justify-between items-center">
-                    <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total</span>
-                    <span className="font-black text-2xl text-brand-dark dark:text-dark-heading tracking-tight">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}
-                    </span>
+                <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total</span>
+                <span className="font-black text-2xl text-brand-dark dark:text-dark-heading tracking-tight">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}
+                </span>
             </div>
         </div>
 

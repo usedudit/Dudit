@@ -353,40 +353,41 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    {/* RIGHT COLUMN - SIDEBAR */}
-                    <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-10 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
+                        {/* RIGHT COLUMN - SIDEBAR */}
+                        <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-10 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
 
-                        {/* Status Management Card */}
-                        <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 relative overflow-hidden transition-colors text-left">
-                            <div className="absolute top-0 left-0 w-full h-1 bg-brand-green dark:bg-brand-green/30"></div>
-                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading mb-4 mt-1">Status do Orçamento</h3>
-                            <div className="flex flex-col gap-1.5">
-                                <FormDropdown
-                                    value={quote.status}
-                                    setValue={handleStatusChange}
-                                    options={[
-                                        { value: 'draft', label: 'Rascunho' },
-                                        { value: 'sent', label: 'Enviado' },
-                                        { value: 'approved', label: 'Aprovado' },
-                                        { value: 'rejected', label: 'Rejeitado' }
-                                    ]}
-                                />
+                            {/* Status Management Card */}
+                            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 relative overflow-hidden transition-colors text-left">
+                                <div className="absolute top-0 left-0 w-full h-1 bg-brand-green dark:bg-brand-green/30"></div>
+                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading mb-4 mt-1">Status do Orçamento</h3>
+                                <div className="flex flex-col gap-1.5">
+                                    <FormDropdown
+                                        value={quote.status}
+                                        setValue={handleStatusChange}
+                                        options={[
+                                            { value: 'draft', label: 'Rascunho' },
+                                            { value: 'sent', label: 'Enviado' },
+                                            { value: 'approved', label: 'Aprovado' },
+                                            { value: 'rejected', label: 'Rejeitado' }
+                                        ]}
+                                    />
+                                </div>
                             </div>
+
+                            <CustomerCard
+                                customer={quote.customers}
+                                address={quote.customers?.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || quote.customers?.addresses?.[0]}
+                                billingAddress={quote.customers?.addresses?.find((a: any) => a.address_type === "billing")}
+                            />
+
+                            {/* Terms/Notes Card using InfoCard */}
+                            <InfoCard
+                                title="Observações da Proposta"
+                                message={<span className="whitespace-pre-wrap">{quote.notes || "Nenhuma observação ou termo adicional vinculado a este orçamento."}</span>}
+                                color="gray"
+                            />
                         </div>
-
-                        <CustomerCard
-                            customer={quote.customers}
-                            address={quote.customers?.addresses?.find((a: any) => a.is_default) || quote.customers?.addresses?.[0]}
-                        />
-
-                        {/* Terms/Notes Card using InfoCard */}
-                        <InfoCard
-                            title="Observações da Proposta"
-                            message={<span className="whitespace-pre-wrap">{quote.notes || "Nenhuma observação ou termo adicional vinculado a este orçamento."}</span>}
-                            color="gray"
-                        />
                     </div>
                 </div>
             </div>

@@ -21,6 +21,7 @@ interface OrderListItemProps {
   onDelete: (order: any) => void
   onCancel: (order: any) => void
   onDetails: (order: any) => void
+  showCheckbox?: boolean
 }
 
 const OrderListItem = React.memo(
@@ -33,6 +34,7 @@ const OrderListItem = React.memo(
     onDelete,
     onCancel,
     onDetails,
+    showCheckbox = true,
   }: OrderListItemProps) => {
 
     const renderCellContent = (colId: string) => {
@@ -131,12 +133,14 @@ const OrderListItem = React.memo(
         className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
         onClick={() => onDetails(order)}
       >
-        <td
-          className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Checkbox checked={selected} onChange={() => onSelect(order.originalId)} />
-        </td>
+        {showCheckbox && (
+          <td
+            className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Checkbox checked={selected} onChange={() => onSelect(order.originalId)} />
+          </td>
+        )}
 
         {columns.map((col) => (
           <td

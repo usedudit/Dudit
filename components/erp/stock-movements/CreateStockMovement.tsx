@@ -58,6 +58,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     const productBucket = useProductBucket(fetchPartnerProductsBucket);
     const [selectedProduct, setSelectedProduct] = useState<ProductBucketItem | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set());
 
     const isDirty = useMemo(() => {
         return (selectedProduct !== null) || (quantity !== '' && quantity !== 0) || (notes !== '') || (reason !== 'Selecione um motivo...');
@@ -83,23 +84,31 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     }, [nextAction])
 
     const handleSave = async () => {
+        const errors = new Set<string>();
+
         if (!selectedProduct) {
+            errors.add('product');
             notifyError("Selecione um produto.");
-            return;
         }
         if (!quantity || Number(quantity) <= 0) {
+            errors.add('quantity');
             notifyError("Informe uma quantidade válida maior que zero.");
-            return;
         }
         if (reason === 'Selecione um motivo...') {
+            errors.add('reason');
             notifyError("Selecione um motivo para a movimentação.");
+        }
+
+        if (errors.size > 0) {
+            setFieldErrors(errors);
             return;
         }
+        setFieldErrors(new Set());
 
         setIsSaving(true);
         try {
             const res = await createStockMovementAction({
-                productId: selectedProduct.id,
+                productId: selectedProduct!.id,
                 type,
                 quantity: Number(quantity),
                 reason,
@@ -245,7 +254,14 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                             type="text"
                                                                             placeholder="Buscar por nome ou SKU..."
                                                                             value={productBucket.searchQuery}
-                                                                            onChange={(e) => productBucket.setSearchQuery(e.target.value)}
+                                                                            onChange={(e) => {
+                                                                                productBucket.setSearchQuery(e.target.value);
+                                                                                setFieldErrors(prev => {
+                                                                                    const next = new Set(prev);
+                                                                                    next.delete('product');
+                                                                                    return next;
+                                                                                });
+                                                                            }}
                                                                             onFocus={productBucket.loadBucket}
                                                                             prefix={
                                                                                 <SearchIcon
@@ -253,6 +269,8 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                                     className="text-brand-inactive-text flex-shrink-0"
                                                                                 />
                                                                             }
+                                                                            error={fieldErrors.has('product')}
+                                                                            errorMessage={fieldErrors.has('product') ? "Selecione um produto" : undefined}
                                                                         />
                                                                     </div>
 
@@ -327,7 +345,16 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                 type="number"
                                                                 placeholder="Ex: 10"
                                                                 value={quantity}
-                                                                onChange={(e) => setQuantity(e.target.value === '' ? '' : Number(e.target.value))}
+                                                                onChange={(e) => {
+                                                                    setQuantity(e.target.value === '' ? '' : Number(e.target.value));
+                                                                    setFieldErrors(prev => {
+                                                                        const next = new Set(prev);
+                                                                        next.delete('quantity');
+                                                                        return next;
+                                                                    });
+                                                                }}
+                                                                error={fieldErrors.has('quantity')}
+                                                                errorMessage={fieldErrors.has('quantity') ? "Quantidade inválida" : undefined}
                                                             />
 
                                                             <FormDropdown

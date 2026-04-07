@@ -10,7 +10,9 @@ import SelectCustomerSheet from '../clientes/SelectCustomerSheet';
 import SelectVariantSheet from './SelectVariantSheet';
 import { useNotification } from '@/hooks/use-notification';
 import { useStore } from '@/lib/store-context';
-import { searchProductsForQuotes, createQuoteAction, getQuoteDetailsAction, getPartnerAddressAction, getNextQuoteNumberAction } from '@/app/actions/erp/quotes';
+import { createQuoteAction, getQuoteDetailsAction, getPartnerAddressAction, getNextQuoteNumberAction } from '@/app/actions/erp/quotes';
+import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders";
+import { useProductBucket } from "../hooks";
 import { useSidebar } from '@/lib/sidebar-context';
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { useRouter } from "next/navigation";
@@ -55,10 +57,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     }, [partnerId]);
 
     // Search States
-    const [searchQuery, setSearchQuery] = useState('');
     const [isProductSearchOpen, setIsProductSearchOpen] = useState(false);
-    const [searchResults, setSearchResults] = useState<any[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
+    const productBucket = useProductBucket(fetchPartnerProductsBucket);
 
     // Sheet States
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false);
@@ -86,6 +86,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const [discountType, setDiscountType] = useState<'R$' | '%'>('R$');
     const [shippingFee, setShippingFee] = useState('');
     const [otherCosts, setOtherCosts] = useState('');
+    const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set());
 
     // Persistence State (for isDirty)
     const [originalQuoteData, setOriginalQuoteData] = useState<any>(null);
@@ -212,20 +213,6 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         setShowAlertModal(false);
     }, [nextAction]);
 
-    // Debounced real search
-    useEffect(() => {
-        const timer = setTimeout(async () => {
-            if (searchQuery.trim().length >= 2) {
-                setIsSearching(true);
-                const results = await searchProductsForQuotes(searchQuery);
-                setSearchResults(results);
-                setIsSearching(false);
-            } else {
-                setSearchResults([]);
-            }
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [searchQuery]);
 
 
 
@@ -279,7 +266,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
             }
         });
 
-        setSearchQuery('');
+        productBucket.setSearchQuery('');
         setIsProductSearchOpen(false);
     };
 
@@ -404,9 +391,11 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
     const handleSave = async () => {
         if (quoteItems.length === 0) {
+            setFieldErrors(new Set(["productSearch"]));
             notifyError("Carrinho vazio", "Adicione pelo menos um item ao orçamento.");
             return;
         }
+        setFieldErrors(new Set());
 
         setIsSaving(true);
         try {
@@ -520,12 +509,13 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
                                 <div className={`flex-1 pt-4 pb-12 px-4 md:px-6 ${activeTab === 'Visualização' ? 'hidden lg:block' : 'block'}`}>
                                     <QuoteEditor
-                                        searchQuery={searchQuery}
-                                        setSearchQuery={setSearchQuery}
+                                        searchQuery={productBucket.searchQuery}
+                                        setSearchQuery={productBucket.setSearchQuery}
                                         isProductSearchOpen={isProductSearchOpen}
                                         setIsProductSearchOpen={setIsProductSearchOpen}
-                                        filteredProducts={searchResults}
-                                        isSearching={isSearching}
+                                        filteredProducts={productBucket.filteredResults}
+                                        isSearching={productBucket.isLoading}
+                                        onSearchFocus={productBucket.loadBucket}
                                         handleProductClick={handleProductClick}
                                         addBlankItem={addBlankItem}
                                         quoteItems={quoteItems}
@@ -565,6 +555,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                         quoteSubtitle={quoteSubtitle}
                                         setQuoteSubtitle={setQuoteSubtitle}
                                         isReadOnly={mode === 'view'}
+                                        fieldErrors={fieldErrors}
+                                        setFieldErrors={setFieldErrors}
                                     />
                                 </div>
                             </div>

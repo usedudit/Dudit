@@ -7,7 +7,9 @@ import Pagination from '@/components/reusable/Pagination';
 import { useNotification } from '@/hooks/use-notification';
 import IconPlaceholder from '@/components/reusable/IconPlaceholder';
 import { getCustomerOrdersAction } from '@/app/actions/erp/customers';
+import { getAddressesAction } from '@/app/actions/shared/addresses';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
+import { useMediaQuery } from '../hooks';
 import OrderListItem from '../orders/OrderListItem';
 import { useRouter } from 'next/navigation';
 
@@ -16,7 +18,6 @@ const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; 
     { id: "total", label: "Total", align: "left", width: "150px" },
     { id: "status", label: "Status", align: "left", width: "220px" },
     { id: "date", label: "Data", align: "left", width: "150px" },
-    { id: "actions", label: "Ações", align: "center", width: "120px" },
 ]
 
 interface Props {
@@ -29,6 +30,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const { success: notifySuccess, error: notifyError } = useNotification();
     const [activeTab, setActiveTab] = useState('Purchase History');
     const [isScrolled, setIsScrolled] = useState(false);
+    const isMobile = useMediaQuery("(max-width: 767px)");
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const handleScroll = useCallback(() => {
@@ -37,6 +39,8 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
 
     const [fetchedOrders, setFetchedOrders] = useState<any[]>([]);
     const [isLoadingOrders, setIsLoadingOrders] = useState(true);
+    const [customerAddress, setCustomerAddress] = useState<string | null>(null);
+    const [billingAddress, setBillingAddress] = useState<string | null>(null);
 
     // Pagination and Selection
     const router = useRouter();
@@ -74,7 +78,32 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                 setIsLoadingOrders(false);
             }
         };
+        const fetchAddress = async () => {
+            try {
+                const res = await getAddressesAction(customer.originalId, "customer");
+                if (res.addresses && res.addresses.length > 0) {
+                    const primaryAddr = res.addresses.find((a: any) => a.address_type === "primary" || a.is_default) || res.addresses[0];
+                    const billingAddr = res.addresses.find((a: any) => a.address_type === "billing");
+                    
+                    const format = (addr: any) => [
+                        addr.street,
+                        addr.number,
+                        addr.complement,
+                        addr.neighborhood,
+                        addr.city,
+                        addr.state,
+                        addr.zip_code
+                    ].filter(Boolean).join(", ");
+
+                    setCustomerAddress(format(primaryAddr));
+                    if (billingAddr) setBillingAddress(format(billingAddr));
+                }
+            } catch (e) {
+                console.error("Error fetching address:", e);
+            }
+        };
         fetchOrders();
+        fetchAddress();
     }, [customer.originalId]);
 
     const isInformationTab = activeTab === 'Information';
@@ -214,7 +243,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                 <TabsContent value="Purchase History" className="mt-0">
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
                                         {/* Unified Stats Card */}
-                                        <div className="w-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-sm overflow-hidden mb-10 transition-all duration-300 hover:shadow-md">
+                                        <div className="w-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl overflow-hidden mb-10 transition-all duration-300">
                                             <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-gray-200 dark:divide-dark-border">
                                                 <div className="p-6 flex flex-col justify-center">
                                                     <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mb-1.5">Pedidos</span>
@@ -250,82 +279,119 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                     <div className="flex-1 flex items-center justify-center p-8 py-20">
                                                         <ThreeDotsLoader />
                                                     </div>
-                                                ) : (
-                                                    <div className="w-full overflow-hidden rounded-xl relative">
-                                                        <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                                                        <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
-
-                                                        <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
-                                                                <thead>
-                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                        <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
-                                                                            <div className="flex items-center">
-                                                                                <Checkbox
-                                                                                    checked={selection.ids.size === paginatedOrders.length && paginatedOrders.length > 0}
-                                                                                    onChange={(checked) => {
-                                                                                        setSelection({ ids: checked ? new Set(paginatedOrders.map((x: any) => x.originalId)) : new Set() })
-                                                                                    }}
-                                                                                    className="bg-white dark:bg-dark-background"
-                                                                                />
+                                                ) : formattedOrders.length > 0 ? (
+                                                    isMobile ? (
+                                                        <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
+                                                            {paginatedOrders.map((o: any) => (
+                                                                <div
+                                                                    key={o.originalId}
+                                                                    className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none cursor-pointer"
+                                                                    onClick={() => handleDetailsOrder(o)}
+                                                                >
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="flex justify-between items-start mb-0.5">
+                                                                            <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate pr-2">
+                                                                                {o.displayId}
+                                                                            </h3>
+                                                                            <div className="flex gap-1.5 shrink-0 items-center">
+                                                                                <Badge variant={o.statusColor} className="h-5 text-[10px] px-1.5">
+                                                                                    {o.statusLabel}
+                                                                                </Badge>
+                                                                                {o.isUnfulfilled && (
+                                                                                    <Badge variant="gray" className="h-5 text-[10px] px-1.5 opacity-70">
+                                                                                        Pendente
+                                                                                    </Badge>
+                                                                                )}
                                                                             </div>
-                                                                        </th>
-                                                                        {COLUMNS.map((col, idx) => {
-                                                                            const isSortable = col.id !== 'actions';
-                                                                            const isSorted = sortConfig?.key === col.id;
-                                                                            const isLast = idx === COLUMNS.length - 1;
-
-                                                                            return (
-                                                                                <th
-                                                                                    key={col.id}
-                                                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isLast ? "rounded-r-lg" : ""}`}
-                                                                                    style={{ width: col.width }}
-                                                                                    onClick={() => {
-                                                                                        if (!isSortable) return
-                                                                                        setSortConfig((prev: any) => ({
-                                                                                            key: col.id,
-                                                                                            direction: prev?.key === col.id && prev.direction === 'asc' ? 'desc' : 'asc'
-                                                                                        }))
-                                                                                    }}
-                                                                                >
-                                                                                    <div className={`flex items-center gap-1.5 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
-                                                                                        {col.label}
-                                                                                        {isSortable && (
-                                                                                            <ArrowUpDownIcon
-                                                                                                size={14}
-                                                                                                className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
-                                                                                                    } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
-                                                                                            />
-                                                                                        )}
-                                                                                    </div>
-                                                                                </th>
-                                                                            )
-                                                                        })}
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    {paginatedOrders.map((o: any) => (
-                                                                        <OrderListItem
-                                                                            key={o.originalId}
-                                                                            order={o}
-                                                                            columns={COLUMNS}
-                                                                            selected={selection.ids.has(o.originalId)}
-                                                                            onSelect={handleSelectRow}
-                                                                            onEdit={() => { router.push(`/erp/orders/edit/${o.originalId}`) }}
-                                                                            onDelete={() => { }}
-                                                                            onCancel={() => { }}
-                                                                            onDetails={handleDetailsOrder}
-                                                                        />
-                                                                    ))}
-                                                                </tbody>
-                                                            </table>
+                                                                        </div>
+                                                                        <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mb-1">
+                                                                            {o.formattedDate}
+                                                                        </div>
+                                                                        <div className="flex items-center gap-2 text-[14px]">
+                                                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">
+                                                                                {o.items_count} {o.items_count === 1 ? 'item' : 'itens'}
+                                                                            </span>
+                                                                            <span className="text-gray-300 dark:text-gray-600 font-medium font-bold">•</span>
+                                                                            <span className="font-bold text-brand-primary">
+                                                                                R$ {Number(o.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
                                                         </div>
-                                                    </div>
-                                                )}
+                                                    ) : (
+                                                        <div className="w-full overflow-hidden rounded-xl relative">
+                                                            <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                                            <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                                                            <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                                <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                                                    <thead>
+                                                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                            {COLUMNS.map((col, idx) => {
+                                                                                const isSortable = true; // All columns here are sortable
+                                                                                const isSorted = sortConfig?.key === col.id;
+                                                                                const isFirst = idx === 0;
+                                                                                const isLast = idx === COLUMNS.length - 1;
+
+                                                                                return (
+                                                                                    <th
+                                                                                        key={col.id}
+                                                                                        className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isFirst ? "rounded-l-lg pl-6" : ""} ${isLast ? "rounded-r-lg pr-6" : ""}`}
+                                                                                        style={{ width: col.width }}
+                                                                                        onClick={() => {
+                                                                                            if (!isSortable) return
+                                                                                            setSortConfig((prev: any) => ({
+                                                                                                key: col.id,
+                                                                                                direction: prev?.key === col.id && prev.direction === 'asc' ? 'desc' : 'asc'
+                                                                                            }))
+                                                                                        }}
+                                                                                    >
+                                                                                        <div className={`flex items-center gap-1.5 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
+                                                                                            {col.label}
+                                                                                            <div className="w-4 h-4 flex items-center justify-center shrink-0">
+                                                                                                {isSortable && (
+                                                                                                    <ArrowUpDownIcon
+                                                                                                        size={14}
+                                                                                                        className={`transition-all duration-200 ${isSorted
+                                                                                                            ? 'text-brand-dark dark:text-dark-heading opacity-100'
+                                                                                                            : 'text-brand-inactive-text opacity-0 group-hover:opacity-40'
+                                                                                                            } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
+                                                                                                    />
+                                                                                                )}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </th>
+                                                                                )
+                                                                            })}
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {paginatedOrders.map((o: any) => (
+                                                                            <OrderListItem
+                                                                                key={o.originalId}
+                                                                                order={o}
+                                                                                columns={COLUMNS}
+                                                                                selected={selection.ids.has(o.originalId)}
+                                                                                onSelect={handleSelectRow}
+                                                                                onEdit={() => { router.push(`/erp/orders/edit/${o.originalId}`) }}
+                                                                                onDelete={() => { }}
+                                                                                onCancel={() => { }}
+                                                                                onDetails={handleDetailsOrder}
+                                                                                showCheckbox={false}
+                                                                            />
+                                                                        ))}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                ) : null}
                                             </AnimatePresence>
                                         </div>
 
-                                        {totalPages > 1 && (
+                                        {totalPages > 1 && formattedOrders.length > 0 && (
                                             <div className="flex justify-center mt-6 w-full hidden md:flex">
                                                 <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
                                             </div>
@@ -372,7 +438,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                 {customer.notes && (
                                     <section>
                                         <div className="flex items-center justify-between mb-4">
-                                            <h3 className="text-[17px] font-bold text-brand-dark dark:text-dark-heading">Observações</h3>
+                                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Observações</h3>
                                         </div>
                                         <InfoCard
                                             title="Anotação Interna"
@@ -384,11 +450,11 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
 
                                 {/* Detalhes e Contato no modelo CustomerCard */}
                                 <section>
-                                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors shadow-sm">
+                                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
                                         <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
 
-                                        <div className="px-6 py-5 border-b border-brand-border dark:border-dark-border bg-gray-50/50 dark:bg-dark-border/20">
-                                            <h3 className="text-[17px] font-bold text-brand-dark dark:text-dark-heading">Detalhes</h3>
+                                        <div className="px-6 py-5">
+                                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Detalhes</h3>
                                         </div>
 
                                         {/* Top Part: Customer Identity */}
@@ -409,13 +475,13 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                             {/* Informações Gerais (Cliente desde, Tipo) */}
                                             <div className="space-y-3">
                                                 <div className="flex justify-between items-center py-2.5 border-b border-brand-border dark:border-dark-border">
-                                                    <span className="text-[13px] text-brand-inactive-text dark:text-dark-body font-semibold tracking-wider">Cliente desde</span>
-                                                    <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
+                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Cliente desde</span>
+                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
                                                         {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('pt-BR', { month: 'short', day: 'numeric', year: 'numeric' }).replace(' de ', ', ') : '-'}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between items-center py-2.5">
-                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold tracking-wider">Tipo de Pessoa</span>
+                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Tipo de Pessoa</span>
                                                     <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.personType === 'pj' || customer.cnpj ? 'Pessoa Jurídica' : 'Pessoa Física'}</span>
                                                 </div>
 
@@ -460,29 +526,42 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                     Endereço
                                                 </h3>
                                             </div>
-
-                                            {customer.address ? (
-                                                <>
-                                                    {/* Map Placeholder */}
-                                                    <div className="w-full h-24 bg-blue-50 dark:bg-gray-800 rounded-lg mb-4 overflow-hidden relative border border-blue-100 dark:border-gray-700 group cursor-pointer">
-                                                        <img src="https://img.dudit.com.br/static/maps/MapSample.png" className="w-full h-full object-cover opacity-60" alt="Map" />
-                                                        <div className="absolute inset-0 flex items-center justify-center">
-                                                            <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white">
-                                                                <div className="w-2 h-2 bg-white rounded-full"></div>
+ 
+                                            {customerAddress ? (
+                                                <div className="space-y-6">
+                                                    <div>
+                                                        {/* Map Placeholder */}
+                                                        <div className="w-full h-24 bg-blue-50 dark:bg-gray-800 rounded-lg mb-4 overflow-hidden relative border border-blue-100 dark:border-gray-700 group cursor-pointer">
+                                                            <img src="https://img.dudit.com.br/static/maps/MapSample.png" className="w-full h-full object-cover opacity-60" alt="Map" />
+                                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                                <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white">
+                                                                     <div className="w-2 h-2 bg-white rounded-full"></div>
+                                                                </div>
                                                             </div>
                                                         </div>
+    
+                                                        <div className="mb-0">
+                                                            <div className="flex justify-between items-start mb-1">
+                                                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate pr-2">Endereço Principal</h4>
+                                                                <a href="#" className="text-xs font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark dark:decoration-dark-heading flex-shrink-0">Ver Mapa</a>
+                                                            </div>
+                                                            <p className="text-[14px] text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                                                                {customerAddress}
+                                                            </p>
+                                                        </div>
                                                     </div>
 
-                                                    <div className="mb-0">
-                                                        <div className="flex justify-between items-start mb-1">
-                                                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate pr-2">Endereço Principal</h4>
-                                                            <a href="#" className="text-xs font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark dark:decoration-dark-heading flex-shrink-0">Ver Mapa</a>
+                                                    {billingAddress && (
+                                                        <div className="pt-4 border-t border-brand-border dark:border-dark-border">
+                                                            <div className="flex justify-between items-start mb-1">
+                                                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate pr-2">Endereço de Cobrança</h4>
+                                                            </div>
+                                                            <p className="text-[14px] text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                                                                {billingAddress}
+                                                            </p>
                                                         </div>
-                                                        <p className="text-[14px] text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                                                            {customer.address}
-                                                        </p>
-                                                    </div>
-                                                </>
+                                                    )}
+                                                </div>
                                             ) : (
                                                 <div className="bg-brand-gray/30 dark:bg-dark-border/30 rounded-lg p-4 text-center">
                                                     <p className="text-sm text-brand-inactive-text dark:text-dark-body italic">

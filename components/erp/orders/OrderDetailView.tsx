@@ -336,7 +336,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                             <CustomerCard
                                 customer={order.customers || (order.customer_name ? { name: order.customer_name, email: order.buyer_email || null, phone: null } : null)}
-                                address={order.customers?.addresses?.find((a: any) => a.is_default) || order.customers?.addresses?.[0] || (order.delivery_address ? { street: order.delivery_address } : null)}
+                                address={order.customers?.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || order.customers?.addresses?.[0] || (order.delivery_address ? { street: order.delivery_address } : null)}
+                                billingAddress={order.customers?.addresses?.find((a: any) => a.address_type === "billing")}
                             />
 
                             {/* Seller Info */}

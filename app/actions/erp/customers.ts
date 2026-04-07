@@ -35,6 +35,14 @@ export async function createComprehensiveCustomerAction(data: {
   status?: string
   notes?: string | null
   csrf_token?: string
+  hasDifferentBillingAddress?: boolean
+  billingZipCode?: string
+  billingStreet?: string
+  billingNumber?: string
+  billingComplement?: string
+  billingNeighborhood?: string
+  billingCity?: string
+  billingState?: string
 }) {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
@@ -92,7 +100,27 @@ export async function createComprehensiveCustomerAction(data: {
       state: data.state || "",
       country: data.country || "BR",
       municipioCodigoIbge: data.municipioCodigoIbge || undefined,
+      addressType: "primary",
       isDefault: true,
+      csrf_token: data.csrf_token,
+    })
+  }
+
+  // Criar endereço de cobrança se for diferente
+  if (data.hasDifferentBillingAddress && (data.billingStreet || data.billingCity)) {
+    await createAddressAction({
+      entityId: newCustomer.id,
+      entityType: "customer",
+      zipCode: data.billingZipCode || "",
+      street: data.billingStreet || "",
+      number: data.billingNumber || "",
+      complement: data.billingComplement,
+      neighborhood: data.billingNeighborhood || "",
+      city: data.billingCity || "",
+      state: data.billingState || "",
+      country: data.country || "BR",
+      addressType: "billing",
+      isDefault: false,
       csrf_token: data.csrf_token,
     })
   }
@@ -102,96 +130,6 @@ export async function createComprehensiveCustomerAction(data: {
   return { success: true }
 }
 
-export async function createCustomerAction(data: {
-  partnerId: string
-  name: string
-  email: string
-  phone: string
-  address: string
-  notes: string
-  csrf_token?: string
-}) {
-  // Validate CSRF token
-  const { requireCSRF, extractCSRFTokenFromObject } = await import("@/lib/security/csrf-action-wrapper")
-  const csrfToken = extractCSRFTokenFromObject(data as Record<string, unknown>)
-  const csrfValidation = await requireCSRF(csrfToken)
-  if (!csrfValidation.valid) {
-    return { error: csrfValidation.error || "Token CSRF inválido" }
-  }
-
-  const user = await requireUser()
-
-  await requirePartnerAccessWithPermission(data.partnerId, "customers", "create")
-
-
-  const supabase = await getSupabaseServerClient()
-
-  const { error } = await supabase.from("customers").insert({
-    partner_id: data.partnerId,
-    name: data.name,
-    email: data.email || null,
-    phone: data.phone || null,
-    address: data.address || null,
-    notes: data.notes || null,
-    status: "ativo",
-  })
-
-  if (error) {
-    return { error: error.message }
-  }
-
-  revalidateCustomers(data.partnerId)
-  revalidatePath("/erp/customers")
-
-  redirect("/erp/customers")
-}
-
-export async function updateCustomerAction(
-  customerId: string,
-  data: {
-    name: string
-    email: string
-    phone: string
-    address: string
-    notes: string
-    csrf_token?: string
-  },
-) {
-  // Validate CSRF token
-  const { requireCSRF, extractCSRFTokenFromObject } = await import("@/lib/security/csrf-action-wrapper")
-  const csrfToken = extractCSRFTokenFromObject(data as Record<string, unknown>)
-  const csrfValidation = await requireCSRF(csrfToken)
-  if (!csrfValidation.valid) {
-    return { error: csrfValidation.error || "Token CSRF inválido" }
-  }
-
-  const user = await requireUser()
-
-  await requireCustomerOwnership(customerId)
-
-
-  const supabase = await getSupabaseServerClient()
-
-  const { error } = await supabase
-    .from("customers")
-    .update({
-      name: data.name,
-      email: data.email || null,
-      phone: data.phone || null,
-      address: data.address || null,
-      notes: data.notes || null,
-    })
-    .eq("id", customerId)
-
-  if (error) {
-    return { error: error.message }
-  }
-
-  revalidateCustomers("")
-  revalidatePath("/erp/customers")
-
-  redirect("/erp/customers")
-}
 
 export async function deleteCustomerAction(customerId: string, csrf_token?: string) {
   // Validate CSRF token
@@ -247,6 +185,14 @@ export async function updateComprehensiveCustomerAction(data: {
   status?: string
   notes?: string | null
   csrf_token?: string
+  hasDifferentBillingAddress?: boolean
+  billingZipCode?: string
+  billingStreet?: string
+  billingNumber?: string
+  billingComplement?: string
+  billingNeighborhood?: string
+  billingCity?: string
+  billingState?: string
 }) {
   // Validate CSRF token
   const { requireCSRF, extractCSRFTokenFromObject } = await import("@/lib/security/csrf-action-wrapper")
@@ -271,9 +217,6 @@ export async function updateComprehensiveCustomerAction(data: {
       name: data.name,
       email: data.email || null,
       phone: data.phone || null,
-      address: [data.street, data.number, data.complement, data.neighborhood, data.city, data.state]
-        .filter(Boolean)
-        .join(", "),
       person_type: data.personType,
       cpf: data.cpf ? await (await import("@/lib/crypto")).encryptCPF(data.cpf.replace(/\D/g, "")) : null,
       contribuinte: data.contribuinte || null,
@@ -282,15 +225,6 @@ export async function updateComprehensiveCustomerAction(data: {
       inscricao_estadual: data.inscricaoEstadual || null,
       regime_tributario: data.regimeTributario || null,
       contribuinte_icms: data.contribuinteIcms || null,
-      country: data.country || null,
-      zip_code: data.zipCode || null,
-      street: data.street || null,
-      number: data.number || null,
-      complement: data.complement || null,
-      neighborhood: data.neighborhood || null,
-      city: data.city || null,
-      state: data.state || null,
-      municipio_codigo_ibge: data.municipioCodigoIbge || null,
       store_credit: data.store_credit,
       status: data.status || "ativo",
       notes: data.notes || null,
@@ -300,6 +234,93 @@ export async function updateComprehensiveCustomerAction(data: {
 
   if (error) {
     return { error: error.message }
+  }
+
+  // Sincronizar endereço na tabela addresses
+  if (data.street || data.city) {
+    const { data: existingAddresses } = await supabase
+      .from("addresses")
+      .select("id")
+      .eq("customer_id", data.customerId)
+      .eq("address_type", "primary")
+      .limit(1)
+
+    if (existingAddresses && existingAddresses.length > 0) {
+      await supabase.from("addresses").update({
+        zip_code: data.zipCode,
+        street: data.street,
+        number: data.number,
+        complement: data.complement || null,
+        neighborhood: data.neighborhood,
+        city: data.city,
+        state: data.state,
+        country: data.country || "BR",
+        municipio_codigo_ibge: data.municipioCodigoIbge || null,
+      }).eq("id", existingAddresses[0].id)
+    } else {
+      await createAddressAction({
+        entityId: data.customerId,
+        entityType: "customer",
+        zipCode: data.zipCode || "",
+        street: data.street || "",
+        number: data.number || "",
+        complement: data.complement,
+        neighborhood: data.neighborhood || "",
+        city: data.city || "",
+        state: data.state || "",
+        country: data.country || "BR",
+        municipioCodigoIbge: data.municipioCodigoIbge || undefined,
+        addressType: "primary",
+        isDefault: true,
+        csrf_token: data.csrf_token,
+      })
+    }
+  }
+
+  // Sincronizar endereço de cobrança
+  if (data.hasDifferentBillingAddress && (data.billingStreet || data.billingCity)) {
+    const { data: existingBilling } = await supabase
+      .from("addresses")
+      .select("id")
+      .eq("customer_id", data.customerId)
+      .eq("address_type", "billing")
+      .limit(1)
+
+    if (existingBilling && existingBilling.length > 0) {
+      await supabase.from("addresses").update({
+        zip_code: data.billingZipCode,
+        street: data.billingStreet,
+        number: data.billingNumber,
+        complement: data.billingComplement || null,
+        neighborhood: data.billingNeighborhood,
+        city: data.billingCity,
+        state: data.billingState,
+        country: data.country || "BR",
+      }).eq("id", existingBilling[0].id)
+    } else {
+      await createAddressAction({
+        entityId: data.customerId,
+        entityType: "customer",
+        zipCode: data.billingZipCode || "",
+        street: data.billingStreet || "",
+        number: data.billingNumber || "",
+        complement: data.billingComplement,
+        neighborhood: data.billingNeighborhood || "",
+        city: data.billingCity || "",
+        state: data.billingState || "",
+        country: data.country || "BR",
+        addressType: "billing",
+        isDefault: false,
+        csrf_token: data.csrf_token,
+      })
+    }
+  } else if (!data.hasDifferentBillingAddress) {
+    // Se não tiver mais endereço de cobrança diferente, remover existente se houver
+    await supabase
+      .from("addresses")
+      .delete()
+      .eq("customer_id", data.customerId)
+      .eq("address_type", "billing")
   }
 
   revalidateCustomers(data.partnerId)

@@ -87,6 +87,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
 
     const [isSaving, setIsSaving] = useState(false)
     const [isSearchingCnpj, setIsSearchingCnpj] = useState(false)
+    const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set())
 
     const isDirty = useMemo(() => {
         return customerName !== "" || fantasia !== "" || cnpj !== "" || ie !== "" || cpf !== "" || rg !== "" ||
@@ -196,10 +197,17 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
     }
 
     const handleSave = async () => {
+        const errors = new Set<string>()
         if (!customerName.trim()) {
-            notifyError("O nome é obrigatório.")
+            errors.add("customerName")
+        }
+        
+        if (errors.size > 0) {
+            setFieldErrors(errors)
+            notifyError("Preencha os campos obrigatórios.")
             return
         }
+        setFieldErrors(new Set())
 
         try {
             setIsSaving(true)
@@ -227,7 +235,15 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                 csrf_token: token,
                 store_credit: storeCredit,
                 status: status === "Ativo" ? "ativo" : status === "Inativo" ? "inativo" : "bloqueado",
-                notes: observacoes
+                notes: observacoes,
+                hasDifferentBillingAddress: hasDifferentBillingAddress,
+                billingZipCode: hasDifferentBillingAddress ? billingCep : undefined,
+                billingStreet: hasDifferentBillingAddress ? billingStreet : undefined,
+                billingNumber: hasDifferentBillingAddress ? (billingNoNumber ? "S/N" : billingNumber) : undefined,
+                billingComplement: hasDifferentBillingAddress ? billingComplement : undefined,
+                billingNeighborhood: hasDifferentBillingAddress ? billingNeighborhood : undefined,
+                billingCity: hasDifferentBillingAddress ? billingCity : undefined,
+                billingState: hasDifferentBillingAddress ? billingUf : undefined,
             }
 
             const res = customerId 
@@ -320,7 +336,17 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 label="Nome ou Razão Social"
                                                                 placeholder="Ex: João da Silva ou Empresa LTDA"
                                                                 value={customerName}
-                                                                onChange={(e) => setCustomerName(e.target.value)}
+                                                                onChange={(e) => {
+                                                                    setCustomerName(e.target.value)
+                                                                    setFieldErrors(prev => {
+                                                                        const next = new Set(prev)
+                                                                        next.delete("customerName")
+                                                                        return next
+                                                                    })
+                                                                }}
+                                                                required
+                                                                error={fieldErrors.has("customerName")}
+                                                                errorMessage={fieldErrors.has("customerName") ? "O nome é obrigatório" : undefined}
                                                             />
                                                         </div>
                                                         <div className="col-span-12 md:col-span-4 mt-[1px]">

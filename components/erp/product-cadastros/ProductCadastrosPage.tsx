@@ -60,6 +60,8 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
         isDeleting: boolean
     }>({ isOpen: false, item: null, isDeleting: false })
 
+    const [nameError, setNameError] = useState(false)
+
     // Refresh Data
     const refreshData = useCallback(async () => {
         const result = await getProductMetadataAction(partnerId)
@@ -99,6 +101,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
             item: { name: "", is_active: true, parentId: null },
             isSaving: false
         })
+        setNameError(false)
     }
 
     const handleEdit = (item: any) => {
@@ -114,6 +117,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
             item: { ...item, parentId: item.parent_id },
             isSaving: false
         })
+        setNameError(false)
     }
 
     const handleDeleteClick = (item: any) => {
@@ -123,9 +127,11 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
     const handleSave = async () => {
         const { mode, type, item } = modal
         if (!item.name.trim()) {
+            setNameError(true)
             error("O nome é obrigatório", "Por favor, preencha o nome do cadastro.")
             return
         }
+        setNameError(false)
 
         setModal(prev => ({ ...prev, isSaving: true }))
         let result: any
@@ -300,8 +306,13 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                         label="Nome"
                         placeholder="Ex: Eletrônicos, Nike, Prateleira A1"
                         value={modal.item.name}
-                        onChange={(e) => setModal(prev => ({ ...prev, item: { ...prev.item, name: e.target.value } }))}
+                        onChange={(e) => {
+                            setModal(prev => ({ ...prev, item: { ...prev.item, name: e.target.value } }))
+                            setNameError(false)
+                        }}
                         onKeyDown={(e) => e.key === "Enter" && handleSave()}
+                        error={nameError}
+                        errorMessage={nameError ? "O nome é obrigatório" : undefined}
                     />
 
                     {modal.type === "subcategory" && (

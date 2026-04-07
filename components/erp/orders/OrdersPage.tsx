@@ -303,7 +303,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
         if (ids.length === 0) return
 
         setActionModal({ open: true, text: action === 'delete' ? "Excluindo pedidos..." : "Cancelando pedidos..." })
-        
+
         try {
             let result;
             if (action === 'delete') {
@@ -732,12 +732,11 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     <div className="flex flex-col gap-4">
                         <p>Tem certeza que deseja cancelar {singleCancelId ? "este pedido" : `${selection.ids.size} pedido(s)`}?</p>
                         <div className="text-left space-y-1.5">
-                            <label className="text-xs font-semibold text-brand-dark dark:text-dark-heading">Motivo do cancelamento (opcional)</label>
                             <Input
+                                label="Motivo do cancelamento (opcional)"
                                 placeholder="Descreva o motivo..."
                                 value={cancelReason}
                                 onChange={(e) => setCancelReason(e.target.value)}
-                                className="bg-brand-gray dark:bg-dark-border/40"
                             />
                         </div>
                     </div>

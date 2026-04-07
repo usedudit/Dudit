@@ -30,8 +30,8 @@ const MetadataCard = React.memo(({ item, type, categories, onEdit, onDelete }: M
         >
             <div className="flex gap-4 mb-2">
                 {/* Icon Placeholder - matching ProductGridCard image size/shape */}
-                <div className="w-20 h-20 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center overflow-hidden">
-                    <Package className="w-10 h-10 text-brand-inactive-text dark:text-dark-body opacity-50" />
+                <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                    <Package className="w-6 h-6 text-brand-dark dark:text-dark-heading" />
                 </div>
 
                 <div className="flex-1 min-w-0 flex flex-col justify-center">
@@ -65,7 +65,7 @@ const MetadataCard = React.memo(({ item, type, categories, onEdit, onDelete }: M
             </div>
 
             {/* Footer Area - matching ProductGridCard border and action position */}
-            <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex items-end justify-between">
+            <div className="mt-auto pt-4 border-t border-brand-border dark:border-dark-border flex gap-3 items-end justify-between">
                 <div className="flex flex-col gap-0.5">
                     <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Criado em</span>
                     <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">

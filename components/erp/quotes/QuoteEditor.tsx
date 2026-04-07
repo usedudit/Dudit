@@ -14,7 +14,7 @@ import {
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import QuantitySelector from '@/components/reusable/QuantitySelector';
-import { Button, Input as FormInput, Dropdown, DropdownItem, TabsContent, FormCurrencyInput, FormDropdown, MoneyInput, PercentageInput, DatePicker, ThreeDotsLoader } from '@/components/reusable';
+import { Button, Input, TabsContent, FormDropdown, MoneyInput, PercentageInput, DatePicker, ThreeDotsLoader } from '@/components/reusable';
 import IconPlaceholder from '@/components/reusable/IconPlaceholder';
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 
@@ -66,6 +66,9 @@ interface QuoteEditorProps {
     quoteSubtitle: string;
     setQuoteSubtitle: (val: string) => void;
     isReadOnly?: boolean;
+    onSearchFocus?: () => void;
+    fieldErrors?: Set<string>;
+    setFieldErrors?: React.Dispatch<React.SetStateAction<Set<string>>>;
 }
 
 const QuoteEditor = (props: QuoteEditorProps) => {
@@ -90,7 +93,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
 
                         <div className="relative mb-6">
                             {!props.isReadOnly && (
-                                <FormInput
+                                <Input
                                     label=""
                                     name="productSearch"
                                     placeholder="Buscar produtos para adicionar..."
@@ -99,9 +102,21 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                     onChange={(e) => {
                                         props.setSearchQuery(e.target.value);
                                         props.setIsProductSearchOpen(true);
+                                        if (props.setFieldErrors) {
+                                            props.setFieldErrors(prev => {
+                                                const next = new Set(prev);
+                                                next.delete("productSearch");
+                                                return next;
+                                            });
+                                        }
                                     }}
-                                    onFocus={() => props.setIsProductSearchOpen(true)}
+                                    onFocus={() => {
+                                        props.setIsProductSearchOpen(true);
+                                        props.onSearchFocus?.();
+                                    }}
                                     className="mb-0"
+                                    error={props.fieldErrors?.has("productSearch")}
+                                    errorMessage={props.fieldErrors?.has("productSearch") ? "Adicione um item" : undefined}
                                 />
                             )}
 
@@ -144,183 +159,206 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                         </div>
 
                         {/* --- ITEMS TABLE (Desktop) --- */}
-                        <div className="hidden md:block w-full overflow-x-auto pb-4 custom-scrollbar mb-4">
-                            <table className="w-full text-left border-separate border-spacing-0">
-                                <thead>
-                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                        <th className="py-3 pl-6 pr-4 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg">Produto</th>
-                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-44">Preço Unit.</th>
-                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36">Qtd.</th>
-                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-right w-36">Total</th>
-                                        {!props.isReadOnly && <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-24 rounded-r-lg">Ações</th>}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {props.quoteItems.map((item, index) => (
-                                        <tr key={index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
-                                            <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
-                                                        <img src={getR2ImageUrl(item.image, "thumbnail")} className="w-full h-full object-cover" alt="" />
-                                                    </div>
-                                                    <div className="flex flex-col text-left flex-1 min-w-0">
-                                                        {item.isEditing ? (
-                                                            <input
-                                                                type="text"
-                                                                value={item.name}
-                                                                onChange={(e) => props.updateItemField(index, 'name', e.target.value)}
-                                                                placeholder="Nome do produto..."
-                                                                className="w-full h-8 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[13px] focus:ring-1 focus:ring-brand-primary outline-none transition-all mb-1"
-                                                            />
-                                                        ) : (
-                                                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[250px]">
-                                                                {item.name || 'Produto sem nome'}
+                        {props.quoteItems.length > 0 && (
+                            <div className="hidden md:block w-full overflow-x-auto pb-4 custom-scrollbar mb-4">
+                                <table className="w-full text-left border-separate border-spacing-0">
+                                    <thead>
+                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                            <th className="py-3 pl-6 pr-4 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg">Produto</th>
+                                            <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-44">Preço Unit.</th>
+                                            <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36">Qtd.</th>
+                                            <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-right w-36">Total</th>
+                                            {!props.isReadOnly && <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-24 rounded-r-lg">Ações</th>}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {props.quoteItems.map((item, index) => (
+                                            <tr key={index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+                                                <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
+                                                            <img src={getR2ImageUrl(item.image, "thumbnail")} className="w-full h-full object-cover" alt="" />
+                                                        </div>
+                                                        <div className="flex flex-col text-left flex-1 min-w-0">
+                                                            {item.isEditing ? (
+                                                                <input
+                                                                    type="text"
+                                                                    value={item.name}
+                                                                    onChange={(e) => props.updateItemField(index, 'name', e.target.value)}
+                                                                    placeholder="Nome do produto..."
+                                                                    className="w-full h-8 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[13px] focus:ring-1 focus:ring-brand-primary outline-none transition-all mb-1"
+                                                                />
+                                                            ) : (
+                                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[250px]">
+                                                                    {item.name || 'Produto sem nome'}
+                                                                </span>
+                                                            )}
+                                                            <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                                {item.sku || 'Sem SKU'}
                                                             </span>
-                                                        )}
-                                                        <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                                            {item.sku || 'Sem SKU'}
-                                                        </span>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </td>
-                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                <div className="flex items-center">
-                                                    <span className="text-[13px] font-medium text-brand-inactive-text mr-1">R$</span>
+                                                </td>
+                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                    <div className="flex items-center">
+                                                        <span className="text-[13px] font-medium text-brand-inactive-text mr-1">R$</span>
+                                                        <input
+                                                            type="number"
+                                                            value={item.price}
+                                                            onChange={(e) => props.updateItemPrice(index, parseFloat(e.target.value) || 0)}
+                                                            className="w-full h-9 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[13px] focus:ring-1 focus:ring-brand-primary outline-none transition-all"
+                                                        />
+                                                    </div>
+                                                </td>
+                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                    <div className="flex justify-center">
+                                                        <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} size="sm" />
+                                                    </div>
+                                                </td>
+                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right">
+                                                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price * item.qty)}
+                                                    </span>
+                                                </td>
+                                                {!props.isReadOnly && (
+                                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                        <div className="flex justify-center gap-2">
+                                                            {item.isEditing ? (
+                                                                <button
+                                                                    onClick={() => props.toggleItemEdit(index, false)}
+                                                                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-green-50 dark:hover:bg-green-900/10 text-brand-green transition-colors"
+                                                                    title="Salvar nome"
+                                                                >
+                                                                    <CheckCircleIcon size={18} />
+                                                                </button>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => props.toggleItemEdit(index, true)}
+                                                                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                                    title="Editar nome"
+                                                                >
+                                                                    <EditIcon size={18} />
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={() => props.removeItem(index)}
+                                                                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
+                                                                title="Remover item"
+                                                            >
+                                                                <TrashIcon size={18} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {/* --- ITEMS LIST (Mobile/Tablet) --- */}
+                        {props.quoteItems.length > 0 && (
+                            <div className="block md:hidden space-y-2 mb-6">
+                                {props.quoteItems.map((item, index) => (
+                                    <div key={index} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
+                                        {/* Left side: Avatar/Image */}
+                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
+                                            <img src={getR2ImageUrl(item.image, "thumbnail")} className="w-full h-full object-cover" alt="" />
+                                        </div>
+
+                                        {/* Middle: Content */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between items-start mb-0.5">
+                                                {item.isEditing ? (
                                                     <input
-                                                        type="number"
-                                                        value={item.price}
-                                                        onChange={(e) => props.updateItemPrice(index, parseFloat(e.target.value) || 0)}
-                                                        className="w-full h-9 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[13px] focus:ring-1 focus:ring-brand-primary outline-none transition-all"
+                                                        type="text"
+                                                        value={item.name}
+                                                        onChange={(e) => props.updateItemField(index, 'name', e.target.value)}
+                                                        placeholder="Nome do produto..."
+                                                        className="flex-1 h-8 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[13px] focus:ring-1 focus:ring-brand-primary outline-none transition-all mr-2"
                                                     />
-                                                </div>
-                                            </td>
-                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                <div className="flex justify-center">
-                                                    <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} size="sm" />
-                                                </div>
-                                            </td>
-                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right">
-                                                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                                ) : (
+                                                    <h4 className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate pr-2">
+                                                        {item.name || 'Produto sem nome'}
+                                                    </h4>
+                                                )}
+                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading flex-shrink-0">
                                                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price * item.qty)}
                                                 </span>
-                                            </td>
-                                            {!props.isReadOnly && (
-                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                    <div className="flex justify-center gap-2">
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-[11px] font-medium text-brand-inactive-text pr-2 truncate">
+                                                    {item.sku || 'Sem SKU'} • {item.qty} un • {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}
+                                                </p>
+                                                {!props.isReadOnly && (
+                                                    <div className="flex items-center gap-1">
                                                         {item.isEditing ? (
                                                             <button
                                                                 onClick={() => props.toggleItemEdit(index, false)}
-                                                                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-green-50 dark:hover:bg-green-900/10 text-green-600 transition-colors"
-                                                                title="Salvar nome"
+                                                                className="w-8 h-8 flex items-center justify-center text-green-600 hover:bg-green-50 dark:hover:bg-green-900/10 rounded-lg transition-colors"
                                                             >
-                                                                <CheckIcon size={18} />
+                                                                <CheckIcon size={16} />
                                                             </button>
                                                         ) : (
                                                             <button
                                                                 onClick={() => props.toggleItemEdit(index, true)}
-                                                                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark transition-colors"
-                                                                title="Editar nome"
+                                                                className="w-8 h-8 flex items-center justify-center text-brand-inactive-text hover:text-brand-dark hover:bg-brand-gray dark:hover:bg-dark-border rounded-lg transition-colors"
                                                             >
-                                                                <EditIcon size={18} />
+                                                                <EditIcon size={16} />
                                                             </button>
                                                         )}
                                                         <button
                                                             onClick={() => props.removeItem(index)}
-                                                            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
-                                                            title="Remover item"
+                                                            className="w-8 h-8 flex items-center justify-center text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full transition-colors"
                                                         >
-                                                            <TrashIcon size={18} />
+                                                            <TrashIcon size={14} />
                                                         </button>
                                                     </div>
-                                                </td>
-                                            )}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* --- ITEMS LIST (Mobile/Tablet) --- */}
-                        <div className="block md:hidden space-y-2 mb-6">
-                            {props.quoteItems.map((item, index) => (
-                                <div key={index} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
-                                    {/* Left side: Avatar/Image */}
-                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
-                                        <img src={getR2ImageUrl(item.image, "thumbnail")} className="w-full h-full object-cover" alt="" />
-                                    </div>
-
-                                    {/* Middle: Content */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex justify-between items-start mb-0.5">
-                                            {item.isEditing ? (
-                                                <input
-                                                    type="text"
-                                                    value={item.name}
-                                                    onChange={(e) => props.updateItemField(index, 'name', e.target.value)}
-                                                    placeholder="Nome do produto..."
-                                                    className="flex-1 h-8 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[13px] focus:ring-1 focus:ring-brand-primary outline-none transition-all mr-2"
-                                                />
-                                            ) : (
-                                                <h4 className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate pr-2">
-                                                    {item.name || 'Produto sem nome'}
-                                                </h4>
-                                            )}
-                                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading flex-shrink-0">
-                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price * item.qty)}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center justify-between">
-                                            <p className="text-[11px] font-medium text-brand-inactive-text pr-2 truncate">
-                                                {item.sku || 'Sem SKU'} • {item.qty} un • {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}
-                                            </p>
-                                            {!props.isReadOnly && (
-                                                <div className="flex items-center gap-1">
-                                                    {item.isEditing ? (
-                                                        <button
-                                                            onClick={() => props.toggleItemEdit(index, false)}
-                                                            className="w-8 h-8 flex items-center justify-center text-green-600 hover:bg-green-50 dark:hover:bg-green-900/10 rounded-lg transition-colors"
-                                                        >
-                                                            <CheckIcon size={16} />
-                                                        </button>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() => props.toggleItemEdit(index, true)}
-                                                            className="w-8 h-8 flex items-center justify-center text-brand-inactive-text hover:text-brand-dark hover:bg-brand-gray dark:hover:bg-dark-border rounded-lg transition-colors"
-                                                        >
-                                                            <EditIcon size={16} />
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        onClick={() => props.removeItem(index)}
-                                                        className="w-8 h-8 flex items-center justify-center text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full transition-colors"
-                                                    >
-                                                        <TrashIcon size={14} />
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {!props.isReadOnly && (
-                                            <div className="flex items-center gap-4 mt-2">
-                                                <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} size="sm" />
-                                                <div className="flex items-center flex-1 max-w-[120px]">
-                                                    <span className="text-[11px] font-medium text-brand-inactive-text mr-1">R$</span>
-                                                    <input
-                                                        type="number"
-                                                        value={item.price}
-                                                        onChange={(e) => props.updateItemPrice(index, parseFloat(e.target.value) || 0)}
-                                                        className="w-full h-8 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[11px] focus:ring-1 focus:ring-brand-primary outline-none"
-                                                    />
-                                                </div>
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
 
-                        {/* Add Item Link */}
-                        {props.quoteItems.length > 0 && !props.isReadOnly && (
+                                            {!props.isReadOnly && (
+                                                <div className="flex items-center gap-4 mt-2">
+                                                    <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} size="sm" />
+                                                    <div className="flex items-center flex-1 max-w-[120px]">
+                                                        <span className="text-[11px] font-medium text-brand-inactive-text mr-1">R$</span>
+                                                        <input
+                                                            type="number"
+                                                            value={item.price}
+                                                            onChange={(e) => props.updateItemPrice(index, parseFloat(e.target.value) || 0)}
+                                                            className="w-full h-8 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[11px] focus:ring-1 focus:ring-brand-primary outline-none"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* --- Empty State --- */}
+                        {props.quoteItems.length === 0 && (
+                            <div className="w-full flex-col flex items-center justify-center py-10 px-4 border-2 border-dashed border-brand-border dark:border-dark-border rounded-xl bg-brand-gray/20 dark:bg-dark-border/10 mb-8">
+                                <div className="w-12 h-12 bg-white dark:bg-dark-surface shadow-sm border border-brand-border dark:border-dark-border rounded-full flex items-center justify-center mb-4">
+                                    <SearchIcon size={20} className="text-brand-inactive-text" />
+                                </div>
+                                <h4 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-1.5">Nenhum produto adicionado</h4>
+                                <p className="text-[13px] font-medium text-brand-inactive-text text-center max-w-xs mb-5">
+                                    Busque produtos no campo acima ou cadastre um item avulso manualmente.
+                                </p>
+                                {!props.isReadOnly && (
+                                    <Button onClick={props.addBlankItem} variant="outline" className="h-9 bg-white dark:bg-dark-surface shadow-sm">
+                                        <PlusIcon size={16} className="mr-2" />
+                                        Adicionar item manual
+                                    </Button>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Add Item Link (When list has items) */}
+                        {!props.isReadOnly && props.quoteItems.length > 0 && (
                             <button
                                 type="button"
                                 className="text-sm font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-border dark:decoration-dark-border underline-offset-4 hover:opacity-80 transition-opacity flex items-center gap-1 mb-8"
@@ -457,14 +495,14 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 )}
                             </div>
 
-                            <FormCurrencyInput
+                            <MoneyInput
                                 label="Frete"
                                 value={Number(props.shippingFee) || 0}
                                 onChange={(val) => props.setShippingFee(val.toString())}
                                 disabled={props.isReadOnly}
                             />
 
-                            <FormCurrencyInput
+                            <MoneyInput
                                 label="Outros Custos"
                                 value={Number(props.otherCosts) || 0}
                                 onChange={(val) => props.setOtherCosts(val.toString())}
@@ -516,7 +554,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 </div>
                             </div>
 
-                            <FormInput
+                            <Input
                                 label="Título do Documento"
                                 name="quoteTitle"
                                 value={props.quoteTitle}
@@ -525,7 +563,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 disabled={props.isReadOnly}
                             />
 
-                            <FormInput
+                            <Input
                                 label="Subtítulo"
                                 name="quoteSubtitle"
                                 value={props.quoteSubtitle}

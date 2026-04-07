@@ -38,6 +38,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [isSaving, setIsSaving] = useState(false)
+    const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set())
 
     // Form State
     const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
@@ -340,9 +341,11 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
     const handleSaveOrder = async () => {
         if (items.length === 0) {
+            setFieldErrors(new Set(["productSearch"]))
             notifyError("Adicione pelo menos um item ao pedido.")
             return
         }
+        setFieldErrors(new Set())
         setIsPaymentModalOpen(true)
     }
 
@@ -439,6 +442,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             searchResults={productBucket.filteredResults}
                             subtotal={subtotal}
                             discountAmount={discountAmount}
+                            discountValue={discountValue}
+                            discountType={discountType}
                             shippingFee={shippingFee}
                             otherCosts={otherCosts}
                             totalAmount={totalAmount}
@@ -461,6 +466,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             addBlankItem={addBlankItem}
                             setShippingFee={setShippingFee}
                             setOtherCosts={setOtherCosts}
+                            setDiscountValue={setDiscountValue}
+                            setDiscountType={setDiscountType}
                             setSelectedCustomer={setSelectedCustomer}
                             setIsCustomerSheetOpen={setIsCustomerSheetOpen}
                             setOrderDate={setOrderDate}
@@ -473,6 +480,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             deliveryMethodOptions={deliveryMethodOptions}
                             statusOptions={statusOptions}
                             deliveryStatusOptions={deliveryStatusOptions}
+                            fieldErrors={fieldErrors}
+                            setFieldErrors={setFieldErrors}
                         />
                     </TabsContent>
 
@@ -544,6 +553,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         cart={items}
                         customer={selectedCustomer}
                         partnerId={partnerId}
+                        shippingFee={parseFloat(shippingFee || "0")}
+                        otherCosts={parseFloat(otherCosts || "0")}
+                        discountAmount={discountAmount}
                         onConfirm={handleConfirmPayment}
                     />
                 )}

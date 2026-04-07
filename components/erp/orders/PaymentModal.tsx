@@ -80,7 +80,7 @@ const SuccessActionCard = ({ icon: Icon, label, onClick }: { icon: any, label: s
 
 // --- MAIN COMPONENT ---
 
-const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId }: any) => {
+const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, shippingFee = 0, otherCosts = 0, discountAmount = 0 }: any) => {
     const { toast } = useToast();
     // Views: methods (main) | money | card | pix | split | split_method_select
     const [view, setView] = useState<string>('methods');
@@ -109,8 +109,7 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId }:
     const [editingPaymentIndex, setEditingPaymentIndex] = useState<number | null>(null);
 
     const subTotal = cart.reduce((acc: number, item: any) => acc + (item.unitPrice * item.quantity), 0);
-    const tax = 0;
-    const total = subTotal + tax;
+    const total = subTotal + shippingFee + otherCosts - discountAmount;
     const itemCount = cart.reduce((acc: number, item: any) => acc + item.quantity, 0);
 
     // Fetch Partner Payment Methods
@@ -395,7 +394,10 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId }:
                         <ReceiptContent
                             cart={cart}
                             subTotal={subTotal}
-                            tax={tax} total={total}
+                            shippingFee={shippingFee}
+                            otherCosts={otherCosts}
+                            discountAmount={discountAmount}
+                            total={total}
                             itemCount={itemCount}
                             customerName={customer?.name}
                         />
@@ -791,7 +793,10 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId }:
                                     <ReceiptContent
                                         cart={cart}
                                         subTotal={subTotal}
-                                        tax={tax} total={total}
+                                        shippingFee={shippingFee}
+                                        otherCosts={otherCosts}
+                                        discountAmount={discountAmount}
+                                        total={total}
                                         itemCount={itemCount}
                                         customerName={customer?.name}
                                     />

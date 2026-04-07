@@ -110,6 +110,7 @@ export async function createAddressAction(data: {
   state: string
   country?: string
   municipioCodigoIbge?: string
+  addressType?: string
   isDefault?: boolean
   csrf_token?: string
 }) {
@@ -138,6 +139,7 @@ export async function createAddressAction(data: {
     city: data.city,
     state: data.state,
     country: data.country || "BR",
+    address_type: data.addressType || "primary",
     is_default: data.isDefault || false,
   }
 

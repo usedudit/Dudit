@@ -5,11 +5,9 @@ export interface Customer {
   email: string | null
   phone: string | null
   cpf_cnpj: string | null
-  address: string | null
-  city: string | null
-  state: string | null
-  zip_code: string | null
   created_at: string
+  // Outros campos de identificação (cpf, cnpj, nome_fantasia, etc) são tratados dinamicamente no código
+  [key: string]: any
 }
 
 export interface CustomerInput {
@@ -18,8 +16,4 @@ export interface CustomerInput {
   email?: string | null
   phone?: string | null
   cpf_cnpj?: string | null
-  address?: string | null
-  city?: string | null
-  state?: string | null
-  zip_code?: string | null
 }
