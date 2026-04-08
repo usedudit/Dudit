@@ -33,31 +33,43 @@ const StockMovementGridCard = React.memo(
       >
         <div className="flex gap-4 mb-2">
           {/* Movement Icon */}
-          <div className="w-14 h-14 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border flex-shrink-0 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
             <Package className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
           </div>
 
           <div className="flex-1 min-w-0 flex flex-col justify-center">
-            {/* Linha 1: ID + Badge */}
-            <div className="flex items-start justify-between gap-2 min-w-0 pr-1">
-              <h3
-                className="flex-1 min-w-0 font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate"
-                title={movement.displayId}
-              >
-                {movement.displayId}
-              </h3>
-              <Badge
-                variant={movement.type === 'in' ? "green" : "red"}
-                icon={movement.type === 'in' ? <ChevronDownIcon /> : <ChevronUpIcon />}
-                className="whitespace-nowrap scale-90 origin-right"
-              >
-                {movement.type === 'in' ? "Entrada" : "Saída"}
-              </Badge>
+            {/* Linha 1: ID + Badge + Checkbox */}
+            <div className="flex items-center gap-2 min-w-0 pr-1">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <h3
+                  className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate shrink-0"
+                  title={movement.displayId}
+                >
+                  {movement.displayId}
+                </h3>
+
+                <Badge
+                  variant={movement.type === 'in' ? "green" : "red"}
+                  icon={movement.type === 'in' ? <ChevronDownIcon /> : <ChevronUpIcon />}
+                  className="whitespace-nowrap scale-90"
+                >
+                  {movement.type === 'in' ? "Entrada" : "Saída"}
+                </Badge>
+              </div>
+
+              {onSelect && (
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    checked={selected || false}
+                    onChange={() => onSelect(movement.id)}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Linha 2: Items count */}
-            <div className="flex items-center mt-1">
-              <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate">
+            <div className="flex items-center">
+              <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                 <span>{movement.items_count} {movement.items_count === 1 ? 'item' : 'itens'}</span>
               </div>
             </div>
@@ -82,11 +94,6 @@ const StockMovementGridCard = React.memo(
             </div>
 
             <div className="flex items-center gap-2">
-              {onSelect && (
-                <div onClick={(e) => e.stopPropagation()}>
-                  <Checkbox checked={selected || false} onChange={() => onSelect(movement.id)} />
-                </div>
-              )}
               <div
                 className="flex-shrink-0"
                 onClick={(e) => e.stopPropagation()}

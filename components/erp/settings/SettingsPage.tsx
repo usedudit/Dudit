@@ -5,17 +5,17 @@ import { useSearchParams } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
 import Link from "next/link"
 import { Button, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
-import { 
-  Store, 
-  LinkIcon, 
-  Users, 
-  CreditCardIcon, 
-  MoneyIcon, 
-  TagIcon, 
-  PackageReceiveIcon, 
-  WrenchIcon, 
-  MailIcon, 
-  ChevronLeftIcon 
+import {
+  Store,
+  LinkIcon,
+  Users,
+  CreditCardIcon,
+  MoneyIcon,
+  TagIcon,
+  PackageReceiveIcon,
+  WrenchIcon,
+  MailIcon,
+  ChevronLeftIcon
 } from "@/lib/icons"
 
 import { SettingsCard } from "./SettingsCard"
@@ -31,12 +31,12 @@ interface SettingsTabsProps {
   paymentMethods: any[]
 }
 
-type ActivePage = 
-  | "home" 
-  | "business-data" 
-  | "integrations" 
-  | "team" 
-  | "subscription" 
+type ActivePage =
+  | "home"
+  | "business-data"
+  | "integrations"
+  | "team"
+  | "subscription"
   | "payment-methods"
   | "crediario"
   | "comissao"
@@ -81,14 +81,14 @@ export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full px-4 md:px-8">
               <TabsList className="bg-transparent p-0 gap-8 w-full justify-start border-b border-brand-border dark:border-dark-border mb-8">
-                <TabsTrigger value="empresa" className="px-0 pb-4 rounded-none border-b-2 border-transparent data-[state=active]:border-brand-dark dark:data-[state=active]:border-dark-heading data-[state=active]:bg-transparent">
-                   Configurações da empresa
+                <TabsTrigger value="empresa">
+                  Configurações da empresa
                 </TabsTrigger>
-                <TabsTrigger value="vendas" className="px-0 pb-4 rounded-none border-b-2 border-transparent data-[state=active]:border-brand-dark dark:data-[state=active]:border-dark-heading data-[state=active]:bg-transparent">
-                   Configurações de vendas
+                <TabsTrigger value="vendas">
+                  Configurações de vendas
                 </TabsTrigger>
-                <TabsTrigger value="adicionais" className="px-0 pb-4 rounded-none border-b-2 border-transparent data-[state=active]:border-brand-dark dark:data-[state=active]:border-dark-heading data-[state=active]:bg-transparent">
-                   Configurações adicionais
+                <TabsTrigger value="adicionais">
+                  Configurações adicionais
                 </TabsTrigger>
               </TabsList>
 

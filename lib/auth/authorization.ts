@@ -101,40 +101,71 @@ export async function requirePartner(resolvedUser?: User | any): Promise<{ id: s
   return { ...partner, email: user.email || "" }
 }
 
-// ─── Shared Access Check Helper ─────────────────────────────────────────────
-// Checks BOTH partner_users (invited users) AND partners.user_id (legacy owners)
+import { getAllUserPartnerAccess } from "@/lib/auth/partner-context"
 
 /**
  * Check if a user has access to a partner via partner_users OR as the legacy owner.
  * Returns the access record if found, or null if no access.
+ * 
+ * OPTIMIZED FAST-PATH:
+ * - Avoids sequential DB queries by reading from the already-fetched request-cached `getPartnerContextHelper`.
+ * - Falls back to the globally cached `getAllUserPartnerAccess` (which hits the RPC or unstable_cache).
  */
-const checkPartnerAccess = cache(async (
+const checkPartnerAccess = async (
   partnerId: string,
   userId: string
 ): Promise<{ role: string; permissions: any } | null> => {
-  const admin = getAdminClient()
-
-  // 1. Check partner_users first (invited users + owners who have records)
-  const { data: puAccess } = await admin
-    .from("partner_users")
-    .select("role, permissions")
-    .eq("partner_id", partnerId)
-    .eq("user_id", userId)
-    .maybeSingle()
-
-  if (puAccess) {
-    return { role: puAccess.role, permissions: puAccess.permissions }
+  // 1. FAST PATH: Check the active partner context in the current request memory.
+  try {
+    const context = await getPartnerContextHelper({ id: userId });
+    if (context && context.partnerId === partnerId) {
+      if (context.role && context.permissions) {
+        console.log("[AUTH]", { type: "CACHE_HIT", layer: "FAST_PATH", userId, partnerId });
+        return { role: context.role, permissions: context.permissions };
+      }
+    }
+  } catch (err) {
+    // Graceful fail of fast-path; do not block fallback
   }
 
-  // 2. Fallback: check if user is the legacy owner via partners.user_id
-  const { data: partner } = await admin
-    .from("partners")
-    .select("user_id")
-    .eq("id", partnerId)
-    .single()
+  // 2. FALLBACK/LAYER 2: Utilize the optimized RPC cached loader to avoid N+1 queries.
+  const allAccess = await getAllUserPartnerAccess({ id: userId });
+  const match = allAccess.find(a => a.partnerId === partnerId);
 
-  if (partner && partner.user_id === userId) {
-    // Owner — return full OWNER permissions
+  if (match && match.role && match.permissions) {
+    console.log("[AUTH]", { type: "CACHE_HIT", layer: "LAYER_2", userId, partnerId });
+    return { role: match.role, permissions: match.permissions };
+  }
+
+  console.log("[AUTH]", { type: "FALLBACK", layer: "AUTHORITATIVE_DB", userId, partnerId });
+  // 3. AUTHORITATIVE DB FALLBACK
+  const admin = getAdminClient()
+  const [invitedAccessRes, ownedPartnerRes] = await Promise.all([
+    admin.from("partner_users").select("role, permissions").eq("partner_id", partnerId).eq("user_id", userId).maybeSingle(),
+    admin.from("partners").select("user_id").eq("id", partnerId).single()
+  ]);
+
+  if (invitedAccessRes.error || ownedPartnerRes.error) {
+    // .maybeSingle() suppresses not-found, but .single() throws PGRST116 if empty.
+    // We consider anything else as a critical DB error that requires aborting gracefully.
+    const isOwnerEmpty = ownedPartnerRes.error?.code === "PGRST116";
+    if (invitedAccessRes.error || (!isOwnerEmpty && ownedPartnerRes.error)) {
+      console.error("[AUTH FALLBACK ERROR]", {
+        userId,
+        partnerId,
+        invitedError: invitedAccessRes.error,
+        ownedError: ownedPartnerRes.error
+      });
+      return null;
+    }
+  }
+
+  // Explicitly validate returned truthy data
+  if (invitedAccessRes.data && invitedAccessRes.data.role && invitedAccessRes.data.permissions) {
+    return { role: invitedAccessRes.data.role, permissions: invitedAccessRes.data.permissions };
+  }
+
+  if (ownedPartnerRes.data && ownedPartnerRes.data.user_id === userId) {
     return {
       role: "OWNER",
       permissions: {
@@ -149,7 +180,7 @@ const checkPartnerAccess = cache(async (
   }
 
   return null
-})
+}
 
 // ─── Soft Ownership Verification (backward-compatible) ──────────────────────
 // These return boolean. PREFER the require*() variants in new code.

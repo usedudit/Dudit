@@ -24,4 +24,7 @@ export const TAGS = {
   partnerProfile: (partnerId: string) => `partner-profile-${partnerId}`,
   partner: (partnerId: string) => `partner-${partnerId}`,
   partnerStatus: 'partner-status',
+
+  // Auth / Permissions
+  userAccess: (userId: string) => `user-access-${userId}`,
 }

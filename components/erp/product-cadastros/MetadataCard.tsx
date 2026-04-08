@@ -19,10 +19,10 @@ const MetadataCard = React.memo(({ item, type, categories, onEdit, onDelete }: M
         ? categories.find(c => c.id === item.parent_id)?.name
         : null
 
-    const IconComponent = type === "subcategories" ? SubcategoryIcon 
-        : type === "brands" ? TagIcon 
-        : type === "locations" ? MapsIcon 
-        : Package
+    const IconComponent = type === "subcategories" ? SubcategoryIcon
+        : type === "brands" ? TagIcon
+            : type === "locations" ? MapsIcon
+                : Package
 
     return (
         <motion.div

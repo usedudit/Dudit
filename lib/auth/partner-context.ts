@@ -1,11 +1,11 @@
 import "server-only"
 import { cache } from "react"
+import { unstable_cache } from "next/cache"
 import { cookies } from "next/headers"
 import { createAdminClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import type { PartnerRole, PartnerPermissions } from "@/lib/permissions/types"
-
-// ─── Constants ──────────────────────────────────────────────────────────────
+import { TAGS } from "@/lib/utils/revalidation-tags"// ─── Constants ──────────────────────────────────────────────────────────────
 
 const ACTIVE_PARTNER_COOKIE = "active_partner_id"
 const PENDING_INVITE_COOKIE = "pending_invite_token"
@@ -106,106 +106,119 @@ export async function getPendingInviteToken(): Promise<string | null> {
 
 import { PERMISSION_PRESETS } from "@/lib/permissions/partner-roles"
 
+// ─── Extracted Cache Factory for stability and strict keying ────────────────
+
+const getCachedUserAccess = (userId: string) => unstable_cache(
+    async () => {
+        console.log(`[AUTH CACHE MISS] Fetching context for user ${userId} via RPC`);
+        const admin = createAdminClient()
+        
+        // Use parameterless RPC for security (auth.uid() handles identity securely)
+        const { data, error } = await admin.rpc('get_user_full_context')
+        
+        if (error || !data || data.length === 0) {
+            console.error("[AUTH CACHE ERRO] RPC falhou ou vazou nulo. Acionando Fallback...", error);
+            
+            // REAL FALLBACK: Manual queries running in parallel without waterfall
+            console.warn(`[AUTH FALLBACK] Building access context manually for user ${userId}`);
+            
+            const [invitedDataRes, ownedDataRes] = await Promise.all([
+                admin.from("partner_users").select(`
+                    partner_id, user_id, role, permissions,
+                    partners!inner (store_name, user_id, business_info)
+                `).eq("user_id", userId),
+                admin.from("partners").select(`
+                    id, user_id, store_name, business_info
+                `).eq("user_id", userId)
+            ]);
+
+            const invitedData = invitedDataRes.data || [];
+            const ownedData = ownedDataRes.data || [];
+
+            const accessRecords: Record<string, PartnerAccessRecord> = {}
+            const ownerUserIds = new Set<string>()
+
+            if (ownedData) {
+                for (const store of ownedData) {
+                    accessRecords[store.id] = {
+                        partnerId: store.id,
+                        userId: userId,
+                        role: "OWNER" as PartnerRole,
+                        permissions: PERMISSION_PRESETS.OWNER,
+                        storeName: store.store_name || "Loja sem nome",
+                        ownerName: "Você",
+                        businessInfo: typeof store.business_info === "string" ? JSON.parse(store.business_info) : (store.business_info || { sells: ["products"], channels: ["online"] }),
+                    }
+                }
+            }
+
+            if (invitedData) {
+                for (const record of invitedData as any[]) {
+                    if (!accessRecords[record.partner_id]) {
+                        const ownerId = record.partners.user_id
+                        if (ownerId) ownerUserIds.add(ownerId)
+
+                        accessRecords[record.partner_id] = {
+                            partnerId: record.partner_id,
+                            userId: record.user_id,
+                            role: record.role as PartnerRole,
+                            permissions: record.permissions as PartnerPermissions,
+                            storeName: record.partners.store_name || "Loja sem nome",
+                            ownerName: ownerId, // temporary
+                            businessInfo: typeof record.partners.business_info === "string" ? JSON.parse(record.partners.business_info) : (record.partners.business_info || { sells: ["products"], channels: ["online"] }),
+                        }
+                    }
+                }
+            }
+
+            let records = Object.values(accessRecords);
+
+            if (ownerUserIds.size > 0) {
+                const { data: profiles } = await admin.from("user_profiles").select("user_id, full_name").in("user_id", Array.from(ownerUserIds))
+                if (profiles) {
+                    const names = Object.fromEntries(profiles.map((p: any) => [p.user_id, p.full_name]))
+                    records = records.map(record => {
+                        if (record.role !== "OWNER" && record.ownerName && names[record.ownerName]) {
+                            record.ownerName = names[record.ownerName]
+                        } else if (record.role !== "OWNER") {
+                            record.ownerName = "Desconhecido"
+                        }
+                        return record;
+                    })
+                }
+            }
+
+            return records;
+        }
+
+        return data.map((record: any) => ({
+            partnerId: record.partner_id,
+            userId: record.user_id,
+            role: record.role as PartnerRole,
+            permissions: typeof record.permissions === "string" ? JSON.parse(record.permissions) : record.permissions,
+            storeName: record.store_name || "Loja sem nome",
+            ownerName: record.owner_name || "Desconhecido",
+            businessInfo: typeof record.business_info === "string" ? JSON.parse(record.business_info) : (record.business_info || { sells: ["products"], channels: ["online"] }),
+        })) as PartnerAccessRecord[]
+    },
+    [TAGS.userAccess(userId)],
+    {
+        tags: [TAGS.userAccess(userId)],
+        revalidate: 900 // 15 mins (strictly short TTL)
+    }
+);
+
 /**
  * Gets ALL partner access records for the current user.
- * Combines both "owned" stores (from partners table) and "invited" stores (from partner_users).
+ * Built safely using cache factory injection and real fallback logic.
  */
 export const getAllUserPartnerAccess = cache(async (resolvedUser?: any): Promise<PartnerAccessRecord[]> => {
     const user = resolvedUser || await getCurrentUser()
     if (!user) return []
 
-    const admin = createAdminClient()
-
-    // 1. Get invited access (from partner_users)
-    const { data: invitedData } = await admin
-        .from("partner_users")
-        .select(`
-            partner_id,
-            user_id,
-            role,
-            permissions,
-            partners!inner (
-                store_name,
-                user_id,
-                business_info
-            )
-        `)
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: true })
-
-    // 2. Get owned access (from partners)
-    const { data: ownedData } = await admin
-        .from("partners")
-        .select(`
-            id,
-            user_id,
-            store_name,
-            business_info
-        `)
-        .eq("user_id", user.id)
-
-    const accessRecords: Record<string, PartnerAccessRecord> = {}
-    const ownerUserIds = new Set<string>()
-
-    // Process owned stores first
-    if (ownedData) {
-        for (const store of ownedData) {
-            accessRecords[store.id] = {
-                partnerId: store.id,
-                userId: user.id,
-                role: "OWNER" as PartnerRole,
-                permissions: PERMISSION_PRESETS.OWNER,
-                storeName: store.store_name || "Loja sem nome",
-                ownerName: "Você",
-                businessInfo: typeof store.business_info === "string" ? JSON.parse(store.business_info) : (store.business_info || { sells: ["products"], channels: ["online"] }),
-            }
-        }
-    }
-
-    // Process invited stores
-    if (invitedData) {
-        for (const record of invitedData as any[]) {
-            // Avoid overwriting if they are somehow both owner and invited (which shouldn't happen, but just in case)
-            if (!accessRecords[record.partner_id]) {
-                const ownerId = record.partners.user_id
-                if (ownerId) ownerUserIds.add(ownerId)
-
-                accessRecords[record.partner_id] = {
-                    partnerId: record.partner_id,
-                    userId: record.user_id,
-                    role: record.role as PartnerRole,
-                    permissions: record.permissions as PartnerPermissions,
-                    storeName: record.partners.store_name || "Loja sem nome",
-                    ownerName: ownerId, // Temporary, will replace with name
-                    businessInfo: typeof record.partners.business_info === "string" ? JSON.parse(record.partners.business_info) : (record.partners.business_info || { sells: ["products"], channels: ["online"] }),
-                }
-            }
-        }
-    }
-
-    const records = Object.values(accessRecords)
-
-    // Fetch owner profiles for invited stores to get their names
-    if (ownerUserIds.size > 0) {
-        const { data: profiles } = await admin
-            .from("user_profiles")
-            .select("user_id, full_name")
-            .in("user_id", Array.from(ownerUserIds))
-
-        if (profiles) {
-            const names = Object.fromEntries(profiles.map((p: any) => [p.user_id, p.full_name]))
-            for (const record of records) {
-                // Only update non-owned records
-                if (record.role !== "OWNER" && record.ownerName && names[record.ownerName]) {
-                    record.ownerName = names[record.ownerName]
-                } else if (record.role !== "OWNER") {
-                    record.ownerName = "Desconhecido" // Fallback
-                }
-            }
-        }
-    }
-
-    return records
+    // Logging Cache Hit vs Exec will be seen structurally (if MISS log above wasn't fired, it is a HIT)
+    const records = await getCachedUserAccess(user.id)();
+    return records;
 })
 
 /**
