@@ -43,6 +43,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [isSaving, setIsSaving] = useState(false)
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set())
+    const [originalPaymentStatus, setOriginalPaymentStatus] = useState<'paid' | 'partially_paid' | 'unpaid'>("unpaid")
+    const [originalPaidAmount, setOriginalPaidAmount] = useState(0)
 
     // Form State
     const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
@@ -102,6 +104,21 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         return subtotal - discountAmount + parseFloat(shippingFee || "0") + parseFloat(otherCosts || "0")
     }, [subtotal, discountAmount, shippingFee, otherCosts])
 
+    const remainingAmount = useMemo(() => {
+        return Math.max(0, totalAmount - originalPaidAmount)
+    }, [totalAmount, originalPaidAmount])
+
+    const shouldOpenPaymentModalForEdit = Boolean(
+        editOrderId &&
+        paymentStatus === "paid" &&
+        (originalPaymentStatus === "unpaid" || originalPaymentStatus === "partially_paid") &&
+        remainingAmount > 0.009
+    )
+
+    const primaryActionLabel = editOrderId
+        ? (shouldOpenPaymentModalForEdit ? "Finalizar Venda" : "Salvar")
+        : "Finalizar Venda"
+
     // --- Effects ---
     useEffect(() => {
         if (!editOrderId) return
@@ -114,7 +131,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setOrderDate(order.created_at.split('T')[0])
                 setSalesChannel(order.order_source || "Direct Sales")
                 setDeliveryMethod(order.delivery_type as any || "pickup")
-                setPaymentStatus(order.situation === "paid" ? "paid" : order.situation === "partially_paid" ? "partially_paid" : "unpaid")
+                const normalizedStatus = order.situation === "paid" ? "paid" : order.situation === "partially_paid" ? "partially_paid" : "unpaid"
+                setPaymentStatus(normalizedStatus)
+                setOriginalPaymentStatus(normalizedStatus)
+                setOriginalPaidAmount(Number(order.paid_amount || 0))
                 setDeliveryStatus(order.delivery_status || "not_sent")
                 setNotes(order.notes || "")
                 setShippingFee((order.shipping_cost || 0).toString())
@@ -123,7 +143,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setDiscountType(order.discount_type || "fixed")
 
                 if (order.order_items) {
-                setItems(order.order_items.map((item: any) => ({
+                    setItems(order.order_items.map((item: any) => ({
                         id: item.id || Math.random().toString(36).substr(2, 9),
                         productId: item.product_id,
                         name: item.product_name,
@@ -291,6 +311,73 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             resetForm()
             router.refresh()
             setWasSaleSuccessful(false)
+            onBack()
+        }
+    }
+
+    const buildOrderPayload = (paymentOverrides?: { paymentStatus?: 'paid' | 'partially_paid' | 'unpaid'; paidAmount?: number; paymentMethod?: string }) => ({
+        partnerId,
+        customerId: selectedCustomer?.id,
+        customerName: selectedCustomer ? selectedCustomer.name : "Consumidor final",
+        salesChannel,
+        deliveryMethod,
+        paymentStatus: paymentOverrides?.paymentStatus || paymentStatus,
+        paymentMethod: paymentOverrides?.paymentMethod || "pendente",
+        deliveryStatus: deliveryStatus as any,
+        paidAmount: paymentOverrides?.paidAmount,
+        address: deliveryMethod === 'delivery' ? {
+            zipCode: cep,
+            street,
+            number,
+            complement,
+            neighborhood,
+            city,
+            state: uf
+        } : undefined,
+        items: items.map((item, idx) => ({
+            productId: item.productId,
+            customName: item.name,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            sortOrder: idx
+        })),
+        subtotal,
+        discountValue: discountAmount,
+        discountType: 'fixed' as const,
+        shippingCost: parseFloat(shippingFee || "0"),
+        additionalCosts: parseFloat(otherCosts || "0"),
+        totalAmount,
+        notes,
+        csrf_token: csrfToken || undefined
+    })
+
+    const submitOrder = async (paymentOverrides?: { paymentStatus?: 'paid' | 'partially_paid' | 'unpaid'; paidAmount?: number; paymentMethod?: string }) => {
+        setIsSaving(true)
+        try {
+            const payload = buildOrderPayload(paymentOverrides)
+            const result = editOrderId
+                ? await updateERPOrderAction(editOrderId, payload)
+                : await createERPOrderAction(payload)
+
+            if (result.success) {
+                notifySuccess(editOrderId ? `Pedido atualizado com sucesso!` : `Pedido criado com sucesso!`)
+                router.refresh()
+                if (editOrderId && !paymentOverrides?.paymentMethod && !shouldOpenPaymentModalForEdit) {
+                    onBack()
+                    return { success: true }
+                }
+                setWasSaleSuccessful(true)
+                const returnedOrderNumber = 'orderNumber' in result ? result.orderNumber : undefined
+                return { success: true, orderNumber: returnedOrderNumber }
+            }
+
+            notifyError(result.error || (editOrderId ? "Erro ao atualizar pedido" : "Erro ao criar pedido"))
+            return { error: result.error }
+        } catch (error) {
+            notifyError("Erro ao processar pedido")
+            return { error: "Erro de processamento" }
+        } finally {
+            setIsSaving(false)
         }
     }
 
@@ -299,68 +386,25 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             notifyError("Adicione pelo menos um item ao pedido.")
             return { error: "Sem itens" }
         }
+        return submitOrder({
+            paymentStatus: paymentData.paymentStatus,
+            paymentMethod: paymentData.paymentMethod,
+            paidAmount: paymentData.paidAmount,
+        })
+    }
 
-        setIsSaving(true)
-        try {
-            const payload = {
-                partnerId,
-                customerId: selectedCustomer?.id,
-                customerName: selectedCustomer ? selectedCustomer.name : "Consumidor final",
-                salesChannel,
-                deliveryMethod,
-                paymentStatus: paymentData.paymentStatus,
-                paymentMethod: paymentData.paymentMethod,
-                deliveryStatus: deliveryStatus as any,
-                address: deliveryMethod === 'delivery' ? {
-                    zipCode: cep,
-                    street,
-                    number,
-                    complement,
-                    neighborhood,
-                    city,
-                    state: uf
-                } : undefined,
-                items: items.map((item, idx) => ({
-                    productId: item.productId,
-                    customName: item.name,
-                    quantity: item.quantity,
-                    unitPrice: item.unitPrice,
-                    sortOrder: idx
-                })),
-                subtotal,
-                discountValue: discountAmount,
-                discountType: 'fixed' as const,
-                shippingCost: parseFloat(shippingFee || "0"),
-                additionalCosts: parseFloat(otherCosts || "0"),
-                totalAmount,
-                notes,
-                csrf_token: csrfToken || undefined
-            }
-
-            let result;
-            if (editOrderId) {
-                result = await updateERPOrderAction(editOrderId, payload)
-            } else {
-                result = await createERPOrderAction(payload)
-            }
-
-            if (result.success) {
-                notifySuccess(editOrderId ? `Pedido atualizado com sucesso!` : `Pedido criado com sucesso!`)
-                router.refresh()
-                setWasSaleSuccessful(true)
-                // updateERPOrderAction does not return orderNumber, so we default to an empty string if undefined to fix TS error
-                const returnedOrderNumber = 'orderNumber' in result ? result.orderNumber : undefined;
-                return { success: true, orderNumber: returnedOrderNumber }
-            } else {
-                notifyError(result.error || "Erro ao criar pedido")
-                return { error: result.error }
-            }
-        } catch (error) {
-            notifyError("Erro ao processar pedido")
-            return { error: "Erro de processamento" }
-        } finally {
-            setIsSaving(false)
+    const handleDirectSaveOrder = async () => {
+        if (items.length === 0) {
+            setFieldErrors(new Set(["productSearch"]))
+            notifyError("Adicione pelo menos um item ao pedido.")
+            return
         }
+
+        setFieldErrors(new Set())
+        await submitOrder({
+            paymentStatus,
+            paidAmount: originalPaidAmount,
+        })
     }
 
     const handleSaveOrder = async () => {
@@ -370,6 +414,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             return
         }
         setFieldErrors(new Set())
+        if (editOrderId && !shouldOpenPaymentModalForEdit) {
+            await handleDirectSaveOrder()
+            return
+        }
         setIsPaymentModalOpen(true)
     }
 
@@ -444,7 +492,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                 </Button>
                                 <Button onClick={handleSaveOrder} disabled={isSaving}>
                                     <SaveIcon className="w-5 h-5 mr-2" />
-                                    {isSaving ? "Salvando..." : "Finalizar Venda"}
+                                    {isSaving ? "Salvando..." : primaryActionLabel}
                                 </Button>
                             </div>
                         </div>
@@ -484,6 +532,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             deliveryMethod={deliveryMethod}
                             paymentStatus={paymentStatus}
                             deliveryStatus={deliveryStatus}
+                            remainingPaymentAmount={editOrderId ? remainingAmount : 0}
+                            primaryActionLabel={primaryActionLabel}
                             isSaving={isSaving}
                             setSearchQuery={productBucket.setSearchQuery}
                             setIsProductSearchOpen={setIsProductSearchOpen}
@@ -587,6 +637,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         shippingFee={parseFloat(shippingFee || "0")}
                         otherCosts={parseFloat(otherCosts || "0")}
                         discountAmount={discountAmount}
+                        amountDue={shouldOpenPaymentModalForEdit ? remainingAmount : undefined}
+                        existingPaidAmount={editOrderId ? originalPaidAmount : 0}
+                        lockPaymentCompletion={shouldOpenPaymentModalForEdit}
                         onConfirm={handleConfirmPayment}
                     />
                 )}
@@ -608,7 +661,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     className="flex-1"
                 >
                     <SaveIcon className="w-4 h-4 mr-2" />
-                    {isSaving ? "Salvando..." : "Salvar"}
+                    {isSaving ? "Salvando..." : primaryActionLabel}
                 </Button>
             </div>
         </Tabs>

@@ -166,7 +166,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                             </div>
                         </div>
 
-                        <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"} pb-2`}>
+                        {/* Tabs Navigation */}
+                        <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                             <Tabs value={activeTab} onValueChange={setActiveTab}>
                                 <TabsList className="px-0 border-b-0">
                                     <TabsTrigger value="summary">Resumo</TabsTrigger>
@@ -265,7 +266,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                     <div className="mt-8">
                                         <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
 
-                                        <div className="flex items-center justify-between mb-4 border-b border-brand-border dark:border-dark-border pb-3">
+                                        <div className="flex items-center justify-between mb-4 pb-3">
                                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Detalhes do Pagamento</h3>
                                             <div className="flex items-center gap-2">
                                                 <Badge variant={paymentStatus.variant}>{paymentStatus.label}</Badge>

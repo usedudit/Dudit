@@ -34,6 +34,7 @@ type ERPOrderPayload = {
     shippingCost: number
     additionalCosts: number
     totalAmount: number
+    paidAmount?: number
     notes?: string
     paymentMethod: string
     address?: {
@@ -60,6 +61,50 @@ function normalizePaymentSituation(paymentStatus: ERPOrderPayload["paymentStatus
         : paymentStatus === "partially_paid"
             ? "partially_paid"
             : "pending"
+}
+
+function clampPaidAmount(value: number, totalAmount: number) {
+    if (!Number.isFinite(value)) return 0
+    return Math.max(0, Math.min(value, Math.max(totalAmount, 0)))
+}
+
+function resolvePaymentState(params: {
+    requestedStatus: ERPOrderPayload["paymentStatus"]
+    totalAmount: number
+    paidAmount?: number
+    fallbackPaidAmount?: number
+}) {
+    const totalAmount = Math.max(Number(params.totalAmount || 0), 0)
+    const requestedPaidAmount = clampPaidAmount(
+        Number(params.paidAmount ?? params.fallbackPaidAmount ?? 0),
+        totalAmount
+    )
+
+    let situation = normalizePaymentSituation(params.requestedStatus)
+    let paidAmount = requestedPaidAmount
+
+    if (situation === "paid") {
+        if (paidAmount >= totalAmount - 0.009) {
+            paidAmount = totalAmount
+        } else if (paidAmount > 0.009) {
+            situation = "partially_paid"
+        } else {
+            situation = "pending"
+            paidAmount = 0
+        }
+    } else if (situation === "partially_paid") {
+        if (paidAmount >= totalAmount - 0.009) {
+            situation = "paid"
+            paidAmount = totalAmount
+        } else if (paidAmount <= 0.009) {
+            situation = "pending"
+            paidAmount = 0
+        }
+    } else {
+        paidAmount = 0
+    }
+
+    return { situation, paidAmount }
 }
 
 function describeItem(item: { customName?: string | null; product_name?: string | null }) {
@@ -134,7 +179,13 @@ function buildItemChangeLines(previousItems: Array<{
 
 function buildOrderChangeLines(currentOrder: any, payload: ERPOrderPayload) {
     const lines: string[] = []
-    const nextSituation = normalizePaymentSituation(payload.paymentStatus)
+    const paymentState = resolvePaymentState({
+        requestedStatus: payload.paymentStatus,
+        totalAmount: payload.totalAmount,
+        paidAmount: payload.paidAmount,
+        fallbackPaidAmount: Number(currentOrder.paid_amount || 0),
+    })
+    const nextSituation = paymentState.situation
     const nextOrderSource = buildOrderSource(payload.salesChannel, payload.deliveryMethod)
     const previousNotes = (currentOrder.notes || "").trim()
     const nextNotes = (payload.notes || "").trim()
@@ -181,6 +232,10 @@ function buildOrderChangeLines(currentOrder: any, payload: ERPOrderPayload) {
         lines.push(`alterou valor total: ${formatCurrency(currentOrder.total_amount || 0)} -> ${formatCurrency(payload.totalAmount || 0)}`)
     }
 
+    if (Math.abs(Number(currentOrder.paid_amount || 0) - Number(paymentState.paidAmount || 0)) > 0.009) {
+        lines.push(`alterou valor pago: ${formatCurrency(currentOrder.paid_amount || 0)} -> ${formatCurrency(paymentState.paidAmount || 0)}`)
+    }
+
     if (previousNotes !== nextNotes) {
         lines.push("alterou observações internas")
     }
@@ -205,6 +260,11 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     if (!limitCheck.allowed) return { error: limitCheck.message || "Limite mensal atingido." }
 
     const supabase = await getSupabaseServerClient()
+    const paymentState = resolvePaymentState({
+        requestedStatus: data.paymentStatus,
+        totalAmount: data.totalAmount,
+        paidAmount: data.paidAmount,
+    })
 
     let deliveryAddressStr = ""
     if (data.deliveryMethod === "delivery" && data.address) {
@@ -220,9 +280,10 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             customer_name: data.customerName || null,
             order_source: buildOrderSource(data.salesChannel, data.deliveryMethod),
             delivery_type: data.deliveryMethod,
-            situation: normalizePaymentSituation(data.paymentStatus),
+            situation: paymentState.situation,
             delivery_status: data.deliveryStatus,
             total_amount: data.totalAmount,
+            paid_amount: paymentState.paidAmount,
             discount_value: data.discountValue,
             discount_type: data.discountType,
             shipping_cost: data.shippingCost,
@@ -256,19 +317,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
 
     try {
         const historyLines = [
-            "criou o pedido",
-            ...data.items.map((item) => `adicionou ${item.quantity} ${describeItem(item)}`),
-            `definiu status de pagamento: ${getPaymentStatusLabel(normalizePaymentSituation(data.paymentStatus))}`,
-            `definiu status de entrega: ${getDeliveryStatusLabel(data.deliveryStatus)}`,
+            "criou venda",
         ]
-
-        if (Number(data.discountValue || 0) > 0) {
-            historyLines.push(`definiu desconto: ${formatCurrency(data.discountValue)}`)
-        }
-
-        if (Number(data.shippingCost || 0) > 0) {
-            historyLines.push(`definiu frete: ${formatCurrency(data.shippingCost)}`)
-        }
 
         await createOrderHistoryEntry({
             orderId: order.id,
@@ -356,6 +406,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             situation,
             delivery_status,
             total_amount,
+            paid_amount,
             discount_value,
             shipping_cost,
             additional_costs,
@@ -368,6 +419,12 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         .single()
 
     if (currentOrderError || !currentOrder) return { error: currentOrderError?.message || "Pedido nÃ£o encontrado" }
+    const paymentState = resolvePaymentState({
+        requestedStatus: data.paymentStatus,
+        totalAmount: data.totalAmount,
+        paidAmount: data.paidAmount,
+        fallbackPaidAmount: Number(currentOrder.paid_amount || 0),
+    })
 
     let deliveryAddressStr = ""
     if (data.deliveryMethod === "delivery" && data.address?.street && data.address.number) {
@@ -382,9 +439,10 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             customer_name: data.customerName || null,
             order_source: buildOrderSource(data.salesChannel, data.deliveryMethod),
             delivery_type: data.deliveryMethod,
-            situation: normalizePaymentSituation(data.paymentStatus),
+            situation: paymentState.situation,
             delivery_status: data.deliveryStatus,
             total_amount: data.totalAmount,
+            paid_amount: paymentState.paidAmount,
             discount_value: data.discountValue,
             discount_type: data.discountType,
             shipping_cost: data.shippingCost,
@@ -465,7 +523,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
     const { data: currentOrders } = await supabase
         .from("orders")
-        .select("id, situation, delivery_status, notes")
+        .select("id, situation, delivery_status, notes, total_amount, paid_amount")
         .in("id", payload.orderIds)
         .eq("partner_id", payload.partnerId)
 
@@ -498,17 +556,43 @@ export async function updateOrdersStatusInBatchAction(payload: {
         }
     }
 
-    const { error } = await supabase
-        .from("orders")
-        .update(updateData)
-        .in("id", payload.orderIds)
-        .eq("partner_id", payload.partnerId)
+    if (payload.actionType === "payment_status") {
+        for (const order of currentOrders || []) {
+            const paymentState = resolvePaymentState({
+                requestedStatus: (payload.statusValue === "partially_paid" ? "partially_paid" : payload.statusValue === "paid" ? "paid" : "unpaid") as ERPOrderPayload["paymentStatus"],
+                totalAmount: Number(order.total_amount || 0),
+                fallbackPaidAmount:
+                    payload.statusValue === "paid"
+                        ? Number(order.total_amount || 0)
+                        : payload.statusValue === "partially_paid"
+                            ? Number(order.paid_amount || 0)
+                            : 0,
+            })
 
-    if (error) return { error: error.message }
+            const { error } = await supabase
+                .from("orders")
+                .update({
+                    situation: paymentState.situation,
+                    paid_amount: paymentState.paidAmount,
+                })
+                .eq("id", order.id)
+                .eq("partner_id", payload.partnerId)
+
+            if (error) return { error: error.message }
+        }
+    } else {
+        const { error } = await supabase
+            .from("orders")
+            .update(updateData)
+            .in("id", payload.orderIds)
+            .eq("partner_id", payload.partnerId)
+
+        if (error) return { error: error.message }
+    }
 
     try {
         await Promise.all(
-            (currentOrders || []).map((order: { id: string; situation: string | null; delivery_status: string | null; notes?: string | null }) => {
+            (currentOrders || []).map((order: { id: string; situation: string | null; delivery_status: string | null; notes?: string | null; total_amount?: number | null; paid_amount?: number | null }) => {
                 const lines: string[] = []
 
                 if (payload.actionType === "payment_status" && payload.statusValue && order.situation !== payload.statusValue) {

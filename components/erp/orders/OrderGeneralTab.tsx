@@ -7,7 +7,8 @@ import {
     Input, Button, FormDropdown,
     CustomerCard, IconPlaceholder, DatePicker, Pagination,
     ThreeDotsLoader,
-    MoneyInput
+    MoneyInput,
+    InfoCard
 } from "@/components/reusable"
 import {
     SearchIcon, PlusIcon, TagIcon, TrashIcon,
@@ -41,6 +42,8 @@ interface OrderGeneralTabProps {
     deliveryMethod: string
     paymentStatus: string
     deliveryStatus: string
+    remainingPaymentAmount?: number
+    primaryActionLabel?: string
     isSaving: boolean
 
     // Handlers
@@ -82,6 +85,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     items, searchQuery, isProductSearchOpen, isSearching, searchResults,
     subtotal, discountAmount, discountValue, discountType, shippingFee, otherCosts, totalAmount,
     selectedCustomer, orderDate, salesChannel, deliveryMethod, paymentStatus, deliveryStatus, isSaving,
+    remainingPaymentAmount = 0, primaryActionLabel = "Ir para Pagamento",
     setSearchQuery, setIsProductSearchOpen, handleSearchProduct, onSearchFocus, addProductToOrder,
     updateItemField, updateItemPrice, updateItemQty, toggleItemEdit, removeItem, addBlankItem,
     setShippingFee, setOtherCosts, setDiscountValue, setDiscountType, setSelectedCustomer, setIsCustomerSheetOpen,
@@ -491,6 +495,14 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                         </div>
 
                         <div className="flex flex-col gap-3 mt-4">
+                            {remainingPaymentAmount > 0.009 && (
+                                <InfoCard
+                                    title="Valor ainda em aberto"
+                                    message={`Falta receber ${formatCurrency(remainingPaymentAmount)} para quitar este pedido.`}
+                                    color="orange"
+                                />
+                            )}
+
                             <div className="flex justify-between items-center text-[15px]">
                                 <span className="text-brand-inactive-text font-medium">Subtotal</span>
                                 <span className="font-bold text-brand-dark dark:text-dark-heading">
@@ -540,7 +552,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 onClick={handleSaveOrder}
                                 disabled={isSaving}
                             >
-                                Ir para Pagamento
+                                {primaryActionLabel}
                             </Button>
                         </div>
                     </section>

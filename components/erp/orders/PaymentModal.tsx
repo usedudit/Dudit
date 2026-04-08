@@ -81,7 +81,20 @@ const SuccessActionCard = ({ icon: Icon, label, onClick }: { icon: any, label: s
 
 // --- MAIN COMPONENT ---
 
-const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, shippingFee = 0, otherCosts = 0, discountAmount = 0 }: any) => {
+const PaymentModal = ({
+    isOpen,
+    onClose,
+    cart,
+    customer,
+    onConfirm,
+    partnerId,
+    shippingFee = 0,
+    otherCosts = 0,
+    discountAmount = 0,
+    amountDue,
+    existingPaidAmount = 0,
+    lockPaymentCompletion = false
+}: any) => {
     const { toast } = useToast();
     // Views: methods (main) | money | card | pix | split | split_method_select
     const [view, setView] = useState<string>('methods');
@@ -111,6 +124,7 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, s
 
     const subTotal = cart.reduce((acc: number, item: any) => acc + (item.unitPrice * item.quantity), 0);
     const total = subTotal + shippingFee + otherCosts - discountAmount;
+    const chargeTarget = Math.max(0, Number(amountDue ?? total));
     const itemCount = cart.reduce((acc: number, item: any) => acc + item.quantity, 0);
 
     // Fetch Partner Payment Methods
@@ -153,17 +167,17 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, s
                     setAmountPaid(currentSlot.amount.toString());
                 } else {
                     const otherPaid = payments.reduce((acc, p, idx) => idx !== editingPaymentIndex ? acc + p.amount : acc, 0);
-                    const needed = Math.max(0, total - otherPaid);
+                    const needed = Math.max(0, chargeTarget - otherPaid);
                     setAmountPaid(needed > 0 ? needed.toFixed(2) : '');
                 }
             } else {
-                setAmountPaid(total.toFixed(2));
+                setAmountPaid(chargeTarget.toFixed(2));
             }
             setTimeout(() => {
                 if (inputRef.current) inputRef.current.focus();
             }, 100);
         }
-    }, [view, editingPaymentIndex, total, payments]);
+    }, [view, editingPaymentIndex, chargeTarget, payments]);
 
     const handleQuickAdd = (val: number) => {
         setAmountPaid(val.toString());
@@ -206,7 +220,7 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, s
         return currentInputVal;
     }, [view, payments, editingPaymentIndex, currentInputVal]);
 
-    const diff = totalPaidCalculated - total;
+    const diff = totalPaidCalculated - chargeTarget;
     const isUnderpaid = diff < -0.01;
     const isOverpaid = diff > 0.01;
     const changeAmount = isOverpaid ? diff : 0;
@@ -273,8 +287,9 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, s
             const result = await onConfirm({
                 paymentMethod: isPendingPayment ? 'pendente' : (view === 'split' ? 'multiple' : (view === 'money' ? 'dinheiro' : (view === 'pix' ? 'pix' : 'cartao'))),
                 splitPayments: view === 'split' ? payments : [],
-                paymentStatus: isUnderpaid ? 'partially_paid' : 'paid',
-                isPendingDelivery
+                paymentStatus: isPendingPayment ? 'unpaid' : (isUnderpaid ? 'partially_paid' : 'paid'),
+                isPendingDelivery,
+                paidAmount: isPendingPayment ? existingPaidAmount : (existingPaidAmount + totalPaidCalculated)
             });
 
             if (result?.success) {
@@ -482,7 +497,8 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, s
 
                                             <div className="border-t border-brand-border dark:border-dark-border my-6"></div>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                            {!lockPaymentCompletion && (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                                 <div
                                                     className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${isPendingPayment ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20'}`}
                                                     onClick={() => setIsPendingPayment(!isPendingPayment)}
@@ -508,13 +524,14 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, s
                                                         <Checkbox checked={isPendingDelivery} onChange={() => { }} name="pendingDel" />
                                                     </div>
                                                 </div>
-                                            </div>
+                                                </div>
+                                            )}
                                         </motion.div>
                                     )}
 
                                     {view === 'money' && (
                                         <motion.div key="money" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="w-full h-full flex flex-col items-center">
-                                            <CompactPaymentStatusAlert totalPaid={totalPaidCalculated} totalNeed={total} />
+                                            <CompactPaymentStatusAlert totalPaid={totalPaidCalculated} totalNeed={chargeTarget} />
                                             <div className="flex justify-center items-baseline gap-1 mb-4 w-full cursor-text" onClick={() => inputRef.current?.focus()}>
                                                 <span className="text-5xl md:text-6xl font-bold text-brand-dark dark:text-dark-heading select-none">R$</span>
                                                 <input
@@ -546,7 +563,7 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, s
                                     {view === 'pix' && (
                                         <motion.div key="pix" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="flex flex-col items-center justify-start pt-0 w-full">
                                             <div className="w-full max-w-sm space-y-4">
-                                                <CompactPaymentStatusAlert totalPaid={totalPaidCalculated} totalNeed={total} />
+                                                <CompactPaymentStatusAlert totalPaid={totalPaidCalculated} totalNeed={chargeTarget} />
                                                 <Input label="Valor a Receber" name="pixAmount" prefix="R$" value={amountPaid} onChange={handleManualInput} className="font-bold text-lg" />
                                                 {!isPixGenerated ? (
                                                     <Button variant="filled" className="w-full h-12" onClick={() => setIsPixGenerated(true)}>Gerar QR Code</Button>
@@ -569,7 +586,7 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, s
 
                                     {view === 'card' && (
                                         <motion.div key="card" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="flex flex-col items-center justify-start pt-6 w-full max-w-sm mx-auto">
-                                            <CompactPaymentStatusAlert totalPaid={totalPaidCalculated} totalNeed={total} />
+                                            <CompactPaymentStatusAlert totalPaid={totalPaidCalculated} totalNeed={chargeTarget} />
                                             <div className="mb-8 text-center">
                                                 <div className="w-24 h-24 bg-green-50 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-green-100 dark:border-green-900/30">
                                                     <CreditCardIcon size={40} className="text-green-600 dark:text-green-400" />
@@ -589,7 +606,7 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, s
                                     {view === 'split' && (
                                         <motion.div key="split" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="flex flex-col w-full h-full">
                                             <div className="flex-1 px-2 py-4">
-                                                <CompactPaymentStatusAlert totalPaid={totalPaidCalculated} totalNeed={total} />
+                                                <CompactPaymentStatusAlert totalPaid={totalPaidCalculated} totalNeed={chargeTarget} />
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                     {payments.map((p, idx) => (
                                                         <SplitPaymentCard
