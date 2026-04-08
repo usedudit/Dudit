@@ -432,7 +432,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     </div>
                 </div>
 
-                <div className="px-4 md:px-6 py-8 max-w-[1300px] mx-auto min-h-[400px]">
+                <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                     <TabsContent value="general" className="mt-0">
                         <OrderGeneralTab
                             items={items}

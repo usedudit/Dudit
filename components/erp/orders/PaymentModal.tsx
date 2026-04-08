@@ -742,7 +742,7 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, s
                                     buttonVariant={
                                         editingPaymentIndex !== null
                                             ? "filled"
-                                            : (isUnderpaid ? "outline" : "filled")
+                                            : (isUnderpaid ? "outline" : "default")
                                     }
                                     onCustomConfirm={editingPaymentIndex !== null ? () => handleSplitPaymentUpdate(parseFloat(amountPaid) || 0) : undefined}
                                 />
@@ -760,7 +760,7 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, s
                         <ActionFooter
                             showConfirm={true}
                             confirmText="Finalizar e Nova Venda"
-                            buttonVariant="filled"
+                            buttonVariant="default"
                             onCustomConfirm={handleFinishSale}
                         />
                     )}

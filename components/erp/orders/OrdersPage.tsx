@@ -74,7 +74,7 @@ const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; 
     { id: "customer", label: "Cliente", align: "left", width: "250px" },
     { id: "date", label: "Data", align: "center", width: "150px" },
     { id: "channel", label: "Canal", align: "left", width: "150px" },
-    { id: "status", label: "Status", align: "center", width: "100px" },
+    { id: "status", label: "Status", align: "center", width: "80px" },
     { id: "actions", label: "Ações", align: "center", width: "80px" },
 ]
 

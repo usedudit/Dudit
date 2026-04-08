@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useCallback, useRef, useMemo, type FC } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect, type FC } from 'react';
 import {
     ChevronLeftIcon,
     SaveIcon,
@@ -63,6 +63,8 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
 
     // Multi-item state
     const [items, setItems] = useState<MovementItem[]>([]);
+    const [isProductSearchOpen, setIsProductSearchOpen] = useState(false);
+    const searchRef = useRef<HTMLDivElement>(null);
 
     // Instant product search (client-side bucket)
     const productBucket = useProductBucket(fetchPartnerProductsBucket);
@@ -73,7 +75,18 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
         return items.length > 0 || notes !== '' || reason !== 'Selecione um motivo...';
     }, [items, notes, reason]);
 
-    const showSearchDropdown = productBucket.searchQuery.length > 0;
+    const showSearchDropdown = isProductSearchOpen && productBucket.searchQuery.length > 0;
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+                setIsProductSearchOpen(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     const { showConfirmDialog: unsavedChangesDialogOpen, confirmNavigation: handleUnsavedChangesConfirm, cancelNavigation: handleUnsavedChangesDialogClose } = useUnsavedChanges(isDirty)
 
@@ -101,6 +114,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
         }
         setItems(prev => [...prev, { product, quantity: 1 }]);
         productBucket.setSearchQuery('');
+        setIsProductSearchOpen(false);
         setFieldErrors(prev => {
             const next = new Set(prev);
             next.delete('items');
@@ -285,7 +299,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                     <div className="space-y-6">
 
                                                         {/* Product Search */}
-                                                        <div className="relative">
+                                                        <div ref={searchRef} className="relative">
                                                             <div className="relative flex items-center w-full">
                                                                 <Input
                                                                     type="text"
@@ -293,13 +307,17 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                     value={productBucket.searchQuery}
                                                                     onChange={(e) => {
                                                                         productBucket.setSearchQuery(e.target.value);
+                                                                        setIsProductSearchOpen(true);
                                                                         setFieldErrors(prev => {
                                                                             const next = new Set(prev);
                                                                             next.delete('items');
                                                                             return next;
                                                                         });
                                                                     }}
-                                                                    onFocus={productBucket.loadBucket}
+                                                                    onFocus={() => {
+                                                                        setIsProductSearchOpen(true);
+                                                                        productBucket.loadBucket();
+                                                                    }}
                                                                     prefix={
                                                                         <SearchIcon
                                                                             size={18}

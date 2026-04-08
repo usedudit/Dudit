@@ -16,6 +16,7 @@ import { useQueryClient } from "@tanstack/react-query"
 // Actions
 import {
     createProductComprehensiveAction,
+    createProductVariantsBatchAction,
     updateProductAction,
     deleteProductAction,
     deleteProductsInBatchAction,
@@ -184,9 +185,10 @@ export default function ProductsPage({
     const isMobile = useMediaQuery("(max-width: 767px)")
 
     const queryClient = useQueryClient()
+    const productsQueryKey = ['erp', 'products', partnerId]
 
     const { data: queryProducts, isLoading: isQueryLoading } = useERPData(
-        ['erp', 'products', partnerId],
+        productsQueryKey,
         () => fetchERPProductsClient(),
         { initialData: initialProducts, isCritical: true }
     )
@@ -416,26 +418,48 @@ export default function ProductsPage({
                     : { productId: selection.product?.id, ...formData }
             const res = await action(payload)
             if (res.success) {
+                if (ui.formMode === "add" && res.data?.id && formData.pending_variants?.length > 0) {
+                    const variantsResult = await createProductVariantsBatchAction({
+                        productId: res.data.id,
+                        variants: formData.pending_variants,
+                        csrf_token: formData.csrf_token,
+                        deletedImages: [],
+                    })
+
+                    if (!variantsResult.success) {
+                        toast({
+                            title: "Produto criado com ressalvas",
+                            description: "O produto foi salvo, mas houve erro ao salvar as variantes.",
+                            variant: "destructive",
+                        })
+                    }
+                }
+
+                const savedProduct = 'data' in res ? res.data : null
+
+                if (savedProduct) {
+                    const nextProducts =
+                        ui.formMode === "add"
+                            ? [savedProduct, ...data.products]
+                            : selection.product?.id
+                                ? data.products.map((prod) =>
+                                    prod.id === selection.product?.id
+                                        ? { ...prod, ...savedProduct }
+                                        : prod
+                                )
+                                : data.products
+
+                    queryClient.setQueryData(productsQueryKey, nextProducts)
+                    setData((p) => ({ ...p, products: nextProducts }))
+                }
+
                 toast({ title: "Sucesso" })
-                queryClient.invalidateQueries({ queryKey: ['erp', 'products', partnerId] })
+                queryClient.invalidateQueries({ queryKey: productsQueryKey })
 
                 // Fecha form IMEDIATAMENTE — sem esperar refresh
                 setUi((p) => ({ ...p, pageState: "list", isSaving: false }))
                 setSelection((p) => ({ ...p, duplicate: null }))
 
-                // Atualiza lista local (optimistic) em vez de router.refresh()
-                if (ui.formMode === "add" && 'data' in res && res.data) {
-                    setData((p) => ({ ...p, products: [res.data, ...p.products] }))
-                } else if (ui.formMode === "edit" && selection.product?.id) {
-                    setData((p) => ({
-                        ...p,
-                        products: p.products.map((prod) =>
-                            prod.id === selection.product?.id
-                                ? { ...prod, ...formData, is_active: formData.status === "Active" }
-                                : prod
-                        ),
-                    }))
-                }
                 return
             } else {
                 toast({ title: "Erro", description: res.error, variant: "destructive" })

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from "framer-motion"
 import { useSupabase } from "@/providers/supabase-provider"
-import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, CheckCircleIcon, CopyIcon, X, ShoppingCart, MoneyIcon, TruckIcon, TwitterIcon, FacebookIcon, WhatsappIcon, LinkedinIcon, TelegramIcon } from "@/lib/icons"
+import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, CheckCircleIcon, CopyIcon, X, ShoppingCartIcon, MoneyIcon, TruckIcon, TwitterIcon, FacebookIcon, WhatsappIcon, LinkedinIcon, TelegramIcon } from "@/lib/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
@@ -1014,7 +1014,7 @@ export function ProductDetailsPageClient({
             <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-50 flex gap-3 lg:hidden shadow-lg">
               <Button variant="outline" className="w-12 h-12 rounded-full border-brand-green text-brand-green"
                 disabled={isOutOfStock || loading} onClick={handleAddToCart}>
-                <ShoppingCart size={20} />
+                <ShoppingCartIcon size={20} />
               </Button>
               <Button className="flex-1 rounded-full" disabled={isOutOfStock || loading} onClick={() => setShowCheckoutModal(true)}>
                 {isOutOfStock ? "Esgotado" : "Comprar Agora"}

@@ -10,12 +10,11 @@ import {
   DashboardIcon,
   ListIcon,
   PlusIcon,
-  ShoppingCart,
+  ShoppingCartIcon,
   CheckCircleIcon,
   ClockIcon,
   CancelCircleIcon,
   TruckIcon,
-  ExportFileIcon,
 } from "@/lib/icons"
 
 interface FilterState {
@@ -100,7 +99,7 @@ const OrderPageControls: React.FC<OrderPageControlsProps> = ({
           onValueChange={(val) => setActiveTab(val as any)}
         >
           <TabsList className="px-0">
-            <TabsTrigger value="Todos" icon={ShoppingCart}>
+            <TabsTrigger value="Todos" icon={ShoppingCartIcon}>
               Todos
             </TabsTrigger>
             <TabsTrigger value="Pendente" icon={ClockIcon}>
@@ -112,7 +111,7 @@ const OrderPageControls: React.FC<OrderPageControlsProps> = ({
             <TabsTrigger value="Enviado" icon={TruckIcon}>
               Enviados
             </TabsTrigger>
-             <TabsTrigger value="Cancelado" icon={CancelCircleIcon}>
+            <TabsTrigger value="Cancelado" icon={CancelCircleIcon}>
               Cancelados
             </TabsTrigger>
           </TabsList>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
     SearchIcon,
     TrashIcon,
@@ -73,6 +73,7 @@ interface QuoteEditorProps {
 }
 
 const QuoteEditor = (props: QuoteEditorProps) => {
+    const searchRef = useRef<HTMLDivElement>(null);
     const statusOptions = [
         { value: 'draft', label: 'Rascunho', icon: ClockIcon, color: 'text-gray-500' },
         { value: 'pending', label: 'Pendente', icon: ClockIcon, color: 'text-amber-500' },
@@ -83,16 +84,27 @@ const QuoteEditor = (props: QuoteEditorProps) => {
 
     const currentStatus = statusOptions.find(o => o.value === props.status) || statusOptions[0];
 
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+                props.setIsProductSearchOpen(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [props.setIsProductSearchOpen]);
+
     return (
         <div className="p-6 md:p-8 pt-4">
             <TabsContent value="Dados Gerais" className="mt-0 focus-visible:outline-none">
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
 
                     {/* 1. PRODUCT SEARCH & TABLE */}
                     <div className="mb-8">
                         <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading mb-6">Itens da Proposta</h3>
 
-                        <div className="relative mb-6">
+                        <div ref={searchRef} className="relative mb-6">
                             {!props.isReadOnly && (
                                 <Input
                                     label=""
@@ -341,33 +353,30 @@ const QuoteEditor = (props: QuoteEditorProps) => {
 
                         {/* --- Empty State --- */}
                         {props.quoteItems.length === 0 && (
-                            <div className="w-full flex-col flex items-center justify-center py-10 px-4 border-2 border-dashed border-brand-border dark:border-dark-border rounded-xl bg-brand-gray/20 dark:bg-dark-border/10 mb-8">
-                                <div className="w-12 h-12 bg-white dark:bg-dark-surface shadow-sm border border-brand-border dark:border-dark-border rounded-full flex items-center justify-center mb-4">
-                                    <SearchIcon size={20} className="text-brand-inactive-text" />
-                                </div>
-                                <h4 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-1.5">Nenhum produto adicionado</h4>
-                                <p className="text-[13px] font-medium text-brand-inactive-text text-center max-w-xs mb-5">
-                                    Busque produtos no campo acima ou cadastre um item avulso manualmente.
-                                </p>
-                                {!props.isReadOnly && (
-                                    <Button onClick={props.addBlankItem} variant="outline" className="h-9 bg-white dark:bg-dark-surface shadow-sm">
-                                        <PlusIcon size={16} className="mr-2" />
-                                        Adicionar item manual
-                                    </Button>
-                                )}
+                            <div className="w-full flex-col flex items-center justify-center">
+                                <IconPlaceholder
+                                    icon={SearchIcon}
+                                    title="Nenhum produto adicionado"
+                                    subtitle="Busque produtos no campo acima ou cadastre um item avulso manualmente."
+                                    itemButton={{
+                                        text: "Adicionar item manual",
+                                        action: props.addBlankItem,
+                                        variant: "outline",
+                                    }}
+                                />
                             </div>
                         )}
 
                         {/* Add Item Link (When list has items) */}
                         {!props.isReadOnly && props.quoteItems.length > 0 && (
-                            <button
+                            <Button
                                 type="button"
-                                className="text-sm font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-border dark:decoration-dark-border underline-offset-4 hover:opacity-80 transition-opacity flex items-center gap-1 mb-8"
+                                variant="link"
                                 onClick={props.addBlankItem}
                             >
                                 <PlusIcon size={14} strokeWidth={3} />
                                 Adicionar item manual
-                            </button>
+                            </Button>
                         )}
                     </div>
 

@@ -4,7 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
-import { StoreIcon } from "@/lib/icons"
+import { ShoppingCartIcon } from "@/lib/icons"
 
 interface ColumnDef {
   id: string
@@ -44,7 +44,7 @@ const OrderListItem = React.memo(
           return (
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                <StoreIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                <ShoppingCartIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
               </div>
               <div className="flex flex-col text-left min-w-0">
                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[150px] leading-tight mb-0.5">
@@ -95,7 +95,7 @@ const OrderListItem = React.memo(
         case "channel":
           return (
             <div className="flex items-center gap-2 text-brand-inactive-text dark:text-dark-body">
-              <StoreIcon size={14} />
+              <ShoppingCartIcon size={14} />
               <span className="text-[13px] font-medium truncate max-w-[120px]">
                 {order.store_name || "Loja"}
               </span>

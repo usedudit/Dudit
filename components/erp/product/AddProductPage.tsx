@@ -83,6 +83,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
     onBack, product: initialProduct, mode: initialModeProp, setMode,
     isSaving = false, productId, initialData, onClose, unidadesMedida = [],
     partnerId: propPartnerId, storeId: propStoreId, isLoadingDetails = false,
+    onSave,
 }) => {
     const [internalMode, setInternalMode] = useState(initialModeProp)
     useEffect(() => { setInternalMode(initialModeProp) }, [initialModeProp])
@@ -498,6 +499,15 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 tags: d.tags || [],
             }
 
+            if (onSave) {
+                await onSave({
+                    ...payload,
+                    pending_variants: productData.pending_variants || [],
+                })
+                setPendingImages([])
+                return
+            }
+
             const dbPromise = internalMode === "edit" && (initialProduct?.id || productId)
                 ? updateProductComprehensiveAction(initialProduct?.id || productId!, payload)
                 : createProductComprehensiveAction(payload)
@@ -529,7 +539,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
             }
         } catch (err) { console.error(err); notifyError("Erro ao salvar produto") }
         finally { setIsSavingProduct(false) }
-    }, [validateProductData, productData, partnerId, storeId, internalMode, initialProduct, productId, notifySuccess, notifyError, onClose, blockedImages])
+    }, [validateProductData, productData, partnerId, storeId, internalMode, initialProduct, productId, notifySuccess, notifyError, onClose, onSave, blockedImages])
 
     const handleSavePendingVariants = useCallback((variantsToSave: any[]) => {
         setProductData((prev: any) => ({ ...prev, pending_variants: variantsToSave }))

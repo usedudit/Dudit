@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import {
-  ShoppingCart,
+  ShoppingCartIcon,
   Settings,
   X,
   ChevronRightIcon,
@@ -50,7 +50,7 @@ const navItems: NavItem[] = [
     href: "/erp/dashboard", // gráficos, métricas, relatórios rápidos
   },
   {
-    icon: ShoppingCart,
+    icon: ShoppingCartIcon,
     label: "Vendas",
     submenu: [
       { label: "Pedidos e Vendas", href: "/erp/orders" },
@@ -162,12 +162,12 @@ export function ERPSidebar() {
   const isActivePath = useCallback((href: string) => {
     if (!pathname) return false;
     if (pathname === href) return true;
-    
+
     // Exception for the Submenu of Products: "Catálogo de Produtos" should not be marked active if currently in "Cadastros de Produtos"
     if (href === "/erp/products" && pathname.startsWith("/erp/products/cadastros")) {
       return false;
     }
-    
+
     return pathname.startsWith(href + "/");
   }, [pathname])
 

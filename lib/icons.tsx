@@ -234,7 +234,7 @@ export const Store = createIcon(Store01Icon)
 export const StoreIcon = createIcon(Store01Icon)
 export const MarketplaceIcon = createIcon(Store01Icon)
 
-export const ShoppingCart = createIcon(ShoppingCart01Icon)
+export const ShoppingCartIcon = createIcon(ShoppingCart01Icon)
 export const ShoppingBag = createIcon(ShoppingBag01Icon)
 export const ShoppingBagIcon = createIcon(ShoppingCart01Icon)
 

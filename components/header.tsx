@@ -13,44 +13,44 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useEffect, useState, useRef } from "react"
 import type { User } from "@supabase/supabase-js"
-import { ShoppingCart } from "@/lib/icons"
+import { ShoppingCartIcon } from "@/lib/icons"
 import { useUserSession } from "@/hooks/use-user-session"
 import { useSupabase } from "@/providers/supabase-provider"
 import { createClient } from "@/lib/supabase/client"
 
 export function Header() {
-    const router = useRouter()
-    const { user, sessionData, supabase: contextSupabase } = useSupabase()
-    const [userName, setUserName] = useState<string>("")
-    const [theme, setTheme] = useState<"light" | "dark">("light")
-  
-    const { profile, cartCount } = useUserSession()
+  const router = useRouter()
+  const { user, sessionData, supabase: contextSupabase } = useSupabase()
+  const [userName, setUserName] = useState<string>("")
+  const [theme, setTheme] = useState<"light" | "dark">("light")
 
-    const isPartner = !!sessionData?.isPartner
+  const { profile, cartCount } = useUserSession()
 
-    useEffect(() => {
-        if (user) {
-            if (profile?.full_name) {
-                setUserName(profile.full_name)
-            } else {
-                setUserName(user.user_metadata?.full_name || user.email || "Usuário")
-            }
-        }
-    }, [user, profile])
+  const isPartner = !!sessionData?.isPartner
 
-    useEffect(() => {
-        // Carregar tema salvo
-        const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
-        if (savedTheme) {
-            setTheme(savedTheme)
-            document.documentElement.classList.toggle("dark", savedTheme === "dark")
-        }
-    }, [])
-
-    const handleSignOut = async () => {
-        await contextSupabase.auth.signOut()
-        router.push("/")
+  useEffect(() => {
+    if (user) {
+      if (profile?.full_name) {
+        setUserName(profile.full_name)
+      } else {
+        setUserName(user.user_metadata?.full_name || user.email || "Usuário")
+      }
     }
+  }, [user, profile])
+
+  useEffect(() => {
+    // Carregar tema salvo
+    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
+    if (savedTheme) {
+      setTheme(savedTheme)
+      document.documentElement.classList.toggle("dark", savedTheme === "dark")
+    }
+  }, [])
+
+  const handleSignOut = async () => {
+    await contextSupabase.auth.signOut()
+    router.push("/")
+  }
 
   const toggleTheme = () => {
     const newTheme = theme === "light" ? "dark" : "light"
@@ -84,7 +84,7 @@ export function Header() {
           {user && (
             <Button asChild variant="outline" className="relative bg-transparent">
               <Link href="/cart" prefetch={false}>
-                <ShoppingCart className="h-5 w-5" />
+                <ShoppingCartIcon className="h-5 w-5" />
                 {cartCount > 0 && (
                   <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground rounded-full w-5 h-5 text-xs flex items-center justify-center">
                     {cartCount}
