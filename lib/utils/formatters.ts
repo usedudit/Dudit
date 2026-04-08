@@ -1,0 +1,170 @@
+/**
+ * Formatting utilities for a standardized display across the project.
+ * Focuses on pt-BR locale.
+ */
+
+/**
+ * Formats a number as BRL currency (R$ 0,00).
+ */
+export function formatCurrency(value: number | string): string {
+  const amount = typeof value === "string" ? parseFloat(value) : value
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(amount || 0)
+}
+
+/**
+ * Formats a date as DD/MM/YYYY.
+ */
+export function formatDate(date: Date | string | number): string {
+  if (!date) return ""
+  const d = new Date(date)
+  return new Intl.DateTimeFormat("pt-BR").format(d)
+}
+
+/**
+ * Formats a date as "DD de Mês de YYYY, HH:mm" (Timezone: America/Sao_Paulo).
+ */
+export function formatFullDate(date: Date | string | number): string {
+  if (!date) return ""
+  const d = new Date(date)
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
+  }).format(d)
+}
+
+/**
+ * Formats a date as "DD de Mês" (Timezone: America/Sao_Paulo).
+ */
+export function formatShortDate(date: Date | string | number): string {
+  if (!date) return ""
+  const d = new Date(date)
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    timeZone: "America/Sao_Paulo",
+  }).format(d)
+}
+
+/**
+ * Formats a date with time: DD/MM/YYYY HH:mm.
+ */
+export function formatDateTime(date: Date | string | number): string {
+  if (!date) return ""
+  const d = new Date(date)
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d)
+}
+
+/**
+ * Formats a date as HH:mm.
+ */
+export function formatTime(date: Date | string | number): string {
+  if (!date) return ""
+  const d = new Date(date)
+  return new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d)
+}
+
+/**
+ * Formats a date as DD/MM.
+ */
+export function formatDayMonth(date: Date | string | number): string {
+  if (!date) return ""
+  const d = new Date(date)
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+  }).format(d)
+}
+/**
+ * Formats a date as a long month name (January, February...).
+ */
+export function formatMonth(date: Date | string | number): string {
+  if (!date) return ""
+  const d = new Date(date)
+  return new Intl.DateTimeFormat("pt-BR", { month: "long" }).format(d)
+}
+
+/**
+ * Formats a date as YYYY.
+ */
+export function formatYear(date: Date | string | number): string {
+  if (!date) return ""
+  const d = new Date(date)
+  return new Intl.DateTimeFormat("pt-BR", { year: "numeric" }).format(d)
+}
+
+/**
+ * Formats a number with pt-BR separators.
+ */
+export function formatNumber(
+  value: number | string,
+  minimumFractionDigits = 2,
+  maximumFractionDigits = 2
+): string {
+  const num = typeof value === "string" ? parseFloat(value) : value
+  return new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits,
+    maximumFractionDigits,
+  }).format(num || 0)
+}
+
+/**
+ * Formats a string as CPF (000.000.000-00).
+ */
+export function formatCPF(value: string): string {
+  const digits = value.replace(/\D/g, "")
+  return digits
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1,2})/, "$1-$2")
+    .replace(/(-\d{2})\d+?$/, "$1")
+}
+
+/**
+ * Formats a string as CNPJ (00.000.000/0000-00).
+ */
+export function formatCNPJ(value: string): string {
+  const digits = value.replace(/\D/g, "")
+  return digits
+    .replace(/(\d{2})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1/$2")
+    .replace(/(\d{4})(\d)/, "$1-$2")
+    .replace(/(-\d{2})\d+?$/, "$1")
+}
+
+/**
+ * Formats a string as CEP (00000-000).
+ */
+export function formatCEP(value: string): string {
+  const digits = value.replace(/\D/g, "")
+  return digits
+    .replace(/(\d{5})(\d)/, "$1-$2")
+    .replace(/(-\d{3})\d+?$/, "$1")
+}
+/**
+ * Formats a number as a percentage (0,00%).
+ */
+export function formatPercent(value: number | string, decimals = 2): string {
+  const num = typeof value === "string" ? parseFloat(value) : value
+  return new Intl.NumberFormat("pt-BR", {
+    style: "percent",
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format((num || 0) / 100)
+}

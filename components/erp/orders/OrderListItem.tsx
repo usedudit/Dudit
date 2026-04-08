@@ -3,6 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
+import { formatCurrency } from "@/lib/utils";
 import { StoreIcon } from "@/lib/icons"
 
 interface ColumnDef {
@@ -59,7 +60,7 @@ const OrderListItem = React.memo(
         case "total":
           return (
             <span className="text-[13px] font-bold text-brand-primary">
-              R$ {Number(order.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              {formatCurrency(order.total_amount)}
             </span>
           )
 

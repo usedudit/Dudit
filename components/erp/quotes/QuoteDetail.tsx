@@ -23,6 +23,7 @@ import CustomerCard from '@/components/reusable/CustomerCard';
 import { useSidebar } from "@/lib/sidebar-context";
 import { useRouter } from "next/navigation";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
+import { formatCurrency, formatDate, formatDayMonth, formatTime } from '@/lib/utils';
 
 interface QuoteDetailProps {
     quoteId: string;
@@ -130,18 +131,14 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
     const additional = Number(quote.additional_costs || 0);
     const total = Number(quote.total || 0);
 
-    const formattedIssueDate = quote.issue_date
-        ? new Date(quote.issue_date + 'T12:00:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' })
-        : '—';
+    const formattedIssueDate = quote.issue_date ? formatDate(quote.issue_date) : '—';
 
-    const formattedExpiryDate = quote.expiration_date
-        ? new Date(quote.expiration_date + 'T12:00:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' })
-        : '—';
+    const formattedExpiryDate = quote.expiration_date ? formatDate(quote.expiration_date) : '—';
 
     const getTimelineSteps = (status: string) => {
         const baseDateObj = quote.created_at ? new Date(quote.created_at) : (quote.issue_date ? new Date(quote.issue_date + 'T12:00:00') : new Date());
-        const baseDate = baseDateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-        const baseTime = baseDateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const baseDate = formatDayMonth(baseDateObj);
+        const baseTime = formatTime(baseDateObj);
 
         const steps = [
             { label: 'Criado', date: baseDate, time: baseTime, active: true },
@@ -161,8 +158,8 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
 
         if (['approved', 'rejected'].includes(status)) {
             const updatedDateObj = quote.updated_at ? new Date(quote.updated_at) : new Date();
-            steps[2].date = updatedDateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-            steps[2].time = updatedDateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            steps[2].date = formatDayMonth(updatedDateObj);
+            steps[2].time = formatTime(updatedDateObj);
         }
 
         return steps;
@@ -320,8 +317,8 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                                         name={item.custom_name || item.products?.name || "Produto sem nome"}
                                         sku={item.products?.sku || "N/A"}
                                         qty={item.quantity}
-                                        price={Number(item.unit_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                        total={Number(item.quantity * item.unit_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        price={item.unit_price}
+                                        total={item.quantity * item.unit_price}
                                     />
                                 ))}
                             </div>
@@ -332,23 +329,23 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                                 <div className="space-y-3">
                                     <div className="flex justify-between items-center text-[14px]">
                                         <span className="text-brand-inactive-text dark:text-dark-body font-medium">Subtotal ({quote.items?.length || 0} itens)</span>
-                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">R$ {subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(subtotal)}</span>
                                     </div>
                                     <div className="flex justify-between items-center text-[14px]">
                                         <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto</span>
-                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">R$ {discount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(discount)}</span>
                                     </div>
                                     <div className="flex justify-between items-center text-[14px]">
                                         <span className="text-brand-inactive-text dark:text-dark-body font-medium">Frete</span>
-                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">R$ {shipping.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(shipping)}</span>
                                     </div>
                                     <div className="flex justify-between items-center text-[14px]">
                                         <span className="text-brand-inactive-text dark:text-dark-body font-medium">Outros Custos</span>
-                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">R$ {additional.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(additional)}</span>
                                     </div>
                                     <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
                                         <span className="font-bold text-base md:text-lg text-brand-dark dark:text-dark-heading">Total do Orçamento</span>
-                                        <span className="font-bold text-xl md:text-2xl text-brand-dark dark:text-dark-heading tracking-tight text-right">R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                        <span className="font-bold text-xl md:text-2xl text-brand-dark dark:text-dark-heading tracking-tight text-right">{formatCurrency(total)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -444,11 +441,11 @@ const QuoteItem = ({ image, name, sku, qty, price, total }: any) => (
         <div className="flex-1 min-w-0">
             <div className="flex justify-between items-start mb-1 gap-2">
                 <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{name}</h4>
-                <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">R$ {total}</span>
+                <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">{formatCurrency(total)}</span>
             </div>
             <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">{sku}</div>
             <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
-                <span>{qty} un. • R$ {price} / un.</span>
+                <span>{qty} un. • {formatCurrency(price)} / un.</span>
             </div>
         </div>
     </div>

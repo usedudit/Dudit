@@ -74,7 +74,7 @@ import {
   ZoomInAreaIcon,
   ZoomOutAreaIcon,
   RotateCropIcon,
-  QrCodeIcon,
+  QrCodeIcon as QrCodeIcon01,
   CreditCardIcon as CreditCard,
   ShippingTruck01Icon,
   StarIcon as StarIcon1,
@@ -290,7 +290,7 @@ export const MoonIcon = createIcon(Moon02Icon)
 export const ClockIcon = createIcon(Clock01Icon)
 export const MapPinIcon = createIcon(Location01Icon)
 
-export const QRCodeIcon = createIcon(QrCodeIcon)
+export const QRCodeIcon = createIcon(QrCodeIcon01)
 
 export const SparklesIcon = createIcon(CoreSparklesIcon)
 export const WandIcon = createIcon(CoreSparklesIcon)

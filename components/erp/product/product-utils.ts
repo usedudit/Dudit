@@ -15,8 +15,10 @@ export const getStockStatus = (stock: number, min = 10) => {
   }
 }
 
+import { formatCurrency as centralizedFormatCurrency } from "@/lib/utils"
+
 export const formatCurrency = (value: number | string) => {
-  return `R$ ${Number(value || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+  return centralizedFormatCurrency(value)
 }
 
 export const getSupplierColor = (name: string) => {

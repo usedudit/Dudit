@@ -3,6 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
+import { formatCurrency } from "@/lib/utils";
 import { ClockIcon, FileIcon } from "@/lib/icons"
 
 interface ColumnDef {
@@ -57,7 +58,7 @@ const QuoteListItem = React.memo(
                 case "total":
                     return (
                         <span className="text-[13px] font-bold text-brand-primary">
-                            R$ {Number(quote.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            {formatCurrency(quote.total_amount)}
                         </span>
                     )
 

@@ -14,6 +14,7 @@ import Button from "@/components/reusable/Button"
 import { Badge } from "@/components/reusable/Badge"
 import { getAuditLogs } from "@/app/actions/admin/audit-logs"
 import type { AuditLogRow, CursorPaginatedResult } from "@/lib/admin/types"
+import { formatDateTime } from "@/lib/utils"
 
 interface AuditLogListProps {
     initialData: CursorPaginatedResult<AuditLogRow>
@@ -178,7 +179,7 @@ const AuditLogList = ({ initialData }: AuditLogListProps) => {
                                         <td className="p-4 pl-6 border-b border-brand-border dark:border-dark-border">
                                             <div className="flex items-center gap-2 text-[13px] text-brand-dark dark:text-dark-heading">
                                                 <Clock size={14} className="text-brand-inactive-text" />
-                                                {new Date(log.created_at).toLocaleString("pt-BR")}
+                                                {formatDateTime(log.created_at)}
                                             </div>
                                         </td>
                                         <td className="p-4 border-b border-brand-border dark:border-dark-border">

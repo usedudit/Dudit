@@ -21,6 +21,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { adminAuditLog } from "@/lib/admin/audit"
 import { AdminActionType } from "@/lib/admin/types"
 import type { ModerationItem, CursorPaginatedResult } from "@/lib/admin/types"
+import { formatDateTime } from "@/lib/utils/formatters";
 
 // ─── Helper: delete image from R2 ──────────────────────────────────────────
 
@@ -38,7 +39,7 @@ const _deleteFromR2 = async (url: string) => {
 // ─── Helper: format date for reason messages ────────────────────────────────
 
 function formatBrazilDateTime(): string {
-    return new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
+    return formatDateTime(new Date())
 }
 
 // ─── Helper: increment partner risk_score (capped at 100) ──────────────────

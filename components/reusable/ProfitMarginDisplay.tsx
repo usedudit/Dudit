@@ -1,19 +1,11 @@
 import type React from "react"
+import { formatCurrency, formatPercent } from "@/lib/utils";
 
 interface ProfitMarginDisplayProps {
   cost: number
   sale: number
 }
 
-const formatAsCurrency = (value: number): string => {
-  if (typeof value !== "number" || isNaN(value)) {
-    value = 0
-  }
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value)
-}
 
 export const ProfitMarginDisplay: React.FC<ProfitMarginDisplayProps> = ({ cost, sale }) => {
   const profitValue = sale - cost
@@ -21,7 +13,7 @@ export const ProfitMarginDisplay: React.FC<ProfitMarginDisplayProps> = ({ cost, 
 
   const displayValue =
     profitValue >= 0 && sale > 0
-      ? `${profitMargin.toFixed(2).replace(".", ",")}% (${formatAsCurrency(profitValue)})`
+      ? `${formatPercent(profitMargin)} (${formatCurrency(profitValue)})`
       : "-"
 
   return (

@@ -20,6 +20,7 @@ import CustomerDetailPage from "./CustomerDetailPage"
 import NewCustomerPage from "./NewCustomerPage"
 import { deleteCustomersInBatchAction, toggleCustomersStatusAction } from "@/app/actions/erp/customers"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import { formatCurrency, formatDate } from "@/lib/utils"
 
 // Icons
 import {
@@ -166,7 +167,7 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
                 totalOrderValue: c.total_spent || 0.00,
                 avgOrderValue: 0.00,
                 status: c.status || 'ativo',
-                lastOrderDate: c.last_order_at ? new Date(c.last_order_at).toLocaleDateString('pt-BR') : '-',
+                lastOrderDate: c.last_order_at ? formatDate(c.last_order_at) : '-',
                 rawLastOrderDate: c.last_order_at ? new Date(c.last_order_at).getTime() : 0,
                 storeCredit: c.store_credit || 0,
                 createdAt: c.created_at,
@@ -450,7 +451,7 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
                                                     </div>
                                                     <div className="flex justify-between items-center mt-1">
                                                         <span className="text-[14px] font-bold text-brand-primary">
-                                                            {c.totalOrderValue ? `R$ ${c.totalOrderValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
+                                                            {c.totalOrderValue ? formatCurrency(c.totalOrderValue) : "-"}
                                                         </span>
                                                         <div className="flex items-center gap-4">
                                                             <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">

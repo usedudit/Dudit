@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import JsBarcode from "jsbarcode"
 import { PrinterIcon, DownloadIcon } from "@/lib/icons"
+import { formatCurrency } from "@/lib/utils"
 
 interface Product {
   id: string
@@ -166,7 +167,7 @@ export function LabelPreview({ products, layout, onClose }: LabelPreviewProps) {
                           }}
                         />
                         <div style={{ textAlign: "center", fontSize: "9px", fontWeight: "bold", color: "#333" }}>
-                          R$ {Number(label.price).toFixed(2)}
+                          {formatCurrency(label.price)}
                         </div>
                       </>
                     ) : null}

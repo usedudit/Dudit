@@ -9,6 +9,7 @@ import {
 } from "@/app/actions/marketplace/products"
 import { createSlug } from "@/lib/utils/slugify"
 import { getProductUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
+import { formatCurrency } from "@/lib/utils";
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
 import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
@@ -49,10 +50,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const city = address?.city || "Brasil"
 
   // Formatação de preço para o Meta Tag
-  const priceFormatted = new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL"
-  }).format(product.promotional_price || product.price);
+  const priceFormatted = formatCurrency(product.promotional_price || product.price);
 
   const productUrl = `https://dudit.com.br${getProductUrl(product)}`
 

@@ -11,6 +11,7 @@ import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { Button, Input, FormDropdown, IconPlaceholder, DefaultModal, Separator } from "@/components/reusable"
+import { formatCurrency } from "@/lib/utils";
 import { ShareModal } from "./ShareModal"
 import dynamic from "next/dynamic"
 import { addToCartAction } from "@/app/actions/marketplace/cart"
@@ -51,8 +52,7 @@ const parseVariantAttributes = (variant: any): Record<string, string> => {
   return attrs
 }
 
-const formatMoney = (val: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val)
+const formatMoney = (val: number) => formatCurrency(val);
 
 const slideVariants = {
   enter: (dir: number) => ({ x: dir > 0 ? "100%" : "-100%", opacity: 0 }),

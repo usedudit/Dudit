@@ -5,6 +5,7 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getPartnerServicesCached } from "@/lib/data/services"
 import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { AccessDenied } from "@/components/erp/access-denied"
+import { formatCurrency } from "@/lib/utils"
 
 export const dynamic = "force-dynamic"
 
@@ -49,7 +50,7 @@ export default async function ServicesPage() {
                   {service.description && <p className="text-sm line-clamp-2">{service.description}</p>}
                   <div className="flex justify-between text-sm">
                     <span>Preço:</span>
-                    <span className="font-semibold">R$ {Number(service.price).toFixed(2)}</span>
+                    <span className="font-semibold">{formatCurrency(service.price)}</span>
                   </div>
                   <Button asChild variant="outline" size="sm" className="w-full bg-transparent">
                     <Link href={`/erp/services/${service.id}`} prefetch={false}>Editar</Link>

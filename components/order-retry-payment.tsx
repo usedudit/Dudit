@@ -25,8 +25,6 @@ export function OrderRetryPayment({ orderId, amount, status }: OrderRetryPayment
       setLoading(true)
       setError(null)
 
-      console.log("Fetching payment info for order:", orderId)
-
       // Buscar dados do pagamento do servidor
       const response = await fetch("/api/orders/retry-payment", {
         method: "POST",
@@ -45,7 +43,6 @@ export function OrderRetryPayment({ orderId, amount, status }: OrderRetryPayment
 
       // Se for PIX/Bank Transfer, mostra a modal
       if ((paymentData.paymentMethod === "pix" || paymentData.paymentMethod === "bank_transfer") && paymentData.pixData?.qrCodeBase64) {
-        console.log("Showing PIX modal for payment:", paymentData.paymentId)
         setPixData(paymentData.pixData)
         setBoletoData(null)
         setOrderDetails(paymentData.orderDetails)
@@ -80,8 +77,6 @@ export function OrderRetryPayment({ orderId, amount, status }: OrderRetryPayment
 
   return (
     <>
-
-
       <Button
         onClick={handlePayNow}
         disabled={loading}

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { LabelPreview } from "./label-preview"
 import { PrinterIcon } from "@/lib/icons"
+import { formatCurrency } from "@/lib/utils"
 
 interface Product {
   id: string
@@ -98,7 +99,7 @@ export function LabelGenerator({ products }: { products: Product[] }) {
                       <label htmlFor={product.id} className="flex-1 cursor-pointer text-sm">
                         <p className="font-medium">{product.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          SKU: {product.sku || "—"} | R$ {Number(product.price).toFixed(2)}
+                          SKU: {product.sku || "—"} | {formatCurrency(product.price)}
                         </p>
                       </label>
                     </div>

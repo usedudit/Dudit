@@ -35,6 +35,7 @@ import {
     SearchIcon,
     FilterIcon
 } from "@/lib/icons"
+import { formatCurrency } from "@/lib/utils"
 
 // --- Utils & Constants ---
 const SPLIT_SEPARATOR = " / "
@@ -101,7 +102,7 @@ const VariationRow = React.memo(({ item, isSelected, isEditing, onSelect, onTogg
             </td>
             <td className="p-3 border-b border-brand-border dark:border-dark-border">
                 <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-                    {item.price ? `R$ ${Number(item.price).toFixed(2)}` : "-"}
+                    {item.price ? formatCurrency(item.price) : "-"}
                 </span>
             </td>
             <td className="p-3 border-b border-brand-border dark:border-dark-border">
@@ -176,7 +177,7 @@ const VariationMobileItem = React.memo(({ item, isSelected, isEditing, onSelect,
                     <div className="flex items-end justify-between gap-2 mt-0.5">
                         <div className="flex items-center gap-2">
                             <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
-                                {item.price ? `R$ ${Number(item.price).toFixed(2)}` : "R$ 0,00"}
+                                {formatCurrency(item.price || 0)}
                             </span>
                             <span className="text-brand-inactive-text dark:text-dark-border">•</span>
                             <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">

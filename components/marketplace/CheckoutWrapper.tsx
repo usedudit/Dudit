@@ -16,6 +16,7 @@ import { getAddressesAction, createAddressAction } from "@/app/actions/shared/ad
 import { useSupabase } from "@/providers/supabase-provider"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import Link from "next/link"
+import { formatCurrency } from "@/lib/utils"
 
 interface ProductItem {
     id: string
@@ -517,12 +518,12 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                                                         <div
                                                                             key={address.id}
                                                                             onClick={() => handleAddressSelect(address.id)}
-                                                                            className={`flex items-start gap-3 p-4 border rounded-xl transition-all cursor-pointer ${selectedAddressId === address.id
+                                                                            className={`flex items-start border py-4 rounded-xl transition-all cursor-pointer ${selectedAddressId === address.id
                                                                                 ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
                                                                                 : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
                                                                                 }`}
                                                                         >
-                                                                            <div className="mt-0.5 flex-shrink-0">
+                                                                            <div className="mt-2.5 flex-shrink-0">
                                                                                 <RadioButton
                                                                                     name="addressSelect"
                                                                                     value={address.id}
@@ -732,7 +733,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                                     )}
                                                     <div className="flex items-center justify-between">
                                                         <span className="text-xs text-brand-inactive-text font-medium">Qtd: {quantities[item.id] || item.quantity}</span>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">R$ {(item.price * (quantities[item.id] || item.quantity)).toFixed(2)}</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{formatCurrency(item.price * (quantities[item.id] || item.quantity))}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -746,7 +747,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                     <div className="space-y-3 mb-4">
                                         <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
                                             <span>Total dos itens</span>
-                                            <span className="text-brand-dark dark:text-dark-heading">R$ {totalAmount.toFixed(2)}</span>
+                                            <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
                                         </div>
                                         <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
                                             <span>Entrega</span>
@@ -760,7 +761,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
 
                                     <div className="flex justify-between items-end mb-4">
                                         <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">Total</span>
-                                        <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">R$ {totalAmount.toFixed(2)}</span>
+                                        <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
                                     </div>
 
                                     <Button
@@ -768,7 +769,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                         disabled={isLoading}
                                         className="w-full h-[46px]"
                                     >
-                                        {isLoading ? "Processando..." : `Finalizar pedido • R$ ${totalAmount.toFixed(2)}`}
+                                        {isLoading ? "Processando..." : `Finalizar pedido • ${formatCurrency(totalAmount)}`}
                                     </Button>
                                 </div>
                             </div>
@@ -791,7 +792,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                             disabled={isLoading}
                             className={`flex-2 h-12 ${isLoading ? "opacity-80" : ""}`}
                         >
-                            {isLoading ? "Processando..." : `Finalizar pedido • R$ ${totalAmount.toFixed(2)}`}
+                            {isLoading ? "Processando..." : `Finalizar pedido • ${formatCurrency(totalAmount)}`}
                         </Button>
                     </div>
                 </div>

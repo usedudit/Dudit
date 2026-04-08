@@ -17,6 +17,7 @@ import QuantitySelector from '@/components/reusable/QuantitySelector';
 import { Button, Input, TabsContent, FormDropdown, MoneyInput, PercentageInput, DatePicker, ThreeDotsLoader } from '@/components/reusable';
 import IconPlaceholder from '@/components/reusable/IconPlaceholder';
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
+import { formatCurrency } from "@/lib/utils";
 
 interface QuoteEditorProps {
     searchQuery: string;
@@ -142,7 +143,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                         <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</div>
                                                         <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">SKU: {product.sku}</div>
                                                     </div>
-                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">R$ {product.price}</div>
+                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(product.price)}</div>
                                                     {product.variants && product.variants.length > 0 && (
                                                         <div className="px-2 py-0.5 bg-gray-100 dark:bg-zinc-700 text-[10px] font-bold rounded text-brand-inactive-text uppercase">
                                                             Opções
@@ -217,7 +218,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                 </td>
                                                 <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right">
                                                     <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price * item.qty)}
+                                                        {formatCurrency(item.price * item.qty)}
                                                     </span>
                                                 </td>
                                                 {!props.isReadOnly && (
@@ -284,12 +285,12 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                     </h4>
                                                 )}
                                                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading flex-shrink-0">
-                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price * item.qty)}
+                                                    {formatCurrency(item.price * item.qty)}
                                                 </span>
                                             </div>
                                             <div className="flex items-center justify-between">
                                                 <p className="text-[11px] font-medium text-brand-inactive-text pr-2 truncate">
-                                                    {item.sku || 'Sem SKU'} • {item.qty} un • {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}
+                                                    {item.sku || 'Sem SKU'} • {item.qty} un • {formatCurrency(item.price)}
                                                 </p>
                                                 {!props.isReadOnly && (
                                                     <div className="flex items-center gap-1">

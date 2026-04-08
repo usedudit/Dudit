@@ -3,6 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
+import { formatCurrency } from "@/lib/utils";
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 interface ColumnDef {
@@ -63,14 +64,14 @@ const CustomerListItem = React.memo(
         case "total_spent":
           return (
             <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-              {customer.totalOrderValue ? `R$ ${customer.totalOrderValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
+              {customer.totalOrderValue ? formatCurrency(customer.totalOrderValue) : "-"}
             </span>
           )
 
         case "store_credit":
           return (
             <span className={`text-[13px] font-bold ${customer.storeCredit > 0 ? 'text-brand-primary' : 'text-brand-inactive-text'}`}>
-              {customer.storeCredit ? `R$ ${customer.storeCredit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
+              {customer.storeCredit ? formatCurrency(customer.storeCredit) : "-"}
             </span>
           )
 

@@ -12,21 +12,8 @@ import { CheckCircleIcon, AlertCircleIcon, X, ClockIcon, Package } from '@/lib/i
 import { MyOrderDetailPage } from './MyOrderDetailPage';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getProductUrl } from "@/lib/utils/url-generator";
+import { formatCurrency, formatFullDate } from "@/lib/utils";
 
-function formatDateToBrazil(dateString: string): string {
-    const date = new Date(dateString)
-    // Subtraindo 3 horas (UTC-3 é o horário padrão do Brasil)
-    const brazilDate = new Date(date.getTime() - 3 * 60 * 60 * 1000)
-
-    const day = String(brazilDate.getDate()).padStart(2, "0")
-    const monthNames = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
-    const month = monthNames[brazilDate.getMonth()]
-    const year = brazilDate.getFullYear()
-    const hours = String(brazilDate.getHours()).padStart(2, "0")
-    const minutes = String(brazilDate.getMinutes()).padStart(2, "0")
-
-    return `${day} de ${month} de ${year} às ${hours}:${minutes}`
-}
 
 const getStatusConfig = (status: string) => {
     switch (status) {
@@ -48,7 +35,7 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
         const tab = searchParams.get('tab');
         const orderNum = searchParams.get('order_number');
         if (tab === 'details' && orderNum) {
-            const orderFound = orders?.find((o: any) => o.order_number === orderNum);
+            const orderFound = orders?.find((o: any) => o.order_number === orderNum || o.id === orderNum);
             if (orderFound) {
                 setActiveOrderId(orderFound.id);
             }
@@ -60,18 +47,18 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
     const handleOpenDetails = (id: string, orderNumber: string) => {
         setActiveOrderId(id);
         const displayNum = orderNumber || id;
-        window.history.pushState(null, '', `?tab=details&order_number=${displayNum}`);
+        router.push(`?tab=details&order_number=${displayNum}`, { scroll: false });
     };
 
     const handleCloseDetails = () => {
         setActiveOrderId(null);
-        window.history.pushState(null, '', window.location.pathname);
+        router.push(window.location.pathname, { scroll: false });
     };
 
     const activeOrder = orders?.find((o: any) => o.id === activeOrderId);
 
     return (
-        <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-6 max-w-[1300px] w-full pt-6 md:pt-10 pb-20 mt-[68px] lg:mt-[108px] relative overflow-hidden">
+        <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-6 max-w-[1300px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
             <AnimatePresence mode="wait">
                 {activeOrderId && activeOrder ? (
                     <MyOrderDetailPage key="details" order={activeOrder} onBack={handleCloseDetails} />
@@ -122,7 +109,7 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                     <div>
                                                         {/* Date Top */}
                                                         <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                                            {formatDateToBrazil(order.created_at)}
+                                                            {formatFullDate(order.created_at)}
                                                         </h3>
                                                         {/* Order ID & Store Name Bottom */}
                                                         <div className="text-xs text-brand-inactive-text flex items-center gap-1 mt-0.5">
@@ -139,9 +126,7 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                 <div className="flex items-center justify-center md:justify-end gap-3 md:gap-6 w-full md:w-auto">
                                                     <div className="flex flex-col items-end">
                                                         <span className="text-xs font-medium text-brand-inactive-text md:block hidden">Total</span>
-                                                        <span className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight">
-                                                            R$ {Number(order.total_amount).toFixed(2)}
-                                                        </span>
+                                                            {formatCurrency(order.total_amount)}
                                                     </div>
                                                     <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold ${statusConfig.bg} ${statusConfig.color} ${statusConfig.border} dark:bg-opacity-20`}>
                                                         <StatusIcon size={14} />
@@ -185,7 +170,7 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                                             <div className="flex items-center gap-2 text-xs mt-1">
                                                                                 <span className="text-brand-inactive-text">{item.quantity} un.</span>
                                                                                 <span className="text-brand-border dark:text-dark-border">|</span>
-                                                                                <span className="font-medium text-brand-dark dark:text-dark-heading">R$ {Number(item.product_price).toFixed(2)}</span>
+                                                                                <span className="font-medium text-brand-dark dark:text-dark-heading">{formatCurrency(item.product_price)}</span>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -220,9 +205,8 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                         <Button
                                                             onClick={() => handleOpenDetails(order.id, order.order_number)}
                                                             variant="outline"
-                                                            className="rounded-[10px] border-brand-border text-brand-dark hover:bg-brand-gray flex-1 sm:flex-initial sm:w-auto order-1"
+                                                            className="flex-1 sm:flex-initial sm:w-auto order-1"
                                                         >
-                                                            <Package size={16} className="mr-2" /> Detalhes
                                                         </Button>
 
                                                         {order.situation === 'pending' && (

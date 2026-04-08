@@ -2,6 +2,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { revalidateOrders } from "@/lib/utils/revalidation"
+import { formatDateTime } from "@/lib/utils/formatters"
 import { requireUser, requirePartnerAccess } from "@/lib/auth/authorization"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -324,7 +325,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
             if (currentOrders) {
                 for (const order of currentOrders) {
-                    const timestamp = new Date().toLocaleString('pt-BR')
+                    const timestamp = formatDateTime(new Date())
                     const log = `\n\nPedido cancelado por: ${effectiveUserName} às ${timestamp} - ${payload.cancelReason}`
                     const newNotes = (order.notes || "") + log
 

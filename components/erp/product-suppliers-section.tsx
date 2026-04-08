@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { PlusIcon, TrashIcon, Store } from "@/lib/icons"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { formatCurrency } from "@/lib/utils"
 
 interface Supplier {
   id: string
@@ -170,7 +171,7 @@ export function ProductSuppliersSection({
               <div className="flex-1">
                 <p className="font-medium text-sm">{supplier.supplierName}</p>
                 <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
-                  {supplier.costPrice && <span>R$ {supplier.costPrice.toFixed(2)}</span>}
+                  {supplier.costPrice && <span>{formatCurrency(supplier.costPrice)}</span>}
                   {supplier.supplierSku && <span>SKU: {supplier.supplierSku}</span>}
                   {supplier.leadTimeDays && <span>{supplier.leadTimeDays} dias</span>}
                 </div>

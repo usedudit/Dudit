@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { TrashIcon, ChevronRightIcon } from '@/lib/icons';
+import { formatCurrency } from '@/lib/utils';
 
 // Scalloped edge specifically for the receipt bottom
 export const ReceiptScallopEdge = () => (
@@ -119,7 +120,7 @@ export const ReceiptContent = ({ cart, subTotal, shippingFee = 0, otherCosts = 0
                         </span>
                     </div>
                     <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unitPrice * item.quantity)}
+                        {formatCurrency(item.unitPrice * item.quantity)}
                     </span>
                 </div>
             ))}
@@ -131,7 +132,7 @@ export const ReceiptContent = ({ cart, subTotal, shippingFee = 0, otherCosts = 0
                 <div className="flex justify-between items-center text-[14px]">
                     <span className="text-gray-500 dark:text-gray-400 font-medium">Itens ({itemCount})</span>
                     <span className="font-bold text-brand-dark dark:text-dark-heading">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subTotal)}
+                        {formatCurrency(subTotal)}
                     </span>
                 </div>
 
@@ -139,7 +140,7 @@ export const ReceiptContent = ({ cart, subTotal, shippingFee = 0, otherCosts = 0
                     <div className="flex justify-between items-center text-[14px]">
                         <span className="text-gray-500 dark:text-gray-400 font-medium">Desconto</span>
                         <span className="font-bold text-brand-red">
-                            -{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(discountAmount)}
+                            -{formatCurrency(discountAmount)}
                         </span>
                     </div>
                 )}
@@ -148,7 +149,7 @@ export const ReceiptContent = ({ cart, subTotal, shippingFee = 0, otherCosts = 0
                     <div className="flex justify-between items-center text-[14px]">
                         <span className="text-gray-500 dark:text-gray-400 font-medium">Frete</span>
                         <span className="font-bold text-brand-dark dark:text-dark-heading">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(shippingFee)}
+                            {formatCurrency(shippingFee)}
                         </span>
                     </div>
                 )}
@@ -157,7 +158,7 @@ export const ReceiptContent = ({ cart, subTotal, shippingFee = 0, otherCosts = 0
                     <div className="flex justify-between items-center text-[14px]">
                         <span className="text-gray-500 dark:text-gray-400 font-medium">Outros Custos</span>
                         <span className="font-bold text-brand-dark dark:text-dark-heading">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(otherCosts)}
+                            {formatCurrency(otherCosts)}
                         </span>
                     </div>
                 )}
@@ -166,7 +167,7 @@ export const ReceiptContent = ({ cart, subTotal, shippingFee = 0, otherCosts = 0
             <div className="flex justify-between items-center">
                 <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total</span>
                 <span className="font-black text-2xl text-brand-dark dark:text-dark-heading tracking-tight">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}
+                    {formatCurrency(total)}
                 </span>
             </div>
         </div>

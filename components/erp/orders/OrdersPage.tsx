@@ -29,6 +29,7 @@ import {
     BlockedIcon
 } from "@/lib/icons"
 import { useRouter } from "next/navigation"
+import { formatCurrency, formatDate } from "@/lib/utils"
 
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import AlertModal from "../../reusable/AlertModal"
@@ -177,7 +178,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     statusLabel: statusInfo.label,
                     statusColor: statusInfo.color,
                     isUnfulfilled: (o.situation === "pending" || o.situation === "in_process"),
-                    formattedDate: new Date(o.order_date || o.created_at).toLocaleDateString('pt-BR'),
+                    formattedDate: formatDate(o.order_date || o.created_at),
                     store_name: o.stores?.name || "-",
                     items_count: o.order_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || o.quantity || 0,
                     created_at_time: new Date(o.order_date || o.created_at).getTime(),
@@ -546,7 +547,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                                                 </span>
                                                                 <span className="text-gray-300 dark:text-gray-600 font-medium font-bold">•</span>
                                                                 <span className="font-bold text-brand-primary">
-                                                                    R$ {Number(o.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                                    {formatCurrency(o.total_amount)}
                                                                 </span>
 
                                                                 <div className="flex-none ml-auto -mb-1" onClick={(e) => e.stopPropagation()}>

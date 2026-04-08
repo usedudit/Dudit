@@ -9,6 +9,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import Link from "next/link"
 import { fetchJSONWithCSRF } from "@/lib/utils/fetch-with-csrf"
+import { formatCurrency } from "@/lib/utils"
 
 interface OrderDetailItem {
     id: string
@@ -507,8 +508,7 @@ export function PaymentWrapper({
                                         )}
                                     </div>
                                     <div className="mt-4 flex flex-col items-center">
-                                        <span className="text-xs text-brand-inactive-text">Total a pagar</span>
-                                        <span className="text-2xl font-bold text-brand-dark">R$ {amount.toFixed(2)}</span>
+                                        <span className="text-2xl font-bold text-brand-dark">{formatCurrency(amount)}</span>
                                     </div>
                                 </div>
                             )}
@@ -613,10 +613,7 @@ export function PaymentWrapper({
                                         </Button>
                                     )}
                                 </div>
-                                <div className="flex flex-col items-center justify-center bg-brand-gray/30 p-4 rounded-xl border border-brand-border mb-6">
-                                    <span className="text-xs text-brand-inactive-text">Total a pagar</span>
-                                    <span className="text-2xl font-bold text-brand-dark">R$ {amount.toFixed(2)}</span>
-                                </div>
+                                    <span className="text-2xl font-bold text-brand-dark">{formatCurrency(amount)}</span>
 
                                 <InfoCard
                                     message="A aprovação pode levar de 1 a 2 dias úteis. Pagamentos realizados em fins de semana ou feriados serão analisados no próximo dia útil."
@@ -677,11 +674,9 @@ export function PaymentWrapper({
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <h4 className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">{item.name}</h4>
-                                                    <p className="text-xs text-brand-inactive-text">{item.quantity}x R$ {item.price.toFixed(2)}</p>
+                                                    <p className="text-xs text-brand-inactive-text">{item.quantity}x {formatCurrency(item.price)}</p>
                                                 </div>
-                                                <div className="font-bold text-sm text-brand-dark shrink-0">
-                                                    R$ {(item.quantity * item.price).toFixed(2)}
-                                                </div>
+                                                    {formatCurrency(item.quantity * item.price)}
                                             </div>
                                         ))}
                                     </div>
@@ -703,10 +698,7 @@ export function PaymentWrapper({
                                     </>
                                 )}
 
-                                <div className="flex items-center justify-between">
-                                    <span className="font-bold text-gray-600 dark:text-gray-300">Valor Total Pago</span>
-                                    <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">R$ {amount.toFixed(2)}</span>
-                                </div>
+                                    <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(amount)}</span>
                             </div>
 
                             <div className="flex justify-center">

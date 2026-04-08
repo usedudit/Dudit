@@ -5,6 +5,8 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export * from "./utils/formatters"
+
 /**
  * Generates a display name from email address
  * Extracts the first part before @ and capitalizes it

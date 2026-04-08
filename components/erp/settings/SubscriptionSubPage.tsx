@@ -34,6 +34,7 @@ import {
   upgradeSubscriptionAction,
 } from "@/app/actions/subscriptions"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { formatCurrency, formatDate } from "@/lib/utils"
 
 // ─── Feature & Limit Label Maps ────────────────────────────────────────────
 
@@ -136,16 +137,13 @@ function buildFeaturesDisplay(features: string[], tierSlug: string, allPlans: an
   ]
 }
 
-function formatPrice(price: number): string {
-  if (price <= 0) return "0"
-  return price.toFixed(2).replace(".", ",")
-}
+// Removed local formatPrice in favor of formatCurrency
 
 // ─── Plan Card ─────────────────────────────────────────────────────────────
 
 interface PlanCardProps {
   name: string
-  price: string
+  price: number
   features: string[]
   limits: string[]
   popular: boolean
@@ -187,9 +185,8 @@ const PlanCard: React.FC<PlanCardProps> = ({
         {name}
       </h3>
       <div className="flex items-baseline gap-1 mt-4">
-        <span className={`text-sm ${popular ? "text-brand-inactive-text/80" : "text-brand-inactive-text"}`}>R$</span>
-        <span className={`text-5xl font-bold ${popular ? "text-white" : "text-brand-dark dark:text-dark-heading"}`}>
-          {price}
+        <span className={`text-4xl font-bold ${popular ? "text-white" : "text-brand-dark dark:text-dark-heading"}`}>
+          {formatCurrency(price)}
         </span>
         <span className={`text-sm ${popular ? "text-brand-inactive-text/80" : "text-brand-inactive-text"}`}>/mês</span>
       </div>
@@ -248,7 +245,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
             <Loader2 size={16} className="animate-spin mr-2" />
           ) : isDowngrade ? (
             "Fazer downgrade"
-          ) : price === "0" ? (
+          ) : price === 0 ? (
             "Começar Grátis"
           ) : (
             <>
@@ -549,7 +546,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                       {subData.subscription?.cancel_at_period_end && " · Cancelamento agendado"}
                       {!subData.subscription && "Plano gratuito"}
                       {subData.subscription?.current_period_end && (
-                        <> · Renova em {new Date(subData.subscription.current_period_end).toLocaleDateString("pt-BR")}</>
+                        <> · Renova em {formatDate(subData.subscription.current_period_end)}</>
                       )}
                     </p>
                   </div>
@@ -586,7 +583,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                     <PlanCard
                       key={plan.id}
                       name={plan.name}
-                      price={formatPrice(plan.price)}
+                      price={plan.price}
                       features={buildFeaturesDisplay(plan.features_json || [], plan.slug, plans)}
                       limits={buildLimitsDisplay(plan.limits_json || {})}
                       popular={isPopular}

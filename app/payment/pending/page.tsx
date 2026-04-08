@@ -4,6 +4,7 @@ import { Button } from "@/components/reusable"
 import Link from "next/link"
 import { ClockIcon } from "@/lib/icons"
 import { redirect } from "next/navigation"
+import { formatCurrency } from "@/lib/utils"
 
 export default async function PaymentPendingPage({
   searchParams,
@@ -35,7 +36,7 @@ export default async function PaymentPendingPage({
             <div className="bg-muted p-4 rounded-lg space-y-2">
               <p className="text-sm text-muted-foreground">Número do Pedido</p>
               <p className="text-2xl font-bold">{order.order_number}</p>
-              <p className="text-lg">Total: R$ {Number(order.total_amount).toFixed(2)}</p>
+              <p className="text-lg">Total: {formatCurrency(order.total_amount)}</p>
             </div>
           )}
 

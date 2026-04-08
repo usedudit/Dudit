@@ -15,6 +15,7 @@ import {
 } from "@/lib/icons"
 import QuantitySelector from "@/components/reusable/QuantitySelector"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { formatCurrency } from "@/lib/utils"
 
 interface OrderGeneralTabProps {
     // Items state
@@ -177,7 +178,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                         <div className="text-xs text-brand-inactive-text dark:text-dark-body">SKU: {product.sku}</div>
                                                     </div>
                                                     <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.price)}
+                                                        {formatCurrency(product.price)}
                                                     </div>
                                                 </div>
                                             ))
@@ -258,7 +259,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                     </td>
                                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right">
                                                         <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unitPrice * item.quantity)}
+                                                            {formatCurrency(item.unitPrice * item.quantity)}
                                                         </span>
                                                     </td>
                                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
@@ -338,12 +339,12 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                         </h4>
                                                     )}
                                                     <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading flex-shrink-0">
-                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unitPrice * item.quantity)}
+                                                        {formatCurrency(item.unitPrice * item.quantity)}
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center justify-between">
                                                     <p className="text-[11px] font-medium text-brand-inactive-text pr-2 truncate">
-                                                        {item.isEditing ? (item.sku ? `${item.sku} • ` : '') : `${item.sku || 'Sem SKU'} • `}{item.quantity} un • {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unitPrice)}
+                                                        {item.isEditing ? (item.sku ? `${item.sku} • ` : '') : `${item.sku || 'Sem SKU'} • `}{item.quantity} un • {formatCurrency(item.unitPrice)}
                                                     </p>
                                                     <div className="flex items-center gap-1">
                                                         {item.isEditing ? (
@@ -493,7 +494,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             <div className="flex justify-between items-center text-[15px]">
                                 <span className="text-brand-inactive-text font-medium">Subtotal</span>
                                 <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}
+                                    {formatCurrency(subtotal)}
                                 </span>
                             </div>
 
@@ -501,7 +502,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 <div className="flex justify-between items-center text-[15px]">
                                     <span className="text-brand-inactive-text font-medium">Desconto</span>
                                     <span className="font-bold text-brand-red">
-                                        -{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(discountAmount)}
+                                        -{formatCurrency(discountAmount)}
                                     </span>
                                 </div>
                             )}
@@ -510,7 +511,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 <div className="flex justify-between items-center text-[15px]">
                                     <span className="text-brand-inactive-text font-medium">Frete</span>
                                     <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(shippingFee))}
+                                        {formatCurrency(shippingFee)}
                                     </span>
                                 </div>
                             )}
@@ -519,7 +520,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 <div className="flex justify-between items-center text-[15px]">
                                     <span className="text-brand-inactive-text font-medium">Outros Custos</span>
                                     <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(otherCosts))}
+                                        {formatCurrency(otherCosts)}
                                     </span>
                                 </div>
                             )}
@@ -528,7 +529,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 <div className="flex justify-between items-end">
                                     <span className="text-xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">Total a Pagar</span>
                                     <span className="text-[32px] font-bold text-brand-dark dark:text-dark-heading leading-none tracking-tighter">
-                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}
+                                        {formatCurrency(totalAmount)}
                                     </span>
                                 </div>
                             </div>

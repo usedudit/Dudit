@@ -16,28 +16,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/reusable'
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url'
 import Link from 'next/link'
-import { QrCodeIcon } from 'lucide-react'
 import { getProductUrl, getPartnerUrl } from '@/lib/utils/url-generator'
+import { formatFullDate, formatShortDate, formatCurrency } from '@/lib/utils'
 
-// Formata Data em Timezone do Brasil
-function formatFullDate(dateString: string): string {
-    const date = new Date(dateString)
-    return new Intl.DateTimeFormat('pt-BR', {
-        day: '2-digit', month: 'long', year: 'numeric',
-        hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo'
-    }).format(date)
-}
-
-function formatShortDate(dateString: string): string {
-    const date = new Date(dateString)
-    return new Intl.DateTimeFormat('pt-BR', {
-        day: '2-digit', month: 'long', timeZone: 'America/Sao_Paulo'
-    }).format(date)
-}
-
-function formatMoney(amount: number): string {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount)
-}
+// Refactored to use centralized formatters
 
 // ---------------------------------------------------------------------------------
 // MODAL DE DETALHES DE ENVIO
@@ -242,7 +224,7 @@ export const OrderDetailsClient = ({ order }: { order: any }) => {
                                                 <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-brand-inactive-text">
                                                     <span className="font-medium bg-brand-gray px-2 py-0.5 rounded-full">{item.quantity} un.</span>
                                                     <span className="text-brand-border hidden sm:block">|</span>
-                                                    <span className="font-bold text-brand-dark">R$ {Number(item.product_price).toFixed(2)} / un</span>
+                                                    <span className="font-bold text-brand-dark">{formatCurrency(item.product_price)} / un</span>
                                                     <span className="text-brand-border">|</span>
                                                     <Link href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)} prefetch={false} className="text-brand-green font-medium cursor-pointer hover:underline">
                                                         Acessar página do produto
@@ -328,7 +310,7 @@ export const OrderDetailsClient = ({ order }: { order: any }) => {
                             <div className="space-y-3 pb-6 border-b border-brand-border mb-6">
                                 <div className="flex justify-between text-[14px] text-brand-inactive-text">
                                     <span>Produtos ({order.order_items?.length || 0})</span>
-                                    <span className="text-brand-dark font-medium">{formatMoney(productsSubtotal)}</span>
+                                    <span className="text-brand-dark font-medium">{formatCurrency(productsSubtotal)}</span>
                                 </div>
                                 {!isDelivery ? (
                                     <div className="flex justify-between text-[14px] text-brand-inactive-text">
@@ -339,7 +321,7 @@ export const OrderDetailsClient = ({ order }: { order: any }) => {
                                     shippingAmount > 0 ? (
                                         <div className="flex justify-between text-[14px] text-brand-inactive-text">
                                             <span>Frete</span>
-                                            <span className="text-brand-dark font-medium">{formatMoney(shippingAmount)}</span>
+                                            <span className="text-brand-dark font-medium">{formatCurrency(shippingAmount)}</span>
                                         </div>
                                     ) : (
                                         <div className="flex justify-between text-[14px] text-brand-inactive-text">
@@ -352,7 +334,7 @@ export const OrderDetailsClient = ({ order }: { order: any }) => {
 
                             <div className="flex justify-between items-end mb-1">
                                 <span className="text-[15px] font-bold text-brand-dark">Pagamento Total</span>
-                                <span className="font-bold text-xl md:text-2xl text-brand-dark">{formatMoney(totalAmount)}</span>
+                                <span className="font-bold text-xl md:text-2xl text-brand-dark">{formatCurrency(totalAmount)}</span>
                             </div>
 
                             <div className="border-t border-brand-border my-6"></div>
@@ -361,7 +343,7 @@ export const OrderDetailsClient = ({ order }: { order: any }) => {
                             <div className="mb-4">
                                 <h4 className="font-bold text-[14px] text-brand-dark mb-3 uppercase tracking-wide">Pagamento</h4>
                                 <InfoCard
-                                    icon={paymentMethodLabel === 'Pix' ? QrCodeIcon : CreditCardIcon}
+                                    icon={paymentMethodLabel === 'Pix' ? QRCodeIcon : CreditCardIcon}
                                     title={`Pagamento via ${paymentMethodLabel}`}
                                     description={isPaid ? 'Aprovado' : 'Pendente'}
                                 />

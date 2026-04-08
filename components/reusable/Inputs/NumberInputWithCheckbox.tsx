@@ -94,7 +94,11 @@ export const NumberInputWithCheckbox: React.FC<
               checked={noNumber}
               onChange={(e) => onNoNumberChange(e.target.checked)}
               disabled={disabled}
-              className="custom-checkbox"
+              className={`
+                custom-checkbox
+                !border
+                ${noNumber ? "!border-brand-green" : "!border-brand-border dark:!border-dark-border"}
+              `}
             />
             <span>Sem nº</span>
           </label>

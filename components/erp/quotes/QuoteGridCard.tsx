@@ -4,6 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
 import { ClockIcon, FileIcon } from "@/lib/icons"
+import { formatCurrency } from "@/lib/utils";
 
 interface QuoteGridCardProps {
     quote: any
@@ -36,7 +37,7 @@ const QuoteGridCard = React.memo(
                 <div className="flex gap-4 mb-2">
                     {/* Visual Indicator */}
                     <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                        <FileIcon className="w-6 h-6 text-brand-dark dark:text-dark-heading" />
+                        <FileIcon className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -73,7 +74,7 @@ const QuoteGridCard = React.memo(
                             </span>
                             <span className="text-brand-inactive-text dark:text-dark-body">•</span>
                             <span className="text-sm font-bold text-brand-primary">
-                                R$ {Number(quote.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                {formatCurrency(quote.total_amount)}
                             </span>
                         </div>
                     </div>

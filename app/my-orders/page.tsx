@@ -20,7 +20,7 @@ export default async function MyOrdersPage() {
     .from("orders")
     .select(`
       *,
-      partners(store_name, store_image_url),
+      partners(store_name, store_image_url, addresses(city, state)),
       order_items(*, product_variants(variant_name, variant_options), products(name, images))
     `)
     .eq("buyer_id", userData.user.id)

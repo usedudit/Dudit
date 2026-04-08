@@ -6,6 +6,7 @@ import Link from "next/link"
 import { createSlug } from "@/lib/utils/slugify"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getProductUrl } from "@/lib/utils/url-generator"
+import { formatCurrency } from "@/lib/utils";
 
 const HOME_BANNERS = [
   { id: 1, src: 'https://img.dudit.com.br/static/banners/Banner-1.png', alt: 'Venda aqui' },
@@ -239,11 +240,11 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product }) => {
           <div className="flex flex-col">
             {product.originalPrice && (
               <span className="text-xs text-gray-400 line-through mb-0.5">
-                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.originalPrice)}
+                {formatCurrency(product.originalPrice)}
               </span>
             )}
             <span className="text-base md:text-lg font-bold text-brand-dark">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(product.price))}
+              {formatCurrency(product.price)}
             </span>
           </div>
 

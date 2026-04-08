@@ -16,6 +16,7 @@ import { Button, Checkbox, IconPlaceholder, AlertModal, DefaultModal } from "@/c
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
+import { formatCurrency } from "@/lib/utils"
 
 interface CartPageClientProps {
   itemsByPartner: any
@@ -278,7 +279,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
     <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
       <MarketplaceHeader />
 
-      <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-6 max-w-[1300px] w-full pt-6 md:pt-10 pb-20 mt-[68px] lg:mt-[108px]">
+      <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-6 max-w-[1300px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
         <div className="flex items-center mb-8">
           <div>
             <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Minha sacola</h1>
@@ -330,7 +331,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                             <img
                               src={getImageUrl(sellerImage) || "https://img.dudit.com.br/static/Placeholder.png"}
                               alt={data.partner?.store_name}
-                              className="w-6 h-6 rounded-full object-cover"
+                              className="bg-white border border-brand-border w-6 h-6 rounded-full object-cover"
                               onClick={e => { e.stopPropagation(); router.push(getPartnerUrl(data.partner)) }}
                             />
                             <h3
@@ -414,7 +415,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                             <span className="w-7 text-center text-[13px] font-medium">{itemQty}</span>
                                             <button onClick={() => updateQty(item.id, 1, itemQty)} className="w-8 h-full flex items-center justify-center hover:bg-brand-gray" disabled={loading === item.id}><PlusIcon size={13} /></button>
                                           </div>
-                                          <span className="text-[15px] font-semibold text-brand-dark">R$ {(getItemPrice(item) * itemQty).toFixed(2)}</span>
+                                          <span className="text-[15px] font-semibold text-brand-dark">{formatCurrency(getItemPrice(item) * itemQty)}</span>
                                         </div>
                                       </div>
                                     </div>
@@ -452,7 +453,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                               {item.product_variants.variant_type}: <span className="font-medium text-brand-dark">{item.product_variants.variant_name}</span>
                                             </p>
                                           )}
-                                          <p className="text-[15px] font-semibold text-brand-dark">R$ {getItemPrice(item).toFixed(2)}</p>
+                                          <p className="text-[15px] font-semibold text-brand-dark">{formatCurrency(getItemPrice(item))}</p>
                                         </div>
 
                                         <div className="flex items-center justify-end gap-4">
@@ -461,7 +462,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                             <span className="w-8 text-center text-[14px] font-medium">{itemQty}</span>
                                             <button onClick={() => updateQty(item.id, 1, itemQty)} className="w-9 h-full flex items-center justify-center hover:bg-brand-gray" disabled={loading === item.id}><PlusIcon size={14} /></button>
                                           </div>
-                                          <div className="text-right min-w-[80px] font-semibold">R$ {(getItemPrice(item) * itemQty).toFixed(2)}</div>
+                                          <div className="text-right min-w-[80px] font-semibold">{formatCurrency(getItemPrice(item) * itemQty)}</div>
                                           <button onClick={() => setDeleteModal({ open: true, cartItemId: item.id })} className="text-brand-red p-2 hover:bg-brand-red/15 rounded-full transition-colors" disabled={loading === item.id}><TrashIcon size={18} /></button>
                                         </div>
                                       </div>
@@ -474,7 +475,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                               <div className="mt-4 pt-4 border-t border-brand-border md:hidden space-y-3">
                                 <div className="flex justify-between items-center text-sm">
                                   <span className="text-brand-inactive-text">Total dos itens</span>
-                                  <span className="font-semibold">R$ {partnerSelectedTotal.toFixed(2)}</span>
+                                  <span className="font-semibold">{formatCurrency(partnerSelectedTotal)}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm">
                                   <span className="text-brand-inactive-text">Entrega</span>
@@ -483,7 +484,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                 <div className="h-[1px] bg-gray-100 w-full" />
                                 <div className="flex justify-between items-center text-base font-bold text-brand-dark">
                                   <span>Total</span>
-                                  <span>R$ {partnerSelectedTotal.toFixed(2)}</span>
+                                  <span>{formatCurrency(partnerSelectedTotal)}</span>
                                 </div>
                                 <Button
                                   onClick={() => handleOpenCheckout(partnerId)}
@@ -515,7 +516,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                       <div className="border border-brand-border rounded-[12px] overflow-hidden bg-white dark:bg-dark-surface sticky top-[100px]">
                         <div className="bg-brand-gray px-6 py-4 border-b border-brand-border font-bold text-brand-dark">
                           Resumo do Pedido{!expanded && partnerSelectedTotal > 0 && (
-                            <span className="text-brand-green font-semibold ml-1">(R$ {partnerSelectedTotal.toFixed(2)})</span>
+                            <span className="text-brand-green font-semibold ml-1">({formatCurrency(partnerSelectedTotal)})</span>
                           )}
                         </div>
 
@@ -532,7 +533,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                               <div className="p-6 space-y-4">
                                 <div className="flex justify-between items-center text-sm font-medium">
                                   <span className="text-brand-inactive-text">Total dos itens</span>
-                                  <span className="text-brand-dark">R$ {partnerSelectedTotal.toFixed(2)}</span>
+                                  <span className="text-brand-dark">{formatCurrency(partnerSelectedTotal)}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm font-medium">
                                   <span className="text-brand-inactive-text">Entrega</span>
@@ -541,7 +542,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                 <div className="h-[1px] bg-gray-100 w-full" />
                                 <div className="flex justify-between items-center font-bold text-xl text-brand-dark dark:text-dark-heading">
                                   <span>Total Geral</span>
-                                  <span>R$ {partnerSelectedTotal.toFixed(2)}</span>
+                                  <span>{formatCurrency(partnerSelectedTotal)}</span>
                                 </div>
                                 <Button
                                   onClick={() => handleOpenCheckout(partnerId)}

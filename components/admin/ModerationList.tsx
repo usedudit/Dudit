@@ -16,6 +16,7 @@ import {
   rejectFlaggedImages,
   rejectModeration,
 } from "@/app/actions/admin/moderation"
+import { formatCurrency, formatDate } from "@/lib/utils"
 
 // ─── Status badge (using reusable Badge) ────────────────────────────────────
 
@@ -96,7 +97,7 @@ function ProductDetailPanel({
             <div className="flex items-center gap-3 mt-3">
               <StatusBadge status={item.moderation_status} />
               <span className="text-sm text-brand-inactive-text dark:text-dark-body">
-                R$ {typeof item.price === "number" ? item.price.toFixed(2) : "0.00"}
+                {formatCurrency(item.price || 0)}
               </span>
             </div>
           </div>
@@ -115,7 +116,7 @@ function ProductDetailPanel({
               <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">Responsável: {item.owner_user_name}</p>
             )}
             <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">
-              Criado em {new Date(item.created_at).toLocaleDateString("pt-BR")}
+              Criado em {formatDate(item.created_at)}
             </p>
           </div>
 
@@ -429,7 +430,7 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                   {/* Time */}
                   <div className="flex items-center justify-center gap-1 text-xs text-brand-inactive-text dark:text-dark-body">
                     <ClockIcon className="w-3 h-3" />
-                    {new Date(item.created_at).toLocaleDateString("pt-BR")}
+                    {formatDate(item.created_at)}
                   </div>
 
                   {/* Quick Actions */}

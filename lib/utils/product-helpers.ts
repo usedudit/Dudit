@@ -1,3 +1,4 @@
+import { formatCurrency } from "./formatters"
 import type { Product } from "@/lib/types/product"
 
 export function calculateProfitMargin(costPrice: number, sellingPrice: number): number {
@@ -10,12 +11,6 @@ export function calculateMarkup(costPrice: number, sellingPrice: number): number
   return ((sellingPrice - costPrice) / sellingPrice) * 100
 }
 
-export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value)
-}
 
 export function formatPercentage(value: number, decimals = 2): string {
   return `${value.toFixed(decimals)}%`

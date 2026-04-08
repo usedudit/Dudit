@@ -3,6 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
+import { formatCurrency } from "@/lib/utils";
 import { ThreeDotsIcon } from "@/lib/icons"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
@@ -79,7 +80,7 @@ const CustomerGridCard = React.memo(
             <div className="flex flex-col gap-0.5">
               <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Total Gasto</span>
               <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
-                {customer.totalOrderValue ? `R$ ${customer.totalOrderValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
+                {customer.totalOrderValue ? formatCurrency(customer.totalOrderValue) : "-"}
               </span>
             </div>
 

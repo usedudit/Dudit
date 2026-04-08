@@ -9,6 +9,7 @@ import { PaymentMethodDialog } from "./payment-method-dialog"
 import { deletePaymentMethodAction } from "@/app/actions/payment-methods"
 import AlertModal from "../reusable/AlertModal"
 import { toast } from "sonner"
+import { formatPercent } from "@/lib/utils"
 
 interface PaymentMethod {
   id: string
@@ -131,7 +132,7 @@ export function PaymentMethodsGrid({ partnerId, methods, onUpdate }: PaymentMeth
               {method.discount_percent && method.discount_percent > 0 && (
                 <div className="bg-green-50 rounded p-2">
                   <p className="text-xs text-muted-foreground mb-1">Desconto do cliente</p>
-                  <p className="text-sm font-semibold text-green-600">{method.discount_percent.toFixed(2)}%</p>
+                  <p className="text-sm font-semibold text-green-600">{formatPercent(method.discount_percent)}</p>
                 </div>
               )}
 

@@ -8,6 +8,7 @@ import BottomSheet from "@/components/BottomSheet";
 import { useMediaQuery } from "@/components/erp/hooks";
 import { CloseIcon } from "@/lib/icons";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
+import { formatCurrency } from "@/lib/utils";
 
 interface Variant {
     id: string | number;
@@ -86,7 +87,7 @@ const SelectVariantSheet = ({ isOpen, onClose, product, onConfirm }: SelectVaria
                         <h4 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading mb-0.5 leading-snug">{product.name}</h4>
                         <p className="text-[13px] text-brand-inactive-text font-medium uppercase tracking-wide">SKU: {product.sku}</p>
                         <p className="font-bold text-[15px] text-brand-dark dark:text-dark-heading mt-1">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.price)}
+                            {formatCurrency(product.price)}
                         </p>
                     </div>
                 </div>
@@ -103,7 +104,7 @@ const SelectVariantSheet = ({ isOpen, onClose, product, onConfirm }: SelectVaria
                         <ListItem
                             key={idx}
                             title={variant.name}
-                            description={`SKU: ${variant.sku} • Estoque: ${variant.stock} ${product.unit || 'un'} • ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(variant.price)}`}
+                            description={`SKU: ${variant.sku} • Estoque: ${variant.stock} ${product.unit || 'un'} • ${formatCurrency(variant.price)}`}
                             right={
                                 <QuantitySelector
                                     value={variant.qty || 0}

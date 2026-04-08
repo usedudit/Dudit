@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react"
 import { Input } from "../Input"
+import { formatNumber } from "@/lib/utils";
 
 interface MoneyInputProps extends Omit<React.ComponentProps<typeof Input>, 'onChange' | 'value'> {
     value?: number | string
@@ -14,13 +15,13 @@ export function MoneyInput({ value = 0, onChange, min, max, ...props }: MoneyInp
     const numericVal = typeof value === 'string' ? Number(value) : value
 
     const [displayValue, setDisplayValue] = useState(
-        numericVal > 0 ? new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2 }).format(numericVal) : ""
+        numericVal > 0 ? formatNumber(numericVal) : ""
     )
 
     useEffect(() => {
         const currentNumericValue = Number(displayValue.replace(/\./g, "").replace(",", "."))
         if (numericVal !== currentNumericValue) {
-            setDisplayValue(numericVal > 0 ? new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2 }).format(numericVal) : "")
+            setDisplayValue(numericVal > 0 ? formatNumber(numericVal) : "")
         }
     }, [numericVal, displayValue])
 
@@ -42,7 +43,7 @@ export function MoneyInput({ value = 0, onChange, min, max, ...props }: MoneyInp
         }
 
         onChange?.(numericValue)
-        setDisplayValue(new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2 }).format(numericValue))
+        setDisplayValue(formatNumber(numericValue))
     }
 
     const handleBlur = () => {
@@ -51,7 +52,7 @@ export function MoneyInput({ value = 0, onChange, min, max, ...props }: MoneyInp
             finalValue = min
             onChange?.(finalValue)
         }
-        setDisplayValue(finalValue > 0 ? new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2 }).format(finalValue) : "")
+        setDisplayValue(finalValue > 0 ? formatNumber(finalValue) : "")
         props.onBlur?.()
     }
 

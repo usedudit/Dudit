@@ -7,6 +7,7 @@ import { ShoppingBag } from "lucide-react"
 import { CheckoutWrapper } from "@/components/marketplace/CheckoutWrapper"
 import { createOrderAction } from "@/app/actions/orders"
 import { useNotification } from "@/hooks/use-notification"
+import { formatCurrency } from "@/lib/utils"
 
 interface ServicePurchaseSectionProps {
   service: {
@@ -123,7 +124,7 @@ export function ServicePurchaseSection({
     <>
       <Button onClick={() => setShowCheckoutModal(true)} className="w-full" size="lg">
         <ShoppingBag className="mr-2 h-5 w-5" />
-        Solicitar Serviço - R$ {Number(service.price).toFixed(2)}
+        Solicitar Serviço - {formatCurrency(service.price)}
       </Button>
 
       {showCheckoutModal && (

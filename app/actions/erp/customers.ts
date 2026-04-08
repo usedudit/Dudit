@@ -4,6 +4,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { revalidatePath } from "next/cache"
 import { revalidateCustomers } from "@/lib/utils/revalidation"
 import { redirect } from "next/navigation"
+import { formatDate } from "@/lib/utils"
 import { requireUser, requirePartnerAccessWithPermission, requireCustomerOwnership } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -151,8 +152,11 @@ export async function deleteCustomerAction(customerId: string, csrf_token?: stri
 
   await requireCustomerOwnership(customerId)
 
-
   const supabase = await getSupabaseServerClient()
+
+  // Fetch partner_id BEFORE deleting so we can invalidate the correct cache tag
+  const { data: customer } = await supabase.from("customers").select("partner_id").eq("id", customerId).single()
+  const partnerId = customer?.partner_id || ""
 
   const { error } = await supabase.from("customers").delete().eq("id", customerId)
 
@@ -160,7 +164,7 @@ export async function deleteCustomerAction(customerId: string, csrf_token?: stri
     return { error: error.message }
   }
 
-  revalidateCustomers("")
+  revalidateCustomers(partnerId)
   revalidatePath("/erp/customers")
 
   redirect("/erp/customers")
@@ -376,8 +380,7 @@ export async function getCustomerOrdersAction(customerId: string) {
   }
 
   const formattedOrders = orders.map((o: any) => {
-    const date = new Date(o.created_at)
-    const dateStr = `${date.getDate()} ${date.toLocaleString('pt-BR', { month: 'short' }).substring(0, 3)} ${date.getFullYear()}`
+    const dateStr = formatDate(o.created_at)
 
     let status = o.situation
     if (status === 'paid' || status === 'delivered') status = 'Paid'
@@ -455,6 +458,10 @@ export async function deleteCustomersInBatchAction(customerIds: string[]) {
 
   const supabase = await getSupabaseServerClient()
 
+  // Fetch partner_id from the first customer so we can invalidate the correct cache
+  const { data: firstCustomer } = await supabase.from("customers").select("partner_id").eq("id", customerIds[0]).single()
+  const partnerId = firstCustomer?.partner_id || ""
+
   const { error } = await supabase
     .from("customers")
     .delete()
@@ -464,6 +471,7 @@ export async function deleteCustomersInBatchAction(customerIds: string[]) {
     return { error: error.message }
   }
 
+  revalidateCustomers(partnerId)
   revalidatePath("/erp/customers")
   return { success: true }
 }
@@ -474,6 +482,10 @@ export async function toggleCustomersStatusAction(customerIds: string[], isActiv
 
   const supabase = await getSupabaseServerClient()
 
+  // Fetch partner_id from the first customer so we can invalidate the correct cache
+  const { data: firstCustomer } = await supabase.from("customers").select("partner_id").eq("id", customerIds[0]).single()
+  const partnerId = firstCustomer?.partner_id || ""
+
   const { error } = await supabase
     .from("customers")
     .update({ status: isActive ? "ativo" : "inativo" })
@@ -483,6 +495,7 @@ export async function toggleCustomersStatusAction(customerIds: string[], isActiv
     return { error: error.message }
   }
 
+  revalidateCustomers(partnerId)
   revalidatePath("/erp/customers")
   return { success: true }
 }

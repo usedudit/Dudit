@@ -158,7 +158,7 @@ export async function deleteProductAction(productId: string) {
         }
 
         // Synchronous revalidation and Redis sync to prevent stale data
-        await invalidateProductCache(productId, product.partner_id, 'delete', { silent: true })
+        await invalidateProductCache(productId, product.partner_id, 'delete')
 
         console.log(`[PERF] deleteProduct took ${Math.round(performance.now() - actionStart)}ms`)
         return { success: true }
@@ -1092,9 +1092,9 @@ export async function toggleProductStatusAction(productIds: string[], isActive: 
 
         if (partnerId) {
             // Revalidate each product to ensure Redis marketplace index is updated
-            Promise.all(sanitized.map(id =>
+            await Promise.all(sanitized.map(id =>
                 invalidateProductCache(id, partnerId, 'update')
-            )).catch(console.error)
+            ))
         }
         return { success: true, count: sanitized.length }
     } catch (error: any) {
@@ -1120,9 +1120,9 @@ export async function deleteProductsInBatchAction(productIds: string[]) {
 
         if (partnerId) {
             // Revalidate each product to ensure Redis marketplace index is updated
-            Promise.all(sanitized.map(id =>
+            await Promise.all(sanitized.map(id =>
                 invalidateProductCache(id, partnerId, 'delete')
-            )).catch(console.error)
+            ))
         }
         return { success: true, deletedCount: sanitized.length }
     } catch (error: any) {
@@ -1153,9 +1153,9 @@ export async function batchUpdateProductsAction(updates: Array<{ id: string;[key
 
         if (partnerId) {
             // Revalidate each product to ensure Redis marketplace index is updated
-            Promise.all(sanitized.map(id =>
+            await Promise.all(sanitized.map(id =>
                 invalidateProductCache(id, partnerId, 'update')
-            )).catch(console.error)
+            ))
         }
         return { success: true, count: updates.length }
     } catch (error: any) {

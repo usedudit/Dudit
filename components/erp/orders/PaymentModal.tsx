@@ -23,6 +23,7 @@ import { Input, Button, Checkbox } from '@/components/reusable';
 import { ReceiptContent, PaymentMethodCard, Numpad, SplitPaymentCard } from './POSComponents';
 import { getPaymentMethodsAction } from '@/app/actions/payment-methods';
 import { useToast } from "@/components/ui/use-toast";
+import { formatCurrency, formatDate, formatTime } from '@/lib/utils';
 
 // --- HELPER COMPONENTS ---
 
@@ -38,12 +39,12 @@ const CompactPaymentStatusAlert = ({ totalPaid, totalNeed }: { totalPaid: number
     if (diff < -0.01) {
         bgClass = "bg-red-50 dark:bg-red-900/20";
         textClass = "text-red-600 dark:text-red-400";
-        message = `Falta Pagar: R$ ${absDiff.toFixed(2)}`;
+        message = `Falta Pagar: ${formatCurrency(absDiff)}`;
         barClass = "bg-red-500";
     } else if (diff > 0.01) {
         bgClass = "bg-green-50 dark:bg-green-900/20";
         textClass = "text-green-700 dark:text-green-400";
-        message = `Troco: R$ ${absDiff.toFixed(2)}`;
+        message = `Troco: ${formatCurrency(absDiff)}`;
         barClass = "bg-green-500";
     } else {
         bgClass = "bg-green-100 dark:bg-green-900/30";
@@ -325,7 +326,7 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, s
                     </div>
                     <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Ver Detalhes do Pedido</span>
                 </div>
-                <span className="font-black text-xl text-brand-dark dark:text-dark-heading">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}</span>
+                <span className="font-black text-xl text-brand-dark dark:text-dark-heading">{formatCurrency(total)}</span>
             </div>
 
             {showConfirm && (
@@ -384,8 +385,8 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, s
                             </div>
                         </div>
                         <div className="flex flex-col items-end text-right">
-                            <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">{new Date().toLocaleDateString('pt-BR')}</span>
-                            <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">{new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">{formatDate(new Date())}</span>
+                            <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">{formatTime(new Date())}</span>
                         </div>
                     </div>
 
@@ -466,8 +467,8 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, s
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-col items-end text-right">
-                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">{new Date().toLocaleDateString('pt-BR')}</span>
-                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">{new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">{formatDate(new Date())}</span>
+                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">{formatTime(new Date())}</span>
                                                 </div>
                                             </div>
 
@@ -574,7 +575,7 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, s
                                                     <CreditCardIcon size={40} className="text-green-600 dark:text-green-400" />
                                                 </div>
                                                 <div className="text-4xl font-bold text-brand-dark dark:text-dark-heading mb-2">
-                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}
+                                                    {formatCurrency(total)}
                                                 </div>
                                                 <p className="text-brand-inactive-text">Aguardando leitura do cartão...</p>
                                             </div>
@@ -595,7 +596,7 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, s
                                                             key={p.id}
                                                             icon={getIconForMethod(p.method)}
                                                             label={p.method || "Selecionar método"}
-                                                            amount={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.amount)}
+                                                            amount={formatCurrency(p.amount)}
                                                             onClick={() => { setEditingPaymentIndex(idx); setView('split_method_select'); }}
                                                         />
                                                     ))}
@@ -666,7 +667,7 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, s
                                             <div className="w-full py-3 px-4 rounded-lg flex items-center gap-3 bg-yellow-50 dark:bg-yellow-900/20 transition-colors duration-300 border border-yellow-100 dark:border-yellow-900/30">
                                                 <div className="w-1 h-4 rounded-full bg-yellow-500"></div>
                                                 <span className="font-bold text-sm flex-1 text-yellow-700 dark:text-yellow-400">
-                                                    Venda paga parcialmente, restante a pagar: R$ {Math.abs(diff).toFixed(2)}
+                                                    Venda paga parcialmente, restante a pagar: {formatCurrency(Math.abs(diff))}
                                                 </span>
                                             </div>
                                         </div>
@@ -676,16 +677,16 @@ const PaymentModal = ({ isOpen, onClose, cart, customer, onConfirm, partnerId, s
                                     <div className="flex flex-col sm:flex-row gap-8 sm:gap-12 mb-10 mt-4 border-l-4 border-brand-dark dark:border-dark-heading pl-6">
                                         <div>
                                             <span className="block text-xs font-bold text-brand-inactive-text dark:text-dark-body mb-1 uppercase tracking-widest">total da venda</span>
-                                            <div className="text-3xl font-black text-brand-dark dark:text-dark-heading tracking-tight">R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                                            <div className="text-3xl font-black text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(total)}</div>
                                         </div>
                                         <div>
                                             <span className="block text-xs font-bold text-brand-inactive-text dark:text-dark-body mb-1 uppercase tracking-widest">total recebido</span>
-                                            <div className="text-3xl font-black text-brand-dark dark:text-dark-heading tracking-tight">R$ {totalPaidCalculated.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                                            <div className="text-3xl font-black text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(totalPaidCalculated)}</div>
                                         </div>
                                         {changeAmount > 0 && (
                                             <div>
                                                 <span className="block text-xs font-bold text-brand-inactive-text dark:text-dark-body mb-1 uppercase tracking-widest">troco</span>
-                                                <div className="text-3xl font-black text-brand-dark dark:text-dark-heading tracking-tight">R$ {changeAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                                                <div className="text-3xl font-black text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(changeAmount)}</div>
                                             </div>
                                         )}
                                     </div>

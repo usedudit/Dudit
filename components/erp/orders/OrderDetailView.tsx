@@ -19,6 +19,7 @@ import { getOrderDetailsAction } from "@/app/actions/erp/orders"
 import { useNotification } from "@/hooks/use-notification"
 import { useRouter } from "next/navigation"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { formatCurrency, formatDateTime, formatDate, formatTime, formatDayMonth } from "@/lib/utils"
 
 interface OrderDetailViewProps {
     orderId: string
@@ -77,8 +78,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
     // Timeline logic
     const getTimelineSteps = (status: string) => {
-        const baseDate = new Date(order.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-        const baseTime = new Date(order.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        const baseDate = formatDayMonth(order.created_at)
+        const baseTime = formatTime(order.created_at)
 
         const steps = [
             { label: 'Pedido Realizado', date: baseDate, time: baseTime, active: true },
@@ -137,7 +138,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                 </h1>
 
                                 <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                    Criado em {new Date(order.created_at).toLocaleString('pt-BR')} • {order.order_source || "Manual"}
+                                    Criado em {formatDateTime(order.created_at)} • {order.order_source || "Manual"}
                                 </div>
                             </div>
 
@@ -239,11 +240,11 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex justify-between items-start mb-1">
                                                     <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.product_name || "Produto sem nome"}</h4>
-                                                    <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">R$ {Number(item.subtotal || item.product_price * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                    <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">{formatCurrency(item.subtotal || item.product_price * item.quantity)}</span>
                                                 </div>
                                                 <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "N/A"}</div>
                                                 <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
-                                                    <span>{item.quantity} un. • R$ {Number(item.product_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / un.</span>
+                                                    <span>{item.quantity} un. • {formatCurrency(item.product_price)} / un.</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -282,7 +283,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                     
                                     <PaymentRow 
                                         label="Subtotal" 
-                                        value={`${order.order_items?.length || 0} itens · R$ ${Number(order.total_amount - (order.shipping_cost || 0) - (order.additional_costs || 0) + (order.discount_value || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
+                                        value={`${order.order_items?.length || 0} itens · ${formatCurrency(order.total_amount - (order.shipping_cost || 0) - (order.additional_costs || 0) + (order.discount_value || 0))}`} 
                                     />
 
                                     <PaymentRow 
@@ -293,7 +294,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                     {order.delivery_type === 'pickup' ? 'Retirada no Balcão' : 'Entrega no Endereço'}
                                                 </span>
                                                 <div className="text-brand-inactive-text dark:text-dark-body font-bold text-[11px]">
-                                                    (R$ {Number(order.shipping_cost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+                                                    ({formatCurrency(order.shipping_cost || 0)})
                                                 </div>
                                             </div>
                                         } 
@@ -302,20 +303,20 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                     {Number(order.additional_costs || 0) > 0 && (
                                         <PaymentRow 
                                             label="Custos Adicionais" 
-                                            value={`R$ ${Number(order.additional_costs).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
+                                            value={formatCurrency(order.additional_costs)} 
                                         />
                                     )}
 
                                     {Number(order.discount_value || 0) > 0 && (
                                         <PaymentRow 
                                             label="Desconto" 
-                                            value={<span className="text-brand-red font-bold">- R$ {Number(order.discount_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>} 
+                                            value={<span className="text-brand-red font-bold">- {formatCurrency(order.discount_value)}</span>} 
                                         />
                                     )}
 
                                     <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
                                         <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>
-                                        <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">R$ {Number(order.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                        <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(order.total_amount)}</span>
                                     </div>
                                 </div>
                             </div>

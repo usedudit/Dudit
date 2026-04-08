@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useMemo } from 'react';
+import { formatCurrency, formatDate } from '@/lib/utils';
 
 interface QuotePreviewProps {
     invoiceNumber: string;
@@ -158,7 +159,7 @@ const QuotePreview = ({
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Data</span>
-                                                    <span className="font-bold text-sm text-black">{quoteDate.split('-').reverse().join('/')}</span>
+                                                    <span className="font-bold text-sm text-black">{formatDate(quoteDate)}</span>
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Número</span>
@@ -166,7 +167,7 @@ const QuotePreview = ({
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Vencimento</span>
-                                                    <span className="font-bold text-sm text-black">{expiryDate.split('-').reverse().join('/')}</span>
+                                                    <span className="font-bold text-sm text-black">{formatDate(expiryDate)}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -222,12 +223,12 @@ const QuotePreview = ({
                                                     </td>
                                                     <td className="py-2 px-4 border-b border-gray-50 text-right">
                                                         <span className="text-[13px] font-medium text-gray-600">
-                                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price).replace('R$', '$')}
+                                                            {formatCurrency(item.price).replace('R$', '$')}
                                                         </span>
                                                     </td>
                                                     <td className="py-2 pl-4 pr-6 border-b border-gray-50 text-right">
                                                         <span className="text-[13px] font-bold text-black">
-                                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price * item.qty).replace('R$', '$')}
+                                                            {formatCurrency(item.price * item.qty).replace('R$', '$')}
                                                         </span>
                                                     </td>
                                                 </tr>
@@ -243,7 +244,7 @@ const QuotePreview = ({
                                                 <div className="flex justify-between items-center text-xs mb-2">
                                                     <span className="text-gray-500 font-medium">Subtotal</span>
                                                     <span className="font-bold">
-                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}
+                                                        {formatCurrency(subtotal)}
                                                     </span>
                                                 </div>
 
@@ -251,7 +252,7 @@ const QuotePreview = ({
                                                     <div className="flex justify-between items-center text-xs mb-2">
                                                         <span className="text-gray-500 font-medium">Frete</span>
                                                         <span className="font-bold">
-                                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(shippingNum)}
+                                                            {formatCurrency(shippingNum)}
                                                         </span>
                                                     </div>
                                                 )}
@@ -259,7 +260,7 @@ const QuotePreview = ({
                                                     <div className="flex justify-between items-center text-xs mb-2">
                                                         <span className="text-gray-500 font-medium">Outros Custos</span>
                                                         <span className="font-bold">
-                                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(otherCosts)}
+                                                            {formatCurrency(otherCosts)}
                                                         </span>
                                                     </div>
                                                 )}
@@ -267,7 +268,7 @@ const QuotePreview = ({
                                                     <div className="flex justify-between items-center text-xs mb-2">
                                                         <span className="text-gray-500 font-medium">Desconto</span>
                                                         <span className="font-bold text-brand-red">
-                                                            -{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(discountValue)}
+                                                            -{formatCurrency(discountValue)}
                                                         </span>
                                                     </div>
                                                 )}
@@ -275,7 +276,7 @@ const QuotePreview = ({
                                                 <div className="flex justify-between items-center">
                                                     <span className="font-bold text-sm">Total</span>
                                                     <div className="text-white px-3 py-1.5 rounded text-sm font-bold shadow-sm" style={{ backgroundColor: primaryColor }}>
-                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}
+                                                        {formatCurrency(total)}
                                                     </div>
                                                 </div>
                                             </div>

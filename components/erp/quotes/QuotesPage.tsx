@@ -7,6 +7,7 @@ import { useStore } from "@/lib/store-context"
 
 // Components
 import { Button, IconPlaceholder, AlertModal, Badge, Checkbox } from "@/components/reusable"
+import { formatCurrency, formatDate } from "@/lib/utils";
 import QuoteSkeleton from "./QuoteSkeleton"
 import { deleteQuoteAction, batchDeleteQuotesAction, batchUpdateQuotesStatusAction } from "@/app/actions/erp/quotes"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
@@ -159,7 +160,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                     formattedIssueDate = `${d}/${m}/${y}`;
                 } else if (q.created_at) {
                     parsedIssueDate = new Date(q.created_at);
-                    formattedIssueDate = parsedIssueDate.toLocaleDateString('pt-BR');
+                    formattedIssueDate = formatDate(parsedIssueDate);
                 }
 
                 let formattedExpirationDate = null;
@@ -557,7 +558,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                                                         </div>
                                                         <div className="flex justify-between items-center mt-1">
                                                             <span className="text-[14px] font-bold text-brand-primary">
-                                                                R$ {q.total_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                                {formatCurrency(q.total_amount)}
                                                             </span>
                                                             <div className="flex items-center gap-4">
                                                                 <div onClick={(e) => { e.stopPropagation(); handleSelectRow(q.originalId); }}>

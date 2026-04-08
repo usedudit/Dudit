@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useEffect, useState } from "react"
+import { formatNumber } from "@/lib/utils";
 
 interface FormCurrencyInputProps {
   label: string
@@ -28,13 +29,13 @@ export function FormCurrencyInput({
   maxLength,
 }: FormCurrencyInputProps) {
   const [displayValue, setDisplayValue] = useState(
-    value > 0 ? new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2 }).format(value) : "",
+    value > 0 ? formatNumber(value) : "",
   )
 
   useEffect(() => {
     const currentNumericValue = Number(displayValue.replace(/\./g, "").replace(",", "."))
     if (value !== currentNumericValue) {
-      setDisplayValue(value > 0 ? new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2 }).format(value) : "")
+      setDisplayValue(value > 0 ? formatNumber(value) : "")
     }
   }, [value, displayValue])
 
@@ -50,11 +51,11 @@ export function FormCurrencyInput({
 
     const numericValue = Number(numericString) / 100
     onChange(numericValue)
-    setDisplayValue(new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2 }).format(numericValue))
+    setDisplayValue(formatNumber(numericValue))
   }
 
   const handleBlur = () => {
-    setDisplayValue(value > 0 ? new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2 }).format(value) : "")
+    setDisplayValue(value > 0 ? formatNumber(value) : "")
   }
 
   return (

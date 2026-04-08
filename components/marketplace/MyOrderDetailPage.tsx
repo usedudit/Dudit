@@ -21,39 +21,13 @@ import { getProductUrl, getPartnerUrl } from '@/lib/utils/url-generator';
 
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
+import { formatCurrency, formatFullDate, formatTime } from '@/lib/utils';
 
 interface MyOrderDetailPageProps {
     order: any;
     onBack: () => void;
 }
 
-function formatDateToBrazil(dateString: string): string {
-    const date = new Date(dateString);
-    const brazilDate = new Date(date.getTime() - 3 * 60 * 60 * 1000);
-    const day = String(brazilDate.getDate()).padStart(2, "0");
-    const monthNames = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-    const month = monthNames[brazilDate.getMonth()];
-    const year = brazilDate.getFullYear();
-    const hours = String(brazilDate.getHours()).padStart(2, "0");
-    const minutes = String(brazilDate.getMinutes()).padStart(2, "0");
-    return { full: `${day} de ${month} de ${year} às ${hours}:${minutes}`, date: `${day} de ${month} de ${year}`, time: `${hours}:${minutes}` } as any;
-}
-
-function getFormattedDate(dateString: string) {
-    const date = new Date(dateString);
-    const brazilDate = new Date(date.getTime() - 3 * 60 * 60 * 1000);
-    const day = String(brazilDate.getDate()).padStart(2, "0");
-    const monthNames = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-    const month = monthNames[brazilDate.getMonth()];
-    const year = brazilDate.getFullYear();
-    const hours = String(brazilDate.getHours()).padStart(2, "0");
-    const minutes = String(brazilDate.getMinutes()).padStart(2, "0");
-    return {
-        full: `${day} de ${month} de ${year} às ${hours}:${minutes}`,
-        date: `${day} de ${month} de ${year}`,
-        time: `${hours}:${minutes}`,
-    };
-}
 
 const getStatusConfig = (status: string) => {
     switch (status) {
@@ -66,7 +40,7 @@ const getStatusConfig = (status: string) => {
 
 const ShippingDetailsModal = ({ isOpen, onClose, order }: { isOpen: boolean; onClose: () => void; order: any }) => {
     if (!isOpen) return null;
-    const { full: dateStr } = getFormattedDate(order.created_at);
+    const dateStr = formatFullDate(order.created_at);
     const deliveryTypeStr = order.delivery_type === "delivery" ? "Delivery" : "Retirada no local";
 
     return (
@@ -157,7 +131,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     if (!order) return null;
 
     const orderNumber = order.order_number || order.id.slice(0, 8).toUpperCase();
-    const { full: dateStrFull, date: dateStrDate, time: dateStrTime } = getFormattedDate(order.created_at);
+    const dateStrFull = formatFullDate(order.created_at);
+    const dateStrTime = formatTime(order.created_at);
     const statusConfig = getStatusConfig(order.situation);
     const storeImage = order.partners?.store_image_url
         ? getR2ImageUrl(order.partners.store_image_url)
@@ -165,7 +140,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
     const isDelivery = order.delivery_type === "delivery";
     const sellerName = order.partners?.store_name || "Loja Parceira";
-    const totalAmount = Number(order.total_amount).toFixed(2);
+    const totalAmount = Number(order.total_amount);
 
     const isPix = order.payment_method?.toLowerCase() === "pix" || order.payment_method?.toLowerCase() === "bank_transfer";
     const paymentMethodName = isPix ? "Pix" : (order.payment_method || order.payment_provider || "Pix");
@@ -259,9 +234,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             <div className="p-6">
                                 <div className={`${statusConfig.color} font-bold text-sm mb-1`}>{statusConfig.statusText}</div>
                                 <div className="flex items-center gap-2 mb-4 flex-wrap">
-                                    <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
-                                        Realizado dia {dateStrDate} às {dateStrTime}
-                                    </h2>
+                                    Realizado em {dateStrFull}
                                     {isDelivery && <span className="italic font-black text-brand-green flex items-center"><TruckIcon size={18} className="fill-current mr-0.5" /> DUDIT</span>}
                                 </div>
                                 <p className="text-brand-dark dark:text-dark-body text-sm">
@@ -288,7 +261,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             title={
                                                 loadingPayment ? <Spinner size={14} className="text-brand-dark" /> :
                                                     <div className="flex items-center gap-2">
-                                                        <span>R$ {totalAmount}</span>
+                                                        <span>{formatCurrency(totalAmount)}</span>
                                                         <span className="font-normal text-brand-inactive-text">• {paymentMethodName}</span>
                                                     </div>
                                             }
@@ -359,7 +332,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             : item.product_variants?.variant_options?.image
                                                 ? getR2ImageUrl(item.product_variants.variant_options.image)
                                                 : "https://img.dudit.com.br/static/Placeholder.png";
-                                        const itemTotal = Number(item.subtotal || item.product_price * item.quantity).toFixed(2);
+                                        const itemTotal = Number(item.subtotal || item.product_price * item.quantity);
 
                                         return (
                                             <Link href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)} prefetch={true} key={item.id} className="group flex flex-row items-center gap-4 cursor-pointer p-2 -mx-2 rounded-lg">
@@ -375,7 +348,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         <div className="flex items-center gap-2 text-xs">
                                                             <span className="text-brand-inactive-text">{item.quantity} un.</span>
                                                             <span className="text-brand-border dark:text-dark-border">|</span>
-                                                            <span className="font-medium text-brand-dark dark:text-dark-heading">R$ {itemTotal}</span>
+                                                            <span className="font-medium text-brand-dark dark:text-dark-heading">{formatCurrency(itemTotal)}</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -389,7 +362,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 <div className="space-y-3 pb-6 border-b border-brand-border dark:border-dark-border mb-6">
                                     <div className="flex justify-between text-sm text-brand-inactive-text">
                                         <span>Itens ({order.order_items?.length || 0})</span>
-                                        <span className="text-brand-dark dark:text-dark-heading">R$ {totalAmount}</span>
+                                        <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
                                     </div>
                                     <div className="flex justify-between text-sm text-brand-inactive-text">
                                         <span>Entrega</span>
@@ -399,7 +372,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                 <div className="flex justify-between items-end">
                                     <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">Total</span>
-                                    <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">R$ {totalAmount}</span>
+                                    <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
                                 </div>
                             </div>
                         </div>

@@ -8,6 +8,7 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getProductUrl } from "@/lib/utils/url-generator"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
 import { ShareModal } from "./ShareModal"
+import { formatCurrency, formatDate, formatMonth, formatYear, formatNumber } from "@/lib/utils"
 
 // --- TYPES ---
 interface VendorPageClientProps {
@@ -31,14 +32,12 @@ const SORT_STRATEGIES: Record<string, (a: any, b: any) => number> = {
   "Preço: maior para menor": (a, b) => (b.promotional_price || b.price) - (a.promotional_price || a.price),
 }
 
-const MONTH_NAMES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
-
-// --- UTILS ---
 const getImageUrl = (path?: string | null) => getR2ImageUrl(path)
 
-const formatJoinDate = (createdAt: string) => {
-  const d = new Date(createdAt)
-  return `Entrou em ${MONTH_NAMES[d.getMonth()]} de ${d.getFullYear()}`
+const formatJoinDate = (createdAt: string | Date) => {
+  const month = formatMonth(createdAt)
+  const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1)
+  return `Entrou em ${capitalizedMonth} de ${formatYear(createdAt)}`
 }
 
 const openWhatsApp = (phone?: string, storeName?: string) => {
@@ -84,12 +83,12 @@ const formatOpeningHours = (hours: any) => {
 const StoreStats = ({ rating, sales, createdAt, reviewsCount }: any) => (
   <div className="flex items-center justify-between mb-8">
     <StatItem
-      value={rating > 0 ? rating.toFixed(1) : "-"}
+      value={rating > 0 ? formatNumber(rating, 1, 1) : "-"}
       label="Avaliação"
       icon={rating > 0 ? <StarIcon size={14} fill="brand-green" className="text-brand-green" /> : null}
     />
     <div className="w-[1px] h-8 bg-brand-border" />
-    <StatItem value={sales >= 1000 ? `${(sales / 1000).toFixed(1)}k` : sales} label="Vendas" />
+    <StatItem value={sales >= 1000 ? `${formatNumber(sales / 1000, 1, 1)}k` : sales} label="Vendas" />
     <div className="w-[1px] h-8 bg-brand-border" />
     <StatItem value={formatJoinDate(createdAt)} label="Na Dudit" />
   </div>
@@ -127,7 +126,7 @@ const ProductCard = ({ item, partner }: { item: any; partner: any }) => {
           {item.name}
         </h3>
         <span className="text-[16px] font-bold text-brand-dark">
-          R$ {Number(displayPrice).toFixed(2)}
+          {formatCurrency(displayPrice)}
         </span>
       </div>
     </Link>
@@ -320,7 +319,7 @@ const ReviewsTab = ({ partner, stats, ratingDistribution, reviews }: any) => {
           <div className="bg-brand-gray rounded-[16px] p-5 mb-10 flex items-center justify-between max-w-[800px]">
             <div className="flex flex-col items-center">
               <span className="text-[48px] font-semibold text-brand-dark leading-none">
-                {partner.rating > 0 ? partner.rating.toFixed(1) : "-"}
+                {partner.rating > 0 ? formatNumber(partner.rating, 1, 1) : "-"}
               </span>
               <div className="flex gap-0.5 my-2">
                 {[...Array(5)].map((_, i) => (
@@ -364,7 +363,7 @@ const ReviewsTab = ({ partner, stats, ratingDistribution, reviews }: any) => {
                       <div className="flex items-center gap-2">
                         <span className="text-[15px] font-semibold text-brand-dark">{rev.profiles?.full_name || "Usuário"}</span>
                         <span className="text-[10px] text-brand-inactive-text">·</span>
-                        <span className="text-[13px] font-normal text-brand-inactive-text">{new Date(rev.created_at).toLocaleDateString()}</span>
+                        <span className="text-[13px] font-normal text-brand-inactive-text">{formatDate(rev.created_at)}</span>
                       </div>
                       <FlagIcon size={14} className="text-gray-300 cursor-pointer hover:text-[#d32f2f] transition-colors" />
                     </div>

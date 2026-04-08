@@ -381,7 +381,7 @@ tbody tr {
   -webkit-appearance: none;
   height: 1.25rem;
   width: 1.25rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--brand-border);
   border-radius: 0.375rem;
   display: inline-block;
   position: relative;
@@ -443,12 +443,12 @@ tbody tr {
 }
 
 .dark .custom-checkbox {
-  border-color: #3f3f46;
+  border-color: var(--dark-border);
 }
 
 .dark .custom-checkbox:checked {
   background-color: #0d5e49;
-  border-color: #0d5e49;
+  border-color: var(--brand-green);
 }
 
 .dark .custom-checkbox:indeterminate {

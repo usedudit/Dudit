@@ -107,8 +107,8 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
                         <>
                             {showMap && (
                                 /* Map Placeholder */
-                                <div className="w-full h-24 bg-blue-50 dark:bg-gray-800 rounded-lg mb-4 overflow-hidden relative border border-blue-100 dark:border-gray-700 group cursor-pointer">
-                                    <img src="https://img.dudit.com.br/static/maps/MapSample.png" className="w-full h-full object-cover opacity-60" alt="Map" />
+                                <div className="w-full h-[120px] bg-brand-gray dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group">
+                                    <img src="https://img.dudit.com.br/static/maps/MapLarge.png" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Mapa" />
                                     <div className="absolute inset-0 flex items-center justify-center">
                                         <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white">
                                             <div className="w-2 h-2 bg-white rounded-full"></div>

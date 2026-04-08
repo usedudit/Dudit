@@ -12,6 +12,7 @@ import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { useMediaQuery } from '../hooks';
 import OrderListItem from '../orders/OrderListItem';
 import { useRouter } from 'next/navigation';
+import { formatCurrency, formatDate } from '@/lib/utils';
 import { FadeIn } from '@/components/animations/FadeIn';
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
@@ -282,13 +283,13 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                     <div className="p-6 flex flex-col justify-center">
                                                         <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mb-1.5">Total Gasto</span>
                                                         <div className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
-                                                            {customer.totalOrderValue ? `$${customer.totalOrderValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
+                                                            {customer.totalOrderValue ? formatCurrency(customer.totalOrderValue) : "-"}
                                                         </div>
                                                     </div>
                                                     <div className="p-6 flex flex-col justify-center">
                                                         <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mb-1.5">Valor médio dos pedidos</span>
                                                         <div className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
-                                                            {customer.orders && customer.totalOrderValue ? `$${(customer.totalOrderValue / customer.orders).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
+                                                            {customer.orders && customer.totalOrderValue ? formatCurrency(customer.totalOrderValue / customer.orders) : "-"}
                                                         </div>
                                                     </div>
                                                     <div className="p-6 flex flex-col justify-center">
@@ -341,7 +342,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                                                 </span>
                                                                                 <span className="text-gray-300 dark:text-gray-600 font-medium font-bold">•</span>
                                                                                 <span className="font-bold text-brand-primary">
-                                                                                    R$ {Number(o.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                                                    {formatCurrency(o.total_amount)}
                                                                                 </span>
                                                                             </div>
                                                                         </div>
@@ -505,7 +506,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                     <div className="flex justify-between items-center py-2.5 border-b border-brand-border dark:border-dark-border">
                                                         <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Cliente desde</span>
                                                         <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                            {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString('pt-BR', { month: 'short', day: 'numeric', year: 'numeric' }).replace(' de ', ', ') : '-'}
+                                                            {customer.createdAt ? formatDate(customer.createdAt) : '-'}
                                                         </span>
                                                     </div>
                                                     <div className="flex justify-between items-center py-2.5">
@@ -559,8 +560,8 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                     <div className="space-y-6">
                                                         <div>
                                                             {/* Map Placeholder */}
-                                                            <div className="w-full h-24 bg-blue-50 dark:bg-gray-800 rounded-lg mb-4 overflow-hidden relative border border-blue-100 dark:border-gray-700 group cursor-pointer">
-                                                                <img src="https://img.dudit.com.br/static/maps/MapSample.png" className="w-full h-full object-cover opacity-60" alt="Map" />
+                                                            <div className="w-full h-[120px] bg-brand-gray dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group">
+                                                                <img src="https://img.dudit.com.br/static/maps/MapLarge.png" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Mapa" />
                                                                 <div className="absolute inset-0 flex items-center justify-center">
                                                                     <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white">
                                                                         <div className="w-2 h-2 bg-white rounded-full"></div>

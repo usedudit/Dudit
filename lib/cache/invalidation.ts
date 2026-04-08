@@ -53,19 +53,19 @@ export async function invalidateProductCache(
 
   // 3. Purge Next.js Cache Layers
   try {
-    const { revalidateTag } = await import('next/cache')
+    const { revalidateTag, revalidatePath } = await import('next/cache')
     const safeRevalidateTag = (tag: string) => (revalidateTag as any)(tag, 'max')
 
     // Always revalidate the specific product tag (for vitrine consistency)
     safeRevalidateTag(`product-${productId}`)
 
-    // Only revalidate list tags if NOT in silent mode
-    // Silent mode avoids background re-renders of the current active page (like ERP list)
-    if (!options?.silent) {
-      safeRevalidateTag(`partner-${partnerId}`)
-      safeRevalidateTag(TAGS.products(partnerId))
-      safeRevalidateTag('products')
-    }
+    // Always revalidate the list tags and path so that the ERP product list updates instantly
+    safeRevalidateTag(`partner-${partnerId}`)
+    safeRevalidateTag(TAGS.products(partnerId))
+    safeRevalidateTag('products')
+
+    // Force the Next.js router cache to refresh the products page
+    revalidatePath('/erp/products')
   } catch (error) {
     console.error(`[CACHE] Erro ao revalidar Next.js cache layers:`, error)
   }

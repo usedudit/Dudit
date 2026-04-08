@@ -7,6 +7,7 @@ import { SearchIcon, PlusIcon, ThreeDotsIcon, CreditCardIcon, MoneyIcon, QRCodeI
 import { createPaymentMethodAction, updatePaymentMethodAction, deletePaymentMethodAction } from "@/app/actions/payment-methods"
 import { useNotification } from "@/hooks/use-notification"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { formatCurrency } from "@/lib/utils"
 
 interface PaymentMethodsSubPageProps {
   partner: any
@@ -205,7 +206,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
           </span>
           {method.fixed_amount > 0 && (
             <span className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-              + R$ {method.fixed_amount.toFixed(2)}
+              + {formatCurrency(method.fixed_amount)}
             </span>
           )}
         </div>

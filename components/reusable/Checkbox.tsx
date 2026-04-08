@@ -51,7 +51,8 @@ export const Checkbox: React.FC<CheckboxProps> = ({
         disabled={disabled}
         className={`
           custom-checkbox focus-visible
-          !border !border-brand-border dark:!border-brand-dark
+          !border
+          ${checked ? "!border-brand-green" : "!border-brand-border dark:!border-dark-border"}
           ${disabled ? "cursor-not-allowed" : "cursor-pointer"}
         `}
       />

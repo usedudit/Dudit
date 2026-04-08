@@ -36,7 +36,7 @@ const MetadataCard = React.memo(({ item, type, categories, onEdit, onDelete }: M
             <div className="flex gap-4 mb-2">
                 {/* Icon Placeholder - matching ProductGridCard image size/shape */}
                 <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                    <IconComponent className="w-6 h-6 text-brand-dark dark:text-dark-heading" />
+                    <IconComponent className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
                 </div>
 
                 <div className="flex-1 min-w-0 flex flex-col justify-center">

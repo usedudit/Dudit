@@ -498,11 +498,11 @@ export const BusinessDataSubPage = ({
                                                 </div>
                                                 <div className="p-4 flex flex-col">
                                                     <div
-                                                        className="w-full h-[120px] bg-gray-200 dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group"
+                                                        className="w-full h-[120px] bg-brand-gray dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group"
                                                         onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${addresses.street}, ${addresses.number}, ${addresses.neighborhood}, ${addresses.city} - ${addresses.state}, ${addresses.zipCode}`)}`, '_blank')}
                                                     >
                                                         <img
-                                                            alt="Satelite Map"
+                                                            alt="Mapa"
                                                             className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
                                                             src="https://img.dudit.com.br/static/MapLarge.png"
                                                             onError={(e) => { e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" fill="rgb(229,231,235)"><rect width="100%" height="100%"/></svg>' }}

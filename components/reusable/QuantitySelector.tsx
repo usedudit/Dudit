@@ -32,6 +32,20 @@ export const QuantitySelector: React.FC<QuantitySelectorProps> = ({
     }
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = Number(e.target.value);
+
+    if (isNaN(newValue)) return;
+
+    if (newValue < min) {
+      onChange(min);
+    } else if (max !== undefined && newValue > max) {
+      onChange(max);
+    } else {
+      onChange(newValue);
+    }
+  };
+
   const heightClass = size === 'sm' ? 'h-8' : 'h-9';
   const iconSize = size === 'sm' ? 14 : 14;
   const fontSize = size === 'sm' ? 'text-xs' : 'text-sm';
@@ -44,22 +58,25 @@ export const QuantitySelector: React.FC<QuantitySelectorProps> = ({
         type="button"
         onClick={handleDecrement}
         disabled={value <= min}
-        className="w-9 h-full flex items-center justify-center hover:bg-brand-gray dark:hover:bg-gray-800 transition-colors disabled:opacity-30"
+        className="w-9 h-full flex items-center justify-center hover:bg-brand-gray dark:hover:bg-dark-border/50 transition-colors disabled:opacity-30"
       >
         <MinusIcon size={iconSize} />
       </button>
 
-      <span
-        className={`w-8 text-center font-medium text-brand-dark dark:text-dark-heading ${fontSize}`}
-      >
-        {value}
-      </span>
+      <input
+        type="number"
+        value={value}
+        onChange={handleInputChange}
+        min={min}
+        max={max}
+        className={`w-10 text-center font-medium bg-transparent outline-none text-brand-dark dark:text-dark-heading ${fontSize}`}
+      />
 
       <button
         type="button"
         onClick={handleIncrement}
         disabled={max !== undefined && value >= max}
-        className="w-9 h-full flex items-center justify-center hover:bg-brand-gray dark:hover:bg-gray-800 transition-colors disabled:opacity-30"
+        className="w-9 h-full flex items-center justify-center hover:bg-brand-gray dark:hover:bg-dark-border/50 transition-colors disabled:opacity-30"
       >
         <PlusIcon size={iconSize} />
       </button>
