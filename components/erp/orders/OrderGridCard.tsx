@@ -59,6 +59,12 @@ const OrderGridCard = React.memo(
                   >
                     {order.statusLabel}
                   </Badge>
+                  <Badge
+                    variant={order.deliveryStatusColor || "gray"}
+                    className="whitespace-nowrap scale-90"
+                  >
+                    {order.deliveryStatusLabel || "Não informado"}
+                  </Badge>
                   {order.isUnfulfilled && (
                     <Badge variant="gray" className="whitespace-nowrap scale-90">
                       Pendente

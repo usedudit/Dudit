@@ -24,6 +24,10 @@ interface CreateQuoteProps {
     mode: 'create' | 'edit' | 'duplicate' | 'view';
 }
 
+const REQUIRED_FIELDS = [
+    { field: "productSearch", tab: "Dados Gerais" },
+]
+
 const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProps) => {
     const { success: notifySuccess, error: notifyError } = useNotification();
     const router = useRouter();
@@ -284,6 +288,11 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
             }
         });
 
+        setFieldErrors(prev => {
+            const next = new Set(prev);
+            next.delete("productSearch");
+            return next;
+        });
         productBucket.setSearchQuery('');
         setIsProductSearchOpen(false);
     };
@@ -304,6 +313,11 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                 isEditing: true
             }
         ]);
+        setFieldErrors(prev => {
+            const next = new Set(prev);
+            next.delete("productSearch");
+            return next;
+        });
     };
 
     // 3. Add Variants from Sheet
@@ -339,6 +353,11 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         });
         setProductToSelectVariant(null);
         setIsVariantSheetOpen(false);
+        setFieldErrors(prev => {
+            const next = new Set(prev);
+            next.delete("productSearch");
+            return next;
+        });
     };
 
     const updateItemQty = (index: number, newQty: number) => {
@@ -452,6 +471,10 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         }
     };
 
+    const getTabErrorCount = useCallback((tab: string) => {
+        return REQUIRED_FIELDS.filter(({ field, tab: fieldTab }) => fieldTab === tab && fieldErrors.has(field)).length
+    }, [fieldErrors])
+
     const currentItems = quoteItems;
     const itemsCount = currentItems.length;
     const hasItems = itemsCount > 0;
@@ -517,7 +540,10 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                         {/* Tabs */}
                                         <div className={`w-full transition-all duration-300 ${isScrolled ? "mt-3" : "mt-6"}`}>
                                             <TabsList className="bg-transparent p-0 w-full justify-start border-b-0 h-auto gap-6">
-                                                <TabsTrigger value="Dados Gerais" className={`px-0 transition-all duration-300 ${isScrolled ? "pb-2 text-[13px]" : "pb-3 text-sm"}`}>Dados Gerais</TabsTrigger>
+                                                <TabsTrigger value="Dados Gerais" className={`px-0 transition-all duration-300 ${isScrolled ? "pb-2 text-[13px]" : "pb-3 text-sm"}`}>
+                                                    Dados Gerais
+                                                    {getTabErrorCount("Dados Gerais") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                                </TabsTrigger>
                                                 <TabsTrigger value="Observações" className={`px-0 transition-all duration-300 ${isScrolled ? "pb-2 text-[13px]" : "pb-3 text-sm"}`}>Observações</TabsTrigger>
                                                 <TabsTrigger value="Visualização" className={`px-0 transition-all duration-300 md:hidden ${isScrolled ? "pb-2 text-[13px]" : "pb-3 text-sm"}`}>Visualização</TabsTrigger>
                                             </TabsList>

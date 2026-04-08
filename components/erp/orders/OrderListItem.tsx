@@ -70,6 +70,9 @@ const OrderListItem = React.memo(
               <Badge variant={order.statusColor}>
                 {order.statusLabel}
               </Badge>
+              <Badge variant={order.deliveryStatusColor || "gray"}>
+                {order.deliveryStatusLabel || "Não informado"}
+              </Badge>
               {order.isUnfulfilled && (
                 <Badge variant="gray" className="opacity-70">
                   Pendente

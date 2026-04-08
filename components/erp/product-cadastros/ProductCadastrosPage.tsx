@@ -247,7 +247,8 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                                 initial={{ opacity: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
-                                className="w-full h-full"
+                                transition={{ duration: 0.4, ease: "easeOut" }}
+                                className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
                             >
                                 <IconPlaceholder
                                     placeholderType="image"

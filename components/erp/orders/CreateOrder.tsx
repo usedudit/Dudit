@@ -26,6 +26,10 @@ interface CreateOrderProps {
     editOrderId?: string
 }
 
+const REQUIRED_FIELDS = [
+    { field: "productSearch", tab: "general" },
+]
+
 export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOrderProps) {
     const { toast } = useToast()
     const { success: notifySuccess, error: notifyError } = useNotification()
@@ -119,12 +123,13 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setDiscountType(order.discount_type || "fixed")
 
                 if (order.order_items) {
-                    setItems(order.order_items.map((item: any) => ({
+                setItems(order.order_items.map((item: any) => ({
                         id: item.id || Math.random().toString(36).substr(2, 9),
                         productId: item.product_id,
                         name: item.product_name,
                         unitPrice: Number(item.product_price),
                         quantity: Number(item.quantity),
+                        sortOrder: Number(item.sort_order ?? 0),
                         image: item.image || item.product?.image || null,
                         sku: item.sku || item.product?.sku || "",
                         isEditing: false
@@ -173,11 +178,17 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 name: product.name,
                 unitPrice: product.price,
                 quantity: 1,
+                sortOrder: items.length,
                 image: product.image,
                 sku: product.sku,
                 isEditing: false
             }
             setItems([...items, newItem])
+            setFieldErrors(prev => {
+                const next = new Set(prev)
+                next.delete("productSearch")
+                return next
+            })
             productBucket.setSearchQuery("")
         }
     }
@@ -193,6 +204,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     name: `${selectedProductForVariant.name} - ${variant.name}`,
                     unitPrice: variant.price || selectedProductForVariant.price,
                     quantity: variant.qty,
+                    sortOrder: items.length + newItems.length,
                     image: variant.image || selectedProductForVariant.image,
                     sku: variant.sku || selectedProductForVariant.sku,
                     isEditing: false
@@ -202,6 +214,11 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         })
         if (newItems.length > 0) {
             setItems([...items, ...newItems])
+            setFieldErrors(prev => {
+                const next = new Set(prev)
+                next.delete("productSearch")
+                return next
+            })
         }
         setIsVariantSheetOpen(false)
         productBucket.setSearchQuery("")
@@ -237,10 +254,16 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             name: "",
             unitPrice: 0,
             quantity: 1,
+            sortOrder: items.length,
             isEditing: true,
             sku: ""
         }
         setItems([...items, newItem])
+        setFieldErrors(prev => {
+            const next = new Set(prev)
+            next.delete("productSearch")
+            return next
+        })
     }
 
     const removeItem = (index: number) => {
@@ -283,6 +306,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 partnerId,
                 customerId: selectedCustomer?.id,
                 customerName: selectedCustomer ? selectedCustomer.name : "Consumidor final",
+                salesChannel,
                 deliveryMethod,
                 paymentStatus: paymentData.paymentStatus,
                 paymentMethod: paymentData.paymentMethod,
@@ -348,6 +372,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         setFieldErrors(new Set())
         setIsPaymentModalOpen(true)
     }
+
+    const getTabErrorCount = useCallback((tab: string) => {
+        return REQUIRED_FIELDS.filter(({ field, tab: fieldTab }) => fieldTab === tab && fieldErrors.has(field)).length
+    }, [fieldErrors])
 
     const salesChannelOptions = [
         { value: "Direct Sales", label: "Venda Direta" },
@@ -424,7 +452,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         {/* Tabs Navigation */}
                         <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                             <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                <TabsTrigger value="general">Dados gerais</TabsTrigger>
+                                <TabsTrigger value="general">
+                                    Dados gerais
+                                    {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                </TabsTrigger>
                                 {deliveryMethod === 'delivery' && <TabsTrigger value="delivery">Entrega</TabsTrigger>}
                                 <TabsTrigger value="observations">Observações</TabsTrigger>
                             </TabsList>

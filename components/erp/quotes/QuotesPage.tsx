@@ -437,238 +437,238 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                     </motion.div>
                 ) : (
 
-            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-                {/* Desktop Header */}
-                <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
-                    <div className="flex flex-col gap-2 pt-1">
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                                Orçamentos
-                            </h1>
+                    <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                        {/* Desktop Header */}
+                        <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                            <div className="flex flex-col gap-2 pt-1">
+                                <div className="flex items-center gap-3">
+                                    <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                                        Orçamentos
+                                    </h1>
+                                </div>
+                                <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                                    Gerencie propostas comerciais para seus clientes.
+                                </p>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <Button variant="outline" onClick={() => { }}>
+                                    <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
+                                </Button>
+
+                                <Button onClick={handleAddQuote}>
+                                    <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
+                                    Novo Orçamento
+                                </Button>
+                            </div>
                         </div>
-                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                            Gerencie propostas comerciais para seus clientes.
-                        </p>
-                    </div>
 
-                    <div className="flex items-center gap-3">
-                        <Button variant="outline" onClick={() => { }}>
-                            <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
-                        </Button>
+                        {hasQuotes && (
+                            <QuotePageControls
+                                activeTab={activeTab}
+                                setActiveTab={setActiveTab}
+                                search={search}
+                                onSearchChange={setSearch}
+                                onOpenFilter={() => setModals(prev => ({ ...prev, filter: true }))}
+                                onExport={() => { }}
+                                onAddQuote={handleAddQuote}
+                                filters={filters}
+                                setFilters={setFilters as any}
+                                viewMode={viewMode}
+                                onViewModeChange={setViewModeState}
+                                hasActiveFilters={hasActiveFilters}
+                            />
+                        )}
 
-                        <Button onClick={handleAddQuote}>
-                            <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
-                            Novo Orçamento
-                        </Button>
-                    </div>
-                </div>
-
-                {hasQuotes && (
-                    <QuotePageControls
-                        activeTab={activeTab}
-                        setActiveTab={setActiveTab}
-                        search={search}
-                        onSearchChange={setSearch}
-                        onOpenFilter={() => setModals(prev => ({ ...prev, filter: true }))}
-                        onExport={() => { }}
-                        onAddQuote={handleAddQuote}
-                        filters={filters}
-                        setFilters={setFilters as any}
-                        viewMode={viewMode}
-                        onViewModeChange={setViewModeState}
-                        hasActiveFilters={hasActiveFilters}
-                    />
-                )}
-
-                <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-8 px-4 md:px-8">
-                    <AnimatePresence mode="wait">
-                        {isLoading ? (
-                            <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                                <QuoteSkeleton count={5} viewMode={viewMode} />
-                            </motion.div>
-                        ) : !hasQuotes ? (
-                            <motion.div
-                                key="empty-no-data"
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                transition={{ duration: 0.4, ease: "easeOut" }}
-                                className="w-full h-full flex items-center justify-center min-h-[500px]"
-                            >
-                                <IconPlaceholder
-                                    placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
-                                    imageAlt="Sem orçamentos"
-                                    title="Você ainda não tem orçamentos"
-                                    subtitle="Seus orçamentos aparecerão aqui assim que você criá-los."
-                                />
-                            </motion.div>
-                        ) : paginated.length === 0 ? (
-                            <motion.div
-                                key="empty-results"
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                transition={{ duration: 0.4, ease: "easeOut" }}
-                                className="w-full h-full flex items-center justify-center min-h-[500px]"
-                            >
-                                <IconPlaceholder
-                                    placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                                    imageAlt="Nenhum orçamento encontrado"
-                                    title="Nenhum orçamento encontrado"
-                                    subtitle="Tente ajustar seus filtros ou termos de busca."
-                                    itemButton={{
-                                        text: "Limpar Filtros",
-                                        action: handleClearFilters,
-                                        variant: "outline"
-                                    }}
-                                />
-                            </motion.div>
-                        ) : (
-                            <motion.div
-                                key={activeTab + viewMode}
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.2 }}
-                                className="w-full"
-                            >
-                                {isTablet ? (
-                                    <div className="flex flex-col w-full">
-                                        {paginated.map((q: Quote, idx) => (
-                                            <React.Fragment key={q.originalId}>
-                                                <div
-                                                    className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex items-center gap-4"
-                                                    onClick={() => handleViewQuote(q)}
-                                                >
-                                                    <div className="flex-1 min-w-0 flex flex-col gap-1">
-                                                        <div className="flex justify-between items-start">
-                                                            <div className="flex flex-col min-w-0 pr-1">
-                                                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                                                                    {q.displayId}
-                                                                </h3>
-                                                                <span className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
-                                                                    {q.customer_name} • {q.formattedIssueDate}
-                                                                </span>
-                                                            </div>
-                                                            <Badge variant={q.statusColor} className="flex-shrink-0 text-[10px] h-5 px-1.5">
-                                                                {q.statusLabel}
-                                                            </Badge>
-                                                        </div>
-                                                        <div className="flex justify-between items-center mt-1">
-                                                            <span className="text-[14px] font-bold text-brand-primary">
-                                                                {formatCurrency(q.total_amount)}
-                                                            </span>
-                                                            <div className="flex items-center gap-4">
-                                                                <div onClick={(e) => { e.stopPropagation(); handleSelectRow(q.originalId); }}>
-                                                                    <Checkbox checked={selection.ids.has(q.originalId)} />
+                        <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-8 px-4 md:px-8">
+                            <AnimatePresence mode="wait">
+                                {isLoading ? (
+                                    <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                                        <QuoteSkeleton count={5} viewMode={viewMode} />
+                                    </motion.div>
+                                ) : !hasQuotes ? (
+                                    <motion.div
+                                        key="empty-no-data"
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        transition={{ duration: 0.4, ease: "easeOut" }}
+                                        className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
+                                    >
+                                        <IconPlaceholder
+                                            placeholderType="image"
+                                            imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
+                                            imageAlt="Sem orçamentos"
+                                            title="Você ainda não tem orçamentos"
+                                            subtitle="Seus orçamentos aparecerão aqui assim que você criá-los."
+                                        />
+                                    </motion.div>
+                                ) : paginated.length === 0 ? (
+                                    <motion.div
+                                        key="empty-results"
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        transition={{ duration: 0.4, ease: "easeOut" }}
+                                        className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
+                                    >
+                                        <IconPlaceholder
+                                            placeholderType="image"
+                                            imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                            imageAlt="Nenhum orçamento encontrado"
+                                            title="Nenhum orçamento encontrado"
+                                            subtitle="Tente ajustar seus filtros ou termos de busca."
+                                            itemButton={{
+                                                text: "Limpar Filtros",
+                                                action: handleClearFilters,
+                                                variant: "outline"
+                                            }}
+                                        />
+                                    </motion.div>
+                                ) : (
+                                    <motion.div
+                                        key={activeTab + viewMode}
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="w-full"
+                                    >
+                                        {isTablet ? (
+                                            <div className="flex flex-col w-full">
+                                                {paginated.map((q: Quote, idx) => (
+                                                    <React.Fragment key={q.originalId}>
+                                                        <div
+                                                            className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex items-center gap-4"
+                                                            onClick={() => handleViewQuote(q)}
+                                                        >
+                                                            <div className="flex-1 min-w-0 flex flex-col gap-1">
+                                                                <div className="flex justify-between items-start">
+                                                                    <div className="flex flex-col min-w-0 pr-1">
+                                                                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                            {q.displayId}
+                                                                        </h3>
+                                                                        <span className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
+                                                                            {q.customer_name} • {q.formattedIssueDate}
+                                                                        </span>
+                                                                    </div>
+                                                                    <Badge variant={q.statusColor} className="flex-shrink-0 text-[10px] h-5 px-1.5">
+                                                                        {q.statusLabel}
+                                                                    </Badge>
+                                                                </div>
+                                                                <div className="flex justify-between items-center mt-1">
+                                                                    <span className="text-[14px] font-bold text-brand-primary">
+                                                                        {formatCurrency(q.total_amount)}
+                                                                    </span>
+                                                                    <div className="flex items-center gap-4">
+                                                                        <div onClick={(e) => { e.stopPropagation(); handleSelectRow(q.originalId); }}>
+                                                                            <Checkbox checked={selection.ids.has(q.originalId)} />
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                </div>
-                                            </React.Fragment>
-                                        ))}
-                                    </div>
-                                ) : viewMode === "grid" ? (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                        {paginated.map((q: Quote) => (
-                                            <QuoteGridCard
-                                                key={q.originalId}
-                                                quote={q}
-                                                selected={selection.ids.has(q.originalId)}
-                                                onSelect={() => handleSelectRow(q.originalId)}
-                                                onEdit={() => handleEditQuote(q)}
-                                                onDuplicate={() => handleDuplicateQuote(q)}
-                                                onDelete={() => handleDeleteQuote(q)}
-                                                onClick={() => handleViewQuote(q)}
-                                            />
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="w-full overflow-hidden rounded-xl relative">
-                                        <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                                        <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+                                                    </React.Fragment>
+                                                ))}
+                                            </div>
+                                        ) : viewMode === "grid" ? (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                                {paginated.map((q: Quote) => (
+                                                    <QuoteGridCard
+                                                        key={q.originalId}
+                                                        quote={q}
+                                                        selected={selection.ids.has(q.originalId)}
+                                                        onSelect={() => handleSelectRow(q.originalId)}
+                                                        onEdit={() => handleEditQuote(q)}
+                                                        onDuplicate={() => handleDuplicateQuote(q)}
+                                                        onDelete={() => handleDeleteQuote(q)}
+                                                        onClick={() => handleViewQuote(q)}
+                                                    />
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="w-full overflow-hidden rounded-xl relative">
+                                                <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                                <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
 
-                                        <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
-                                                <thead>
-                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                        <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
-                                                            <div className="flex items-center">
-                                                                <Checkbox
-                                                                    checked={selection.ids.size === paginated.length && paginated.length > 0}
-                                                                    onChange={(checked) => {
-                                                                        setSelection({ ids: checked ? new Set(paginated.map((x: Quote) => x.originalId)) : new Set() })
-                                                                    }}
-                                                                    className="bg-white dark:bg-dark-background"
-                                                                />
-                                                            </div>
-                                                        </th>
-                                                        {COLUMNS.map((col, idx) => {
-                                                            const isSortable = col.id !== "actions";
-                                                            const isSorted = sortConfig?.key === col.id;
-                                                            return (
-                                                                <th
-                                                                    key={col.id}
-                                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""}`}
-                                                                    style={{ width: col.width }}
-                                                                    onClick={() => {
-                                                                        if (!isSortable) return;
-                                                                        setSortConfig(prev => ({
-                                                                            key: col.id as SortKey,
-                                                                            direction: prev?.key === col.id && prev.direction === 'asc' ? 'desc' : 'asc'
-                                                                        }));
-                                                                    }}
-                                                                >
-                                                                    <div className={`flex items-center gap-1.5 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
-                                                                        {col.label}
-                                                                        {isSortable && (
-                                                                            <ArrowUpDownIcon
-                                                                                size={14}
-                                                                                className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
-                                                                                    } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
-                                                                            />
-                                                                        )}
+                                                <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                    <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                                        <thead>
+                                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
+                                                                    <div className="flex items-center">
+                                                                        <Checkbox
+                                                                            checked={selection.ids.size === paginated.length && paginated.length > 0}
+                                                                            onChange={(checked) => {
+                                                                                setSelection({ ids: checked ? new Set(paginated.map((x: Quote) => x.originalId)) : new Set() })
+                                                                            }}
+                                                                            className="bg-white dark:bg-dark-background"
+                                                                        />
                                                                     </div>
                                                                 </th>
-                                                            );
-                                                        })}
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {paginated.map((q: Quote) => (
-                                                        <QuoteListItem
-                                                            key={q.originalId}
-                                                            quote={q}
-                                                            columns={COLUMNS}
-                                                            selected={selection.ids.has(q.originalId)}
-                                                            onSelect={handleSelectRow}
-                                                            onEdit={handleEditQuote}
-                                                            onDuplicate={handleDuplicateQuote}
-                                                            onDelete={handleDeleteQuote}
-                                                            onClick={handleViewQuote}
-                                                        />
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
+                                                                {COLUMNS.map((col, idx) => {
+                                                                    const isSortable = col.id !== "actions";
+                                                                    const isSorted = sortConfig?.key === col.id;
+                                                                    return (
+                                                                        <th
+                                                                            key={col.id}
+                                                                            className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""}`}
+                                                                            style={{ width: col.width }}
+                                                                            onClick={() => {
+                                                                                if (!isSortable) return;
+                                                                                setSortConfig(prev => ({
+                                                                                    key: col.id as SortKey,
+                                                                                    direction: prev?.key === col.id && prev.direction === 'asc' ? 'desc' : 'asc'
+                                                                                }));
+                                                                            }}
+                                                                        >
+                                                                            <div className={`flex items-center gap-1.5 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
+                                                                                {col.label}
+                                                                                {isSortable && (
+                                                                                    <ArrowUpDownIcon
+                                                                                        size={14}
+                                                                                        className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
+                                                                                            } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
+                                                                                    />
+                                                                                )}
+                                                                            </div>
+                                                                        </th>
+                                                                    );
+                                                                })}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {paginated.map((q: Quote) => (
+                                                                <QuoteListItem
+                                                                    key={q.originalId}
+                                                                    quote={q}
+                                                                    columns={COLUMNS}
+                                                                    selected={selection.ids.has(q.originalId)}
+                                                                    onSelect={handleSelectRow}
+                                                                    onEdit={handleEditQuote}
+                                                                    onDuplicate={handleDuplicateQuote}
+                                                                    onDelete={handleDeleteQuote}
+                                                                    onClick={handleViewQuote}
+                                                                />
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </motion.div>
                                 )}
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
+                            </AnimatePresence>
+                        </div>
 
-                {(isServerPaginated ? totalPages > 0 : paginated.length > 0) && (
-                    <Pagination
-                        currentPage={isServerPaginated ? currentPage : page}
-                        totalPages={totalPages}
-                        onPageChange={handlePageChange}
-                    />
-                )}
-                </div>
+                        {(isServerPaginated ? totalPages > 0 : paginated.length > 0) && (
+                            <Pagination
+                                currentPage={isServerPaginated ? currentPage : page}
+                                totalPages={totalPages}
+                                onPageChange={handlePageChange}
+                            />
+                        )}
+                    </div>
                 )}
             </AnimatePresence>
             <FilterSheet

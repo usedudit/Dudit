@@ -36,6 +36,7 @@ import AlertModal from "../../reusable/AlertModal"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import { deleteOrdersInBatchAction, updateOrdersStatusInBatchAction } from "@/app/actions/erp/orders"
+import { getDeliveryStatusMeta } from "@/lib/orders/status"
 
 // --- TYPES & INTERFACES ---
 
@@ -47,6 +48,8 @@ interface Order {
     total_amount: number;
     statusLabel: string;
     statusColor: any;
+    deliveryStatusLabel: string;
+    deliveryStatusColor: any;
     isUnfulfilled: boolean;
     formattedDate: string;
     store_name: string;
@@ -168,6 +171,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     pending: { label: "Pendente", color: "gray" },
                 }
                 const statusInfo = statusMap[o.situation] || { label: o.situation, color: "gray" }
+                const deliveryInfo = getDeliveryStatusMeta(o.delivery_status)
 
                 return {
                     originalId: o.id,
@@ -177,6 +181,8 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     total_amount: Number(o.total_amount),
                     statusLabel: statusInfo.label,
                     statusColor: statusInfo.color,
+                    deliveryStatusLabel: deliveryInfo.label,
+                    deliveryStatusColor: deliveryInfo.variant,
                     isUnfulfilled: (o.situation === "pending" || o.situation === "in_process"),
                     formattedDate: formatDate(o.order_date || o.created_at),
                     store_name: o.stores?.name || "-",
@@ -473,7 +479,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                         animate={{ opacity: 1, scale: 1 }}
                                         exit={{ opacity: 0, scale: 0.95 }}
                                         transition={{ duration: 0.4, ease: "easeOut" }}
-                                        className="w-full h-full flex items-center justify-center min-h-[500px]"
+                                        className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
                                     >
                                         <IconPlaceholder
                                             placeholderType="image"
@@ -490,7 +496,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                         animate={{ opacity: 1, scale: 1 }}
                                         exit={{ opacity: 0, scale: 0.95 }}
                                         transition={{ duration: 0.4, ease: "easeOut" }}
-                                        className="w-full h-full flex items-center justify-center min-h-[500px]"
+                                        className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
                                     >
                                         <IconPlaceholder
                                             placeholderType="image"
@@ -530,6 +536,9 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                                                 <div className="flex gap-1.5 shrink-0 items-center">
                                                                     <Badge variant={o.statusColor} className="h-5 text-[10px] px-1.5">
                                                                         {o.statusLabel}
+                                                                    </Badge>
+                                                                    <Badge variant={o.deliveryStatusColor} className="h-5 text-[10px] px-1.5">
+                                                                        {o.deliveryStatusLabel}
                                                                     </Badge>
                                                                     {o.isUnfulfilled && (
                                                                         <Badge variant="gray" className="h-5 text-[10px] px-1.5 opacity-70">

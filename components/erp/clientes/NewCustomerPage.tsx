@@ -36,6 +36,10 @@ interface NewCustomerPageProps {
     onError?: (msg: string) => void;
 }
 
+const REQUIRED_FIELDS = [
+    { field: "customerName", tab: "general" },
+]
+
 const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customerId, onSuccess, onError }) => {
     const { success: notifySuccess, error: notifyError } = useNotification()
     const [activeTab, setActiveTab] = useState("general")
@@ -184,6 +188,10 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
         nextAction?.()
         setShowAlertModal(false)
     }, [nextAction])
+
+    const getTabErrorCount = useCallback((tab: string) => {
+        return REQUIRED_FIELDS.filter(({ field, tab: fieldTab }) => fieldTab === tab && fieldErrors.has(field)).length
+    }, [fieldErrors])
 
     const handleCnpjBlur = useCallback(async () => {
         const cleanCnpj = cnpj.replace(/\D/g, "")
@@ -334,7 +342,10 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                 {/* Tabs */}
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                        <TabsTrigger value="general">Dados gerais</TabsTrigger>
+                                        <TabsTrigger value="general">
+                                            Dados gerais
+                                            {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                        </TabsTrigger>
                                         <TabsTrigger value="address">Endereço</TabsTrigger>
                                         <TabsTrigger value="notes">Observações</TabsTrigger>
                                     </TabsList>

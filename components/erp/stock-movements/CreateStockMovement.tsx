@@ -46,6 +46,11 @@ interface CreateStockMovementProps {
     onSuccess?: () => void;
 }
 
+const REQUIRED_FIELDS = [
+    { field: "items", tab: "Geral" },
+    { field: "reason", tab: "Geral" },
+]
+
 const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }) => {
     const { success: notifySuccess, error: notifyError } = useNotification();
     const [activeTab, setActiveTab] = useState('Geral');
@@ -105,6 +110,10 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
         setShowAlertModal(false)
     }, [nextAction])
 
+    const getTabErrorCount = useCallback((tab: string) => {
+        return REQUIRED_FIELDS.filter(({ field, tab: fieldTab }) => fieldTab === tab && fieldErrors.has(field)).length
+    }, [fieldErrors])
+
     const addProduct = useCallback((product: ProductBucketItem) => {
         // Check if product is already in the list
         const exists = items.find(item => item.product.id === product.id);
@@ -124,6 +133,15 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
 
     const updateItemQty = useCallback((index: number, qty: number) => {
         setItems(prev => prev.map((item, i) => i === index ? { ...item, quantity: Math.max(1, qty) } : item));
+    }, []);
+
+    const handleReasonChange = useCallback((value: string) => {
+        setReason(value);
+        setFieldErrors(prev => {
+            const next = new Set(prev);
+            next.delete('reason');
+            return next;
+        });
     }, []);
 
     const removeItem = useCallback((index: number) => {
@@ -229,7 +247,10 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                 {/* Tabs */}
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                        <TabsTrigger value="Geral" className="px-0 pb-3">Dados gerais</TabsTrigger>
+                                        <TabsTrigger value="Geral" className="px-0 pb-3">
+                                            Dados gerais
+                                            {getTabErrorCount("Geral") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                        </TabsTrigger>
                                         <TabsTrigger value="Observações" className="px-0 pb-3">Observações</TabsTrigger>
                                         <TabsTrigger value="Anexos" className="px-0 pb-3">Anexos</TabsTrigger>
                                     </TabsList>
@@ -252,7 +273,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Tipo de Movimentação</h3>
                                                     <div className="flex flex-col md:flex-row gap-4">
                                                         <motion.button
-                                                            onClick={() => { setType('in'); setReason('Selecione um motivo...'); }}
+                                                            onClick={() => { setType('in'); handleReasonChange('Selecione um motivo...'); }}
                                                             className={`flex-1 flex items-center justify-between p-5 rounded-2xl transition-all border ${type === 'in'
                                                                 ? 'bg-green-50/50 dark:bg-green-900/10 border-brand-green'
                                                                 : 'bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border border-brand-border dark:border-dark-border'
@@ -271,7 +292,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                         </motion.button>
 
                                                         <motion.button
-                                                            onClick={() => { setType('out'); setReason('Selecione um motivo...'); }}
+                                                            onClick={() => { setType('out'); handleReasonChange('Selecione um motivo...'); }}
                                                             className={`flex-1 flex items-center justify-between p-5 rounded-2xl transition-all border ${type === 'out'
                                                                 ? 'bg-red-50/50 dark:bg-red-900/10 border-brand-red'
                                                                 : 'bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border border-brand-border dark:border-dark-border'
@@ -471,7 +492,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                         <FormDropdown
                                                             label="Motivo"
                                                             value={reason}
-                                                            setValue={setReason}
+                                                            setValue={handleReasonChange}
                                                             options={type === 'in' ? [
                                                                 { value: 'Compra de Fornecedor', label: 'Compra de Fornecedor' },
                                                                 { value: 'Devolução de Cliente', label: 'Devolução de Cliente' },

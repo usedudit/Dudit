@@ -373,7 +373,8 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                 initial={{ opacity: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
-                                className="flex-1 flex items-center justify-center h-[500px]"
+                                transition={{ duration: 0.4, ease: "easeOut" }}
+                                className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
                             >
                                 <IconPlaceholder
                                     placeholderType="image"
