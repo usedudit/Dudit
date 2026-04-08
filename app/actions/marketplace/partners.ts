@@ -8,6 +8,8 @@ import { revalidatePartnerProfile } from "@/lib/utils/revalidation"
 import { requireUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { sanitizeInput, validatePhoneBR } from "@/lib/input-validator"
+import { normalizePhoneToE164 } from "@/lib/utils/phone-utils"
 
 // --- CLIENTES ---
 
@@ -300,6 +302,7 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   }
 
   const updateData: any = {}
+  const sanitizedPhone = typeof data.phone === "string" ? sanitizeInput(data.phone, 20) : undefined
 
   // Mapeamento de campos da tabela PARTNERS
   if (data.storeName) updateData.store_name = data.storeName
@@ -312,6 +315,16 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   }
   if (data.businessInfo !== undefined) updateData.business_info = data.businessInfo
   if (data.openingHours !== undefined) updateData.opening_hours = data.openingHours
+  if (sanitizedPhone !== undefined) {
+    if (sanitizedPhone) {
+      if (!validatePhoneBR(sanitizedPhone)) {
+        return { error: "Número de telefone inválido" }
+      }
+      updateData.phone = normalizePhoneToE164(sanitizedPhone)
+    } else {
+      updateData.phone = null
+    }
+  }
 
   // Campos fiscais
   if (data.crt !== undefined) updateData.crt = data.crt
@@ -420,6 +433,8 @@ export async function registerPartner(data: any) {
   const supabaseAdmin = getAdminClient()
 
   try {
+    const sanitizedPhone = typeof data.phone === "string" ? sanitizeInput(data.phone, 20) : ""
+
     // 1. Verifica duplicidade de usuário na tabela de partners
     const { data: existing } = await supabaseAdmin.from("partners").select("id").eq("user_id", userId).maybeSingle()
     if (existing) return { success: false, error: "Você já possui uma conta de parceiro." }
@@ -435,6 +450,10 @@ export async function registerPartner(data: any) {
       if (duplicateName) {
         return { success: false, error: "Já existe uma loja com este nome. Escolha outro nome." }
       }
+    }
+
+    if (!sanitizedPhone || !validatePhoneBR(sanitizedPhone)) {
+      return { success: false, error: "Número de telefone inválido" }
     }
 
     // --- GARANTIR QUE O PERFIL EXISTE ANTES DE CRIAR O PARTNER ---
@@ -472,6 +491,7 @@ export async function registerPartner(data: any) {
       store_name: data.storeName,
       store_description: data.storeDescription || "",
       store_image_url: data.storeImageUrl,
+      phone: normalizePhoneToE164(sanitizedPhone),
       business_type: data.businessType,
       cnpj: data.cnpj?.replace(/\D/g, "") || null,
       cpf_encrypted: cpfEncrypted,

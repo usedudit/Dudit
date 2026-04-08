@@ -225,8 +225,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             <div className="px-6 py-4 border-b border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-emerald-900/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div>
                                     <div className="font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                        Status do Pedido
-                                        <span className="text-xs font-medium text-brand-inactive-text tracking-wider uppercase">#{orderNumber}</span>
+                                        Status do Pedido #{orderNumber}
                                     </div>
                                 </div>
                                 <span className={`text-sm font-bold ${statusConfig.color}`}>{statusConfig.label}</span>

@@ -12,8 +12,8 @@ interface FormInputProps {
   onChange?: (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => void
-  onBlur?: () => void
-  onFocus?: () => void
+  onBlur?: React.FocusEventHandler<HTMLInputElement | HTMLTextAreaElement>
+  onFocus?: React.FocusEventHandler<HTMLInputElement | HTMLTextAreaElement>
   name?: string
   disabled?: boolean
   readOnly?: boolean
@@ -110,8 +110,10 @@ export const Input: React.FC<FormInputProps> = ({
     py-2
   `
 
-  const handleFocus = () => {
-    onFocus?.()
+  const handleFocus: React.FocusEventHandler<
+    HTMLInputElement | HTMLTextAreaElement
+  > = (event) => {
+    onFocus?.(event)
   }
 
   return (

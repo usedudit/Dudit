@@ -46,14 +46,16 @@ export function MoneyInput({ value = 0, onChange, min, max, ...props }: MoneyInp
         setDisplayValue(formatNumber(numericValue))
     }
 
-    const handleBlur = () => {
+    const handleBlur: React.FocusEventHandler<
+        HTMLInputElement | HTMLTextAreaElement
+    > = (e) => {
         let finalValue = numericVal
         if (min !== undefined && finalValue < min) {
             finalValue = min
             onChange?.(finalValue)
         }
         setDisplayValue(finalValue > 0 ? formatNumber(finalValue) : "")
-        props.onBlur?.()
+        props.onBlur?.(e)
     }
 
     return (

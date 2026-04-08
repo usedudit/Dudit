@@ -134,7 +134,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
       postalCode: partner.addresses?.[0]?.zip_code || '',
       addressCountry: 'BR',
     },
-    telephone: partner.telefone || '',
+    telephone: partner.phone || '',
     aggregateRating: partner.rating ? {
       '@type': 'AggregateRating',
       ratingValue: Number(partner.rating).toFixed(1),
@@ -180,6 +180,9 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     createdAt: partner.created_at,
     offeringType: partner.offering_type,
     openingHours: partner.opening_hours,
+    phone: partner.phone,
+    lat: partner.latitude,
+    lng: partner.longitude,
   }
 
   return (

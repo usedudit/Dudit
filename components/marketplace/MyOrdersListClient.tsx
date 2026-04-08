@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ReviewButton } from "@/components/marketplace/review-button";
 import { OrderRetryPayment } from "@/components/order-retry-payment";
@@ -25,7 +25,6 @@ const getStatusConfig = (status: string) => {
 };
 
 export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { orders: any[], reviewedOrderIdsArray: string[], userId: string }) {
-    const router = useRouter();
     const searchParams = useSearchParams();
     const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
 
@@ -44,15 +43,32 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
         }
     }, [searchParams, orders]);
 
+    const updateDetailsUrl = (orderNumber?: string | null) => {
+        const params = new URLSearchParams(searchParams.toString());
+
+        if (orderNumber) {
+            params.set('tab', 'details');
+            params.set('order_number', orderNumber);
+        } else {
+            params.delete('tab');
+            params.delete('order_number');
+        }
+
+        const query = params.toString();
+        const nextUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+
+        window.history.pushState(null, '', nextUrl);
+    };
+
     const handleOpenDetails = (id: string, orderNumber: string) => {
         setActiveOrderId(id);
         const displayNum = orderNumber || id;
-        router.push(`?tab=details&order_number=${displayNum}`, { scroll: false });
+        updateDetailsUrl(displayNum);
     };
 
     const handleCloseDetails = () => {
         setActiveOrderId(null);
-        router.push(window.location.pathname, { scroll: false });
+        updateDetailsUrl(null);
     };
 
     const activeOrder = orders?.find((o: any) => o.id === activeOrderId);
@@ -130,7 +146,7 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                 <div className="flex items-center justify-center md:justify-end gap-3 md:gap-6 w-full md:w-auto">
                                                     <div className="flex flex-col items-end">
                                                         <span className="text-xs font-medium text-brand-inactive-text md:block hidden">Total</span>
-                                                            {formatCurrency(order.total_amount)}
+                                                        {formatCurrency(order.total_amount)}
                                                     </div>
                                                     <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold ${statusConfig.bg} ${statusConfig.color} ${statusConfig.border} dark:bg-opacity-20`}>
                                                         <StatusIcon size={14} />
@@ -211,6 +227,7 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                             variant="outline"
                                                             className="flex-1 sm:flex-initial sm:w-auto order-1"
                                                         >
+                                                            Ver detalhes
                                                         </Button>
 
                                                         {order.situation === 'pending' && (

@@ -45,9 +45,11 @@ export function PercentageInput({ value = 0, onChange, ...props }: PercentageInp
         }
     }
 
-    const handleBlur = () => {
+    const handleBlur: React.FocusEventHandler<
+        HTMLInputElement | HTMLTextAreaElement
+    > = (e) => {
         setDisplayValue(numericVal > 0 ? numericVal.toString() : "")
-        props.onBlur?.()
+        props.onBlur?.(e)
     }
 
     return (
