@@ -385,35 +385,6 @@ export async function toggleCartSelectionAction(cartItemId: string, csrf_token?:
   return { success: true }
 }
 
-// --- CHECKOUT HELPER ---
-async function generateOrderNumber(supabase: any): Promise<string> {
-  const { data: lastOrder } = await supabase
-    .from("orders")
-    .select("order_number")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single()
-
-  let nextNumber = 1
-  if (lastOrder?.order_number) {
-    const match = lastOrder.order_number.match(/#([A-Z0-9]{3})-/)
-    if (match) {
-      const currentBase36 = match[1]
-      const currentNum = parseInt(currentBase36, 36)
-      nextNumber = currentNum + 1
-    }
-  }
-
-  const firstPart = nextNumber.toString(36).toUpperCase().padStart(3, "0")
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-  let secondPart = ""
-  for (let i = 0; i < 5; i++) {
-    secondPart += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-
-  return `#${firstPart}-${secondPart}`
-}
-
 export async function checkoutCartAction(
   partnerItems: { cartItemId: string; productId: string; variantId?: string; quantity: number }[],
   deliveryType: "delivery" | "pickup",
@@ -518,12 +489,10 @@ export async function checkoutCartAction(
   }
 
   const partnerId = products[0].partner_id
-  const orderNumber = await generateOrderNumber(supabase)
 
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .insert({
-      order_number: orderNumber,
       buyer_id: user.id,
       customer_name: buyerProfile?.full_name || null,
       partner_id: partnerId,
@@ -531,6 +500,7 @@ export async function checkoutCartAction(
       delivery_type: deliveryType,
       delivery_address: deliveryAddress,
       payment_method: useMercadoPago ? "Mercado Pago" : paymentMethod,
+      payment_provider: useMercadoPago ? "Mercado Pago" : paymentMethod,
       situation: "pending",
       notes,
     })

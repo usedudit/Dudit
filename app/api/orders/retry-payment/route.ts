@@ -40,6 +40,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 })
     }
 
+    if (order.payment_provider !== "Mercado Pago") {
+      return NextResponse.json({ error: "This order does not use Mercado Pago" }, { status: 400 })
+    }
+
     let mpAccessToken: string
     try {
       mpAccessToken = await getValidMercadoPagoAccessToken(order.partner_id)

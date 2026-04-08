@@ -5,12 +5,12 @@ import { useEffect } from 'react'
 interface OrderStatusSyncProps {
   orderId: string
   status: string
+  paymentProvider?: string | null
 }
 
-export function OrderStatusSyncOnLoad({ orderId, status }: OrderStatusSyncProps) {
+export function OrderStatusSyncOnLoad({ orderId, status, paymentProvider }: OrderStatusSyncProps) {
   useEffect(() => {
-    // Só sincroniza UMA VEZ quando o componente monta se for pending
-    if (status === 'pending') {
+    if (status === 'pending' && paymentProvider === "Mercado Pago") {
       const syncOnce = async () => {
         try {
           const response = await fetch('/api/orders/sync-payment-status', {
@@ -23,9 +23,8 @@ export function OrderStatusSyncOnLoad({ orderId, status }: OrderStatusSyncProps)
             const data = await response.json()
             console.log('Payment sync result:', data)
 
-            // Se foi pago (mesmo que já tenha sido atualizado por webhook antes), recarrega
             if (data.newStatus === 'paid' || data.paymentStatus === 'approved') {
-              console.log('✓ Payment confirmed! Reloading page to show updated status...')
+              console.log('Payment confirmed! Reloading page to show updated status...')
               setTimeout(() => {
                 window.location.reload()
               }, 1000)
@@ -38,7 +37,7 @@ export function OrderStatusSyncOnLoad({ orderId, status }: OrderStatusSyncProps)
 
       syncOnce()
     }
-  }, []) // Vazio para rodar só uma vez ao montar
+  }, [orderId, paymentProvider, status])
 
   return null
 }

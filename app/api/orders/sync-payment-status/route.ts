@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
-      .select("id, situation, total_amount, mp_payment_id, payment_method, buyer_id, partner_id")
+      .select("id, situation, total_amount, mp_payment_id, payment_method, payment_provider, buyer_id, partner_id")
       .eq("id", orderId)
       .eq("buyer_id", user.id)
       .single()
@@ -33,9 +33,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 })
     }
 
+    if (order.payment_provider !== "Mercado Pago") {
+      return NextResponse.json({
+        success: true,
+        orderId: order.id,
+        previousStatus: order.situation,
+        newStatus: order.situation,
+        updated: false,
+        skipped: true,
+        reason: "non_mercado_pago_order",
+      })
+    }
+
     if (!order.mp_payment_id) {
-      SecureLogger.error("Missing payment id during sync", { orderId })
-      return NextResponse.json({ error: "No payment info found" }, { status: 400 })
+      SecureLogger.error("Missing Mercado Pago payment id during sync", { orderId })
+      return NextResponse.json({ error: "No Mercado Pago payment info found" }, { status: 400 })
     }
 
     let mpAccessToken: string

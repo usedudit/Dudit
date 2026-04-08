@@ -93,7 +93,11 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                     return (
                                         <div key={order.id} className="bg-white dark:bg-dark-surface rounded-[12px] border border-brand-border dark:border-dark-border overflow-hidden transition-colors">
                                             {order.situation === "pending" && (
-                                                <OrderStatusSyncOnLoad orderId={order.id} status={order.situation} />
+                                                <OrderStatusSyncOnLoad
+                                                    orderId={order.id}
+                                                    status={order.situation}
+                                                    paymentProvider={order.payment_provider}
+                                                />
                                             )}
 
                                             {/* Card Header */}
@@ -215,6 +219,7 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                                     orderId={order.id}
                                                                     amount={order.total_amount}
                                                                     status={order.situation}
+                                                                    paymentProvider={order.payment_provider}
                                                                 />
                                                             </div>
                                                         )}

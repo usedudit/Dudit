@@ -9,9 +9,10 @@ interface OrderRetryPaymentProps {
   orderId: string
   amount: number
   status: string
+  paymentProvider?: string | null
 }
 
-export function OrderRetryPayment({ orderId, amount, status }: OrderRetryPaymentProps) {
+export function OrderRetryPayment({ orderId, amount, status, paymentProvider }: OrderRetryPaymentProps) {
   const { success: notifySuccess, error: notifyError } = useNotification()
   const [loading, setLoading] = useState(false)
   const [showPixModal, setShowPixModal] = useState(false)
@@ -71,7 +72,7 @@ export function OrderRetryPayment({ orderId, amount, status }: OrderRetryPayment
     }
   }
 
-  if (status !== "pending") {
+  if (status !== "pending" || paymentProvider !== "Mercado Pago") {
     return null
   }
 

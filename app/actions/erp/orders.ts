@@ -8,16 +8,6 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
 
-async function generateOrderNumber(supabase: any): Promise<string> {
-    const chars = '0123456789'
-    let secondPart = ''
-    for (let i = 0; i < 6; i++) {
-        secondPart += chars.charAt(Math.floor(Math.random() * chars.length))
-    }
-
-    return `DDT${secondPart}`
-}
-
 export async function createERPOrderAction(data: {
     partnerId: string
     customerId?: string
@@ -71,7 +61,6 @@ export async function createERPOrderAction(data: {
     if (!limitCheck.allowed) return { error: limitCheck.message || "Limite mensal atingido." }
 
     const supabase = await getSupabaseServerClient()
-    const orderNumber = await generateOrderNumber(supabase)
 
     // Format address string if it exists
     let deliveryAddressStr = ""
@@ -87,7 +76,6 @@ export async function createERPOrderAction(data: {
             partner_id: partnerId,
             buyer_id: data.customerId || null,
             customer_name: data.customerName || null,
-            order_number: orderNumber,
             order_source: data.deliveryMethod === 'pickup' ? 'Balcão' : 'Entrega', // Defaulting to source based on method for now, or use channel if passed
             delivery_type: data.deliveryMethod,
             situation: data.paymentStatus === 'paid' ? 'paid' : (data.paymentStatus === 'partially_paid' ? 'partially_paid' : 'pending'),
@@ -99,6 +87,7 @@ export async function createERPOrderAction(data: {
             additional_costs: data.additionalCosts,
             notes: data.notes || null,
             payment_method: data.paymentMethod,
+            payment_provider: data.paymentMethod,
             delivery_address: deliveryAddressStr || null,
             created_by: user.id
         })
