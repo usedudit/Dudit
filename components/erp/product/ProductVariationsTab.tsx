@@ -82,7 +82,7 @@ const VariationRow = React.memo(({ item, isSelected, isEditing, onSelect, onTogg
             </td>
             <td className="p-3 border-b border-brand-border dark:border-dark-border">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden border border-gray-100 dark:border-gray-700">
+                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                         <img
                             src={getR2ImageUrl(item.variant_options?.image || item.image) || "https://img.dudit.com.br/static/Placeholder.png"}
                             alt="Variant"
@@ -94,7 +94,7 @@ const VariationRow = React.memo(({ item, isSelected, isEditing, onSelect, onTogg
                         <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5">
                             {item.name || "-"}
                         </span>
-                        <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
                             {item.sku || "-"} • {item.type || "Variação"}
                         </span>
                     </div>
@@ -169,7 +169,7 @@ const VariationMobileItem = React.memo(({ item, isSelected, isEditing, onSelect,
                     </div>
 
                     {/* Linha 2: SKU */}
-                    <div className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body uppercase">
+                    <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body uppercase">
                         {item.sku || "-"}
                     </div>
 

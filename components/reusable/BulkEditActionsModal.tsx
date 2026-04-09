@@ -374,18 +374,16 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
       case 'order_payment':
       case 'order_delivery':
         const orderStatuses = view === 'order_payment' ? [
-            { value: 'pending', label: 'Pendente' },
-            { value: 'paid', label: 'Pago' },
-            { value: 'partially_paid', label: 'Parcialmente Pago' },
-            { value: 'refunded', label: 'Reembolsado' },
-            { value: 'cancelled', label: 'Cancelado' }
+          { value: 'pending', label: 'Pendente' },
+          { value: 'paid', label: 'Pago' },
+          { value: 'partially_paid', label: 'Parcialmente Pago' }
         ] : [
-            { value: 'not_sent', label: 'Não enviado' },
-            { value: 'preparing', label: 'Preparando' },
-            { value: 'sent', label: 'Enviado' },
-            { value: 'delivered', label: 'Entregue' },
-            { value: 'pickup_available', label: 'Pronto para retirada' },
-            { value: 'delivery_failed', label: 'Falha na entrega' }
+          { value: 'not_sent', label: 'Não enviado' },
+          { value: 'preparing', label: 'Preparando' },
+          { value: 'sent', label: 'Enviado' },
+          { value: 'delivered', label: 'Entregue' },
+          { value: 'pickup_available', label: 'Pronto para retirada' },
+          { value: 'delivery_failed', label: 'Falha na entrega' }
         ]
         return (
           <div className="space-y-1 pt-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
@@ -393,8 +391,9 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
               <ListItem
                 key={s.value}
                 title={s.label}
+                titleClassName="font-medium"
                 onClick={() => setOrderStatusConfig(s.value)}
-                className="cursor-pointer px-4"
+                className="cursor-pointer py-1 pl-4"
                 right={
                   <RadioButton
                     checked={orderStatusConfig === s.value}
@@ -439,9 +438,9 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
   }
 
   return (
-    <DefaultModal 
-      isOpen={isOpen} 
-      onClose={onClose} 
+    <DefaultModal
+      isOpen={isOpen}
+      onClose={onClose}
       title={view === 'menu' ? "Ações em Massa" : viewTitles[view]}
       leftAction={view !== 'menu' ? (
         <Button variant="filled" className="h-10 w-10 p-0 flex items-center justify-center flex-shrink-0" onClick={() => setView('menu')}>

@@ -1,5 +1,6 @@
 "use client"
 
+import { cn } from "@/lib/utils"
 import type React from "react"
 
 interface FormInputProps {
@@ -117,9 +118,9 @@ export const Input: React.FC<FormInputProps> = ({
   }
 
   return (
-    <div className={`flex-1 w-full ${className ?? ""}`}>
+    <div className={cn("flex-1 w-full", className)}>
       {label && (
-        <div className={`flex items-center ${labelSpacingClass}`}>
+        <div className="flex items-center gap-2 mb-1.5">
           <label
             htmlFor={inputId}
             className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate"

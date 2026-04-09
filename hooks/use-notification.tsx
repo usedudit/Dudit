@@ -17,16 +17,39 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([])
 
   const notify = useCallback((type: NotificationType, title: string, message?: string, duration?: number) => {
-    const id = Math.random().toString(36).substring(2, 9)
-    const notification: Notification = {
-      id,
-      type,
-      title,
-      message,
-      duration: duration || 5000,
-    }
+    const normalizedDuration = duration || 5000
 
-    setNotifications((prev) => [...prev, notification])
+    setNotifications((prev) => {
+      const existingNotification = prev.find(
+        (notification) =>
+          notification.type === type && notification.title === title && notification.message === message,
+      )
+
+      if (existingNotification) {
+        return prev.map((notification) =>
+          notification.id === existingNotification.id
+            ? {
+                ...notification,
+                duration: normalizedDuration,
+                repeatCount: (notification.repeatCount || 1) + 1,
+                resetKey: Date.now(),
+              }
+            : notification,
+        )
+      }
+
+      const notification: Notification = {
+        id: Math.random().toString(36).substring(2, 9),
+        type,
+        title,
+        message,
+        duration: normalizedDuration,
+        repeatCount: 1,
+        resetKey: Date.now(),
+      }
+
+      return [...prev, notification]
+    })
   }, [])
 
   const success = useCallback(

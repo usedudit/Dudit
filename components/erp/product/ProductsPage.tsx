@@ -811,17 +811,19 @@ export default function ProductsPage({
                                                 <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
                                                     <thead>
                                                         <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                            <th className="py-3 pl-6 pr-0 w-14 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
-                                                                <Checkbox
-                                                                    checked={selection.ids.size === paginated.length && paginated.length > 0}
-                                                                    onChange={(checked) =>
-                                                                        setSelection((p) => ({
-                                                                            ...p,
-                                                                            ids: checked ? new Set(paginated.map((x) => x.id)) : new Set(),
-                                                                        }))
-                                                                    }
-                                                                    className="bg-white dark:bg-dark-background"
-                                                                />
+                                                            <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
+                                                                <div className="flex items-center">
+                                                                    <Checkbox
+                                                                        checked={selection.ids.size === paginated.length && paginated.length > 0}
+                                                                        onChange={(checked) =>
+                                                                            setSelection((p) => ({
+                                                                                ...p,
+                                                                                ids: checked ? new Set(paginated.map((x) => x.id)) : new Set(),
+                                                                            }))
+                                                                        }
+                                                                        className="bg-white dark:bg-dark-background"
+                                                                    />
+                                                                </div>
                                                             </th>
                                                             {FIXED_COLUMNS.map((col, idx) => {
                                                                 const isSortable = col.id !== "actions";

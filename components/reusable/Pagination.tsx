@@ -4,6 +4,7 @@ import React from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/reusable"
 import { ChevronLeftIcon, ChevronRightIcon } from "@/lib/icons"
+import { cn } from "@/lib/utils"
 
 interface PaginationProps {
   currentPage: number
@@ -34,16 +35,24 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
               <ChevronLeftIcon className="w-6 h-6" />
             </Button>
 
-            {getPaginationGroup().map((page) => (
-              <Button
-                key={page}
-                variant="ghost"
-                onClick={() => onPageChange(page)}
-                className={`w-9 h-9 ${currentPage === page ? "bg-brand-gray dark:bg-dark-border text-brand-dark dark:text-dark-heading border-brand-border dark:border-dark-border" : "bg-transparent text-brand-inactive-text dark:text-dark-body border-transparent hover:bg-brand-gray dark:hover:bg-dark-border"}`}
-              >
-                {page}
-              </Button>
-            ))}
+            {getPaginationGroup().map((page) => {
+              const isActive = currentPage === page
+              return (
+                <Button
+                  key={page}
+                  variant="ghost"
+                  onClick={() => onPageChange(page)}
+                  className={cn(
+                    "w-9 h-9 p-0",
+                    isActive 
+                      ? "bg-brand-gray dark:bg-dark-border text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border" 
+                      : "bg-transparent text-brand-inactive-text dark:text-dark-body border-transparent hover:bg-brand-gray dark:hover:bg-dark-border"
+                  )}
+                >
+                  {page}
+                </Button>
+              )
+            })}
 
             <Button
               variant="ghost"

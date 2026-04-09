@@ -54,6 +54,7 @@ interface Order {
     formattedDate: string;
     formattedTime: string;
     store_name: string;
+    order_source: string;
     items_count: number;
     created_at_time: number;
     situation: string;
@@ -80,7 +81,7 @@ const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; 
     { id: "total", label: "Total", align: "left", width: "150px" },
     { id: "customer", label: "Cliente", align: "left", width: "250px" },
     { id: "channel", label: "Canal", align: "left", width: "150px" },
-    { id: "date", label: "Data", align: "center", width: "150px" },
+    { id: "date", label: "Data", align: "left", width: "150px" },
     { id: "status", label: "Status", align: "left", width: "80px" },
     { id: "actions", label: "Ações", align: "center", width: "80px" },
 ]
@@ -103,7 +104,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
     const [modals, setModals] = useState({ filter: false })
     const [bulkEditModal, setBulkEditModal] = useState({ isOpen: false })
-    const [confirmations, setConfirmations] = useState({ bulkDelete: false, bulkCancel: false })
+    const [confirmations, setConfirmations] = useState({ bulkCancel: false })
     const [actionModal, setActionModal] = useState<{ open: boolean; text: string }>({ open: false, text: "" })
     const [cancelReason, setCancelReason] = useState("")
     const [restoreStockOnCancel, setRestoreStockOnCancel] = useState(true)
@@ -157,7 +158,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
 
     const filterSections: FilterSectionConfig[] = [
         { id: "status", title: "Status", type: "checkbox-list", options: ["Pago", "Pendente", "Enviado", "Cancelado", "Em análise"] },
-        { id: "channel", title: "Canal", type: "checkbox-list", options: Array.from(new Set(effectiveOrders?.map((o: any) => o.stores?.name || "Loja Principal") || [])) as string[] },
+        { id: "channel", title: "Canal", type: "checkbox-list", options: Array.from(new Set(effectiveOrders?.map((o: any) => o.order_source || "Venda Direta") || [])) as string[] },
     ]
 
     const filteredOrders: Order[] = useMemo(() => {
@@ -197,6 +198,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     formattedDate: formatDate(o.order_date || o.created_at),
                     formattedTime: formatTime(o.order_date || o.created_at),
                     store_name: o.stores?.name || "-",
+                    order_source: o.order_source || "Venda Direta",
                     items_count: o.order_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || o.quantity || 0,
                     created_at_time: new Date(o.order_date || o.created_at).getTime(),
                     situation: o.situation,
@@ -221,7 +223,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                 else if (activeTab === "Cancelado") tabMatch = o.situation === "cancelled"
 
                 const statusFilterMatch = filters.status.length === 0 || filters.status.includes(o.statusLabel)
-                const channelFilterMatch = filters.channel.length === 0 || filters.channel.includes(o.store_name)
+                const channelFilterMatch = filters.channel.length === 0 || filters.channel.includes(o.order_source)
 
                 return tabMatch && statusFilterMatch && channelFilterMatch
             })
@@ -238,7 +240,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     case "status": aVal = a.statusLabel; bVal = b.statusLabel; break
                     case "customer": aVal = a.customer_name; bVal = b.customer_name; break
                     case "date": aVal = a.created_at_time; bVal = b.created_at_time; break
-                    case "channel": aVal = a.store_name; bVal = b.store_name; break
+                    case "channel": aVal = a.order_source; bVal = b.order_source; break
                     default: return 0
                 }
 
@@ -319,7 +321,8 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     statusValue: payload.orderStatus
                 })
                 if (result.success) {
-                    queryClient.invalidateQueries({ queryKey: ['erp', 'orders', partnerId] })
+                    await queryClient.invalidateQueries({ queryKey: ['erp', 'orders', partnerId] })
+                    await queryClient.refetchQueries({ queryKey: ['erp', 'orders', partnerId], type: 'active' })
                     setSelection({ ids: new Set() })
                     toast({ title: "Sucesso", description: "Status alterado com sucesso" })
                     setBulkEditModal({ isOpen: false })
@@ -618,7 +621,6 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                                         onEdit={() => handleEditOrder(o)}
                                                         canEdit={o.canEdit}
                                                         cancelLabel={o.canReopen ? "Reabrir" : "Cancelar"}
-                                                        onDelete={() => { }}
                                                         onCancel={() => o.canReopen ? handleReopenOrder(o.originalId) : openCancelModal(o.originalId)}
                                                     />
                                                 ))}
@@ -687,7 +689,6 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                                                     onEdit={handleEditOrder}
                                                                     canEdit={o.canEdit}
                                                                     cancelLabel={o.canReopen ? "Reabrir" : "Cancelar"}
-                                                                    onDelete={() => { }}
                                                                     onCancel={() => o.canReopen ? handleReopenOrder(o.originalId) : openCancelModal(o.originalId)}
                                                                     onDetails={handleDetailsOrder}
                                                                 />
@@ -746,16 +747,16 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
 
                 <Button
                     variant="ghost"
-                    onClick={() => setConfirmations((p) => ({ ...p, bulkDelete: true }))}
+                    onClick={() => { }}
                     leftIcon={<TrashIcon className="w-4 h-4" />}
-                    className="h-10 px-3 text-brand-red hover:text-brand-red/90 dark:text-brand-red dark:hover:text-brand-red/90 hover:bg-brand-red/5"
+                    className="hidden"
                 >
                     Excluir
                 </Button>
             </FloatingActionBar>
 
             <AlertModal
-                isOpen={confirmations.bulkDelete}
+                isOpen={false}
                 onClose={() => setConfirmations((p) => ({ ...p, bulkDelete: false }))}
                 onConfirm={() => confirmBulk("delete")}
                 title="Excluir Pedidos"
@@ -784,7 +785,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                 value={cancelReason}
                                 onChange={(e) => setCancelReason(e.target.value)}
                             />
-                            <label className="flex items-center gap-3 rounded-xl border border-brand-border dark:border-dark-border px-3 py-2 cursor-pointer">
+                            <label className="flex items-center gap-3 py-2 cursor-pointer">
                                 <Checkbox checked={restoreStockOnCancel} onChange={(checked) => setRestoreStockOnCancel(Boolean(checked))} />
                                 <span className="text-sm text-brand-dark dark:text-dark-heading">Restaurar estoque dos itens</span>
                             </label>

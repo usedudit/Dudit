@@ -53,7 +53,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     // Form State
     const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
     const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0])
-    const [salesChannel, setSalesChannel] = useState("Direct Sales")
+    const [salesChannel, setSalesChannel] = useState("Venda Direta")
     const [deliveryMethod, setDeliveryMethod] = useState<'delivery' | 'pickup'>("pickup")
     const [paymentStatus, setPaymentStatus] = useState<'paid' | 'partially_paid' | 'unpaid'>("unpaid")
     const [deliveryStatus, setDeliveryStatus] = useState('not_sent')
@@ -116,6 +116,13 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
     const primaryActionLabel = editOrderId ? "Salvar" : "Finalizar Venda"
 
+    const normalizeSalesChannel = useCallback((value?: string | null) => {
+        if (!value) return "Venda Direta"
+        if (value === "Direct Sales") return "Venda Direta"
+        if (value === "Online Store") return "Loja Online"
+        return value
+    }, [])
+
     // --- Effects ---
     useEffect(() => {
         if (!editOrderId) return
@@ -126,7 +133,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 const order = res.data
                 setSelectedCustomer(order.buyer_id ? { id: order.buyer_id, name: order.customer_name } : null)
                 setOrderDate(order.created_at.split('T')[0])
-                setSalesChannel(order.order_source || "Direct Sales")
+                setSalesChannel(normalizeSalesChannel(order.order_source))
                 setDeliveryMethod(order.delivery_type as any || "pickup")
                 const normalizedStatus = order.situation === "paid" ? "paid" : order.situation === "partially_paid" ? "partially_paid" : "unpaid"
                 setPaymentStatus(normalizedStatus)
@@ -175,7 +182,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             setIsLoadingData(false)
         }
         load()
-    }, [editOrderId, partnerId, notifyError])
+    }, [editOrderId, partnerId, notifyError, normalizeSalesChannel])
 
     // --- Handlers ---
     const handleScroll = useCallback(() => {
@@ -555,8 +562,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     }, [fieldErrors])
 
     const salesChannelOptions = [
-        { value: "Direct Sales", label: "Venda Direta" },
-        { value: "Online Store", label: "Loja Online" },
+        { value: "Venda Direta", label: "Venda Direta" },
+        { value: "Loja Online", label: "Loja Online" },
         { value: "WhatsApp", label: "WhatsApp" },
         { value: "Instagram", label: "Instagram" }
     ]

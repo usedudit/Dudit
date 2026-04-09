@@ -3,7 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Badge, ActionsDropdown, Checkbox } from "@/components/reusable"
-import { ThreeDotsIcon, ChevronDownIcon, ChevronUpIcon, Package } from "@/lib/icons"
+import { ChevronDownIcon, ChevronUpIcon, Package } from "@/lib/icons"
 
 interface StockMovementGridCardProps {
   movement: any

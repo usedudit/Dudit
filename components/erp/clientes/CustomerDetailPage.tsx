@@ -405,7 +405,6 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                                                     selected={selection.ids.has(o.originalId)}
                                                                                     onSelect={handleSelectRow}
                                                                                     onEdit={() => { router.push(`/erp/orders/edit/${o.originalId}`) }}
-                                                                                    onDelete={() => { }}
                                                                                     onCancel={() => { }}
                                                                                     onDetails={handleDetailsOrder}
                                                                                     showCheckbox={false}

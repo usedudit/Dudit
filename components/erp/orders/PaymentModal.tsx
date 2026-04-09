@@ -401,7 +401,7 @@ const PaymentModal = ({
                             </div>
                             <div className="flex flex-col overflow-hidden">
                                 <span className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight truncate max-w-[180px]">{customer?.name || 'Consumidor Final'}</span>
-                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">Venda ERP / Presencial</span>
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">Venda de Itens</span>
                             </div>
                         </div>
                         <div className="flex flex-col items-end text-right">

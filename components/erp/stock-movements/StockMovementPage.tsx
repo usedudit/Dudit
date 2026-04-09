@@ -184,6 +184,9 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
         return (initialMovements || []).map(mov => {
             const dateObj = new Date(mov.created_at);
             let reason = mov.reason || MOVEMENT_TYPE_LABELS[mov.movement_type] || mov.movement_type;
+            const orderReference = mov.order_id && mov.orders?.order_number
+                ? `Pedido #${mov.orders.order_number}`
+                : null;
             if (!mov.reason && mov.order_id && mov.orders?.order_number) {
                 reason += ` (Pedido #${mov.orders.order_number})`;
             } else if (!mov.reason && mov.reference_name) {
@@ -212,7 +215,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                 quantity: totalQuantity,
                 reason,
                 user: mov.created_by ? mov.created_by.split('@')[0] : 'Sistema',
-                reference: mov.reference_name || mov.reference_type || "-",
+                reference: orderReference || mov.reference_name || mov.reference_type || "-",
                 notes: mov.notes || '',
             };
         });

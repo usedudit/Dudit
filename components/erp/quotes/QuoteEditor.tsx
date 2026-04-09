@@ -188,7 +188,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                             <tr key={index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
                                                 <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
+                                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                                                             <img src={getR2ImageUrl(item.image, "thumbnail")} className="w-full h-full object-cover" alt="" />
                                                         </div>
                                                         <div className="flex flex-col text-left flex-1 min-w-0">
@@ -205,7 +205,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                                     {item.name || 'Produto sem nome'}
                                                                 </span>
                                                             )}
-                                                            <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
                                                                 {item.sku || 'Sem SKU'}
                                                             </span>
                                                         </div>

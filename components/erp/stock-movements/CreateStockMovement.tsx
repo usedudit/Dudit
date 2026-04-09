@@ -293,7 +293,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                 }`}
                                                         >
                                                             <div className="flex items-center gap-4">
-                                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${type === 'in' ? 'bg-brand-green text-white' : 'bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text'
+                                                                <div className={`w-12 h-12 rounded-full border border-brand-border dark:border-dark-border flex items-center justify-center flex-shrink-0 ${type === 'in' ? 'bg-brand-green text-white' : 'bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text'
                                                                     }`}>
                                                                     <ChevronDownIcon size={22} strokeWidth={2.5} />
                                                                 </div>
@@ -420,7 +420,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                             <tr key={item.product.id} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
                                                                                 <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
                                                                                     <div className="flex items-center gap-3">
-                                                                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
+                                                                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                                                                                             <img src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className={`w-full h-full ${!item.product.image ? 'object-contain' : 'object-cover'}`} alt="" />
                                                                                         </div>
                                                                                         <div className="flex flex-col text-left flex-1 min-w-0">
@@ -428,9 +428,9 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                                                 {item.product.name}
                                                                                             </span>
                                                                                             <div className="flex items-center gap-2">
-                                                                                                <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">{item.product.sku}</span>
+                                                                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">{item.product.sku}</span>
                                                                                                 <span className="w-1 h-1 rounded-full bg-brand-inactive-text opacity-40"></span>
-                                                                                                <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">Estoque: <strong className="text-brand-dark dark:text-dark-heading font-bold">{item.product.stock}</strong></span>
+                                                                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Estoque: <strong className="text-brand-dark dark:text-dark-heading font-bold">{item.product.stock}</strong></span>
                                                                                             </div>
                                                                                         </div>
                                                                                     </div>
@@ -506,6 +506,8 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                             label="Motivo"
                                                             value={reason}
                                                             setValue={handleReasonChange}
+                                                            error={fieldErrors.has('reason')}
+                                                            errorMessage={fieldErrors.has('reason') ? 'Selecione um motivo para a movimentaÃ§Ã£o.' : undefined}
                                                             options={type === 'in' ? [
                                                                 { value: 'Compra de Fornecedor', label: 'Compra de Fornecedor' },
                                                                 { value: 'Devolução de Cliente', label: 'Devolução de Cliente' },

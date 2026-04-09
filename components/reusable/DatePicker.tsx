@@ -189,19 +189,29 @@ export const DatePicker: React.FC<DatePickerProps> = ({
       variant="outline"
       disabled={disabled}
       className={cn(
-        "w-full h-[42px] justify-start text-left font-normal transition-all duration-200 rounded-xl",
-        "bg-brand-gray dark:bg-dark-border/30 border-brand-border dark:border-dark-border",
-        "hover:bg-white dark:hover:bg-dark-surface hover:border-brand-dark dark:hover:border-dark-body",
-        "focus-visible:ring-0 focus:border-brand-dark dark:focus:border-dark-body",
-        !value && "text-brand-inactive-text",
-        error && "border-brand-red",
-        open && "border-brand-dark dark:border-dark-body bg-white dark:bg-dark-surface ring-0 outline-none"
+        "flex h-[42px] w-full items-center justify-between rounded-lg border px-4 py-2.5 text-left text-sm font-normal transition-colors duration-150",
+        "bg-brand-gray dark:bg-dark-border/30",
+        error
+          ? "border-brand-red"
+          : "border-brand-border dark:border-dark-border focus:border-brand-dark dark:focus:border-dark-body",
+        "text-brand-dark dark:text-dark-heading",
+        "focus:bg-white dark:focus:bg-dark-surface focus:outline-none focus-visible:ring-0",
+        "disabled:bg-brand-gray dark:disabled:bg-dark-border/30 disabled:cursor-not-allowed",
+        open && "bg-white dark:bg-dark-surface border-brand-dark dark:border-dark-body"
       )}
     >
-      <CalendarIcon className="mr-3 ml-0.5 h-4 w-4 text-brand-inactive-text" />
-      <span className="truncate">
-        {displayValue || placeholder}
+      <span className="flex min-w-0 items-center">
+        <CalendarIcon className="mr-3 h-4 w-4 flex-shrink-0 text-brand-inactive-text" />
+        <span className={cn("truncate", !value && "text-brand-inactive-text")}>
+          {displayValue || placeholder}
+        </span>
       </span>
+      <ChevronDownIcon
+        className={cn(
+          "ml-2 h-4 w-4 flex-shrink-0 text-brand-inactive-text transition-transform duration-200",
+          open && "rotate-180"
+        )}
+      />
     </Button>
   )
 
@@ -209,7 +219,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     <div className={cn("flex-1 w-full", className)}>
       {label && (
         <div className="flex items-center gap-2 mb-1.5">
-          <label className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+          <label className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
             {label}
             {required && <span className="text-brand-red"> *</span>}
           </label>

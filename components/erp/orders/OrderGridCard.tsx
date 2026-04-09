@@ -11,7 +11,6 @@ interface OrderGridCardProps {
   selected: boolean
   onSelect: () => void
   onEdit: () => void
-  onDelete: () => void
   onCancel: () => void
   onDetails: () => void
   canEdit?: boolean
@@ -24,7 +23,6 @@ const OrderGridCard = React.memo(
     selected,
     onSelect,
     onEdit,
-    onDelete,
     onCancel,
     onDetails,
     canEdit = true,
@@ -115,7 +113,7 @@ const OrderGridCard = React.memo(
                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">
                   {order.formattedDate}
                 </span>
-                <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
                   {order.formattedTime}
                 </span>
               </div>
@@ -140,7 +138,6 @@ const OrderGridCard = React.memo(
             >
               <ActionsDropdown
                 onEdit={canEdit ? onEdit : undefined}
-                onDelete={onDelete}
                 onCancel={onCancel}
                 cancelLabel={cancelLabel}
               />

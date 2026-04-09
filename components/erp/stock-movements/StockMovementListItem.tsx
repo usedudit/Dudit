@@ -46,7 +46,7 @@ const StockMovementListItem = React.memo(
                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[150px] leading-tight mb-0.5">
                   {movement.displayId}
                 </span>
-                <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
                   {movement.items_count} {movement.items_count === 1 ? 'item' : 'itens'}
                 </span>
               </div>
@@ -72,7 +72,7 @@ const StockMovementListItem = React.memo(
               <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">
                 {movement.date.split(',')[0]}
               </span>
-              <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+              <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
                 {movement.date.split(',')[1]}
               </span>
             </div>

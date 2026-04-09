@@ -48,7 +48,7 @@ const ProductListItem = React.memo(
         case "name":
           return (
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden">
+              <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                 <img
                   src={getR2ImageUrl(product.images?.[0], "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
                   alt=""
@@ -65,7 +65,7 @@ const ProductListItem = React.memo(
                     </Tooltip>
                   )}
                 </span>
-                <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
                   {product.sku}
                 </span>
               </div>

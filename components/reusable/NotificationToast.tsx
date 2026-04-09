@@ -13,6 +13,8 @@ export interface Notification {
   title: string
   message?: string
   duration?: number
+  repeatCount?: number
+  resetKey?: number
 }
 
 interface NotificationToastProps {
@@ -40,6 +42,8 @@ function NotificationItem({
   const [isExiting, setIsExiting] = useState(false)
 
   useEffect(() => {
+    setIsExiting(false)
+
     // Anima entrada
     requestAnimationFrame(() => {
       setIsVisible(true)
@@ -52,7 +56,7 @@ function NotificationItem({
     }, duration)
 
     return () => clearTimeout(timer)
-  }, [notification.id])
+  }, [notification.id, notification.resetKey, notification.duration])
 
   const handleDismiss = () => {
     setIsExiting(true)
@@ -99,6 +103,9 @@ function NotificationItem({
   }
 
   const styles = getStyles()
+  const repeatSuffix = notification.repeatCount && notification.repeatCount > 1 ? ` (${notification.repeatCount})` : ""
+  const displayTitle = notification.message ? notification.title : `${notification.title}${repeatSuffix}`
+  const displayMessage = notification.message ? `${notification.message}${repeatSuffix}` : notification.message
 
   return (
     <div
@@ -116,8 +123,8 @@ function NotificationItem({
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <p className={cn("text-sm font-semibold", styles.titleColor)}>{notification.title}</p>
-          {notification.message && <p className={cn("text-xs mt-0.5", styles.messageColor)}>{notification.message}</p>}
+          <p className={cn("text-sm font-semibold", styles.titleColor)}>{displayTitle}</p>
+          {displayMessage && <p className={cn("text-xs mt-0.5", styles.messageColor)}>{displayMessage}</p>}
         </div>
 
         {/* Close button */}

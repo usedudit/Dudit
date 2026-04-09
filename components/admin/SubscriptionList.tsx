@@ -272,7 +272,7 @@ const SubscriptionList = () => {
                         <div className="font-bold text-[13px] text-brand-dark dark:text-dark-heading flex items-center gap-2">
                           {sub.tenant}
                         </div>
-                        <div className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">{sub.tenantId}</div>
+                        <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">{sub.tenantId}</div>
                       </div>
                     </div>
                   </td>

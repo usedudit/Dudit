@@ -89,6 +89,12 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const pendingSuffix = paymentStatus.label !== "Pago" ? ` (${paymentStatus.label})` : ""
     const remainingPaymentAmount = Math.max(0, Number(order.total_amount || 0) - Number(order.paid_amount || 0))
     const hasPendingPayment = order.situation !== "paid" && remainingPaymentAmount > 0.009
+    const paymentMethodLabel = `${order.payment_method || "Nao informado"}${pendingSuffix}`
+    const itemCount = Number(order.order_items?.length || 0)
+    const itemsLabel = itemCount === 1 ? "1 item" : `${itemCount} itens`
+    const subtotalValue = Number(order.total_amount || 0) - Number(order.shipping_cost || 0) - Number(order.additional_costs || 0) + Number(order.discount_value || 0)
+    const cleanNotes = String(order.notes || "").replace(/\n*Pedido cancelado por:[\s\S]*$/, "").trim()
+    const cancelNote = (String(order.notes || "").match(/Pedido cancelado por:[\s\S]*$/)?.[0] || "").trim()
 
     const getTimelineSteps = (status: string) => {
         const baseDate = formatDayMonth(order.created_at)
@@ -102,7 +108,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         ]
 
         if (status === "pickup_available") {
-            steps[3].label = "Disponível"
+            steps[3].label = "Disponivel"
             steps[3].active = true
         } else if (status === "delivery_failed") {
             steps[3].label = "Falha na entrega"
@@ -115,36 +121,11 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const timelineSteps = getTimelineSteps(order.delivery_status)
 
     const PaymentRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
-        <div className="flex justify-between items-start text-[14px]">
+        <div className="flex justify-between items-start text-[14px] gap-4">
             <span className="text-brand-inactive-text dark:text-dark-body font-medium">{label}</span>
             <div className="text-right">{value}</div>
         </div>
     )
-
-    const paymentMethodNode = (() => {
-        const method = order.payment_method || "Não informado"
-        const m = method.toLowerCase()
-        let brand = ""
-        if (m.includes("visa")) brand = "VISA"
-        else if (m.includes("master")) brand = "MASTERCARD"
-        else if (m.includes("elo")) brand = "ELO"
-        else if (m.includes("hiper")) brand = "HIPERCARD"
-        else if (m.includes("pix")) brand = "PIX"
-        else if (m.includes("dinheiro")) brand = "CASH"
-
-        if (brand) {
-            return (
-                <div className="flex items-center gap-2">
-                    <div className="border border-brand-border dark:border-dark-border px-1.5 py-0.5 rounded bg-white dark:bg-dark-surface text-[10px] font-bold text-blue-800 dark:text-blue-400">
-                        {brand}
-                    </div>
-                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{`${method}${pendingSuffix}`}</span>
-                </div>
-            )
-        }
-
-        return <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{`${method}${pendingSuffix}`}</span>
-    })()
 
     return (
         <div className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300 relative">
@@ -179,7 +160,6 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                 <ActionsDropdown
                                     onPrint={() => window.print()}
                                     onShare={() => { }}
-                                    onDelete={() => { }}
                                 />
 
                                 {order.situation !== "paid" && (
@@ -195,7 +175,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                             <Tabs value={activeTab} onValueChange={setActiveTab}>
                                 <TabsList className="px-0 border-b-0">
                                     <TabsTrigger value="summary">Resumo</TabsTrigger>
-                                    <TabsTrigger value="history">Histórico</TabsTrigger>
+                                    <TabsTrigger value="history">Historico</TabsTrigger>
                                 </TabsList>
                             </Tabs>
                         </div>
@@ -212,12 +192,12 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                             <div className="flex justify-between items-center">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-                                                        {order.order_source === "Marketplace" ? "Canal de venda:" : "Responsável pela venda:"}
+                                                        {order.order_source === "Marketplace" ? "Canal de venda:" : "Responsavel pela venda:"}
                                                     </span>
                                                     <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
                                                         {order.order_source === "Marketplace"
                                                             ? (order.order_source || "Marketplace")
-                                                            : (order.seller_name || "Venda Automática")}
+                                                            : (order.seller_name || "Venda automatica")}
                                                     </div>
                                                 </div>
                                                 {order.order_source !== "Marketplace" && (
@@ -299,24 +279,25 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                         </div>
 
                                         <div className="space-y-3">
-                                            <PaymentRow label="Método de Pagamento" value={paymentMethodNode} />
+                                            <PaymentRow
+                                                label="Metodo de Pagamento"
+                                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{paymentMethodLabel}</span>}
+                                            />
 
                                             <PaymentRow
                                                 label="Subtotal"
-                                                value={`${order.order_items?.length || 0} itens · ${formatCurrency(order.total_amount - (order.shipping_cost || 0) - (order.additional_costs || 0) + (order.discount_value || 0))}`}
+                                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{`${itemsLabel} • ${formatCurrency(subtotalValue)}`}</span>}
                                             />
 
                                             <PaymentRow
                                                 label="Tipo de Entrega"
                                                 value={
-                                                    <div className="text-right">
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                                            {order.delivery_type === "pickup" ? "Retirada no Balcão" : "Entrega no Endereço"}
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
+                                                        {order.delivery_type === "pickup" ? "Retirada no local" : "Entrega no endereco"} •{" "}
+                                                        <span className={Number(order.shipping_cost || 0) <= 0 ? "text-brand-green" : "text-brand-dark dark:text-dark-heading"}>
+                                                            {Number(order.shipping_cost || 0) <= 0 ? "Gratis" : formatCurrency(order.shipping_cost || 0)}
                                                         </span>
-                                                        <div className="text-brand-inactive-text dark:text-dark-body font-bold text-[11px]">
-                                                            ({formatCurrency(order.shipping_cost || 0)})
-                                                        </div>
-                                                    </div>
+                                                    </span>
                                                 }
                                             />
 
@@ -348,10 +329,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                         />
                                     )}
 
-                                    {order.notes && (
+                                    {(cleanNotes || cancelNote) && (
                                         <InfoCard
-                                            title="Observações do Pedido"
-                                            message={order.notes}
+                                            title="Observacoes do Pedido"
+                                            message={[cleanNotes, cancelNote].filter(Boolean).join("\n")}
                                             color="orange"
                                         />
                                     )}
@@ -376,11 +357,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                 <ActionsDropdown
                     onPrint={() => window.print()}
                     onShare={() => { }}
-                    onDelete={() => { }}
                     trigger={
                         <Button variant="outline" className="flex-1">
                             <ThreeDotsIcon className="w-4 h-4 mr-2" />
-                            Opções
+                            Opcoes
                         </Button>
                     }
                 />

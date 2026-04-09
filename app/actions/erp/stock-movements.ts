@@ -207,10 +207,13 @@ export async function getStockMovementDetails(id: string) {
                 id,
                 created_at,
                 movement_type,
+                order_id,
                 reference_name,
+                reference_type,
                 reason,
                 notes,
-                created_by
+                created_by,
+                orders(order_number)
             `)
             .eq("id", id)
             .eq("partner_id", ctx.partnerId)
@@ -224,7 +227,7 @@ export async function getStockMovementDetails(id: string) {
         if (!data) return errorResponse("Movimentação não encontrada")
 
         // Fetch child items from stock_movement_items
-        const { data: itemsData } = await supabase
+        const { data: itemsData, error: itemsError } = await supabase
             .from("stock_movement_items")
             .select(`
                 id,
@@ -243,6 +246,11 @@ export async function getStockMovementDetails(id: string) {
             .eq("movement_id", id)
             .order("created_at", { ascending: true })
 
+        if (itemsError) {
+            console.error("getStockMovementDetails items query error:", itemsError)
+            return errorResponse("Erro ao buscar itens da movimentaÃ§Ã£o")
+        }
+
         // Resolve user name
         const userNamePromise = data.created_by
             ? supabase.from("user_profiles").select("full_name").eq("user_id", data.created_by).single().then((r: any) => r.data?.full_name || data.created_by)
@@ -251,7 +259,9 @@ export async function getStockMovementDetails(id: string) {
         const userName = await userNamePromise
 
         let reason = data.reason || data.movement_type;
-        if (!data.reason && data.reference_name) {
+        if (!data.reason && data.order_id && data.orders?.order_number) {
+            reason += ` (Pedido #${data.orders.order_number})`;
+        } else if (!data.reason && data.reference_name) {
             reason = data.reference_name;
         }
 
@@ -268,7 +278,7 @@ export async function getStockMovementDetails(id: string) {
             timeZone: 'America/Sao_Paulo'
         });
 
-        const items = itemsData.map((item: any) => ({
+        const items = (itemsData || []).map((item: any) => ({
             id: item.id,
             product: {
                 name: item.products?.name || 'Produto Excluído',
@@ -282,17 +292,23 @@ export async function getStockMovementDetails(id: string) {
             type: item.quantity > 0 ? 'in' : 'out',
         }))
 
+        const movementType = data.movement_type === 'out' ? 'out' : 'in'
+        const totalQuantity = items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0)
+
         return successResponse({
             id: data.id,
             displayId: data.id.split('-')[0].toUpperCase() + '-' + data.id.slice(-4).toUpperCase(),
             date: `${dateStr}, ${timeStr}`,
             items,
             items_count: items.length,
-            type: data.quantity > 0 ? 'in' : 'out',
-            quantity: Math.abs(data.quantity),
+            type: movementType,
+            quantity: totalQuantity,
             reason: reason,
             user: userName,
             notes: data.notes || '',
+            reference: data.order_id && data.orders?.order_number
+                ? `Pedido #${data.orders.order_number}`
+                : data.reference_name || data.reference_type || '-',
             // Legacy single product for backward compat
             product: items[0]?.product || null,
         });

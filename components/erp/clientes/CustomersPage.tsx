@@ -454,7 +454,7 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
                                                             {c.totalOrderValue ? formatCurrency(c.totalOrderValue) : "-"}
                                                         </span>
                                                         <div className="flex items-center gap-4">
-                                                            <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
                                                                 {c.orders} pedido{c.orders !== 1 && 's'}
                                                             </span>
                                                             <div onClick={(e) => { e.stopPropagation(); handleSelectRow(c.originalId); }}>

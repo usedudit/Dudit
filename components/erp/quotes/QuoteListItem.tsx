@@ -48,7 +48,7 @@ const QuoteListItem = React.memo(
                                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 flex items-center gap-1.5">
                                     <span className="truncate max-w-[200px]">{quote.displayId}</span>
                                 </span>
-                                <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
                                     Criado por {quote.user_profiles?.full_name || "Sistema"}
                                 </span>
                             </div>

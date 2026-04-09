@@ -3,6 +3,7 @@
 import React from "react"
 import { Spinner } from "@/components/reusable/Spinner"
 import { Slot } from "@radix-ui/react-slot"
+import { cn } from "@/lib/utils"
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
     variant?: "default" | "outline" | "outlinered" | "destructive" | "warning" | "ghost" | "filled" | "link"
@@ -54,7 +55,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             return (
                 <Comp
                     ref={ref}
-                    className={`${baseStyles} ${sizeClass} ${variants[variant]} ${className}`}
+                    className={cn(baseStyles, sizeClass, variants[variant], className)}
                     {...(props as any)}
                 >
                     {children}
@@ -66,7 +67,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             <button
                 ref={ref}
                 disabled={disabled || isLoading}
-                className={`${baseStyles} ${sizeClass} ${variants[variant]} ${className}`}
+                className={cn(baseStyles, sizeClass, variants[variant], className)}
                 {...props}
             >
                 {isLoading && <Spinner size={18} className="text-white" />}

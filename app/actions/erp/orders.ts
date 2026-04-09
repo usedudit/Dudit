@@ -58,6 +58,21 @@ function buildOrderSource(salesChannel: string | undefined, deliveryMethod: 'del
     return deliveryMethod === "pickup" ? "Balcão" : "Entrega"
 }
 
+function normalizeOrderNotes(value?: string | null) {
+    return (value || "").replace(/\n*Pedido cancelado por:[\s\S]*$/, "").trim()
+}
+
+function buildCancelledOrderNotes(params: {
+    currentNotes?: string | null
+    userName: string
+    timestamp: string
+    reason?: string
+}) {
+    const baseNotes = normalizeOrderNotes(params.currentNotes)
+    const cancelLine = `Pedido cancelado por: ${params.userName} as ${params.timestamp}${params.reason ? ` - ${params.reason.trim()}` : ""}`
+    return [baseNotes, cancelLine].filter(Boolean).join("\n")
+}
+
 function normalizePaymentSituation(paymentStatus: ERPOrderPayload["paymentStatus"]) {
     return paymentStatus === "paid"
         ? "paid"
@@ -574,7 +589,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             additional_costs: data.additionalCosts,
             notes: data.notes || null,
             payment_method: data.paymentMethod,
-            payment_provider: data.paymentMethod,
+            payment_provider: null,
             delivery_address: deliveryAddressStr || null,
             created_by: user.id
         })
@@ -606,7 +621,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         orderId: order.id,
         createdBy: user.id,
         type: "out",
-        reason: "Venda ERP",
+        reason: "Venda de Produto",
         notes: "Baixa de estoque ao criar pedido no ERP",
         items: sanitizedItems.map((item) => ({
             product_id: item.productId,
@@ -788,6 +803,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             additional_costs: data.additionalCosts,
             notes: data.notes || null,
             payment_method: data.paymentMethod,
+            payment_provider: null,
             ...(deliveryAddressStr ? { delivery_address: deliveryAddressStr } : {})
         })
         .eq("id", orderId)
@@ -848,8 +864,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             orderId,
             createdBy: user.id,
             type: "out",
-            reason: "Venda ERP",
-            notes: "Baixa de estoque ao editar pedido no ERP",
+            reason: "Venda de Produtos",
             items: sanitizedItems.map((item) => ({
                 product_id: item.productId,
                 variant_id: item.variantId || null,
@@ -909,7 +924,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
     userName?: string
 }) {
     const user = await requireUser()
-    if (!user) return { error: "Não autenticado" }
+    if (!user) return { error: "Nao autenticado" }
 
     await requirePartnerAccess(payload.partnerId)
     const supabase = await getSupabaseServerClient()
@@ -927,15 +942,18 @@ export async function updateOrdersStatusInBatchAction(payload: {
             .eq("user_id", user.id)
             .single()
 
-        const effectiveUserName = profile?.full_name || payload.userName || "UsuÃ¡rio"
+        const effectiveUserName = profile?.full_name || payload.userName || "Usuario"
 
         for (const order of currentOrders || []) {
             if (payload.actionType === "cancel") {
                 if (order.situation === "cancelled") continue
 
-                const nextNotes = payload.cancelReason?.trim()
-                    ? `${order.notes || ""}\n\nPedido cancelado por: ${effectiveUserName} Ã s ${formatDateTime(new Date())} - ${payload.cancelReason.trim()}`.trim()
-                    : order.notes
+                const nextNotes = buildCancelledOrderNotes({
+                    currentNotes: order.notes,
+                    userName: effectiveUserName,
+                    timestamp: formatDateTime(new Date()),
+                    reason: payload.cancelReason?.trim(),
+                })
 
                 const { error } = await supabase
                     .from("orders")
@@ -978,6 +996,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         situation: restoredSituation,
                         previous_situation_before_cancel: null,
                         stock_restored_on_cancel: false,
+                        notes: normalizeOrderNotes(order.notes) || null,
                     })
                     .eq("id", order.id)
                     .eq("partner_id", payload.partnerId)
@@ -1039,44 +1058,27 @@ export async function updateOrdersStatusInBatchAction(payload: {
         return { success: true }
     }
 
-    let updateData: any = {}
-    if (payload.actionType === "payment_status") {
-        updateData.situation = payload.statusValue
-    } else if (payload.actionType === "delivery_status") {
-        updateData.delivery_status = payload.statusValue
-    } else if (payload.actionType === "cancel") {
-        updateData.situation = "cancelled"
-
-        if (payload.cancelReason) {
-            const { data: profile } = await supabase
-                .from("user_profiles")
-                .select("full_name")
-                .eq("user_id", user.id)
-                .single()
-
-            const effectiveUserName = profile?.full_name || payload.userName || "Usuário"
-
-            if (currentOrders) {
-                for (const order of currentOrders) {
-                    const timestamp = formatDateTime(new Date())
-                    const log = `\n\nPedido cancelado por: ${effectiveUserName} às ${timestamp} - ${payload.cancelReason}`
-                    const newNotes = (order.notes || "") + log
-
-                    await supabase.from("orders").update({ notes: newNotes }).eq("id", order.id)
-                }
-            }
-        }
+    const paymentStatusMap: Record<string, ERPOrderPayload["paymentStatus"]> = {
+        pending: "unpaid",
+        unpaid: "unpaid",
+        paid: "paid",
+        partially_paid: "partially_paid",
     }
 
     if (payload.actionType === "payment_status") {
+        const requestedStatus = paymentStatusMap[payload.statusValue || ""]
+        if (!requestedStatus) {
+            return { error: "Status de pagamento invalido para atualizacao em massa." }
+        }
+
         for (const order of currentOrders || []) {
             const paymentState = resolvePaymentState({
-                requestedStatus: (payload.statusValue === "partially_paid" ? "partially_paid" : payload.statusValue === "paid" ? "paid" : "unpaid") as ERPOrderPayload["paymentStatus"],
+                requestedStatus,
                 totalAmount: Number(order.total_amount || 0),
                 fallbackPaidAmount:
-                    payload.statusValue === "paid"
+                    requestedStatus === "paid"
                         ? Number(order.total_amount || 0)
-                        : payload.statusValue === "partially_paid"
+                        : requestedStatus === "partially_paid"
                             ? Number(order.paid_amount || 0)
                             : 0,
             })
@@ -1092,10 +1094,25 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
             if (error) return { error: error.message }
         }
-    } else {
+    }
+
+    if (payload.actionType === "delivery_status") {
+        const allowedDeliveryStatuses = new Set([
+            "not_sent",
+            "preparing",
+            "sent",
+            "delivered",
+            "pickup_available",
+            "delivery_failed",
+        ])
+
+        if (!payload.statusValue || !allowedDeliveryStatuses.has(payload.statusValue)) {
+            return { error: "Status de envio invalido para atualizacao em massa." }
+        }
+
         const { error } = await supabase
             .from("orders")
-            .update(updateData)
+            .update({ delivery_status: payload.statusValue })
             .in("id", payload.orderIds)
             .eq("partner_id", payload.partnerId)
 
@@ -1104,22 +1121,32 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
     try {
         await Promise.all(
-            (currentOrders || []).map((order: { id: string; situation: string | null; delivery_status: string | null; notes?: string | null; total_amount?: number | null; paid_amount?: number | null }) => {
+            (currentOrders || []).map((order: { id: string; situation: string | null; delivery_status: string | null; total_amount?: number | null; paid_amount?: number | null }) => {
                 const lines: string[] = []
 
-                if (payload.actionType === "payment_status" && payload.statusValue && order.situation !== payload.statusValue) {
-                    lines.push(`alterou status de pagamento: ${getPaymentStatusLabel(order.situation)} -> ${getPaymentStatusLabel(payload.statusValue)}`)
+                if (payload.actionType === "payment_status") {
+                    const requestedStatus = paymentStatusMap[payload.statusValue || ""]
+
+                    if (requestedStatus) {
+                        const nextPaymentState = resolvePaymentState({
+                            requestedStatus,
+                            totalAmount: Number(order.total_amount || 0),
+                            fallbackPaidAmount:
+                                requestedStatus === "paid"
+                                    ? Number(order.total_amount || 0)
+                                    : requestedStatus === "partially_paid"
+                                        ? Number(order.paid_amount || 0)
+                                        : 0,
+                        })
+
+                        if (order.situation !== nextPaymentState.situation) {
+                            lines.push(`alterou status de pagamento: ${getPaymentStatusLabel(order.situation)} -> ${getPaymentStatusLabel(nextPaymentState.situation)}`)
+                        }
+                    }
                 }
 
                 if (payload.actionType === "delivery_status" && payload.statusValue && order.delivery_status !== payload.statusValue) {
                     lines.push(`alterou status de entrega: ${getDeliveryStatusLabel(order.delivery_status)} -> ${getDeliveryStatusLabel(payload.statusValue)}`)
-                }
-
-                if (payload.actionType === "cancel") {
-                    lines.push("cancelou o pedido")
-                    if (payload.cancelReason?.trim()) {
-                        lines.push(`informou motivo do cancelamento: ${payload.cancelReason.trim()}`)
-                    }
                 }
 
                 if (lines.length === 0) return Promise.resolve()

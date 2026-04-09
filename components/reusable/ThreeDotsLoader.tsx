@@ -9,14 +9,14 @@ interface ThreeDotsLoaderProps extends HTMLMotionProps<"div"> {
   dotClassName?: string;
 }
 
-const ThreeDotsLoader: React.FC<ThreeDotsLoaderProps> = ({ 
-  className, 
+const ThreeDotsLoader: React.FC<ThreeDotsLoaderProps> = ({
+  className,
   dotClassName,
-  ...props 
+  ...props
 }) => {
   return (
-    <motion.div 
-      className={cn("w-full h-full flex items-center justify-center p-20 opacity-50", className)}
+    <motion.div
+      className={cn("w-full h-full flex items-center justify-center p-8 opacity-50", className)}
       {...props}
     >
       <div className="animate-pulse flex items-center gap-2">

@@ -19,7 +19,6 @@ interface OrderListItemProps {
   selected: boolean
   onSelect: (id: string) => void
   onEdit: (order: any) => void
-  onDelete: (order: any) => void
   onCancel: (order: any) => void
   onDetails: (order: any) => void
   canEdit?: boolean
@@ -34,7 +33,6 @@ const OrderListItem = React.memo(
     selected,
     onSelect,
     onEdit,
-    onDelete,
     onCancel,
     onDetails,
     canEdit = true,
@@ -54,7 +52,7 @@ const OrderListItem = React.memo(
                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[150px] leading-tight mb-0.5">
                   {order.displayId}
                 </span>
-                <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
                   {order.items_count} {order.items_count === 1 ? 'item' : 'itens'}
                 </span>
               </div>
@@ -98,7 +96,7 @@ const OrderListItem = React.memo(
               <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">
                 {order.formattedDate}
               </span>
-              <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+              <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
                 {order.formattedTime}
               </span>
             </div>
@@ -106,12 +104,9 @@ const OrderListItem = React.memo(
 
         case "channel":
           return (
-            <div className="flex items-center gap-2 text-brand-inactive-text dark:text-dark-body">
-              <ShoppingCartIcon size={14} />
-              <span className="text-[13px] font-medium truncate max-w-[120px]">
-                {order.store_name || "Loja"}
-              </span>
-            </div>
+            <span className="text-[13px] font-medium truncate max-w-[120px]">
+              {order.order_source || "Venda Direta"}
+            </span>
           )
 
         case "actions":
@@ -122,7 +117,6 @@ const OrderListItem = React.memo(
             >
               <ActionsDropdown
                 onEdit={canEdit ? () => onEdit(order) : undefined}
-                onDelete={() => onDelete(order)}
                 onCancel={() => onCancel(order)}
                 cancelLabel={cancelLabel}
               />

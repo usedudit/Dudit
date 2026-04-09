@@ -47,7 +47,7 @@ const CustomerListItem = React.memo(
                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[200px] xl:max-w-[300px]">
                   {customer.name}
                 </span>
-                <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
                   ID {customer.id || "-"}
                 </span>
               </div>
