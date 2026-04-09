@@ -16,7 +16,8 @@ import {
     PrinterIcon,
     FileIcon,
     CheckCircleIcon,
-    ChevronRightIcon
+    ChevronRightIcon,
+    CancelCircleIcon
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Input, Button, Checkbox } from '@/components/reusable';
@@ -668,9 +669,9 @@ const PaymentModal = ({
                                     transition={standardTransition}
                                     className="w-full h-full flex flex-col items-center justify-center p-8 text-center"
                                 >
-                                    <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-red-500 to-red-600 flex items-center justify-center mb-6 relative">
-                                        <div className="absolute inset-0 rounded-full bg-white opacity-15 animate-pulse"></div>
-                                        <CheckCircleIcon size={56} className="text-white" />
+                                    <div className="w-32 h-32 rounded-full bg-brand-red flex items-center justify-center mb-6 relative">
+                                        <div className="absolute inset-0 rounded-full bg-white"></div>
+                                        <CancelCircleIcon size={56} className="text-white" />
                                     </div>
                                     <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">Não foi possível concluir a venda</h2>
                                     <p className="text-brand-inactive-text dark:text-dark-body max-w-md">{errorMessage}</p>

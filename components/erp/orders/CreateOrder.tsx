@@ -28,6 +28,7 @@ interface CreateOrderProps {
 
 const REQUIRED_FIELDS = [
     { field: "productSearch", tab: "general" },
+    { field: "manualItemNames", tab: "general" },
 ]
 
 export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOrderProps) {
@@ -43,6 +44,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [isSaving, setIsSaving] = useState(false)
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set())
+    const [manualItemNameErrors, setManualItemNameErrors] = useState<Set<number>>(new Set())
+    const [inventoryAlreadyDeducted, setInventoryAlreadyDeducted] = useState(false)
     const [originalPaymentStatus, setOriginalPaymentStatus] = useState<'paid' | 'partially_paid' | 'unpaid'>("unpaid")
     const [originalPaidAmount, setOriginalPaidAmount] = useState(0)
     const [originalPaymentMethod, setOriginalPaymentMethod] = useState("Não informado")
@@ -86,6 +89,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [isVariantSheetOpen, setIsVariantSheetOpen] = useState(false)
     const [selectedProductForVariant, setSelectedProductForVariant] = useState<any>(null)
     const [showAlertModal, setShowAlertModal] = useState(false)
+    const [showValidationModal, setShowValidationModal] = useState(false)
+    const [validationMessage, setValidationMessage] = useState("")
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
     const [wasSaleSuccessful, setWasSaleSuccessful] = useState(false)
 
@@ -134,18 +139,23 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setOtherCosts((order.additional_costs || 0).toString())
                 setDiscountValue(order.discount_value || 0)
                 setDiscountType(order.discount_type || "fixed")
+                setInventoryAlreadyDeducted(Boolean(order.inventory_deducted))
 
                 if (order.order_items) {
                     setItems(order.order_items.map((item: any) => ({
                         id: item.id || Math.random().toString(36).substr(2, 9),
                         productId: item.product_id,
+                        variantId: item.variant_id || null,
                         name: item.product_name,
                         unitPrice: Number(item.product_price),
                         quantity: Number(item.quantity),
                         sortOrder: Number(item.sort_order ?? 0),
-                        image: item.image || item.product?.image || null,
-                        sku: item.sku || item.product?.sku || "",
-                        isEditing: false
+                        image: item.product_variants?.image || item.products?.images?.[0] || item.image || item.product?.image || null,
+                        sku: item.product_variants?.sku || item.sku || item.product?.sku || item.products?.sku || "",
+                        stock: Number(item.product_variants?.stock_quantity ?? item.products?.stock_quantity ?? 0),
+                        allowSellWithoutStock: Boolean(item.products?.allow_sell_without_stock),
+                        isEditing: false,
+                        isManual: !item.product_id
                     })))
                 }
 
@@ -180,11 +190,55 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         }
     }
 
+    const getItemMaxQuantity = useCallback((item: any) => {
+        if (!item || item.isManual || item.allowSellWithoutStock) return undefined
+        if (inventoryAlreadyDeducted) {
+            return Math.max(0, Number(item.stock ?? 0) + Number(item.quantity ?? 0))
+        }
+        return Math.max(0, Number(item.stock ?? 0))
+    }, [inventoryAlreadyDeducted])
+
+    const validateStockAvailability = useCallback((targetItems: any[]) => {
+        if (inventoryAlreadyDeducted) return null
+        const stockMap = new Map<string, { name: string; quantity: number; stock: number; allowSellWithoutStock: boolean }>()
+
+        for (const item of targetItems) {
+            if (!item?.productId || item.isManual) continue
+            const key = item.variantId ? `variant:${item.variantId}` : `product:${item.productId}`
+            const existing = stockMap.get(key)
+
+            if (existing) {
+                existing.quantity += Number(item.quantity || 0)
+                continue
+            }
+
+            stockMap.set(key, {
+                name: item.name || "Produto",
+                quantity: Number(item.quantity || 0),
+                stock: Number(item.stock ?? 0),
+                allowSellWithoutStock: Boolean(item.allowSellWithoutStock),
+            })
+        }
+
+        for (const entry of stockMap.values()) {
+            if (entry.allowSellWithoutStock) continue
+            if (entry.quantity > entry.stock) {
+                return `A quantidade de "${entry.name}" está maior que o estoque disponível.`
+            }
+        }
+
+        return null
+    }, [inventoryAlreadyDeducted])
+
     const addProductToOrder = (product: any) => {
         if (product.has_variants) {
             setSelectedProductForVariant(product)
             setIsVariantSheetOpen(true)
         } else {
+            if (!product.allow_sell_without_stock && Number(product.stock || 0) < 1) {
+                notifyError(`"${product.name}" está sem estoque disponível.`)
+                return
+            }
             const newItem = {
                 id: Math.random().toString(36).substr(2, 9),
                 productId: product.id,
@@ -194,7 +248,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 sortOrder: items.length,
                 image: product.image,
                 sku: product.sku,
-                isEditing: false
+                stock: Number(product.stock || 0),
+                allowSellWithoutStock: Boolean(product.allow_sell_without_stock),
+                isEditing: false,
+                isManual: false
             }
             setItems([...items, newItem])
             setFieldErrors(prev => {
@@ -210,6 +267,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         const newItems: any[] = []
         variants.forEach(variant => {
             if (variant.qty > 0) {
+                if (!selectedProductForVariant.allow_sell_without_stock && variant.qty > Number(variant.stock || 0)) {
+                    return
+                }
                 const newItem = {
                     id: Math.random().toString(36).substr(2, 9),
                     productId: selectedProductForVariant.id,
@@ -220,7 +280,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     sortOrder: items.length + newItems.length,
                     image: variant.image || selectedProductForVariant.image,
                     sku: variant.sku || selectedProductForVariant.sku,
-                    isEditing: false
+                    stock: Number(variant.stock || 0),
+                    allowSellWithoutStock: Boolean(selectedProductForVariant.allow_sell_without_stock),
+                    isEditing: false,
+                    isManual: false
                 }
                 newItems.push(newItem)
             }
@@ -241,6 +304,22 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         const newItems = [...items]
         newItems[index][field] = value
         setItems(newItems)
+        if (field === "name") {
+            setManualItemNameErrors(prev => {
+                if (!prev.has(index)) return prev
+                const next = new Set(prev)
+                if (String(value || "").trim()) next.delete(index)
+                return next
+            })
+            setFieldErrors(prev => {
+                if (!prev.has("manualItemNames")) return prev
+                const hasInvalidManualItems = newItems.some((item) => item.isManual && !String(item.name || "").trim())
+                if (hasInvalidManualItems) return prev
+                const next = new Set(prev)
+                next.delete("manualItemNames")
+                return next
+            })
+        }
     }
 
     const updateItemPrice = (index: number, price: number) => {
@@ -251,12 +330,19 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
     const updateItemQty = (index: number, qty: number) => {
         const newItems = [...items]
-        newItems[index].quantity = qty
+        const maxQty = getItemMaxQuantity(newItems[index])
+        if (maxQty !== undefined && qty > maxQty) {
+            notifyError(`A quantidade de "${newItems[index].name}" está maior que o estoque disponível.`)
+            newItems[index].quantity = maxQty
+        } else {
+            newItems[index].quantity = qty
+        }
         setItems(newItems)
     }
 
     const toggleItemEdit = (index: number, isEditing: boolean) => {
         const newItems = [...items]
+        if (isEditing && !newItems[index]?.isManual) return
         newItems[index].isEditing = isEditing
         setItems(newItems)
     }
@@ -269,7 +355,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             quantity: 1,
             sortOrder: items.length,
             isEditing: true,
-            sku: ""
+            sku: "",
+            isManual: true
         }
         setItems([...items, newItem])
         setFieldErrors(prev => {
@@ -283,6 +370,15 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         const newItems = [...items]
         newItems.splice(index, 1)
         setItems(newItems)
+        setManualItemNameErrors(new Set())
+        setFieldErrors(prev => {
+            if (!prev.has("manualItemNames")) return prev
+            const hasInvalidManualItems = newItems.some((item) => item.isManual && !String(item.name || "").trim())
+            if (hasInvalidManualItems) return prev
+            const next = new Set(prev)
+            next.delete("manualItemNames")
+            return next
+        })
     }
 
     const resetForm = () => {
@@ -295,7 +391,47 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         setDiscountValue(0)
         setPaymentStatus("unpaid")
         setDeliveryStatus("not_sent")
+        setInventoryAlreadyDeducted(false)
+        setManualItemNameErrors(new Set())
+        setFieldErrors(new Set())
         setActiveTab("general")
+    }
+
+    const validateOrderBeforeSubmit = () => {
+        if (items.length === 0) {
+            setFieldErrors(new Set(["productSearch"]))
+            notifyError("Adicione pelo menos um item ao pedido.")
+            return false
+        }
+
+        const invalidManualIndexes = new Set<number>()
+        items.forEach((item, index) => {
+            if (item.isManual && !String(item.name || "").trim()) {
+                invalidManualIndexes.add(index)
+            }
+        })
+
+        if (invalidManualIndexes.size > 0) {
+            setManualItemNameErrors(invalidManualIndexes)
+            setFieldErrors(new Set(["manualItemNames"]))
+            setActiveTab("general")
+            setValidationMessage("Preencha o nome dos itens adicionados manualmente antes de salvar a venda.")
+            setShowValidationModal(true)
+            return false
+        }
+
+        const stockValidationMessage = validateStockAvailability(items)
+        if (stockValidationMessage) {
+            setFieldErrors(new Set(["productSearch"]))
+            setActiveTab("general")
+            setValidationMessage(stockValidationMessage)
+            setShowValidationModal(true)
+            return false
+        }
+
+        setManualItemNameErrors(new Set())
+        setFieldErrors(new Set())
+        return true
     }
 
     const handleClosePaymentModal = () => {
@@ -329,6 +465,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         } : undefined,
         items: items.map((item, idx) => ({
             productId: item.productId,
+            variantId: item.variantId,
             customName: item.name,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
@@ -375,8 +512,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     }
 
     const handleConfirmPayment = async (paymentData: any) => {
-        if (items.length === 0) {
-            notifyError("Adicione pelo menos um item ao pedido.")
+        if (!validateOrderBeforeSubmit()) {
             return { error: "Sem itens" }
         }
         return submitOrder({
@@ -387,13 +523,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     }
 
     const handleDirectSaveOrder = async () => {
-        if (items.length === 0) {
-            setFieldErrors(new Set(["productSearch"]))
-            notifyError("Adicione pelo menos um item ao pedido.")
+        if (!validateOrderBeforeSubmit()) {
             return
         }
-
-        setFieldErrors(new Set())
         await submitOrder({
             paymentStatus,
             paidAmount: originalPaidAmount,
@@ -401,22 +533,16 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     }
 
     const handleOpenPaymentModal = async () => {
-        if (items.length === 0) {
-            setFieldErrors(new Set(["productSearch"]))
-            notifyError("Adicione pelo menos um item ao pedido.")
+        if (!validateOrderBeforeSubmit()) {
             return
         }
-        setFieldErrors(new Set())
         setIsPaymentModalOpen(true)
     }
 
     const handleSaveOrder = async () => {
-        if (items.length === 0) {
-            setFieldErrors(new Set(["productSearch"]))
-            notifyError("Adicione pelo menos um item ao pedido.")
+        if (!validateOrderBeforeSubmit()) {
             return
         }
-        setFieldErrors(new Set())
         if (editOrderId) {
             await handleDirectSaveOrder()
             return
@@ -536,6 +662,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             paymentStatus={paymentStatus}
                             deliveryStatus={deliveryStatus}
                             remainingPaymentAmount={editOrderId ? remainingAmount : 0}
+                            manualItemNameErrors={manualItemNameErrors}
                             isSaving={isSaving}
                             setSearchQuery={productBucket.setSearchQuery}
                             setIsProductSearchOpen={setIsProductSearchOpen}
@@ -544,6 +671,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             updateItemField={updateItemField}
                             updateItemPrice={updateItemPrice}
                             updateItemQty={updateItemQty}
+                            resolveItemQuantityMax={getItemMaxQuantity}
                             toggleItemEdit={toggleItemEdit}
                             removeItem={removeItem}
                             addBlankItem={addBlankItem}
@@ -626,6 +754,15 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 title="Descartar alterações?"
                 description="Se você sair agora, todas as informações preenchidas serão perdidas. Tem certeza que deseja descartar?"
                 confirmText="Descartar"
+                variant="warning"
+            />
+
+            <AlertModal
+                isOpen={showValidationModal}
+                onClose={() => setShowValidationModal(false)}
+                title="Campos obrigatórios pendentes"
+                message={validationMessage || "Revise os campos obrigatórios antes de salvar a venda."}
+                confirmText="Ok, entendi"
                 variant="warning"
             />
             <AnimatePresence>

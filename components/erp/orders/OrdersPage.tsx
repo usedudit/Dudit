@@ -29,7 +29,7 @@ import {
     BlockedIcon
 } from "@/lib/icons"
 import { useRouter } from "next/navigation"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
 
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import AlertModal from "../../reusable/AlertModal"
@@ -52,11 +52,14 @@ interface Order {
     deliveryStatusColor: any;
     isUnfulfilled: boolean;
     formattedDate: string;
+    formattedTime: string;
     store_name: string;
     items_count: number;
     created_at_time: number;
     situation: string;
+    previousSituationBeforeCancel?: string | null;
     canEdit: boolean;
+    canReopen: boolean;
 }
 
 interface FilterState {
@@ -76,9 +79,9 @@ const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; 
     { id: "order_id", label: "Pedido", align: "left", width: "200px" },
     { id: "total", label: "Total", align: "left", width: "150px" },
     { id: "customer", label: "Cliente", align: "left", width: "250px" },
-    { id: "date", label: "Data", align: "center", width: "150px" },
     { id: "channel", label: "Canal", align: "left", width: "150px" },
-    { id: "status", label: "Status", align: "center", width: "80px" },
+    { id: "date", label: "Data", align: "center", width: "150px" },
+    { id: "status", label: "Status", align: "left", width: "80px" },
     { id: "actions", label: "Ações", align: "center", width: "80px" },
 ]
 
@@ -103,6 +106,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
     const [confirmations, setConfirmations] = useState({ bulkDelete: false, bulkCancel: false })
     const [actionModal, setActionModal] = useState<{ open: boolean; text: string }>({ open: false, text: "" })
     const [cancelReason, setCancelReason] = useState("")
+    const [restoreStockOnCancel, setRestoreStockOnCancel] = useState(true)
     const [singleCancelId, setSingleCancelId] = useState<string | null>(null)
     const [selection, setSelection] = useState({ ids: new Set<string>() })
     const [wrapperMode, setWrapperMode] = useState<'create' | 'edit' | 'view' | null>(null)
@@ -191,11 +195,14 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     deliveryStatusColor: deliveryInfo.variant,
                     isUnfulfilled: (o.situation === "pending" || o.situation === "in_process"),
                     formattedDate: formatDate(o.order_date || o.created_at),
+                    formattedTime: formatTime(o.order_date || o.created_at),
                     store_name: o.stores?.name || "-",
                     items_count: o.order_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || o.quantity || 0,
                     created_at_time: new Date(o.order_date || o.created_at).getTime(),
                     situation: o.situation,
-                    canEdit: o.situation !== "paid"
+                    previousSituationBeforeCancel: o.previous_situation_before_cancel || null,
+                    canEdit: o.situation !== "paid" && o.previous_situation_before_cancel !== "paid",
+                    canReopen: o.situation === "cancelled"
                 }
             })
             .filter((o: Order) => {
@@ -274,6 +281,18 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
         })
     }
 
+    const openCancelModal = (orderId: string) => {
+        setSingleCancelId(orderId)
+        setCancelReason("")
+        setRestoreStockOnCancel(true)
+        setConfirmations(p => ({ ...p, bulkCancel: true }))
+    }
+
+    const handleReopenOrder = async (orderId: string) => {
+        setSingleCancelId(orderId)
+        await confirmBulk("reopen", [orderId])
+    }
+
     const handleBulkEditApply = async (payload: BulkActionPayload) => {
         const ids = Array.from(selection.ids)
         if (ids.length === 0) return
@@ -316,22 +335,30 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
         }
     }
 
-    const confirmBulk = async (action: 'delete' | 'cancel') => {
-        const ids = singleCancelId ? [singleCancelId] : Array.from(selection.ids)
+    const confirmBulk = async (action: 'delete' | 'cancel' | 'reopen', explicitIds?: string[]) => {
+        const ids = explicitIds?.length ? explicitIds : (singleCancelId ? [singleCancelId] : Array.from(selection.ids))
         if (ids.length === 0) return
 
-        setActionModal({ open: true, text: action === 'delete' ? "Excluindo pedidos..." : "Cancelando pedidos..." })
+        setActionModal({ open: true, text: action === 'delete' ? "Excluindo pedidos..." : action === 'reopen' ? "Reabrindo pedidos..." : "Cancelando pedidos..." })
 
         try {
             let result;
             if (action === 'delete') {
                 result = await deleteOrdersInBatchAction(ids, partnerId)
+            } else if (action === 'reopen') {
+                result = await updateOrdersStatusInBatchAction({
+                    orderIds: ids,
+                    partnerId,
+                    actionType: 'reopen',
+                    userName: currentUserName
+                })
             } else {
                 result = await updateOrdersStatusInBatchAction({
                     orderIds: ids,
                     partnerId,
                     actionType: 'cancel',
                     cancelReason: cancelReason.trim() || undefined,
+                    restoreStock: restoreStockOnCancel,
                     userName: currentUserName
                 })
             }
@@ -350,6 +377,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
             setConfirmations(p => ({ ...p, bulkDelete: false, bulkCancel: false }))
             setSingleCancelId(null)
             setCancelReason("")
+            setRestoreStockOnCancel(true)
             setActionModal({ open: false, text: "" })
         }
     }
@@ -589,11 +617,9 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                                         onDetails={() => handleDetailsOrder(o)}
                                                         onEdit={() => handleEditOrder(o)}
                                                         canEdit={o.canEdit}
+                                                        cancelLabel={o.canReopen ? "Reabrir" : "Cancelar"}
                                                         onDelete={() => { }}
-                                                        onCancel={() => {
-                                                            setSingleCancelId(o.originalId)
-                                                            setConfirmations(p => ({ ...p, bulkCancel: true }))
-                                                        }}
+                                                        onCancel={() => o.canReopen ? handleReopenOrder(o.originalId) : openCancelModal(o.originalId)}
                                                     />
                                                 ))}
                                             </div>
@@ -660,11 +686,9 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                                                     onSelect={handleSelectRow}
                                                                     onEdit={handleEditOrder}
                                                                     canEdit={o.canEdit}
+                                                                    cancelLabel={o.canReopen ? "Reabrir" : "Cancelar"}
                                                                     onDelete={() => { }}
-                                                                    onCancel={() => {
-                                                                        setSingleCancelId(o.originalId)
-                                                                        setConfirmations(p => ({ ...p, bulkCancel: true }))
-                                                                    }}
+                                                                    onCancel={() => o.canReopen ? handleReopenOrder(o.originalId) : openCancelModal(o.originalId)}
                                                                     onDetails={handleDetailsOrder}
                                                                 />
                                                             ))}
@@ -746,6 +770,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     setConfirmations((p) => ({ ...p, bulkCancel: false }))
                     setSingleCancelId(null)
                     setCancelReason("")
+                    setRestoreStockOnCancel(true)
                 }}
                 onConfirm={() => confirmBulk("cancel")}
                 title={singleCancelId ? "Cancelar Pedido" : "Cancelar Pedidos"}
@@ -759,10 +784,14 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                 value={cancelReason}
                                 onChange={(e) => setCancelReason(e.target.value)}
                             />
+                            <label className="flex items-center gap-3 rounded-xl border border-brand-border dark:border-dark-border px-3 py-2 cursor-pointer">
+                                <Checkbox checked={restoreStockOnCancel} onChange={(checked) => setRestoreStockOnCancel(Boolean(checked))} />
+                                <span className="text-sm text-brand-dark dark:text-dark-heading">Restaurar estoque dos itens</span>
+                            </label>
                         </div>
                     </div>
                 }
-                confirmText="Cancelar Pedidos"
+                confirmText={singleCancelId ? "Cancelar Pedido" : "Cancelar Pedidos"}
                 variant="danger"
             />
 

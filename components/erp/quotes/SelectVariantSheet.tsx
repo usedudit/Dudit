@@ -111,7 +111,7 @@ const SelectVariantSheet = ({ isOpen, onClose, product, onConfirm }: SelectVaria
                                     onChange={(val) => handleUpdateQty(idx, val)}
                                     min={0}
                                     max={variant.stock} // Limiting by stock limit
-                                    size="sm"
+                                    size="md"
                                 />
                             }
                         />

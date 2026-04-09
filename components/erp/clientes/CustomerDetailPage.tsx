@@ -483,12 +483,12 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                             <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
 
                                             <div className="px-6 pt-5">
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Detalhes</h3>
+                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Detalhes</h3>
                                             </div>
 
                                             {/* Top Part: Customer Identity */}
                                             <div className="p-6 text-left">
-                                                <div className="flex items-center gap-4 mb-6 mt-2">
+                                                <div className="flex items-center gap-4 mb-6">
                                                     <div className="relative">
                                                         <UserProfileImage
                                                             fullName={customer.name || "Cliente"}

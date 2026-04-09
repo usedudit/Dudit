@@ -92,6 +92,40 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const [otherCosts, setOtherCosts] = useState('');
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set());
 
+    const getItemMaxQuantity = useCallback((item: any) => {
+        if (!item || item.isBlank) return undefined;
+        return Math.max(0, Number(item.stock ?? 0));
+    }, []);
+
+    const validateQuoteStock = useCallback((targetItems: any[]) => {
+        const stockMap = new Map<string, { name: string; quantity: number; stock: number }>();
+
+        for (const item of targetItems) {
+            if (item.isBlank || !item.id) continue;
+            const key = item.variantId ? `variant:${item.variantId}` : `product:${item.id}`;
+            const existing = stockMap.get(key);
+
+            if (existing) {
+                existing.quantity += Number(item.qty || 0);
+                continue;
+            }
+
+            stockMap.set(key, {
+                name: item.name || "Produto",
+                quantity: Number(item.qty || 0),
+                stock: Number(item.stock ?? 0),
+            });
+        }
+
+        for (const entry of stockMap.values()) {
+            if (entry.quantity > entry.stock) {
+                return `A quantidade de "${entry.name}" está maior que o estoque disponível.`;
+            }
+        }
+
+        return null;
+    }, []);
+
     // Persistence State (for isDirty)
     const [originalQuoteData, setOriginalQuoteData] = useState<any>(null);
 
@@ -137,6 +171,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                         sku: item.products?.sku || 'N/A',
                         price: Number(item.unit_price),
                         qty: Number(item.quantity),
+                        stock: Number(item.products?.stock_quantity ?? 0),
                         image: item.products?.images?.[0] || 'https://img.dudit.com.br/static/Placeholder.png',
                         isEditing: false
                     }));
@@ -244,6 +279,10 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         const variants = product.variants || [];
 
         if (variants.length === 0) {
+            if (Number(product.stock || 0) < 1) {
+                notifyError("Estoque insuficiente", `"${product.name}" está sem estoque disponível.`);
+                return;
+            }
             addItem(product, undefined, undefined, 1, product.price);
             setIsProductSearchOpen(false);
             return;
@@ -269,9 +308,15 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
             if (existingItemIndex >= 0) {
                 const newItems = [...prevItems];
+                const nextQty = newItems[existingItemIndex].qty + qty;
+                const maxQty = getItemMaxQuantity(newItems[existingItemIndex]);
+                if (maxQty !== undefined && nextQty > maxQty) {
+                    notifyError("Estoque insuficiente", `A quantidade de "${finalName}" está maior que o estoque disponível.`);
+                    return prevItems;
+                }
                 newItems[existingItemIndex] = {
                     ...newItems[existingItemIndex],
-                    qty: newItems[existingItemIndex].qty + qty
+                    qty: nextQty
                 };
                 return newItems;
             } else {
@@ -282,6 +327,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     sku: finalSku,
                     price: finalPrice,
                     variant: variantName,
+                    variantId: product.variantId || null,
                     qty: qty,
                     isEditing: false
                 }];
@@ -333,7 +379,11 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
                     const existingIndex = newItems.findIndex(i => i.id === productToSelectVariant.id && i.variant === variantNameForCheck);
                     if (existingIndex >= 0) {
-                        newItems[existingIndex] = { ...newItems[existingIndex], qty: newItems[existingIndex].qty + v.qty };
+                        const nextQty = newItems[existingIndex].qty + v.qty;
+                        if (nextQty > Number(newItems[existingIndex].stock ?? 0)) {
+                            return;
+                        }
+                        newItems[existingIndex] = { ...newItems[existingIndex], qty: nextQty };
                     } else {
                         const finalName = variantName === productToSelectVariant.name ? productToSelectVariant.name : `${productToSelectVariant.name} - ${v.name}`;
                         newItems.push({
@@ -343,6 +393,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                             sku: v.sku,
                             price: v.price,
                             variant: variantNameForCheck,
+                            variantId: v.id,
+                            stock: v.stock,
                             qty: v.qty,
                             isEditing: false
                         });
@@ -363,7 +415,13 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const updateItemQty = (index: number, newQty: number) => {
         if (newQty < 1) return;
         const newItems = [...quoteItems];
-        newItems[index].qty = newQty;
+        const maxQty = getItemMaxQuantity(newItems[index]);
+        if (maxQty !== undefined && newQty > maxQty) {
+            notifyError("Estoque insuficiente", `A quantidade de "${newItems[index].name}" está maior que o estoque disponível.`);
+            newItems[index].qty = maxQty;
+        } else {
+            newItems[index].qty = newQty;
+        }
         setQuoteItems(newItems);
     };
 
@@ -430,6 +488,11 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         if (quoteItems.length === 0) {
             setFieldErrors(new Set(["productSearch"]));
             notifyError("Carrinho vazio", "Adicione pelo menos um item ao orçamento.");
+            return;
+        }
+        const stockValidationMessage = validateQuoteStock(quoteItems);
+        if (stockValidationMessage) {
+            notifyError("Estoque insuficiente", stockValidationMessage);
             return;
         }
         setFieldErrors(new Set());

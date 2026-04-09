@@ -15,6 +15,7 @@ interface OrderGridCardProps {
   onCancel: () => void
   onDetails: () => void
   canEdit?: boolean
+  cancelLabel?: string
 }
 
 const OrderGridCard = React.memo(
@@ -26,7 +27,8 @@ const OrderGridCard = React.memo(
     onDelete,
     onCancel,
     onDetails,
-    canEdit = true
+    canEdit = true,
+    cancelLabel = "Cancelar"
   }: OrderGridCardProps) => {
 
     return (
@@ -109,9 +111,12 @@ const OrderGridCard = React.memo(
 
             <div className="flex flex-col gap-0.5 items-end shrink-0">
               <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body text-right">Data</span>
-              <div className="flex items-center gap-1 justify-end">
-                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+              <div className="flex flex-col items-end text-right">
+                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">
                   {order.formattedDate}
+                </span>
+                <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+                  {order.formattedTime}
                 </span>
               </div>
             </div>
@@ -137,6 +142,7 @@ const OrderGridCard = React.memo(
                 onEdit={canEdit ? onEdit : undefined}
                 onDelete={onDelete}
                 onCancel={onCancel}
+                cancelLabel={cancelLabel}
               />
             </div>
           </div>

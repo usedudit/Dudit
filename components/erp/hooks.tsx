@@ -95,8 +95,17 @@ export interface ProductBucketItem {
   sku: string
   price: number
   stock: number
+  allow_sell_without_stock?: boolean
   image: string | null
   has_variants: boolean
+  variants?: Array<{
+    id: string
+    name: string
+    sku: string
+    price: number
+    stock: number
+    image?: string | null
+  }>
 }
 
 /**
@@ -146,4 +155,3 @@ export function useProductBucket(loadFn: () => Promise<ProductBucketItem[]>) {
     loadBucket,
   }
 }
-

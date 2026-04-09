@@ -132,8 +132,16 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     }, [items, productBucket, notifyError]);
 
     const updateItemQty = useCallback((index: number, qty: number) => {
-        setItems(prev => prev.map((item, i) => i === index ? { ...item, quantity: Math.max(1, qty) } : item));
-    }, []);
+        setItems(prev => prev.map((item, i) => {
+            if (i !== index) return item;
+            const nextQty = Math.max(1, qty);
+            if (type === 'out' && nextQty > Number(item.product.stock || 0)) {
+                notifyError(`A quantidade de "${item.product.name}" está maior que o estoque disponível.`);
+                return { ...item, quantity: Number(item.product.stock || 0) };
+            }
+            return { ...item, quantity: nextQty };
+        }));
+    }, [notifyError, type]);
 
     const handleReasonChange = useCallback((value: string) => {
         setReason(value);
@@ -165,6 +173,11 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
             if (item.quantity <= 0) {
                 errors.add('items');
                 notifyError("Todas as quantidades devem ser maiores que zero.");
+                break;
+            }
+            if (type === 'out' && item.quantity > Number(item.product.stock || 0)) {
+                errors.add('items');
+                notifyError(`A quantidade de "${item.product.name}" está maior que o estoque disponível.`);
                 break;
             }
         }
@@ -424,7 +437,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                                 </td>
                                                                                 <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
                                                                                     <div className="flex justify-center">
-                                                                                        <QuantitySelector value={item.quantity} onChange={(val) => updateItemQty(index, val)} size="sm" />
+                                                                                        <QuantitySelector value={item.quantity} onChange={(val) => updateItemQty(index, val)} max={type === 'out' ? Math.max(0, Number(item.product.stock || 0)) : undefined} size="md" />
                                                                                     </div>
                                                                                 </td>
                                                                                 <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
@@ -468,7 +481,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                             <p className="text-[11px] font-medium text-brand-inactive-text pr-2 truncate mb-2">
                                                                                 {item.product.sku} • Estoque: {item.product.stock}
                                                                             </p>
-                                                                            <QuantitySelector value={item.quantity} onChange={(val) => updateItemQty(index, val)} size="sm" />
+                                                                            <QuantitySelector value={item.quantity} onChange={(val) => updateItemQty(index, val)} max={type === 'out' ? Math.max(0, Number(item.product.stock || 0)) : undefined} size="md" />
                                                                         </div>
                                                                     </div>
                                                                 ))}

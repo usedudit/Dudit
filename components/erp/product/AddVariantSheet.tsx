@@ -823,7 +823,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                   </div>
                                 </td>
                                 <td className="p-2 border-b border-brand-border dark:border-dark-border align-middle">
-                                  <QuantitySelector value={row.stock} onChange={(val) => updateRow(row.id, "stock", val)} min={0} size="sm" />
+                                  <QuantitySelector value={row.stock} onChange={(val) => updateRow(row.id, "stock", val)} min={0} size="md" />
                                 </td>
                                 <td className="p-2 border-b border-brand-border dark:border-dark-border align-middle text-center">
                                   <div className="flex justify-center">

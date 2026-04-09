@@ -87,6 +87,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const paymentStatus = getPaymentStatusMeta(order.situation)
     const deliveryStatus = getDeliveryStatusMeta(order.delivery_status)
     const pendingSuffix = paymentStatus.label !== "Pago" ? ` (${paymentStatus.label})` : ""
+    const remainingPaymentAmount = Math.max(0, Number(order.total_amount || 0) - Number(order.paid_amount || 0))
+    const hasPendingPayment = order.situation !== "paid" && remainingPaymentAmount > 0.009
 
     const getTimelineSteps = (status: string) => {
         const baseDate = formatDayMonth(order.created_at)
@@ -338,6 +340,14 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                 </div>
 
                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-10 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
+                                    {hasPendingPayment && (
+                                        <InfoCard
+                                            title="Valor ainda em aberto"
+                                            message={`Falta receber ${formatCurrency(remainingPaymentAmount)} para quitar este pedido.`}
+                                            color="orange"
+                                        />
+                                    )}
+
                                     {order.notes && (
                                         <InfoCard
                                             title="Observações do Pedido"

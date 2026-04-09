@@ -10,6 +10,58 @@ import { revalidateQuotes } from "@/lib/utils/revalidation"
 import { checkLimit, increment_usage_counter, decrement_usage_counter } from "@/lib/services/subscription.service"
 import { withTelemetry } from "@/lib/utils/action-logger"
 
+type QuoteItemPayload = {
+    productId?: string | null
+    customName?: string
+    description?: string
+    quantity: number
+    unitPrice: number
+    sortOrder?: number
+}
+
+async function validateQuoteItemsStock(partnerId: string, items: QuoteItemPayload[], supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>) {
+    const productIds = Array.from(new Set(items.map((item) => item.productId).filter(Boolean))) as string[]
+    if (productIds.length === 0) return null
+
+    const { data: products, error } = await supabase
+        .from("products")
+        .select("id, name, stock_quantity")
+        .eq("partner_id", partnerId)
+        .in("id", productIds)
+
+    if (error) {
+        console.error("[validateQuoteItemsStock] Error:", error)
+        return "Não foi possível validar o estoque dos itens do orçamento."
+    }
+
+    const stockMap = new Map<string, { name: string; stock: number }>((products || []).map((product: any) => [
+        product.id,
+        {
+            name: product.name || "Produto",
+            stock: Number(product.stock_quantity || 0),
+        },
+    ]))
+
+    const requestedMap = new Map<string, number>()
+    for (const item of items) {
+        if (!item.productId) continue
+        requestedMap.set(item.productId, (requestedMap.get(item.productId) || 0) + Number(item.quantity || 0))
+    }
+
+    for (const [productId, requestedQty] of requestedMap.entries()) {
+        const stockInfo = stockMap.get(productId)
+        if (!stockInfo) {
+            return "Um dos produtos do orçamento não foi encontrado para validar o estoque."
+        }
+
+        if (requestedQty > stockInfo.stock) {
+            return `A quantidade de "${stockInfo.name}" está maior que o estoque disponível.`
+        }
+    }
+
+    return null
+}
+
 // ─── GET NEXT QUOTE NUMBER ──────────────────────────────────────────────────
 
 export async function getNextQuoteNumberAction(partnerId: string) {
@@ -63,14 +115,7 @@ export async function createQuoteAction(data: {
     discountValue?: number
     shippingCost?: number
     additionalCosts?: number
-    items?: Array<{
-        productId?: string | null
-        customName?: string
-        description?: string
-        quantity: number
-        unitPrice: number
-        sortOrder?: number
-    }>
+    items?: QuoteItemPayload[]
 }) {
     return withTelemetry("createQuoteAction", async () => {
         await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -85,6 +130,10 @@ export async function createQuoteAction(data: {
             }
 
             const supabase = await getSupabaseServerClient()
+            const stockValidationError = await validateQuoteItemsStock(data.partnerId, data.items || [], supabase)
+            if (stockValidationError) {
+                return errorResponse(stockValidationError)
+            }
 
             // Map data to JSON for the Postgres RPC Function
             const itemsJson = data.items && data.items.length > 0 ? data.items.map((item, idx) => ({
@@ -585,7 +634,7 @@ export async function searchProductsForQuotes(query: string) {
         const { data, error } = await supabase
             .from("products")
             .select(`
-                id, name, sku, price, stock_quantity, images, unit,
+                id, name, sku, price, stock_quantity, allow_sell_without_stock, images, unit,
                 variants:product_variants(id, variant_name, sku, price_adjustment, stock_quantity)
             `)
             .eq("partner_id", ctx.partnerId)
@@ -603,6 +652,7 @@ export async function searchProductsForQuotes(query: string) {
             name: p.name,
             sku: p.sku || 'N/A',
             stock: p.stock_quantity || 0,
+            allow_sell_without_stock: Boolean(p.allow_sell_without_stock),
             price: p.price || 0,
             unit: p.unit || 'un',
             image: p.images && p.images.length > 0 ? p.images[0] : 'https://img.dudit.com.br/static/Placeholder.png',

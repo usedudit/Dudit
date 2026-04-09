@@ -120,6 +120,44 @@ export async function createBatchStockMovementAction(data: {
 
         const supabase = await getSupabaseServerClient()
 
+        if (data.type === 'out') {
+            const productIds = Array.from(new Set(data.items.map((item) => item.productId)))
+            const { data: products, error: productsError } = await supabase
+                .from("products")
+                .select("id, name, stock_quantity")
+                .eq("partner_id", partnerId)
+                .in("id", productIds)
+
+            if (productsError) {
+                console.error("createBatchStockMovementAction stock validation error:", productsError)
+                return errorResponse("Não foi possível validar o estoque disponível")
+            }
+
+            const stockMap = new Map<string, { name: string; stock: number }>((products || []).map((product: any) => [
+                product.id,
+                {
+                    name: product.name || "Produto",
+                    stock: Number(product.stock_quantity || 0),
+                },
+            ]))
+
+            const requestedMap = new Map<string, number>()
+            for (const item of data.items) {
+                requestedMap.set(item.productId, (requestedMap.get(item.productId) || 0) + Number(item.quantity || 0))
+            }
+
+            for (const [productId, quantity] of requestedMap.entries()) {
+                const stockInfo = stockMap.get(productId)
+                if (!stockInfo) {
+                    return errorResponse("Um dos produtos da movimentação não foi encontrado")
+                }
+
+                if (quantity > stockInfo.stock) {
+                    return errorResponse(`A quantidade de "${stockInfo.name}" está maior que o estoque disponível`)
+                }
+            }
+        }
+
         const itemsPayload = data.items.map(item => ({
             product_id: item.productId,
             variant_id: item.variantId || null,

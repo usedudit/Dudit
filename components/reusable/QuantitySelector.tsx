@@ -46,13 +46,19 @@ export const QuantitySelector: React.FC<QuantitySelectorProps> = ({
     }
   };
 
-  const heightClass = size === 'sm' ? 'h-8' : 'h-9';
+  const heightMap = {
+    sm: 'h-8',
+    md: 'h-10'
+  };
+
+
+  const heightClass = heightMap[size];
   const iconSize = size === 'sm' ? 14 : 14;
   const fontSize = size === 'sm' ? 'text-xs' : 'text-sm';
 
   return (
     <div
-      className={`flex items-center border border-brand-border dark:border-dark-border rounded-[6px] bg-white dark:bg-dark-surface ${heightClass} ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
+      className={`flex items-center border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface ${heightClass} ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
     >
       <button
         type="button"

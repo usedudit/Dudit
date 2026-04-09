@@ -50,6 +50,14 @@ export async function revalidateOrders(partnerId: string) {
 }
 
 /**
+ * Revalida histórico de um pedido específico
+ */
+export async function revalidateOrderHistory(orderId: string) {
+  if (!orderId) return
+  safeRevalidateTag(TAGS.orderHistory(orderId))
+}
+
+/**
  * Revalida dados de ORÇAMENTOS
  */
 export async function revalidateQuotes(partnerId: string) {

@@ -43,6 +43,7 @@ interface OrderGeneralTabProps {
     paymentStatus: string
     deliveryStatus: string
     remainingPaymentAmount?: number
+    manualItemNameErrors?: Set<number>
     isSaving: boolean
 
     // Handlers
@@ -54,6 +55,7 @@ interface OrderGeneralTabProps {
     updateItemField: (index: number, field: string, value: any) => void
     updateItemPrice: (index: number, price: number) => void
     updateItemQty: (index: number, qty: number) => void
+    resolveItemQuantityMax?: (item: any) => number | undefined
     toggleItemEdit: (index: number, isEditing: boolean) => void
     removeItem: (index: number) => void
     addBlankItem: () => void
@@ -85,8 +87,9 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     subtotal, discountAmount, discountValue, discountType, shippingFee, otherCosts, totalAmount,
     selectedCustomer, orderDate, salesChannel, deliveryMethod, paymentStatus, deliveryStatus, isSaving,
     remainingPaymentAmount = 0,
+    manualItemNameErrors = new Set<number>(),
     setSearchQuery, setIsProductSearchOpen, handleSearchProduct, onSearchFocus, addProductToOrder,
-    updateItemField, updateItemPrice, updateItemQty, toggleItemEdit, removeItem, addBlankItem,
+    updateItemField, updateItemPrice, updateItemQty, resolveItemQuantityMax, toggleItemEdit, removeItem, addBlankItem,
     setShippingFee, setOtherCosts, setDiscountValue, setDiscountType, setSelectedCustomer, setIsCustomerSheetOpen,
     setOrderDate, setSalesChannel, setDeliveryMethod, setPaymentStatus, setDeliveryStatus, handleSaveOrder,
     salesChannelOptions, deliveryMethodOptions, statusOptions, deliveryStatusOptions,
@@ -178,7 +181,9 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                     <img src={getR2ImageUrl(product.image, "thumbnail")} className={`w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border ${!product.image ? 'object-contain' : 'object-cover'}`} />
                                                     <div className="flex-1">
                                                         <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</div>
-                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body">SKU: {product.sku}</div>
+                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                            SKU: {product.sku} • Estoque: {product.stock}
+                                                        </div>
                                                     </div>
                                                     <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
                                                         {formatCurrency(product.price)}
@@ -209,6 +214,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     <tbody>
                                         {paginatedItems.map((item, paginatedIndex) => {
                                             const index = (currentPage - 1) * ITEMS_PER_PAGE + paginatedIndex;
+                                            const hasNameError = Boolean(nameErrors[index] || manualItemNameErrors.has(index));
                                             return (
                                                 <tr key={index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
                                                     <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
@@ -229,7 +235,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                                 }
                                                                             }}
                                                                             placeholder="Nome do produto..."
-                                                                            error={nameErrors[index]}
+                                                                            error={hasNameError}
                                                                             errorMessage="Nome obrigatório"
                                                                             className="mb-0"
                                                                         />
@@ -239,9 +245,11 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                         {item.name || 'Produto sem nome'}
                                                                     </span>
                                                                 )}
-                                                                <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                                                    {item.isEditing ? (item.sku || '') : (item.sku || 'Sem SKU')}
-                                                                </span>
+                                                                {!item.isEditing && (
+                                                                    <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                                        {item.sku || 'Sem SKU'}
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </td>
@@ -257,7 +265,12 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                     </td>
                                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
                                                         <div className="flex justify-center">
-                                                            <QuantitySelector value={item.quantity} onChange={(val) => updateItemQty(index, val)} size="sm" />
+                                                            <QuantitySelector
+                                                                value={item.quantity}
+                                                                onChange={(val) => updateItemQty(index, val)}
+                                                                max={resolveItemQuantityMax ? resolveItemQuantityMax(item) : undefined}
+                                                                size="md"
+                                                            />
                                                         </div>
                                                     </td>
                                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right">
@@ -281,7 +294,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                 >
                                                                     <CheckCircleIcon size={18} />
                                                                 </button>
-                                                            ) : (
+                                                            ) : item.isManual ? (
                                                                 <button
                                                                     onClick={() => toggleItemEdit(index, true)}
                                                                     className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
@@ -289,7 +302,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                 >
                                                                     <EditIcon size={18} />
                                                                 </button>
-                                                            )}
+                                                            ) : null}
                                                             <button
                                                                 onClick={() => removeItem(index)}
                                                                 className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
@@ -312,6 +325,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             <div className="block md:hidden space-y-2 mb-6">
                                 {paginatedItems.map((item, paginatedIndex) => {
                                     const index = (currentPage - 1) * ITEMS_PER_PAGE + paginatedIndex;
+                                    const hasNameError = Boolean(nameErrors[index] || manualItemNameErrors.has(index));
                                     return (
                                         <div key={index} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
                                             <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
@@ -331,7 +345,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                     }
                                                                 }}
                                                                 placeholder="Nome do produto..."
-                                                                error={nameErrors[index]}
+                                                                error={hasNameError}
                                                                 errorMessage="Nome obrigatório"
                                                                 className="mb-0"
                                                             />
@@ -363,14 +377,14 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                             >
                                                                 <CheckCircleIcon size={14} />
                                                             </button>
-                                                        ) : (
+                                                        ) : item.isManual ? (
                                                             <button
                                                                 onClick={() => toggleItemEdit(index, true)}
                                                                 className="w-8 h-8 flex items-center justify-center text-brand-inactive-text hover:bg-brand-gray dark:hover:bg-dark-border rounded-full transition-colors"
                                                             >
                                                                 <EditIcon size={14} />
                                                             </button>
-                                                        )}
+                                                        ) : null}
                                                         <button
                                                             onClick={() => removeItem(index)}
                                                             className="w-8 h-8 flex items-center justify-center text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full transition-colors"
@@ -381,7 +395,12 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                 </div>
 
                                                 <div className="flex items-center gap-4 mt-2">
-                                                    <QuantitySelector value={item.quantity} onChange={(val) => updateItemQty(index, val)} size="sm" />
+                                                    <QuantitySelector
+                                                        value={item.quantity}
+                                                        onChange={(val) => updateItemQty(index, val)}
+                                                        max={resolveItemQuantityMax ? resolveItemQuantityMax(item) : undefined}
+                                                        size="sm"
+                                                    />
                                                     <div className="flex-1 max-w-[140px]">
                                                         <Input
                                                             name={`item-price-mobile-${index}`}
@@ -550,7 +569,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                 </div>
 
                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                    {remainingPaymentAmount > 0.009 && (
+                    {paymentStatus !== "paid" && remainingPaymentAmount > 0.009 && (
                         <div className="mb-6">
                             <InfoCard
                                 title="Valor ainda em aberto"

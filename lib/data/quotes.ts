@@ -94,7 +94,7 @@ export const getQuoteWithItemsCached = cache(async (quoteId: string, partnerId: 
                 .from("quote_items")
                 .select(`
                     *,
-                    products (id, name, sku, images, price)
+                    products (id, name, sku, images, price, stock_quantity, allow_sell_without_stock)
                 `)
                 .eq("quote_id", quoteId)
                 .order("sort_order", { ascending: true })

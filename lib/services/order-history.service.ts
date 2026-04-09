@@ -1,6 +1,10 @@
 import "server-only"
 
+import { cache } from "react"
+import { unstable_cache } from "next/cache"
 import { getAdminClient } from "@/lib/supabase/admin"
+import { revalidateOrderHistory } from "@/lib/utils/revalidation"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 
 export interface OrderHistoryEntry {
   id: number
@@ -44,9 +48,11 @@ export async function createOrderHistoryEntry(input: CreateOrderHistoryEntryInpu
   if (error) {
     throw new Error(error.message)
   }
+
+  await revalidateOrderHistory(input.orderId)
 }
 
-export async function getOrderHistoryEntries(orderId: string, partnerId: string, limit = 100): Promise<OrderHistoryEntryWithActor[]> {
+async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limit: number): Promise<OrderHistoryEntryWithActor[]> {
   const supabase = getAdminClient()
 
   const { data, error } = await supabase
@@ -98,3 +104,13 @@ export async function getOrderHistoryEntries(orderId: string, partnerId: string,
     actor_name: entry.actor_user_id ? (namesByUserId.get(entry.actor_user_id) || "Usuário") : "Sistema",
   }))
 }
+
+export const getOrderHistoryEntries = cache(async (orderId: string, partnerId: string, limit = 100): Promise<OrderHistoryEntryWithActor[]> => {
+  return unstable_cache(
+    async () => fetchOrderHistoryEntries(orderId, partnerId, limit),
+    [TAGS.orderHistory(orderId), partnerId, String(limit)],
+    {
+      tags: [TAGS.orderHistory(orderId)],
+    }
+  )()
+})

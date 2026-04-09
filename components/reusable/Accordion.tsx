@@ -83,6 +83,7 @@ interface ActionsDropdownProps {
   onEmail?: () => void
   onArchive?: () => void
   onCancel?: () => void
+  cancelLabel?: string
   trigger?: React.ReactElement
   className?: string
   children?: React.ReactNode
@@ -99,6 +100,7 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
   onEmail,
   onArchive,
   onCancel,
+  cancelLabel = "Cancelar",
   trigger,
   className,
   children
@@ -160,8 +162,8 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
       </DropdownItem>
     )}
     {onCancel && (
-      <DropdownItem onClick={onCancel} className="text-brand-red dark:text-brand-red">
-        <BlockedIcon className="w-4 h-4" /> Cancelar
+      <DropdownItem onClick={onCancel} className={cancelLabel === "Cancelar" ? "text-brand-red dark:text-brand-red" : ""}>
+        <BlockedIcon className="w-4 h-4" /> {cancelLabel}
       </DropdownItem>
     )}
     {children}

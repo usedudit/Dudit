@@ -23,6 +23,7 @@ interface OrderListItemProps {
   onCancel: (order: any) => void
   onDetails: (order: any) => void
   canEdit?: boolean
+  cancelLabel?: string
   showCheckbox?: boolean
 }
 
@@ -37,6 +38,7 @@ const OrderListItem = React.memo(
     onCancel,
     onDetails,
     canEdit = true,
+    cancelLabel = "Cancelar",
     showCheckbox = true,
   }: OrderListItemProps) => {
 
@@ -68,7 +70,7 @@ const OrderListItem = React.memo(
 
         case "status":
           return (
-            <div className="flex items-center justify-center gap-2 w-full">
+            <div className="flex gap-2 w-full">
               <Badge variant={order.statusColor}>
                 {order.statusLabel}
               </Badge>
@@ -92,9 +94,14 @@ const OrderListItem = React.memo(
 
         case "date":
           return (
-            <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-              {order.formattedDate}
-            </span>
+            <div className="flex flex-col text-left">
+              <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">
+                {order.formattedDate}
+              </span>
+              <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+                {order.formattedTime}
+              </span>
+            </div>
           )
 
         case "channel":
@@ -117,6 +124,7 @@ const OrderListItem = React.memo(
                 onEdit={canEdit ? () => onEdit(order) : undefined}
                 onDelete={() => onDelete(order)}
                 onCancel={() => onCancel(order)}
+                cancelLabel={cancelLabel}
               />
             </div>
           )

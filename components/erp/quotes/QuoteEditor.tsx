@@ -152,7 +152,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                     <img src={getR2ImageUrl(product.image, "thumbnail")} className={`w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border ${!product.image ? 'object-contain' : 'object-cover'}`} />
                                                     <div className="flex-1">
                                                         <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</div>
-                                                        <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">SKU: {product.sku}</div>
+                                                        <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">SKU: {product.sku} • Estoque: {product.stock}</div>
                                                     </div>
                                                     <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(product.price)}</div>
                                                     {product.variants && product.variants.length > 0 && (
@@ -224,7 +224,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                 </td>
                                                 <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
                                                     <div className="flex justify-center">
-                                                        <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} size="sm" />
+                                                        <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} max={item.isBlank ? undefined : Math.max(0, Number(item.stock ?? 0))} size="md" />
                                                     </div>
                                                 </td>
                                                 <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right">
@@ -332,7 +332,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
 
                                             {!props.isReadOnly && (
                                                 <div className="flex items-center gap-4 mt-2">
-                                                    <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} size="sm" />
+                                                    <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} max={item.isBlank ? undefined : Math.max(0, Number(item.stock ?? 0))} size="md" />
                                                     <div className="flex items-center flex-1 max-w-[120px]">
                                                         <span className="text-[11px] font-medium text-brand-inactive-text mr-1">R$</span>
                                                         <input
