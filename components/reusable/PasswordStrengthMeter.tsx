@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { CheckCircle, XCircle } from "lucide-react"
+import { CheckCircleIcon, CancelCircleIcon } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 
 import { calculatePasswordScore } from "@/lib/utils"
@@ -61,9 +61,9 @@ export const PasswordStrengthMeter = ({ password }: { password: string }) => {
                 {reqs.map((req, idx) => (
                     <div key={idx} className="flex items-center gap-1.5">
                         {req.met ? (
-                            <CheckCircle size={12} className="text-brand-green shrink-0" />
+                            <CheckCircleIcon size={12} className="text-brand-green shrink-0" />
                         ) : (
-                            <XCircle size={12} className="text-brand-red shrink-0" />
+                            <CancelCircleIcon size={12} className="text-brand-red shrink-0" />
                         )}
                         <span className={cn("text-xs", req.met ? "text-brand-inactive-text font-medium" : "text-brand-inactive-text/50")}>
                             {req.text}

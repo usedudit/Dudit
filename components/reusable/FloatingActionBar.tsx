@@ -4,7 +4,7 @@ import React, { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/reusable"
 import Portal from "@/components/Portal"
-import { X, Settings2Icon } from "@/lib/icons"
+import { XIcon, Settings2Icon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import BottomSheet from "@/components/BottomSheet"
 
@@ -74,13 +74,13 @@ const FloatingActionBar: React.FC<FloatingActionBarProps> = ({
               {/* Divisória Final */}
               <div className="h-5 w-px bg-brand-border dark:bg-dark-border mx-1" />
 
-              {/* Botão Fechar (X) - Sempre presente */}
+              {/* Botão Fechar - Sempre presente */}
               <Button
                 variant="ghost"
                 onClick={onClearSelection}
                 className="ml-1 h-10 w-10 rounded-full hover:bg-gray-100 dark:hover:bg-dark-border"
               >
-                <X className="w-5 h-5" />
+                <XIcon className="w-5 h-5" />
               </Button>
             </motion.div>
           </Portal>

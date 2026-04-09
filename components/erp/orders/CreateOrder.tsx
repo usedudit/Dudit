@@ -45,6 +45,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set())
     const [originalPaymentStatus, setOriginalPaymentStatus] = useState<'paid' | 'partially_paid' | 'unpaid'>("unpaid")
     const [originalPaidAmount, setOriginalPaidAmount] = useState(0)
+    const [originalPaymentMethod, setOriginalPaymentMethod] = useState("Não informado")
 
     // Form State
     const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
@@ -108,16 +109,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         return Math.max(0, totalAmount - originalPaidAmount)
     }, [totalAmount, originalPaidAmount])
 
-    const shouldOpenPaymentModalForEdit = Boolean(
-        editOrderId &&
-        paymentStatus === "paid" &&
-        (originalPaymentStatus === "unpaid" || originalPaymentStatus === "partially_paid") &&
-        remainingAmount > 0.009
-    )
-
-    const primaryActionLabel = editOrderId
-        ? (shouldOpenPaymentModalForEdit ? "Finalizar Venda" : "Salvar")
-        : "Finalizar Venda"
+    const primaryActionLabel = editOrderId ? "Salvar" : "Finalizar Venda"
 
     // --- Effects ---
     useEffect(() => {
@@ -135,6 +127,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setPaymentStatus(normalizedStatus)
                 setOriginalPaymentStatus(normalizedStatus)
                 setOriginalPaidAmount(Number(order.paid_amount || 0))
+                setOriginalPaymentMethod(order.payment_method || "Não informado")
                 setDeliveryStatus(order.delivery_status || "not_sent")
                 setNotes(order.notes || "")
                 setShippingFee((order.shipping_cost || 0).toString())
@@ -322,7 +315,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         salesChannel,
         deliveryMethod,
         paymentStatus: paymentOverrides?.paymentStatus || paymentStatus,
-        paymentMethod: paymentOverrides?.paymentMethod || "pendente",
+        paymentMethod: paymentOverrides?.paymentMethod || (editOrderId ? originalPaymentMethod : "pendente"),
         deliveryStatus: deliveryStatus as any,
         paidAmount: paymentOverrides?.paidAmount,
         address: deliveryMethod === 'delivery' ? {
@@ -362,7 +355,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             if (result.success) {
                 notifySuccess(editOrderId ? `Pedido atualizado com sucesso!` : `Pedido criado com sucesso!`)
                 router.refresh()
-                if (editOrderId && !paymentOverrides?.paymentMethod && !shouldOpenPaymentModalForEdit) {
+                if (editOrderId && !paymentOverrides?.paymentMethod) {
                     onBack()
                     return { success: true }
                 }
@@ -407,6 +400,16 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         })
     }
 
+    const handleOpenPaymentModal = async () => {
+        if (items.length === 0) {
+            setFieldErrors(new Set(["productSearch"]))
+            notifyError("Adicione pelo menos um item ao pedido.")
+            return
+        }
+        setFieldErrors(new Set())
+        setIsPaymentModalOpen(true)
+    }
+
     const handleSaveOrder = async () => {
         if (items.length === 0) {
             setFieldErrors(new Set(["productSearch"]))
@@ -414,7 +417,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             return
         }
         setFieldErrors(new Set())
-        if (editOrderId && !shouldOpenPaymentModalForEdit) {
+        if (editOrderId) {
             await handleDirectSaveOrder()
             return
         }
@@ -533,7 +536,6 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             paymentStatus={paymentStatus}
                             deliveryStatus={deliveryStatus}
                             remainingPaymentAmount={editOrderId ? remainingAmount : 0}
-                            primaryActionLabel={primaryActionLabel}
                             isSaving={isSaving}
                             setSearchQuery={productBucket.setSearchQuery}
                             setIsProductSearchOpen={setIsProductSearchOpen}
@@ -556,7 +558,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             setDeliveryMethod={setDeliveryMethod}
                             setPaymentStatus={setPaymentStatus}
                             setDeliveryStatus={setDeliveryStatus}
-                            handleSaveOrder={handleSaveOrder}
+                            handleSaveOrder={handleOpenPaymentModal}
                             salesChannelOptions={salesChannelOptions}
                             deliveryMethodOptions={deliveryMethodOptions}
                             statusOptions={statusOptions}
@@ -637,9 +639,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         shippingFee={parseFloat(shippingFee || "0")}
                         otherCosts={parseFloat(otherCosts || "0")}
                         discountAmount={discountAmount}
-                        amountDue={shouldOpenPaymentModalForEdit ? remainingAmount : undefined}
+                        amountDue={editOrderId && remainingAmount > 0.009 ? remainingAmount : undefined}
                         existingPaidAmount={editOrderId ? originalPaidAmount : 0}
-                        lockPaymentCompletion={shouldOpenPaymentModalForEdit}
+                        lockPaymentCompletion={Boolean(editOrderId && remainingAmount > 0.009)}
                         onConfirm={handleConfirmPayment}
                     />
                 )}

@@ -7,7 +7,7 @@ import {
     ChevronRightIcon,
     TruckIcon,
     QRCodeIcon,
-    X,
+    XIcon,
     CreditCardIcon,
     InfoIcon,
     NormalProductsIcon
@@ -41,7 +41,7 @@ const ShippingDetailsModal = ({ isOpen, onClose, order }: { isOpen: boolean; onC
                 <div className="flex items-center justify-between px-6 py-4 border-b border-brand-border dark:border-dark-border">
                     <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Detalhe do envio</h3>
                     <button onClick={onClose} className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading">
-                        <X size={24} />
+                        <XIcon size={24} />
                     </button>
                 </div>
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { Moon } from "@/lib/icons"
+import { MoonIcon } from "@/lib/icons"
 import { Switch } from "@/components/ui/switch"
 
 interface BusinessHoursSelectorProps {
@@ -76,7 +76,7 @@ export function BusinessHoursSelector({ value, onChange }: BusinessHoursSelector
             </div>
           ) : (
             <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg flex-1">
-              <Moon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <MoonIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
               <span className="text-sm text-gray-400">Fechado</span>
             </div>
           )}

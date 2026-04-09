@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from "framer-motion"
 import { useSupabase } from "@/providers/supabase-provider"
-import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, CheckCircleIcon, CopyIcon, X, ShoppingCartIcon, MoneyIcon, TruckIcon, TwitterIcon, FacebookIcon, WhatsappIcon, LinkedinIcon, TelegramIcon } from "@/lib/icons"
+import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, CheckCircleIcon, XIcon, ShoppingCartIcon, MoneyIcon, TruckIcon } from "@/lib/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
@@ -627,7 +627,7 @@ export function ProductDetailsPageClient({
       <div className="flex lg:hidden items-center justify-between px-6 pt-12 pb-4 shrink-0">
         <button onClick={() => setIsLightboxOpen(false)}
           className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
-          <X size={20} />
+          <XIcon size={20} />
         </button>
         <span className="text-white text-sm font-semibold">
           {lightboxActiveImg + 1}/{productImages.length}
@@ -650,7 +650,7 @@ export function ProductDetailsPageClient({
         {/* Close button */}
         <button onClick={() => setIsLightboxOpen(false)}
           className="absolute top-6 right-6 z-10 w-11 h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
-          <X size={22} />
+          <XIcon size={22} />
         </button>
 
         {/* Thumbnails column */}

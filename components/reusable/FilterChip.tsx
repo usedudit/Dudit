@@ -3,7 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Badge } from "@/components/reusable"
-import { X } from "@/lib/icons"
+import { XIcon } from "@/lib/icons"
 
 interface FilterChipProps {
   label: string
@@ -34,7 +34,7 @@ const FilterChip: React.FC<FilterChipProps> = ({
         onClick={onRemove}
         className="hover:bg-black/10 dark:hover:bg-white/20 rounded-full p-0.5 ml-1 transition-colors flex-shrink-0"
       >
-        <X className="w-3 h-3" />
+        <XIcon className="w-3 h-3" />
       </button>
     </Badge>
   </motion.div>

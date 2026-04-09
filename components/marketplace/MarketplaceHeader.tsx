@@ -5,7 +5,7 @@ import { useState, useRef, useEffect, useMemo, memo, useCallback, useTransition 
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import {
-  ShoppingBag,
+  ShoppingBagIcon,
   MapPinIcon,
   ChevronDownIcon,
   SearchIcon,
@@ -253,7 +253,7 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
               </div>
             </div>
             <Link href="/cart" prefetch={true} className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
-              <ShoppingBag size={24} strokeWidth={2} />
+              <ShoppingBagIcon size={24} strokeWidth={2} />
               {cartCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 bg-brand-orange text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border border-brand-dark">
                   {cartCount}
@@ -520,7 +520,7 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
 
             <Link href="/cart" prefetch={false} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
               <div className="relative">
-                <ShoppingBag size={20} strokeWidth={2} />
+                <ShoppingBagIcon size={20} strokeWidth={2} />
                 {cartCount > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 bg-brand-orange text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border border-brand-dark">
                     {cartCount}

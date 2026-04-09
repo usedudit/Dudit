@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { SearchIcon, UserIcon, PlusIcon, CloseIcon } from '@/lib/icons';
+import { SearchIcon, UserIcon, PlusIcon, XIcon } from '@/lib/icons';
 import { Button, Input, IconPlaceholder } from '@/components/reusable';
 import Portal from "@/components/Portal";
 import BottomSheet from "@/components/BottomSheet";
@@ -52,7 +52,7 @@ const SelectCustomerSheet = ({ isOpen, onClose, onSelect, partnerId }: SelectCus
             <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center bg-white dark:bg-dark-surface z-10 shrink-0">
                 <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar Cliente</h2>
                 <Button variant="ghost" onClick={onClose} size="icon">
-                    <CloseIcon className="w-5 h-5" />
+                    <XIcon className="w-5 h-5" />
                 </Button>
             </header>
 

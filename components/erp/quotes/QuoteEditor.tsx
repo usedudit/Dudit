@@ -4,7 +4,7 @@ import {
     TrashIcon,
     UserIcon,
     ChevronDownIcon,
-    WandIcon,
+    SparklesIcon,
     PlusIcon,
     CheckIcon,
     AlertCircleIcon,
@@ -527,7 +527,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
                     <div className="mb-8">
                         <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading mb-6 flex items-center gap-2">
-                            <WandIcon size={20} className="text-brand-dark dark:text-dark-heading" /> Personalizar Aparência
+                            <SparklesIcon size={20} className="text-brand-dark dark:text-dark-heading" /> Personalizar Aparência
                         </h3>
 
                         <div className="space-y-6">

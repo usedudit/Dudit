@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { Menu, X, ChevronRightIcon, ChevronDownIcon } from "@/lib/icons"
+import { Menu, XIcon, ChevronRightIcon, ChevronDownIcon } from "@/lib/icons"
 import { Home, ShieldAlert, DollarSign, Users, FileText, Building2, Flag } from "lucide-react"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import { useSidebarState } from "@/lib/hooks/use-sidebar-state"
@@ -192,7 +192,7 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                     </Link>
 
                     <button className="xl:hidden absolute right-2" onClick={() => setIsMobileOpen(false)}>
-                        <X className="w-6 h-6 text-gray-400" />
+                        <XIcon className="w-6 h-6 text-gray-400" />
                     </button>
                 </div>
 

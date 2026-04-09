@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import Portal from "@/components/Portal"
-import { CloseIcon, SparklesIcon, CheckIcon } from "@/lib/icons"
+import { XIcon, SparklesIcon, CheckIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import BottomSheet from "@/components/BottomSheet"
 import { Button } from "@/components/reusable/Button"
@@ -211,7 +211,7 @@ export default function NcmSelectionModal({
             onClick={handleClose}
             className="absolute top-3 right-3 text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading z-10"
           >
-            <CloseIcon className="w-5 h-5" />
+            <XIcon className="w-5 h-5" />
           </button>
           <div className="flex flex-col gap-4 px-6 pt-6 relative">
             <div className="relative w-max">

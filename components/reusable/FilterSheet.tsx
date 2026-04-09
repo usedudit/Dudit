@@ -6,7 +6,7 @@ import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { Accordion } from "./Accordion"
 import { useMediaQuery } from "@/components/erp/hooks"
-import { CloseIcon } from "@/lib/icons"
+import { XIcon } from "@/lib/icons"
 
 // --- Tipos de Configuração do Filtro ---
 
@@ -79,7 +79,7 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
       <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center">
         <h2 className="text-xl font-bold dark:text-dark-heading">Filtros</h2>
         <Button variant="ghost" onClick={onClose} size="icon">
-          <CloseIcon className="w-5 h-5" />
+          <XIcon className="w-5 h-5" />
         </Button>
       </header>
 

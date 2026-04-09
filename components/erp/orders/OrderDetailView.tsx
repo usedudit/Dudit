@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import {
     ChevronLeftIcon,
-    ClockIcon,
     EditIcon,
     ThreeDotsIcon
 } from "@/lib/icons"
@@ -87,6 +86,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const pageTitle = `Pedido ${order.order_number}`
     const paymentStatus = getPaymentStatusMeta(order.situation)
     const deliveryStatus = getDeliveryStatusMeta(order.delivery_status)
+    const pendingSuffix = paymentStatus.label !== "Pago" ? ` (${paymentStatus.label})` : ""
 
     const getTimelineSteps = (status: string) => {
         const baseDate = formatDayMonth(order.created_at)
@@ -96,15 +96,14 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
             { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
             { label: "Preparando", date: baseDate, time: "", active: ["preparing", "sent", "delivered", "pickup_available", "delivery_failed"].includes(status) },
             { label: "Enviado", date: "", time: "", active: ["sent", "delivered", "delivery_failed"].includes(status) },
-            { label: "Entregue", date: "", time: "", active: ["delivered"].includes(status), isFinal: true }
+            { label: "Entregue", date: "", time: "", active: ["delivered"].includes(status) }
         ]
 
         if (status === "pickup_available") {
             steps[3].label = "Disponível"
+            steps[3].active = true
         } else if (status === "delivery_failed") {
             steps[3].label = "Falha na entrega"
-            steps[3].active = true
-        } else if (status === "delivered") {
             steps[3].active = true
         }
 
@@ -119,6 +118,31 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
             <div className="text-right">{value}</div>
         </div>
     )
+
+    const paymentMethodNode = (() => {
+        const method = order.payment_method || "Não informado"
+        const m = method.toLowerCase()
+        let brand = ""
+        if (m.includes("visa")) brand = "VISA"
+        else if (m.includes("master")) brand = "MASTERCARD"
+        else if (m.includes("elo")) brand = "ELO"
+        else if (m.includes("hiper")) brand = "HIPERCARD"
+        else if (m.includes("pix")) brand = "PIX"
+        else if (m.includes("dinheiro")) brand = "CASH"
+
+        if (brand) {
+            return (
+                <div className="flex items-center gap-2">
+                    <div className="border border-brand-border dark:border-dark-border px-1.5 py-0.5 rounded bg-white dark:bg-dark-surface text-[10px] font-bold text-blue-800 dark:text-blue-400">
+                        {brand}
+                    </div>
+                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{`${method}${pendingSuffix}`}</span>
+                </div>
+            )
+        }
+
+        return <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{`${method}${pendingSuffix}`}</span>
+    })()
 
     return (
         <div className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300 relative">
@@ -142,9 +166,6 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                     <Badge variant={paymentStatus.variant}>
                                         {paymentStatus.label}
                                     </Badge>
-                                    <Badge variant={deliveryStatus.variant}>
-                                        {deliveryStatus.label}
-                                    </Badge>
                                 </h1>
 
                                 <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
@@ -159,15 +180,16 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                     onDelete={() => { }}
                                 />
 
-                                <Button onClick={() => onEditOrder(order)} className="whitespace-nowrap">
-                                    <EditIcon className="w-[18px] h-[18px] mr-2" />
-                                    Editar Venda
-                                </Button>
+                                {order.situation !== "paid" && (
+                                    <Button onClick={() => onEditOrder(order)} className="whitespace-nowrap">
+                                        <EditIcon className="w-[18px] h-[18px] mr-2" />
+                                        Editar Venda
+                                    </Button>
+                                )}
                             </div>
                         </div>
 
-                        {/* Tabs Navigation */}
-                        <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                        <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"} pb-2`}>
                             <Tabs value={activeTab} onValueChange={setActiveTab}>
                                 <TabsList className="px-0 border-b-0">
                                     <TabsTrigger value="summary">Resumo</TabsTrigger>
@@ -187,15 +209,20 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                         <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
                                             <div className="flex justify-between items-center">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Local:</span>
+                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                                        {order.order_source === "Marketplace" ? "Canal de venda:" : "Responsável pela venda:"}
+                                                    </span>
                                                     <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                                        {order.stores?.name || "Loja Dudit"}
+                                                        {order.order_source === "Marketplace"
+                                                            ? (order.order_source || "Marketplace")
+                                                            : (order.seller_name || "Venda Automática")}
                                                     </div>
                                                 </div>
-                                                <div className="hidden md:flex items-center gap-2">
-                                                    <Badge variant={paymentStatus.variant}>{paymentStatus.label}</Badge>
-                                                    <Badge variant={deliveryStatus.variant}>{deliveryStatus.label}</Badge>
-                                                </div>
+                                                {order.order_source !== "Marketplace" && (
+                                                    <div className="hidden md:block text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                                        Canal de venda: <strong className="text-brand-dark dark:text-dark-heading">{order.order_source || "Manual"}</strong>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
@@ -265,34 +292,12 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                     <div className="mt-8">
                                         <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-
-                                        <div className="flex items-center justify-between mb-4 pb-3">
+                                        <div className="flex items-center justify-between">
                                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Detalhes do Pagamento</h3>
-                                            <div className="flex items-center gap-2">
-                                                <Badge variant={paymentStatus.variant}>{paymentStatus.label}</Badge>
-                                                <Badge variant={deliveryStatus.variant}>{deliveryStatus.label}</Badge>
-                                            </div>
                                         </div>
 
                                         <div className="space-y-3">
-                                            <PaymentRow
-                                                label="Método de Pagamento"
-                                                value={(() => {
-                                                    const m = order.payment_method?.toLowerCase() || ""
-                                                    let brand = ""
-                                                    if (m.includes("visa")) brand = "VISA"
-                                                    else if (m.includes("master")) brand = "MASTERCARD"
-                                                    else if (m.includes("elo")) brand = "ELO"
-                                                    else if (m.includes("hiper")) brand = "HIPERCARD"
-                                                    else if (m.includes("pix")) brand = "PIX"
-                                                    else if (m.includes("dinheiro")) brand = "DINHEIRO"
-
-                                                    if (brand === "PIX") return <div className="flex items-center gap-2"><div className="border border-brand-border dark:border-dark-border px-1.5 py-0.5 rounded bg-white dark:bg-dark-surface text-[10px] font-bold text-teal-600 dark:text-teal-400">PIX</div> <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">Pagamento Instantâneo</span></div>
-                                                    if (brand === "DINHEIRO") return <div className="flex items-center gap-2"><div className="border border-brand-border dark:border-dark-border px-1.5 py-0.5 rounded bg-white dark:bg-dark-surface text-[10px] font-bold text-green-600 dark:text-green-400">CASH</div> <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">Dinheiro</span></div>
-                                                    if (brand) return <div className="flex items-center gap-2"><div className="border border-brand-border dark:border-dark-border px-1.5 py-0.5 rounded bg-white dark:bg-dark-surface text-[10px] font-bold text-blue-800 dark:text-blue-400">{brand}</div> <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{order.payment_method}</span></div>
-                                                    return <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{order.payment_method || "Não informado"}</span>
-                                                })()}
-                                            />
+                                            <PaymentRow label="Método de Pagamento" value={paymentMethodNode} />
 
                                             <PaymentRow
                                                 label="Subtotal"
@@ -314,10 +319,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                             />
 
                                             {Number(order.additional_costs || 0) > 0 && (
-                                                <PaymentRow
-                                                    label="Custos Adicionais"
-                                                    value={formatCurrency(order.additional_costs)}
-                                                />
+                                                <PaymentRow label="Custos Adicionais" value={formatCurrency(order.additional_costs)} />
                                             )}
 
                                             {Number(order.discount_value || 0) > 0 && (
@@ -349,19 +351,6 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                         address={order.customers?.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || order.customers?.addresses?.[0] || (order.delivery_address ? { street: order.delivery_address } : null)}
                                         billingAddress={order.customers?.addresses?.find((a: any) => a.address_type === "billing")}
                                     />
-
-                                    <div className="bg-[#EFFAF5] dark:bg-green-900/10 rounded-2xl p-5 border border-green-100 dark:border-green-900/30">
-                                        <h4 className="text-[11px] font-bold text-green-700 dark:text-green-400 uppercase tracking-widest mb-2 font-body">Responsável pela Venda</h4>
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center text-green-700 dark:text-green-400">
-                                                <ClockIcon size={16} />
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{order.seller_name || "Venda Automática"}</span>
-                                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body">Operador no ERP</span>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         </TabsContent>
@@ -379,19 +368,18 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                     onShare={() => { }}
                     onDelete={() => { }}
                     trigger={
-                        <Button
-                            variant="outline"
-                            className="flex-1"
-                        >
+                        <Button variant="outline" className="flex-1">
                             <ThreeDotsIcon className="w-4 h-4 mr-2" />
                             Opções
                         </Button>
                     }
                 />
-                <Button onClick={() => onEditOrder(order)} className="flex-1 whitespace-nowrap">
-                    <EditIcon className="w-4 h-4 mr-2" />
-                    Editar Venda
-                </Button>
+                {order.situation !== "paid" && (
+                    <Button onClick={() => onEditOrder(order)} className="flex-1 whitespace-nowrap">
+                        <EditIcon className="w-4 h-4 mr-2" />
+                        Editar Venda
+                    </Button>
+                )}
             </div>
         </div>
     )

@@ -15,7 +15,7 @@ import {
     PlusIcon,
     PrinterIcon,
     FileIcon,
-    CheckIcon,
+    CheckCircleIcon,
     ChevronRightIcon
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -103,8 +103,10 @@ const PaymentModal = ({
     const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
     // Payment Status State
-    const [paymentStatus, setPaymentStatus] = useState<'input' | 'processing' | 'success'>('input');
+    const [paymentStatus, setPaymentStatus] = useState<'input' | 'processing' | 'success' | 'error'>('input');
     const [saleId, setSaleId] = useState<string>("");
+    const [lastPaymentPayload, setLastPaymentPayload] = useState<any | null>(null);
+    const [errorMessage, setErrorMessage] = useState("Não conseguimos concluir a venda agora.");
 
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -149,6 +151,8 @@ const PaymentModal = ({
             setEditingPaymentIndex(null);
             setIsPixGenerated(false);
             setPaymentStatus('input');
+            setLastPaymentPayload(null);
+            setErrorMessage("Não conseguimos concluir a venda agora.");
 
             setPayments([
                 { id: 1, method: null, amount: 0 },
@@ -279,32 +283,32 @@ const PaymentModal = ({
         }
     };
 
-    const handleStartProcessing = async () => {
-        setPaymentStatus('processing');
+    const buildConfirmPayload = () => ({
+        paymentMethod: isPendingPayment ? 'pendente' : (view === 'split' ? 'multiple' : (view === 'money' ? 'dinheiro' : (view === 'pix' ? 'pix' : 'cartao'))),
+        splitPayments: view === 'split' ? payments : [],
+        paymentStatus: isPendingPayment ? 'unpaid' : (isUnderpaid ? 'partially_paid' : 'paid'),
+        isPendingDelivery,
+        paidAmount: isPendingPayment ? existingPaidAmount : (existingPaidAmount + totalPaidCalculated)
+    });
 
-        // Final Confirmation to Parent Action
+    const handleStartProcessing = async (forcedPayload?: any) => {
+        setPaymentStatus('processing');
+        const payload = forcedPayload || buildConfirmPayload();
+        setLastPaymentPayload(payload);
+
         try {
-            const result = await onConfirm({
-                paymentMethod: isPendingPayment ? 'pendente' : (view === 'split' ? 'multiple' : (view === 'money' ? 'dinheiro' : (view === 'pix' ? 'pix' : 'cartao'))),
-                splitPayments: view === 'split' ? payments : [],
-                paymentStatus: isPendingPayment ? 'unpaid' : (isUnderpaid ? 'partially_paid' : 'paid'),
-                isPendingDelivery,
-                paidAmount: isPendingPayment ? existingPaidAmount : (existingPaidAmount + totalPaidCalculated)
-            });
+            const result = await onConfirm(payload);
 
             if (result?.success) {
                 setSaleId(result.orderNumber || "DDT000000");
                 setPaymentStatus('success');
             } else {
-                toast({
-                    title: "Erro ao finalizar venda",
-                    description: result?.error || "Ocorreu um erro desconhecido",
-                    variant: "destructive"
-                });
-                setPaymentStatus('input');
+                setErrorMessage(result?.error || "Ocorreu um problema ao concluir o pagamento. Você pode tentar novamente.");
+                setPaymentStatus('error');
             }
         } catch (error) {
-            setPaymentStatus('input');
+            setErrorMessage("Ocorreu um problema inesperado ao concluir o pagamento. Você pode tentar novamente.");
+            setPaymentStatus('error');
         }
     };
 
@@ -391,11 +395,11 @@ const PaymentModal = ({
                     {/* Customer Info Section */}
                     <div className="flex items-start justify-between mb-8">
                         <div className="flex gap-4">
-                            <div className="w-12 h-12 bg-brand-dark rounded-xl flex items-center justify-center text-white font-medium text-lg shrink-0">
-                                {customer?.name?.substring(0, 2).toUpperCase() || 'CB'}
+                            <div className="w-12 h-12 bg-brand-dark rounded-full flex items-center justify-center text-white font-medium text-lg shrink-0">
+                                {customer?.name?.substring(0, 2).toUpperCase() || 'CF'}
                             </div>
                             <div className="flex flex-col overflow-hidden">
-                                <span className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight truncate max-w-[180px]">{customer?.name || 'Cliente Balcão'}</span>
+                                <span className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight truncate max-w-[180px]">{customer?.name || 'Consumidor Final'}</span>
                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">Venda ERP / Presencial</span>
                             </div>
                         </div>
@@ -499,31 +503,31 @@ const PaymentModal = ({
 
                                             {!lockPaymentCompletion && (
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                                <div
-                                                    className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${isPendingPayment ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20'}`}
-                                                    onClick={() => setIsPendingPayment(!isPendingPayment)}
-                                                >
-                                                    <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center flex-shrink-0">
-                                                        <ClockIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+                                                    <div
+                                                        className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${isPendingPayment ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20'}`}
+                                                        onClick={() => setIsPendingPayment(!isPendingPayment)}
+                                                    >
+                                                        <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center flex-shrink-0">
+                                                            <ClockIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+                                                        </div>
+                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">Pendente de pagamento</span>
+                                                        <div className="ml-auto pointer-events-none">
+                                                            <Checkbox checked={isPendingPayment} onChange={() => { }} name="pendingPay" />
+                                                        </div>
                                                     </div>
-                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">Pendente de pagamento</span>
-                                                    <div className="ml-auto pointer-events-none">
-                                                        <Checkbox checked={isPendingPayment} onChange={() => { }} name="pendingPay" />
-                                                    </div>
-                                                </div>
 
-                                                <div
-                                                    className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${isPendingDelivery ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20'}`}
-                                                    onClick={() => setIsPendingDelivery(!isPendingDelivery)}
-                                                >
-                                                    <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center flex-shrink-0">
-                                                        <TruckIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+                                                    <div
+                                                        className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${isPendingDelivery ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20'}`}
+                                                        onClick={() => setIsPendingDelivery(!isPendingDelivery)}
+                                                    >
+                                                        <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center flex-shrink-0">
+                                                            <TruckIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+                                                        </div>
+                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">Pendente de entrega</span>
+                                                        <div className="ml-auto pointer-events-none">
+                                                            <Checkbox checked={isPendingDelivery} onChange={() => { }} name="pendingDel" />
+                                                        </div>
                                                     </div>
-                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">Pendente de entrega</span>
-                                                    <div className="ml-auto pointer-events-none">
-                                                        <Checkbox checked={isPendingDelivery} onChange={() => { }} name="pendingDel" />
-                                                    </div>
-                                                </div>
                                                 </div>
                                             )}
                                         </motion.div>
@@ -655,6 +659,24 @@ const PaymentModal = ({
                                 </motion.div>
                             )}
 
+                            {paymentStatus === 'error' && (
+                                <motion.div
+                                    key="error"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={standardTransition}
+                                    className="w-full h-full flex flex-col items-center justify-center p-8 text-center"
+                                >
+                                    <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-red-500 to-red-600 flex items-center justify-center mb-6 relative">
+                                        <div className="absolute inset-0 rounded-full bg-white opacity-15 animate-pulse"></div>
+                                        <CheckCircleIcon size={56} className="text-white" />
+                                    </div>
+                                    <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">Não foi possível concluir a venda</h2>
+                                    <p className="text-brand-inactive-text dark:text-dark-body max-w-md">{errorMessage}</p>
+                                </motion.div>
+                            )}
+
                             {/* === STATE: SUCCESS === */}
                             {paymentStatus === 'success' && (
                                 <motion.div
@@ -668,13 +690,13 @@ const PaymentModal = ({
                                     {/* Success Header */}
                                     <div className="flex items-center gap-4 mb-6">
                                         <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400 shrink-0">
-                                            <CheckIcon size={32} />
+                                            <CheckCircleIcon size={32} />
                                         </div>
                                         <div>
-                                            <h2 className="text-3xl font-black text-brand-dark dark:text-dark-heading leading-tight leading-none">
+                                            <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
                                                 Venda nº {saleId}
                                             </h2>
-                                            <p className="text-brand-inactive-text dark:text-dark-body font-bold uppercase tracking-wider text-xs mt-1">Finalizada com sucesso</p>
+                                            <p className="text-brand-inactive-text dark:text-dark-body font-medium text-md">Finalizada com sucesso</p>
                                         </div>
                                     </div>
 
@@ -693,17 +715,17 @@ const PaymentModal = ({
                                     {/* Stats Row */}
                                     <div className="flex flex-col sm:flex-row gap-8 sm:gap-12 mb-10 mt-4 border-l-4 border-brand-dark dark:border-dark-heading pl-6">
                                         <div>
-                                            <span className="block text-xs font-bold text-brand-inactive-text dark:text-dark-body mb-1 uppercase tracking-widest">total da venda</span>
-                                            <div className="text-3xl font-black text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(total)}</div>
+                                            <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">total da venda</span>
+                                            <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(total)}</div>
                                         </div>
                                         <div>
-                                            <span className="block text-xs font-bold text-brand-inactive-text dark:text-dark-body mb-1 uppercase tracking-widest">total recebido</span>
-                                            <div className="text-3xl font-black text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(totalPaidCalculated)}</div>
+                                            <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">total recebido</span>
+                                            <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(totalPaidCalculated)}</div>
                                         </div>
                                         {changeAmount > 0 && (
                                             <div>
-                                                <span className="block text-xs font-bold text-brand-inactive-text dark:text-dark-body mb-1 uppercase tracking-widest">troco</span>
-                                                <div className="text-3xl font-black text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(changeAmount)}</div>
+                                                <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">troco</span>
+                                                <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(changeAmount)}</div>
                                             </div>
                                         )}
                                     </div>
@@ -776,10 +798,20 @@ const PaymentModal = ({
                     {paymentStatus === 'success' && (
                         <ActionFooter
                             showConfirm={true}
-                            confirmText="Finalizar e Nova Venda"
+                            confirmText="Finalizar"
                             buttonVariant="default"
                             onCustomConfirm={handleFinishSale}
                         />
+                    )}
+                    {paymentStatus === 'error' && (
+                        <div className="w-full bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-4 md:p-6 mt-auto flex-shrink-0 relative z-30 flex gap-3">
+                            <Button variant="outline" className="flex-1 h-[52px]" onClick={onClose}>
+                                Cancelar
+                            </Button>
+                            <Button className="flex-1 h-[52px]" onClick={() => handleStartProcessing(lastPaymentPayload)}>
+                                Tentar novamente
+                            </Button>
+                        </div>
                     )}
                 </div>
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react"
 import Portal from "@/components/Portal"
-import { CloseIcon, AlertCircleIcon, CheckCircleIcon, AlertTriangleIcon, InfoIcon } from "@/lib/icons"
+import { XIcon, AlertCircleIcon, CheckCircleIcon, AlertTriangleIcon, InfoIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import BottomSheet from "@/components/BottomSheet"
 import { Button } from "@/components/reusable/Button"
@@ -245,7 +245,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
             className="absolute top-4 right-4 w-[42px] h-[42px] flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-dark-border transition-colors z-10"
             aria-label="Fechar"
           >
-            <CloseIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+            <XIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
           </button>
 
           <div className="flex flex-col items-center gap-4 px-6 pt-10 relative text-center">

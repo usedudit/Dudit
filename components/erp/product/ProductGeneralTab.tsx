@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useMemo } from "react"
 import { Input, FormDropdown, Checkbox, Accordion, MoneyInput } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
-import { PlusIcon, ShoppingBag } from "@/lib/icons"
+import { PlusIcon, ShoppingBagIcon } from "@/lib/icons"
 import ProductImagesSection from "./ProductImagesSection"
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from "recharts"
 import { Combobox } from "@/components/reusable"
@@ -106,13 +106,13 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
         <div className="space-y-6">
           <div className="grid grid-cols-12 gap-6">
             <div className="col-span-12">
-              <Input 
-                label="Nome do Produto" 
-                name="name" 
-                value={productData.name} 
-                onChange={handleFieldChange} 
-                disabled={!isEditing} 
-                required 
+              <Input
+                label="Nome do Produto"
+                name="name"
+                value={productData.name}
+                onChange={handleFieldChange}
+                disabled={!isEditing}
+                required
                 error={fieldErrors?.has("name")}
                 errorMessage={fieldErrors?.has("name") ? "Nome é obrigatório" : undefined}
               />
@@ -151,13 +151,13 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6">
             <MoneyInput label="Preço de Custo" name="costPrice" value={productData.costPrice || ""} onChange={(val) => handleFieldChange({ target: { name: "costPrice", value: val } })} disabled={!isEditing || !showPrice} />
-            <MoneyInput 
-              label="Preço de Venda" 
-              name="price" 
-              value={productData.price || ""} 
-              onChange={(val) => handleFieldChange({ target: { name: "price", value: val } })} 
-              disabled={!isEditing || !showPrice} 
-              required 
+            <MoneyInput
+              label="Preço de Venda"
+              name="price"
+              value={productData.price || ""}
+              onChange={(val) => handleFieldChange({ target: { name: "price", value: val } })}
+              disabled={!isEditing || !showPrice}
+              required
               error={fieldErrors?.has("price")}
               errorMessage={fieldErrors?.has("price") ? "Preço de venda é obrigatório" : undefined}
             />
@@ -323,7 +323,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 
         {mode !== "add" && (
           <SidebarCard>
-            <div className="flex items-center gap-2 mb-2"><ShoppingBag size={18} className="rotate-90 stroke-[2.5]" /><h3 className="text-[15px] font-bold">Total sales</h3></div>
+            <div className="flex items-center gap-2 mb-2"><ShoppingBagIcon size={18} className="rotate-90 stroke-[2.5]" /><h3 className="text-[15px] font-bold">Total sales</h3></div>
             <div className="flex items-baseline gap-3 mb-8 pl-1"><span className="text-[32px] font-bold">{formatCurrency(840.00)}</span></div>
             <div className="h-48 w-full"><ResponsiveContainer width="100%" height="100%"><AreaChart data={chartData}><defs><linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#059669" stopOpacity={0.15} /><stop offset="95%" stopColor="#059669" stopOpacity={0} /></linearGradient></defs><XAxis dataKey="name" axisLine={false} tickLine={false} interval={3} /><Tooltip /><Area type="monotone" dataKey="value" stroke="#059669" strokeWidth={2.5} fillOpacity={1} fill="url(#colorValue)" /></AreaChart></ResponsiveContainer></div>
           </SidebarCard>

@@ -2,7 +2,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/reusable"
 import Link from "next/link"
-import { XCircle } from "@/lib/icons"
+import { CancelCircleIcon } from "@/lib/icons"
 import { redirect } from "next/navigation"
 import { formatCurrency } from "@/lib/utils"
 
@@ -26,7 +26,7 @@ export default async function PaymentFailurePage({
       <Card className="text-center">
         <CardHeader>
           <div className="flex justify-center mb-4">
-            <XCircle className="h-16 w-16 text-brand-red" />
+            <CancelCircleIcon className="h-16 w-16 text-brand-red" />
           </div>
           <CardTitle className="text-3xl">Pagamento Não Processado</CardTitle>
           <CardDescription>Não foi possível concluir seu pagamento. Por favor, tente novamente.</CardDescription>

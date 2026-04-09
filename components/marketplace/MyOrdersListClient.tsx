@@ -8,7 +8,7 @@ import { OrderRetryPayment } from "@/components/order-retry-payment";
 import { OrderStatusSyncOnLoad } from "@/components/order-status-sync-on-load";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { Button, IconPlaceholder } from "@/components/reusable";
-import { CheckCircleIcon, AlertCircleIcon, X, ClockIcon, Package } from '@/lib/icons';
+import { CheckCircleIcon, AlertCircleIcon, XIcon, ClockIcon } from '@/lib/icons';
 import { MyOrderDetailPage } from './MyOrderDetailPage';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getProductUrl } from "@/lib/utils/url-generator";
@@ -19,7 +19,7 @@ const getStatusConfig = (status: string) => {
     switch (status) {
         case 'paid': return { label: 'Pago', color: 'text-green-700', bg: 'bg-green-100', icon: CheckCircleIcon, border: 'border-green-200' };
         case 'pending': return { label: 'Pendente', color: 'text-brand-orange', bg: 'bg-orange-100', icon: ClockIcon, border: 'border-orange-200' };
-        case 'cancelled': return { label: 'Cancelado', color: 'text-red-700', bg: 'bg-red-100', icon: X, border: 'border-red-200' };
+        case 'cancelled': return { label: 'Cancelado', color: 'text-red-700', bg: 'bg-red-100', icon: XIcon, border: 'border-red-200' };
         default: return { label: status, color: 'text-gray-700', bg: 'bg-gray-100', icon: AlertCircleIcon, border: 'border-gray-200' };
     }
 };

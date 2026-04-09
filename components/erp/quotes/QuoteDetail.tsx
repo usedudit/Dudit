@@ -3,13 +3,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     ChevronLeftIcon,
-    PrinterIcon,
-    ShareIcon,
-    MailIcon,
-    ClockIcon,
-    CheckCircle2,
+    CancelCircleIcon,
     FileIcon,
-    XCircle,
     AlertTriangleIcon,
     ArrowRightIcon,
     UploadIcon,
@@ -83,8 +78,8 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
     const getStatusInfo = (s: string) => {
         switch (s) {
             case 'sent': return { label: 'Enviado', variant: 'blue' as const, icon: <UploadIcon size={12} />, color: 'bg-blue-500' };
-            case 'approved': return { label: 'Aprovado', variant: 'green' as const, icon: <CheckCircle2 size={12} />, color: 'bg-green-500' };
-            case 'rejected': return { label: 'Rejeitado', variant: 'red' as const, icon: <XCircle size={12} />, color: 'bg-red-500' };
+            case 'approved': return { label: 'Aprovado', variant: 'green' as const, icon: <CancelCircleIcon size={12} />, color: 'bg-green-500' };
+            case 'rejected': return { label: 'Rejeitado', variant: 'red' as const, icon: <CancelCircleIcon size={12} />, color: 'bg-red-500' };
             case 'expired': return { label: 'Expirado', variant: 'orange' as const, icon: <AlertTriangleIcon size={12} />, color: 'bg-orange-500' };
             case 'draft': return { label: 'Rascunho', variant: 'gray' as const, icon: <FileIcon size={12} />, color: 'bg-gray-400' };
             default: return { label: s, variant: 'gray' as const, icon: <FileIcon size={12} />, color: 'bg-gray-400' };

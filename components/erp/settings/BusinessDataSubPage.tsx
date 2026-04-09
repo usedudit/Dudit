@@ -1,13 +1,12 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useRef, useTransition } from "react"
+import React, { useState, useCallback, useRef, useTransition } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, InfoCard, Badge, AlertModal, Input as FormInput, Checkbox as FormCheckbox, RadioButton as FormRadioButton, IconPlaceholder } from "@/components/reusable"
-import { CpfCnpjInput, CepInput, StateComboBox, MoneyInput, PhoneInput, ListItem, Spinner, Tabs, TabsList, TabsTrigger, TabsContent, DefaultModal, ActionsDropdown, FormDropdown } from "@/components/reusable"
-import { Switch } from "@/components/reusable/Switch"
+import { Button, Input as FormInput, Checkbox as FormCheckbox, RadioButton as FormRadioButton } from "@/components/reusable"
+import { CpfCnpjInput, CepInput, StateComboBox, PhoneInput, ListItem, Spinner, Tabs, TabsList, TabsTrigger, TabsContent, DefaultModal } from "@/components/reusable"
 import { BusinessHoursSelector } from "@/components/business-hours-selector"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
-import { ChevronLeftIcon, SaveIcon, Store, ShoppingBag, HomeIcon, WrenchIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, Store, ShoppingBagIcon, HomeIcon, WrenchIcon } from "@/lib/icons"
 import { useNotification } from "@/hooks/use-notification"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
@@ -17,7 +16,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 const SELLS_OPTIONS = [
     {
         value: "products",
-        icon: ShoppingBag,
+        icon: ShoppingBagIcon,
         title: "Produtos",
         description: "Venda roupas, eletrônicos, comida ou alugue equipamentos e trajes."
     },

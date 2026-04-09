@@ -43,7 +43,6 @@ interface OrderGeneralTabProps {
     paymentStatus: string
     deliveryStatus: string
     remainingPaymentAmount?: number
-    primaryActionLabel?: string
     isSaving: boolean
 
     // Handlers
@@ -85,7 +84,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     items, searchQuery, isProductSearchOpen, isSearching, searchResults,
     subtotal, discountAmount, discountValue, discountType, shippingFee, otherCosts, totalAmount,
     selectedCustomer, orderDate, salesChannel, deliveryMethod, paymentStatus, deliveryStatus, isSaving,
-    remainingPaymentAmount = 0, primaryActionLabel = "Ir para Pagamento",
+    remainingPaymentAmount = 0,
     setSearchQuery, setIsProductSearchOpen, handleSearchProduct, onSearchFocus, addProductToOrder,
     updateItemField, updateItemPrice, updateItemQty, toggleItemEdit, removeItem, addBlankItem,
     setShippingFee, setOtherCosts, setDiscountValue, setDiscountType, setSelectedCustomer, setIsCustomerSheetOpen,
@@ -215,7 +214,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                     <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
-                                                                <img src={getR2ImageUrl(item.image, "thumbnail")} className={`w-full h-full ${!item.image ? 'object-contain p-1.5' : 'object-cover'}`} alt="" />
+                                                                <img src={getR2ImageUrl(item.image, "thumbnail")} className={`w-full h-full ${!item.image ? 'object-contain' : 'object-cover'}`} alt="" />
                                                             </div>
                                                             <div className="flex flex-col text-left flex-1 min-w-0">
                                                                 {item.isEditing ? (
@@ -316,7 +315,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     return (
                                         <div key={index} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
                                             <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
-                                                <img src={getR2ImageUrl(item.image, "thumbnail")} className={`w-full h-full ${!item.image ? 'object-contain p-1.5' : 'object-cover'}`} alt="" />
+                                                <img src={getR2ImageUrl(item.image, "thumbnail")} className={`w-full h-full ${!item.image ? 'object-contain' : 'object-cover'}`} alt="" />
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex justify-between items-start mb-0.5">
@@ -495,14 +494,6 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                         </div>
 
                         <div className="flex flex-col gap-3 mt-4">
-                            {remainingPaymentAmount > 0.009 && (
-                                <InfoCard
-                                    title="Valor ainda em aberto"
-                                    message={`Falta receber ${formatCurrency(remainingPaymentAmount)} para quitar este pedido.`}
-                                    color="orange"
-                                />
-                            )}
-
                             <div className="flex justify-between items-center text-[15px]">
                                 <span className="text-brand-inactive-text font-medium">Subtotal</span>
                                 <span className="font-bold text-brand-dark dark:text-dark-heading">
@@ -552,13 +543,23 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 onClick={handleSaveOrder}
                                 disabled={isSaving}
                             >
-                                {primaryActionLabel}
+                                Ir para Pagamento
                             </Button>
                         </div>
                     </section>
                 </div>
 
                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                    {remainingPaymentAmount > 0.009 && (
+                        <div className="mb-6">
+                            <InfoCard
+                                title="Valor ainda em aberto"
+                                message={`Falta receber ${formatCurrency(remainingPaymentAmount)} para quitar este pedido.`}
+                                color="orange"
+                            />
+                        </div>
+                    )}
+
                     {/* --- 1. CUSTOMER CARD --- */}
                     <div>
                         {selectedCustomer ? (

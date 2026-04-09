@@ -189,6 +189,9 @@ function buildOrderChangeLines(currentOrder: any, payload: ERPOrderPayload) {
     const nextOrderSource = buildOrderSource(payload.salesChannel, payload.deliveryMethod)
     const previousNotes = (currentOrder.notes || "").trim()
     const nextNotes = (payload.notes || "").trim()
+    const nextDeliveryAddress = payload.deliveryMethod === "delivery" && payload.address
+        ? `${payload.address.street}, ${payload.address.number}${payload.address.complement ? ` (${payload.address.complement})` : ""}, ${payload.address.neighborhood}, ${payload.address.city} - ${payload.address.state}, ${payload.address.zipCode}`
+        : ""
 
     lines.push(...buildItemChangeLines(currentOrder.order_items || [], payload.items))
 
@@ -210,6 +213,10 @@ function buildOrderChangeLines(currentOrder: any, payload: ERPOrderPayload) {
 
     if ((currentOrder.delivery_type || "pickup") !== payload.deliveryMethod) {
         lines.push(`alterou tipo de entrega: ${currentOrder.delivery_type === "delivery" ? "Entrega" : "Retirada"} -> ${payload.deliveryMethod === "delivery" ? "Entrega" : "Retirada"}`)
+    }
+
+    if ((currentOrder.delivery_address || "") !== nextDeliveryAddress) {
+        lines.push("alterou endereço de entrega")
     }
 
     if ((currentOrder.payment_method || "Não informado") !== (payload.paymentMethod || "Não informado")) {
@@ -412,6 +419,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             additional_costs,
             notes,
             payment_method,
+            delivery_address,
             order_items(product_id, product_name, quantity, product_price)
         `)
         .eq("id", orderId)
@@ -419,6 +427,9 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         .single()
 
     if (currentOrderError || !currentOrder) return { error: currentOrderError?.message || "Pedido nÃ£o encontrado" }
+    if (currentOrder.situation === "paid") {
+        return { error: "Pedidos pagos não podem mais ser editados." }
+    }
     const paymentState = resolvePaymentState({
         requestedStatus: data.paymentStatus,
         totalAmount: data.totalAmount,
@@ -430,6 +441,11 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     if (data.deliveryMethod === "delivery" && data.address?.street && data.address.number) {
         const { street, number, neighborhood, city, state, zipCode, complement } = data.address
         deliveryAddressStr = `${street}, ${number}${complement ? ` (${complement})` : ""}, ${neighborhood}, ${city} - ${state}, ${zipCode}`
+    }
+
+    const changeLines = buildOrderChangeLines(currentOrder, data)
+    if (changeLines.length === 0) {
+        return { success: true, noChanges: true }
     }
 
     const { error: orderError } = await supabase
@@ -472,16 +488,13 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     if (itemsError) return { error: itemsError.message }
 
     try {
-        const changeLines = buildOrderChangeLines(currentOrder, data)
-        if (changeLines.length > 0) {
-            await createOrderHistoryEntry({
-                orderId,
-                partnerId: data.partnerId,
-                actorUserId: user.id,
-                entryType: "updated",
-                changeLines,
-            })
-        }
+        await createOrderHistoryEntry({
+            orderId,
+            partnerId: data.partnerId,
+            actorUserId: user.id,
+            entryType: "updated",
+            changeLines,
+        })
     } catch (historyError) {
         console.error("[orders_history] updateERPOrderAction:", historyError)
     }

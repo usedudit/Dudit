@@ -14,6 +14,7 @@ interface OrderGridCardProps {
   onDelete: () => void
   onCancel: () => void
   onDetails: () => void
+  canEdit?: boolean
 }
 
 const OrderGridCard = React.memo(
@@ -24,7 +25,8 @@ const OrderGridCard = React.memo(
     onEdit,
     onDelete,
     onCancel,
-    onDetails
+    onDetails,
+    canEdit = true
   }: OrderGridCardProps) => {
 
     return (
@@ -52,7 +54,7 @@ const OrderGridCard = React.memo(
                 >
                   {order.displayId}
                 </h3>
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center shrink-0">
                   <Badge
                     variant={order.statusColor}
                     className="whitespace-nowrap scale-90"
@@ -132,7 +134,7 @@ const OrderGridCard = React.memo(
               onClick={(e) => e.stopPropagation()}
             >
               <ActionsDropdown
-                onEdit={onEdit}
+                onEdit={canEdit ? onEdit : undefined}
                 onDelete={onDelete}
                 onCancel={onCancel}
               />

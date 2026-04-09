@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 import {
   ShoppingCartIcon,
   Settings,
-  X,
+  XIcon,
   ChevronRightIcon,
   ChevronDownIcon,
   HomeIcon,
@@ -306,7 +306,7 @@ export function ERPSidebar() {
           </Link>
 
           <button className="md:hidden absolute right-2" onClick={() => setIsMobileOpen(false)}>
-            <X className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
+            <XIcon className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
           </button>
         </div>
 

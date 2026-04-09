@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { TrashIcon, UploadIcon, Package, CloseIcon } from "@/lib/icons"
+import { TrashIcon, UploadIcon, Package, XIcon } from "@/lib/icons"
 import { Input, Button, IconPlaceholder, Spinner } from "@/components/reusable"
 import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
 import { TagsInput } from "@/components/reusable/TagsInput"
@@ -503,7 +503,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
 
       const response = await fetchWithCSRF(uploadUrl.toString(), { method: "POST", body: formData })
       const result = await response.json()
-      
+
       if (result.success && result.key) {
         return result.key
       }
@@ -614,7 +614,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
       <div className="flex items-center justify-between px-8 py-5 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface z-10">
         <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Adicionar Variantes</h2>
         <Button variant="filled" onClick={onClose} className="w-[40px] h-[40px]">
-          <CloseIcon className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
+          <XIcon className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
         </Button>
       </div>
 
@@ -836,7 +836,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                     onClick={() => handleRemoveRow(row.id)}
                                     className="w-8 h-8 p-0 rounded-full border-brand-border dark:border-dark-border text-brand-inactive-text hover:text-brand-red hover:border-red-200 hover:bg-red-50"
                                   >
-                                    <CloseIcon className="w-4 h-4" />
+                                    <XIcon className="w-4 h-4" />
                                   </Button>
                                 </td>
                               </motion.tr>

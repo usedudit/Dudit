@@ -51,7 +51,7 @@ const QuoteGridCard = React.memo(
                                 >
                                     {quote.displayId}
                                 </h3>
-                                <div className="flex items-center gap-1.5 shrink-0">
+                                <div className="flex items-center shrink-0">
                                     <Badge
                                         variant={quote.statusColor}
                                         className="whitespace-nowrap scale-90 shrink-0"

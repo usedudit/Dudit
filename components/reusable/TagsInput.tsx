@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { X } from "@/lib/icons"
+import { XIcon } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 
 interface TagsInputProps {
@@ -66,7 +66,7 @@ export function TagsInput({
                 }}
                 className="hover:bg-gray-200 dark:hover:bg-dark-border/50 rounded-full p-0.5 transition-colors"
               >
-                <X className="w-3 h-3" />
+                <XIcon className="w-3 h-3" />
               </button>
             )}
           </div>

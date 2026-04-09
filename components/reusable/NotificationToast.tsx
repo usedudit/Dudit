@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CloseIcon, CheckCircleIcon, AlertCircleIcon } from "@/lib/icons"
+import { XIcon, CheckCircleIcon, AlertCircleIcon } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/reusable"
 
@@ -123,7 +123,7 @@ function NotificationItem({
         {/* Close button */}
         <Button variant="ghost" className="w-[40px] h-[40px]"
           onClick={handleDismiss}>
-          <CloseIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+          <XIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
         </Button>
       </div>
     </div>

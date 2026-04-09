@@ -22,6 +22,7 @@ interface OrderListItemProps {
   onDelete: (order: any) => void
   onCancel: (order: any) => void
   onDetails: (order: any) => void
+  canEdit?: boolean
   showCheckbox?: boolean
 }
 
@@ -35,6 +36,7 @@ const OrderListItem = React.memo(
     onDelete,
     onCancel,
     onDetails,
+    canEdit = true,
     showCheckbox = true,
   }: OrderListItemProps) => {
 
@@ -66,7 +68,7 @@ const OrderListItem = React.memo(
 
         case "status":
           return (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center gap-2 w-full">
               <Badge variant={order.statusColor}>
                 {order.statusLabel}
               </Badge>
@@ -112,7 +114,7 @@ const OrderListItem = React.memo(
               onClick={(e) => e.stopPropagation()}
             >
               <ActionsDropdown
-                onEdit={() => onEdit(order)}
+                onEdit={canEdit ? () => onEdit(order) : undefined}
                 onDelete={() => onDelete(order)}
                 onCancel={() => onCancel(order)}
               />

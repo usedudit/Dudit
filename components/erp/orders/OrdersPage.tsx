@@ -56,6 +56,7 @@ interface Order {
     items_count: number;
     created_at_time: number;
     situation: string;
+    canEdit: boolean;
 }
 
 interface FilterState {
@@ -173,6 +174,11 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                 const statusInfo = statusMap[o.situation] || { label: o.situation, color: "gray" }
                 const deliveryInfo = getDeliveryStatusMeta(o.delivery_status)
 
+                if (o.situation === "partially_paid") {
+                    statusInfo.label = "Parcialmente Pago"
+                    statusInfo.color = "orange"
+                }
+
                 return {
                     originalId: o.id,
                     displayId: o.mp_payment_id || o.order_number || `#${o.id.substring(0, 8)}`,
@@ -188,7 +194,8 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     store_name: o.stores?.name || "-",
                     items_count: o.order_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || o.quantity || 0,
                     created_at_time: new Date(o.order_date || o.created_at).getTime(),
-                    situation: o.situation
+                    situation: o.situation,
+                    canEdit: o.situation !== "paid"
                 }
             })
             .filter((o: Order) => {
@@ -248,6 +255,10 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
         setWrapperMode('create')
     }
     const handleEditOrder = (order: Order) => {
+        if (!order.canEdit) {
+            toast({ title: "Edição bloqueada", description: "Pedidos pagos não podem mais ser editados.", variant: "destructive" })
+            return
+        }
         setSelectedOrderId(order.originalId)
         setWrapperMode('edit')
     }
@@ -577,6 +588,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                                         onSelect={() => handleSelectRow(o.originalId)}
                                                         onDetails={() => handleDetailsOrder(o)}
                                                         onEdit={() => handleEditOrder(o)}
+                                                        canEdit={o.canEdit}
                                                         onDelete={() => { }}
                                                         onCancel={() => {
                                                             setSingleCancelId(o.originalId)
@@ -647,6 +659,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                                                     selected={selection.ids.has(o.originalId)}
                                                                     onSelect={handleSelectRow}
                                                                     onEdit={handleEditOrder}
+                                                                    canEdit={o.canEdit}
                                                                     onDelete={() => { }}
                                                                     onCancel={() => {
                                                                         setSingleCancelId(o.originalId)

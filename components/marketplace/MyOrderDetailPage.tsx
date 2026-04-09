@@ -6,8 +6,8 @@ import {
     ChevronRightIcon,
     CreditCardIcon,
     TruckIcon,
-    X,
-    CheckCircle2,
+    XIcon,
+    CheckCircleIcon,
     ClockIcon,
     AlertCircleIcon
 } from '@/lib/icons';
@@ -31,9 +31,9 @@ interface MyOrderDetailPageProps {
 
 const getStatusConfig = (status: string) => {
     switch (status) {
-        case 'paid': return { label: 'Pago', color: 'text-brand-green', icon: CheckCircle2, statusText: 'Aprovado' };
+        case 'paid': return { label: 'Pago', color: 'text-brand-green', icon: CheckCircleIcon, statusText: 'Aprovado' };
         case 'pending': return { label: 'Pendente', color: 'text-brand-orange', icon: ClockIcon, statusText: 'Aguardando pagamento' };
-        case 'cancelled': return { label: 'Cancelado', color: 'text-brand-red', icon: X, statusText: 'Cancelado' };
+        case 'cancelled': return { label: 'Cancelado', color: 'text-brand-red', icon: XIcon, statusText: 'Cancelado' };
         default: return { label: status, color: 'text-gray-500', icon: AlertCircleIcon, statusText: status };
     }
 };
@@ -54,7 +54,7 @@ const ShippingDetailsModal = ({ isOpen, onClose, order }: { isOpen: boolean; onC
                 <div className="flex items-center justify-between px-6 py-4 border-b border-brand-border dark:border-dark-border">
                     <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Detalhe do envio</h3>
                     <button onClick={onClose} className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading">
-                        <X size={24} />
+                        <XIcon size={24} />
                     </button>
                 </div>
                 <div className="p-6 max-h-[80vh] overflow-y-auto custom-scrollbar">
@@ -206,7 +206,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 <div className="mb-8 flex flex-col md:flex-row md:items-center gap-4 w-full justify-start">
                     <div className="hidden md:flex">
                         <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
-                            <X className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                            <XIcon className="w-5 h-5" />
                         </Button>
                     </div>
                     <div className="text-left w-full">

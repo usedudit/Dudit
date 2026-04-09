@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-    MapPinIcon, PlusIcon, Package, TagIcon, X, ChevronUpIcon, ChevronDownIcon,
+    MapPinIcon, PlusIcon, Package, TagIcon, XIcon, ChevronUpIcon, ChevronDownIcon,
 } from "@/lib/icons"
 import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
@@ -140,7 +140,7 @@ function CouponInput({ onApply }: { onApply: (code: string) => void }) {
                 </div>
                 {applied ? (
                     <button type="button" onClick={handleRemove} className="text-xs font-semibold text-brand-red hover:text-red-600 flex items-center gap-1 flex-shrink-0 pb-0.5">
-                        <X size={12} /> Remover
+                        <XIcon size={12} /> Remover
                     </button>
                 ) : (
                     <button
@@ -427,7 +427,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                     <div className="mb-8 flex flex-col md:flex-row md:items-center gap-4 w-full justify-start">
                         <div className="hidden md:flex">
                             <Button variant="filled" onClick={handleClose} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
-                                <X className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                <XIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                             </Button>
                         </div>
                         <div className="text-left w-full">

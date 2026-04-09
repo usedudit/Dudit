@@ -6,7 +6,7 @@ import { Button, ListItem } from '@/components/reusable';
 import Portal from "@/components/Portal";
 import BottomSheet from "@/components/BottomSheet";
 import { useMediaQuery } from "@/components/erp/hooks";
-import { CloseIcon } from "@/lib/icons";
+import { XIcon } from "@/lib/icons";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { formatCurrency } from "@/lib/utils";
 
@@ -71,7 +71,7 @@ const SelectVariantSheet = ({ isOpen, onClose, product, onConfirm }: SelectVaria
             <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center bg-white dark:bg-dark-surface z-10 shrink-0">
                 <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar Variações</h2>
                 <Button variant="ghost" onClick={onClose} size="icon">
-                    <CloseIcon className="w-5 h-5" />
+                    <XIcon className="w-5 h-5" />
                 </Button>
             </header>
 

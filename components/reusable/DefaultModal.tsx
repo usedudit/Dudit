@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, type ReactNode } from "react"
 import Portal from "@/components/Portal"
-import { CloseIcon } from "@/lib/icons"
+import { XIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import BottomSheet from "@/components/BottomSheet"
 import { Button } from "@/components/reusable"
@@ -102,7 +102,7 @@ const DefaultModal: React.FC<DefaultModalProps> = ({
                 <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</h3>
               </div>
               <Button variant="filled" onClick={handleClose} className="w-[40px] h-[40px] p-0 flex items-center justify-center flex-shrink-0">
-                <CloseIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                <XIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
               </Button>
             </div>
           )}
