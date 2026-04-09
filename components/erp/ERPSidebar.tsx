@@ -6,7 +6,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import {
   ShoppingCartIcon,
-  Settings,
+  SettingsIcon,
   XIcon,
   ChevronRightIcon,
   ChevronDownIcon,
@@ -119,7 +119,7 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    icon: Settings,
+    icon: SettingsIcon,
     label: "Configurações",
     href: "/erp/settings",
   },

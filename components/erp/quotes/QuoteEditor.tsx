@@ -3,7 +3,6 @@ import {
     SearchIcon,
     TrashIcon,
     UserIcon,
-    ChevronDownIcon,
     SparklesIcon,
     PlusIcon,
     CheckIcon,

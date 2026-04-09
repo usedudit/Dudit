@@ -2,7 +2,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/reusable"
 import Link from "next/link"
-import { CheckCircle2 } from "@/lib/icons"
+import { CheckCircleIcon } from "@/lib/icons"
 import { redirect } from "next/navigation"
 import { formatCurrency } from "@/lib/utils"
 
@@ -31,7 +31,7 @@ export default async function PaymentSuccessPage({
       <Card className="text-center">
         <CardHeader>
           <div className="flex justify-center mb-4">
-            <CheckCircle2 className="h-16 w-16 text-green-600" />
+            <CheckCircleIcon className="h-16 w-16 text-green-600" />
           </div>
           <CardTitle className="text-3xl">Pagamento Confirmado</CardTitle>
           <CardDescription>Seu pedido foi processado com sucesso</CardDescription>
