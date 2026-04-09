@@ -44,6 +44,7 @@ interface OrderGeneralTabProps {
     deliveryStatus: string
     remainingPaymentAmount?: number
     manualItemNameErrors?: Set<number>
+    manualItemPriceErrors?: Set<number>
     isSaving: boolean
 
     // Handlers
@@ -88,6 +89,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     selectedCustomer, orderDate, salesChannel, deliveryMethod, paymentStatus, deliveryStatus, isSaving,
     remainingPaymentAmount = 0,
     manualItemNameErrors = new Set<number>(),
+    manualItemPriceErrors = new Set<number>(),
     setSearchQuery, setIsProductSearchOpen, handleSearchProduct, onSearchFocus, addProductToOrder,
     updateItemField, updateItemPrice, updateItemQty, resolveItemQuantityMax, toggleItemEdit, removeItem, addBlankItem,
     setShippingFee, setOtherCosts, setDiscountValue, setDiscountType, setSelectedCustomer, setIsCustomerSheetOpen,
@@ -99,6 +101,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     const ITEMS_PER_PAGE = 8;
     const [currentPage, setCurrentPage] = React.useState(1);
     const [nameErrors, setNameErrors] = React.useState<Record<number, boolean>>({});
+    const [priceErrors, setPriceErrors] = React.useState<Record<number, boolean>>({});
 
     const totalPages = Math.ceil(items.length / ITEMS_PER_PAGE);
     const paginatedItems = items.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
@@ -215,19 +218,20 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                         {paginatedItems.map((item, paginatedIndex) => {
                                             const index = (currentPage - 1) * ITEMS_PER_PAGE + paginatedIndex;
                                             const hasNameError = Boolean(nameErrors[index] || manualItemNameErrors.has(index));
+                                            const hasPriceError = Boolean(priceErrors[index] || manualItemPriceErrors.has(index));
                                             return (
                                                 <tr key={index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
                                                     <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                                                <img src={getR2ImageUrl(item.image, "thumbnail")} className={`w-full h-full ${!item.image ? 'object-contain' : 'object-cover'}`} alt="" />
+                                                                <img src={getR2ImageUrl(item.image, "thumbnail")} className={`w-full h-full rounded-full ${!item.image ? 'object-contain' : 'object-cover'}`} alt="" />
                                                             </div>
                                                             <div className="flex flex-col text-left flex-1 min-w-0">
                                                                 {item.isEditing ? (
                                                                     <div className="mb-0">
-                                                                        <Input
-                                                                            name={`item-name-${index}`}
-                                                                            value={item.name}
+                                                                <Input
+                                                                    name={`item-name-${index}`}
+                                                                    value={item.name}
                                                                             onChange={(e: any) => {
                                                                                 updateItemField(index, 'name', e.target.value);
                                                                                 if (nameErrors[index]) {
@@ -258,8 +262,15 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                             <MoneyInput
                                                                 name={`item-price-${index}`}
                                                                 value={item.unitPrice}
-                                                                onChange={(e: any) => updateItemPrice(index, parseFloat(e.target.value) || 0)}
+                                                                onChange={(e: any) => {
+                                                                    updateItemPrice(index, parseFloat(e.target.value) || 0)
+                                                                    if (priceErrors[index]) {
+                                                                        setPriceErrors(prev => ({ ...prev, [index]: false }));
+                                                                    }
+                                                                }}
                                                                 className="mb-0"
+                                                                error={hasPriceError}
+                                                                errorMessage="Preço obrigatório"
                                                             />
                                                         </div>
                                                     </td>
@@ -285,6 +296,8 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                     onClick={() => {
                                                                         if (!item.name || item.name.trim() === '') {
                                                                             setNameErrors(prev => ({ ...prev, [index]: true }));
+                                                                        } else if (item.isManual && Number(item.unitPrice || 0) <= 0) {
+                                                                            setPriceErrors(prev => ({ ...prev, [index]: true }));
                                                                         } else {
                                                                             toggleItemEdit(index, false);
                                                                         }
@@ -326,6 +339,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 {paginatedItems.map((item, paginatedIndex) => {
                                     const index = (currentPage - 1) * ITEMS_PER_PAGE + paginatedIndex;
                                     const hasNameError = Boolean(nameErrors[index] || manualItemNameErrors.has(index));
+                                    const hasPriceError = Boolean(priceErrors[index] || manualItemPriceErrors.has(index));
                                     return (
                                         <div key={index} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
                                             <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
@@ -369,6 +383,8 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                 onClick={() => {
                                                                     if (!item.name || item.name.trim() === '') {
                                                                         setNameErrors(prev => ({ ...prev, [index]: true }));
+                                                                    } else if (item.isManual && Number(item.unitPrice || 0) <= 0) {
+                                                                        setPriceErrors(prev => ({ ...prev, [index]: true }));
                                                                     } else {
                                                                         toggleItemEdit(index, false);
                                                                     }
@@ -407,8 +423,15 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                             type="number"
                                                             prefix="R$"
                                                             value={item.unitPrice}
-                                                            onChange={(e: any) => updateItemPrice(index, parseFloat(e.target.value) || 0)}
+                                                            onChange={(e: any) => {
+                                                                updateItemPrice(index, parseFloat(e.target.value) || 0)
+                                                                if (priceErrors[index]) {
+                                                                    setPriceErrors(prev => ({ ...prev, [index]: false }));
+                                                                }
+                                                            }}
                                                             className="mb-0"
+                                                            error={hasPriceError}
+                                                            errorMessage="Preço obrigatório"
                                                         />
                                                     </div>
                                                 </div>

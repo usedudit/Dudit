@@ -496,6 +496,7 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
                                                                     onChange={(checked) => {
                                                                         setSelection({ ids: checked ? new Set(paginated.map((x: Customer) => x.originalId)) : new Set() })
                                                                     }}
+                                                                    className="bg-white dark:bg-dark-background"
                                                                 />
                                                             </div>
                                                         </th>

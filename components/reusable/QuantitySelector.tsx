@@ -13,7 +13,7 @@ interface QuantitySelectorProps {
 export const QuantitySelector: React.FC<QuantitySelectorProps> = ({
   value,
   onChange,
-  min = 0,
+  min = 1,
   max,
   size = 'md',
   disabled = false

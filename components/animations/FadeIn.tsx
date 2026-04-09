@@ -5,7 +5,7 @@ import React from "react"
 import { motion, type Transition } from "framer-motion"
 import type { ReactNode } from "react"
 
-const pageTransition: Transition = { duration: 0.2, ease: [0.4, 0, 0.2, 1] }
+const pageTransition: Transition = { duration: 0.2, ease: [0.2, 0, 0.2, 1] }
 
 interface FadeInProps {
   children: ReactNode

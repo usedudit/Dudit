@@ -49,7 +49,7 @@ function CalendarDayButton({ className, day, modifiers, ...props }: React.Compon
       className={cn(
         "relative flex aspect-square size-auto w-full min-w-[32px] flex-col gap-1 leading-none font-normal transition-all duration-200 rounded-md",
         "hover:bg-brand-slate hover:text-brand-dark",
-        isToday && "bg-brand-gray text-brand-dark font-bold border border-brand-border",
+        isToday && "bg-brand-gray text-brand-dark font-bold border border-brand-border dark:bg-dark-border/50 dark:text-dark-heading dark:border-dark-border",
         isSelected && !isRangeMiddle && "!bg-brand-green !text-white hover:!bg-brand-green/90 hover:!text-white",
         isRangeMiddle && "bg-brand-gray text-brand-dark rounded-none",
         modifiers?.outside && "text-brand-inactive-text opacity-50",
@@ -81,7 +81,7 @@ function LocalCalendar({
         months: cn("flex gap-4 flex-col md:flex-row relative", defaultClassNames.months),
         month: cn("flex flex-col w-full gap-4", defaultClassNames.month),
         nav: cn("flex items-center gap-1 w-full absolute top-0 inset-x-0 justify-between", defaultClassNames.nav),
-        month_caption: "flex items-center justify-center h-8 w-full px-8 text-sm font-bold text-brand-dark",
+        month_caption: "flex items-center justify-center h-8 w-full px-8 text-sm font-bold text-brand-dark dark:text-dark-heading",
         dropdowns: "w-full flex items-center text-xs font-medium justify-center h-8 gap-1.5",
         table: "w-full border-collapse",
         weekdays: "flex mb-1",

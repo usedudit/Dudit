@@ -19,13 +19,44 @@ type QuoteItemPayload = {
     sortOrder?: number
 }
 
+function validateQuotePayload(items: QuoteItemPayload[] = [], shippingCost = 0, additionalCosts = 0, discountValue = 0) {
+    if (items.length === 0) {
+        return "Adicione pelo menos um item ao orçamento."
+    }
+
+    let subtotal = 0
+
+    for (const item of items) {
+        if (!item.productId && !String(item.customName || "").trim()) {
+            return "Preencha o nome dos itens adicionados manualmente antes de salvar o orçamento."
+        }
+
+        if (Number(item.quantity || 0) <= 0) {
+            return "Todos os itens do orçamento devem ter quantidade mínima de 1."
+        }
+
+        if (!item.productId && Number(item.unitPrice || 0) <= 0) {
+            return "Preencha o preço dos itens adicionados manualmente antes de salvar o orçamento."
+        }
+
+        subtotal += Number(item.quantity || 0) * Number(item.unitPrice || 0)
+    }
+
+    const total = subtotal + Number(shippingCost || 0) + Number(additionalCosts || 0) - Number(discountValue || 0)
+    if (total <= 0) {
+        return "O orçamento não pode ser salvo com valor total zerado."
+    }
+
+    return null
+}
+
 async function validateQuoteItemsStock(partnerId: string, items: QuoteItemPayload[], supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>) {
     const productIds = Array.from(new Set(items.map((item) => item.productId).filter(Boolean))) as string[]
     if (productIds.length === 0) return null
 
     const { data: products, error } = await supabase
         .from("products")
-        .select("id, name, stock_quantity")
+    .select("id, name, stock_available")
         .eq("partner_id", partnerId)
         .in("id", productIds)
 
@@ -38,7 +69,7 @@ async function validateQuoteItemsStock(partnerId: string, items: QuoteItemPayloa
         product.id,
         {
             name: product.name || "Produto",
-            stock: Number(product.stock_quantity || 0),
+      stock: Number(product.stock_available || 0),
         },
     ]))
 
@@ -60,6 +91,36 @@ async function validateQuoteItemsStock(partnerId: string, items: QuoteItemPayloa
     }
 
     return null
+}
+
+async function getQuoteItemsForValidation(
+    quoteId: string,
+    partnerId: string,
+    supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>
+) {
+    const { data, error } = await supabase
+        .from("quote_items")
+        .select("product_id, custom_name, description, quantity, unit_price, sort_order")
+        .eq("quote_id", quoteId)
+        .eq("partner_id", partnerId)
+        .order("sort_order", { ascending: true })
+
+    if (error) {
+        console.error("[getQuoteItemsForValidation] Error:", error)
+        return { items: null, error: "NÃ£o foi possÃ­vel validar os itens do orÃ§amento." }
+    }
+
+    return {
+        items: (data || []).map((item: any) => ({
+            productId: item.product_id || null,
+            customName: item.custom_name || "",
+            description: item.description || "",
+            quantity: Number(item.quantity || 0),
+            unitPrice: Number(item.unit_price || 0),
+            sortOrder: Number(item.sort_order || 0),
+        })) as QuoteItemPayload[],
+        error: null,
+    }
 }
 
 // ─── GET NEXT QUOTE NUMBER ──────────────────────────────────────────────────
@@ -130,6 +191,15 @@ export async function createQuoteAction(data: {
             }
 
             const supabase = await getSupabaseServerClient()
+            const payloadValidationError = validateQuotePayload(
+                data.items || [],
+                data.shippingCost || 0,
+                data.additionalCosts || 0,
+                data.discountValue || 0
+            )
+            if (payloadValidationError) {
+                return errorResponse(payloadValidationError)
+            }
             const stockValidationError = await validateQuoteItemsStock(data.partnerId, data.items || [], supabase)
             if (stockValidationError) {
                 return errorResponse(stockValidationError)
@@ -211,6 +281,32 @@ export async function updateQuoteAction(data: {
             await requirePartnerAccessWithPermission(data.partnerId, "quotes", "edit", user)
 
             const supabase = await getSupabaseServerClient()
+            const existingItemsResult = await getQuoteItemsForValidation(data.quoteId, data.partnerId, supabase)
+            if (existingItemsResult.error || !existingItemsResult.items) {
+                return errorResponse(existingItemsResult.error || "NÃ£o foi possÃ­vel validar o orÃ§amento")
+            }
+
+            const { data: currentQuote, error: currentQuoteError } = await supabase
+                .from("quotes")
+                .select("shipping_cost, additional_costs, discount_value")
+                .eq("id", data.quoteId)
+                .eq("partner_id", data.partnerId)
+                .single()
+
+            if (currentQuoteError || !currentQuote) {
+                console.error("[updateQuoteAction] Error fetching current quote:", currentQuoteError)
+                return errorResponse("OrÃ§amento nÃ£o encontrado")
+            }
+
+            const payloadValidationError = validateQuotePayload(
+                existingItemsResult.items,
+                data.shippingCost ?? Number(currentQuote.shipping_cost || 0),
+                data.additionalCosts ?? Number(currentQuote.additional_costs || 0),
+                data.discountValue ?? Number(currentQuote.discount_value || 0)
+            )
+            if (payloadValidationError) {
+                return errorResponse(payloadValidationError)
+            }
 
             const updatePayload: any = {}
             if (data.customerId !== undefined) updatePayload.customer_id = data.customerId || null
@@ -420,6 +516,12 @@ export async function addQuoteItemAction(data: {
         if (data.quantity > 999999) return errorResponse("Quantidade m\u00e1xima excedida")
         if (data.unitPrice < 0) return errorResponse("Pre\u00e7o unit\u00e1rio n\u00e3o pode ser negativo")
         if (data.unitPrice > 99999999.99) return errorResponse("Pre\u00e7o unit\u00e1rio m\u00e1ximo excedido")
+        if (!data.productId && !String(data.customName || "").trim()) {
+            return errorResponse("Nome do item manual Ã© obrigatÃ³rio")
+        }
+        if (!data.productId && data.unitPrice <= 0) {
+            return errorResponse("PreÃ§o do item manual deve ser maior que zero")
+        }
 
         const supabase = await getSupabaseServerClient()
 
@@ -482,6 +584,30 @@ export async function updateQuoteItemAction(data: {
         }
 
         const supabase = await getSupabaseServerClient()
+        const { data: existingItem, error: existingItemError } = await supabase
+            .from("quote_items")
+            .select("id, product_id, custom_name, unit_price")
+            .eq("id", data.itemId)
+            .eq("partner_id", data.partnerId)
+            .single()
+
+        if (existingItemError || !existingItem) {
+            console.error("[updateQuoteItemAction] Error fetching current item:", existingItemError)
+            return errorResponse("Item do orÃ§amento nÃ£o encontrado")
+        }
+
+        if (!existingItem.product_id) {
+            const resolvedCustomName = data.customName !== undefined ? data.customName : existingItem.custom_name
+            const resolvedUnitPrice = data.unitPrice !== undefined ? data.unitPrice : Number(existingItem.unit_price || 0)
+
+            if (!String(resolvedCustomName || "").trim()) {
+                return errorResponse("Nome do item manual Ã© obrigatÃ³rio")
+            }
+
+            if (Number(resolvedUnitPrice || 0) <= 0) {
+                return errorResponse("PreÃ§o do item manual deve ser maior que zero")
+            }
+        }
 
         const updatePayload: any = {}
         if (data.customName !== undefined) updatePayload.custom_name = data.customName
@@ -634,8 +760,8 @@ export async function searchProductsForQuotes(query: string) {
         const { data, error } = await supabase
             .from("products")
             .select(`
-                id, name, sku, price, stock_quantity, allow_sell_without_stock, images, unit,
-                variants:product_variants(id, variant_name, sku, price_adjustment, stock_quantity)
+      id, name, sku, price, stock_available, allow_sell_without_stock, images, unit,
+      variants:product_variants(id, variant_name, sku, price_adjustment, stock_available)
             `)
             .eq("partner_id", ctx.partnerId)
             .eq("is_active", true)
@@ -651,7 +777,7 @@ export async function searchProductsForQuotes(query: string) {
             id: p.id,
             name: p.name,
             sku: p.sku || 'N/A',
-            stock: p.stock_quantity || 0,
+      stock: p.stock_available || 0,
             allow_sell_without_stock: Boolean(p.allow_sell_without_stock),
             price: p.price || 0,
             unit: p.unit || 'un',
@@ -660,7 +786,7 @@ export async function searchProductsForQuotes(query: string) {
                 id: v.id,
                 name: v.variant_name,
                 sku: v.sku || 'N/A',
-                stock: v.stock_quantity || 0,
+      stock: v.stock_available || 0,
                 price: (p.price || 0) + (v.price_adjustment || 0)
             })) : []
         }))

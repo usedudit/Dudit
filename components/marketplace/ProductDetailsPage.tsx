@@ -210,7 +210,7 @@ export function ProductDetailsPageClient({
     [reviews]
   )
 
-  const MAX_STOCK = selectedVariant ? selectedVariant.stock_quantity : product.stock_quantity || 0
+  const MAX_STOCK = selectedVariant ? (selectedVariant.stock_available ?? selectedVariant.stock_quantity ?? 0) : (product.stock_available ?? product.stock_quantity ?? 0)
   const isOutOfStock = MAX_STOCK === 0
 
   // Check if user is owner OR team member of this store
@@ -234,7 +234,7 @@ export function ProductDetailsPageClient({
 
   useEffect(() => {
     if (processedVariants.length > 0 && !selectedVariant) {
-      const first = processedVariants.find((v) => v.stock_quantity > 0) || processedVariants[0]
+      const first = processedVariants.find((v) => (v.stock_available ?? v.stock_quantity ?? 0) > 0) || processedVariants[0]
       setSelectedAttributes(first.attributes)
       setSelectedVariant(first)
       if (first.imageIndex !== -1) setActiveImgIndex(first.imageIndex)
@@ -244,8 +244,8 @@ export function ProductDetailsPageClient({
   const handleAttributeSelect = useCallback((key: string, value: string) => {
     const newAttrs = { ...selectedAttributes, [key]: value }
     let match = processedVariants.find((v) => Object.entries(newAttrs).every(([k, val]) => v.attributes[k] === val))
-    if (!match || match.stock_quantity === 0)
-      match = processedVariants.find((v) => v.attributes[key] === value && v.stock_quantity > 0)
+    if (!match || (match.stock_available ?? match.stock_quantity ?? 0) === 0)
+      match = processedVariants.find((v) => v.attributes[key] === value && (v.stock_available ?? v.stock_quantity ?? 0) > 0)
     if (match) {
       setSelectedAttributes(match.attributes)
       setSelectedVariant(match)
@@ -386,7 +386,7 @@ export function ProductDetailsPageClient({
             <div className="flex flex-wrap gap-3">
               {uniqueValues.map((value: any) => {
                 const isSelected = selectedAttributes[type] === value
-                const isAvailable = processedVariants.some((v) => v.attributes[type] === value && v.stock_quantity > 0)
+                const isAvailable = processedVariants.some((v) => v.attributes[type] === value && (v.stock_available ?? v.stock_quantity ?? 0) > 0)
                 const variantWithImg = processedVariants.find((v) => v.attributes[type] === value && v.hasDbImage)
                 if (groupHasImage) {
                   return (

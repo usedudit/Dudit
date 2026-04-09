@@ -215,7 +215,7 @@ async function _searchMarketplaceInternal(
             if (produtosIds.length > 0) {
                 promises.push(
                     supabase.from("products").select(`
-                        id, name, description, price, promotional_price, images, rating, category, created_at,
+                        id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating, category, created_at,
                         partners(id, store_name, store_image_url, addresses(city, state)),
                         product_variants(variant_options, price_adjustment, is_active)
                     `)
@@ -373,7 +373,7 @@ async function searchMarketplacePostgresFTS(
 
         if (type === 'tudo' || type === 'produtos') {
             let req = supabase.from("products").select(`
-                id, name, description, price, promotional_price, images, rating, category, created_at,
+                id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating, category, created_at,
                 partners(id, store_name, store_image_url, addresses(city, state)),
                 product_variants(variant_options, price_adjustment, is_active)
             `).eq("is_active", true).eq("show_in_marketplace", true)

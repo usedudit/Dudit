@@ -5,6 +5,8 @@ export interface Product {
   description: string | null
   price: number
   stock_quantity: number
+  stock_reserved?: number
+  stock_available?: number
   category: string | null
   category_id: string | null
   subcategory: string | null
@@ -114,6 +116,8 @@ export interface ProductVariant {
   sku: string | null
   price_adjustment: number
   stock_quantity: number
+  stock_reserved?: number
+  stock_available?: number
   is_active: boolean
 }
 

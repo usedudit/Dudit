@@ -12,6 +12,12 @@ import { getDeliveryStatusLabel, getPaymentStatusLabel } from "@/lib/orders/stat
 import { createOrderHistoryEntry, getOrderHistoryEntries } from "@/lib/services/order-history.service"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { revalidateStockMovements } from "@/lib/utils/revalidation"
+import {
+    finalizeOrderInventory,
+    releaseOrderInventory,
+    reserveOrderInventory,
+    shouldDeductInventory,
+} from "@/lib/stock/reservations"
 
 type ERPItemPayload = {
     productId: string | null
@@ -293,6 +299,10 @@ function sanitizeERPItems(items: ERPItemPayload[]) {
         if (item.quantity <= 0) {
             return { error: "A quantidade de todos os itens deve ser maior que zero." as const }
         }
+
+        if (!item.productId && item.unitPrice <= 0) {
+            return { error: "Preencha o preço dos itens adicionados manualmente antes de salvar o pedido." as const }
+        }
     }
 
     return { items: sanitizedItems }
@@ -315,7 +325,7 @@ async function validateERPItemsStock(params: {
 
     const { data: products, error: productsError } = await params.supabase
         .from("products")
-        .select("id, name, stock_quantity, allow_sell_without_stock")
+        .select("id, name, stock_available, allow_sell_without_stock")
         .eq("partner_id", params.partnerId)
         .in("id", productIds)
 
@@ -328,7 +338,7 @@ async function validateERPItemsStock(params: {
         product.id,
         {
             name: product.name || "Produto",
-            stock: Number(product.stock_quantity || 0),
+            stock: Number(product.stock_available ?? 0),
             allowSellWithoutStock: Boolean(product.allow_sell_without_stock),
         },
     ]))
@@ -337,7 +347,7 @@ async function validateERPItemsStock(params: {
     if (variantIds.length > 0) {
         const { data: variants, error: variantsError } = await params.supabase
             .from("product_variants")
-            .select("id, product_id, variant_name, stock_quantity")
+            .select("id, product_id, variant_name, stock_available")
             .in("id", variantIds)
 
         if (variantsError) {
@@ -348,7 +358,7 @@ async function validateERPItemsStock(params: {
         for (const variant of variants || []) {
             variantMap.set(variant.id, {
                 name: variant.variant_name || "Variação",
-                stock: Number(variant.stock_quantity || 0),
+                stock: Number(variant.stock_available ?? 0),
                 productId: variant.product_id,
             })
         }
@@ -533,6 +543,16 @@ async function createOrderStockMovement(params: {
     return { success: true as const }
 }
 
+async function invalidateInventoryItems(partnerId: string, items: Array<{ product_id?: string | null }>) {
+    const productIds = Array.from(
+        new Set(items.map((item) => item.product_id).filter(Boolean))
+    ) as string[]
+
+    for (const productId of productIds) {
+        await invalidateProductCache(productId, partnerId, "update", { silent: true })
+    }
+}
+
 export async function createERPOrderAction(data: ERPOrderPayload) {
     await requireRateLimit(RateLimitCategory.ORDER_CREATE)
 
@@ -564,6 +584,10 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         totalAmount: data.totalAmount,
         paidAmount: data.paidAmount,
     })
+
+    if (Number(data.totalAmount || 0) <= 0) {
+        return { error: "A venda não pode ser salva com valor total zerado." }
+    }
 
     let deliveryAddressStr = ""
     if (data.deliveryMethod === "delivery" && data.address) {
@@ -615,32 +639,54 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         return { error: itemsError.message }
     }
 
-    const stockMovementResult = await createOrderStockMovement({
-        supabase,
+    const stockItems = sanitizedItems.map((item) => ({
+        product_id: item.productId,
+        variant_id: item.variantId || null,
+        quantity: item.quantity,
+    }))
+
+    const reserveResult = await reserveOrderInventory({
+        client: supabase,
         partnerId,
         orderId: order.id,
-        createdBy: user.id,
-        type: "out",
-        reason: "Venda de Produto",
-        notes: "Baixa de estoque ao criar pedido no ERP",
-        items: sanitizedItems.map((item) => ({
-            product_id: item.productId,
-            variant_id: item.variantId || null,
-            quantity: item.quantity,
-        })),
+        items: stockItems,
     })
 
-    if ("error" in stockMovementResult) {
+    if ("error" in reserveResult) {
         await supabase.from("order_items").delete().eq("order_id", order.id)
         await supabase.from("orders").delete().eq("id", order.id)
-        return { error: stockMovementResult.error }
+        return { error: reserveResult.error }
     }
 
-    await supabase
-        .from("orders")
-        .update({ inventory_deducted: true })
-        .eq("id", order.id)
-        .eq("partner_id", partnerId)
+    if (shouldDeductInventory(data.deliveryStatus)) {
+        const finalizeResult = await finalizeOrderInventory({
+            client: supabase,
+            partnerId,
+            orderId: order.id,
+            createdBy: user.id,
+            reason: "Venda de Produto",
+            notes: "Baixa de estoque ao criar pedido no ERP",
+            items: stockItems,
+        })
+
+        if ("error" in finalizeResult) {
+            await releaseOrderInventory({
+                client: supabase,
+                partnerId,
+                orderId: order.id,
+                items: stockItems,
+            })
+            await supabase.from("order_items").delete().eq("order_id", order.id)
+            await supabase.from("orders").delete().eq("id", order.id)
+            return { error: finalizeResult.error }
+        }
+
+        await supabase
+            .from("orders")
+            .update({ inventory_deducted: true })
+            .eq("id", order.id)
+            .eq("partner_id", partnerId)
+    }
 
     try {
         const historyLines = [
@@ -660,6 +706,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
 
     increment_usage_counter(partnerId, "orders_month_count").catch(console.error)
 
+    await invalidateInventoryItems(partnerId, stockItems)
     await revalidateOrders(partnerId)
 
     return { success: true, orderId: order.id, orderNumber: order.order_number }
@@ -676,7 +723,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         .from("orders")
         .select(`
             *,
-            order_items(*, products(id, name, sku, images, stock_quantity, allow_sell_without_stock), product_variants(id, variant_name, sku, stock_quantity)),
+            order_items(*, products(id, name, sku, images, stock_quantity, stock_available, allow_sell_without_stock), product_variants(id, variant_name, sku, stock_quantity, stock_available)),
             stores(name)
         `)
         .eq("id", orderId)
@@ -775,6 +822,10 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         fallbackPaidAmount: Number(currentOrder.paid_amount || 0),
     })
 
+    if (Number(data.totalAmount || 0) <= 0) {
+        return { error: "A venda não pode ser salva com valor total zerado." }
+    }
+
     let deliveryAddressStr = ""
     if (data.deliveryMethod === "delivery" && data.address?.street && data.address.number) {
         const { street, number, neighborhood, city, state, zipCode, complement } = data.address
@@ -827,6 +878,12 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     const { error: itemsError } = await supabase.from("order_items").insert(itemsToInsert)
     if (itemsError) return { error: itemsError.message }
 
+    const stockItems = sanitizedItems.map((item) => ({
+        product_id: item.productId,
+        variant_id: item.variantId || null,
+        quantity: item.quantity,
+    }))
+
     if (currentOrder.inventory_deducted) {
         if (delta.incoming.length > 0) {
             const movementResult = await createOrderStockMovement({
@@ -858,27 +915,47 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             if ("error" in movementResult) return { error: movementResult.error }
         }
     } else {
-        const movementResult = await createOrderStockMovement({
-            supabase,
-            partnerId: data.partnerId,
-            orderId,
-            createdBy: user.id,
-            type: "out",
-            reason: "Venda de Produtos",
-            items: sanitizedItems.map((item) => ({
-                product_id: item.productId,
-                variant_id: item.variantId || null,
-                quantity: item.quantity,
-            })),
-        })
+        if (delta.incoming.length > 0) {
+            const releaseResult = await releaseOrderInventory({
+                client: supabase,
+                partnerId: data.partnerId,
+                orderId,
+                items: delta.incoming,
+            })
 
-        if ("error" in movementResult) return { error: movementResult.error }
+            if ("error" in releaseResult) return { error: releaseResult.error }
+        }
 
-        await supabase
-            .from("orders")
-            .update({ inventory_deducted: true })
-            .eq("id", orderId)
-            .eq("partner_id", data.partnerId)
+        if (delta.outgoing.length > 0) {
+            const reserveResult = await reserveOrderInventory({
+                client: supabase,
+                partnerId: data.partnerId,
+                orderId,
+                items: delta.outgoing,
+            })
+
+            if ("error" in reserveResult) return { error: reserveResult.error }
+        }
+
+        if (shouldDeductInventory(data.deliveryStatus)) {
+            const finalizeResult = await finalizeOrderInventory({
+                client: supabase,
+                partnerId: data.partnerId,
+                orderId,
+                createdBy: user.id,
+                reason: "Venda de Produtos",
+                notes: "Baixa de estoque ao atualizar pedido no ERP",
+                items: stockItems,
+            })
+
+            if ("error" in finalizeResult) return { error: finalizeResult.error }
+
+            await supabase
+                .from("orders")
+                .update({ inventory_deducted: true })
+                .eq("id", orderId)
+                .eq("partner_id", data.partnerId)
+        }
     }
 
     try {
@@ -893,6 +970,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         console.error("[orders_history] updateERPOrderAction:", historyError)
     }
 
+    await invalidateInventoryItems(data.partnerId, stockItems)
     await revalidateOrders(data.partnerId)
     return { success: true }
 }
@@ -955,12 +1033,13 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     reason: payload.cancelReason?.trim(),
                 })
 
+                const stockWasRestoredOnCancel = Boolean(payload.restoreStock && order.inventory_deducted)
                 const { error } = await supabase
                     .from("orders")
                     .update({
                         situation: "cancelled",
                         previous_situation_before_cancel: order.situation || "pending",
-                        stock_restored_on_cancel: Boolean(payload.restoreStock && order.inventory_deducted),
+                        stock_restored_on_cancel: stockWasRestoredOnCancel,
                         notes: nextNotes || null,
                     })
                     .eq("id", order.id)
@@ -968,7 +1047,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
                 if (error) return { error: error.message }
 
-                if (payload.restoreStock && order.inventory_deducted) {
+                if (order.inventory_deducted && stockWasRestoredOnCancel) {
                     const movementResult = await createOrderStockMovement({
                         supabase,
                         partnerId: payload.partnerId,
@@ -981,6 +1060,15 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     })
 
                     if ("error" in movementResult) return { error: movementResult.error }
+                } else if (!order.inventory_deducted) {
+                    const releaseResult = await releaseOrderInventory({
+                        client: supabase,
+                        partnerId: payload.partnerId,
+                        orderId: order.id,
+                        items: order.order_items || [],
+                    })
+
+                    if ("error" in releaseResult) return { error: releaseResult.error }
                 }
             }
 
@@ -1015,13 +1103,22 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     })
 
                     if ("error" in movementResult) return { error: movementResult.error }
+                } else if (!order.inventory_deducted) {
+                    const reserveResult = await reserveOrderInventory({
+                        client: supabase,
+                        partnerId: payload.partnerId,
+                        orderId: order.id,
+                        items: order.order_items || [],
+                    })
+
+                    if ("error" in reserveResult) return { error: reserveResult.error }
                 }
             }
         }
 
         try {
             await Promise.all(
-                (currentOrders || []).map((order: { id: string; previous_situation_before_cancel?: string | null; stock_restored_on_cancel?: boolean | null }) => {
+                (currentOrders || []).map((order: { id: string; previous_situation_before_cancel?: string | null; stock_restored_on_cancel?: boolean | null; inventory_deducted?: boolean | null }) => {
                     const lines: string[] = []
 
                     if (payload.actionType === "cancel") {
@@ -1029,8 +1126,10 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         if (payload.cancelReason?.trim()) {
                             lines.push(`informou motivo do cancelamento: ${payload.cancelReason.trim()}`)
                         }
-                        if (payload.restoreStock) {
+                        if (payload.restoreStock && order.inventory_deducted) {
                             lines.push("restaurou o estoque dos itens do pedido")
+                        } else if (!order.stock_restored_on_cancel) {
+                            lines.push("liberou a reserva de estoque dos itens do pedido")
                         }
                     }
 
@@ -1038,6 +1137,8 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         lines.push(`reabriu o pedido e restaurou o status para ${getPaymentStatusLabel(order.previous_situation_before_cancel || "pending")}`)
                         if (order.stock_restored_on_cancel) {
                             lines.push("removeu novamente os itens do estoque")
+                        } else {
+                            lines.push("reservou novamente o estoque dos itens do pedido")
                         }
                     }
 
@@ -1054,6 +1155,10 @@ export async function updateOrdersStatusInBatchAction(payload: {
             console.error("[orders_history] updateOrdersStatusInBatchAction:", historyError)
         }
 
+        await invalidateInventoryItems(
+            payload.partnerId,
+            (currentOrders || []).flatMap((order: any) => order.order_items || [])
+        )
         await revalidateOrders(payload.partnerId)
         return { success: true }
     }
@@ -1110,13 +1215,34 @@ export async function updateOrdersStatusInBatchAction(payload: {
             return { error: "Status de envio invalido para atualizacao em massa." }
         }
 
-        const { error } = await supabase
-            .from("orders")
-            .update({ delivery_status: payload.statusValue })
-            .in("id", payload.orderIds)
-            .eq("partner_id", payload.partnerId)
+        for (const order of currentOrders || []) {
+            const shouldFinalizeNow = !order.inventory_deducted && shouldDeductInventory(payload.statusValue)
 
-        if (error) return { error: error.message }
+            const { error } = await supabase
+                .from("orders")
+                .update({
+                    delivery_status: payload.statusValue,
+                    ...(shouldFinalizeNow ? { inventory_deducted: true } : {}),
+                })
+                .eq("id", order.id)
+                .eq("partner_id", payload.partnerId)
+
+            if (error) return { error: error.message }
+
+            if (shouldFinalizeNow) {
+                const finalizeResult = await finalizeOrderInventory({
+                    client: supabase,
+                    partnerId: payload.partnerId,
+                    orderId: order.id,
+                    createdBy: user.id,
+                    reason: "Venda de Produtos",
+                    notes: `Baixa de estoque ao alterar status para ${payload.statusValue}`,
+                    items: order.order_items || [],
+                })
+
+                if ("error" in finalizeResult) return { error: finalizeResult.error }
+            }
+        }
     }
 
     try {
@@ -1164,6 +1290,10 @@ export async function updateOrdersStatusInBatchAction(payload: {
         console.error("[orders_history] updateOrdersStatusInBatchAction:", historyError)
     }
 
+    await invalidateInventoryItems(
+        payload.partnerId,
+        (currentOrders || []).flatMap((order: any) => order.order_items || [])
+    )
     await revalidateOrders(payload.partnerId)
     return { success: true }
 }

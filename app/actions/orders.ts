@@ -9,6 +9,8 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
 import { revalidateOrders } from "@/lib/utils/revalidation"
+import { releaseOrderInventory, reserveOrderInventory } from "@/lib/stock/reservations"
+import { invalidateProductCache } from "@/lib/cache/invalidation"
 
 // Single revalidation to minimize cache calls
 const revalidateOrdersCache = async () => await revalidateOrders("")
@@ -78,7 +80,7 @@ export async function createOrderAction(data: {
   if (data.itemType === "product") {
     const { data: product, error: productError } = await supabase
       .from("products")
-      .select("price, promotional_price, name, is_active")
+      .select("price, promotional_price, name, is_active, stock_available")
       .eq("id", data.itemId)
       .single()
 
@@ -95,18 +97,7 @@ export async function createOrderAction(data: {
       : product.price
     itemName = product.name || "Produto"
 
-    // ========================================================================
-    // SECURITY FIX: Atomic stock decrement with stock >= quantity guard
-    // Prevents overselling under concurrent requests
-    // ========================================================================
-    const { data: stockResult, error: stockError } = await supabase.rpc(
-      "decrement_stock_atomic", {
-      p_product_id: data.itemId,
-      p_quantity: data.quantity,
-    }
-    )
-
-    if (stockError || !stockResult) {
+    if ((product.stock_available ?? 0) < data.quantity) {
       return { error: "Estoque insuficiente para este produto" }
     }
 
@@ -170,6 +161,26 @@ export async function createOrderAction(data: {
     quantity: data.quantity,
     subtotal: expectedTotal,
   })
+
+  if (data.itemType === "product") {
+    const reserveResult = await reserveOrderInventory({
+      client: supabase,
+      partnerId: data.partnerId,
+      orderId: order.id,
+      items: [{
+        product_id: data.itemId,
+        quantity: data.quantity,
+      }],
+    })
+
+    if ("error" in reserveResult) {
+      await supabase.from("order_items").delete().eq("order_id", order.id)
+      await supabase.from("orders").delete().eq("id", order.id)
+      return { error: reserveResult.error }
+    }
+
+    await invalidateProductCache(data.itemId, data.partnerId, "update", { silent: true })
+  }
 
   revalidateOrdersCache()
 
@@ -332,7 +343,7 @@ export async function cancelBuyerOrderAction(orderId: string) {
 
   const { data: order, error: fetchError } = await supabase
     .from("orders")
-    .select("situation, buyer_id, mp_payment_id, partner_id")
+    .select("situation, buyer_id, mp_payment_id, partner_id, inventory_deducted, order_items(product_id, variant_id, quantity)")
     .eq("id", orderId)
     .single()
 
@@ -378,6 +389,23 @@ export async function cancelBuyerOrderAction(orderId: string) {
 
   if (error) {
     return { error: error.message }
+  }
+
+  if (!order.inventory_deducted) {
+    const releaseResult = await releaseOrderInventory({
+      client: supabase,
+      partnerId: order.partner_id,
+      orderId,
+      items: order.order_items || [],
+    })
+
+    if ("error" in releaseResult) {
+      return { error: releaseResult.error }
+    }
+
+    for (const productId of [...new Set((order.order_items || []).map((item: any) => item.product_id).filter(Boolean))]) {
+      await invalidateProductCache(productId, order.partner_id, "update", { silent: true })
+    }
   }
 
   revalidateOrdersCache()

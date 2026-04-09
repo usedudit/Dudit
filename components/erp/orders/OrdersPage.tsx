@@ -172,7 +172,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     paid: { label: "Pago", color: "green" },
                     shipped: { label: "Enviado", color: "blue" },
                     delivered: { label: "Entregue", color: "green" },
-                    cancelled: { label: "Cancelado", color: "gray" },
+                    cancelled: { label: "Cancelado", color: "red" },
                     in_process: { label: "Em análise", color: "yellow" },
                     pending: { label: "Pendente", color: "gray" },
                 }

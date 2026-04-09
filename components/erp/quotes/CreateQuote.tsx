@@ -26,6 +26,7 @@ interface CreateQuoteProps {
 
 const REQUIRED_FIELDS = [
     { field: "productSearch", tab: "Dados Gerais" },
+    { field: "manualItemPrices", tab: "Dados Gerais" },
 ]
 
 const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProps) => {
@@ -171,7 +172,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                         sku: item.products?.sku || 'N/A',
                         price: Number(item.unit_price),
                         qty: Number(item.quantity),
-                        stock: Number(item.products?.stock_quantity ?? 0),
+                        stock: Number(item.products?.stock_available ?? item.products?.stock_quantity ?? 0),
                         image: item.products?.images?.[0] || 'https://img.dudit.com.br/static/Placeholder.png',
                         isEditing: false
                     }));
@@ -413,14 +414,14 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     };
 
     const updateItemQty = (index: number, newQty: number) => {
-        if (newQty < 1) return;
+        const normalizedQty = Math.max(1, Number(newQty || 1));
         const newItems = [...quoteItems];
         const maxQty = getItemMaxQuantity(newItems[index]);
-        if (maxQty !== undefined && newQty > maxQty) {
+        if (maxQty !== undefined && normalizedQty > maxQty) {
             notifyError("Estoque insuficiente", `A quantidade de "${newItems[index].name}" está maior que o estoque disponível.`);
-            newItems[index].qty = maxQty;
+            newItems[index].qty = Math.max(1, maxQty);
         } else {
-            newItems[index].qty = newQty;
+            newItems[index].qty = normalizedQty;
         }
         setQuoteItems(newItems);
     };
@@ -435,6 +436,14 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         const newItems = [...quoteItems];
         newItems[index].price = newPrice;
         setQuoteItems(newItems);
+        setFieldErrors(prev => {
+            if (!prev.has("manualItemPrices")) return prev;
+            const hasInvalidManualPrice = newItems.some((item) => item.isBlank && Number(item.price || 0) <= 0);
+            if (hasInvalidManualPrice) return prev;
+            const next = new Set(prev);
+            next.delete("manualItemPrices");
+            return next;
+        });
     };
 
     const updateItemField = (index: number, field: string, value: any) => {
@@ -488,6 +497,25 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         if (quoteItems.length === 0) {
             setFieldErrors(new Set(["productSearch"]));
             notifyError("Carrinho vazio", "Adicione pelo menos um item ao orçamento.");
+            return;
+        }
+        const hasManualItemWithoutName = quoteItems.some((item) => item.isBlank && !String(item.name || "").trim());
+        if (hasManualItemWithoutName) {
+            notifyError("Item manual invÃ¡lido", "Preencha o nome dos itens manuais antes de salvar o orÃ§amento.");
+            return;
+        }
+        const hasManualItemWithoutPrice = quoteItems.some((item) => item.isBlank && Number(item.price || 0) <= 0);
+        if (hasManualItemWithoutPrice) {
+            setFieldErrors(new Set(["manualItemPrices"]));
+            notifyError("Item manual invÃ¡lido", "Preencha o preÃ§o dos itens manuais antes de salvar o orÃ§amento.");
+            return;
+        }
+        if (quoteItems.some((item) => Number(item.qty || 0) <= 0)) {
+            notifyError("Quantidade invÃ¡lida", "Todos os itens precisam ter quantidade mÃ­nima de 1.");
+            return;
+        }
+        if (total <= 0) {
+            notifyError("Total invÃ¡lido", "O orÃ§amento nÃ£o pode ser salvo com valor total zerado.");
             return;
         }
         const stockValidationMessage = validateQuoteStock(quoteItems);

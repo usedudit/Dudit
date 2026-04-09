@@ -108,11 +108,11 @@ async function handler(request: NextRequest) {
     const [productsRes, variantsRes] = await Promise.all([
       adminClient
         .from("products")
-        .select("id, price, promotional_price, stock_quantity, partner_id, name")
+        .select("id, price, promotional_price, stock_available, partner_id, name")
         .in("id", productIds),
       adminClient
         .from("product_variants")
-        .select("id, price_adjustment, stock_quantity, product_id, products!inner(partner_id, price, promotional_price, name)")
+        .select("id, price_adjustment, stock_available, product_id, products!inner(partner_id, price, promotional_price, name)")
         .in("id", variantIds)
     ])
 
@@ -141,7 +141,7 @@ async function handler(request: NextRequest) {
         resolvedPrice = variant.price_adjustment
           ? Number(variant.price_adjustment)
           : Number(parentProduct.price)
-        resolvedStock = variant.stock_quantity ?? 0
+        resolvedStock = variant.stock_available ?? 0
         resolvedPartnerId = parentProduct.partner_id
         resolvedName = parentProduct.name
       } else {
@@ -151,7 +151,7 @@ async function handler(request: NextRequest) {
           const basePrice = Number(product.price)
           const promoPrice = product.promotional_price ? Number(product.promotional_price) : 0
           resolvedPrice = (promoPrice > 0 && promoPrice < basePrice) ? promoPrice : basePrice
-          resolvedStock = product.stock_quantity
+          resolvedStock = product.stock_available
           resolvedPartnerId = product.partner_id
           resolvedName = product.name
         } else {

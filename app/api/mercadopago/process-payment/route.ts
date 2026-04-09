@@ -9,6 +9,8 @@ import { withCSRFProtection } from "@/lib/security/csrf-middleware"
 import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
+import { reserveOrderInventory } from "@/lib/stock/reservations"
+import { invalidateProductCache } from "@/lib/cache/invalidation"
 
 const isDev = process.env.NODE_ENV === "development"
 
@@ -128,7 +130,7 @@ async function handler(request: NextRequest) {
         if (isDev) console.log("[v0] Validating variant with ID:", item.variant_id)
         const { data: variant } = await adminClient
           .from("product_variants")
-          .select("id, price_adjustment, stock_quantity, product_id, products!inner(partner_id, price, promotional_price)")
+          .select("id, price_adjustment, stock_available, product_id, products!inner(partner_id, price, promotional_price)")
           .eq("id", item.variant_id)
           .single()
 
@@ -141,7 +143,7 @@ async function handler(request: NextRequest) {
         resolvedPrice = variant.price_adjustment
           ? Number(variant.price_adjustment)
           : Number(parentProduct.price)
-        resolvedStock = variant.stock_quantity ?? 0
+        resolvedStock = variant.stock_available ?? 0
         resolvedPartnerId = parentProduct.partner_id
         resolvedProductId = variant.product_id // Use product_id from variant
         resolvedVariantId = variant.id
@@ -149,7 +151,7 @@ async function handler(request: NextRequest) {
         // Se não houver variant_id, buscar como produto padrão
         const { data: product } = await adminClient
           .from("products")
-          .select("id, price, promotional_price, stock_quantity, partner_id")
+          .select("id, price, promotional_price, stock_available, partner_id")
           .eq("id", item.id)
           .single()
 
@@ -158,7 +160,7 @@ async function handler(request: NextRequest) {
           const basePrice = Number(product.price)
           const promoPrice = product.promotional_price ? Number(product.promotional_price) : 0
           resolvedPrice = (promoPrice > 0 && promoPrice < basePrice) ? promoPrice : basePrice
-          resolvedStock = product.stock_quantity
+          resolvedStock = product.stock_available
           resolvedPartnerId = product.partner_id
           resolvedProductId = product.id
         } else {
@@ -448,6 +450,23 @@ async function handler(request: NextRequest) {
       return NextResponse.json({ error: "Erro ao criar itens do pedido" }, { status: 500 })
     }
 
+    const reserveResult = await reserveOrderInventory({
+      client: adminClient,
+      partnerId,
+      orderId: newOrder.id,
+      items: validatedItems.map((item) => ({
+        product_id: item.product_id,
+        variant_id: item.variant_id,
+        quantity: item.quantity,
+      })),
+    })
+
+    if ("error" in reserveResult) {
+      await adminClient.from("order_items").delete().eq("order_id", newOrder.id)
+      await adminClient.from("orders").delete().eq("id", newOrder.id)
+      return NextResponse.json({ error: reserveResult.error }, { status: 400 })
+    }
+
     // NOTA: O decrement_stock agora é feito automaticamente pelo trigger no banco
     // quando o status da order mudar para 'paid' ou 'approved'
     // Isso evita duplicação com webhook/sync-payment-status
@@ -474,13 +493,12 @@ async function handler(request: NextRequest) {
     }
 
     // 3. Revalidar cache dos produtos (para atualizar UI com estoque correto)
-    if (paymentStatus === "approved") {
-      const uniqueProductIds = [...new Set(validatedItems.map(i => i.product_id))]
-      for (const pid of uniqueProductIds) {
-        revalidateProducts(partnerId, pid)
-      }
-      revalidateMarketplace()
+    const uniqueProductIds = [...new Set(validatedItems.map(i => i.product_id))]
+    for (const pid of uniqueProductIds) {
+      await invalidateProductCache(pid, partnerId, "update", { silent: true })
+      revalidateProducts(partnerId, pid)
     }
+    revalidateMarketplace()
 
     // 3. Revalidar carrinho do usuário (SEMPRE, independente do status)
     // Isso garante que o carrinho limpe visualmente

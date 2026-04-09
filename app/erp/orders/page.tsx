@@ -26,7 +26,7 @@ export default async function OrdersPageServer() {
   return (
     <>
       <ERPPageHeader title="Pedidos" />
-      <FadeIn className="p-4 overflow-y-auto">
+      <FadeIn className="p-4">
         <OrdersPage
           orders={orders || []}
           partnerId={partnerId}

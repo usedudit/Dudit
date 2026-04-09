@@ -73,6 +73,7 @@ interface QuoteEditorProps {
 
 const QuoteEditor = (props: QuoteEditorProps) => {
     const searchRef = useRef<HTMLDivElement>(null);
+    const [priceErrors, setPriceErrors] = React.useState<Record<number, boolean>>({});
     const statusOptions = [
         { value: 'draft', label: 'Rascunho', icon: ClockIcon, color: 'text-gray-500' },
         { value: 'pending', label: 'Pendente', icon: ClockIcon, color: 'text-amber-500' },
@@ -217,8 +218,13 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                         <input
                                                             type="number"
                                                             value={item.price}
-                                                            onChange={(e) => props.updateItemPrice(index, parseFloat(e.target.value) || 0)}
-                                                            className="w-full h-9 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[13px] focus:ring-1 focus:ring-brand-primary outline-none transition-all"
+                                                            onChange={(e) => {
+                                                                props.updateItemPrice(index, parseFloat(e.target.value) || 0)
+                                                                if (priceErrors[index]) {
+                                                                    setPriceErrors(prev => ({ ...prev, [index]: false }))
+                                                                }
+                                                            }}
+                                                            className={`w-full h-9 px-2 rounded-lg border bg-white dark:bg-dark-background font-bold text-[13px] focus:ring-1 focus:ring-brand-primary outline-none transition-all ${priceErrors[index] ? 'border-red-500' : 'border-brand-border'}`}
                                                         />
                                                     </div>
                                                 </td>
@@ -237,7 +243,13 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                         <div className="flex justify-center gap-2">
                                                             {item.isEditing ? (
                                                                 <button
-                                                                    onClick={() => props.toggleItemEdit(index, false)}
+                                                                    onClick={() => {
+                                                                        if (item.isBlank && Number(item.price || 0) <= 0) {
+                                                                            setPriceErrors(prev => ({ ...prev, [index]: true }))
+                                                                            return
+                                                                        }
+                                                                        props.toggleItemEdit(index, false)
+                                                                    }}
                                                                     className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-green-50 dark:hover:bg-green-900/10 text-brand-green transition-colors"
                                                                     title="Salvar nome"
                                                                 >
@@ -307,7 +319,13 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                     <div className="flex items-center gap-1">
                                                         {item.isEditing ? (
                                                             <button
-                                                                onClick={() => props.toggleItemEdit(index, false)}
+                                                                onClick={() => {
+                                                                    if (item.isBlank && Number(item.price || 0) <= 0) {
+                                                                        setPriceErrors(prev => ({ ...prev, [index]: true }))
+                                                                        return
+                                                                    }
+                                                                    props.toggleItemEdit(index, false)
+                                                                }}
                                                                 className="w-8 h-8 flex items-center justify-center text-green-600 hover:bg-green-50 dark:hover:bg-green-900/10 rounded-lg transition-colors"
                                                             >
                                                                 <CheckIcon size={16} />
@@ -338,8 +356,13 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                         <input
                                                             type="number"
                                                             value={item.price}
-                                                            onChange={(e) => props.updateItemPrice(index, parseFloat(e.target.value) || 0)}
-                                                            className="w-full h-8 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[11px] focus:ring-1 focus:ring-brand-primary outline-none"
+                                                            onChange={(e) => {
+                                                                props.updateItemPrice(index, parseFloat(e.target.value) || 0)
+                                                                if (priceErrors[index]) {
+                                                                    setPriceErrors(prev => ({ ...prev, [index]: false }))
+                                                                }
+                                                            }}
+                                                            className={`w-full h-8 px-2 rounded-lg border bg-white dark:bg-dark-background font-bold text-[11px] focus:ring-1 focus:ring-brand-primary outline-none ${priceErrors[index] ? 'border-red-500' : 'border-brand-border'}`}
                                                         />
                                                     </div>
                                                 </div>

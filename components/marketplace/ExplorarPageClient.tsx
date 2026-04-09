@@ -178,8 +178,10 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
     } else {
       // Relevância
       filtered.sort((a, b) => {
-        const scoreA = (a.rating || 0) * 10 + (a.originalPrice ? 20 : 0) + (a.stock_quantity > 0 ? 5 : 0)
-        const scoreB = (b.rating || 0) * 10 + (b.originalPrice ? 20 : 0) + (b.stock_quantity > 0 ? 5 : 0)
+      const stockA = a.stock_available ?? a.stock_quantity ?? 0
+      const stockB = b.stock_available ?? b.stock_quantity ?? 0
+      const scoreA = (a.rating || 0) * 10 + (a.originalPrice ? 20 : 0) + (stockA > 0 ? 5 : 0)
+      const scoreB = (b.rating || 0) * 10 + (b.originalPrice ? 20 : 0) + (stockB > 0 ? 5 : 0)
         return scoreB - scoreA
       })
     }

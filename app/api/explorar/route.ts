@@ -57,7 +57,7 @@ export async function GET(request: Request) {
             if (produtosIds.length > 0) {
                 promises.push(
                     supabase.from("products").select(`
-                        id, name, description, price, promotional_price, images, rating, category, created_at,
+              id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating, category, created_at,
                         partners(id, store_name, store_image_url, addresses(city, state)),
                         product_variants(variant_options, price_adjustment, is_active)
                     `).in("id", produtosIds)

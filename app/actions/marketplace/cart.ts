@@ -9,6 +9,8 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getUserSessionData } from "@/lib/data/user"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
+import { reserveOrderInventory } from "@/lib/stock/reservations"
+import { invalidateProductCache } from "@/lib/cache/invalidation"
 
 export async function getCartItemCountAction() {
   try {
@@ -37,8 +39,8 @@ export const getCachedCart = async (userId: string) => {
       quantity,
       selected,
       created_at,
-      products(id, name, price, promotional_price, images, stock_quantity),
-      product_variants(id, variant_name, variant_type, variant_value, price_adjustment, stock_quantity, variant_options),
+      products(id, name, price, promotional_price, images, stock_quantity, stock_available),
+      product_variants(id, variant_name, variant_type, variant_value, price_adjustment, stock_quantity, stock_available, variant_options),
       partners(
         id, 
         store_name, 
@@ -441,7 +443,7 @@ export async function checkoutCartAction(
   if (variantIds.length > 0) {
     const { data: variantData } = await adminClient
       .from("product_variants")
-      .select("id, variant_name, price_adjustment, stock_quantity, is_active")
+      .select("id, variant_name, price_adjustment, stock_available, is_active")
       .in("id", variantIds)
     variants = variantData || []
   }
@@ -460,13 +462,13 @@ export async function checkoutCartAction(
     if (item.variantId) {
       const variant = variants.find((v: any) => v.id === item.variantId)
       if (!variant || !variant.is_active) return { error: `Variante inativa ou não encontrada.` }
-      if (variant.stock_quantity < item.quantity) return { error: `Estoque insuficiente para: ${variant.variant_name}` }
+      if ((variant.stock_available ?? 0) < item.quantity) return { error: `Estoque insuficiente para: ${variant.variant_name}` }
       // Variante: usar price_adjustment como preço (preço da variante)
       itemPrice = Number(variant.price_adjustment || product.price)
       itemName = `${product.name} - ${variant.variant_name}`
       itemId = variant.id
     } else {
-      if (product.stock_quantity < item.quantity) return { error: `Estoque insuficiente para o produto: ${product.name}` }
+      if ((product.stock_available ?? 0) < item.quantity) return { error: `Estoque insuficiente para o produto: ${product.name}` }
       // Produto normal: usar preço promocional se disponível
       const basePrice = Number(product.price)
       const promoPrice = product.promotional_price ? Number(product.promotional_price) : 0
@@ -525,7 +527,7 @@ export async function checkoutCartAction(
   }
 
   // ATOMIC STOCK DECREMENT (MED-04) - Paralelizado para performance
-  await Promise.all(
+  if (false) await Promise.all(
     partnerItems.map(async (item) => {
       const { error: stockError } = await adminClient.rpc("decrement_stock_atomic", {
         p_product_id: item.productId,
@@ -541,11 +543,31 @@ export async function checkoutCartAction(
     })
   )
 
+  const reserveResult = await reserveOrderInventory({
+    client: adminClient,
+    partnerId,
+    orderId: order.id,
+    items: partnerItems.map((item) => ({
+      product_id: item.productId,
+      variant_id: item.variantId || null,
+      quantity: item.quantity,
+    })),
+  })
+
+  if ("error" in reserveResult) {
+    await supabase.from("order_items").delete().eq("order_id", order.id)
+    await supabase.from("orders").delete().eq("id", order.id)
+    return { error: reserveResult.error }
+  }
+
   // SECURITY FIX (MED-02): Scope cart deletion to current user
   const cartItemIds = partnerItems.map((item: any) => item.cartItemId)
   await supabase.from("cart_items").delete().in("id", cartItemIds).eq("user_id", user.id)
 
   // Limpa Cache
+  for (const productId of [...new Set(partnerItems.map((item: any) => item.productId))]) {
+    await invalidateProductCache(productId, partnerId, "update", { silent: true })
+  }
   await revalidateCart(user.id)
   await revalidateOrders(products[0].partner_id)
 
