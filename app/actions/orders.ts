@@ -403,7 +403,15 @@ export async function cancelBuyerOrderAction(orderId: string) {
       return { error: releaseResult.error }
     }
 
-    for (const productId of [...new Set((order.order_items || []).map((item: any) => item.product_id).filter(Boolean))]) {
+    const productIds = Array.from(
+      new Set(
+        (order.order_items || [])
+          .map((item: any) => item.product_id)
+          .filter((productId: unknown): productId is string => typeof productId === "string" && productId.length > 0),
+      ),
+    ) as string[]
+
+    for (const productId of productIds) {
       await invalidateProductCache(productId, order.partner_id, "update", { silent: true })
     }
   }
