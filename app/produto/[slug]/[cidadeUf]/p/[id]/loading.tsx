@@ -4,7 +4,7 @@ export default function ProductDetailsLoading() {
     return (
         <div className="flex flex-col min-h-screen bg-white font-sans">
             {/* Same literal Header Skeleton */}
-            <header className="fixed top-0 left-0 right-0 z-[100] bg-brand-dark flex flex-col w-full">
+            <header className="fixed top-0 left-0 right-0 z-100 bg-brand-dark flex flex-col w-full">
                 <div className="hidden lg:flex w-full h-[68px] items-center justify-between max-w-[1300px] px-4 mx-auto gap-4">
                     <div className="w-[140px] h-[40px] bg-white/10 rounded-md" />
                     <div className="flex-1 max-w-[600px] h-[42px] bg-white rounded-full mx-4" />

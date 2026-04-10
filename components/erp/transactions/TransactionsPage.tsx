@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, Checkbox, IconPlaceholder, Badge } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
@@ -64,6 +65,7 @@ export default function TransactionsPage({
 }: {
     transactions?: ERPTransaction[]
 }) {
+    const router = useRouter()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
 
@@ -226,7 +228,7 @@ export default function TransactionsPage({
                             <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
                         </Button>
 
-                        <Button onClick={() => { }}>
+                        <Button onClick={() => router.push("/erp/financial/transactions/new")}>
                             <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
                             Nova Transação
                         </Button>
@@ -239,7 +241,7 @@ export default function TransactionsPage({
                     search={search}
                     onSearchChange={setSearch}
                     onOpenFilter={() => setModals((prev) => ({ ...prev, filter: true }))}
-                    onAddTransaction={() => { }}
+                    onAddTransaction={() => router.push("/erp/financial/transactions/new")}
                     filters={filters}
                     setFilters={setFilters}
                     viewMode={viewMode}
