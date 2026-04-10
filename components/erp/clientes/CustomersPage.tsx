@@ -445,7 +445,7 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
                                                                 {c.id !== '-' ? c.id : "Cliente"}
                                                             </span>
                                                         </div>
-                                                        <Badge variant={c.status === 'ativo' ? 'green' : c.status === 'inativo' ? 'gray' : 'red'} className="flex-shrink-0 text-[10px] h-5 px-1.5">
+                                                        <Badge variant={c.status === 'ativo' ? 'green' : c.status === 'inativo' ? 'gray' : 'red'} className="shrink-0 text-[10px] h-5 px-1.5">
                                                             {c.status === 'ativo' ? "Ativo" : c.status === 'inativo' ? "Inativo" : "Bloqueado"}
                                                         </Badge>
                                                     </div>

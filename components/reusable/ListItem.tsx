@@ -33,10 +33,10 @@ export const ListItem: React.FC<ListItemProps> = ({
             onClick={onClick}
             className={`group flex items-center rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-dark/90 transition-all cursor-pointer ${className}`}
         >
-            {left && <div className="flex-shrink-0">{left}</div>}
+            {left && <div className="shrink-0">{left}</div>}
 
             {Icon && (
-                <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex items-center justify-center flex-shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
+                <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
                     <Icon className="text-brand-dark dark:text-dark-heading" />
                 </div>
             )}

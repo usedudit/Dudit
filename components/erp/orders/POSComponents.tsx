@@ -10,7 +10,7 @@ export const ReceiptScallopEdge = () => (
         {Array.from({ length: 12 }).map((_, i) => (
             <div
                 key={i}
-                className="w-10 h-10 bg-white dark:bg-dark-surface rounded-full flex-shrink-0 -ml-3 first:-ml-5"
+                className="w-10 h-10 bg-white dark:bg-dark-surface rounded-full shrink-0 -ml-3 first:-ml-5"
                 style={{ marginTop: '-24px' }}
             ></div>
         ))}
@@ -77,7 +77,7 @@ export const SplitPaymentCard: React.FC<SplitPaymentCardProps> = ({ icon: Icon, 
         className="flex items-center gap-3 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20 cursor-pointer transition-colors group"
         onClick={onClick}
     >
-        <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center flex-shrink-0 group-hover:bg-white dark:group-hover:bg-dark-surface">
+        <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center shrink-0 group-hover:bg-white dark:group-hover:bg-dark-surface">
             <Icon size={18} className="text-brand-dark dark:text-dark-heading" />
         </div>
         <div className="flex-1">

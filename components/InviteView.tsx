@@ -65,7 +65,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <footer className="bg-[#2D2D37] text-white pt-8 pb-8 mt-auto w-full">
                 <div className="container mx-auto px-4 max-w-[1300px] flex flex-col md:flex-row justify-between items-center h-16">
                     <div className="flex flex-col md:flex-row items-center gap-8">
-                        <div className="flex-shrink-0 bg-white p-1 rounded-full w-10 h-10 flex items-center justify-center">
+                        <div className="shrink-0 bg-white p-1 rounded-full w-10 h-10 flex items-center justify-center">
                             <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" width={30} height={10} className="w-full h-auto" />
                         </div>
                         <nav>

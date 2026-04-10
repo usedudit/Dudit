@@ -605,7 +605,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             )}
                                             {productData.moderation_status === 'pending_moderation' && (
                                                 <Tooltip text="Aguardando aprovação para exibição pública.">
-                                                    <Badge variant="orange" className="flex-shrink-0 hidden md:inline-flex" />
+                                                    <Badge variant="orange" className="shrink-0 hidden md:inline-flex" />
                                                 </Tooltip>
                                             )}
                                         </h1>
@@ -618,7 +618,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                     </div>
 
                                     {/* Desktop action buttons only */}
-                                    <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         {isEditing ? (
                                             <>
                                                 <Button variant="outline" onClick={handleCancelEdit} disabled={isSavingProduct || isLoadingDetails}>

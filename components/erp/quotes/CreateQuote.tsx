@@ -26,6 +26,7 @@ interface CreateQuoteProps {
 
 const REQUIRED_FIELDS = [
     { field: "productSearch", tab: "Dados Gerais" },
+    { field: "manualItemNames", tab: "Dados Gerais" },
     { field: "manualItemPrices", tab: "Dados Gerais" },
 ]
 
@@ -92,6 +93,10 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const [shippingFee, setShippingFee] = useState('');
     const [otherCosts, setOtherCosts] = useState('');
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set());
+    const [manualItemNameErrors, setManualItemNameErrors] = useState<Set<number>>(new Set());
+    const [manualItemPriceErrors, setManualItemPriceErrors] = useState<Set<number>>(new Set());
+    const [showValidationModal, setShowValidationModal] = useState(false);
+    const [validationMessage, setValidationMessage] = useState('');
 
     const getItemMaxQuantity = useCallback((item: any) => {
         if (!item || item.isBlank) return undefined;
@@ -174,7 +179,9 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                         qty: Number(item.quantity),
                         stock: Number(item.products?.stock_available ?? item.products?.stock_quantity ?? 0),
                         image: item.products?.images?.[0] || 'https://img.dudit.com.br/static/Placeholder.png',
-                        isEditing: false
+                        isEditing: false,
+                        isBlank: !item.product_id,
+                        isManual: !item.product_id,
                     }));
 
                     setQuoteItems(items);
@@ -330,7 +337,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     variant: variantName,
                     variantId: product.variantId || null,
                     qty: qty,
-                    isEditing: false
+                    isEditing: false,
+                    isManual: false
                 }];
             }
         });
@@ -357,7 +365,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                 qty: 1,
                 image: '',
                 isBlank: true,
-                isEditing: true
+                isEditing: true,
+                isManual: true
             }
         ]);
         setFieldErrors(prev => {
@@ -397,7 +406,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                             variantId: v.id,
                             stock: v.stock,
                             qty: v.qty,
-                            isEditing: false
+                            isEditing: false,
+                            isManual: false
                         });
                     }
                 }
@@ -430,15 +440,31 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         const newItems = [...quoteItems];
         newItems.splice(index, 1);
         setQuoteItems(newItems);
+        setManualItemNameErrors(new Set());
+        setManualItemPriceErrors(new Set());
+        setFieldErrors(prev => {
+            if (!prev.has("manualItemNames")) return prev;
+            const hasInvalidManualItems = newItems.some((item) => item.isManual && !String(item.name || "").trim());
+            if (hasInvalidManualItems) return prev;
+            const next = new Set(prev);
+            next.delete("manualItemNames");
+            return next;
+        });
     };
 
     const updateItemPrice = (index: number, newPrice: number) => {
         const newItems = [...quoteItems];
         newItems[index].price = newPrice;
         setQuoteItems(newItems);
+        setManualItemPriceErrors(prev => {
+            if (!prev.has(index)) return prev;
+            const next = new Set(prev);
+            if (Number(newPrice || 0) > 0) next.delete(index);
+            return next;
+        });
         setFieldErrors(prev => {
             if (!prev.has("manualItemPrices")) return prev;
-            const hasInvalidManualPrice = newItems.some((item) => item.isBlank && Number(item.price || 0) <= 0);
+            const hasInvalidManualPrice = newItems.some((item) => item.isManual && Number(item.price || 0) <= 0);
             if (hasInvalidManualPrice) return prev;
             const next = new Set(prev);
             next.delete("manualItemPrices");
@@ -450,10 +476,27 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         const newItems = [...quoteItems];
         newItems[index] = { ...newItems[index], [field]: value };
         setQuoteItems(newItems);
+        if (field === "name") {
+            setManualItemNameErrors(prev => {
+                if (!prev.has(index)) return prev;
+                const next = new Set(prev);
+                if (String(value || "").trim()) next.delete(index);
+                return next;
+            });
+            setFieldErrors(prev => {
+                if (!prev.has("manualItemNames")) return prev;
+                const hasInvalidManualItems = newItems.some((item) => item.isManual && !String(item.name || "").trim());
+                if (hasInvalidManualItems) return prev;
+                const next = new Set(prev);
+                next.delete("manualItemNames");
+                return next;
+            });
+        }
     };
 
     const toggleItemEdit = (index: number, isEditing: boolean) => {
         const newItems = [...quoteItems];
+        if (isEditing && !newItems[index]?.isManual) return;
         newItems[index] = { ...newItems[index], isEditing };
         setQuoteItems(newItems);
     };
@@ -499,17 +542,44 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
             notifyError("Carrinho vazio", "Adicione pelo menos um item ao orçamento.");
             return;
         }
-        const hasManualItemWithoutName = quoteItems.some((item) => item.isBlank && !String(item.name || "").trim());
-        if (hasManualItemWithoutName) {
+        const invalidManualIndexes = new Set<number>();
+        const invalidManualPriceIndexes = new Set<number>();
+        /*
             notifyError("Item manual invÃ¡lido", "Preencha o nome dos itens manuais antes de salvar o orÃ§amento.");
             return;
         }
-        const hasManualItemWithoutPrice = quoteItems.some((item) => item.isBlank && Number(item.price || 0) <= 0);
-        if (hasManualItemWithoutPrice) {
+            if (item.isManual && !String(item.name || "").trim()) {
+                invalidManualIndexes.add(index);
             setFieldErrors(new Set(["manualItemPrices"]));
             notifyError("Item manual invÃ¡lido", "Preencha o preÃ§o dos itens manuais antes de salvar o orÃ§amento.");
             return;
         }
+        */
+        quoteItems.forEach((item, index) => {
+            if (item.isManual && !String(item.name || "").trim()) {
+                invalidManualIndexes.add(index);
+            }
+            if (item.isManual && Number(item.price || 0) <= 0) {
+                invalidManualPriceIndexes.add(index);
+            }
+        });
+        if (invalidManualIndexes.size > 0) {
+            setManualItemNameErrors(invalidManualIndexes);
+            setFieldErrors(new Set(["manualItemNames"]));
+            setActiveTab("Dados Gerais");
+            setValidationMessage("Preencha o nome dos itens adicionados manualmente antes de salvar o orçamento.");
+            setShowValidationModal(true);
+            return;
+        }
+        if (invalidManualPriceIndexes.size > 0) {
+            setManualItemPriceErrors(invalidManualPriceIndexes);
+            setFieldErrors(new Set(["manualItemPrices"]));
+            setActiveTab("Dados Gerais");
+            setValidationMessage("Preencha o preço dos itens adicionados manualmente antes de salvar o orçamento.");
+            setShowValidationModal(true);
+            return;
+        }
+        /*
         if (quoteItems.some((item) => Number(item.qty || 0) <= 0)) {
             notifyError("Quantidade invÃ¡lida", "Todos os itens precisam ter quantidade mÃ­nima de 1.");
             return;
@@ -523,6 +593,30 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
             notifyError("Estoque insuficiente", stockValidationMessage);
             return;
         }
+        setFieldErrors(new Set());
+        */
+        if (quoteItems.some((item) => Number(item.qty || 0) <= 0)) {
+            setActiveTab("Dados Gerais");
+            setValidationMessage("Todos os itens precisam ter quantidade mínima de 1.");
+            setShowValidationModal(true);
+            return;
+        }
+        if (total <= 0) {
+            setActiveTab("Dados Gerais");
+            setValidationMessage("O orçamento não pode ser salvo com valor total zerado.");
+            setShowValidationModal(true);
+            return;
+        }
+        const stockValidationMessage = validateQuoteStock(quoteItems);
+        if (stockValidationMessage) {
+            setFieldErrors(new Set(["productSearch"]));
+            setActiveTab("Dados Gerais");
+            setValidationMessage(stockValidationMessage);
+            setShowValidationModal(true);
+            return;
+        }
+        setManualItemNameErrors(new Set());
+        setManualItemPriceErrors(new Set());
         setFieldErrors(new Set());
 
         setIsSaving(true);
@@ -593,7 +687,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                                 <Button
                                                     variant="filled"
                                                     onClick={handleBackWithSafety}
-                                                    className={`flex-shrink-0 flex items-center justify-center transition-all duration-300 ${isScrolled ? "w-8 h-8" : "w-10 h-10"}`}
+                                                    className={`shrink-0 flex items-center justify-center transition-all duration-300 ${isScrolled ? "w-8 h-8" : "w-10 h-10"}`}
                                                 >
                                                     <ChevronLeftIcon className={`${isScrolled ? "w-4 h-4" : "w-5 h-5"} text-brand-inactive-text dark:text-dark-body`} />
                                                 </Button>
@@ -617,7 +711,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                             </div>
 
                                             {/* Desktop action buttons */}
-                                            <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
+                                            <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                                 <Button variant="outline" onClick={handleBackWithSafety} disabled={isSaving} className={isScrolled ? "h-9 px-3 text-xs" : ""}>
                                                     Cancelar
                                                 </Button>
@@ -692,6 +786,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                         isReadOnly={mode === 'view'}
                                         fieldErrors={fieldErrors}
                                         setFieldErrors={setFieldErrors}
+                                        manualItemNameErrors={manualItemNameErrors}
+                                        manualItemPriceErrors={manualItemPriceErrors}
                                     />
                                 </div>
                             </div>
@@ -778,6 +874,15 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     description="Você tem alterações não salvas. Deseja realmente sair sem salvar?"
                     confirmText="Descartar"
                     cancelText="Cancelar"
+                    variant="warning"
+                />
+
+                <AlertModal
+                    isOpen={showValidationModal}
+                    onClose={() => setShowValidationModal(false)}
+                    title="Campos obrigatórios pendentes"
+                    message={validationMessage || "Revise os campos obrigatórios antes de salvar o orçamento."}
+                    confirmText="Ok, entendi"
                     variant="warning"
                 />
             </div>

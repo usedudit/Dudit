@@ -66,14 +66,14 @@ const ShippingDetailsModal = ({ isOpen, onClose, order }: { isOpen: boolean; onC
                         <div className="relative pl-2 space-y-8">
                             <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-gray-200 dark:bg-zinc-700"></div>
                             <div className="relative flex gap-4">
-                                <div className="w-6 h-6 rounded-full bg-brand-dark dark:bg-white border-4 border-white dark:border-dark-surface z-10 flex-shrink-0"></div>
+                                <div className="w-6 h-6 rounded-full bg-brand-dark dark:bg-white border-4 border-white dark:border-dark-surface z-10 shrink-0"></div>
                                 <div>
                                     <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">Pedido Realizado</div>
                                     <div className="text-xs text-brand-inactive-text mt-1">{dateStr}</div>
                                 </div>
                             </div>
                             <div className="relative flex gap-4">
-                                <div className={`w-6 h-6 rounded-full ${order.situation === "paid" ? "bg-brand-dark dark:bg-white" : "bg-gray-200 dark:bg-zinc-700"} border-4 border-white dark:border-dark-surface z-10 flex-shrink-0`}></div>
+                                <div className={`w-6 h-6 rounded-full ${order.situation === "paid" ? "bg-brand-dark dark:bg-white" : "bg-gray-200 dark:bg-zinc-700"} border-4 border-white dark:border-dark-surface z-10 shrink-0`}></div>
                                 <div>
                                     <div className={`text-sm ${order.situation === "paid" ? "font-bold text-brand-dark dark:text-dark-heading" : "text-brand-inactive-text"}`}>
                                         {order.situation === "pending" ? "Aguardando Pagamento" : "Pagamento Aprovado"}
@@ -106,7 +106,7 @@ const InfoCard = ({ icon: Icon, title, description, onClick, rightIcon: RightIco
         onClick={onClick}
         className="group flex items-center gap-4 p-4 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-dark-heading/30 transition-all cursor-pointer"
     >
-        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center flex-shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
+        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
             <Icon size={20} className="text-brand-dark dark:text-dark-heading" />
         </div>
         <div className="flex-1 w-full min-w-0 pr-2">
@@ -287,7 +287,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 Vendedor
                             </div>
                             <Link href={getPartnerUrl({ ...order.partners, id: order.partner_id })} prefetch={true} className="p-6 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors block cursor-pointer">
-                                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border flex-shrink-0">
+                                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
                                     <img src={storeImage} alt={sellerName} className="w-full h-full object-cover" />
                                 </div>
                                 <div className="flex-1">
@@ -335,7 +335,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                         return (
                                             <Link href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)} prefetch={true} key={item.id} className="group flex flex-row items-center gap-4 cursor-pointer p-2 -mx-2 rounded-lg">
-                                                <div className="w-14 h-14 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center flex-shrink-0">
+                                                <div className="w-14 h-14 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center shrink-0">
                                                     <img src={itemImage} alt={item.products?.name || item.product_name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
                                                 </div>
                                                 <div className="flex-1 w-full min-w-0">

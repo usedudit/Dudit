@@ -2,7 +2,7 @@ export interface TransactionContact {
     id: string
     partner_id: string
     name: string
-    type: "cliente" | "fornecedor" | "funcionario" | "outro"
+    type: "cliente" | "fornecedor" | "funcionario" | "outro" | "customer" | "supplier" | "employee" | "other"
     description: string | null
     contact_id: string | null
     created_at: string
@@ -15,6 +15,7 @@ export interface Transaction {
     description: string
     category: string
     contact_id: string | null
+    contact_type: "customer" | "supplier" | "service" | "employee" | "partner" | "other" | null
     amount: number
     due_date: string | null
     payment_date: string | null
@@ -28,7 +29,7 @@ export interface Transaction {
     interest_amount: number
     fee_amount: number
     payment_type: string | null
-    transaction_type: "income" | "expense"
+    transaction_type: "income" | "expense" | "transfer" | "adjustment" | "refund"
 }
 
 export interface TransactionInput {
@@ -36,6 +37,7 @@ export interface TransactionInput {
     description: string
     category: string
     contact_id?: string | null
+    contact_type?: "customer" | "supplier" | "service" | "employee" | "partner" | "other" | null
     amount: number
     due_date?: string | null
     payment_date?: string | null
@@ -47,5 +49,5 @@ export interface TransactionInput {
     interest_amount?: number
     fee_amount?: number
     payment_type?: string | null
-    transaction_type: "income" | "expense"
+    transaction_type: "income" | "expense" | "transfer" | "adjustment" | "refund"
 }

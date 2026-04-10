@@ -412,7 +412,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                                 className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none"
                                                 onClick={() => handleViewDetails(mov.id)}
                                             >
-                                                <div className="w-14 h-14 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border flex-shrink-0 flex items-center justify-center">
+                                                <div className="w-14 h-14 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border shrink-0 flex items-center justify-center">
                                                     <Package className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
                                                 </div>
 

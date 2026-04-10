@@ -91,6 +91,11 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const remainingPaymentAmount = Math.max(0, Number(order.total_amount || 0) - Number(order.paid_amount || 0))
     const hasPendingPayment = order.situation !== "paid" && remainingPaymentAmount > 0.009
     const paymentMethodLabel = `${order.payment_method || "Nao informado"}${pendingSuffix}`
+    const paymentBreakdown = Array.isArray(order.payment_breakdown) && order.payment_breakdown.length > 0
+        ? order.payment_breakdown.filter((entry: any) => entry?.method)
+        : Number(order.paid_amount || 0) > 0 && order.payment_method
+            ? [{ method: order.payment_method, amount: Number(order.paid_amount || 0) }]
+            : []
     const itemCount = Number(order.order_items?.length || 0)
     const itemsLabel = itemCount === 1 ? "1 item" : `${itemCount} itens`
     const subtotalValue = Number(order.total_amount || 0) - Number(order.shipping_cost || 0) - Number(order.additional_costs || 0) + Number(order.discount_value || 0)
@@ -158,7 +163,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                     </div>
                                 </div>
 
-                                <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
+                                <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                     <ActionsDropdown
                                         onPrint={() => window.print()}
                                         onShare={() => { }}
@@ -249,7 +254,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                             <div className="space-y-4">
                                                 {(order.order_items || []).map((item: any) => (
                                                     <div key={item.id} className="flex items-start gap-4 p-3">
-                                                        <div className="w-16 h-16 overflow-hidden flex-shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                        <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
                                                             <img
                                                                 src={getR2ImageUrl(item.image, "thumbnail")}
                                                                 className="w-full h-full object-cover rounded-xl"
@@ -283,6 +288,21 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                     label="Metodo de Pagamento"
                                                     value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{paymentMethodLabel}</span>}
                                                 />
+
+                                                {paymentBreakdown.length > 0 && (
+                                                    <PaymentRow
+                                                        label="Valores por meio"
+                                                        value={
+                                                            <div className="flex flex-col gap-1">
+                                                                {paymentBreakdown.map((entry: any, index: number) => (
+                                                                    <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                        {entry.method}: {formatCurrency(entry.amount || 0)}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        }
+                                                    />
+                                                )}
 
                                                 <PaymentRow
                                                     label="Subtotal"

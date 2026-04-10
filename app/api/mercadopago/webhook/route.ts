@@ -347,7 +347,7 @@ async function processWebhookWithRetry(body: any, requestId: string, attempt: nu
         const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
         const { data: fullOrder } = await supabase
           .from("orders")
-          .select("order_number, partner_id, total_amount, payment_method, notes, customer_name")
+          .select("order_number, partner_id, total_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name")
           .eq("id", orderId)
           .single()
 
@@ -357,8 +357,10 @@ async function processWebhookWithRetry(body: any, requestId: string, attempt: nu
             partner_id: fullOrder.partner_id,
             total_amount: fullOrder.total_amount,
             payment_method: fullOrder.payment_method,
+            payment_provider: fullOrder.payment_provider,
+            payment_breakdown: fullOrder.payment_breakdown,
             payment_date: paymentInfo.date_approved || new Date().toISOString(),
-            notes: fullOrder.notes,
+            customer_contact_id: fullOrder.buyer_id,
             customer_name: fullOrder.customer_name,
           })
 

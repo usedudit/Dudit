@@ -145,7 +145,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                             </div>
 
                             {/* Desktop Actions */}
-                            <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                            <div className="flex items-center gap-3 shrink-0 ml-3">
                                 <Button
                                     variant="outline"
                                     className="h-[42px] px-6"
@@ -196,7 +196,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                             <div className="p-6">
                                                 <div className="flex flex-col md:flex-row md:items-center gap-6">
                                                     <div className="flex items-start gap-5 flex-1">
-                                                        <div className="w-12 h-12 rounded-full border border-brand-border dark:border-dark-border overflow-hidden flex-shrink-0 bg-brand-gray dark:bg-dark-border/20">
+                                                        <div className="w-12 h-12 rounded-full border border-brand-border dark:border-dark-border overflow-hidden shrink-0 bg-brand-gray dark:bg-dark-border/20">
                                                             <img
                                                                 src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
                                                                 className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"

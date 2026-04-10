@@ -142,7 +142,7 @@ const QuotePageControls: React.FC<QuotePageControlsProps> = ({
                             prefix={
                                 <SearchIcon
                                     size={18}
-                                    className="text-brand-inactive-text flex-shrink-0"
+                                    className="text-brand-inactive-text shrink-0"
                                 />
                             }
                             label=""
@@ -182,7 +182,7 @@ const QuotePageControls: React.FC<QuotePageControlsProps> = ({
 
                 {/* DESKTOP CONTROLS */}
                 <div className="hidden md:flex items-center w-full gap-4">
-                    <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="flex items-center gap-3 shrink-0">
                         <div className="w-80">
                             <Input
                                 name="search"
@@ -194,7 +194,7 @@ const QuotePageControls: React.FC<QuotePageControlsProps> = ({
                                 prefix={
                                     <SearchIcon
                                         size={18}
-                                        className="text-brand-inactive-text flex-shrink-0"
+                                        className="text-brand-inactive-text shrink-0"
                                     />
                                 }
                                 label=""
@@ -230,7 +230,7 @@ const QuotePageControls: React.FC<QuotePageControlsProps> = ({
                     </div>
 
                     {/* View Toggles (Desktop) */}
-                    <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] flex-shrink-0">
+                    <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
                         <button
                             onClick={() => onViewModeChange("list")}
                             className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}

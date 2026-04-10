@@ -13,8 +13,7 @@ import {
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import QuantitySelector from '@/components/reusable/QuantitySelector';
-import { Button, Input, TabsContent, FormDropdown, MoneyInput, PercentageInput, DatePicker, ThreeDotsLoader } from '@/components/reusable';
-import IconPlaceholder from '@/components/reusable/IconPlaceholder';
+import { Button, Input, TabsContent, FormDropdown, MoneyInput, PercentageInput, DatePicker, ThreeDotsLoader, IconPlaceholder, Pagination } from '@/components/reusable';
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { formatCurrency } from "@/lib/utils";
 
@@ -69,10 +68,17 @@ interface QuoteEditorProps {
     onSearchFocus?: () => void;
     fieldErrors?: Set<string>;
     setFieldErrors?: React.Dispatch<React.SetStateAction<Set<string>>>;
+    manualItemNameErrors?: Set<number>;
+    manualItemPriceErrors?: Set<number>;
 }
 
 const QuoteEditor = (props: QuoteEditorProps) => {
     const searchRef = useRef<HTMLDivElement>(null);
+    const ITEMS_PER_PAGE = 8;
+    const [currentPage, setCurrentPage] = React.useState(1);
+    const totalPages = Math.ceil(props.quoteItems.length / ITEMS_PER_PAGE);
+    const paginatedItems = props.quoteItems.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+    const [nameErrors, setNameErrors] = React.useState<Record<number, boolean>>({});
     const [priceErrors, setPriceErrors] = React.useState<Record<number, boolean>>({});
     const statusOptions = [
         { value: 'draft', label: 'Rascunho', icon: ClockIcon, color: 'text-gray-500' },
@@ -83,6 +89,12 @@ const QuoteEditor = (props: QuoteEditorProps) => {
     ];
 
     const currentStatus = statusOptions.find(o => o.value === props.status) || statusOptions[0];
+
+    useEffect(() => {
+        if (currentPage > totalPages && totalPages > 0) {
+            setCurrentPage(totalPages);
+        }
+    }, [props.quoteItems.length, totalPages, currentPage]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -185,109 +197,240 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {props.quoteItems.map((item, index) => (
-                                            <tr key={index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
-                                                <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                                            <img src={getR2ImageUrl(item.image, "thumbnail")} className="w-full h-full object-cover" alt="" />
-                                                        </div>
-                                                        <div className="flex flex-col text-left flex-1 min-w-0">
-                                                            {item.isEditing ? (
-                                                                <input
-                                                                    type="text"
-                                                                    value={item.name}
-                                                                    onChange={(e) => props.updateItemField(index, 'name', e.target.value)}
-                                                                    placeholder="Nome do produto..."
-                                                                    className="w-full h-8 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[13px] focus:ring-1 focus:ring-brand-primary outline-none transition-all mb-1"
-                                                                />
-                                                            ) : (
-                                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[250px]">
-                                                                    {item.name || 'Produto sem nome'}
-                                                                </span>
-                                                            )}
-                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                                                {item.sku || 'Sem SKU'}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                    <div className="flex items-center">
-                                                        <span className="text-[13px] font-medium text-brand-inactive-text mr-1">R$</span>
-                                                        <input
-                                                            type="number"
-                                                            value={item.price}
-                                                            onChange={(e) => {
-                                                                props.updateItemPrice(index, parseFloat(e.target.value) || 0)
-                                                                if (priceErrors[index]) {
-                                                                    setPriceErrors(prev => ({ ...prev, [index]: false }))
-                                                                }
-                                                            }}
-                                                            className={`w-full h-9 px-2 rounded-lg border bg-white dark:bg-dark-background font-bold text-[13px] focus:ring-1 focus:ring-brand-primary outline-none transition-all ${priceErrors[index] ? 'border-red-500' : 'border-brand-border'}`}
-                                                        />
-                                                    </div>
-                                                </td>
-                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                    <div className="flex justify-center">
-                                                        <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} max={item.isBlank ? undefined : Math.max(0, Number(item.stock ?? 0))} size="md" />
-                                                    </div>
-                                                </td>
-                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right">
-                                                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                                                        {formatCurrency(item.price * item.qty)}
-                                                    </span>
-                                                </td>
-                                                {!props.isReadOnly && (
-                                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
-                                                        <div className="flex justify-center gap-2">
-                                                            {item.isEditing ? (
-                                                                <button
-                                                                    onClick={() => {
-                                                                        if (item.isBlank && Number(item.price || 0) <= 0) {
-                                                                            setPriceErrors(prev => ({ ...prev, [index]: true }))
-                                                                            return
-                                                                        }
-                                                                        props.toggleItemEdit(index, false)
-                                                                    }}
-                                                                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-green-50 dark:hover:bg-green-900/10 text-brand-green transition-colors"
-                                                                    title="Salvar nome"
-                                                                >
-                                                                    <CheckCircleIcon size={18} />
-                                                                </button>
-                                                            ) : (
-                                                                <button
-                                                                    onClick={() => props.toggleItemEdit(index, true)}
-                                                                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                                    title="Editar nome"
-                                                                >
-                                                                    <EditIcon size={18} />
-                                                                </button>
-                                                            )}
-                                                            <button
-                                                                onClick={() => props.removeItem(index)}
-                                                                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
-                                                                title="Remover item"
-                                                            >
-                                                                <TrashIcon size={18} />
-                                                            </button>
+                                        {paginatedItems.map((item, paginatedIndex) => {
+                                            const index = (currentPage - 1) * ITEMS_PER_PAGE + paginatedIndex;
+                                            const hasNameError = Boolean(nameErrors[index] || props.manualItemNameErrors?.has(index));
+                                            const hasPriceError = Boolean(priceErrors[index] || props.manualItemPriceErrors?.has(index));
+                                            return (
+                                                <tr key={index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+                                                    <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                                <img src={getR2ImageUrl(item.image, "thumbnail")} className={`w-full h-full rounded-full ${!item.image ? 'object-contain' : 'object-cover'}`} alt="" />
+                                                            </div>
+                                                            <div className="flex flex-col text-left flex-1 min-w-0">
+                                                                {item.isEditing ? (
+                                                                    <div className="mb-0">
+                                                                        <Input
+                                                                            name={`item-name-${index}`}
+                                                                            value={item.name}
+                                                                            onChange={(e: any) => {
+                                                                                props.updateItemField(index, 'name', e.target.value);
+                                                                                if (nameErrors[index]) {
+                                                                                    setNameErrors(prev => ({ ...prev, [index]: false }));
+                                                                                }
+                                                                            }}
+                                                                            placeholder="Nome do produto..."
+                                                                            error={hasNameError}
+                                                                            errorMessage="Nome obrigatório"
+                                                                            className="mb-0"
+                                                                        />
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[250px]">
+                                                                        {item.name || 'Produto sem nome'}
+                                                                    </span>
+                                                                )}
+                                                                {!item.isEditing && (
+                                                                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                                        {item.sku || 'Sem SKU'}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </td>
-                                                )}
-                                            </tr>
-                                        ))}
+                                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                        <div className="w-[140px]">
+                                                            <MoneyInput
+                                                                name={`item-price-${index}`}
+                                                                value={item.price}
+                                                                onChange={(e: any) => {
+                                                                    props.updateItemPrice(index, parseFloat(e.target.value) || 0)
+                                                                    if (priceErrors[index]) {
+                                                                        setPriceErrors(prev => ({ ...prev, [index]: false }))
+                                                                    }
+                                                                }}
+                                                                className="mb-0"
+                                                                error={hasPriceError}
+                                                                errorMessage="Preço obrigatório"
+                                                            />
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                        <div className="flex justify-center">
+                                                            <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} max={item.isManual ? undefined : Math.max(0, Number(item.stock ?? 0))} size="md" />
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right">
+                                                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                                            {formatCurrency(item.price * item.qty)}
+                                                        </span>
+                                                    </td>
+                                                    {!props.isReadOnly && (
+                                                        <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                            <div className="flex justify-center gap-2">
+                                                                {item.isEditing ? (
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            if (!item.name || item.name.trim() === '') {
+                                                                                setNameErrors(prev => ({ ...prev, [index]: true }))
+                                                                            } else if (item.isManual && Number(item.price || 0) <= 0) {
+                                                                                setPriceErrors(prev => ({ ...prev, [index]: true }))
+                                                                            } else {
+                                                                                props.toggleItemEdit(index, false)
+                                                                            }
+                                                                        }}
+                                                                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-green-50 dark:hover:bg-green-900/10 text-brand-green transition-colors"
+                                                                        title="Salvar nome"
+                                                                    >
+                                                                        <CheckCircleIcon size={18} />
+                                                                    </button>
+                                                                ) : item.isManual ? (
+                                                                    <button
+                                                                        onClick={() => props.toggleItemEdit(index, true)}
+                                                                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                                        title="Editar nome"
+                                                                    >
+                                                                        <EditIcon size={18} />
+                                                                    </button>
+                                                                ) : null}
+                                                                <button
+                                                                    onClick={() => props.removeItem(index)}
+                                                                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
+                                                                    title="Remover item"
+                                                                >
+                                                                    <TrashIcon size={18} />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            )
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
                         )}
+                        {props.quoteItems.length > 0 && (
+                            <div className="block md:hidden space-y-2 mb-6">
+                                {paginatedItems.map((item, paginatedIndex) => {
+                                    const index = (currentPage - 1) * ITEMS_PER_PAGE + paginatedIndex;
+                                    const hasNameError = Boolean(nameErrors[index] || props.manualItemNameErrors?.has(index));
+                                    const hasPriceError = Boolean(priceErrors[index] || props.manualItemPriceErrors?.has(index));
+                                    return (
+                                        <div key={index} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
+                                            <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 overflow-hidden flex items-center justify-center">
+                                                <img src={getR2ImageUrl(item.image, "thumbnail")} className={`w-full h-full ${!item.image ? 'object-contain' : 'object-cover'}`} alt="" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex justify-between items-start mb-0.5">
+                                                    {item.isEditing ? (
+                                                        <div className="flex-1 mr-2">
+                                                            <Input
+                                                                name={`item-name-mobile-${index}`}
+                                                                value={item.name}
+                                                                onChange={(e: any) => {
+                                                                    props.updateItemField(index, 'name', e.target.value);
+                                                                    if (nameErrors[index]) {
+                                                                        setNameErrors(prev => ({ ...prev, [index]: false }));
+                                                                    }
+                                                                }}
+                                                                placeholder="Nome do produto..."
+                                                                error={hasNameError}
+                                                                errorMessage="Nome obrigatório"
+                                                                className="mb-0"
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <h4 className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate pr-2">
+                                                            {item.name || 'Produto sem nome'}
+                                                        </h4>
+                                                    )}
+                                                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading shrink-0">
+                                                        {formatCurrency(item.price * item.qty)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-[11px] font-medium text-brand-inactive-text pr-2 truncate">
+                                                        {item.isEditing ? (item.sku ? `${item.sku} • ` : '') : `${item.sku || 'Sem SKU'} • `}{item.qty} un • {formatCurrency(item.price)}
+                                                    </p>
+                                                    {!props.isReadOnly && (
+                                                        <div className="flex items-center gap-1">
+                                                            {item.isEditing ? (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (!item.name || item.name.trim() === '') {
+                                                                            setNameErrors(prev => ({ ...prev, [index]: true }));
+                                                                        } else if (item.isManual && Number(item.price || 0) <= 0) {
+                                                                            setPriceErrors(prev => ({ ...prev, [index]: true }));
+                                                                        } else {
+                                                                            props.toggleItemEdit(index, false);
+                                                                        }
+                                                                    }}
+                                                                    className="w-8 h-8 flex items-center justify-center text-green-600 hover:bg-green-50 dark:hover:bg-green-900/10 rounded-full transition-colors"
+                                                                >
+                                                                    <CheckCircleIcon size={14} />
+                                                                </button>
+                                                            ) : item.isManual ? (
+                                                                <button
+                                                                    onClick={() => props.toggleItemEdit(index, true)}
+                                                                    className="w-8 h-8 flex items-center justify-center text-brand-inactive-text hover:text-brand-dark hover:bg-brand-gray dark:hover:bg-dark-border rounded-full transition-colors"
+                                                                >
+                                                                    <EditIcon size={14} />
+                                                                </button>
+                                                            ) : null}
+                                                            <button
+                                                                onClick={() => props.removeItem(index)}
+                                                                className="w-8 h-8 flex items-center justify-center text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full transition-colors"
+                                                            >
+                                                                <TrashIcon size={14} />
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {!props.isReadOnly && (
+                                                    <div className="flex items-center gap-4 mt-2">
+                                                        <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} max={item.isManual ? undefined : Math.max(0, Number(item.stock ?? 0))} size="sm" />
+                                                        <div className="flex-1 max-w-[140px]">
+                                                            <Input
+                                                                name={`item-price-mobile-${index}`}
+                                                                type="number"
+                                                                prefix="R$"
+                                                                value={item.price}
+                                                                onChange={(e: any) => {
+                                                                    props.updateItemPrice(index, parseFloat(e.target.value) || 0);
+                                                                    if (priceErrors[index]) {
+                                                                        setPriceErrors(prev => ({ ...prev, [index]: false }));
+                                                                    }
+                                                                }}
+                                                                className="mb-0"
+                                                                error={hasPriceError}
+                                                                errorMessage="Preço obrigatório"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
+
+                        {props.quoteItems.length > ITEMS_PER_PAGE && (
+                            <div className="mt-6 flex justify-center">
+                                <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+                            </div>
+                        )}
 
                         {/* --- ITEMS LIST (Mobile/Tablet) --- */}
-                        {props.quoteItems.length > 0 && (
+                        {false && props.quoteItems.length > 0 && (
                             <div className="block md:hidden space-y-2 mb-6">
                                 {props.quoteItems.map((item, index) => (
                                     <div key={index} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
                                         {/* Left side: Avatar/Image */}
-                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
+                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 overflow-hidden flex items-center justify-center">
                                             <img src={getR2ImageUrl(item.image, "thumbnail")} className="w-full h-full object-cover" alt="" />
                                         </div>
 
@@ -307,7 +450,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                         {item.name || 'Produto sem nome'}
                                                     </h4>
                                                 )}
-                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading flex-shrink-0">
+                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading shrink-0">
                                                     {formatCurrency(item.price * item.qty)}
                                                 </span>
                                             </div>

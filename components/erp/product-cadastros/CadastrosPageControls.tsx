@@ -67,7 +67,7 @@ const CadastrosPageControls: React.FC<CadastrosPageControlsProps> = ({
                             prefix={
                                 <SearchIcon
                                     size={18}
-                                    className="text-brand-inactive-text flex-shrink-0"
+                                    className="text-brand-inactive-text shrink-0"
                                 />
                             }
                             label=""
@@ -85,7 +85,7 @@ const CadastrosPageControls: React.FC<CadastrosPageControlsProps> = ({
 
                 {/* DESKTOP CONTROLS - Exactly like ProductPageControls */}
                 <div className="hidden md:flex items-center w-full gap-4">
-                    <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="flex items-center gap-3 shrink-0">
                         <div className="w-80">
                             <Input
                                 name="search"
@@ -97,7 +97,7 @@ const CadastrosPageControls: React.FC<CadastrosPageControlsProps> = ({
                                 prefix={
                                     <SearchIcon
                                         size={18}
-                                        className="text-brand-inactive-text flex-shrink-0"
+                                        className="text-brand-inactive-text shrink-0"
                                     />
                                 }
                                 label=""

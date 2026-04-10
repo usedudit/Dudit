@@ -33,7 +33,7 @@ const FinancialCategoryCard = React.memo(
                 onClick={onEdit}
             >
                 <div className="flex gap-4 mb-2">
-                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                         <IconComponent className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
                     </div>
 
@@ -72,7 +72,7 @@ const FinancialCategoryCard = React.memo(
                         </span>
                     </div>
 
-                    <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                         <ActionsDropdown onEdit={onEdit} onDelete={onDelete} />
                     </div>
                 </div>

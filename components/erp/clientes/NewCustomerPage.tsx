@@ -328,7 +328,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                     </div>
 
                                     {/* Desktop action buttons */}
-                                    <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         <Button variant="outline" onClick={handleBack} disabled={isSaving}>
                                             Cancelar
                                         </Button>

@@ -223,15 +223,15 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                 <tr key={index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
                                                     <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                                                                 <img src={getR2ImageUrl(item.image, "thumbnail")} className={`w-full h-full rounded-full ${!item.image ? 'object-contain' : 'object-cover'}`} alt="" />
                                                             </div>
                                                             <div className="flex flex-col text-left flex-1 min-w-0">
                                                                 {item.isEditing ? (
                                                                     <div className="mb-0">
-                                                                <Input
-                                                                    name={`item-name-${index}`}
-                                                                    value={item.name}
+                                                                        <Input
+                                                                            name={`item-name-${index}`}
+                                                                            value={item.name}
                                                                             onChange={(e: any) => {
                                                                                 updateItemField(index, 'name', e.target.value);
                                                                                 if (nameErrors[index]) {
@@ -342,7 +342,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     const hasPriceError = Boolean(priceErrors[index] || manualItemPriceErrors.has(index));
                                     return (
                                         <div key={index} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
-                                            <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
+                                            <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 overflow-hidden flex items-center justify-center">
                                                 <img src={getR2ImageUrl(item.image, "thumbnail")} className={`w-full h-full ${!item.image ? 'object-contain' : 'object-cover'}`} alt="" />
                                             </div>
                                             <div className="flex-1 min-w-0">
@@ -369,7 +369,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                             {item.name || 'Produto sem nome'}
                                                         </h4>
                                                     )}
-                                                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading flex-shrink-0">
+                                                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading shrink-0">
                                                         {formatCurrency(item.unitPrice * item.quantity)}
                                                     </span>
                                                 </div>
@@ -522,7 +522,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                         </div>
 
                         <div className="p-3 bg-brand-gray/30 dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-xl flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-brand-dark dark:bg-dark-heading flex items-center justify-center text-white flex-shrink-0">
+                            <div className="w-10 h-10 rounded-full bg-brand-dark dark:bg-dark-heading flex items-center justify-center text-white shrink-0">
                                 <TagIcon size={18} />
                             </div>
                             <div className="flex-1 min-w-0">

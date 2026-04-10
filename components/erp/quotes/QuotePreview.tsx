@@ -108,7 +108,7 @@ const QuotePreview = ({
                         <div key={pageIndex} className="w-full max-w-[650px] bg-white text-[#113833] shadow-md overflow-hidden relative font-sans rounded-sm min-h-[1050px] flex flex-col">
 
                             <div
-                                className="px-8 py-8 relative overflow-hidden flex flex-col justify-between h-[160px] flex-shrink-0"
+                                className="px-8 py-8 relative overflow-hidden flex flex-col justify-between h-[160px] shrink-0"
                                 style={{ backgroundColor: primaryColor }}
                             >
                                 <div className="absolute -top-12 right-6 flex gap-3 opacity-90 rotate-180">
@@ -127,11 +127,11 @@ const QuotePreview = ({
                                 <div className="relative z-10 mt-2">
                                     <div className="flex items-center gap-3 mb-6">
                                         {partnerAvatar ? (
-                                            <div className="w-8 h-8 rounded-full overflow-hidden bg-white flex-shrink-0">
+                                            <div className="w-8 h-8 rounded-full overflow-hidden bg-white shrink-0">
                                                 <img src={partnerAvatar} className="w-full h-full object-cover" alt="Logo" />
                                             </div>
                                         ) : (
-                                            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white text-[15px] font-bold text-black flex-shrink-0">
+                                            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white text-[15px] font-bold text-black shrink-0">
                                                 {partnerName.charAt(0).toUpperCase()}
                                             </div>
                                         )}

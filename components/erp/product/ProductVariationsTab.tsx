@@ -82,7 +82,7 @@ const VariationRow = React.memo(({ item, isSelected, isEditing, onSelect, onTogg
             </td>
             <td className="p-3 border-b border-brand-border dark:border-dark-border">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                         <img
                             src={getR2ImageUrl(item.variant_options?.image || item.image) || "https://img.dudit.com.br/static/Placeholder.png"}
                             alt="Variant"
@@ -148,7 +148,7 @@ const VariationMobileItem = React.memo(({ item, isSelected, isEditing, onSelect,
         >
             <div className="flex items-start gap-4 h-auto">
                 {/* Imagem */}
-                <div className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border flex-shrink-0 overflow-hidden">
+                <div className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border shrink-0 overflow-hidden">
                     <img
                         src={getR2ImageUrl(item.variant_options?.image || item.image) || "https://img.dudit.com.br/static/Placeholder.png"}
                         alt={item.name}
@@ -164,7 +164,7 @@ const VariationMobileItem = React.memo(({ item, isSelected, isEditing, onSelect,
                             {item.name || "-"}
                         </h3>
                         <div
-                            className={`mt-1.5 w-2.5 h-2.5 rounded-full flex-shrink-0 ${item.status ? "bg-brand-green" : "bg-brand-red"}`}
+                            className={`mt-1.5 w-2.5 h-2.5 rounded-full shrink-0 ${item.status ? "bg-brand-green" : "bg-brand-red"}`}
                         ></div>
                     </div>
 
@@ -727,7 +727,7 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
                                 prefix={
                                     <SearchIcon
                                         size={18}
-                                        className="text-brand-inactive-text flex-shrink-0"
+                                        className="text-brand-inactive-text shrink-0"
                                     />
                                 }
                                 label=""

@@ -232,7 +232,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                     </div>
 
                                     {/* Desktop action buttons */}
-                                    <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         <ActionsDropdown
                                             onShare={() => { }}
                                             onArchive={() => { }}
@@ -445,7 +445,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                             {/* Review content stays mostly the same but with standardized classes */}
                                             <div className="rounded-2xl bg-brand-green/5 dark:bg-brand-green/10 border border-brand-green/20 p-6 flex items-start gap-5 mb-10 shadow-sm relative overflow-hidden group">
                                                 <div className="absolute top-0 right-0 w-32 h-32 bg-brand-green/10 rounded-full -mr-16 -mt-16 blur-3xl transition-all duration-500 group-hover:scale-150" />
-                                                <div className="w-12 h-12 rounded-xl bg-brand-green/20 flex items-center justify-center flex-shrink-0">
+                                                <div className="w-12 h-12 rounded-xl bg-brand-green/20 flex items-center justify-center shrink-0">
                                                     <SparklesIcon size={24} className="text-brand-green" />
                                                 </div>
                                                 <div className="flex-1">
@@ -571,7 +571,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                             <div className="mb-0">
                                                                 <div className="flex justify-between items-start mb-1">
                                                                     <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate pr-2">Endereço Principal</h4>
-                                                                    <a href="#" className="text-xs font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark dark:decoration-dark-heading flex-shrink-0">Ver Mapa</a>
+                                                                    <a href="#" className="text-xs font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark dark:decoration-dark-heading shrink-0">Ver Mapa</a>
                                                                 </div>
                                                                 <p className="text-[14px] text-brand-inactive-text dark:text-dark-body leading-relaxed">
                                                                     {customerAddress}

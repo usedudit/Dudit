@@ -15,13 +15,13 @@ interface QuoteHeaderProps {
     hideOnMobile?: boolean;
 }
 
-const QuoteHeader = ({ 
-    isScrolled, 
-    onBack, 
-    onSave, 
-    isSaving, 
-    title, 
-    subtitle, 
+const QuoteHeader = ({
+    isScrolled,
+    onBack,
+    onSave,
+    isSaving,
+    title,
+    subtitle,
     saveLabel = "Salvar",
     activeTab = "Dados Gerais",
     hideOnMobile = false
@@ -32,15 +32,15 @@ const QuoteHeader = ({
     return (
         <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300">
             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
-                
+
                 {/* Header Content - Control visibility on mobile */}
                 <div className={`flex items-start justify-between transition-all duration-300 ${hideOnMobile ? "hidden md:flex" : "flex"} ${isScrolled ? "py-2" : "py-4 md:py-6"}`}>
                     <div className="flex items-center gap-4 min-w-0">
                         {/* Back button */}
-                        <Button 
-                            variant="outline" 
-                            onClick={onBack} 
-                            className={`flex-shrink-0 flex items-center justify-center transition-all duration-300 ${isScrolled ? "w-8 h-8" : "w-10 h-10"}`}
+                        <Button
+                            variant="outline"
+                            onClick={onBack}
+                            className={`shrink-0 flex items-center justify-center transition-all duration-300 ${isScrolled ? "w-8 h-8" : "w-10 h-10"}`}
                         >
                             <ChevronLeftIcon className={`${isScrolled ? "w-4 h-4" : "w-5 h-5"} text-brand-inactive-text dark:text-dark-body`} />
                         </Button>
@@ -59,7 +59,7 @@ const QuoteHeader = ({
                     </div>
 
                     {onSave && (
-                        <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
+                        <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                             <Button variant="outline" onClick={onBack} className={isScrolled ? "h-9 px-3 text-xs" : ""}>
                                 Cancelar
                             </Button>

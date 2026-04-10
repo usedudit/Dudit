@@ -35,7 +35,7 @@ const MetadataCard = React.memo(({ item, type, categories, onEdit, onDelete }: M
         >
             <div className="flex gap-4 mb-2">
                 {/* Icon Placeholder - matching ProductGridCard image size/shape */}
-                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                     <IconComponent className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
                 </div>
 
@@ -78,7 +78,7 @@ const MetadataCard = React.memo(({ item, type, categories, onEdit, onDelete }: M
                     </span>
                 </div>
 
-                <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                     <ActionsDropdown
                         onEdit={onEdit}
                         onDelete={onDelete}

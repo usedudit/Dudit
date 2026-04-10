@@ -613,7 +613,7 @@ export function PaymentWrapper({
                                         </Button>
                                     )}
                                 </div>
-                                    <span className="text-2xl font-bold text-brand-dark">{formatCurrency(amount)}</span>
+                                <span className="text-2xl font-bold text-brand-dark">{formatCurrency(amount)}</span>
 
                                 <InfoCard
                                     message="A aprovação pode levar de 1 a 2 dias úteis. Pagamentos realizados em fins de semana ou feriados serão analisados no próximo dia útil."
@@ -669,14 +669,14 @@ export function PaymentWrapper({
                                     <div className="space-y-4">
                                         {orderDetails.items.map((item, idx) => (
                                             <div key={idx} className="flex gap-4 items-center">
-                                                <div className="w-12 h-12 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center p-1 flex-shrink-0">
+                                                <div className="w-12 h-12 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center p-1 shrink-0">
                                                     <img src={item.image || "https://img.dudit.com.br/static/Placeholder.png"} alt={item.name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <h4 className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">{item.name}</h4>
                                                     <p className="text-xs text-brand-inactive-text">{item.quantity}x {formatCurrency(item.price)}</p>
                                                 </div>
-                                                    {formatCurrency(item.quantity * item.price)}
+                                                {formatCurrency(item.quantity * item.price)}
                                             </div>
                                         ))}
                                     </div>
@@ -698,7 +698,7 @@ export function PaymentWrapper({
                                     </>
                                 )}
 
-                                    <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(amount)}</span>
+                                <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(amount)}</span>
                             </div>
 
                             <div className="flex justify-center">

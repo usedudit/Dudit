@@ -139,7 +139,7 @@ function CouponInput({ onApply }: { onApply: (code: string) => void }) {
                     />
                 </div>
                 {applied ? (
-                    <button type="button" onClick={handleRemove} className="text-xs font-semibold text-brand-red hover:text-red-600 flex items-center gap-1 flex-shrink-0 pb-0.5">
+                    <button type="button" onClick={handleRemove} className="text-xs font-semibold text-brand-red hover:text-red-600 flex items-center gap-1 shrink-0 pb-0.5">
                         <XIcon size={12} /> Remover
                     </button>
                 ) : (
@@ -147,7 +147,7 @@ function CouponInput({ onApply }: { onApply: (code: string) => void }) {
                         type="button"
                         onClick={handleApply}
                         disabled={!value.trim()}
-                        className="text-xs font-bold text-brand-green hover:text-[#047857] disabled:opacity-40 transition-colors flex-shrink-0 pb-0.5"
+                        className="text-xs font-bold text-brand-green hover:text-[#047857] disabled:opacity-40 transition-colors shrink-0 pb-0.5"
                     >
                         Aplicar
                     </button>
@@ -486,7 +486,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                                                     }}
                                                                 />
                                                             }
-                                                            right={<span className="text-sm font-bold text-brand-green flex-shrink-0 mr-4">Grátis</span>}
+                                                            right={<span className="text-sm font-bold text-brand-green shrink-0 mr-4">Grátis</span>}
                                                         />
                                                     </div>
                                                 </div>
@@ -499,7 +499,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                                                 <img
                                                                     src="https://img.dudit.com.br/static/Map.png"
                                                                     alt="Mapa do local"
-                                                                    className="w-12 h-12 object-cover rounded-xl flex-shrink-0"
+                                                                    className="w-12 h-12 object-cover rounded-xl shrink-0"
                                                                 />
                                                                 <div className="flex flex-col justify-center">
                                                                     <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
@@ -523,7 +523,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                                                                 : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
                                                                                 }`}
                                                                         >
-                                                                            <div className="mt-2.5 flex-shrink-0">
+                                                                            <div className="mt-2.5 shrink-0">
                                                                                 <RadioButton
                                                                                     name="addressSelect"
                                                                                     value={address.id}
@@ -651,7 +651,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                                 ) : (
                                                     <>
                                                         <div className="flex gap-3 mb-6">
-                                                            <div className="w-1 rounded-full bg-brand-border dark:bg-dark-border flex-shrink-0" />
+                                                            <div className="w-1 rounded-full bg-brand-border dark:bg-dark-border shrink-0" />
                                                             <p className="text-sm text-brand-inactive-text">Este vendedor aceita apenas pagamentos diretos (Entrega ou Retirada).</p>
                                                         </div>
                                                         <div className="mb-6">
@@ -711,7 +711,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                     <div className="space-y-4 mb-6 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
                                         {products.map((item) => (
                                             <div key={item.id} className="flex gap-3">
-                                                <div className="w-16 h-16 bg-gray-100 border border-brand-border dark:border-dark-border rounded-lg overflow-hidden flex-shrink-0">
+                                                <div className="w-16 h-16 bg-gray-100 border border-brand-border dark:border-dark-border rounded-lg overflow-hidden shrink-0">
                                                     {item.image ? (
                                                         <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                                                     ) : (

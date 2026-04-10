@@ -82,7 +82,7 @@ async function TeamList() {
                     {members.map((member) => (
                         <div key={member.id} className="px-6 py-4 flex items-center gap-4">
                             {/* Avatar */}
-                            <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                            <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center shrink-0 overflow-hidden">
                                 {member.avatarUrl ? (
                                     <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" />
                                 ) : (
@@ -110,12 +110,12 @@ async function TeamList() {
                             </div>
 
                             {/* Role Badge */}
-                            <span className={`inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full flex-shrink-0 ${ROLE_COLORS[member.role]}`}>
+                            <span className={`inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full shrink-0 ${ROLE_COLORS[member.role]}`}>
                                 {ROLE_LABELS[member.role] || member.role}
                             </span>
 
                             {/* Join Date */}
-                            <span className="text-xs text-gray-400 dark:text-gray-500 hidden md:block flex-shrink-0">
+                            <span className="text-xs text-gray-400 dark:text-gray-500 hidden md:block shrink-0">
                                 {new Date(member.createdAt).toLocaleDateString("pt-BR")}
                             </span>
                         </div>

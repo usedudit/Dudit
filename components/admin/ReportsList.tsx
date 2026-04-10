@@ -105,7 +105,7 @@ const ReportsList = ({ initialData }: ReportsListProps) => {
                         prefix={
                             <SearchIcon
                                 size={18}
-                                className="text-brand-inactive-text flex-shrink-0"
+                                className="text-brand-inactive-text shrink-0"
                             />
                         }
                     />

@@ -246,7 +246,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                     </div>
 
                                     {/* Desktop action buttons */}
-                                    <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3 mb-4">
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3 mb-4">
                                         <Button variant="outline" onClick={handleBack} disabled={isSaving}>
                                             Cancelar
                                         </Button>
@@ -293,7 +293,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                 }`}
                                                         >
                                                             <div className="flex items-center gap-4">
-                                                                <div className={`w-12 h-12 rounded-full border border-brand-border dark:border-dark-border flex items-center justify-center flex-shrink-0 ${type === 'in' ? 'bg-brand-green text-white' : 'bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text'
+                                                                <div className={`w-12 h-12 rounded-full border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0 ${type === 'in' ? 'bg-brand-green text-white' : 'bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text'
                                                                     }`}>
                                                                     <ChevronDownIcon size={22} strokeWidth={2.5} />
                                                                 </div>
@@ -312,7 +312,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                 }`}
                                                         >
                                                             <div className="flex items-center gap-4">
-                                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${type === 'out' ? 'bg-brand-red text-white' : 'bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text'
+                                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${type === 'out' ? 'bg-brand-red text-white' : 'bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text'
                                                                     }`}>
                                                                     <ChevronUpIcon size={22} strokeWidth={2.5} />
                                                                 </div>
@@ -355,7 +355,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                     prefix={
                                                                         <SearchIcon
                                                                             size={18}
-                                                                            className="text-brand-inactive-text flex-shrink-0"
+                                                                            className="text-brand-inactive-text shrink-0"
                                                                         />
                                                                     }
                                                                     error={fieldErrors.has('items') && items.length === 0}
@@ -382,7 +382,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                                     className={`flex items-center gap-4 p-3.5 border-b border-brand-border dark:border-dark-border last:border-0 transition-colors ${alreadyAdded ? 'opacity-40 cursor-default' : 'hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer'}`}
                                                                                     onClick={() => !alreadyAdded && addProduct(product)}
                                                                                 >
-                                                                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden flex-shrink-0 border border-brand-border dark:border-dark-border">
+                                                                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
                                                                                         <img src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={product.name} className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border" />
                                                                                     </div>
                                                                                     <div className="flex-1 min-w-0">
@@ -420,7 +420,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                             <tr key={item.product.id} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
                                                                                 <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
                                                                                     <div className="flex items-center gap-3">
-                                                                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                                                                                             <img src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className={`w-full h-full ${!item.product.image ? 'object-contain' : 'object-cover'}`} alt="" />
                                                                                         </div>
                                                                                         <div className="flex flex-col text-left flex-1 min-w-0">
@@ -463,7 +463,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                             <div className="block md:hidden space-y-2">
                                                                 {items.map((item, index) => (
                                                                     <div key={item.product.id} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
-                                                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 overflow-hidden flex items-center justify-center">
+                                                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 overflow-hidden flex items-center justify-center">
                                                                             <img src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className={`w-full h-full ${!item.product.image ? 'object-contain p-1.5' : 'object-cover'}`} alt="" />
                                                                         </div>
                                                                         <div className="flex-1 min-w-0">
@@ -473,7 +473,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                                 </h4>
                                                                                 <button
                                                                                     onClick={() => removeItem(index)}
-                                                                                    className="w-8 h-8 flex items-center justify-center text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full transition-colors flex-shrink-0"
+                                                                                    className="w-8 h-8 flex items-center justify-center text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full transition-colors shrink-0"
                                                                                 >
                                                                                     <TrashIcon size={14} />
                                                                                 </button>
@@ -584,7 +584,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                             return (
                                                                 <div key={item.product.id} className={`py-4 ${index > 0 ? 'border-t border-brand-border/40 dark:border-dark-border/40' : ''}`}>
                                                                     <div className="flex items-center gap-3 mb-3">
-                                                                        <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden flex-shrink-0 border border-brand-border dark:border-dark-border">
+                                                                        <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
                                                                             <img src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className="w-full h-full object-cover rounded-full" alt="" />
                                                                         </div>
                                                                         <div className="flex-1 min-w-0">

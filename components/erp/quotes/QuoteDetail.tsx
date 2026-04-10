@@ -197,7 +197,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                             </div>
 
                             {/* Desktop action buttons only */}
-                            <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
+                            <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                 <ActionsDropdown
                                     onPrint={() => { }}
                                     onEmail={() => { }}
@@ -425,7 +425,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
 
 const QuoteItem = ({ image, name, sku, qty, price, total }: any) => (
     <div className="flex items-start gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0 hover:bg-brand-gray/20 transition-colors px-2 rounded-xl text-left group">
-        <div className="w-16 h-16 rounded-xl bg-brand-gray/50 dark:bg-dark-border/50 border border-brand-border dark:border-dark-border overflow-hidden flex-shrink-0 flex items-center justify-center p-1">
+        <div className="w-16 h-16 rounded-xl bg-brand-gray/50 dark:bg-dark-border/50 border border-brand-border dark:border-dark-border overflow-hidden shrink-0 flex items-center justify-center p-1">
             <img
                 src={image}
                 className="w-full h-full object-cover mix-blend-multiply dark:mix-blend-normal rounded-lg transition-transform group-hover:scale-105"

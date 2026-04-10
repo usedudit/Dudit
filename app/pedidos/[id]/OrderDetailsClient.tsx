@@ -62,7 +62,7 @@ const ShippingDetailsModal = ({ isOpen, onClose, order }: { isOpen: boolean; onC
 
                             {/* Step 1: Pedido Feito */}
                             <div className="relative flex gap-4">
-                                <div className="w-6 h-6 rounded-full bg-brand-dark border-4 border-white z-10 flex-shrink-0"></div>
+                                <div className="w-6 h-6 rounded-full bg-brand-dark border-4 border-white z-10 shrink-0"></div>
                                 <div>
                                     <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">Pedido Realizado</div>
                                     <div className="text-xs text-brand-inactive-text mt-1">{formatFullDate(order.created_at)}</div>
@@ -71,7 +71,7 @@ const ShippingDetailsModal = ({ isOpen, onClose, order }: { isOpen: boolean; onC
 
                             {/* Step 2: Pagamento */}
                             <div className="relative flex gap-4">
-                                <div className={`w-6 h-6 rounded-full border-4 border-white z-10 flex-shrink-0 ${isPaid ? 'bg-brand-dark' : 'bg-gray-200 dark:bg-zinc-700'}`}></div>
+                                <div className={`w-6 h-6 rounded-full border-4 border-white z-10 shrink-0 ${isPaid ? 'bg-brand-dark' : 'bg-gray-200 dark:bg-zinc-700'}`}></div>
                                 <div>
                                     <div className={`text-sm ${isPaid ? 'font-bold text-brand-dark' : 'text-brand-inactive-text'}`}>
                                         {isPaid ? "Pagamento Aprovado" : "Aguardando Pagamento"}
@@ -81,7 +81,7 @@ const ShippingDetailsModal = ({ isOpen, onClose, order }: { isOpen: boolean; onC
 
                             {/* Step 3: Entrega/Retirada */}
                             <div className="relative flex gap-4">
-                                <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-zinc-700 border-4 border-white z-10 flex-shrink-0"></div>
+                                <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-zinc-700 border-4 border-white z-10 shrink-0"></div>
                                 <div>
                                     <div className="text-sm text-brand-inactive-text">
                                         {isDelivery ? "Entregue" : "Retirado na Loja"}
@@ -117,7 +117,7 @@ const InfoCard = ({ icon: Icon, title, description, onClick, rightIcon: RightIco
         onClick={onClick}
         className={`group flex items-center gap-4 p-4 rounded-[12px] border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface transition-all ${onClick ? 'cursor-pointer hover:border-brand-dark/30 hover:bg-brand-gray/30' : ''}`}
     >
-        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-gray-800 flex items-center justify-center flex-shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-gray-700 transition-colors">
+        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-gray-800 flex items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-gray-700 transition-colors">
             <Icon size={20} className="text-brand-dark dark:text-dark-heading" />
         </div>
         <div className="flex-1">
@@ -214,7 +214,7 @@ export const OrderDetailsClient = ({ order }: { order: any }) => {
                                     const imgUrl = item.products?.images?.[0] ? getR2ImageUrl(item.products.images[0]) : "https://img.dudit.com.br/static/Placeholder.png"
                                     return (
                                         <div key={item.id} className="flex flex-col sm:flex-row items-start gap-4">
-                                            <div className="w-20 h-20 bg-white border border-brand-border rounded-[10px] flex items-center justify-center p-2 flex-shrink-0">
+                                            <div className="w-20 h-20 bg-white border border-brand-border rounded-[10px] flex items-center justify-center p-2 shrink-0">
                                                 <img src={imgUrl} alt={item.products?.name} className="w-full h-full object-contain" />
                                             </div>
                                             <div className="flex-1">
@@ -280,7 +280,7 @@ export const OrderDetailsClient = ({ order }: { order: any }) => {
                             Documentos da compra
                         </div>
                         <div className="p-6 flex items-start gap-4">
-                            <div className="w-12 h-12 rounded-full bg-brand-gray flex items-center justify-center text-brand-inactive-text flex-shrink-0">
+                            <div className="w-12 h-12 rounded-full bg-brand-gray flex items-center justify-center text-brand-inactive-text shrink-0">
                                 <FileIcon size={22} />
                             </div>
                             <div>

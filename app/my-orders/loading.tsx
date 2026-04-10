@@ -45,7 +45,7 @@ export default function MyOrdersLoading() {
                                 <div className="space-y-4">
                                     {[1, 2].map((j) => (
                                         <div key={j} className="flex gap-4">
-                                            <SkeletonLoader width={64} height={64} className="rounded-[8px] flex-shrink-0" />
+                                            <SkeletonLoader width={64} height={64} className="rounded-[8px] shrink-0" />
                                             <div className="flex-1 flex justify-between items-start pt-1">
                                                 <div>
                                                     <SkeletonLoader width={180} height={20} className="mb-1" />

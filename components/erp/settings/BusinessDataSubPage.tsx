@@ -238,7 +238,7 @@ export const BusinessDataSubPage = ({
                                     </div>
 
                                     {/* Desktop action buttons */}
-                                    <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         <Button variant="outline" onClick={onBack} disabled={isLoading}>
                                             Cancelar
                                         </Button>
@@ -389,7 +389,7 @@ export const BusinessDataSubPage = ({
                                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Logo do Negócio</h3>
 
                                                 <div className="flex items-center gap-4 dark:bg-dark-background/50">
-                                                    <div onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                    <div onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                                                         {imagePreview ? (
                                                             <img src={imagePreview} alt="Logo" className="object-cover w-full h-full rounded-full" />
                                                         ) : (

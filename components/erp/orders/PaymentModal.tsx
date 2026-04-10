@@ -26,6 +26,16 @@ import { getPaymentMethodsAction } from '@/app/actions/payment-methods';
 import { useToast } from "@/components/ui/use-toast";
 import { formatCurrency, formatDate, formatTime } from '@/lib/utils';
 
+const normalizePaymentMethodLabel = (value?: string | null) => {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (!normalized) return '';
+    if (normalized === 'dinheiro') return 'Dinheiro';
+    if (normalized === 'pix') return 'Pix';
+    if (normalized === 'cartao' || normalized === 'cartão') return 'Cartão';
+    if (normalized === 'pendente') return 'Pendente';
+    return String(value || '').trim();
+};
+
 // --- HELPER COMPONENTS ---
 
 const CompactPaymentStatusAlert = ({ totalPaid, totalNeed }: { totalPaid: number, totalNeed: number }) => {
@@ -70,7 +80,7 @@ const SuccessActionCard = ({ icon: Icon, label, onClick }: { icon: any, label: s
         className="flex items-center gap-3 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20 cursor-pointer transition-colors group"
         onClick={onClick}
     >
-        <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center flex-shrink-0 group-hover:bg-white dark:group-hover:bg-dark-surface">
+        <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center shrink-0 group-hover:bg-white dark:group-hover:bg-dark-surface">
             <Icon size={18} className="text-brand-dark dark:text-dark-heading" />
         </div>
         <div className="flex-1">
@@ -94,6 +104,7 @@ const PaymentModal = ({
     discountAmount = 0,
     amountDue,
     existingPaidAmount = 0,
+    existingPaymentBreakdown = [],
     lockPaymentCompletion = false
 }: any) => {
     const { toast } = useToast();
@@ -284,13 +295,37 @@ const PaymentModal = ({
         }
     };
 
-    const buildConfirmPayload = () => ({
-        paymentMethod: isPendingPayment ? 'pendente' : (view === 'split' ? 'multiple' : (view === 'money' ? 'dinheiro' : (view === 'pix' ? 'pix' : 'cartao'))),
-        splitPayments: view === 'split' ? payments : [],
-        paymentStatus: isPendingPayment ? 'unpaid' : (isUnderpaid ? 'partially_paid' : 'paid'),
-        isPendingDelivery,
-        paidAmount: isPendingPayment ? existingPaidAmount : (existingPaidAmount + totalPaidCalculated)
-    });
+    const buildConfirmPayload = () => {
+        const newPaymentBreakdown = isPendingPayment
+            ? []
+            : view === 'split'
+                ? payments
+                    .filter((payment) => payment.method && payment.amount > 0.009)
+                    .map((payment) => ({
+                        method: normalizePaymentMethodLabel(payment.method),
+                        amount: Number(payment.amount || 0),
+                    }))
+                : [{
+                    method: normalizePaymentMethodLabel(view === 'money' ? 'dinheiro' : (view === 'pix' ? 'pix' : 'cartao')),
+                    amount: Number(totalPaidCalculated || 0),
+                }];
+
+        const mergedPaymentBreakdown = [...(existingPaymentBreakdown || []), ...newPaymentBreakdown]
+            .filter((entry: any) => entry?.method && Number(entry?.amount || 0) > 0.009);
+
+        const paymentMethod = isPendingPayment
+            ? 'pendente'
+            : Array.from(new Set(mergedPaymentBreakdown.map((entry: any) => normalizePaymentMethodLabel(entry.method)))).join(', ');
+
+        return {
+            paymentMethod: paymentMethod || 'pendente',
+            paymentBreakdown: mergedPaymentBreakdown,
+            splitPayments: view === 'split' ? payments : [],
+            paymentStatus: isPendingPayment ? 'unpaid' : (isUnderpaid ? 'partially_paid' : 'paid'),
+            isPendingDelivery,
+            paidAmount: isPendingPayment ? existingPaidAmount : (existingPaidAmount + totalPaidCalculated)
+        };
+    };
 
     const handleStartProcessing = async (forcedPayload?: any) => {
         setPaymentStatus('processing');
@@ -335,7 +370,7 @@ const PaymentModal = ({
     if (!isOpen) return null;
 
     const ActionFooter = ({ showConfirm = true, confirmText = "Registrar venda", disabled = false, buttonVariant = 'default', onCustomConfirm }: any) => (
-        <div className="w-full bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-4 md:p-6 mt-auto flex-shrink-0 relative z-30">
+        <div className="w-full bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-4 md:p-6 mt-auto shrink-0 relative z-30">
             <div
                 className="md:hidden flex items-center justify-between mb-4 cursor-pointer active:opacity-70 transition-opacity"
                 onClick={() => setIsReceiptOpen(true)}
@@ -438,7 +473,7 @@ const PaymentModal = ({
                                         animate={{ opacity: 1, scale: 1 }}
                                         transition={standardTransition}
                                         onClick={handleGoBack}
-                                        className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center text-brand-dark dark:text-dark-heading hover:bg-gray-200 dark:hover:bg-dark-border transition-colors flex-shrink-0"
+                                        className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center text-brand-dark dark:text-dark-heading hover:bg-gray-200 dark:hover:bg-dark-border transition-colors shrink-0"
                                     >
                                         <ChevronLeftIcon size={20} />
                                     </motion.button>
@@ -508,7 +543,7 @@ const PaymentModal = ({
                                                         className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${isPendingPayment ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20'}`}
                                                         onClick={() => setIsPendingPayment(!isPendingPayment)}
                                                     >
-                                                        <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center flex-shrink-0">
+                                                        <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center shrink-0">
                                                             <ClockIcon size={18} className="text-brand-dark dark:text-dark-heading" />
                                                         </div>
                                                         <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">Pendente de pagamento</span>
@@ -521,7 +556,7 @@ const PaymentModal = ({
                                                         className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${isPendingDelivery ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20'}`}
                                                         onClick={() => setIsPendingDelivery(!isPendingDelivery)}
                                                     >
-                                                        <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center flex-shrink-0">
+                                                        <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center shrink-0">
                                                             <TruckIcon size={18} className="text-brand-dark dark:text-dark-heading" />
                                                         </div>
                                                         <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">Pendente de entrega</span>
@@ -805,7 +840,7 @@ const PaymentModal = ({
                         />
                     )}
                     {paymentStatus === 'error' && (
-                        <div className="w-full bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-4 md:p-6 mt-auto flex-shrink-0 relative z-30 flex gap-3">
+                        <div className="w-full bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-4 md:p-6 mt-auto shrink-0 relative z-30 flex gap-3">
                             <Button variant="outline" className="flex-1 h-[52px]" onClick={onClose}>
                                 Cancelar
                             </Button>

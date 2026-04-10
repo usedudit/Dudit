@@ -36,7 +36,7 @@ const QuoteGridCard = React.memo(
             >
                 <div className="flex gap-4 mb-2">
                     {/* Visual Indicator */}
-                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                         <FileIcon className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
                     </div>
 
@@ -62,7 +62,7 @@ const QuoteGridCard = React.memo(
                             </div>
 
                             {/* Checkbox */}
-                            <div className="flex-shrink-0 -mt-0.5 -mr-1" onClick={(e) => e.stopPropagation()}>
+                            <div className="shrink-0 -mt-0.5 -mr-1" onClick={(e) => e.stopPropagation()}>
                                 <Checkbox checked={selected} onChange={onSelect} />
                             </div>
                         </div>
@@ -110,7 +110,7 @@ const QuoteGridCard = React.memo(
 
                         {/* Botão de Ações */}
                         <div
-                            className="flex-shrink-0"
+                            className="shrink-0"
                             onClick={(e) => {
                                 e.stopPropagation()
                             }}

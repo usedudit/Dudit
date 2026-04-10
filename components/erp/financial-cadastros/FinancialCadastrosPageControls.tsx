@@ -49,7 +49,7 @@ const FinancialCadastrosPageControls: React.FC<FinancialCadastrosPageControlsPro
                             className="h-[42px] w-full"
                             variant="full-rounded"
                             prefix={
-                                <SearchIcon size={18} className="text-brand-inactive-text flex-shrink-0" />
+                                <SearchIcon size={18} className="text-brand-inactive-text shrink-0" />
                             }
                             label=""
                         />
@@ -65,7 +65,7 @@ const FinancialCadastrosPageControls: React.FC<FinancialCadastrosPageControlsPro
                 </div>
 
                 <div className="hidden md:flex items-center w-full gap-4">
-                    <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="flex items-center gap-3 shrink-0">
                         <div className="w-80">
                             <Input
                                 name="search"
@@ -75,7 +75,7 @@ const FinancialCadastrosPageControls: React.FC<FinancialCadastrosPageControlsPro
                                 className="h-[42px]"
                                 variant="full-rounded"
                                 prefix={
-                                    <SearchIcon size={18} className="text-brand-inactive-text flex-shrink-0" />
+                                    <SearchIcon size={18} className="text-brand-inactive-text shrink-0" />
                                 }
                                 label=""
                             />

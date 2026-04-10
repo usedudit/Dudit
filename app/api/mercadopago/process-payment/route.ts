@@ -480,8 +480,10 @@ async function handler(request: NextRequest) {
           partner_id: partnerId,
           total_amount: totalAmount,
           payment_method: paymentMethodDisplayName,
+          payment_provider: "Mercado Pago",
           payment_date: new Date().toISOString(),
-          notes: notes || null,
+          payment_breakdown: [{ method: paymentMethodDisplayName, amount: totalAmount }],
+          customer_contact_id: buyerId,
           customer_name: customerName,
         })
 

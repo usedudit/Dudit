@@ -9,7 +9,7 @@ export interface ERPTransaction {
   details?: string
   category: string
   contactName: string
-  contactType: "cliente" | "fornecedor" | "funcionario" | "outro"
+  contactType: "cliente" | "fornecedor" | "funcionario" | "outro" | "customer" | "supplier" | "service" | "employee" | "partner" | "other"
   dueDate: string
   dueDateShort: string
   dueDateTime?: string
@@ -19,6 +19,6 @@ export interface ERPTransaction {
   status: string
   statusVariant: TransactionStatusVariant
   amount: number
-  transactionType: "income" | "expense"
+  transactionType: "income" | "expense" | "transfer" | "adjustment" | "refund"
   notes?: string
 }

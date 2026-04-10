@@ -27,6 +27,11 @@ interface CreateOrderProps {
     editOrderId?: string
 }
 
+type PaymentBreakdownEntry = {
+    method: string
+    amount: number
+}
+
 const REQUIRED_FIELDS = [
     { field: "productSearch", tab: "general" },
     { field: "manualItemNames", tab: "general" },
@@ -52,6 +57,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [originalPaymentStatus, setOriginalPaymentStatus] = useState<'paid' | 'partially_paid' | 'unpaid'>("unpaid")
     const [originalPaidAmount, setOriginalPaidAmount] = useState(0)
     const [originalPaymentMethod, setOriginalPaymentMethod] = useState("Não informado")
+    const [originalPaymentBreakdown, setOriginalPaymentBreakdown] = useState<PaymentBreakdownEntry[]>([])
 
     // Form State
     const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
@@ -139,10 +145,16 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setSalesChannel(normalizeSalesChannel(order.order_source))
                 setDeliveryMethod(order.delivery_type as any || "pickup")
                 const normalizedStatus = order.situation === "paid" ? "paid" : order.situation === "partially_paid" ? "partially_paid" : "unpaid"
+                const loadedPaymentBreakdown = Array.isArray(order.payment_breakdown) && order.payment_breakdown.length > 0
+                    ? order.payment_breakdown
+                    : Number(order.paid_amount || 0) > 0 && order.payment_method
+                        ? [{ method: order.payment_method, amount: Number(order.paid_amount || 0) }]
+                        : []
                 setPaymentStatus(normalizedStatus)
                 setOriginalPaymentStatus(normalizedStatus)
                 setOriginalPaidAmount(Number(order.paid_amount || 0))
                 setOriginalPaymentMethod(order.payment_method || "Não informado")
+                setOriginalPaymentBreakdown(loadedPaymentBreakdown)
                 setDeliveryStatus(order.delivery_status || "not_sent")
                 setNotes(order.notes || "")
                 setShippingFee((order.shipping_cost || 0).toString())
@@ -417,6 +429,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         setDiscountValue(0)
         setPaymentStatus("unpaid")
         setDeliveryStatus("not_sent")
+        setOriginalPaidAmount(0)
+        setOriginalPaymentMethod("Não informado")
+        setOriginalPaymentBreakdown([])
         setInventoryAlreadyDeducted(false)
         setManualItemNameErrors(new Set())
         setManualItemPriceErrors(new Set())
@@ -499,7 +514,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         }
     }
 
-    const buildOrderPayload = (paymentOverrides?: { paymentStatus?: 'paid' | 'partially_paid' | 'unpaid'; paidAmount?: number; paymentMethod?: string }) => ({
+    const buildOrderPayload = (paymentOverrides?: { paymentStatus?: 'paid' | 'partially_paid' | 'unpaid'; paidAmount?: number; paymentMethod?: string; paymentBreakdown?: PaymentBreakdownEntry[] }) => ({
         partnerId,
         customerId: selectedCustomer?.id,
         customerName: selectedCustomer ? selectedCustomer.name : "Consumidor final",
@@ -507,6 +522,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         deliveryMethod,
         paymentStatus: paymentOverrides?.paymentStatus || paymentStatus,
         paymentMethod: paymentOverrides?.paymentMethod || (editOrderId ? originalPaymentMethod : "pendente"),
+        paymentBreakdown: paymentOverrides?.paymentBreakdown || originalPaymentBreakdown,
         deliveryStatus: deliveryStatus as any,
         paidAmount: paymentOverrides?.paidAmount,
         address: deliveryMethod === 'delivery' ? {
@@ -536,7 +552,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         csrf_token: csrfToken || undefined
     })
 
-    const submitOrder = async (paymentOverrides?: { paymentStatus?: 'paid' | 'partially_paid' | 'unpaid'; paidAmount?: number; paymentMethod?: string }) => {
+    const submitOrder = async (paymentOverrides?: { paymentStatus?: 'paid' | 'partially_paid' | 'unpaid'; paidAmount?: number; paymentMethod?: string; paymentBreakdown?: PaymentBreakdownEntry[] }) => {
         setIsSaving(true)
         try {
             const payload = buildOrderPayload(paymentOverrides)
@@ -573,6 +589,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         return submitOrder({
             paymentStatus: paymentData.paymentStatus,
             paymentMethod: paymentData.paymentMethod,
+            paymentBreakdown: paymentData.paymentBreakdown,
             paidAmount: paymentData.paidAmount,
         })
     }
@@ -671,7 +688,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                     </div>
                                 </div>
 
-                                <div className="hidden md:flex items-center gap-3 flex-shrink-0 ml-3">
+                                <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                     <Button variant="outline" onClick={handleBack} disabled={isSaving}>
                                         Cancelar
                                     </Button>
@@ -835,6 +852,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             discountAmount={discountAmount}
                             amountDue={editOrderId && remainingAmount > 0.009 ? remainingAmount : undefined}
                             existingPaidAmount={editOrderId ? originalPaidAmount : 0}
+                            existingPaymentBreakdown={editOrderId ? originalPaymentBreakdown : []}
                             lockPaymentCompletion={Boolean(editOrderId && remainingAmount > 0.009)}
                             onConfirm={handleConfirmPayment}
                         />

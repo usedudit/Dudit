@@ -508,7 +508,7 @@ export function ERPSidebar() {
                 <Drawer.Portal>
                     <Drawer.Overlay className="fixed inset-0 bg-black/40 z-50" />
                     <Drawer.Content className="bg-dark-background border-t border-dark-border flex flex-col rounded-t-[20px] h-[85vh] fixed bottom-0 left-0 right-0 z-[60] outline-none">
-                        <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-dark-border mt-3 mb-2" />
+                        <div className="mx-auto w-12 h-1.5 shrink-0 rounded-full bg-dark-border mt-3 mb-2" />
                         <div className="p-4 flex-1 overflow-y-auto no-scrollbar">
                             <nav className="flex flex-col gap-1">
                                 {filteredNavItems.map((item) => {

@@ -122,7 +122,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
                             <div className="mb-0">
                                 <div className="flex justify-between items-start mb-1">
                                     <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate pr-2">{customer?.name || "Endereço Padrão"}</h4>
-                                    <a href="#" className="text-xs font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark dark:decoration-dark-heading flex-shrink-0">Ver Mapa</a>
+                                    <a href="#" className="text-xs font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark dark:decoration-dark-heading shrink-0">Ver Mapa</a>
                                 </div>
                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-line">
                                     {formattedAddress}

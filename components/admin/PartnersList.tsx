@@ -180,7 +180,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                         prefix={
                             <SearchIcon
                                 size={18}
-                                className="text-brand-inactive-text flex-shrink-0"
+                                className="text-brand-inactive-text shrink-0"
                             />
                         }
                     />
@@ -216,7 +216,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                             >
                                 {/* Partner info */}
                                 <div className="flex items-center gap-3 min-w-0">
-                                    <div className="w-9 h-9 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0">
+                                    <div className="w-9 h-9 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0">
                                         <StoreIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                                     </div>
                                     <div className="min-w-0">
@@ -228,7 +228,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                                         </span>
                                         {partner.suspended_at && partner.suspended_until && (
                                             <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-0.5">
-                                                <AlertTriangleIcon className="w-3 h-3 flex-shrink-0" />
+                                                <AlertTriangleIcon className="w-3 h-3 shrink-0" />
                                                 Até {new Date(partner.suspended_until).toLocaleDateString("pt-BR")}
                                             </p>
                                         )}

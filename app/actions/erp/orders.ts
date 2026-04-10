@@ -46,6 +46,10 @@ type ERPOrderPayload = {
     paidAmount?: number
     notes?: string
     paymentMethod: string
+    paymentBreakdown?: Array<{
+        method: string
+        amount: number
+    }>
     address?: {
         zipCode: string
         street: string
@@ -56,6 +60,11 @@ type ERPOrderPayload = {
         state: string
     }
     csrf_token?: string
+}
+
+type PaymentBreakdownEntry = {
+    method: string
+    amount: number
 }
 
 function buildOrderSource(salesChannel: string | undefined, deliveryMethod: 'delivery' | 'pickup') {
@@ -129,6 +138,47 @@ function resolvePaymentState(params: {
     }
 
     return { situation, paidAmount }
+}
+
+function normalizePaymentMethodLabel(value?: string | null) {
+    const normalized = String(value || "").trim().toLowerCase()
+    if (!normalized) return ""
+    if (normalized === "dinheiro") return "Dinheiro"
+    if (normalized === "pix") return "Pix"
+    if (normalized === "cartao" || normalized === "cartão") return "Cartão"
+    if (normalized === "pendente") return "Pendente"
+    return String(value || "").trim()
+}
+
+function sanitizePaymentBreakdown(entries: ERPOrderPayload["paymentBreakdown"]) {
+    const normalizedEntries = (entries || [])
+        .map((entry) => ({
+            method: normalizePaymentMethodLabel(entry?.method),
+            amount: Math.max(0, Number(entry?.amount || 0)),
+        }))
+        .filter((entry) => entry.method && entry.amount > 0.009)
+
+    return normalizedEntries
+}
+
+function buildPaymentMethodSummary(
+    paymentBreakdown: PaymentBreakdownEntry[],
+    fallbackMethod?: string | null
+) {
+    const labels = Array.from(
+        new Set(
+            paymentBreakdown
+                .map((entry) => normalizePaymentMethodLabel(entry.method))
+                .filter(Boolean)
+        )
+    )
+
+    if (labels.length > 0) {
+        return labels.join(", ")
+    }
+
+    const fallbackLabel = normalizePaymentMethodLabel(fallbackMethod)
+    return fallbackLabel || "Não informado"
 }
 
 function describeItem(item: { customName?: string | null; product_name?: string | null }) {
@@ -250,8 +300,13 @@ function buildOrderChangeLines(currentOrder: any, payload: ERPOrderPayload) {
         lines.push("alterou endereço de entrega")
     }
 
-    if ((currentOrder.payment_method || "Não informado") !== (payload.paymentMethod || "Não informado")) {
-        lines.push(`alterou forma de pagamento: ${(currentOrder.payment_method || "Não informado")} -> ${(payload.paymentMethod || "Não informado")}`)
+    const nextPaymentMethodSummary = buildPaymentMethodSummary(
+        sanitizePaymentBreakdown(payload.paymentBreakdown),
+        payload.paymentMethod
+    )
+
+    if ((currentOrder.payment_method || "Não informado") !== nextPaymentMethodSummary) {
+        lines.push(`alterou forma de pagamento: ${(currentOrder.payment_method || "Não informado")} -> ${nextPaymentMethodSummary}`)
     }
 
     if (Math.abs(Number(currentOrder.discount_value || 0) - Number(payload.discountValue || 0)) > 0.009) {
@@ -488,6 +543,35 @@ function buildInventoryMovementDelta(previousItems: Array<{
     return { outgoing, incoming }
 }
 
+async function createFinancialTransactionsForPaidOrder(supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>, params: {
+    orderNumber: string
+    partnerId: string
+    totalAmount: number
+    paymentMethod?: string | null
+    paymentProvider?: string | null
+    paymentBreakdown?: Array<{ method: string; amount: number }> | null
+    customerId?: string | null
+    customerName?: string | null
+    paymentDate?: string | null
+}) {
+    try {
+        const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
+        await createTransactionFromOrder(supabase, {
+            order_number: params.orderNumber,
+            partner_id: params.partnerId,
+            total_amount: params.totalAmount,
+            payment_method: params.paymentMethod || null,
+            payment_provider: params.paymentProvider || null,
+            payment_breakdown: params.paymentBreakdown || null,
+            payment_date: params.paymentDate || new Date().toISOString(),
+            customer_contact_id: params.customerId || null,
+            customer_name: params.customerName || null,
+        })
+    } catch (error) {
+        console.error("[orders_financial] createFinancialTransactionsForPaidOrder:", error)
+    }
+}
+
 async function createOrderStockMovement(params: {
     supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>
     partnerId: string
@@ -584,6 +668,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         totalAmount: data.totalAmount,
         paidAmount: data.paidAmount,
     })
+    const sanitizedPaymentBreakdown = sanitizePaymentBreakdown(data.paymentBreakdown)
+    const paymentMethodSummary = buildPaymentMethodSummary(sanitizedPaymentBreakdown, data.paymentMethod)
 
     if (Number(data.totalAmount || 0) <= 0) {
         return { error: "A venda não pode ser salva com valor total zerado." }
@@ -612,7 +698,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             shipping_cost: data.shippingCost,
             additional_costs: data.additionalCosts,
             notes: data.notes || null,
-            payment_method: data.paymentMethod,
+            payment_method: paymentMethodSummary,
+            payment_breakdown: sanitizedPaymentBreakdown,
             payment_provider: null,
             delivery_address: deliveryAddressStr || null,
             created_by: user.id
@@ -706,6 +793,20 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
 
     increment_usage_counter(partnerId, "orders_month_count").catch(console.error)
 
+    if (paymentState.situation === "paid") {
+        await createFinancialTransactionsForPaidOrder(supabase, {
+            orderNumber: order.order_number,
+            partnerId,
+            totalAmount: Number(order.total_amount || 0),
+            paymentMethod: paymentMethodSummary,
+            paymentProvider: order.payment_provider,
+            paymentBreakdown: sanitizedPaymentBreakdown,
+            customerId: order.buyer_id,
+            customerName: order.customer_name,
+            paymentDate: new Date().toISOString(),
+        })
+    }
+
     await invalidateInventoryItems(partnerId, stockItems)
     await revalidateOrders(partnerId)
 
@@ -776,6 +877,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         .from("orders")
         .select(`
             id,
+            order_number,
             partner_id,
             customer_name,
             order_source,
@@ -789,6 +891,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             additional_costs,
             notes,
             payment_method,
+            payment_breakdown,
             delivery_address,
             inventory_deducted,
             order_items(product_id, variant_id, product_name, quantity, product_price)
@@ -821,6 +924,8 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         paidAmount: data.paidAmount,
         fallbackPaidAmount: Number(currentOrder.paid_amount || 0),
     })
+    const sanitizedPaymentBreakdown = sanitizePaymentBreakdown(data.paymentBreakdown)
+    const paymentMethodSummary = buildPaymentMethodSummary(sanitizedPaymentBreakdown, data.paymentMethod)
 
     if (Number(data.totalAmount || 0) <= 0) {
         return { error: "A venda não pode ser salva com valor total zerado." }
@@ -853,7 +958,8 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             shipping_cost: data.shippingCost,
             additional_costs: data.additionalCosts,
             notes: data.notes || null,
-            payment_method: data.paymentMethod,
+            payment_method: paymentMethodSummary,
+            payment_breakdown: sanitizedPaymentBreakdown,
             payment_provider: null,
             ...(deliveryAddressStr ? { delivery_address: deliveryAddressStr } : {})
         })
@@ -861,6 +967,20 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         .eq("partner_id", data.partnerId)
 
     if (orderError) return { error: orderError.message }
+
+    if (currentOrder.situation !== "paid" && paymentState.situation === "paid") {
+        await createFinancialTransactionsForPaidOrder(supabase, {
+            orderNumber: currentOrder.order_number || orderId,
+            partnerId: data.partnerId,
+            totalAmount: Number(data.totalAmount || 0),
+            paymentMethod: paymentMethodSummary,
+            paymentProvider: null,
+            paymentBreakdown: sanitizedPaymentBreakdown,
+            customerId: data.customerId || null,
+            customerName: data.customerName || null,
+            paymentDate: new Date().toISOString(),
+        })
+    }
 
     await supabase.from("order_items").delete().eq("order_id", orderId)
 
@@ -1009,7 +1129,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
     const { data: currentOrders } = await supabase
         .from("orders")
-        .select("id, situation, delivery_status, notes, total_amount, paid_amount, previous_situation_before_cancel, stock_restored_on_cancel, inventory_deducted, order_items(product_id, variant_id, quantity)")
+        .select("id, order_number, situation, delivery_status, notes, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, previous_situation_before_cancel, stock_restored_on_cancel, inventory_deducted, order_items(product_id, variant_id, quantity)")
         .in("id", payload.orderIds)
         .eq("partner_id", payload.partnerId)
 
@@ -1198,6 +1318,20 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 .eq("partner_id", payload.partnerId)
 
             if (error) return { error: error.message }
+
+            if (order.situation !== "paid" && paymentState.situation === "paid") {
+                await createFinancialTransactionsForPaidOrder(supabase, {
+                    orderNumber: order.order_number || order.id,
+                    partnerId: payload.partnerId,
+                    totalAmount: Number(order.total_amount || 0),
+                    paymentMethod: order.payment_method || null,
+                    paymentProvider: order.payment_provider || null,
+                    paymentBreakdown: order.payment_breakdown || null,
+                    customerId: order.buyer_id || null,
+                    customerName: order.customer_name || null,
+                    paymentDate: new Date().toISOString(),
+                })
+            }
         }
     }
 

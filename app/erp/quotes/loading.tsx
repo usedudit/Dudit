@@ -40,14 +40,14 @@ export default function ERPPageLoading() {
 
                     {/* Desktop controls */}
                     <div className="hidden md:flex items-center w-full gap-4">
-                        <div className="flex items-center gap-3 flex-shrink-0">
+                        <div className="flex items-center gap-3 shrink-0">
                             <div className="h-[42px] w-80 bg-gray-200 dark:bg-dark-border rounded-full animate-pulse" />
                             <div className="h-[42px] w-[90px] bg-gray-200 dark:bg-dark-border rounded-full animate-pulse" />
                         </div>
 
                         <div className="flex-1" />
 
-                        <div className="h-[42px] w-[74px] bg-gray-200 dark:bg-dark-border rounded-full animate-pulse flex-shrink-0" />
+                        <div className="h-[42px] w-[74px] bg-gray-200 dark:bg-dark-border rounded-full animate-pulse shrink-0" />
                     </div>
                 </div>
 
@@ -80,7 +80,7 @@ export default function ERPPageLoading() {
                                 {[...Array(6)].map((_, i) => (
                                     <div key={i} className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 flex items-start gap-4">
                                         {/* Imagem */}
-                                        <div className="w-20 h-20 rounded-full bg-gray-200 dark:bg-dark-border animate-pulse flex-shrink-0" />
+                                        <div className="w-20 h-20 rounded-full bg-gray-200 dark:bg-dark-border animate-pulse shrink-0" />
 
                                         {/* Detalhes */}
                                         <div className="flex-1 space-y-2.5">

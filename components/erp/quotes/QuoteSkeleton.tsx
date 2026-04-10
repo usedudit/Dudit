@@ -22,7 +22,7 @@ export default function QuoteSkeleton({ count = 5, viewMode = "list" }: QuoteSke
                     >
                         <div className="h-1 bg-brand-border dark:bg-dark-border/50 w-full" />
                         <div className="flex gap-4 p-4 pb-0 pt-5">
-                            <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-transparent border border-brand-border dark:border-dark-border flex-shrink-0" />
+                            <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-transparent border border-brand-border dark:border-dark-border shrink-0" />
                             <div className="flex-1 flex flex-col gap-2 justify-center">
                                 <div className="h-4 bg-brand-gray dark:bg-dark-border rounded w-2/3" />
                                 <div className="h-4 bg-brand-gray dark:bg-dark-border rounded w-1/3" />
@@ -65,7 +65,7 @@ export default function QuoteSkeleton({ count = 5, viewMode = "list" }: QuoteSke
                                     <td className="px-4 py-3"><div className="h-5 w-5 bg-brand-gray dark:bg-dark-border rounded" /></td>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border flex-shrink-0" />
+                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0" />
                                             <div className="flex flex-col gap-2">
                                                 <div className="h-3 bg-brand-gray dark:bg-dark-border rounded w-[100px]" />
                                                 <div className="h-3 bg-brand-gray dark:bg-dark-border rounded w-[60px]" />

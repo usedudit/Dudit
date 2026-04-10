@@ -552,7 +552,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                                                                             {q.customer_name} • {q.formattedIssueDate}
                                                                         </span>
                                                                     </div>
-                                                                    <Badge variant={q.statusColor} className="flex-shrink-0 text-[10px] h-5 px-1.5">
+                                                                    <Badge variant={q.statusColor} className="shrink-0 text-[10px] h-5 px-1.5">
                                                                         {q.statusLabel}
                                                                     </Badge>
                                                                 </div>

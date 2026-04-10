@@ -80,7 +80,7 @@ const SelectVariantSheet = ({ isOpen, onClose, product, onConfirm }: SelectVaria
 
                 {/* Product Info */}
                 <div className="flex gap-4 mb-8 pt-2">
-                    <div className="w-16 h-16 rounded-2xl bg-brand-gray dark:bg-gray-800 flex-shrink-0 overflow-hidden border border-brand-border dark:border-dark-border flex items-center justify-center">
+                    <div className="w-16 h-16 rounded-2xl bg-brand-gray dark:bg-gray-800 shrink-0 overflow-hidden border border-brand-border dark:border-dark-border flex items-center justify-center">
                         <img src={getR2ImageUrl(product.image, "thumbnail")} className="w-full h-full object-cover mix-blend-multiply dark:mix-blend-normal p-2" alt={product.name} />
                     </div>
                     <div className="flex flex-col justify-center">
