@@ -396,17 +396,17 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.2 }}
-            className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300 overflow-hidden"
+            className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
         >
             <style>{`
-                .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
-                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
-                .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
-                .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-                .hide-scrollbar::-webkit-scrollbar { display: none; }
-                .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-            `}</style>
+        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
+        .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
 
             <AnimatePresence mode="wait">
                 {wrapperMode === 'view' && selectedOrderId ? (

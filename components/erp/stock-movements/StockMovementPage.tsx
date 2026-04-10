@@ -321,14 +321,14 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
             className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
         >
             <style>{`
-               .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
-               .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
-               .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
-               .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
-               .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-               .hide-scrollbar::-webkit-scrollbar { display: none; }
-               .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-             `}</style>
+        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
+        .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
 
             <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
                 <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
