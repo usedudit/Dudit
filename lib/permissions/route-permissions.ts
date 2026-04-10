@@ -97,7 +97,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
         key: "financial_dre", path: "/erp/financial/dre", label: "DRE Gerencial", category: "Financeiro", legacyCategory: "financial",
         specificPermissions: ["can_view_dre"],
     },
-    cadastros_financeiro: { key: "cadastros_financeiro", path: "/erp/financial/cadastros-financeiro", label: "Cadastros", category: "Financeiro", legacyCategory: "financial" },
+    cadastros_financeiro: { key: "cadastros_financeiro", path: "/erp/financial/cadastros-financeiro", label: "Categorias Financeiras", category: "Financeiro", legacyCategory: "financial" },
 
     // ── Minha Vitrine
     store_customize: {
