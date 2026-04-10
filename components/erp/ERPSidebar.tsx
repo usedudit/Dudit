@@ -90,7 +90,7 @@ const navItems: NavItem[] = [
     icon: MoneyIcon,
     label: "Financeiro",
     submenu: [
-      { label: "Transações", href: "/" },
+      { label: "Transações", href: "/erp/financial/transactions" },
       { label: "Fluxo de Caixa", href: "/" },
       { label: "DRE Gerencial", href: "/" },
       { label: "Categorias Financeiras", href: "/" },
