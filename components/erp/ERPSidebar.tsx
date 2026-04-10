@@ -93,7 +93,7 @@ const navItems: NavItem[] = [
             { label: "Transações", href: "/erp/financial/transactions" },
             { label: "Fluxo de Caixa", href: "/" },
             { label: "DRE Gerencial", href: "/" },
-            { label: "Categorias Financeiras", href: "/erp/financial/cadastros-financeiro" },
+            { label: "Cadastros financeiros", href: "/erp/financial/cadastros-financeiro" },
         ],
     },
     {

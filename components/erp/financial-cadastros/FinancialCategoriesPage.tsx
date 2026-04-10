@@ -4,13 +4,14 @@ import React, { useState, useMemo, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useNotification } from "@/hooks/use-notification"
 import { PlusIcon } from "@/lib/icons"
-import { Button, IconPlaceholder, Combobox, Input, Checkbox } from "@/components/reusable"
+import { Button, IconPlaceholder, Combobox, Input, Checkbox, FormTextarea } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
 import Pagination from "@/components/reusable/Pagination"
 
 import FinancialCategoryCard from "./FinancialCategoryCard"
-import FinancialCadastrosPageControls from "./FinancialCadastrosPageControls"
+import FinancialAccountCard, { type FinanceAccountRow } from "./FinancialAccountCard"
+import FinancialCadastrosPageControls, { type FinancialCadastrosTab } from "./FinancialCadastrosPageControls"
 
 import {
     createFinancialCategoryAction,
@@ -18,6 +19,13 @@ import {
     deleteFinancialCategoryAction,
     getFinancialCategoriesAction,
 } from "@/app/actions/erp/financial-category-metadata"
+import {
+    createFinanceAccountAction,
+    updateFinanceAccountAction,
+    deleteFinanceAccountAction,
+    getFinanceAccountsAction,
+    type FinanceAccountType,
+} from "@/app/actions/erp/finance-accounts"
 
 interface FinancialCategoriesPageProps {
     initialCategories: {
@@ -27,14 +35,40 @@ interface FinancialCategoriesPageProps {
         is_active: boolean
         created_at: string
     }[]
+    initialAccounts: FinanceAccountRow[]
     partnerId: string
 }
 
-export default function FinancialCategoriesPage({ initialCategories, partnerId }: FinancialCategoriesPageProps) {
+const ACCOUNT_TYPE_OPTIONS: { value: FinanceAccountType; label: string }[] = [
+    { value: "cash", label: "Caixa" },
+    { value: "bank", label: "Conta bancária" },
+    { value: "wallet", label: "Carteira digital" },
+]
+
+function parseMoneyInput(s: string): number {
+    const t = s.trim().replace(",", ".")
+    if (t === "") return 0
+    const n = Number(t)
+    return Number.isFinite(n) ? n : 0
+}
+
+function parseOptionalMoneyInput(s: string): number | null {
+    const t = s.trim().replace(",", ".")
+    if (t === "") return null
+    const n = Number(t)
+    return Number.isFinite(n) ? n : null
+}
+
+export default function FinancialCategoriesPage({
+    initialCategories,
+    initialAccounts,
+    partnerId,
+}: FinancialCategoriesPageProps) {
     const { success, error } = useNotification()
 
     const [categories, setCategories] = useState(initialCategories)
-    const [activeTab, setActiveTab] = useState<"categories" | "subcategories">("categories")
+    const [accounts, setAccounts] = useState<FinanceAccountRow[]>(initialAccounts)
+    const [activeTab, setActiveTab] = useState<FinancialCadastrosTab>("categories")
     const [search, setSearch] = useState("")
     const [page, setPage] = useState(1)
     const ITEMS_PER_PAGE = 8
@@ -58,22 +92,52 @@ export default function FinancialCategoriesPage({ initialCategories, partnerId }
         isSaving: false,
     })
 
+    const [accountModal, setAccountModal] = useState<{
+        isOpen: boolean
+        mode: "add" | "edit"
+        item: {
+            id?: string
+            name: string
+            type: FinanceAccountType
+            description: string
+            initialBalanceStr: string
+            currentBalanceStr: string
+            is_active: boolean
+        }
+        isSaving: boolean
+    }>({
+        isOpen: false,
+        mode: "add",
+        item: {
+            name: "",
+            type: "cash",
+            description: "",
+            initialBalanceStr: "0",
+            currentBalanceStr: "",
+            is_active: true,
+        },
+        isSaving: false,
+    })
+
     const [deleteModal, setDeleteModal] = useState<{
         isOpen: boolean
-        item: { id: string; name: string } | null
+        item: { id: string; name: string; kind: "category" | "account" } | null
         isDeleting: boolean
     }>({ isOpen: false, item: null, isDeleting: false })
 
     const [nameError, setNameError] = useState(false)
+    const [accountNameError, setAccountNameError] = useState(false)
 
     const refreshData = useCallback(async () => {
-        const result = await getFinancialCategoriesAction(partnerId)
-        if (result.success && result.data) {
-            setCategories(result.data.categories)
-        }
+        const [catsRes, accRes] = await Promise.all([
+            getFinancialCategoriesAction(partnerId),
+            getFinanceAccountsAction(partnerId),
+        ])
+        if (catsRes.success && catsRes.data) setCategories(catsRes.data.categories)
+        if (accRes.success && accRes.data) setAccounts(accRes.data.accounts as FinanceAccountRow[])
     }, [partnerId])
 
-    const filteredItems = useMemo(() => {
+    const filteredCategoryItems = useMemo(() => {
         const items =
             activeTab === "categories"
                 ? categories.filter((c) => !c.parent_id)
@@ -82,10 +146,43 @@ export default function FinancialCategoriesPage({ initialCategories, partnerId }
         return items.filter((item) => item.name.toLowerCase().includes(search.toLowerCase()))
     }, [activeTab, categories, search])
 
+    const filteredAccounts = useMemo(() => {
+        const q = search.toLowerCase()
+        return accounts.filter((a) => {
+            const typeLabel = ACCOUNT_TYPE_OPTIONS.find((o) => o.value === a.type)?.label ?? a.type
+            return (
+                a.name.toLowerCase().includes(q) ||
+                (a.description && a.description.toLowerCase().includes(q)) ||
+                typeLabel.toLowerCase().includes(q)
+            )
+        })
+    }, [accounts, search])
+
+    const filteredItems =
+        activeTab === "accounts" ? filteredAccounts : filteredCategoryItems
+
     const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE)
     const paginatedItems = filteredItems.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
 
     const handleAdd = () => {
+        if (activeTab === "accounts") {
+            setAccountModal({
+                isOpen: true,
+                mode: "add",
+                item: {
+                    name: "",
+                    type: "cash",
+                    description: "",
+                    initialBalanceStr: "0",
+                    currentBalanceStr: "",
+                    is_active: true,
+                },
+                isSaving: false,
+            })
+            setAccountNameError(false)
+            return
+        }
+
         const type = activeTab === "subcategories" ? "subcategory" : "category"
         setModal({
             isOpen: true,
@@ -97,7 +194,7 @@ export default function FinancialCategoriesPage({ initialCategories, partnerId }
         setNameError(false)
     }
 
-    const handleEdit = (item: (typeof categories)[0]) => {
+    const handleEditCategory = (item: (typeof categories)[0]) => {
         const type = item.parent_id ? "subcategory" : "category"
         setModal({
             isOpen: true,
@@ -109,11 +206,44 @@ export default function FinancialCategoriesPage({ initialCategories, partnerId }
         setNameError(false)
     }
 
-    const handleDeleteClick = (item: (typeof categories)[0]) => {
-        setDeleteModal({ isOpen: true, item: { id: item.id, name: item.name }, isDeleting: false })
+    const handleEditAccount = (item: FinanceAccountRow) => {
+        setAccountModal({
+            isOpen: true,
+            mode: "edit",
+            item: {
+                id: item.id,
+                name: item.name,
+                type: item.type as FinanceAccountType,
+                description: item.description ?? "",
+                initialBalanceStr: String(item.initial_balance ?? "0"),
+                currentBalanceStr:
+                    item.current_balance === null || item.current_balance === undefined
+                        ? ""
+                        : String(item.current_balance),
+                is_active: item.is_active,
+            },
+            isSaving: false,
+        })
+        setAccountNameError(false)
     }
 
-    const handleSave = async () => {
+    const handleDeleteCategory = (item: (typeof categories)[0]) => {
+        setDeleteModal({
+            isOpen: true,
+            item: { id: item.id, name: item.name, kind: "category" },
+            isDeleting: false,
+        })
+    }
+
+    const handleDeleteAccount = (item: FinanceAccountRow) => {
+        setDeleteModal({
+            isOpen: true,
+            item: { id: item.id, name: item.name, kind: "account" },
+            isDeleting: false,
+        })
+    }
+
+    const handleSaveCategory = async () => {
         const { mode, type, item } = modal
         if (!item.name.trim()) {
             setNameError(true)
@@ -157,13 +287,69 @@ export default function FinancialCategoriesPage({ initialCategories, partnerId }
         }
     }
 
+    const handleSaveAccount = async () => {
+        const { mode, item } = accountModal
+        if (!item.name.trim()) {
+            setAccountNameError(true)
+            error("O nome é obrigatório", "Por favor, preencha o nome da conta.")
+            return
+        }
+        setAccountNameError(false)
+
+        const initialBal = parseMoneyInput(item.initialBalanceStr)
+        const currentBal = parseOptionalMoneyInput(item.currentBalanceStr)
+
+        setAccountModal((prev) => ({ ...prev, isSaving: true }))
+        try {
+            let result: { success: boolean; error?: string }
+            if (mode === "add") {
+                result = await createFinanceAccountAction({
+                    partnerId,
+                    name: item.name,
+                    type: item.type,
+                    description: item.description || null,
+                    initialBalance: initialBal,
+                    currentBalance: currentBal,
+                })
+            } else {
+                if (!item.id) {
+                    setAccountModal((prev) => ({ ...prev, isSaving: false }))
+                    return
+                }
+                result = await updateFinanceAccountAction(item.id, partnerId, {
+                    name: item.name,
+                    type: item.type,
+                    description: item.description || null,
+                    initialBalance: initialBal,
+                    currentBalance: currentBal,
+                    isActive: item.is_active,
+                })
+            }
+
+            if (result.success) {
+                success("Cadastro salvo com sucesso!")
+                refreshData()
+                setAccountModal((prev) => ({ ...prev, isOpen: false }))
+            } else {
+                error(result.error || "Erro ao salvar")
+            }
+        } catch {
+            error("Erro ao processar solicitação")
+        } finally {
+            setAccountModal((prev) => ({ ...prev, isSaving: false }))
+        }
+    }
+
     const confirmDelete = async () => {
         const { item } = deleteModal
         if (!item) return
 
         setDeleteModal((prev) => ({ ...prev, isDeleting: true }))
         try {
-            const result = await deleteFinancialCategoryAction(item.id, partnerId)
+            const result =
+                item.kind === "category"
+                    ? await deleteFinancialCategoryAction(item.id, partnerId)
+                    : await deleteFinanceAccountAction(item.id, partnerId)
             if (result.success) {
                 success("Item excluído com sucesso!")
                 refreshData()
@@ -200,11 +386,11 @@ export default function FinancialCategoriesPage({ initialCategories, partnerId }
                     <div className="flex flex-col gap-2 pt-1">
                         <div className="flex items-center gap-3">
                             <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                                Categorias Financeiras
+                                Cadastros financeiros
                             </h1>
                         </div>
                         <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                            Gerencie categorias e subcategorias para classificar receitas e despesas.
+                            Categorias, subcategorias e contas (caixa, bancos e carteiras digitais).
                         </p>
                     </div>
 
@@ -231,7 +417,7 @@ export default function FinancialCategoriesPage({ initialCategories, partnerId }
                     <AnimatePresence mode="wait">
                         {filteredItems.length === 0 ? (
                             <motion.div
-                                key="empty"
+                                key={`empty-${activeTab}`}
                                 initial={{ opacity: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
@@ -245,22 +431,39 @@ export default function FinancialCategoriesPage({ initialCategories, partnerId }
                                     imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
                                 />
                             </motion.div>
-                        ) : (
+                        ) : activeTab === "accounts" ? (
                             <motion.div
-                                key="grid"
+                                key="grid-accounts"
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8"
                             >
-                                {paginatedItems.map((item) => (
+                                {(paginatedItems as FinanceAccountRow[]).map((item) => (
+                                    <FinancialAccountCard
+                                        key={item.id}
+                                        item={item}
+                                        onEdit={() => handleEditAccount(item)}
+                                        onDelete={() => handleDeleteAccount(item)}
+                                    />
+                                ))}
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                key="grid-categories"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8"
+                            >
+                                {(paginatedItems as (typeof categories)[0][]).map((item) => (
                                     <FinancialCategoryCard
                                         key={item.id}
                                         item={item}
                                         type={activeTab}
                                         categories={categories}
-                                        onEdit={() => handleEdit(item)}
-                                        onDelete={() => handleDeleteClick(item)}
+                                        onEdit={() => handleEditCategory(item)}
+                                        onDelete={() => handleDeleteCategory(item)}
                                     />
                                 ))}
                             </motion.div>
@@ -282,7 +485,7 @@ export default function FinancialCategoriesPage({ initialCategories, partnerId }
                         <Button variant="outline" onClick={() => setModal((prev) => ({ ...prev, isOpen: false }))}>
                             Cancelar
                         </Button>
-                        <Button onClick={handleSave} isLoading={modal.isSaving}>
+                        <Button onClick={handleSaveCategory} isLoading={modal.isSaving}>
                             Salvar
                         </Button>
                     </div>
@@ -314,7 +517,7 @@ export default function FinancialCategoriesPage({ initialCategories, partnerId }
                             setModal((prev) => ({ ...prev, item: { ...prev.item, name: e.target.value } }))
                             setNameError(false)
                         }}
-                        onKeyDown={(e) => e.key === "Enter" && handleSave()}
+                        onKeyDown={(e) => e.key === "Enter" && handleSaveCategory()}
                         error={nameError}
                         errorMessage={nameError ? "O nome é obrigatório" : undefined}
                     />
@@ -343,6 +546,108 @@ export default function FinancialCategoriesPage({ initialCategories, partnerId }
                         checked={modal.item.is_active}
                         onChange={(checked) =>
                             setModal((prev) => ({ ...prev, item: { ...prev.item, is_active: checked } }))
+                        }
+                        className="mt-2"
+                    />
+                </div>
+            </DefaultModal>
+
+            <DefaultModal
+                isOpen={accountModal.isOpen}
+                onClose={() => setAccountModal((prev) => ({ ...prev, isOpen: false }))}
+                title={accountModal.mode === "add" ? "Nova conta" : "Editar conta"}
+                footer={
+                    <div className="flex justify-end gap-3 w-full">
+                        <Button
+                            variant="outline"
+                            onClick={() => setAccountModal((prev) => ({ ...prev, isOpen: false }))}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleSaveAccount} isLoading={accountModal.isSaving}>
+                            Salvar
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="flex flex-col gap-4 p-4">
+                    <Input
+                        label="Nome"
+                        placeholder="Ex: Caixa loja, Nubank, Banco Itaú"
+                        value={accountModal.item.name}
+                        onChange={(e) => {
+                            setAccountModal((prev) => ({
+                                ...prev,
+                                item: { ...prev.item, name: e.target.value },
+                            }))
+                            setAccountNameError(false)
+                        }}
+                        error={accountNameError}
+                        errorMessage={accountNameError ? "O nome é obrigatório" : undefined}
+                    />
+
+                    <Combobox
+                        label="Tipo"
+                        options={ACCOUNT_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                        value={accountModal.item.type}
+                        onChange={(val: string) =>
+                            setAccountModal((prev) => ({
+                                ...prev,
+                                item: { ...prev.item, type: val as FinanceAccountType },
+                            }))
+                        }
+                    />
+
+                    <FormTextarea
+                        name="finance_account_description"
+                        label="Descrição (opcional)"
+                        value={accountModal.item.description}
+                        onChange={(e) =>
+                            setAccountModal((prev) => ({
+                                ...prev,
+                                item: { ...prev.item, description: e.target.value },
+                            }))
+                        }
+                        rows={3}
+                    />
+
+                    <Input
+                        label="Saldo inicial"
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0,00"
+                        value={accountModal.item.initialBalanceStr}
+                        onChange={(e) =>
+                            setAccountModal((prev) => ({
+                                ...prev,
+                                item: { ...prev.item, initialBalanceStr: e.target.value },
+                            }))
+                        }
+                    />
+
+                    <Input
+                        label="Saldo atual (opcional)"
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="Deixe vazio se não quiser informar"
+                        value={accountModal.item.currentBalanceStr}
+                        onChange={(e) =>
+                            setAccountModal((prev) => ({
+                                ...prev,
+                                item: { ...prev.item, currentBalanceStr: e.target.value },
+                            }))
+                        }
+                    />
+
+                    <Checkbox
+                        id="finance_account_is_active"
+                        label="Cadastro Ativo"
+                        checked={accountModal.item.is_active}
+                        onChange={(checked) =>
+                            setAccountModal((prev) => ({
+                                ...prev,
+                                item: { ...prev.item, is_active: checked },
+                            }))
                         }
                         className="mt-2"
                     />

@@ -1,5 +1,6 @@
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getFinancialCategoriesAction } from "@/app/actions/erp/financial-category-metadata"
+import { getFinanceAccountsAction } from "@/app/actions/erp/finance-accounts"
 import FinancialCategoriesPage from "@/components/erp/financial-cadastros/FinancialCategoriesPage"
 import { redirect } from "next/navigation"
 import { getCurrentUser, checkPartnerPermission } from "@/lib/auth/authorization"
@@ -23,16 +24,27 @@ export default async function FinancialCategoriesRoute() {
   const { allowed } = await checkPartnerPermission(partnerId, "financial", "view")
   if (!allowed) return <AccessDenied />
 
-  const result = await getFinancialCategoriesAction(partnerId)
-  if (!result.success || !result.data) {
-    throw new Error(result.error || "Erro ao carregar dados")
+  const [catResult, accResult] = await Promise.all([
+    getFinancialCategoriesAction(partnerId),
+    getFinanceAccountsAction(partnerId),
+  ])
+
+  if (!catResult.success || !catResult.data) {
+    throw new Error(catResult.error || "Erro ao carregar categorias")
+  }
+  if (!accResult.success || !accResult.data) {
+    throw new Error(accResult.error || "Erro ao carregar contas")
   }
 
   return (
     <>
-      <ERPPageHeader title="Categorias Financeiras" />
+      <ERPPageHeader title="Cadastros financeiros" />
       <FadeIn className="p-4">
-        <FinancialCategoriesPage initialCategories={result.data.categories} partnerId={partnerId} />
+        <FinancialCategoriesPage
+          initialCategories={catResult.data.categories}
+          initialAccounts={accResult.data.accounts}
+          partnerId={partnerId}
+        />
       </FadeIn>
     </>
   )

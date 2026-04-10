@@ -14,6 +14,7 @@ export default function FinancialCategoriesLoading() {
                     <div className="flex items-center gap-6 border-b border-gray-200 dark:border-dark-border pb-[1px]">
                         <div className="h-6 w-24 bg-gray-200 dark:bg-dark-border rounded animate-pulse mb-3" />
                         <div className="h-6 w-28 bg-gray-200 dark:bg-dark-border rounded animate-pulse mb-3" />
+                        <div className="h-6 w-16 bg-gray-200 dark:bg-dark-border rounded animate-pulse mb-3" />
                     </div>
                 </div>
 

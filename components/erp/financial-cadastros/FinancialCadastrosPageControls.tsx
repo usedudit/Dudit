@@ -1,11 +1,13 @@
 import React from "react"
 import { Button, Input } from "@/components/reusable"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
-import { SearchIcon, PlusIcon, Package, SubcategoryIcon } from "@/lib/icons"
+import { SearchIcon, PlusIcon, Package, SubcategoryIcon, MoneyIcon } from "@/lib/icons"
+
+export type FinancialCadastrosTab = "categories" | "subcategories" | "accounts"
 
 interface FinancialCadastrosPageControlsProps {
-    activeTab: "categories" | "subcategories"
-    setActiveTab: (tab: "categories" | "subcategories") => void
+    activeTab: FinancialCadastrosTab
+    setActiveTab: (tab: FinancialCadastrosTab) => void
     search: string
     onSearchChange: (value: string) => void
     onAdd: () => void
@@ -21,13 +23,16 @@ const FinancialCadastrosPageControls: React.FC<FinancialCadastrosPageControlsPro
     return (
         <>
             <div className="mb-6 px-4 md:px-8">
-                <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as "categories" | "subcategories")}>
+                <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as FinancialCadastrosTab)}>
                     <TabsList className="px-0">
                         <TabsTrigger value="categories" icon={Package}>
                             Categorias
                         </TabsTrigger>
                         <TabsTrigger value="subcategories" icon={SubcategoryIcon}>
                             Subcategorias
+                        </TabsTrigger>
+                        <TabsTrigger value="accounts" icon={MoneyIcon}>
+                            Contas
                         </TabsTrigger>
                     </TabsList>
                 </Tabs>
