@@ -40,7 +40,7 @@ const TransactionGridCard = React.memo(
                         <div className="flex justify-between items-start gap-1">
                             <div className="flex items-center gap-2 min-w-0 pr-1 flex-nowrap">
                                 <h3 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate shrink">
-                                    {transaction.displayId}
+                                    {transaction.description}
                                 </h3>
                                 <Badge variant={transaction.statusVariant} className="whitespace-nowrap scale-90 shrink-0">
                                     {transaction.status}
@@ -52,10 +52,9 @@ const TransactionGridCard = React.memo(
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-1.5">
-                            <span className={`text-sm font-bold ${transaction.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}>
-                                {transaction.ledgerDirection === "in" ? "+ " : "- "}
-                                {formatCurrency(transaction.amount)}
+                        <div className="flex items-center gap-1.5 mt-1">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                {transaction.paymentType}
                             </span>
                         </div>
                     </div>
@@ -63,22 +62,23 @@ const TransactionGridCard = React.memo(
 
                 <div className="mt-auto pt-4 border-t border-brand-border dark:border-dark-border flex flex-col gap-3">
                     <div className="flex flex-col gap-0.5">
-                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Descrição</span>
-                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                            {transaction.description}
+                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Valor</span>
+                        <span className={`text-[15px] font-bold ${transaction.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}>
+                            {transaction.ledgerDirection === "in" ? "+ " : "- "}
+                            {formatCurrency(transaction.amount)}
                         </span>
                     </div>
 
                     <div className="flex justify-between items-start gap-2">
                         <div className="flex flex-col gap-0.5 min-w-0">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Contato</span>
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Data</span>
                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                                {transaction.contactName}
+                                {transaction.createdAtDate}
                             </span>
                         </div>
 
                         <div className="flex flex-col gap-0.5 items-end shrink-0">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body text-right">Data</span>
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body text-right">Vencimento</span>
                             <span className={`text-sm font-bold ${transaction.isOverdue ? "text-brand-red" : "text-brand-dark dark:text-dark-heading"}`}>
                                 {transaction.dueDateShort}
                             </span>
@@ -87,9 +87,9 @@ const TransactionGridCard = React.memo(
 
                     <div className="flex justify-between items-end gap-2">
                         <div className="flex flex-col gap-0.5 min-w-0">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Pagamento</span>
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Contato</span>
                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                                {transaction.paymentType}
+                                {transaction.contactName}
                             </span>
                         </div>
 

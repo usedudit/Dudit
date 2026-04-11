@@ -1,4 +1,4 @@
-export type TransactionTab = "Todas" | "Entradas" | "Saídas" | "Pendentes" | "Atrasadas"
+export type TransactionTab = "Transações" | "Previstos"
 
 export type TransactionStatusVariant = "green" | "red" | "orange" | "gray"
 
@@ -16,6 +16,9 @@ export interface ERPTransaction {
   dueDateShort: string
   dueDateTime?: string
   dateNote: string
+  createdAtDate: string
+  createdAtTime: string
+  daysUntilDue: number
   isOverdue: boolean
   paymentType: string
   status: string

@@ -101,20 +101,11 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
             <div className="mb-6 px-4 md:px-8">
                 <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as TransactionTab)}>
                     <TabsList className="px-0">
-                        <TabsTrigger value="Todas" icon={ArrowUpDownIcon}>
-                            Todas
+                        <TabsTrigger value="Transações" icon={ListIcon}>
+                            Transações
                         </TabsTrigger>
-                        <TabsTrigger value="Entradas" icon={ArrowUpIcon}>
-                            Entradas
-                        </TabsTrigger>
-                        <TabsTrigger value="Saídas" icon={ArrowDownIcon}>
-                            Saídas
-                        </TabsTrigger>
-                        <TabsTrigger value="Pendentes" icon={ClockIcon}>
-                            Pendentes
-                        </TabsTrigger>
-                        <TabsTrigger value="Atrasadas" icon={MoneyIcon}>
-                            Atrasadas
+                        <TabsTrigger value="Previstos" icon={ClockIcon}>
+                            Previstos
                         </TabsTrigger>
                     </TabsList>
                 </Tabs>

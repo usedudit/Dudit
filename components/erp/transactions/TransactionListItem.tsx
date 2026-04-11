@@ -39,10 +39,10 @@ const TransactionListItem = React.memo(
                             <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate leading-tight mb-0.5">
                                 {transaction.description}
                             </span>
-                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                {transaction.displayId}
-                                {transaction.details ? ` • ${transaction.details}` : ""}
-                            </span>
+                            <div className="flex items-center gap-1.5 text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                {getPaymentIcon(transaction.paymentType)({ className: "w-3.5 h-3.5" })}
+                                <span>{transaction.paymentType}</span>
+                            </div>
                         </div>
                     )
 
@@ -64,22 +64,33 @@ const TransactionListItem = React.memo(
                     return (
                         <div className="flex flex-col text-left">
                             <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                                {transaction.dueDate}
+                                {transaction.createdAtDate}
                             </span>
-                            <span className={`text-xs font-medium ${transaction.isOverdue ? "text-brand-red" : "text-brand-inactive-text dark:text-dark-body"}`}>
-                                {transaction.dateNote}
+                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                {transaction.createdAtTime}
                             </span>
                         </div>
                     )
 
-                case "payment":
-                    const PaymentIcon = getPaymentIcon(transaction.paymentType)
+                case "dueDate":
                     return (
-                        <div className="flex items-center gap-2">
-                            <PaymentIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                            <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading whitespace-nowrap">
-                                {transaction.paymentType}
+                        <div className="flex flex-col text-left">
+                            <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                {transaction.dueDate}
                             </span>
+                            {transaction.daysUntilDue === 0 && !transaction.isOverdue ? (
+                                <span className="text-xs font-bold text-brand-yellow">
+                                    Vence hoje
+                                </span>
+                            ) : transaction.isOverdue ? (
+                                <span className="text-xs font-bold text-brand-red">
+                                    Atrasado
+                                </span>
+                            ) : (
+                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                    Faltam {transaction.daysUntilDue} dias
+                                </span>
+                            )}
                         </div>
                     )
 

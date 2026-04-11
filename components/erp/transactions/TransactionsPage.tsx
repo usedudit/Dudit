@@ -41,11 +41,11 @@ const INITIAL_FILTERS: FilterState = {
 const ITEMS_PER_PAGE = 8
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
-    { id: "transaction", label: "Descrição / ID", align: "left", width: "300px" },
+    { id: "transaction", label: "Descrição", align: "left", width: "300px" },
     { id: "category", label: "Categoria", align: "left", width: "170px" },
     { id: "contact", label: "Cliente / Fornecedor", align: "left", width: "220px" },
-    { id: "date", label: "Vencimento/Data", align: "left", width: "170px" },
-    { id: "payment", label: "Meio de Pagamento", align: "left", width: "200px" },
+    { id: "date", label: "Data", align: "left", width: "170px" },
+    { id: "dueDate", label: "Vencimento", align: "left", width: "170px" },
     { id: "status", label: "Status", align: "left", width: "150px" },
     { id: "amount", label: "Valor", align: "right", width: "160px" },
     { id: "actions", label: "Ações", align: "center", width: "80px" },
@@ -74,7 +74,7 @@ export default function TransactionsPage({
     const isTablet = useMediaQuery("(max-width: 1024px)")
 
     const [search, setSearch] = useState("")
-    const [activeTab, setActiveTab] = useState<TransactionTab>("Todas")
+    const [activeTab, setActiveTab] = useState<TransactionTab>("Transações")
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const [page, setPage] = useState(1)
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
@@ -118,12 +118,9 @@ export default function TransactionsPage({
                 item.contactName.toLowerCase().includes(term) ||
                 item.category.toLowerCase().includes(term)
 
-            const matchesTab =
-                activeTab === "Todas" ||
-                (activeTab === "Entradas" && item.ledgerDirection === "in") ||
-                (activeTab === "Saídas" && item.ledgerDirection === "out") ||
-                (activeTab === "Pendentes" && item.status === "Pendente" && !item.isOverdue) ||
-                (activeTab === "Atrasadas" && item.isOverdue)
+            const isPrevisto = item.status === "Pendente" || item.isOverdue || item.status === "Atrasado" || (item.transactionType !== 'adjustment' && item.transactionType !== 'transfer' && !['recebido', 'pago', 'paid'].includes(item.status.toLowerCase()))
+            
+            const matchesTab = activeTab === "Transações" ? !isPrevisto : isPrevisto
 
             const matchesStatus = filters.status.length === 0 || filters.status.includes(item.status)
             const matchesCategory = filters.category.length === 0 || filters.category.includes(item.category)
@@ -172,6 +169,12 @@ export default function TransactionsPage({
                 const comparison = aVal < bVal ? -1 : 1
                 return sortConfig.direction === "asc" ? comparison : -comparison
             })
+        } else if (activeTab === "Previstos") {
+            result = [...result].sort((a, b) => {
+                const aDate = new Date(a.dueDate).getTime()
+                const bDate = new Date(b.dueDate).getTime()
+                return aDate - bDate
+            })
         }
 
         return result
@@ -192,7 +195,7 @@ export default function TransactionsPage({
 
     const handleClearFilters = () => {
         setSearch("")
-        setActiveTab("Todas")
+        setActiveTab("Transações")
         setFilters(INITIAL_FILTERS)
     }
 

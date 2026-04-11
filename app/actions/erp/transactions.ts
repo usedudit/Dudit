@@ -211,10 +211,16 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
         }
 
         const now = new Date()
+        const nowTime = now.getTime()
         const mapped: ERPTransaction[] = txs.map((t) => {
             const baseDate = t.due_date || t.payment_date || t.created_at
             const dateObj = new Date(baseDate)
-            const isOverdue = String(t.status || "").toLowerCase() !== "paid" && dateObj.getTime() < now.getTime()
+            const isOverdue = String(t.status || "").toLowerCase() !== "paid" && dateObj.getTime() < nowTime
+            
+            const createdDateObj = t.created_at ? new Date(t.created_at) : now
+            const diffTime = dateObj.getTime() - nowTime
+            const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
             const order = t.category === "Vendas" ? orderByNumber.get(String(t.description || "").trim()) : null
             const customerName = order?.buyer_id ? customerById.get(order.buyer_id)?.name : null
             const salesContactName = customerName || order?.customer_name || "Cliente"
@@ -239,6 +245,9 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
                 dueDateShort: formatDateShort(baseDate),
                 dueDateTime: "",
                 dateNote: isOverdue ? "Atrasado" : "-",
+                createdAtDate: createdDateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }),
+                createdAtTime: createdDateObj.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+                daysUntilDue,
                 isOverdue,
                 paymentType: t.payment_type || "Não informado",
                 status: toDisplayStatus(t.status, t.transaction_type, t.refund_kind, isOverdue),
