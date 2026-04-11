@@ -21,7 +21,6 @@ import TransactionPageControls from "./TransactionPageControls"
 import TransactionListItem from "./TransactionListItem"
 import TransactionGridCard from "./TransactionGridCard"
 import CreateTransactionPage, { type CategoryItem, type AccountItem } from "./CreateTransactionPage"
-import { TRANSACTIONS_MOCK } from "./transactions.mock"
 import type { ERPTransaction, TransactionTab } from "../../../lib/services/transactions.types"
 
 interface FilterState {
@@ -61,12 +60,12 @@ const getPaymentIcon = (paymentType: string) => {
 }
 
 export default function TransactionsPage({
-    transactions = TRANSACTIONS_MOCK,
+    transactions,
     partnerId,
     categories = [],
     accounts = [],
 }: {
-    transactions?: ERPTransaction[]
+    transactions: ERPTransaction[]
     partnerId: string
     categories?: CategoryItem[]
     accounts?: AccountItem[]
