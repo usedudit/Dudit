@@ -1,119 +1,121 @@
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  MenuSquareIcon as MenuSquare01,
-  Home03Icon,
-  Wrench01Icon,
-  Money04Icon,
-  ShoppingBasket03Icon,
-  Megaphone03Icon,
-  Store01Icon,
-  Notification01Icon,
-  DeliveryBox01Icon,
-  ShoppingCart01Icon,
-  Tag01Icon,
-  User03Icon,
-  UserMultiple02Icon,
-  ColumnInsertIcon,
-  Settings01Icon,
-  FilterHorizontalIcon,
-  PackageIcon,
-  PackageDeliveredIcon,
-  PackageReceiveIcon as PackageReceiveIcon01,
-  PackageRemoveIcon,
-  DashboardSquare01Icon,
-  Chart03Icon,
-  ViewIcon,
-  Mail01Icon,
-  WhatsappIcon as WhatsappIcon01,
-  HelpCircleIcon as HelpCircle,
-  Archive03Icon,
-  Location01Icon,
-  InstagramIcon as InstagramIcon01,
-  NewTwitterIcon,
-  SubnodeAddIcon,
-  MapsIcon as MapsIcon01,
-  Menu01Icon,
-  Moon02Icon,
-  Flag01Icon,
-  Search01Icon,
-  FilterIcon as CoreFilterIcon,
-  ParagraphBulletsPoint01Icon,
-  PlusSignIcon,
-  ArrowDown01Icon,
-  ArrowUp01Icon,
-  ArrowLeft01Icon,
-  ArrowRight01Icon,
-  ArrowRight02Icon,
-  ArrowLeft02Icon,
-  FloppyDiskIcon,
-  ImageUploadIcon,
-  ImageDelete02Icon,
-  Calendar03Icon,
-  Camera01Icon,
-  Facebook02Icon,
-  TelegramIcon as TelegramIcon01,
-  Linkedin02Icon,
-  Delete02Icon,
-  AlertCircleIcon as AlertCircleIcon01,
-  Alert02Icon,
-  File02Icon,
-  FileUploadIcon,
-  FileVerifiedIcon as FileVerified01Icon,
-  ArrowUpDownIcon as ArrowUpDown,
-  MoreVerticalCircle01Icon,
-  Copy01Icon,
-  PencilEdit02Icon,
-  Share01Icon,
-  InformationCircleIcon,
-  SparklesIcon as CoreSparklesIcon,
-  Cancel01Icon,
-  CancelCircleIcon as CancelCircle,
-  UnfoldMoreIcon as UnfoldMore01Icon,
-  ZoomInAreaIcon,
-  ZoomOutAreaIcon,
-  RotateCropIcon,
-  QrCodeIcon as QrCodeIcon01,
-  CreditCardIcon as CreditCard,
-  ShippingTruck01Icon,
-  StarIcon as StarIcon1,
-  ResourcesAddIcon,
-  StatusIcon as StatusIcon1,
-  UnavailableIcon,
-  Logout02Icon,
-  LockPasswordIcon,
-  SmartPhone01Icon,
-  FavouriteIcon,
-  Clock01Icon,
-  IdentityCardIcon as IdentityCard,
-  TextBoldIcon,
-  Download01Icon,
-  TextItalicIcon,
-  Link02Icon,
-  PrinterIcon as Printer,
-  TextUnderlineIcon,
-  MinusSignIcon,
-  ReloadIcon as ReloadIcon01,
-  CheckmarkCircle01Icon,
-  ShoppingBag01Icon
+    MenuSquareIcon as MenuSquare01,
+    Home03Icon,
+    Wrench01Icon,
+    Money04Icon,
+    ShoppingBasket03Icon,
+    Megaphone03Icon,
+    Store01Icon,
+    Notification01Icon,
+    DeliveryBox01Icon,
+    ShoppingCart01Icon,
+    Tag01Icon,
+    User03Icon,
+    UserMultiple02Icon,
+    ColumnInsertIcon,
+    Settings01Icon,
+    FilterHorizontalIcon,
+    PackageIcon,
+    PackageDeliveredIcon,
+    PackageReceiveIcon as PackageReceiveIcon01,
+    PackageRemoveIcon,
+    DashboardSquare01Icon,
+    Chart03Icon,
+    ViewIcon,
+    Mail01Icon,
+    WhatsappIcon as WhatsappIcon01,
+    HelpCircleIcon as HelpCircle,
+    Archive03Icon,
+    Location01Icon,
+    InstagramIcon as InstagramIcon01,
+    NewTwitterIcon,
+    SubnodeAddIcon,
+    MapsIcon as MapsIcon01,
+    Menu01Icon,
+    Moon02Icon,
+    Flag01Icon,
+    Search01Icon,
+    FilterIcon as CoreFilterIcon,
+    ParagraphBulletsPoint01Icon,
+    PlusSignIcon,
+    ArrowDown01Icon,
+    ArrowUp01Icon,
+    ArrowLeft01Icon,
+    ArrowRight01Icon,
+    ArrowRight02Icon,
+    ArrowLeft02Icon,
+    FloppyDiskIcon,
+    ImageUploadIcon,
+    ImageDelete02Icon,
+    Calendar03Icon,
+    Camera01Icon,
+    Facebook02Icon,
+    TelegramIcon as TelegramIcon01,
+    Linkedin02Icon,
+    Delete02Icon,
+    AlertCircleIcon as AlertCircleIcon01,
+    Alert02Icon,
+    File02Icon,
+    FileUploadIcon,
+    FileVerifiedIcon as FileVerified01Icon,
+    ArrowUpDownIcon as ArrowUpDown,
+    MoreVerticalCircle01Icon,
+    Copy01Icon,
+    PencilEdit02Icon,
+    Share01Icon,
+    InformationCircleIcon,
+    SparklesIcon as CoreSparklesIcon,
+    Cancel01Icon,
+    CancelCircleIcon as CancelCircle,
+    UnfoldMoreIcon as UnfoldMore01Icon,
+    ZoomInAreaIcon,
+    ZoomOutAreaIcon,
+    RotateCropIcon,
+    QrCodeIcon as QrCodeIcon01,
+    CreditCardIcon as CreditCard,
+    ShippingTruck01Icon,
+    StarIcon as StarIcon1,
+    ResourcesAddIcon,
+    StatusIcon as StatusIcon1,
+    UnavailableIcon,
+    Logout02Icon,
+    LockPasswordIcon,
+    SmartPhone01Icon,
+    FavouriteIcon,
+    Clock01Icon,
+    IdentityCardIcon as IdentityCard,
+    TextBoldIcon,
+    Download01Icon,
+    TextItalicIcon,
+    Link02Icon,
+    PrinterIcon as Printer,
+    TextUnderlineIcon,
+    MinusSignIcon,
+    ReloadIcon as ReloadIcon01,
+    CheckmarkCircle01Icon,
+    ShoppingBag01Icon,
+    PlusMinus01Icon,
+    ArrowTurnBackwardIcon as ArrowTurnBackwardIcon01
 } from "@hugeicons/core-free-icons"
 
 interface IconProps {
-  icon?: any
-  size?: number
-  color?: string
-  strokeWidth?: number
-  className?: string
-  [key: string]: any
+    icon?: any
+    size?: number
+    color?: string
+    strokeWidth?: number
+    className?: string
+    [key: string]: any
 }
 
 const CreateIcon = (defaultIcon: any) => (props?: IconProps) => (
-  <HugeiconsIcon
-    icon={props?.icon || defaultIcon}
-    size={22}
-    color={props?.color || "currentColor"}
-    strokeWidth={2}
-    {...props}
-  />
+    <HugeiconsIcon
+        icon={props?.icon || defaultIcon}
+        size={22}
+        color={props?.color || "currentColor"}
+        strokeWidth={2}
+        {...props}
+    />
 )
 
 // ============================
@@ -139,6 +141,9 @@ export const ArrowUpDownIcon = CreateIcon(ArrowUpDown)
 
 export const UnfoldMoreIcon = CreateIcon(UnfoldMore01Icon)
 export const ChevronsUpDown = CreateIcon(MenuSquare01)
+
+export const AdjustIcon = CreateIcon(PlusMinus01Icon)
+export const ReturnIcon = CreateIcon(ArrowTurnBackwardIcon01)
 
 
 // ============================

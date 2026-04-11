@@ -129,7 +129,7 @@ const StockMovementListItem = React.memo(
                 {columns.map((col) => (
                     <td
                         key={col.id}
-                        className={`py-2 px-4 border-b border-brand-border dark:border-dark-border ${getAlignClass(col.align)}`}
+                        className={`p-2 border-b border-brand-border dark:border-dark-border ${getAlignClass(col.align)}`}
                     >
                         {renderCellContent(col.id)}
                     </td>

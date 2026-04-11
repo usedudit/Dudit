@@ -25,7 +25,6 @@ type DbTransaction = {
     transaction_contacts?: {
         name: string | null
         type: ERPTransaction["contactType"] | null
-        contact_id: string | null
     } | null
 }
 
@@ -87,7 +86,7 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
             .select(`
         id, description, category, amount, due_date, payment_date, created_at, status, notes, payment_type, transaction_type, contact_id, contact_type,
         transfer_group_id, refund_kind, reference_note,
-        transaction_contacts(name, type, contact_id)
+        transaction_contacts(name, type)
       `)
             .eq("partner_id", partnerId)
             .order("created_at", { ascending: false })

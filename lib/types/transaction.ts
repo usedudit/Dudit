@@ -2,9 +2,8 @@ export interface TransactionContact {
     id: string
     partner_id: string
     name: string
-    type: "cliente" | "fornecedor" | "funcionario" | "outro" | "customer" | "supplier" | "employee" | "other"
+    type: "cliente" | "fornecedor" | "funcionario" | "outro" | "customer" | "supplier" | "service" | "employee" | "partner" | "other"
     description: string | null
-    contact_id: string | null
     created_at: string
     updated_at: string
 }

@@ -2,7 +2,7 @@ import "server-only"
 import { cache } from "react"
 import { unstable_cache } from "next/cache"
 import { cookies } from "next/headers"
-import { createAdminClient } from "@/lib/supabase/server"
+import { createAdminClient, createClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import type { PartnerRole, PartnerPermissions } from "@/lib/permissions/types"
 import { TAGS } from "@/lib/utils/revalidation-tags"// ─── Constants ──────────────────────────────────────────────────────────────
@@ -108,98 +108,115 @@ import { PERMISSION_PRESETS } from "@/lib/permissions/partner-roles"
 
 // ─── Extracted Cache Factory for stability and strict keying ────────────────
 
+function normalizeUserFullContextRpcPayload(data: unknown): any[] {
+    if (data == null) return []
+    if (Array.isArray(data)) return data
+    if (typeof data === "string") {
+        try {
+            const parsed = JSON.parse(data)
+            return Array.isArray(parsed) ? parsed : []
+        } catch {
+            return []
+        }
+    }
+    return []
+}
+
 const getCachedUserAccess = (userId: string) => unstable_cache(
     async () => {
-        console.log(`[AUTH CACHE MISS] Fetching context for user ${userId} via RPC`);
         const admin = createAdminClient()
-        
-        // Use parameterless RPC for security (auth.uid() handles identity securely)
-        const { data, error } = await admin.rpc('get_user_full_context')
-        
-        if (error || !data || data.length === 0) {
-            console.error("[AUTH CACHE ERRO] RPC falhou ou vazou nulo. Acionando Fallback...", error);
-            
-            // REAL FALLBACK: Manual queries running in parallel without waterfall
-            console.warn(`[AUTH FALLBACK] Building access context manually for user ${userId}`);
-            
-            const [invitedDataRes, ownedDataRes] = await Promise.all([
-                admin.from("partner_users").select(`
+
+        // RPC uses auth.uid() — MUST use the user's session client, not service role (auth.uid() is null there).
+        const supabase = await createClient()
+        const { data: rpcData, error: rpcError } = await supabase.rpc("get_user_full_context")
+        const rows = normalizeUserFullContextRpcPayload(rpcData)
+
+        if (!rpcError) {
+            if (rows.length === 0) {
+                return []
+            }
+            return rows.map((record: any) => ({
+                partnerId: record.partner_id,
+                userId: record.user_id,
+                role: record.role as PartnerRole,
+                permissions: typeof record.permissions === "string" ? JSON.parse(record.permissions) : record.permissions,
+                storeName: record.store_name || "Loja sem nome",
+                ownerName: record.owner_name || "Desconhecido",
+                businessInfo: typeof record.business_info === "string" ? JSON.parse(record.business_info) : (record.business_info || { sells: ["products"], channels: ["online"] }),
+            })) as PartnerAccessRecord[]
+        }
+
+        if (rpcError && process.env.NODE_ENV === "development") {
+            console.warn("[AUTH] get_user_full_context RPC failed, using admin fallback:", rpcError.message)
+        }
+
+        const [invitedDataRes, ownedDataRes] = await Promise.all([
+            admin.from("partner_users").select(`
                     partner_id, user_id, role, permissions,
                     partners!inner (store_name, user_id, business_info)
                 `).eq("user_id", userId),
-                admin.from("partners").select(`
+            admin.from("partners").select(`
                     id, user_id, store_name, business_info
                 `).eq("user_id", userId)
-            ]);
+        ])
 
-            const invitedData = invitedDataRes.data || [];
-            const ownedData = ownedDataRes.data || [];
+        const invitedData = invitedDataRes.data || []
+        const ownedData = ownedDataRes.data || []
 
-            const accessRecords: Record<string, PartnerAccessRecord> = {}
-            const ownerUserIds = new Set<string>()
+        const accessRecords: Record<string, PartnerAccessRecord> = {}
+        const ownerUserIds = new Set<string>()
 
-            if (ownedData) {
-                for (const store of ownedData) {
-                    accessRecords[store.id] = {
-                        partnerId: store.id,
-                        userId: userId,
-                        role: "OWNER" as PartnerRole,
-                        permissions: PERMISSION_PRESETS.OWNER,
-                        storeName: store.store_name || "Loja sem nome",
-                        ownerName: "Você",
-                        businessInfo: typeof store.business_info === "string" ? JSON.parse(store.business_info) : (store.business_info || { sells: ["products"], channels: ["online"] }),
-                    }
+        if (ownedData) {
+            for (const store of ownedData) {
+                accessRecords[store.id] = {
+                    partnerId: store.id,
+                    userId: userId,
+                    role: "OWNER" as PartnerRole,
+                    permissions: PERMISSION_PRESETS.OWNER,
+                    storeName: store.store_name || "Loja sem nome",
+                    ownerName: "Você",
+                    businessInfo: typeof store.business_info === "string" ? JSON.parse(store.business_info) : (store.business_info || { sells: ["products"], channels: ["online"] }),
                 }
             }
-
-            if (invitedData) {
-                for (const record of invitedData as any[]) {
-                    if (!accessRecords[record.partner_id]) {
-                        const ownerId = record.partners.user_id
-                        if (ownerId) ownerUserIds.add(ownerId)
-
-                        accessRecords[record.partner_id] = {
-                            partnerId: record.partner_id,
-                            userId: record.user_id,
-                            role: record.role as PartnerRole,
-                            permissions: record.permissions as PartnerPermissions,
-                            storeName: record.partners.store_name || "Loja sem nome",
-                            ownerName: ownerId, // temporary
-                            businessInfo: typeof record.partners.business_info === "string" ? JSON.parse(record.partners.business_info) : (record.partners.business_info || { sells: ["products"], channels: ["online"] }),
-                        }
-                    }
-                }
-            }
-
-            let records = Object.values(accessRecords);
-
-            if (ownerUserIds.size > 0) {
-                const { data: profiles } = await admin.from("user_profiles").select("user_id, full_name").in("user_id", Array.from(ownerUserIds))
-                if (profiles) {
-                    const names = Object.fromEntries(profiles.map((p: any) => [p.user_id, p.full_name]))
-                    records = records.map(record => {
-                        if (record.role !== "OWNER" && record.ownerName && names[record.ownerName]) {
-                            record.ownerName = names[record.ownerName]
-                        } else if (record.role !== "OWNER") {
-                            record.ownerName = "Desconhecido"
-                        }
-                        return record;
-                    })
-                }
-            }
-
-            return records;
         }
 
-        return data.map((record: any) => ({
-            partnerId: record.partner_id,
-            userId: record.user_id,
-            role: record.role as PartnerRole,
-            permissions: typeof record.permissions === "string" ? JSON.parse(record.permissions) : record.permissions,
-            storeName: record.store_name || "Loja sem nome",
-            ownerName: record.owner_name || "Desconhecido",
-            businessInfo: typeof record.business_info === "string" ? JSON.parse(record.business_info) : (record.business_info || { sells: ["products"], channels: ["online"] }),
-        })) as PartnerAccessRecord[]
+        if (invitedData) {
+            for (const record of invitedData as any[]) {
+                if (!accessRecords[record.partner_id]) {
+                    const ownerId = record.partners.user_id
+                    if (ownerId) ownerUserIds.add(ownerId)
+
+                    accessRecords[record.partner_id] = {
+                        partnerId: record.partner_id,
+                        userId: record.user_id,
+                        role: record.role as PartnerRole,
+                        permissions: record.permissions as PartnerPermissions,
+                        storeName: record.partners.store_name || "Loja sem nome",
+                        ownerName: ownerId, // temporary
+                        businessInfo: typeof record.partners.business_info === "string" ? JSON.parse(record.partners.business_info) : (record.partners.business_info || { sells: ["products"], channels: ["online"] }),
+                    }
+                }
+            }
+        }
+
+        let records = Object.values(accessRecords)
+
+        if (ownerUserIds.size > 0) {
+            const { data: profiles } = await admin.from("user_profiles").select("user_id, full_name").in("user_id", Array.from(ownerUserIds))
+            if (profiles) {
+                const names = Object.fromEntries(profiles.map((p: any) => [p.user_id, p.full_name]))
+                records = records.map(record => {
+                    if (record.role !== "OWNER" && record.ownerName && names[record.ownerName]) {
+                        record.ownerName = names[record.ownerName]
+                    } else if (record.role !== "OWNER") {
+                        record.ownerName = "Desconhecido"
+                    }
+                    return record
+                })
+            }
+        }
+
+        return records
     },
     [TAGS.userAccess(userId)],
     {

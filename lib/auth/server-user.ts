@@ -22,8 +22,6 @@ const requestCache = new WeakMap<any, User | null>()
  * 3. Fallback to Supabase verification (Slow path - cached for current request).
  */
 export const getCurrentUser = cache(async (): Promise<User | null> => {
-    const timestamp = new Date().toISOString()
-    
     // 0. Use headers() object as a request-specific identifier key
     let headerList: any
     try {
@@ -35,9 +33,7 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
 
     // 1. Check module-level cache (Deduplicates calls within the same Node.js request lifecycle)
     if (requestCache.has(headerList)) {
-        const cachedUser = requestCache.get(headerList)
-        console.log(`[OPT] getCurrentUser() returning from INTERNAL CACHE at ${timestamp} for ${cachedUser?.email || "anonymous"}`)
-        return cachedUser!
+        return requestCache.get(headerList)!
     }
 
     // 2. Try to get user from middleware headers (passed to the page/action)
@@ -59,22 +55,14 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
             aud: "authenticated",
             created_at: "",
         } as User
-        console.log(`[OPT] getCurrentUser() returning from HEADERS at ${timestamp} for ${userEmail}`)
         requestCache.set(headerList, user)
         return user
     }
 
     // 3. Fallback to full Supabase verification if headers are missing
-    console.log(`[SUPABASE CALL] auth.getUser() (FALLBACK) at ${timestamp}`)
     const supabase = await getSupabaseServerClient()
     const { data: { user } } = await supabase.auth.getUser()
-    
-    if (user) {
-        console.log(`[SUPABASE CALL] auth.getUser() SUCCESS at ${timestamp} for ${user.email}`)
-    } else {
-        console.log(`[SUPABASE CALL] auth.getUser() EMPTY at ${timestamp}`)
-    }
-    
+
     // Cache the result for subsequent calls in this request
     requestCache.set(headerList, user || null)
     return user

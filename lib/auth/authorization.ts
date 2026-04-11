@@ -120,7 +120,6 @@ const checkPartnerAccess = async (
     const context = await getPartnerContextHelper({ id: userId });
     if (context && context.partnerId === partnerId) {
       if (context.role && context.permissions) {
-        console.log("[AUTH]", { type: "CACHE_HIT", layer: "FAST_PATH", userId, partnerId });
         return { role: context.role, permissions: context.permissions };
       }
     }
@@ -133,11 +132,9 @@ const checkPartnerAccess = async (
   const match = allAccess.find(a => a.partnerId === partnerId);
 
   if (match && match.role && match.permissions) {
-    console.log("[AUTH]", { type: "CACHE_HIT", layer: "LAYER_2", userId, partnerId });
     return { role: match.role, permissions: match.permissions };
   }
 
-  console.log("[AUTH]", { type: "FALLBACK", layer: "AUTHORITATIVE_DB", userId, partnerId });
   // 3. AUTHORITATIVE DB FALLBACK
   const admin = getAdminClient()
   const [invitedAccessRes, ownedPartnerRes] = await Promise.all([
