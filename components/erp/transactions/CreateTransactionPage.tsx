@@ -20,6 +20,8 @@ import {
     Checkbox,
 } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
+import AlertModal from "@/components/reusable/AlertModal"
+import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
     SaveIcon,
@@ -97,6 +99,8 @@ const FormCombobox = ({
     disabled,
     actionItem,
     placeholder,
+    error,
+    errorMessage,
 }: {
     label: string
     value: string | undefined
@@ -105,6 +109,8 @@ const FormCombobox = ({
     disabled?: boolean
     actionItem?: { label: string; icon?: React.ReactNode; onClick: () => void }
     placeholder?: string
+    error?: boolean
+    errorMessage?: string
 }) => (
     <div className="flex flex-col gap-1.5 w-full">
         <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">{label}</label>
@@ -118,6 +124,7 @@ const FormCombobox = ({
             actionItem={actionItem}
             placeholder={placeholder}
         />
+        {error && errorMessage ? <p className="text-xs text-brand-red">{errorMessage}</p> : null}
     </div>
 )
 
@@ -155,7 +162,6 @@ export default function CreateTransactionPage({
     const [subcategoryId, setSubcategoryId] = useState<string | undefined>(undefined)
     const [dueDate, setDueDate] = useState(() => format(new Date(), "yyyy-MM-dd"))
     const [paymentDate, setPaymentDate] = useState(() => format(new Date(), "yyyy-MM-dd"))
-    const [competencyDate, setCompetencyDate] = useState(() => format(new Date(), "yyyy-MM-dd"))
     const [status, setStatus] = useState<"pending" | "paid">("pending")
     const [accountId, setAccountId] = useState<string | undefined>(undefined)
     const [fromAccountId, setFromAccountId] = useState<string | undefined>(undefined)
@@ -167,6 +173,10 @@ export default function CreateTransactionPage({
     const [contactRows, setContactRows] = useState<TransactionContactRow[]>([])
     const [contactsLoading, setContactsLoading] = useState(false)
     const [selectedContactId, setSelectedContactId] = useState<string | undefined>(undefined)
+    const [selectedCustomer, setSelectedCustomer] = useState<{ id: string; name: string } | null>(null)
+    const [customerSheetOpen, setCustomerSheetOpen] = useState(false)
+    const [fieldErrors, setFieldErrors] = useState<Set<string>>(() => new Set())
+    const [showDiscardModal, setShowDiscardModal] = useState(false)
 
     const [adjustDirection, setAdjustDirection] = useState<"increase" | "decrease">("increase")
     const [refundKind, setRefundKind] = useState<"expense_refund" | "revenue_refund">("expense_refund")
@@ -186,12 +196,94 @@ export default function CreateTransactionPage({
     const [quickName, setQuickName] = useState("")
     const [newAccountType, setNewAccountType] = useState<FinanceAccountType>("cash")
     const [newAccountInitial, setNewAccountInitial] = useState(0)
-    const [newContactModalType, setNewContactModalType] = useState<ContactType>("customer")
+    const [newContactModalType, setNewContactModalType] = useState<ContactType>("supplier")
     const [newContactDesc, setNewContactDesc] = useState("")
     const pendingSelectContactIdRef = useRef<string | null>(null)
+    const pendingCloseRef = useRef<(() => void) | null>(null)
+
+    const defaultDayYmd = useMemo(() => format(new Date(), "yyyy-MM-dd"), [])
+    const defaultRecurrenceNext = useMemo(
+        () => ymdAfterAddingPeriod(format(new Date(), "yyyy-MM-dd"), "monthly", 1),
+        [],
+    )
+
+    const isDirty = useMemo(() => {
+        if (description.trim()) return true
+        if (amount > 0) return true
+        if (notes.trim()) return true
+        if (categoryId) return true
+        if (subcategoryId) return true
+        if (accountId) return true
+        if (fromAccountId || toAccountId) return true
+        if (selectedContactId) return true
+        if (selectedCustomer) return true
+        if (enableRecurrence) return true
+        if (status !== "pending") return true
+        if (paymentType !== "Pix") return true
+        if (contactType !== "customer") return true
+        if (referenceNote.trim()) return true
+        if (refundKind !== "expense_refund") return true
+        if (adjustDirection !== "increase") return true
+        if (txKind !== "income") return true
+        if (dueDate !== defaultDayYmd || paymentDate !== defaultDayYmd) return true
+        if (recurrenceEndYmd.trim()) return true
+        if (recurrenceMonthlyLastDay) return true
+        if (recurrenceInterval !== 1 || recurrenceFrequency !== "monthly") return true
+        if (recurrenceNextRunYmd !== defaultRecurrenceNext) return true
+        return false
+    }, [
+        description,
+        amount,
+        notes,
+        categoryId,
+        subcategoryId,
+        accountId,
+        fromAccountId,
+        toAccountId,
+        selectedContactId,
+        selectedCustomer,
+        enableRecurrence,
+        status,
+        paymentType,
+        contactType,
+        referenceNote,
+        refundKind,
+        adjustDirection,
+        txKind,
+        dueDate,
+        paymentDate,
+        defaultDayYmd,
+        recurrenceEndYmd,
+        recurrenceMonthlyLastDay,
+        recurrenceInterval,
+        recurrenceFrequency,
+        recurrenceNextRunYmd,
+        defaultRecurrenceNext,
+    ])
+
+    const requestClose = useCallback(() => {
+        if (isDirty) {
+            pendingCloseRef.current = () => {
+                setShowDiscardModal(false)
+                onClose()
+            }
+            setShowDiscardModal(true)
+        } else {
+            onClose()
+        }
+    }, [isDirty, onClose])
+
+    const confirmDiscard = useCallback(() => {
+        pendingCloseRef.current?.()
+        pendingCloseRef.current = null
+    }, [])
 
     const isIncomeExpense = txKind === "income" || txKind === "expense"
     const needsContactPanel = isIncomeExpense || txKind === "refund"
+
+    useEffect(() => {
+        if (contactType !== "customer") setSelectedCustomer(null)
+    }, [contactType])
 
     const activeAccounts = useMemo(() => accounts.filter((a) => a.is_active), [accounts])
     const accountOptions = useMemo(
@@ -218,6 +310,14 @@ export default function CreateTransactionPage({
         if (!needsContactPanel) {
             setContactRows([])
             setSelectedContactId(undefined)
+            setSelectedCustomer(null)
+            return
+        }
+        if (contactType === "customer") {
+            setContactRows([])
+            setSelectedContactId(undefined)
+            setContactsLoading(false)
+            pendingSelectContactIdRef.current = null
             return
         }
         let cancelled = false
@@ -247,13 +347,13 @@ export default function CreateTransactionPage({
 
     useEffect(() => {
         if (!enableRecurrence || !isIncomeExpense) return
-        setRecurrenceNextRunYmd(ymdAfterAddingPeriod(competencyDate, recurrenceFrequency, recurrenceInterval))
-    }, [enableRecurrence, competencyDate, recurrenceFrequency, recurrenceInterval, isIncomeExpense])
+        setRecurrenceNextRunYmd(ymdAfterAddingPeriod(dueDate, recurrenceFrequency, recurrenceInterval))
+    }, [enableRecurrence, dueDate, recurrenceFrequency, recurrenceInterval, isIncomeExpense])
 
-    const competencyYmdParts = useMemo(() => {
-        const [y, m, d] = competencyDate.split("-").map(Number)
+    const dueDateYmdParts = useMemo(() => {
+        const [y, m, d] = dueDate.split("-").map(Number)
         return { month: m || 1, day: d || 1 }
-    }, [competencyDate])
+    }, [dueDate])
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
@@ -280,6 +380,7 @@ export default function CreateTransactionPage({
         setQuickModal("account")
     }
     const openQuickContact = () => {
+        if (contactType === "customer") return
         setQuickName("")
         setNewContactModalType(contactType)
         setNewContactDesc("")
@@ -370,17 +471,94 @@ export default function CreateTransactionPage({
         }
     }
 
-    const handleSave = async () => {
+    const collectValidationErrors = useCallback((): Set<string> => {
+        const e = new Set<string>()
         if (txKind === "transfer") {
-            if (!(amount > 0)) return error("Valor inválido")
-            if (!fromAccountId || !toAccountId) return error("Selecione conta de origem e destino")
-            if (fromAccountId === toAccountId) return error("As contas devem ser diferentes")
+            if (!(amount > 0)) e.add("amount")
+            if (!fromAccountId) e.add("fromAccountId")
+            if (!toAccountId) e.add("toAccountId")
+            if (fromAccountId && toAccountId && fromAccountId === toAccountId) e.add("toAccountId")
+        } else if (txKind === "adjustment") {
+            if (!description.trim()) e.add("description")
+            if (!(Math.abs(amount) > 0)) e.add("amount")
+            if (!accountId) e.add("accountId")
+        } else if (txKind === "refund") {
+            if (!description.trim()) e.add("description")
+            if (!(amount > 0)) e.add("amount")
+            if (!accountId) e.add("accountId")
+        } else if (isIncomeExpense) {
+            if (!description.trim()) e.add("description")
+            if (!(amount > 0)) e.add("amount")
+            if (!accountId) e.add("accountId")
+            if (enableRecurrence) {
+                if (!recurrenceNextRunYmd) e.add("recurrenceNextRunYmd")
+                if (recurrenceEndYmd.trim()) {
+                    const nextIso = toMiddayIsoFromYmd(recurrenceNextRunYmd)
+                    const endIso = toMiddayIsoFromYmd(recurrenceEndYmd.trim())
+                    if (new Date(endIso) < new Date(nextIso)) e.add("recurrenceEndYmd")
+                }
+            }
+        }
+        return e
+    }, [
+        txKind,
+        amount,
+        fromAccountId,
+        toAccountId,
+        description,
+        accountId,
+        isIncomeExpense,
+        enableRecurrence,
+        recurrenceNextRunYmd,
+        recurrenceEndYmd,
+    ])
+
+    const contactPayload = useCallback(() => {
+        if (contactType === "customer" && selectedCustomer) {
+            return {
+                contactId: null as string | null,
+                customerId: selectedCustomer.id,
+                contactTypeResolved: "customer" as const,
+            }
+        }
+        if (contactType === "customer") {
+            return {
+                contactId: null as string | null,
+                customerId: null as string | null,
+                contactTypeResolved: null as null,
+            }
+        }
+        if (!selectedContactId) {
+            return {
+                contactId: null as string | null,
+                customerId: null as string | null,
+                contactTypeResolved: null as null,
+            }
+        }
+        return {
+            contactId: selectedContactId,
+            customerId: null as string | null,
+            contactTypeResolved: contactType,
+        }
+    }, [contactType, selectedCustomer, selectedContactId])
+
+    const handleSave = async () => {
+        const errs = collectValidationErrors()
+        if (errs.size > 0) {
+            setFieldErrors(new Set(errs))
+            setActiveTab("general")
+            error("Verifique os campos obrigatórios.")
+            return
+        }
+        setFieldErrors(new Set())
+
+        if (txKind === "transfer") {
             setIsSaving(true)
             try {
                 const res = await createTransferPairAction({
                     partnerId,
-                    fromAccountId,
-                    toAccountId,
+                    fromAccountId: fromAccountId!,
+                    toAccountId: toAccountId!,
                     amount,
                     description: description.trim() || null,
                     transactionDate: dueDate,
@@ -398,10 +576,7 @@ export default function CreateTransactionPage({
         }
 
         if (txKind === "adjustment") {
-            if (!description.trim()) return error("Descrição obrigatória para ajuste")
             const abs = Math.abs(amount)
-            if (!(abs > 0)) return error("Informe um valor")
-            if (!accountId) return error("Selecione a conta")
             const signed = adjustDirection === "increase" ? abs : -abs
             setIsSaving(true)
             try {
@@ -415,11 +590,12 @@ export default function CreateTransactionPage({
                     subcategoryId: null,
                     accountId: accountId || null,
                     contactId: null,
+                    customerId: null,
                     contactType: null,
                     paymentType: "Ajuste",
                     dueDate,
                     paymentDate: status === "paid" ? paymentDate : null,
-                    transactionDate: competencyDate,
+                    transactionDate: dueDate,
                     status,
                     notes: notes || null,
                     origin: "manual",
@@ -436,10 +612,7 @@ export default function CreateTransactionPage({
         }
 
         if (txKind === "refund") {
-            if (!description.trim()) return error("Descrição obrigatória")
-            if (!(amount > 0)) return error("Valor inválido")
-            if (!accountId) return error("Selecione a conta")
-            if (!selectedContactId) return error("Selecione um contato")
+            const cp = contactPayload()
             setIsSaving(true)
             try {
                 const res = await createManualTransactionAction({
@@ -451,12 +624,13 @@ export default function CreateTransactionPage({
                     categoryId: null,
                     subcategoryId: null,
                     accountId: accountId || null,
-                    contactId: selectedContactId,
-                    contactType,
+                    contactId: cp.contactId,
+                    customerId: cp.customerId,
+                    contactType: needsContactPanel ? cp.contactTypeResolved : null,
                     paymentType: "Reembolso",
                     dueDate,
                     paymentDate: status === "paid" ? paymentDate : null,
-                    transactionDate: competencyDate,
+                    transactionDate: dueDate,
                     status,
                     notes: notes || null,
                     origin: "manual",
@@ -474,21 +648,14 @@ export default function CreateTransactionPage({
             return
         }
 
-        if (!description.trim()) return error("Descrição obrigatória")
-        if (!(amount > 0)) return error("Valor inválido")
-        if (!selectedContactId) return error("Selecione um contato")
-
+        const cp = contactPayload()
         setIsSaving(true)
         try {
             if (enableRecurrence) {
                 const iv = Math.max(Math.floor(Number(recurrenceInterval) || 1), 1)
-                if (!recurrenceNextRunYmd) return error("Defina a data da próxima execução automática.")
-                const startIso = toMiddayIsoFromYmd(competencyDate)
+                const startIso = toMiddayIsoFromYmd(dueDate)
                 const nextIso = toMiddayIsoFromYmd(recurrenceNextRunYmd)
                 const endIso = recurrenceEndYmd.trim() ? toMiddayIsoFromYmd(recurrenceEndYmd.trim()) : null
-                if (endIso && new Date(endIso) < new Date(nextIso)) {
-                    return error("A data final da recorrência deve ser após a próxima execução.")
-                }
 
                 const recRes = await createRecurringTransactionAction({
                     partnerId,
@@ -497,22 +664,23 @@ export default function CreateTransactionPage({
                     description: description.trim(),
                     frequency: recurrenceFrequency,
                     intervalValue: iv,
-                    weekDays: recurrenceFrequency === "weekly" ? [parseYmdToLocalNoon(competencyDate).getDay()] : null,
+                    weekDays: recurrenceFrequency === "weekly" ? [parseYmdToLocalNoon(dueDate).getDay()] : null,
                     monthDay:
                         recurrenceFrequency === "monthly" && !recurrenceMonthlyLastDay
-                            ? competencyYmdParts.day
+                            ? dueDateYmdParts.day
                             : null,
                     useLastDay: recurrenceFrequency === "monthly" && recurrenceMonthlyLastDay,
-                    yearMonth: recurrenceFrequency === "yearly" ? competencyYmdParts.month : null,
-                    yearDay: recurrenceFrequency === "yearly" ? competencyYmdParts.day : null,
+                    yearMonth: recurrenceFrequency === "yearly" ? dueDateYmdParts.month : null,
+                    yearDay: recurrenceFrequency === "yearly" ? dueDateYmdParts.day : null,
                     startDate: startIso,
                     endDate: endIso,
                     nextRunDate: nextIso,
                     accountId: accountId || null,
                     categoryId: categoryId || null,
                     subcategoryId: subcategoryId || null,
-                    contactId: selectedContactId,
-                    contactType,
+                    contactId: cp.contactId,
+                    customerId: cp.customerId,
+                    contactType: cp.contactTypeResolved,
                 })
                 if (!recRes.success) return error(recRes.error || "Erro ao criar recorrência")
             }
@@ -526,12 +694,13 @@ export default function CreateTransactionPage({
                 categoryId: categoryId || null,
                 subcategoryId: subcategoryId || null,
                 accountId: accountId || null,
-                contactId: selectedContactId,
-                contactType,
+                contactId: cp.contactId,
+                customerId: cp.customerId,
+                contactType: cp.contactTypeResolved,
                 paymentType,
                 dueDate,
                 paymentDate: status === "paid" ? paymentDate : null,
-                transactionDate: competencyDate,
+                transactionDate: dueDate,
                 status,
                 notes: notes || null,
                 origin: "manual",
@@ -615,7 +784,13 @@ export default function CreateTransactionPage({
                     <p className="text-sm text-brand-inactive-text dark:text-dark-body">
                         Serão criados dois lançamentos vinculados (saída na origem e entrada no destino).
                     </p>
-                    <MoneyInput label="Valor" value={amount} onChange={setAmount} />
+                    <MoneyInput
+                        label="Valor"
+                        value={amount}
+                        onChange={setAmount}
+                        error={fieldErrors.has("amount")}
+                        errorMessage={fieldErrors.has("amount") ? "Valor inválido" : undefined}
+                    />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormCombobox
                             label="Conta de origem"
@@ -623,6 +798,8 @@ export default function CreateTransactionPage({
                             value={fromAccountId}
                             onChange={(v) => setFromAccountId(v)}
                             actionItem={accountAction}
+                            error={fieldErrors.has("fromAccountId")}
+                            errorMessage={fieldErrors.has("fromAccountId") ? "Selecione a conta de origem" : undefined}
                         />
                         <FormCombobox
                             label="Conta de destino"
@@ -630,6 +807,14 @@ export default function CreateTransactionPage({
                             value={toAccountId}
                             onChange={(v) => setToAccountId(v)}
                             actionItem={accountAction}
+                            error={fieldErrors.has("toAccountId")}
+                            errorMessage={
+                                fieldErrors.has("toAccountId")
+                                    ? fromAccountId === toAccountId
+                                        ? "Contas devem ser diferentes"
+                                        : "Selecione a conta de destino"
+                                    : undefined
+                            }
                         />
                     </div>
                     <DatePicker label="Data" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} />
@@ -648,7 +833,13 @@ export default function CreateTransactionPage({
                     <p className="text-sm text-brand-inactive-text dark:text-dark-body rounded-xl border border-brand-border dark:border-dark-border p-3 bg-brand-gray/40 dark:bg-dark-border/20">
                         Esse lançamento ajusta o saldo da conta manualmente (ex.: conciliação ou correção).
                     </p>
-                    <MoneyInput label="Valor" value={Math.abs(amount)} onChange={(n) => setAmount(Math.abs(n))} />
+                    <MoneyInput
+                        label="Valor"
+                        value={Math.abs(amount)}
+                        onChange={(n) => setAmount(Math.abs(n))}
+                        error={fieldErrors.has("amount")}
+                        errorMessage={fieldErrors.has("amount") ? "Informe um valor" : undefined}
+                    />
                     <FormDropdown
                         label="Direção do ajuste"
                         options={[
@@ -664,13 +855,11 @@ export default function CreateTransactionPage({
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         placeholder="Ex: Ajuste após conciliação bancária"
+                        error={fieldErrors.has("description")}
+                        errorMessage={fieldErrors.has("description") ? "Descrição obrigatória" : undefined}
                     />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <DatePicker
-                            label="Data"
-                            value={competencyDate}
-                            onChange={(d) => setCompetencyDate(toYmd(d))}
-                        />
+                        <DatePicker label="Data" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} />
                         <DatePicker
                             label="Data do pagamento"
                             value={paymentDate}
@@ -693,7 +882,13 @@ export default function CreateTransactionPage({
                         value={refundKind}
                         setValue={(v) => setRefundKind(v as "expense_refund" | "revenue_refund")}
                     />
-                    <MoneyInput label="Valor" value={amount} onChange={setAmount} />
+                    <MoneyInput
+                        label="Valor"
+                        value={amount}
+                        onChange={setAmount}
+                        error={fieldErrors.has("amount")}
+                        errorMessage={fieldErrors.has("amount") ? "Valor inválido" : undefined}
+                    />
                     <Input
                         label="Referência (opcional)"
                         value={referenceNote}
@@ -706,27 +901,31 @@ export default function CreateTransactionPage({
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         placeholder="Detalhe o reembolso"
+                        error={fieldErrors.has("description")}
+                        errorMessage={fieldErrors.has("description") ? "Descrição obrigatória" : undefined}
                     />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <DatePicker label="Data de vencimento" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} />
-                        <DatePicker
-                            label="Competência"
-                            value={competencyDate}
-                            onChange={(d) => setCompetencyDate(toYmd(d))}
-                        />
-                    </div>
+                    <DatePicker label="Data de vencimento" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} />
                 </section>
             )}
 
             {isIncomeExpense && (
                 <section className="space-y-4">
                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Detalhes do lançamento</h3>
-                    <MoneyInput label="Valor" value={amount} onChange={setAmount} />
+                    <MoneyInput
+                        label="Valor"
+                        value={amount}
+                        onChange={setAmount}
+                        error={fieldErrors.has("amount")}
+                        errorMessage={fieldErrors.has("amount") ? "Valor obrigatório" : undefined}
+                    />
                     <Input
                         label="Descrição"
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         placeholder="Ex: Venda de serviço"
+                        required
+                        error={fieldErrors.has("description")}
+                        errorMessage={fieldErrors.has("description") ? "Descrição obrigatória" : undefined}
                     />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormCombobox
@@ -765,7 +964,6 @@ export default function CreateTransactionPage({
                             disabled={status !== "paid"}
                         />
                     </div>
-                    <DatePicker label="Competência" value={competencyDate} onChange={(d) => setCompetencyDate(toYmd(d))} />
 
                     <div className="rounded-2xl border border-brand-border dark:border-dark-border p-4 space-y-4 bg-brand-gray/25 dark:bg-dark-border/15">
                         <Checkbox
@@ -813,11 +1011,23 @@ export default function CreateTransactionPage({
                                         label="Próxima execução automática"
                                         value={recurrenceNextRunYmd}
                                         onChange={(d) => setRecurrenceNextRunYmd(toYmd(d))}
+                                        error={fieldErrors.has("recurrenceNextRunYmd")}
+                                        errorMessage={
+                                            fieldErrors.has("recurrenceNextRunYmd")
+                                                ? "Defina a próxima execução"
+                                                : undefined
+                                        }
                                     />
                                     <DatePicker
                                         label="Encerrar em (opcional)"
                                         value={recurrenceEndYmd}
                                         onChange={(d) => setRecurrenceEndYmd(toYmd(d))}
+                                        error={fieldErrors.has("recurrenceEndYmd")}
+                                        errorMessage={
+                                            fieldErrors.has("recurrenceEndYmd")
+                                                ? "Data final deve ser após a próxima execução"
+                                                : undefined
+                                        }
                                     />
                                 </div>
                                 {recurrenceFrequency === "monthly" && (
@@ -869,6 +1079,8 @@ export default function CreateTransactionPage({
                             value={accountId}
                             onChange={(v) => setAccountId(v)}
                             actionItem={accountAction}
+                            error={fieldErrors.has("accountId")}
+                            errorMessage={fieldErrors.has("accountId") ? "Selecione a conta" : undefined}
                         />
                     )}
 
@@ -900,6 +1112,9 @@ export default function CreateTransactionPage({
             {needsContactPanel && (
                 <SidebarCard>
                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Contato</h3>
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-3">
+                        Opcional — salve sem vincular contato se preferir.
+                    </p>
                     <FormDropdown
                         label="Tipo de contato"
                         options={[
@@ -914,7 +1129,30 @@ export default function CreateTransactionPage({
                         setValue={(v) => setContactType(v as ContactType)}
                     />
                     <div className="mt-4">
-                        {contactsLoading ? (
+                        {contactType === "customer" ? (
+                            selectedCustomer ? (
+                                <div className="rounded-xl border border-brand-border dark:border-dark-border p-3 flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">Cliente</p>
+                                        <p className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                            {selectedCustomer.name}
+                                        </p>
+                                    </div>
+                                    <Button type="button" variant="outline" size="sm" onClick={() => setCustomerSheetOpen(true)}>
+                                        Alterar
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={() => setCustomerSheetOpen(true)}
+                                >
+                                    Selecionar cliente
+                                </Button>
+                            )
+                        ) : contactsLoading ? (
                             <p className="text-sm text-brand-inactive-text">Carregando contatos…</p>
                         ) : contactComboboxOptions.length === 0 ? (
                             <IconPlaceholder
@@ -960,7 +1198,7 @@ export default function CreateTransactionPage({
                                 <div
                                     className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-300 ${isScrolled ? "scale-90" : "scale-100"}`}
                                 >
-                                    <Button variant="filled" onClick={onClose} className="w-10 h-10 p-0 flex items-center justify-center">
+                                    <Button variant="filled" onClick={requestClose} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
                                 </div>
@@ -980,7 +1218,7 @@ export default function CreateTransactionPage({
                                     </div>
 
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3 mb-4">
-                                        <Button variant="outline" onClick={onClose} disabled={isSaving}>
+                                        <Button variant="outline" onClick={requestClose} disabled={isSaving}>
                                             Cancelar
                                         </Button>
                                         <Button onClick={handleSave} disabled={isSaving}>
@@ -992,7 +1230,18 @@ export default function CreateTransactionPage({
 
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                        <TabsTrigger value="general" className="px-0 pb-3">
+                                        <TabsTrigger
+                                            value="general"
+                                            className="px-0 pb-3"
+                                            badge={
+                                                fieldErrors.size > 0 ? (
+                                                    <span
+                                                        className="inline-block w-2 h-2 rounded-full bg-brand-red shrink-0"
+                                                        aria-hidden
+                                                    />
+                                                ) : undefined
+                                            }
+                                        >
                                             Dados gerais
                                         </TabsTrigger>
                                         <TabsTrigger value="attachments" className="px-0 pb-3">
@@ -1020,7 +1269,39 @@ export default function CreateTransactionPage({
                                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">
                                                     Tipo de lançamento
                                                 </h3>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                                                <div className="lg:hidden -mx-4 px-4">
+                                                    <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 pt-0.5 no-scrollbar scroll-pl-4 pl-4 pr-2">
+                                                        {typeButtons.map((b) => (
+                                                            <button
+                                                                key={b.id}
+                                                                type="button"
+                                                                onClick={() => setTxKind(b.id)}
+                                                                className={`snap-start shrink-0 flex-[0_0_calc(85%-0.5rem)] max-w-[320px] sm:flex-[0_0_280px] flex items-center justify-between p-4 rounded-2xl transition-all border text-left ${txKind === b.id
+                                                                    ? b.activeClass
+                                                                    : "bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border border-brand-border dark:border-dark-border"
+                                                                    }`}
+                                                            >
+                                                                <div className="flex items-center gap-3 min-w-0">
+                                                                    <div
+                                                                        className={`w-11 h-11 rounded-full border flex items-center justify-center shrink-0 transition-colors duration-200 ${txKind === b.id
+                                                                            ? b.iconActiveClass
+                                                                            : "border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text"
+                                                                            }`}
+                                                                    >
+                                                                        {b.icon}
+                                                                    </div>
+                                                                    <div className="min-w-0">
+                                                                        <div className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
+                                                                            {b.label}
+                                                                        </div>
+                                                                        <div className="text-xs text-brand-inactive-text truncate">{b.sub}</div>
+                                                                    </div>
+                                                                </div>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div className="hidden lg:grid lg:grid-cols-3 gap-3">
                                                     {typeButtons.map((b) => (
                                                         <button
                                                             key={b.id}
@@ -1094,7 +1375,7 @@ export default function CreateTransactionPage({
                     </div>
 
                     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
-                        <Button variant="outline" onClick={onClose} disabled={isSaving} className="flex-1 h-[48px]">
+                        <Button variant="outline" onClick={requestClose} disabled={isSaving} className="flex-1 h-[48px]">
                             Cancelar
                         </Button>
                         <Button onClick={handleSave} disabled={isSaving} className="flex-1 h-[48px]">
@@ -1197,14 +1478,13 @@ export default function CreateTransactionPage({
                         <FormDropdown
                             label="Tipo do contato"
                             options={[
-                                { value: "customer", label: "Cliente" },
                                 { value: "supplier", label: "Fornecedor" },
                                 { value: "service", label: "Serviço" },
                                 { value: "employee", label: "Funcionário" },
                                 { value: "partner", label: "Parceiro" },
                                 { value: "other", label: "Outro" },
                             ]}
-                            value={newContactModalType}
+                            value={newContactModalType === "customer" ? "supplier" : newContactModalType}
                             setValue={(v) => setNewContactModalType(v as ContactType)}
                         />
                         <Input label="Nome" value={quickName} onChange={(e) => setQuickName(e.target.value)} placeholder="Nome exibido nas transações" />
@@ -1216,6 +1496,28 @@ export default function CreateTransactionPage({
                         />
                     </div>
                 </DefaultModal>
+
+                <SelectCustomerSheet
+                    isOpen={customerSheetOpen}
+                    onClose={() => setCustomerSheetOpen(false)}
+                    onSelect={(c: { id: string; name: string }) =>
+                        setSelectedCustomer({ id: c.id, name: c.name || "Cliente" })
+                    }
+                    partnerId={partnerId}
+                />
+
+                <AlertModal
+                    isOpen={showDiscardModal}
+                    onClose={() => {
+                        setShowDiscardModal(false)
+                        pendingCloseRef.current = null
+                    }}
+                    onConfirm={confirmDiscard}
+                    title="Descartar alterações?"
+                    description="Você tem dados não salvos. Se sair agora, eles serão perdidos."
+                    confirmText="Sair sem salvar"
+                    variant="warning"
+                />
             </div>
         </FadeIn>
     )

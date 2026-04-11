@@ -3,6 +3,8 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { getAdminClient } from "@/lib/supabase/admin"
+import { requireRateLimit } from "@/lib/security/require-rate-limit"
+import { RateLimitCategory } from "@/lib/rate-limiter"
 
 export type RecurringFrequency = "daily" | "weekly" | "monthly" | "yearly"
 export type RecurringType = "income" | "expense"
@@ -43,12 +45,19 @@ export async function createRecurringTransactionAction(input: {
   categoryId?: string | null
   subcategoryId?: string | null
   contactId?: string | null
+  customerId?: string | null
   contactType?: RecurringContactType | null
 }) {
   try {
+    const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
     await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
     const supabase = await getSupabaseServerClient()
     const nextRunDate = input.nextRunDate || input.startDate
+    const customerId = input.customerId?.trim() || null
+    const contactId = customerId ? null : input.contactId ?? null
+    const contactTypeResolved = customerId ? "customer" : input.contactType ?? null
     const { data, error } = await supabase
       .from("recurring_transactions")
       .insert({
@@ -69,8 +78,9 @@ export async function createRecurringTransactionAction(input: {
         account_id: input.accountId ?? null,
         category_id: input.categoryId ?? null,
         subcategory_id: input.subcategoryId ?? null,
-        contact_id: input.contactId ?? null,
-        contact_type: input.contactType ?? null,
+        contact_id: contactId,
+        customer_id: customerId,
+        contact_type: contactTypeResolved,
         active: true,
       })
       .select("*")
@@ -88,6 +98,9 @@ export async function updateRecurringTransactionAction(
   patch: Record<string, unknown>,
 ) {
   try {
+    const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
     await requirePartnerAccessWithPermission(partnerId, "financial", "edit")
     const supabase = await getSupabaseServerClient()
     const payload: Record<string, unknown> = { ...patch, updated_at: new Date().toISOString() }
@@ -127,6 +140,9 @@ export async function resumeRecurringTransactionAction(id: string, partnerId: st
 
 export async function duplicateRecurringTransactionAction(id: string, partnerId: string) {
   try {
+    const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
     await requirePartnerAccessWithPermission(partnerId, "financial", "edit")
     const supabase = await getSupabaseServerClient()
     const { data: source, error: sourceError } = await supabase
@@ -160,6 +176,7 @@ export async function duplicateRecurringTransactionAction(id: string, partnerId:
         category_id: source.category_id,
         subcategory_id: source.subcategory_id,
         contact_id: source.contact_id,
+        customer_id: source.customer_id,
         contact_type: source.contact_type,
         active: source.active,
       })

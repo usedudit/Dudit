@@ -2,6 +2,8 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requireRateLimit } from "@/lib/security/require-rate-limit"
+import { RateLimitCategory } from "@/lib/rate-limiter"
 
 export type FinanceAccountType = "cash" | "bank" | "wallet"
 
@@ -47,6 +49,9 @@ export async function createFinanceAccountAction(data: {
   currentBalance?: number | null
 }) {
   try {
+    const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
     await requirePartnerAccessWithPermission(data.partnerId, "financial", "edit")
     const supabase = await getSupabaseServerClient()
 

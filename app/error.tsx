@@ -5,6 +5,7 @@ import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
 import { InfoCard } from "@/components/reusable/InfoCard"
+import { getErrorMessage } from "@/lib/utils/error-handlers"
 
 export default function Error({
   error,
@@ -43,7 +44,7 @@ export default function Error({
               message={
                 <div className="flex flex-col gap-1">
                   <p className="text-xs break-all">
-                    {error.message || "Erro desconhecido"}
+                    {getErrorMessage(error)}
                   </p>
                   {error.digest && (
                     <p className="text-[10px] opacity-70">

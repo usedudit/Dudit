@@ -3,11 +3,20 @@
  * Primarily handles translations to Brazilian Portuguese and user-friendly formatting.
  */
 
+/** Next.js omits real RSC error text in production; `error.message` is this placeholder. */
+const NEXT_RSC_PRODUCTION_PLACEHOLDER =
+  "An error occurred in the Server Components render"
+
 export function getErrorMessage(error: any): string {
   if (!error) return "Ocorreu um erro inesperado."
 
   const message = typeof error === "string" ? error : error.message || "Erro desconhecido"
   const code = error?.code || error?.status
+
+  // Next.js App Router: production Server Components use a generic English message + digest
+  if (typeof message === "string" && message.includes(NEXT_RSC_PRODUCTION_PLACEHOLDER)) {
+    return "Não foi possível carregar esta parte da página. Tente novamente em instantes."
+  }
 
   // 1. Handle Supabase Rate Limiting (dynamic messages)
   // Example: "For security purposes, you can only request this after 54 seconds."

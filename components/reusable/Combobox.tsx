@@ -235,7 +235,7 @@ export function Combobox({
             </div>
 
             {actionItem && (
-                <div className="p-1 border-t border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-bg/30 sticky bottom-0 z-10">
+                <div className="p-1 border-t border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-border/50 sticky bottom-0 z-10">
                     <button
                         type="button"
                         onClick={() => {

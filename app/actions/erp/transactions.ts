@@ -4,6 +4,8 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import type { ERPTransaction } from "@/lib/services/transactions.types"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { requireRateLimit } from "@/lib/security/require-rate-limit"
+import { RateLimitCategory } from "@/lib/rate-limiter"
 
 type DbTransaction = {
     id: string
@@ -18,6 +20,7 @@ type DbTransaction = {
     payment_type: string | null
     transaction_type: ERPTransaction["transactionType"]
     contact_id: string | null
+    customer_id: string | null
     contact_type: "customer" | "supplier" | "service" | "employee" | "partner" | "other" | null
     transfer_group_id?: string | null
     refund_kind?: "expense_refund" | "revenue_refund" | null
@@ -84,7 +87,7 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
         const { data, error } = await supabase
             .from("transactions")
             .select(`
-        id, description, category, amount, due_date, payment_date, created_at, status, notes, payment_type, transaction_type, contact_id, contact_type,
+        id, description, category, amount, due_date, payment_date, created_at, status, notes, payment_type, transaction_type, contact_id, customer_id, contact_type,
         transfer_group_id, refund_kind, reference_note,
         transaction_contacts(name, type)
       `)
@@ -135,6 +138,22 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
             for (const c of customers || []) customerById.set(c.id, { name: c.name })
         }
 
+        const linkedCustomerIds = Array.from(
+            new Set(
+                txs.map((t) => t.customer_id).filter(Boolean),
+            ),
+        ) as string[]
+        if (linkedCustomerIds.length > 0) {
+            const { data: linkedCustomers } = await supabase
+                .from("customers")
+                .select("id, name")
+                .eq("partner_id", partnerId)
+                .in("id", linkedCustomerIds)
+            for (const c of linkedCustomers || []) {
+                if (!customerById.has(c.id)) customerById.set(c.id, { name: c.name })
+            }
+        }
+
         const now = new Date()
         const mapped: ERPTransaction[] = txs.map((t) => {
             const baseDate = t.due_date || t.payment_date || t.created_at
@@ -143,7 +162,9 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
             const order = t.category === "Vendas" ? orderByNumber.get(String(t.description || "").trim()) : null
             const customerName = order?.buyer_id ? customerById.get(order.buyer_id)?.name : null
             const salesContactName = customerName || order?.customer_name || "Cliente"
+            const linkedCustomerName = t.customer_id ? customerById.get(t.customer_id)?.name : null
             const fallbackContact = t.transaction_contacts?.name || "—"
+            const manualCustomerName = linkedCustomerName || "Cliente"
 
             return {
                 id: t.id,
@@ -151,8 +172,13 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
                 description: t.description,
                 details: undefined,
                 category: t.category || "Outros",
-                contactName: t.category === "Vendas" ? salesContactName : fallbackContact,
-                contactType: t.category === "Vendas" ? "customer" : (t.contact_type || t.transaction_contacts?.type || "other"),
+                contactName:
+                    t.category === "Vendas"
+                        ? salesContactName
+                        : t.customer_id
+                          ? manualCustomerName
+                          : fallbackContact,
+                contactType: t.category === "Vendas" ? "customer" : (t.contact_type || t.transaction_contacts?.type || (t.customer_id ? "customer" : "other")),
                 dueDate: formatDateLabel(baseDate),
                 dueDateShort: formatDateShort(baseDate),
                 dueDateTime: "",
@@ -187,6 +213,7 @@ export type CreateManualTransactionInput = {
     subcategoryId?: string | null
     accountId?: string | null
     contactId?: string | null
+    customerId?: string | null
     contactType?: "customer" | "supplier" | "service" | "employee" | "partner" | "other" | null
     paymentType?: string | null
     dueDate?: string | null
@@ -209,6 +236,9 @@ function isBlockedForEdit(status?: string | null, origin?: string | null) {
 
 export async function createManualTransactionAction(input: CreateManualTransactionInput) {
     try {
+        const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
         await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
         const supabase = await getSupabaseServerClient()
 
@@ -232,6 +262,10 @@ export async function createManualTransactionAction(input: CreateManualTransacti
         const status = input.status || "pending"
 
         const absAmount = input.transactionType === "adjustment" ? Math.abs(amount) : amount
+        const customerId = input.customerId?.trim() || null
+        const contactId = customerId ? null : input.contactId ?? null
+        const contactTypeResolved = customerId ? "customer" : input.contactType ?? null
+
         const payload: Record<string, unknown> = {
             partner_id: input.partnerId,
             description: input.description.trim(),
@@ -239,8 +273,9 @@ export async function createManualTransactionAction(input: CreateManualTransacti
             category_id: input.categoryId ?? null,
             subcategory_id: input.subcategoryId ?? null,
             account_id: input.accountId ?? null,
-            contact_id: input.contactId ?? null,
-            contact_type: input.contactType ?? null,
+            contact_id: contactId,
+            customer_id: customerId,
+            contact_type: contactTypeResolved,
             amount: input.transactionType === "adjustment" ? amount : absAmount,
             due_date: input.dueDate || transactionDate,
             payment_date: input.paymentDate ?? null,
@@ -277,6 +312,9 @@ export type CreateTransferPairInput = {
 
 export async function createTransferPairAction(input: CreateTransferPairInput) {
     try {
+        const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
         await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
         const supabase = await getSupabaseServerClient()
 
@@ -321,6 +359,7 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
             transfer_group_id: transferGroupId,
             contact_id: null,
             contact_type: null,
+            customer_id: null,
             category_id: null,
             subcategory_id: null,
         }
@@ -345,6 +384,7 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
             transfer_group_id: transferGroupId,
             contact_id: null,
             contact_type: null,
+            customer_id: null,
             category_id: null,
             subcategory_id: null,
         }
@@ -363,6 +403,9 @@ export async function updateManualTransactionAction(
     patch: Partial<CreateManualTransactionInput>,
 ) {
     try {
+        const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
         await requirePartnerAccessWithPermission(partnerId, "financial", "edit")
         const supabase = await getSupabaseServerClient()
 
@@ -386,6 +429,7 @@ export async function updateManualTransactionAction(
         if (patch.subcategoryId !== undefined) payload.subcategory_id = patch.subcategoryId
         if (patch.accountId !== undefined) payload.account_id = patch.accountId
         if (patch.contactId !== undefined) payload.contact_id = patch.contactId
+        if (patch.customerId !== undefined) payload.customer_id = patch.customerId
         if (patch.contactType !== undefined) payload.contact_type = patch.contactType
         if (patch.paymentType !== undefined) payload.payment_type = patch.paymentType
         if (patch.dueDate !== undefined) payload.due_date = patch.dueDate
