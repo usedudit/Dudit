@@ -14,6 +14,25 @@ export type TransactionContactRow = {
 
 const CONTACT_TYPES = new Set(["customer", "supplier", "service", "employee", "partner", "other"])
 
+export async function listAllTransactionContactsAction(
+    partnerId: string,
+): Promise<{ success: true; data: TransactionContactRow[] } | { success: false; error: string }> {
+    try {
+        await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+        const supabase = await getSupabaseServerClient()
+        const { data, error } = await supabase
+            .from("transaction_contacts")
+            .select("id, name, type, description")
+            .eq("partner_id", partnerId)
+            .order("name")
+
+        if (error) throw error
+        return { success: true, data: (data || []) as TransactionContactRow[] }
+    } catch (e: any) {
+        return { success: false, error: e.message || "Erro ao carregar contatos" }
+    }
+}
+
 export async function listTransactionContactsByTypeAction(
     partnerId: string,
     contactType: string,

@@ -4,6 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Badge } from "@/components/reusable"
 import { ActionsDropdown } from "@/components/reusable/Accordion"
+import { DropdownItem } from "@/components/reusable/Dropdown"
 import { MoneyIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 
@@ -32,7 +33,17 @@ function num(v: number | string | null | undefined): number {
 }
 
 const FinancialAccountCard = React.memo(
-    ({ item, onEdit, onDelete }: { item: FinanceAccountRow; onEdit: () => void; onDelete: () => void }) => {
+    ({
+        item,
+        onEdit,
+        onDelete,
+        onAdjustBalance,
+    }: {
+        item: FinanceAccountRow
+        onEdit: () => void
+        onDelete: () => void
+        onAdjustBalance: () => void
+    }) => {
         const initial = num(item.initial_balance)
         const current = item.current_balance === null || item.current_balance === undefined ? null : num(item.current_balance)
 
@@ -94,7 +105,9 @@ const FinancialAccountCard = React.memo(
                     </div>
 
                     <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                        <ActionsDropdown onEdit={onEdit} onDelete={onDelete} />
+                        <ActionsDropdown onEdit={onEdit} onDelete={onDelete}>
+                            <DropdownItem onClick={onAdjustBalance}>Ajustar saldo</DropdownItem>
+                        </ActionsDropdown>
                     </div>
                 </div>
             </motion.div>

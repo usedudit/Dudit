@@ -122,8 +122,8 @@ export default function TransactionsPage({
                 activeTab === "Todas" ||
                 (activeTab === "Entradas" && item.ledgerDirection === "in") ||
                 (activeTab === "Saídas" && item.ledgerDirection === "out") ||
-                (activeTab === "Pendentes" && item.status === "Pendente") ||
-                (activeTab === "Atrasadas" && (item.status === "Atrasado" || item.isOverdue))
+                (activeTab === "Pendentes" && item.status === "Pendente" && !item.isOverdue) ||
+                (activeTab === "Atrasadas" && item.isOverdue)
 
             const matchesStatus = filters.status.length === 0 || filters.status.includes(item.status)
             const matchesCategory = filters.category.length === 0 || filters.category.includes(item.category)

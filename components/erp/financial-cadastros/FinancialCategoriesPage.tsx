@@ -1,16 +1,18 @@
 "use client"
 
-import React, { useState, useMemo, useCallback } from "react"
+import React, { useState, useMemo, useCallback, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { useNotification } from "@/hooks/use-notification"
 import { PlusIcon } from "@/lib/icons"
-import { Button, IconPlaceholder, Combobox, Input, Checkbox, FormTextarea } from "@/components/reusable"
+import { Button, IconPlaceholder, Combobox, Input, Checkbox, FormTextarea, FormDropdown, MoneyInput } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
 import Pagination from "@/components/reusable/Pagination"
 
 import FinancialCategoryCard from "./FinancialCategoryCard"
 import FinancialAccountCard, { type FinanceAccountRow } from "./FinancialAccountCard"
+import FinancialContactCard from "./FinancialContactCard"
 import FinancialCadastrosPageControls, { type FinancialCadastrosTab } from "./FinancialCadastrosPageControls"
 
 import {
@@ -26,6 +28,13 @@ import {
     getFinanceAccountsAction,
     type FinanceAccountType,
 } from "@/app/actions/erp/finance-accounts"
+import {
+    listAllTransactionContactsAction,
+    createTransactionContactAction,
+    type TransactionContactRow,
+} from "@/app/actions/erp/transaction-contacts"
+import { adjustAccountBalanceViaTransactionAction } from "@/app/actions/erp/transactions"
+import { formatCurrency } from "@/lib/utils"
 
 interface FinancialCategoriesPageProps {
     initialCategories: {
@@ -52,12 +61,14 @@ function parseMoneyInput(s: string): number {
     return Number.isFinite(n) ? n : 0
 }
 
-function parseOptionalMoneyInput(s: string): number | null {
-    const t = s.trim().replace(",", ".")
-    if (t === "") return null
-    const n = Number(t)
-    return Number.isFinite(n) ? n : null
+function accountCurrentNum(item: FinanceAccountRow): number {
+    const v = item.current_balance
+    if (v === null || v === undefined) return 0
+    const n = Number(v)
+    return Number.isFinite(n) ? n : 0
 }
+
+type FinContactModalType = "supplier" | "service" | "employee" | "partner" | "other"
 
 export default function FinancialCategoriesPage({
     initialCategories,
@@ -65,6 +76,7 @@ export default function FinancialCategoriesPage({
     partnerId,
 }: FinancialCategoriesPageProps) {
     const { success, error } = useNotification()
+    const router = useRouter()
 
     const [categories, setCategories] = useState(initialCategories)
     const [accounts, setAccounts] = useState<FinanceAccountRow[]>(initialAccounts)
@@ -101,7 +113,6 @@ export default function FinancialCategoriesPage({
             type: FinanceAccountType
             description: string
             initialBalanceStr: string
-            currentBalanceStr: string
             is_active: boolean
         }
         isSaving: boolean
@@ -113,11 +124,33 @@ export default function FinancialCategoriesPage({
             type: "cash",
             description: "",
             initialBalanceStr: "0",
-            currentBalanceStr: "",
             is_active: true,
         },
         isSaving: false,
     })
+
+    const [contacts, setContacts] = useState<TransactionContactRow[]>([])
+
+    const [contactModal, setContactModal] = useState<{
+        isOpen: boolean
+        type: FinContactModalType
+        name: string
+        description: string
+        saving: boolean
+    }>({
+        isOpen: false,
+        type: "supplier",
+        name: "",
+        description: "",
+        saving: false,
+    })
+
+    const [adjustBalanceModal, setAdjustBalanceModal] = useState<{
+        open: boolean
+        account: FinanceAccountRow | null
+        newBalance: number
+        saving: boolean
+    }>({ open: false, account: null, newBalance: 0, saving: false })
 
     const [deleteModal, setDeleteModal] = useState<{
         isOpen: boolean
@@ -136,6 +169,14 @@ export default function FinancialCategoriesPage({
         if (catsRes.success && catsRes.data) setCategories(catsRes.data.categories)
         if (accRes.success && accRes.data) setAccounts(accRes.data.accounts as FinanceAccountRow[])
     }, [partnerId])
+
+    useEffect(() => {
+        if (activeTab !== "contacts") return
+        ;(async () => {
+            const res = await listAllTransactionContactsAction(partnerId)
+            if (res.success) setContacts(res.data)
+        })()
+    }, [activeTab, partnerId])
 
     const filteredCategoryItems = useMemo(() => {
         const items =
@@ -158,13 +199,37 @@ export default function FinancialCategoriesPage({
         })
     }, [accounts, search])
 
+    const filteredContacts = useMemo(() => {
+        const q = search.toLowerCase()
+        return contacts.filter(
+            (c) =>
+                c.name.toLowerCase().includes(q) ||
+                c.type.toLowerCase().includes(q) ||
+                (c.description && c.description.toLowerCase().includes(q)),
+        )
+    }, [contacts, search])
+
     const filteredItems =
-        activeTab === "accounts" ? filteredAccounts : filteredCategoryItems
+        activeTab === "accounts"
+            ? filteredAccounts
+            : activeTab === "contacts"
+              ? filteredContacts
+              : filteredCategoryItems
 
     const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE)
     const paginatedItems = filteredItems.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
 
     const handleAdd = () => {
+        if (activeTab === "contacts") {
+            setContactModal({
+                isOpen: true,
+                type: "supplier",
+                name: "",
+                description: "",
+                saving: false,
+            })
+            return
+        }
         if (activeTab === "accounts") {
             setAccountModal({
                 isOpen: true,
@@ -174,7 +239,6 @@ export default function FinancialCategoriesPage({
                     type: "cash",
                     description: "",
                     initialBalanceStr: "0",
-                    currentBalanceStr: "",
                     is_active: true,
                 },
                 isSaving: false,
@@ -216,10 +280,6 @@ export default function FinancialCategoriesPage({
                 type: item.type as FinanceAccountType,
                 description: item.description ?? "",
                 initialBalanceStr: String(item.initial_balance ?? "0"),
-                currentBalanceStr:
-                    item.current_balance === null || item.current_balance === undefined
-                        ? ""
-                        : String(item.current_balance),
                 is_active: item.is_active,
             },
             isSaving: false,
@@ -297,7 +357,6 @@ export default function FinancialCategoriesPage({
         setAccountNameError(false)
 
         const initialBal = parseMoneyInput(item.initialBalanceStr)
-        const currentBal = parseOptionalMoneyInput(item.currentBalanceStr)
 
         setAccountModal((prev) => ({ ...prev, isSaving: true }))
         try {
@@ -309,7 +368,6 @@ export default function FinancialCategoriesPage({
                     type: item.type,
                     description: item.description || null,
                     initialBalance: initialBal,
-                    currentBalance: currentBal,
                 })
             } else {
                 if (!item.id) {
@@ -321,7 +379,6 @@ export default function FinancialCategoriesPage({
                     type: item.type,
                     description: item.description || null,
                     initialBalance: initialBal,
-                    currentBalance: currentBal,
                     isActive: item.is_active,
                 })
             }
@@ -329,6 +386,7 @@ export default function FinancialCategoriesPage({
             if (result.success) {
                 success("Cadastro salvo com sucesso!")
                 refreshData()
+                router.refresh()
                 setAccountModal((prev) => ({ ...prev, isOpen: false }))
             } else {
                 error(result.error || "Erro ao salvar")
@@ -337,6 +395,40 @@ export default function FinancialCategoriesPage({
             error("Erro ao processar solicitação")
         } finally {
             setAccountModal((prev) => ({ ...prev, isSaving: false }))
+        }
+    }
+
+    const handleSaveContact = async () => {
+        if (!contactModal.name.trim()) {
+            error("O nome é obrigatório")
+            return
+        }
+        setContactModal((prev) => ({ ...prev, saving: true }))
+        try {
+            const result = await createTransactionContactAction({
+                partnerId,
+                name: contactModal.name.trim(),
+                type: contactModal.type,
+                description: contactModal.description.trim() || null,
+            })
+            if (result.success) {
+                success("Contato criado com sucesso!")
+                setContactModal({
+                    isOpen: false,
+                    type: "supplier",
+                    name: "",
+                    description: "",
+                    saving: false,
+                })
+                const list = await listAllTransactionContactsAction(partnerId)
+                if (list.success) setContacts(list.data)
+            } else {
+                error(result.error || "Erro ao salvar")
+            }
+        } catch {
+            error("Erro ao processar solicitação")
+        } finally {
+            setContactModal((prev) => ({ ...prev, saving: false }))
         }
     }
 
@@ -390,7 +482,7 @@ export default function FinancialCategoriesPage({
                             </h1>
                         </div>
                         <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                            Categorias, subcategorias e contas (caixa, bancos e carteiras digitais).
+                            Categorias, subcategorias, contas e contatos financeiros.
                         </p>
                     </div>
 
@@ -445,7 +537,27 @@ export default function FinancialCategoriesPage({
                                         item={item}
                                         onEdit={() => handleEditAccount(item)}
                                         onDelete={() => handleDeleteAccount(item)}
+                                        onAdjustBalance={() =>
+                                            setAdjustBalanceModal({
+                                                open: true,
+                                                account: item,
+                                                newBalance: accountCurrentNum(item),
+                                                saving: false,
+                                            })
+                                        }
                                     />
+                                ))}
+                            </motion.div>
+                        ) : activeTab === "contacts" ? (
+                            <motion.div
+                                key="grid-contacts"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8"
+                            >
+                                {(paginatedItems as TransactionContactRow[]).map((item) => (
+                                    <FinancialContactCard key={item.id} item={item} onClick={() => {}} />
                                 ))}
                             </motion.div>
                         ) : (
@@ -625,19 +737,22 @@ export default function FinancialCategoriesPage({
                         }
                     />
 
-                    <Input
-                        label="Saldo atual (opcional)"
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="Deixe vazio se não quiser informar"
-                        value={accountModal.item.currentBalanceStr}
-                        onChange={(e) =>
-                            setAccountModal((prev) => ({
-                                ...prev,
-                                item: { ...prev.item, currentBalanceStr: e.target.value },
-                            }))
-                        }
-                    />
+                    {accountModal.mode === "edit" && accountModal.item.id ? (
+                        <Input
+                            label="Saldo atual"
+                            readOnly
+                            disabled
+                            value={(() => {
+                                const a = accounts.find((x) => x.id === accountModal.item.id)
+                                return a ? formatCurrency(accountCurrentNum(a)) : "—"
+                            })()}
+                        />
+                    ) : (
+                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                            O saldo inicial aberto será registrado como transação de ajuste. Para alterar o saldo depois,
+                            use &quot;Ajustar saldo&quot; no menu da conta.
+                        </p>
+                    )}
 
                     <Checkbox
                         id="finance_account_is_active"
@@ -651,6 +766,133 @@ export default function FinancialCategoriesPage({
                         }
                         className="mt-2"
                     />
+                </div>
+            </DefaultModal>
+
+            <DefaultModal
+                isOpen={contactModal.isOpen}
+                onClose={() =>
+                    setContactModal({ isOpen: false, type: "supplier", name: "", description: "", saving: false })
+                }
+                title="Novo contato financeiro"
+                maxWidth="md"
+                footer={
+                    <div className="flex justify-end gap-2 w-full">
+                        <Button
+                            variant="outline"
+                            onClick={() =>
+                                setContactModal({
+                                    isOpen: false,
+                                    type: "supplier",
+                                    name: "",
+                                    description: "",
+                                    saving: false,
+                                })
+                            }
+                        >
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleSaveContact} isLoading={contactModal.saving}>
+                            Salvar
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="space-y-4 p-4">
+                    <FormDropdown
+                        label="Tipo do contato"
+                        options={[
+                            { value: "supplier", label: "Fornecedor" },
+                            { value: "service", label: "Serviço" },
+                            { value: "employee", label: "Funcionário" },
+                            { value: "partner", label: "Parceiro" },
+                            { value: "other", label: "Outro" },
+                        ]}
+                        value={contactModal.type}
+                        setValue={(v) =>
+                            setContactModal((prev) => ({ ...prev, type: v as FinContactModalType }))
+                        }
+                    />
+                    <Input
+                        label="Nome"
+                        value={contactModal.name}
+                        onChange={(e) => setContactModal((prev) => ({ ...prev, name: e.target.value }))}
+                        placeholder="Nome exibido nas transações"
+                    />
+                    <Input
+                        label="Descrição (opcional)"
+                        value={contactModal.description}
+                        onChange={(e) => setContactModal((prev) => ({ ...prev, description: e.target.value }))}
+                        placeholder="Notas internas"
+                    />
+                </div>
+            </DefaultModal>
+
+            <DefaultModal
+                isOpen={adjustBalanceModal.open}
+                onClose={() => setAdjustBalanceModal({ open: false, account: null, newBalance: 0, saving: false })}
+                title="Ajustar saldo"
+                maxWidth="md"
+                footer={
+                    <div className="flex justify-end gap-2 w-full">
+                        <Button
+                            variant="outline"
+                            onClick={() =>
+                                setAdjustBalanceModal({ open: false, account: null, newBalance: 0, saving: false })
+                            }
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            isLoading={adjustBalanceModal.saving}
+                            onClick={async () => {
+                                const acc = adjustBalanceModal.account
+                                if (!acc) return
+                                setAdjustBalanceModal((p) => ({ ...p, saving: true }))
+                                try {
+                                    const res = await adjustAccountBalanceViaTransactionAction({
+                                        partnerId,
+                                        accountId: acc.id,
+                                        newBalance: adjustBalanceModal.newBalance,
+                                        description: `Ajuste de saldo — ${acc.name}`,
+                                    })
+                                    if (!res.success) {
+                                        error(res.error || "Erro ao ajustar saldo")
+                                        return
+                                    }
+                                    success("Saldo atualizado.")
+                                    setAdjustBalanceModal({ open: false, account: null, newBalance: 0, saving: false })
+                                    await refreshData()
+                                    router.refresh()
+                                } finally {
+                                    setAdjustBalanceModal((p) => ({ ...p, saving: false }))
+                                }
+                            }}
+                        >
+                            Salvar
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="space-y-4 p-4">
+                    {adjustBalanceModal.account ? (
+                        <>
+                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                {adjustBalanceModal.account.name}
+                            </p>
+                            <Input
+                                label="Saldo atual"
+                                readOnly
+                                disabled
+                                value={formatCurrency(accountCurrentNum(adjustBalanceModal.account))}
+                            />
+                            <MoneyInput
+                                label="Novo saldo"
+                                value={adjustBalanceModal.newBalance}
+                                onChange={(n) => setAdjustBalanceModal((p) => ({ ...p, newBalance: n }))}
+                            />
+                        </>
+                    ) : null}
                 </div>
             </DefaultModal>
 

@@ -202,7 +202,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
                     <div
                         ref={menuRef}
                         style={position}
-                        className={`z-50 ${width} ${originClass} rounded-md shadow-lg bg-white dark:bg-dark-surface ring-1 ring-black ring-opacity-5 ring-border dark:ring-dark-border transition-all ease-out duration-200 ${isOpen ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"}`}
+                        className={`z-130 ${width} ${originClass} rounded-md shadow-lg bg-white dark:bg-dark-surface ring-1 ring-black ring-opacity-5 ring-border dark:ring-dark-border transition-all ease-out duration-200 ${isOpen ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"}`}
                     >
                         <div className={contentClasses} role="menu" aria-orientation="vertical">
                             {children}

@@ -4,6 +4,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { createManualTransactionAction } from "@/app/actions/erp/transactions"
 
 export type FinanceAccountType = "cash" | "bank" | "wallet"
 
@@ -59,8 +60,10 @@ export async function createFinanceAccountAction(data: {
     if (!["cash", "bank", "wallet"].includes(data.type)) throw new Error("Tipo de conta inválido.")
 
     const initial = parseBalance(data.initialBalance)
-    const current =
+    const explicitCurrent =
       data.currentBalance === undefined ? null : parseOptionalBalance(data.currentBalance)
+    const targetCurrent =
+      explicitCurrent !== null && explicitCurrent !== undefined ? explicitCurrent : initial
 
     const { data: inserted, error } = await supabase
       .from("finance_accounts")
@@ -70,7 +73,7 @@ export async function createFinanceAccountAction(data: {
         type: data.type,
         description: data.description?.trim() || null,
         initial_balance: initial,
-        current_balance: current,
+        current_balance: 0,
       })
       .select(
         "id, name, type, description, initial_balance, current_balance, is_active, created_at, updated_at",
@@ -78,7 +81,40 @@ export async function createFinanceAccountAction(data: {
       .single()
 
     if (error) throw error
-    return { success: true, data: inserted }
+
+    if (Math.abs(targetCurrent) >= 0.005) {
+      const today = new Date().toISOString().slice(0, 10)
+      const transactionTs = new Date(`${today}T12:00:00`).toISOString()
+      const adj = await createManualTransactionAction({
+        partnerId: data.partnerId,
+        transactionType: "adjustment",
+        amount: targetCurrent,
+        description: `Saldo inicial — ${data.name.trim()}`,
+        category: "Ajuste de saldo",
+        categoryId: null,
+        subcategoryId: null,
+        accountId: inserted.id,
+        contactId: null,
+        customerId: null,
+        contactType: null,
+        paymentType: "Ajuste",
+        dueDate: today,
+        paymentDate: transactionTs,
+        transactionDate: transactionTs,
+        status: "paid",
+        notes: null,
+        origin: "manual",
+      })
+      if (!adj.success) throw new Error(adj.error || "Erro ao registrar saldo inicial.")
+    }
+
+    const { data: refreshed } = await supabase
+      .from("finance_accounts")
+      .select("id, name, type, description, initial_balance, current_balance, is_active, created_at, updated_at")
+      .eq("id", inserted.id)
+      .single()
+
+    return { success: true, data: refreshed || inserted }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -92,11 +128,13 @@ export async function updateFinanceAccountAction(
     type?: FinanceAccountType
     description?: string | null
     initialBalance?: number
-    currentBalance?: number | null
     isActive?: boolean
   },
 ) {
   try {
+    const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
     await requirePartnerAccessWithPermission(partnerId, "financial", "edit")
     const supabase = await getSupabaseServerClient()
 
@@ -108,7 +146,6 @@ export async function updateFinanceAccountAction(
     }
     if (data.description !== undefined) payload.description = data.description?.trim() || null
     if (data.initialBalance !== undefined) payload.initial_balance = parseBalance(data.initialBalance)
-    if (data.currentBalance !== undefined) payload.current_balance = parseOptionalBalance(data.currentBalance)
     if (data.isActive !== undefined) payload.is_active = data.isActive
 
     const { data: updated, error } = await supabase

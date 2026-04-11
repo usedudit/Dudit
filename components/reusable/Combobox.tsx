@@ -32,6 +32,8 @@ interface ComboboxProps {
     width?: string
     label?: string
     required?: boolean
+    /** Borda vermelha (validação), alinhado ao Input */
+    error?: boolean
 }
 
 export function Combobox({
@@ -47,6 +49,7 @@ export function Combobox({
     width = "w-full",
     label,
     required,
+    error = false,
 }: ComboboxProps) {
     const [isOpen, setIsOpen] = useState(false)
     const [isMounted, setIsMounted] = useState(false)
@@ -268,7 +271,7 @@ export function Combobox({
                     className={cn(
                         inputBaseClasses,
                         "flex items-center justify-between",
-                        borderClasses(isOpen),
+                        borderClasses(isOpen, error),
                         "disabled:bg-brand-gray dark:disabled:bg-dark-border/30 disabled:opacity-100 disabled:cursor-not-allowed",
                         // CORREÇÃO 3: Força o background branco quando está aberto
                         isOpen && "bg-white dark:bg-dark-surface"
@@ -300,7 +303,7 @@ export function Combobox({
                     style={position}
                     className={cn(
                         "rounded-md shadow-lg bg-white dark:bg-dark-surface ring-1 ring-black ring-opacity-5 ring-border dark:ring-dark-border overflow-hidden",
-                        "transition-all ease-out duration-200 z-[9999]",
+                        "transition-all ease-out duration-200 z-9999",
                         isOpen ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none",
                     )}
                 >

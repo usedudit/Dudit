@@ -1,9 +1,9 @@
 import React from "react"
 import { Button, Input } from "@/components/reusable"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
-import { SearchIcon, PlusIcon, Package, SubcategoryIcon, MoneyIcon } from "@/lib/icons"
+import { SearchIcon, PlusIcon, Package, SubcategoryIcon, MoneyIcon, UserIcon } from "@/lib/icons"
 
-export type FinancialCadastrosTab = "categories" | "subcategories" | "accounts"
+export type FinancialCadastrosTab = "categories" | "subcategories" | "accounts" | "contacts"
 
 interface FinancialCadastrosPageControlsProps {
     activeTab: FinancialCadastrosTab
@@ -33,6 +33,9 @@ const FinancialCadastrosPageControls: React.FC<FinancialCadastrosPageControlsPro
                         </TabsTrigger>
                         <TabsTrigger value="accounts" icon={MoneyIcon}>
                             Contas
+                        </TabsTrigger>
+                        <TabsTrigger value="contacts" icon={UserIcon}>
+                            Contatos
                         </TabsTrigger>
                     </TabsList>
                 </Tabs>

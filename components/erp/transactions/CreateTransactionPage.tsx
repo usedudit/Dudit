@@ -18,6 +18,7 @@ import {
     DatePicker,
     FormDropdown,
     Checkbox,
+    InfoCard,
 } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
@@ -35,7 +36,12 @@ import {
     ReturnIcon,
 } from "@/lib/icons"
 import { useNotification } from "@/hooks/use-notification"
-import { createManualTransactionAction, createTransferPairAction } from "@/app/actions/erp/transactions"
+import { formatCurrency } from "@/lib/utils"
+import {
+    createManualTransactionAction,
+    createTransferPairAction,
+    adjustAccountBalanceViaTransactionAction,
+} from "@/app/actions/erp/transactions"
 import { createFinancialCategoryAction } from "@/app/actions/erp/financial-category-metadata"
 import { createFinanceAccountAction, type FinanceAccountType } from "@/app/actions/erp/finance-accounts"
 import {
@@ -49,7 +55,13 @@ import {
 } from "@/app/actions/erp/recurring-transactions"
 
 export type CategoryItem = { id: string; name: string; parent_id: string | null }
-export type AccountItem = { id: string; name: string; type: string; is_active: boolean }
+export type AccountItem = {
+    id: string
+    name: string
+    type: string
+    is_active: boolean
+    current_balance?: number | string | null
+}
 
 export type TxKind = "income" | "expense" | "transfer" | "adjustment" | "refund"
 
@@ -123,6 +135,7 @@ const FormCombobox = ({
             className="w-full"
             actionItem={actionItem}
             placeholder={placeholder}
+            error={error}
         />
         {error && errorMessage ? <p className="text-xs text-brand-red">{errorMessage}</p> : null}
     </div>
@@ -178,7 +191,7 @@ export default function CreateTransactionPage({
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(() => new Set())
     const [showDiscardModal, setShowDiscardModal] = useState(false)
 
-    const [adjustDirection, setAdjustDirection] = useState<"increase" | "decrease">("increase")
+    const [adjustmentTargetBalance, setAdjustmentTargetBalance] = useState(0)
     const [refundKind, setRefundKind] = useState<"expense_refund" | "revenue_refund">("expense_refund")
     const [referenceNote, setReferenceNote] = useState("")
 
@@ -200,6 +213,13 @@ export default function CreateTransactionPage({
     const [newContactDesc, setNewContactDesc] = useState("")
     const pendingSelectContactIdRef = useRef<string | null>(null)
     const pendingCloseRef = useRef<(() => void) | null>(null)
+    const skipTransferBalanceCheckRef = useRef(false)
+
+    const [transferInsufficientOpen, setTransferInsufficientOpen] = useState(false)
+    const [transferInsufficientMeta, setTransferInsufficientMeta] = useState({ fromBal: 0, amount: 0 })
+    const [adjustFromTransferOpen, setAdjustFromTransferOpen] = useState(false)
+    const [adjustFromTransferNewBalance, setAdjustFromTransferNewBalance] = useState(0)
+    const [adjustFromTransferSaving, setAdjustFromTransferSaving] = useState(false)
 
     const defaultDayYmd = useMemo(() => format(new Date(), "yyyy-MM-dd"), [])
     const defaultRecurrenceNext = useMemo(
@@ -207,9 +227,30 @@ export default function CreateTransactionPage({
         [],
     )
 
+    const activeAccounts = useMemo(() => accounts.filter((a) => a.is_active), [accounts])
+    const accountOptions = useMemo(
+        () => activeAccounts.map((a) => ({ value: a.id, label: a.name })),
+        [activeAccounts],
+    )
+
+    const getAccountBalance = useCallback(
+        (id?: string) => {
+            if (!id) return 0
+            const a = activeAccounts.find((x) => x.id === id)
+            if (!a) return 0
+            const v = a.current_balance
+            if (v === null || v === undefined) return 0
+            const n = Number(v)
+            return Number.isFinite(n) ? n : 0
+        },
+        [activeAccounts],
+    )
+
     const isDirty = useMemo(() => {
         if (description.trim()) return true
-        if (amount > 0) return true
+        if (txKind === "adjustment") {
+            if (accountId && Math.abs(adjustmentTargetBalance - getAccountBalance(accountId)) > 0.005) return true
+        } else if (amount > 0) return true
         if (notes.trim()) return true
         if (categoryId) return true
         if (subcategoryId) return true
@@ -223,7 +264,6 @@ export default function CreateTransactionPage({
         if (contactType !== "customer") return true
         if (referenceNote.trim()) return true
         if (refundKind !== "expense_refund") return true
-        if (adjustDirection !== "increase") return true
         if (txKind !== "income") return true
         if (dueDate !== defaultDayYmd || paymentDate !== defaultDayYmd) return true
         if (recurrenceEndYmd.trim()) return true
@@ -238,6 +278,7 @@ export default function CreateTransactionPage({
         categoryId,
         subcategoryId,
         accountId,
+        adjustmentTargetBalance,
         fromAccountId,
         toAccountId,
         selectedContactId,
@@ -248,8 +289,8 @@ export default function CreateTransactionPage({
         contactType,
         referenceNote,
         refundKind,
-        adjustDirection,
         txKind,
+        getAccountBalance,
         dueDate,
         paymentDate,
         defaultDayYmd,
@@ -285,10 +326,18 @@ export default function CreateTransactionPage({
         if (contactType !== "customer") setSelectedCustomer(null)
     }, [contactType])
 
-    const activeAccounts = useMemo(() => accounts.filter((a) => a.is_active), [accounts])
-    const accountOptions = useMemo(
-        () => activeAccounts.map((a) => ({ value: a.id, label: a.name })),
-        [activeAccounts],
+    useEffect(() => {
+        if (txKind === "adjustment") setStatus("paid")
+    }, [txKind])
+
+    useEffect(() => {
+        if (txKind !== "adjustment" || !accountId) return
+        setAdjustmentTargetBalance(getAccountBalance(accountId))
+    }, [txKind, accountId, getAccountBalance])
+
+    const transferFromAccountName = useMemo(
+        () => activeAccounts.find((a) => a.id === fromAccountId)?.name || "Conta de origem",
+        [activeAccounts, fromAccountId],
     )
 
     const parentCategories = useMemo(() => categories.filter((c) => !c.parent_id), [categories])
@@ -480,8 +529,9 @@ export default function CreateTransactionPage({
             if (fromAccountId && toAccountId && fromAccountId === toAccountId) e.add("toAccountId")
         } else if (txKind === "adjustment") {
             if (!description.trim()) e.add("description")
-            if (!(Math.abs(amount) > 0)) e.add("amount")
             if (!accountId) e.add("accountId")
+            const cur = getAccountBalance(accountId)
+            if (Math.abs(adjustmentTargetBalance - cur) < 0.005) e.add("adjustmentTarget")
         } else if (txKind === "refund") {
             if (!description.trim()) e.add("description")
             if (!(amount > 0)) e.add("amount")
@@ -511,6 +561,8 @@ export default function CreateTransactionPage({
         enableRecurrence,
         recurrenceNextRunYmd,
         recurrenceEndYmd,
+        adjustmentTargetBalance,
+        getAccountBalance,
     ])
 
     const contactPayload = useCallback(() => {
@@ -553,6 +605,19 @@ export default function CreateTransactionPage({
         setFieldErrors(new Set())
 
         if (txKind === "transfer") {
+            const fromBal = getAccountBalance(fromAccountId)
+            if (
+                !skipTransferBalanceCheckRef.current &&
+                status === "paid" &&
+                amount > 0 &&
+                fromBal + 0.005 < amount
+            ) {
+                setTransferInsufficientMeta({ fromBal, amount })
+                setTransferInsufficientOpen(true)
+                return
+            }
+            skipTransferBalanceCheckRef.current = false
+
             setIsSaving(true)
             try {
                 const res = await createTransferPairAction({
@@ -576,8 +641,13 @@ export default function CreateTransactionPage({
         }
 
         if (txKind === "adjustment") {
-            const abs = Math.abs(amount)
-            const signed = adjustDirection === "increase" ? abs : -abs
+            const cur = getAccountBalance(accountId)
+            const signed = Math.round((adjustmentTargetBalance - cur) * 100) / 100
+            if (Math.abs(signed) < 0.005) {
+                return error("O novo saldo deve ser diferente do saldo atual.")
+            }
+            const datePart = dueDate.slice(0, 10)
+            const transactionTs = new Date(`${datePart}T12:00:00`).toISOString()
             setIsSaving(true)
             try {
                 const res = await createManualTransactionAction({
@@ -594,9 +664,9 @@ export default function CreateTransactionPage({
                     contactType: null,
                     paymentType: "Ajuste",
                     dueDate,
-                    paymentDate: status === "paid" ? paymentDate : null,
-                    transactionDate: dueDate,
-                    status,
+                    paymentDate: transactionTs,
+                    transactionDate: datePart,
+                    status: "paid",
                     notes: notes || null,
                     origin: "manual",
                 })
@@ -781,9 +851,7 @@ export default function CreateTransactionPage({
             {txKind === "transfer" && (
                 <section className="space-y-4">
                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Transferência</h3>
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                        Serão criados dois lançamentos vinculados (saída na origem e entrada no destino).
-                    </p>
+                    <InfoCard message="Serão criados dois lançamentos vinculados (saída na origem e entrada no destino)." color="gray" />
                     <MoneyInput
                         label="Valor"
                         value={amount}
@@ -830,24 +898,22 @@ export default function CreateTransactionPage({
             {txKind === "adjustment" && (
                 <section className="space-y-4">
                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Ajuste de saldo</h3>
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body rounded-xl border border-brand-border dark:border-dark-border p-3 bg-brand-gray/40 dark:bg-dark-border/20">
-                        Esse lançamento ajusta o saldo da conta manualmente (ex.: conciliação ou correção).
-                    </p>
-                    <MoneyInput
-                        label="Valor"
-                        value={Math.abs(amount)}
-                        onChange={(n) => setAmount(Math.abs(n))}
-                        error={fieldErrors.has("amount")}
-                        errorMessage={fieldErrors.has("amount") ? "Informe um valor" : undefined}
+                    <InfoCard message="Informe o novo saldo da conta; o sistema calcula a diferença e registra o ajuste." color="gray" />
+
+                    <Input
+                        label="Saldo atual"
+                        readOnly
+                        disabled
+                        value={accountId ? formatCurrency(getAccountBalance(accountId)) : "—"}
                     />
-                    <FormDropdown
-                        label="Direção do ajuste"
-                        options={[
-                            { value: "increase", label: "Aumentar saldo (crédito)" },
-                            { value: "decrease", label: "Reduzir saldo (débito)" },
-                        ]}
-                        value={adjustDirection}
-                        setValue={(v) => setAdjustDirection(v as "increase" | "decrease")}
+                    <MoneyInput
+                        label="Novo saldo"
+                        value={adjustmentTargetBalance}
+                        onChange={setAdjustmentTargetBalance}
+                        error={fieldErrors.has("adjustmentTarget")}
+                        errorMessage={
+                            fieldErrors.has("adjustmentTarget") ? "Defina um saldo diferente do atual" : undefined
+                        }
                     />
                     <Input
                         label="Descrição"
@@ -858,15 +924,7 @@ export default function CreateTransactionPage({
                         error={fieldErrors.has("description")}
                         errorMessage={fieldErrors.has("description") ? "Descrição obrigatória" : undefined}
                     />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <DatePicker label="Data" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} />
-                        <DatePicker
-                            label="Data do pagamento"
-                            value={paymentDate}
-                            onChange={(d) => setPaymentDate(toYmd(d))}
-                            disabled={status !== "paid"}
-                        />
-                    </div>
+                    <DatePicker label="Data" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} />
                 </section>
             )}
 
@@ -882,6 +940,15 @@ export default function CreateTransactionPage({
                         value={refundKind}
                         setValue={(v) => setRefundKind(v as "expense_refund" | "revenue_refund")}
                     />
+                    <Input
+                        label="Descrição"
+                        required
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Detalhe o reembolso"
+                        error={fieldErrors.has("description")}
+                        errorMessage={fieldErrors.has("description") ? "Descrição obrigatória" : undefined}
+                    />
                     <MoneyInput
                         label="Valor"
                         value={amount}
@@ -894,15 +961,6 @@ export default function CreateTransactionPage({
                         value={referenceNote}
                         onChange={(e) => setReferenceNote(e.target.value)}
                         placeholder="Ex: Pedido #1234, NF, despesa anterior…"
-                    />
-                    <Input
-                        label="Descrição"
-                        required
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Detalhe o reembolso"
-                        error={fieldErrors.has("description")}
-                        errorMessage={fieldErrors.has("description") ? "Descrição obrigatória" : undefined}
                     />
                     <DatePicker label="Data de vencimento" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} />
                 </section>
@@ -1057,20 +1115,28 @@ export default function CreateTransactionPage({
                     {txKind === "transfer" ? "Status" : txKind === "adjustment" ? "Status e conta" : "Status e conta"}
                 </h3>
                 <div className="space-y-4">
-                    <div>
-                        <label className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Situação</label>
-                        <div className="grid grid-cols-2 gap-2 mt-2">
-                            <Button variant={status === "paid" ? "default" : "outline"} onClick={() => setStatus("paid")}>
-                                {txKind === "transfer" ? "Efetivado" : txKind === "adjustment" ? "Confirmado" : paidLabel}
-                            </Button>
-                            <Button
-                                variant={status === "pending" ? "default" : "outline"}
-                                onClick={() => setStatus("pending")}
-                            >
-                                Pendente
-                            </Button>
+                    {txKind === "adjustment" ? (
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                            O ajuste é confirmado ao salvar e atualiza o saldo da conta.
+                        </p>
+                    ) : (
+                        <div>
+                            <label className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                Situação
+                            </label>
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                                <Button variant={status === "paid" ? "default" : "outline"} onClick={() => setStatus("paid")}>
+                                    {txKind === "transfer" ? "Efetivado" : paidLabel}
+                                </Button>
+                                <Button
+                                    variant={status === "pending" ? "default" : "outline"}
+                                    onClick={() => setStatus("pending")}
+                                >
+                                    Pendente
+                                </Button>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {(isIncomeExpense || txKind === "refund" || txKind === "adjustment") && (
                         <FormCombobox
@@ -1112,9 +1178,6 @@ export default function CreateTransactionPage({
             {needsContactPanel && (
                 <SidebarCard>
                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Contato</h3>
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-3">
-                        Opcional — salve sem vincular contato se preferir.
-                    </p>
                     <FormDropdown
                         label="Tipo de contato"
                         options={[
@@ -1493,6 +1556,100 @@ export default function CreateTransactionPage({
                             value={newContactDesc}
                             onChange={(e) => setNewContactDesc(e.target.value)}
                             placeholder="Notas internas"
+                        />
+                    </div>
+                </DefaultModal>
+
+                <DefaultModal
+                    isOpen={transferInsufficientOpen}
+                    onClose={() => setTransferInsufficientOpen(false)}
+                    title="Saldo insuficiente"
+                    maxWidth="md"
+                    footer={
+                        <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end w-full">
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setTransferInsufficientOpen(false)
+                                    setAdjustFromTransferNewBalance(transferInsufficientMeta.fromBal)
+                                    setAdjustFromTransferOpen(true)
+                                }}
+                            >
+                                Ajustar saldo
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    skipTransferBalanceCheckRef.current = true
+                                    setTransferInsufficientOpen(false)
+                                    void handleSave()
+                                }}
+                            >
+                                Continuar
+                            </Button>
+                        </div>
+                    }
+                >
+                    <div className="space-y-4 text-sm text-brand-inactive-text dark:text-dark-body">
+                        <p>A conta de origem selecionada não possui saldo suficiente para essa transferência.</p>
+                        <div className="rounded-xl border border-brand-border dark:border-dark-border p-3 space-y-2 text-brand-dark dark:text-dark-heading font-medium">
+                            <p>Saldo atual: {formatCurrency(transferInsufficientMeta.fromBal)}</p>
+                            <p>Valor da transferência: {formatCurrency(transferInsufficientMeta.amount)}</p>
+                        </div>
+                        <p className="text-brand-red text-xs">Se continuar, o saldo ficará negativo.</p>
+                    </div>
+                </DefaultModal>
+
+                <DefaultModal
+                    isOpen={adjustFromTransferOpen}
+                    onClose={() => setAdjustFromTransferOpen(false)}
+                    title="Ajustar saldo da conta"
+                    maxWidth="md"
+                    footer={
+                        <div className="flex justify-end gap-2 w-full">
+                            <Button variant="outline" onClick={() => setAdjustFromTransferOpen(false)}>
+                                Cancelar
+                            </Button>
+                            <Button
+                                isLoading={adjustFromTransferSaving}
+                                onClick={async () => {
+                                    if (!fromAccountId) return
+                                    setAdjustFromTransferSaving(true)
+                                    try {
+                                        const res = await adjustAccountBalanceViaTransactionAction({
+                                            partnerId,
+                                            accountId: fromAccountId,
+                                            newBalance: adjustFromTransferNewBalance,
+                                            description: `Ajuste de saldo — ${transferFromAccountName}`,
+                                            transactionDateYmd: dueDate,
+                                        })
+                                        if (!res.success) return error(res.error || "Erro ao ajustar saldo")
+                                        success("Saldo atualizado. Você pode concluir a transferência.")
+                                        setAdjustFromTransferOpen(false)
+                                        router.refresh()
+                                    } finally {
+                                        setAdjustFromTransferSaving(false)
+                                    }
+                                }}
+                            >
+                                Salvar ajuste
+                            </Button>
+                        </div>
+                    }
+                >
+                    <div className="space-y-4">
+                        <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                            {transferFromAccountName}
+                        </p>
+                        <Input
+                            label="Saldo atual"
+                            readOnly
+                            disabled
+                            value={formatCurrency(getAccountBalance(fromAccountId))}
+                        />
+                        <MoneyInput
+                            label="Novo saldo"
+                            value={adjustFromTransferNewBalance}
+                            onChange={setAdjustFromTransferNewBalance}
                         />
                     </div>
                 </DefaultModal>

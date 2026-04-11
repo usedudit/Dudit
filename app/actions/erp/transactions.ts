@@ -68,6 +68,7 @@ function toDisplayStatus(
     status: string,
     transactionType: ERPTransaction["transactionType"],
     refundKind?: string | null,
+    isOverdue?: boolean,
 ) {
     const s = String(status || "").toLowerCase().trim()
     if (s === "paid") {
@@ -75,8 +76,63 @@ function toDisplayStatus(
         if (transactionType === "refund" && refundKind === "expense_refund") return "Recebido"
         return "Pago"
     }
+    if (s === "pending" && isOverdue) return "Atrasado"
     if (s === "pending") return "Pendente"
     return status || "Pendente"
+}
+
+function isLedgerConfirmedStatus(status: string | null | undefined): boolean {
+    const s = String(status || "").toLowerCase()
+    return ["paid", "pago", "recebido", "confirmed", "confirmado", "efetivado"].includes(s)
+}
+
+function numFinanceBalance(v: unknown): number {
+    if (v === null || v === undefined) return 0
+    const n = Number(v)
+    return Number.isFinite(n) ? n : 0
+}
+
+async function applyFinanceAccountBalanceAfterInsert(
+    supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+    partnerId: string,
+    accountId: string | null | undefined,
+    row: {
+        transaction_type: string
+        amount: number | string
+        status: string
+        refund_kind?: string | null
+    },
+) {
+    if (!accountId) return
+    if (!isLedgerConfirmedStatus(row.status)) return
+
+    const rawAmt = Number(row.amount || 0)
+    let delta = 0
+    const tt = row.transaction_type
+    if (tt === "income") delta = Math.abs(rawAmt)
+    else if (tt === "expense") delta = -Math.abs(rawAmt)
+    else if (tt === "adjustment") delta = rawAmt
+    else if (tt === "refund") {
+        if (row.refund_kind === "expense_refund") delta = Math.abs(rawAmt)
+        else if (row.refund_kind === "revenue_refund") delta = -Math.abs(rawAmt)
+        else return
+    } else return
+
+    const { data: acc, error: fetchErr } = await supabase
+        .from("finance_accounts")
+        .select("id, current_balance")
+        .eq("id", accountId)
+        .eq("partner_id", partnerId)
+        .single()
+    if (fetchErr || !acc) return
+
+    const cur = numFinanceBalance(acc.current_balance)
+    const next = Math.round((cur + delta) * 100) / 100
+    await supabase
+        .from("finance_accounts")
+        .update({ current_balance: next, updated_at: new Date().toISOString() })
+        .eq("id", accountId)
+        .eq("partner_id", partnerId)
 }
 
 export async function getFinancialTransactionsAction(partnerId: string): Promise<{ success: true; data: ERPTransaction[] } | { success: false; error: string }> {
@@ -185,7 +241,7 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
                 dateNote: isOverdue ? "Atrasado" : "-",
                 isOverdue,
                 paymentType: t.payment_type || "Não informado",
-                status: toDisplayStatus(t.status, t.transaction_type, t.refund_kind),
+                status: toDisplayStatus(t.status, t.transaction_type, t.refund_kind, isOverdue),
                 statusVariant: toStatusVariant(t.status, isOverdue),
                 amount: Math.abs(Number(t.amount || 0)),
                 transactionType: t.transaction_type,
@@ -294,6 +350,14 @@ export async function createManualTransactionAction(input: CreateManualTransacti
 
         const { data, error } = await supabase.from("transactions").insert(payload).select("*").single()
         if (error) throw error
+
+        await applyFinanceAccountBalanceAfterInsert(supabase, input.partnerId, input.accountId, {
+            transaction_type: input.transactionType,
+            amount: payload.amount as number,
+            status: String(status),
+            refund_kind: input.refundKind,
+        })
+
         return { success: true, data }
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao criar transação" }
@@ -391,6 +455,20 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
 
         const { data, error } = await supabase.from("transactions").insert([outRow, inRow]).select("*")
         if (error) throw error
+
+        if (isLedgerConfirmedStatus(status)) {
+            await applyFinanceAccountBalanceAfterInsert(supabase, input.partnerId, input.fromAccountId, {
+                transaction_type: "expense",
+                amount: amt,
+                status,
+            })
+            await applyFinanceAccountBalanceAfterInsert(supabase, input.partnerId, input.toAccountId, {
+                transaction_type: "income",
+                amount: amt,
+                status,
+            })
+        }
+
         return { success: true, data, transferGroupId }
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao criar transferência" }
@@ -453,6 +531,69 @@ export async function updateManualTransactionAction(
         return { success: true, data }
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao atualizar transação" }
+    }
+}
+
+export async function adjustAccountBalanceViaTransactionAction(input: {
+    partnerId: string
+    accountId: string
+    newBalance: number
+    description?: string | null
+    transactionDateYmd?: string | null
+}) {
+    try {
+        const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
+        await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const supabase = await getSupabaseServerClient()
+
+        const { data: acc, error: accErr } = await supabase
+            .from("finance_accounts")
+            .select("id, name, current_balance")
+            .eq("id", input.accountId)
+            .eq("partner_id", input.partnerId)
+            .single()
+        if (accErr || !acc) throw new Error("Conta não encontrada.")
+
+        const old = numFinanceBalance(acc.current_balance)
+        const target = Number(input.newBalance)
+        if (!Number.isFinite(target)) throw new Error("Saldo inválido.")
+
+        const delta = Math.round((target - old) * 100) / 100
+        if (delta === 0) {
+            return { success: true, data: { skipped: true as const } }
+        }
+
+        const datePart = (input.transactionDateYmd || new Date().toISOString().slice(0, 10)).slice(0, 10)
+        const transactionTs = new Date(`${datePart}T12:00:00`).toISOString()
+        const desc = (input.description && input.description.trim()) || `Ajuste de saldo — ${acc.name}`
+
+        const res = await createManualTransactionAction({
+            partnerId: input.partnerId,
+            transactionType: "adjustment",
+            amount: delta,
+            description: desc,
+            category: "Ajuste de saldo",
+            categoryId: null,
+            subcategoryId: null,
+            accountId: input.accountId,
+            contactId: null,
+            customerId: null,
+            contactType: null,
+            paymentType: "Ajuste",
+            dueDate: datePart,
+            paymentDate: transactionTs,
+            transactionDate: transactionTs,
+            status: "paid",
+            notes: null,
+            origin: "manual",
+        })
+
+        if (!res.success) throw new Error(res.error || "Erro ao registrar ajuste.")
+        return { success: true, data: res.data }
+    } catch (e: any) {
+        return { success: false, error: e.message || "Erro ao ajustar saldo" }
     }
 }
 
