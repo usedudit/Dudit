@@ -109,7 +109,7 @@ import { getAllUserPartnerAccess } from "@/lib/auth/partner-context"
  * 
  * OPTIMIZED FAST-PATH:
  * - Avoids sequential DB queries by reading from the already-fetched request-cached `getPartnerContextHelper`.
- * - Falls back to the globally cached `getAllUserPartnerAccess` (which hits the RPC or unstable_cache).
+ * - Falls back to the globally cached `getAllUserPartnerAccess` (unstable_cache + admin, keyed by userId).
  */
 const checkPartnerAccess = async (
   partnerId: string,

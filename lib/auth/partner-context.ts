@@ -2,7 +2,7 @@ import "server-only"
 import { cache } from "react"
 import { unstable_cache } from "next/cache"
 import { cookies } from "next/headers"
-import { createAdminClient, createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import type { PartnerRole, PartnerPermissions } from "@/lib/permissions/types"
 import { TAGS } from "@/lib/utils/revalidation-tags"// ─── Constants ──────────────────────────────────────────────────────────────
@@ -107,48 +107,14 @@ export async function getPendingInviteToken(): Promise<string | null> {
 import { PERMISSION_PRESETS } from "@/lib/permissions/partner-roles"
 
 // ─── Extracted Cache Factory for stability and strict keying ────────────────
-
-function normalizeUserFullContextRpcPayload(data: unknown): any[] {
-    if (data == null) return []
-    if (Array.isArray(data)) return data
-    if (typeof data === "string") {
-        try {
-            const parsed = JSON.parse(data)
-            return Array.isArray(parsed) ? parsed : []
-        } catch {
-            return []
-        }
-    }
-    return []
-}
+//
+// unstable_cache must NOT call cookies(), headers(), or createClient() (session).
+// We load access by userId using the service role; userId is always resolved from
+// getCurrentUser() outside this scope, so rows cannot cross users.
 
 const getCachedUserAccess = (userId: string) => unstable_cache(
     async () => {
         const admin = createAdminClient()
-
-        // RPC uses auth.uid() — MUST use the user's session client, not service role (auth.uid() is null there).
-        const supabase = await createClient()
-        const { data: rpcData, error: rpcError } = await supabase.rpc("get_user_full_context")
-        const rows = normalizeUserFullContextRpcPayload(rpcData)
-
-        if (!rpcError) {
-            if (rows.length === 0) {
-                return []
-            }
-            return rows.map((record: any) => ({
-                partnerId: record.partner_id,
-                userId: record.user_id,
-                role: record.role as PartnerRole,
-                permissions: typeof record.permissions === "string" ? JSON.parse(record.permissions) : record.permissions,
-                storeName: record.store_name || "Loja sem nome",
-                ownerName: record.owner_name || "Desconhecido",
-                businessInfo: typeof record.business_info === "string" ? JSON.parse(record.business_info) : (record.business_info || { sells: ["products"], channels: ["online"] }),
-            })) as PartnerAccessRecord[]
-        }
-
-        if (rpcError && process.env.NODE_ENV === "development") {
-            console.warn("[AUTH] get_user_full_context RPC failed, using admin fallback:", rpcError.message)
-        }
 
         const [invitedDataRes, ownedDataRes] = await Promise.all([
             admin.from("partner_users").select(`
@@ -233,7 +199,6 @@ export const getAllUserPartnerAccess = cache(async (resolvedUser?: any): Promise
     const user = resolvedUser || await getCurrentUser()
     if (!user) return []
 
-    // Logging Cache Hit vs Exec will be seen structurally (if MISS log above wasn't fired, it is a HIT)
     const records = await getCachedUserAccess(user.id)();
     return records;
 })
