@@ -329,7 +329,7 @@ export function ERPSidebar() {
 
                 <nav
                     className={cn(
-                        "flex-grow py-2 px-3",
+                        "grow py-2 px-3",
                         isCollapsed
                             ? "overflow-visible"
                             : "overflow-y-auto overflow-x-hidden scrollbar-hide"
@@ -507,7 +507,7 @@ export function ERPSidebar() {
             <Drawer.Root open={isMobileOpen} onOpenChange={setIsMobileOpen}>
                 <Drawer.Portal>
                     <Drawer.Overlay className="fixed inset-0 bg-black/40 z-50" />
-                    <Drawer.Content className="bg-dark-background border-t border-dark-border flex flex-col rounded-t-[20px] h-[85vh] fixed bottom-0 left-0 right-0 z-[60] outline-none">
+                    <Drawer.Content className="bg-dark-background border-t border-dark-border flex flex-col rounded-t-[20px] h-[85vh] fixed bottom-0 left-0 right-0 z-60 outline-none">
                         <div className="mx-auto w-12 h-1.5 shrink-0 rounded-full bg-dark-border mt-3 mb-2" />
                         <div className="p-4 flex-1 overflow-y-auto no-scrollbar">
                             <nav className="flex flex-col gap-1">

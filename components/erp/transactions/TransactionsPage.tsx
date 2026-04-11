@@ -1,7 +1,6 @@
 "use client"
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, Checkbox, IconPlaceholder, Badge } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
@@ -21,6 +20,7 @@ import {
 import TransactionPageControls from "./TransactionPageControls"
 import TransactionListItem from "./TransactionListItem"
 import TransactionGridCard from "./TransactionGridCard"
+import CreateTransactionPage, { type CategoryItem, type AccountItem } from "./CreateTransactionPage"
 import { TRANSACTIONS_MOCK } from "./transactions.mock"
 import type { ERPTransaction, TransactionTab } from "../../../lib/services/transactions.types"
 
@@ -62,10 +62,15 @@ const getPaymentIcon = (paymentType: string) => {
 
 export default function TransactionsPage({
     transactions = TRANSACTIONS_MOCK,
+    partnerId,
+    categories = [],
+    accounts = [],
 }: {
     transactions?: ERPTransaction[]
+    partnerId: string
+    categories?: CategoryItem[]
+    accounts?: AccountItem[]
 }) {
-    const router = useRouter()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
 
@@ -77,6 +82,7 @@ export default function TransactionsPage({
     const [modals, setModals] = useState({ filter: false })
     const [selection, setSelection] = useState({ ids: new Set<string>() })
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
+    const [showCreateTransaction, setShowCreateTransaction] = useState(false)
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
@@ -115,8 +121,8 @@ export default function TransactionsPage({
 
             const matchesTab =
                 activeTab === "Todas" ||
-                (activeTab === "Entradas" && item.transactionType === "income") ||
-                (activeTab === "Saídas" && item.transactionType === "expense") ||
+                (activeTab === "Entradas" && item.ledgerDirection === "in") ||
+                (activeTab === "Saídas" && item.ledgerDirection === "out") ||
                 (activeTab === "Pendentes" && item.status === "Pendente") ||
                 (activeTab === "Atrasadas" && (item.status === "Atrasado" || item.isOverdue))
 
@@ -195,6 +201,27 @@ export default function TransactionsPage({
         setPage(1)
     }, [search, activeTab, filters])
 
+    if (showCreateTransaction) {
+        return (
+            <motion.div
+                key="create-transaction"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="w-full h-full"
+            >
+                <CreateTransactionPage
+                    partnerId={partnerId}
+                    categories={categories}
+                    accounts={accounts}
+                    onClose={() => setShowCreateTransaction(false)}
+                    onSuccess={() => setShowCreateTransaction(false)}
+                />
+            </motion.div>
+        )
+    }
+
     return (
         <motion.div
             initial={{ opacity: 0 }}
@@ -228,7 +255,7 @@ export default function TransactionsPage({
                             <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
                         </Button>
 
-                        <Button onClick={() => router.push("/erp/financial/transactions/new")}>
+                        <Button onClick={() => setShowCreateTransaction(true)}>
                             <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
                             Nova Transação
                         </Button>
@@ -241,7 +268,7 @@ export default function TransactionsPage({
                     search={search}
                     onSearchChange={setSearch}
                     onOpenFilter={() => setModals((prev) => ({ ...prev, filter: true }))}
-                    onAddTransaction={() => router.push("/erp/financial/transactions/new")}
+                    onAddTransaction={() => setShowCreateTransaction(true)}
                     filters={filters}
                     setFilters={setFilters}
                     viewMode={viewMode}
@@ -325,8 +352,8 @@ export default function TransactionsPage({
                                                             </span>
                                                         </div>
 
-                                                        <div className={`text-[16px] font-bold ${transaction.transactionType === "income" ? "text-brand-green" : "text-brand-red"}`}>
-                                                            {transaction.transactionType === "income" ? "+ " : "- "}
+                                                        <div className={`text-[16px] font-bold ${transaction.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}>
+                                                            {transaction.ledgerDirection === "in" ? "+ " : "- "}
                                                             {formatCurrency(transaction.amount)}
                                                         </div>
 
@@ -363,8 +390,8 @@ export default function TransactionsPage({
                                     </div>
                                 ) : (
                                     <div className="w-full overflow-hidden rounded-xl relative">
-                                        <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                                        <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+                                        <div className={`absolute top-0 left-0 h-full w-12 bg-linear-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                        <div className={`absolute top-0 right-0 h-full w-12 bg-linear-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
 
                                         <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
                                             <table className="w-full text-left border-separate border-spacing-0 min-w-[1460px]">

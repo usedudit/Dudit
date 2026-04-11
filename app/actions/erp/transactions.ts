@@ -19,11 +19,29 @@ type DbTransaction = {
     transaction_type: ERPTransaction["transactionType"]
     contact_id: string | null
     contact_type: "customer" | "supplier" | "service" | "employee" | "partner" | "other" | null
+    transfer_group_id?: string | null
+    refund_kind?: "expense_refund" | "revenue_refund" | null
+    reference_note?: string | null
     transaction_contacts?: {
         name: string | null
         type: ERPTransaction["contactType"] | null
         contact_id: string | null
     } | null
+}
+
+function ledgerDirectionFromRow(t: DbTransaction): ERPTransaction["ledgerDirection"] {
+    const tt = t.transaction_type
+    const amt = Number(t.amount || 0)
+    if (tt === "income") return "in"
+    if (tt === "expense") return "out"
+    if (tt === "adjustment") return amt >= 0 ? "in" : "out"
+    if (tt === "refund") {
+        if (t.refund_kind === "expense_refund") return "in"
+        if (t.refund_kind === "revenue_refund") return "out"
+        return "in"
+    }
+    if (tt === "transfer") return "in"
+    return amt >= 0 ? "in" : "out"
 }
 
 function formatDateLabel(value: string) {
@@ -44,9 +62,17 @@ function toStatusVariant(status: string, isOverdue: boolean): ERPTransaction["st
     return "green"
 }
 
-function toDisplayStatus(status: string, transactionType: ERPTransaction["transactionType"]) {
+function toDisplayStatus(
+    status: string,
+    transactionType: ERPTransaction["transactionType"],
+    refundKind?: string | null,
+) {
     const s = String(status || "").toLowerCase().trim()
-    if (s === "paid") return transactionType === "income" ? "Recebido" : "Pago"
+    if (s === "paid") {
+        if (transactionType === "income") return "Recebido"
+        if (transactionType === "refund" && refundKind === "expense_refund") return "Recebido"
+        return "Pago"
+    }
     if (s === "pending") return "Pendente"
     return status || "Pendente"
 }
@@ -60,6 +86,7 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
             .from("transactions")
             .select(`
         id, description, category, amount, due_date, payment_date, created_at, status, notes, payment_type, transaction_type, contact_id, contact_type,
+        transfer_group_id, refund_kind, reference_note,
         transaction_contacts(name, type, contact_id)
       `)
             .eq("partner_id", partnerId)
@@ -126,17 +153,21 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
                 details: undefined,
                 category: t.category || "Outros",
                 contactName: t.category === "Vendas" ? salesContactName : fallbackContact,
-        contactType: t.category === "Vendas" ? "customer" : (t.contact_type || t.transaction_contacts?.type || "other"),
+                contactType: t.category === "Vendas" ? "customer" : (t.contact_type || t.transaction_contacts?.type || "other"),
                 dueDate: formatDateLabel(baseDate),
                 dueDateShort: formatDateShort(baseDate),
                 dueDateTime: "",
                 dateNote: isOverdue ? "Atrasado" : "-",
                 isOverdue,
                 paymentType: t.payment_type || "Não informado",
-                status: toDisplayStatus(t.status, t.transaction_type),
+                status: toDisplayStatus(t.status, t.transaction_type, t.refund_kind),
                 statusVariant: toStatusVariant(t.status, isOverdue),
-                amount: Number(t.amount || 0),
+                amount: Math.abs(Number(t.amount || 0)),
                 transactionType: t.transaction_type,
+                ledgerDirection: ledgerDirectionFromRow(t),
+                refundKind: t.refund_kind ?? undefined,
+                transferGroupId: t.transfer_group_id ?? undefined,
+                referenceNote: t.reference_note ?? undefined,
                 notes: t.notes || undefined,
             }
         })
@@ -165,6 +196,8 @@ export type CreateManualTransactionInput = {
     status?: "pending" | "paid"
     notes?: string | null
     origin?: "manual" | "system" | "gateway"
+    refundKind?: "expense_refund" | "revenue_refund" | null
+    referenceNote?: string | null
 }
 
 function isBlockedForEdit(status?: string | null, origin?: string | null) {
@@ -180,14 +213,27 @@ export async function createManualTransactionAction(input: CreateManualTransacti
         await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
         const supabase = await getSupabaseServerClient()
 
+        if (input.transactionType === "transfer") {
+            throw new Error("Use a ação de transferência para movimentar entre contas.")
+        }
+
         if (!input.description?.trim()) throw new Error("Descrição é obrigatória.")
         const amount = Number(input.amount || 0)
-        if (!(amount > 0)) throw new Error("Valor deve ser maior que zero.")
+
+        if (input.transactionType === "adjustment") {
+            if (!Number.isFinite(amount) || amount === 0) throw new Error("Informe um valor diferente de zero.")
+        } else if (input.transactionType === "refund") {
+            if (!(amount > 0)) throw new Error("Valor deve ser maior que zero.")
+            if (!input.refundKind) throw new Error("Selecione o tipo de reembolso.")
+        } else {
+            if (!(amount > 0)) throw new Error("Valor deve ser maior que zero.")
+        }
 
         const transactionDate = input.transactionDate || input.paymentDate || input.dueDate || new Date().toISOString()
         const status = input.status || "pending"
 
-        const payload = {
+        const absAmount = input.transactionType === "adjustment" ? Math.abs(amount) : amount
+        const payload: Record<string, unknown> = {
             partner_id: input.partnerId,
             description: input.description.trim(),
             category: input.category || "Outros",
@@ -196,18 +242,20 @@ export async function createManualTransactionAction(input: CreateManualTransacti
             account_id: input.accountId ?? null,
             contact_id: input.contactId ?? null,
             contact_type: input.contactType ?? null,
-            amount,
+            amount: input.transactionType === "adjustment" ? amount : absAmount,
             due_date: input.dueDate || transactionDate,
             payment_date: input.paymentDate ?? null,
             transaction_date: transactionDate,
             status,
             notes: input.notes ?? null,
             payment_type: input.paymentType || null,
-            original_amount: amount,
+            original_amount: absAmount,
             interest_amount: null,
             fee_amount: 0,
             transaction_type: input.transactionType,
             origin: input.origin || "manual",
+            refund_kind: input.transactionType === "refund" ? input.refundKind ?? null : null,
+            reference_note: input.referenceNote?.trim() || null,
         }
 
         const { data, error } = await supabase.from("transactions").insert(payload).select("*").single()
@@ -215,6 +263,98 @@ export async function createManualTransactionAction(input: CreateManualTransacti
         return { success: true, data }
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao criar transação" }
+    }
+}
+
+export type CreateTransferPairInput = {
+    partnerId: string
+    fromAccountId: string
+    toAccountId: string
+    amount: number
+    description?: string | null
+    transactionDate: string
+    status?: "pending" | "paid"
+}
+
+export async function createTransferPairAction(input: CreateTransferPairInput) {
+    try {
+        await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const supabase = await getSupabaseServerClient()
+
+        const amt = Number(input.amount || 0)
+        if (!(amt > 0)) throw new Error("Valor deve ser maior que zero.")
+        if (!input.fromAccountId || !input.toAccountId) throw new Error("Selecione origem e destino.")
+        if (input.fromAccountId === input.toAccountId) throw new Error("Contas devem ser diferentes.")
+
+        const transferGroupId = crypto.randomUUID()
+        const datePart = (input.transactionDate || new Date().toISOString()).slice(0, 10)
+        const transactionTs = new Date(`${datePart}T12:00:00`).toISOString()
+        const status = input.status || "paid"
+        const baseDesc = (input.description && input.description.trim()) || "Transferência entre contas"
+
+        const { data: accounts } = await supabase
+            .from("finance_accounts")
+            .select("id, name")
+            .eq("partner_id", input.partnerId)
+            .in("id", [input.fromAccountId, input.toAccountId])
+
+        const nameById = new Map((accounts || []).map((a: { id: string; name: string }) => [a.id, a.name]))
+        const fromName = nameById.get(input.fromAccountId) || "Origem"
+        const toName = nameById.get(input.toAccountId) || "Destino"
+
+        const outRow = {
+            partner_id: input.partnerId,
+            description: `${baseDesc} (${fromName} → ${toName}, saída)`,
+            category: "Transferência",
+            transaction_type: "expense",
+            account_id: input.fromAccountId,
+            amount: amt,
+            due_date: datePart,
+            payment_date: status === "paid" ? transactionTs : null,
+            transaction_date: transactionTs,
+            status,
+            notes: null,
+            payment_type: "Transferência",
+            original_amount: amt,
+            interest_amount: null,
+            fee_amount: 0,
+            origin: "manual",
+            transfer_group_id: transferGroupId,
+            contact_id: null,
+            contact_type: null,
+            category_id: null,
+            subcategory_id: null,
+        }
+
+        const inRow = {
+            partner_id: input.partnerId,
+            description: `${baseDesc} (${fromName} → ${toName}, entrada)`,
+            category: "Transferência",
+            transaction_type: "income",
+            account_id: input.toAccountId,
+            amount: amt,
+            due_date: datePart,
+            payment_date: status === "paid" ? transactionTs : null,
+            transaction_date: transactionTs,
+            status,
+            notes: null,
+            payment_type: "Transferência",
+            original_amount: amt,
+            interest_amount: null,
+            fee_amount: 0,
+            origin: "manual",
+            transfer_group_id: transferGroupId,
+            contact_id: null,
+            contact_type: null,
+            category_id: null,
+            subcategory_id: null,
+        }
+
+        const { data, error } = await supabase.from("transactions").insert([outRow, inRow]).select("*")
+        if (error) throw error
+        return { success: true, data, transferGroupId }
+    } catch (e: any) {
+        return { success: false, error: e.message || "Erro ao criar transferência" }
     }
 }
 
@@ -255,6 +395,8 @@ export async function updateManualTransactionAction(
         if (patch.status !== undefined) payload.status = patch.status
         if (patch.notes !== undefined) payload.notes = patch.notes
         if (patch.transactionType !== undefined) payload.transaction_type = patch.transactionType
+        if (patch.refundKind !== undefined) payload.refund_kind = patch.refundKind
+        if (patch.referenceNote !== undefined) payload.reference_note = patch.referenceNote
         payload.updated_at = new Date().toISOString()
 
         const { data, error } = await supabase

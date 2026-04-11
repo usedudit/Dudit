@@ -19,6 +19,7 @@ export const TRANSACTIONS_MOCK: ERPTransaction[] = [
         statusVariant: "green",
         amount: 8092.89,
         transactionType: "income",
+        ledgerDirection: "in",
     },
     {
         id: "2",
@@ -37,6 +38,7 @@ export const TRANSACTIONS_MOCK: ERPTransaction[] = [
         statusVariant: "green",
         amount: 4500,
         transactionType: "expense",
+        ledgerDirection: "out",
     },
     {
         id: "3",
@@ -55,6 +57,7 @@ export const TRANSACTIONS_MOCK: ERPTransaction[] = [
         statusVariant: "orange",
         amount: 320.5,
         transactionType: "expense",
+        ledgerDirection: "out",
     },
     {
         id: "4",
@@ -74,6 +77,7 @@ export const TRANSACTIONS_MOCK: ERPTransaction[] = [
         statusVariant: "green",
         amount: 499,
         transactionType: "income",
+        ledgerDirection: "in",
     },
     {
         id: "5",
@@ -92,6 +96,7 @@ export const TRANSACTIONS_MOCK: ERPTransaction[] = [
         statusVariant: "red",
         amount: 150,
         transactionType: "expense",
+        ledgerDirection: "out",
     },
     {
         id: "6",
@@ -110,6 +115,7 @@ export const TRANSACTIONS_MOCK: ERPTransaction[] = [
         statusVariant: "green",
         amount: 2000,
         transactionType: "expense",
+        ledgerDirection: "out",
     },
     {
         id: "7",
@@ -129,6 +135,7 @@ export const TRANSACTIONS_MOCK: ERPTransaction[] = [
         statusVariant: "green",
         amount: 2200,
         transactionType: "income",
+        ledgerDirection: "in",
     },
     {
         id: "8",
@@ -147,6 +154,7 @@ export const TRANSACTIONS_MOCK: ERPTransaction[] = [
         statusVariant: "green",
         amount: 149.9,
         transactionType: "expense",
+        ledgerDirection: "out",
     },
     {
         id: "9",
@@ -165,6 +173,7 @@ export const TRANSACTIONS_MOCK: ERPTransaction[] = [
         statusVariant: "green",
         amount: 780,
         transactionType: "income",
+        ledgerDirection: "in",
     },
     {
         id: "10",
@@ -183,6 +192,7 @@ export const TRANSACTIONS_MOCK: ERPTransaction[] = [
         statusVariant: "green",
         amount: 950,
         transactionType: "expense",
+        ledgerDirection: "out",
     },
     {
         id: "11",
@@ -201,6 +211,7 @@ export const TRANSACTIONS_MOCK: ERPTransaction[] = [
         statusVariant: "orange",
         amount: 189.9,
         transactionType: "expense",
+        ledgerDirection: "out",
     },
     {
         id: "12",
@@ -220,5 +231,6 @@ export const TRANSACTIONS_MOCK: ERPTransaction[] = [
         statusVariant: "green",
         amount: 5299.9,
         transactionType: "income",
+        ledgerDirection: "in",
     },
 ]

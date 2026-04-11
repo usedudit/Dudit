@@ -53,8 +53,8 @@ const TransactionGridCard = React.memo(
                         </div>
 
                         <div className="flex items-center gap-1.5">
-                            <span className={`text-sm font-bold ${transaction.transactionType === "income" ? "text-brand-green" : "text-brand-red"}`}>
-                                {transaction.transactionType === "income" ? "+ " : "- "}
+                            <span className={`text-sm font-bold ${transaction.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}>
+                                {transaction.ledgerDirection === "in" ? "+ " : "- "}
                                 {formatCurrency(transaction.amount)}
                             </span>
                         </div>

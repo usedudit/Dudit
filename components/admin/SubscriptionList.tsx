@@ -347,14 +347,14 @@ const SubscriptionList = () => {
                             animate={{ opacity: 0.5 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setDetailItem(null)}
-                            className="fixed inset-0 bg-black z-[60]"
+                            className="fixed inset-0 bg-black z-60"
                         />
                         <motion.div
                             initial={{ x: '100%' }}
                             animate={{ x: 0 }}
                             exit={{ x: '100%' }}
                             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                            className="fixed right-0 top-0 h-full w-full max-w-md bg-white dark:bg-dark-surface shadow-2xl z-[70] border-l border-brand-border dark:border-dark-border overflow-y-auto flex flex-col"
+                            className="fixed right-0 top-0 h-full w-full max-w-md bg-white dark:bg-dark-surface shadow-2xl z-70 border-l border-brand-border dark:border-dark-border overflow-y-auto flex flex-col"
                         >
                             <div className="p-6 border-b border-brand-border dark:border-dark-border flex items-center justify-between sticky top-0 bg-white dark:bg-dark-surface z-10">
                                 <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Subscription Details</h2>

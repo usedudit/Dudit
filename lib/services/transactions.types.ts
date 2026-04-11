@@ -2,6 +2,8 @@ export type TransactionTab = "Todas" | "Entradas" | "Saídas" | "Pendentes" | "A
 
 export type TransactionStatusVariant = "green" | "red" | "orange" | "gray"
 
+export type LedgerDirection = "in" | "out"
+
 export interface ERPTransaction {
   id: string
   displayId: string
@@ -20,5 +22,10 @@ export interface ERPTransaction {
   statusVariant: TransactionStatusVariant
   amount: number
   transactionType: "income" | "expense" | "transfer" | "adjustment" | "refund"
+  /** Fluxo de caixa para exibição (+ verde / − vermelho) */
+  ledgerDirection: LedgerDirection
+  refundKind?: "expense_refund" | "revenue_refund"
+  transferGroupId?: string
+  referenceNote?: string
   notes?: string
 }

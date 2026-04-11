@@ -94,8 +94,8 @@ const TransactionListItem = React.memo(
 
                 case "amount":
                     return (
-                        <span className={`text-[13px] font-bold whitespace-nowrap ${transaction.transactionType === "income" ? "text-brand-green" : "text-brand-red"}`}>
-                            {transaction.transactionType === "income" ? "+ " : "- "}
+                        <span className={`text-[13px] font-bold whitespace-nowrap ${transaction.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}>
+                            {transaction.ledgerDirection === "in" ? "+ " : "- "}
                             {formatCurrency(transaction.amount)}
                         </span>
                     )
