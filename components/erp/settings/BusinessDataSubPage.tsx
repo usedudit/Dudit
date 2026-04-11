@@ -446,10 +446,9 @@ export const BusinessDataSubPage = ({
                                                         <div>
                                                             <NumberInputWithCheckbox
                                                                 label="Número"
-                                                                value={addresses.number}
                                                                 number={addresses.number}
                                                                 noNumber={addresses.noNumber}
-                                                                onNumberChange={e => setAddresses({ ...addresses, number: e.target.value })}
+                                                                onNumberChange={val => setAddresses({ ...addresses, number: val })}
                                                                 onNoNumberChange={checked => setAddresses({ ...addresses, noNumber: checked, number: checked ? "S/N" : "" })}
                                                             />
                                                         </div>

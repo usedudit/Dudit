@@ -19,6 +19,8 @@ interface TransactionListItemProps {
     columns: ColumnDef[]
     selected: boolean
     onSelect: (id: string) => void
+    onEdit?: (transaction: ERPTransaction) => void
+    onMarkAsPaid?: (transaction: ERPTransaction) => void
 }
 
 const getPaymentIcon = (paymentType: string) => {
@@ -30,15 +32,22 @@ const getPaymentIcon = (paymentType: string) => {
 }
 
 const TransactionListItem = React.memo(
-    ({ transaction, columns, selected, onSelect }: TransactionListItemProps) => {
+    ({ transaction, columns, selected, onSelect, onEdit, onMarkAsPaid }: TransactionListItemProps) => {
         const renderCellContent = (colId: string) => {
             switch (colId) {
                 case "transaction":
                     return (
                         <div className="flex flex-col text-left min-w-0">
-                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate leading-tight mb-0.5">
-                                {transaction.description}
-                            </span>
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate leading-tight">
+                                    {transaction.description}
+                                </span>
+                                {(transaction.recurringId || transaction.isRecurringOccurrence) && (
+                                    <span className="inline-flex items-center h-4 px-1.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700/40 whitespace-nowrap shrink-0">
+                                        Recorrente
+                                    </span>
+                                )}
+                            </div>
                             <div className="flex items-center gap-1.5 text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
                                 {getPaymentIcon(transaction.paymentType)({ className: "w-3.5 h-3.5" })}
                                 <span>{transaction.paymentType}</span>
@@ -114,7 +123,11 @@ const TransactionListItem = React.memo(
                 case "actions":
                     return (
                         <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
-                            <ActionsDropdown onView={() => { }} onEdit={() => { }} onDelete={() => { }} />
+                            <ActionsDropdown
+                                onEdit={transaction.isRecurringOccurrence ? undefined : (onEdit ? () => onEdit(transaction) : undefined)}
+                                onCancel={transaction.isRecurringOccurrence && onMarkAsPaid ? () => onMarkAsPaid(transaction) : undefined}
+                                cancelLabel={transaction.isRecurringOccurrence ? "Marcar como pago" : undefined}
+                            />
                         </div>
                     )
 

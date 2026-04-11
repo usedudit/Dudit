@@ -382,10 +382,9 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                 <div className="grid grid-cols-2 gap-3">
                                     <NumberInputWithCheckbox
                                         label="Número"
-                                        value={partnerData.address.number}
                                         number={partnerData.address.number}
                                         noNumber={partnerData.address.noNumber}
-                                        onNumberChange={e => patchAddress({ number: e.target.value })}
+                                        onNumberChange={val => patchAddress({ number: val })}
                                         onNoNumberChange={checked => patchAddress({ noNumber: checked, number: checked ? "" : partnerData.address.number })}
                                     />
                                     <Input name="complement" label="Complemento" value={partnerData.address.complement} onChange={e => patchAddress({ complement: e.target.value })} />

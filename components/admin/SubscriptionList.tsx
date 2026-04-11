@@ -211,7 +211,7 @@ const SubscriptionList = () => {
             {/* Desktop Table View */}
             <div className="hidden md:block bg-white dark:bg-dark-surface rounded-2xl overflow-hidden mb-6">
                 <div className="overflow-x-auto custom-scrollbar">
-                    <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                    <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
                         <thead>
                             <tr className="bg-brand-slate dark:bg-dark-surface transition-colors">
                                 <th className="py-2 px-4 w-12 pl-6 rounded-l-xl border-b border-brand-border dark:border-dark-border">

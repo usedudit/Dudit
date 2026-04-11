@@ -455,7 +455,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                         <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
 
                                         <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
                                                 <thead>
                                                     <tr className="bg-brand-gray dark:bg-dark-border/50">
                                                         <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
@@ -477,7 +477,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                                                             return (
                                                                 <th
                                                                     key={col.id}
-                                                                    className={`py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'} ${isSortable ? 'cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors' : ''} ${isLast ? 'rounded-r-lg' : ''}`}
+                                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'} ${isSortable ? 'cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors' : ''} ${isLast ? 'rounded-r-lg' : ''}`}
                                                                     style={{ width: col.width }}
                                                                     onClick={() => {
                                                                         if (!isSortable) return;

@@ -1,19 +1,19 @@
 "use client"
 
-import type React from "react"
+import React from "react"
 
 interface NumberInputWithCheckboxProps {
   label: string
   placeholder?: string
-  value: string
   number: string
   noNumber: boolean
-  onNumberChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onNumberChange: (value: string) => void
   onNoNumberChange: (checked: boolean) => void
   required?: boolean
   disabled?: boolean
   error?: boolean
   errorMessage?: string
+  maxLength?: number
 }
 
 export const NumberInputWithCheckbox: React.FC<
@@ -29,12 +29,33 @@ export const NumberInputWithCheckbox: React.FC<
   disabled = false,
   error = false,
   errorMessage,
+  maxLength = 10,
 }) => {
     const displayPlaceholder = noNumber ? "S/N" : placeholder
 
-    const inputId = "number-input"
+    // 🔑 evita conflito se usar mais de um componente na tela
+    const inputId = React.useId()
+    const checkboxId = React.useId()
 
-    // 🔥 mesmas classes base do Input
+    // 🔥 sanitiza entrada (não trava digitação, só limpa)
+    const sanitizeValue = (value: string) => {
+      return value
+        .replace(/[^0-9a-zA-Z\s\-\/]/g, "") // remove inválidos
+        .slice(0, maxLength)
+    }
+
+    const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const sanitized = sanitizeValue(e.target.value)
+      onNumberChange(sanitized)
+    }
+
+    const handleNoNumberChange = (checked: boolean) => {
+      if (checked) {
+        onNumberChange("") // limpa campo
+      }
+      onNoNumberChange(checked)
+    }
+
     const baseInputClasses = `
     w-full h-[42px]
     bg-brand-gray dark:bg-dark-border/30
@@ -52,7 +73,6 @@ export const NumberInputWithCheckbox: React.FC<
     disabled:cursor-not-allowed
   `
 
-    // padding ajustado pro checkbox dentro
     const paddingClasses = "pl-4 pr-20 py-2"
 
     return (
@@ -64,7 +84,9 @@ export const NumberInputWithCheckbox: React.FC<
             className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate"
           >
             {label}
-            {required && <span className="text-brand-red"> *</span>}
+            {required && !noNumber && (
+              <span className="text-brand-red"> *</span>
+            )}
           </label>
         </div>
 
@@ -76,29 +98,34 @@ export const NumberInputWithCheckbox: React.FC<
             name="number"
             placeholder={displayPlaceholder}
             value={number}
-            onChange={onNumberChange}
+            onChange={handleNumberChange}
             disabled={noNumber || disabled}
             required={required && !noNumber}
+            maxLength={maxLength}
+            autoComplete="address-line2"
             className={`${baseInputClasses} ${paddingClasses}`}
           />
 
-          {/* Checkbox como "suffix" */}
+          {/* Checkbox */}
           <label
-            htmlFor="noNumber"
+            htmlFor={checkboxId}
             className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-xs text-brand-dark dark:text-dark-heading cursor-pointer"
           >
             <input
-              id="noNumber"
+              id={checkboxId}
               name="noNumber"
               type="checkbox"
               checked={noNumber}
-              onChange={(e) => onNoNumberChange(e.target.checked)}
+              onChange={(e) => handleNoNumberChange(e.target.checked)}
               disabled={disabled}
               className={`
-                custom-checkbox
-                !border
-                ${noNumber ? "!border-brand-green" : "!border-brand-border dark:!border-dark-border"}
-              `}
+              custom-checkbox
+              !border
+              ${noNumber
+                  ? "!border-brand-green"
+                  : "!border-brand-border dark:!border-dark-border"
+                }
+            `}
             />
             <span>Sem nº</span>
           </label>

@@ -6,6 +6,7 @@ import type { ERPTransaction } from "@/lib/services/transactions.types"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { formatTime } from "@/lib/utils/formatters"
 
 type DbTransaction = {
     id: string
@@ -25,6 +26,11 @@ type DbTransaction = {
     transfer_group_id?: string | null
     refund_kind?: "expense_refund" | "revenue_refund" | null
     reference_note?: string | null
+    origin?: string | null
+    account_id?: string | null
+    category_id?: string | null
+    subcategory_id?: string | null
+    recurring_id?: string | null
     transaction_contacts?: {
         name: string | null
         type: ERPTransaction["contactType"] | null
@@ -144,7 +150,7 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
             .from("transactions")
             .select(`
         id, description, category, amount, due_date, payment_date, created_at, status, notes, payment_type, transaction_type, contact_id, customer_id, contact_type,
-        transfer_group_id, refund_kind, reference_note,
+        transfer_group_id, refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id,
         transaction_contacts(name, type)
       `)
             .eq("partner_id", partnerId)
@@ -231,7 +237,7 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
             return {
                 id: t.id,
                 displayId: `TRX-${t.id.slice(0, 8).toUpperCase()}`,
-                description: t.description,
+                description: t.category === "Vendas" ? `Venda - ${t.description}` : t.description,
                 details: undefined,
                 category: t.category || "Outros",
                 contactName:
@@ -245,8 +251,8 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
                 dueDateShort: formatDateShort(baseDate),
                 dueDateTime: "",
                 dateNote: isOverdue ? "Atrasado" : "-",
-                createdAtDate: createdDateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }),
-                createdAtTime: createdDateObj.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+                createdAtDate: formatDateLabel(t.created_at || now.toISOString()),
+                createdAtTime: formatTime(t.created_at || now.toISOString()),
                 daysUntilDue,
                 isOverdue,
                 paymentType: t.payment_type || "Não informado",
@@ -259,6 +265,17 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
                 transferGroupId: t.transfer_group_id ?? undefined,
                 referenceNote: t.reference_note ?? undefined,
                 notes: t.notes || undefined,
+                // Raw DB fields for edit mode & recurring badge
+                rawStatus: t.status || "pending",
+                origin: (t.origin as ERPTransaction["origin"]) || "manual",
+                accountId: t.account_id ?? null,
+                categoryId: t.category_id ?? null,
+                subcategoryId: t.subcategory_id ?? null,
+                contactId: t.contact_id ?? null,
+                customerId: t.customer_id ?? null,
+                recurringId: t.recurring_id ?? null,
+                paymentDateRaw: t.payment_date ?? null,
+                dueDateRaw: t.due_date ?? null,
             }
         })
 
@@ -291,13 +308,26 @@ export type CreateManualTransactionInput = {
     referenceNote?: string | null
 }
 
-function isBlockedForEdit(status?: string | null, origin?: string | null) {
-    const normalizedStatus = String(status || "").toLowerCase()
-    const normalizedOrigin = String(origin || "").toLowerCase()
-    const isConfirmed = ["paid", "confirmed", "recebido", "pago"].includes(normalizedStatus)
-    const isGateway = normalizedOrigin === "gateway"
-    return isConfirmed || isGateway
+/** Canonical status check — ALWAYS use DB values, never UI-displayed strings */
+function isStatusPaid(status?: string | null): boolean {
+    return String(status || "").toLowerCase() === "paid"
 }
+
+function isSystemOrGatewayOrigin(origin?: string | null): boolean {
+    const o = String(origin || "").toLowerCase()
+    return o === "system" || o === "gateway"
+}
+
+/** Fields that are NEVER editable on paid/confirmed transactions */
+const LOCKED_FIELDS_WHEN_PAID = new Set([
+    "amount", "accountId", "account_id", "transactionType", "transaction_type",
+    "origin", "paymentType", "payment_type",
+])
+
+/** Fields that are NEVER editable on system/gateway transactions */
+const LOCKED_FIELDS_SYSTEM_GATEWAY = new Set([
+    "amount", "accountId", "account_id", "origin",
+])
 
 export async function createManualTransactionAction(input: CreateManualTransactionInput) {
     try {
@@ -342,7 +372,7 @@ export async function createManualTransactionAction(input: CreateManualTransacti
             customer_id: customerId,
             contact_type: contactTypeResolved,
             amount: input.transactionType === "adjustment" ? amount : absAmount,
-            due_date: input.dueDate || transactionDate,
+            due_date: ["adjustment", "transfer", "refund"].includes(input.transactionType) ? null : (input.dueDate || transactionDate),
             payment_date: input.paymentDate ?? null,
             transaction_date: transactionDate,
             status,
@@ -419,7 +449,7 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
             transaction_type: "expense",
             account_id: input.fromAccountId,
             amount: amt,
-            due_date: datePart,
+            due_date: null,
             payment_date: status === "paid" ? transactionTs : null,
             transaction_date: transactionTs,
             status,
@@ -444,7 +474,7 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
             transaction_type: "income",
             account_id: input.toAccountId,
             amount: amt,
-            due_date: datePart,
+            due_date: null,
             payment_date: status === "paid" ? transactionTs : null,
             transaction_date: transactionTs,
             status,
@@ -498,35 +528,64 @@ export async function updateManualTransactionAction(
 
         const { data: current, error: currentError } = await supabase
             .from("transactions")
-            .select("id, partner_id, status, origin")
+            .select("id, partner_id, status, origin, recurring_id")
             .eq("id", transactionId)
             .eq("partner_id", partnerId)
             .single()
         if (currentError || !current) throw new Error(currentError?.message || "Transação não encontrada.")
 
-        if (isBlockedForEdit(current.status, current.origin)) {
-            throw new Error("Não é permitido editar transação confirmada ou de gateway.")
+        const paid = isStatusPaid(current.status)
+        const systemGateway = isSystemOrGatewayOrigin(current.origin)
+
+        // Build payload with strict field-level locking
+        const payload: Record<string, unknown> = {}
+        const patchKeys = Object.keys(patch) as (keyof CreateManualTransactionInput)[]
+
+        for (const key of patchKeys) {
+            // Enforce paid transaction locks
+            if (paid && LOCKED_FIELDS_WHEN_PAID.has(key)) {
+                throw new Error(`Campo "${key}" não pode ser editado em transação confirmada.`)
+            }
+            // Enforce system/gateway locks
+            if (systemGateway && LOCKED_FIELDS_SYSTEM_GATEWAY.has(key)) {
+                throw new Error(`Campo "${key}" não pode ser editado em transação do sistema/gateway.`)
+            }
         }
 
-        const payload: Record<string, unknown> = {}
-        if (patch.description !== undefined) payload.description = patch.description?.trim()
-        if (patch.amount !== undefined) payload.amount = Number(patch.amount || 0)
-        if (patch.category !== undefined) payload.category = patch.category
-        if (patch.categoryId !== undefined) payload.category_id = patch.categoryId
-        if (patch.subcategoryId !== undefined) payload.subcategory_id = patch.subcategoryId
-        if (patch.accountId !== undefined) payload.account_id = patch.accountId
-        if (patch.contactId !== undefined) payload.contact_id = patch.contactId
-        if (patch.customerId !== undefined) payload.customer_id = patch.customerId
-        if (patch.contactType !== undefined) payload.contact_type = patch.contactType
-        if (patch.paymentType !== undefined) payload.payment_type = patch.paymentType
-        if (patch.dueDate !== undefined) payload.due_date = patch.dueDate
-        if (patch.paymentDate !== undefined) payload.payment_date = patch.paymentDate
-        if (patch.transactionDate !== undefined) payload.transaction_date = patch.transactionDate
-        if (patch.status !== undefined) payload.status = patch.status
-        if (patch.notes !== undefined) payload.notes = patch.notes
-        if (patch.transactionType !== undefined) payload.transaction_type = patch.transactionType
-        if (patch.refundKind !== undefined) payload.refund_kind = patch.refundKind
-        if (patch.referenceNote !== undefined) payload.reference_note = patch.referenceNote
+        // Pending transactions: allow all editable fields
+        // Paid transactions: only description, category, subcategory, notes
+        if (paid) {
+            if (patch.description !== undefined) payload.description = patch.description?.trim()
+            if (patch.category !== undefined) payload.category = patch.category
+            if (patch.categoryId !== undefined) payload.category_id = patch.categoryId
+            if (patch.subcategoryId !== undefined) payload.subcategory_id = patch.subcategoryId
+            if (patch.notes !== undefined) payload.notes = patch.notes
+        } else {
+            // Pending: all safe fields editable
+            if (patch.description !== undefined) payload.description = patch.description?.trim()
+            if (patch.amount !== undefined) payload.amount = Number(patch.amount || 0)
+            if (patch.category !== undefined) payload.category = patch.category
+            if (patch.categoryId !== undefined) payload.category_id = patch.categoryId
+            if (patch.subcategoryId !== undefined) payload.subcategory_id = patch.subcategoryId
+            if (!systemGateway && patch.accountId !== undefined) payload.account_id = patch.accountId
+            if (patch.contactId !== undefined) payload.contact_id = patch.contactId
+            if (patch.customerId !== undefined) payload.customer_id = patch.customerId
+            if (patch.contactType !== undefined) payload.contact_type = patch.contactType
+            if (patch.paymentType !== undefined) payload.payment_type = patch.paymentType
+            if (patch.dueDate !== undefined) payload.due_date = patch.dueDate
+            if (patch.paymentDate !== undefined) payload.payment_date = patch.paymentDate
+            if (patch.transactionDate !== undefined) payload.transaction_date = patch.transactionDate
+            if (patch.status !== undefined) payload.status = patch.status
+            if (patch.notes !== undefined) payload.notes = patch.notes
+            if (patch.refundKind !== undefined) payload.refund_kind = patch.refundKind
+            if (patch.referenceNote !== undefined) payload.reference_note = patch.referenceNote
+        }
+
+        // NEVER allow these fields to be mutated via patch
+        delete payload.origin
+        delete payload.recurring_id
+        delete payload.transaction_type
+
         payload.updated_at = new Date().toISOString()
 
         const { data, error } = await supabase
@@ -540,6 +599,177 @@ export async function updateManualTransactionAction(
         return { success: true, data }
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao atualizar transação" }
+    }
+}
+
+/**
+ * Fetch a single transaction with all raw DB fields needed for the edit form.
+ */
+export async function getTransactionForEditAction(transactionId: string, partnerId: string) {
+    try {
+        await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+        const supabase = await getSupabaseServerClient()
+
+        const { data, error } = await supabase
+            .from("transactions")
+            .select(`
+                id, description, category, amount, due_date, payment_date, created_at,
+                status, notes, payment_type, transaction_type, contact_id, customer_id,
+                contact_type, transfer_group_id, refund_kind, reference_note, origin,
+                account_id, category_id, subcategory_id, recurring_id, transaction_date
+            `)
+            .eq("id", transactionId)
+            .eq("partner_id", partnerId)
+            .single()
+        if (error || !data) throw error || new Error("Transação não encontrada.")
+
+        return { success: true as const, data }
+    } catch (e: any) {
+        return { success: false as const, error: e.message || "Erro ao carregar transação" }
+    }
+}
+
+/**
+ * Mark a recurring occurrence as paid.
+ * Idempotent: if already paid for this date, returns the existing record.
+ * Duplicate-safe: unique index on (recurring_id, due_date) prevents DB-level duplicates.
+ */
+export async function markRecurringOccurrenceAsPaidAction(input: {
+    partnerId: string
+    recurringId: string
+    occurrenceDate: string // yyyy-MM-dd
+    accountId?: string | null
+}) {
+    try {
+        const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
+        await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const supabase = await getSupabaseServerClient()
+
+        // Fetch the recurring template
+        const { data: rec, error: recErr } = await supabase
+            .from("recurring_transactions")
+            .select("*")
+            .eq("id", input.recurringId)
+            .eq("partner_id", input.partnerId)
+            .single()
+        if (recErr || !rec) throw new Error("Recorrência não encontrada.")
+
+        const dueDateValue = input.occurrenceDate
+        const transactionTs = new Date(`${dueDateValue}T12:00:00`).toISOString()
+
+        // Idempotent check: if already paid for this date, return existing
+        const { data: existing } = await supabase
+            .from("transactions")
+            .select("id")
+            .eq("recurring_id", input.recurringId)
+            .eq("due_date", dueDateValue)
+            .eq("status", "paid")
+            .limit(1)
+            .maybeSingle()
+
+        if (existing) {
+            return { success: true, data: existing, alreadyPaid: true }
+        }
+
+        // Resolve category name
+        let categoryName = "Recorrência"
+        if (rec.category_id) {
+            const { data: cat } = await supabase
+                .from("financial_categories")
+                .select("name")
+                .eq("id", rec.category_id)
+                .single()
+            if (cat?.name) categoryName = cat.name
+        }
+
+        const accountId = input.accountId || rec.account_id || null
+        const nowIso = new Date().toISOString()
+
+        // Check if a pending transaction already exists (from cron) — upgrade it to paid
+        const { data: pendingTx } = await supabase
+            .from("transactions")
+            .select("id, status, account_id")
+            .eq("recurring_id", input.recurringId)
+            .eq("due_date", dueDateValue)
+            .eq("status", "pending")
+            .limit(1)
+            .maybeSingle()
+
+        if (pendingTx) {
+            // Upgrade pending → paid
+            const { data: updated, error: updErr } = await supabase
+                .from("transactions")
+                .update({
+                    status: "paid",
+                    payment_date: nowIso,
+                    account_id: accountId,
+                    updated_at: nowIso,
+                })
+                .eq("id", pendingTx.id)
+                .eq("partner_id", input.partnerId)
+                .select("*")
+                .single()
+            if (updErr) throw updErr
+
+            await applyFinanceAccountBalanceAfterInsert(supabase, input.partnerId, accountId, {
+                transaction_type: rec.type,
+                amount: rec.amount,
+                status: "paid",
+            })
+            return { success: true, data: updated }
+        }
+
+        // Create a fresh paid transaction from recurring template
+        const payload = {
+            partner_id: input.partnerId,
+            description: rec.description,
+            category: categoryName,
+            category_id: rec.category_id,
+            subcategory_id: rec.subcategory_id,
+            contact_id: rec.contact_id,
+            contact_type: rec.contact_type,
+            customer_id: rec.customer_id,
+            amount: rec.amount,
+            due_date: dueDateValue,
+            payment_date: nowIso,
+            transaction_date: transactionTs,
+            status: "paid",
+            notes: null,
+            original_amount: rec.amount,
+            interest_amount: 0,
+            fee_amount: 0,
+            payment_type: null as string | null,
+            transaction_type: rec.type,
+            account_id: accountId,
+            origin: "system" as const,
+            recurring_id: rec.id,
+        }
+
+        const { data: newTx, error: insertErr } = await supabase
+            .from("transactions")
+            .insert(payload)
+            .select("*")
+            .single()
+
+        if (insertErr) {
+            // Handle unique constraint violation gracefully (idempotent)
+            if (insertErr.code === "23505") {
+                return { success: true, data: null, alreadyPaid: true }
+            }
+            throw insertErr
+        }
+
+        await applyFinanceAccountBalanceAfterInsert(supabase, input.partnerId, accountId, {
+            transaction_type: rec.type,
+            amount: rec.amount,
+            status: "paid",
+        })
+
+        return { success: true, data: newTx }
+    } catch (e: any) {
+        return { success: false, error: e.message || "Erro ao marcar como pago" }
     }
 }
 

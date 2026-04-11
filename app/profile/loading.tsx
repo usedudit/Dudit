@@ -1,3 +1,5 @@
+import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
+import MarketplaceHeader from "@/components/marketplace/MarketplaceHeader"
 import { SkeletonLoader } from "@/components/reusable"
 
 export default function ProfileLoading() {
@@ -5,13 +7,13 @@ export default function ProfileLoading() {
     const rows = Array.from({ length: 3 })
 
     return (
-        <div className="animate-fade-in">
+        <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
+            <MarketplaceHeader />
 
-            <div className="flex items-center mb-8">
-                <div>
-                    <SkeletonLoader width={180} height={28} className="mb-2" />
-                    <SkeletonLoader width={380} height={16} />
-                </div>
+            {/* Header */}
+            <div className="mb-8">
+                <SkeletonLoader width={220} height={32} className="mb-2" />
+                <SkeletonLoader width={260} height={20} />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
@@ -51,6 +53,7 @@ export default function ProfileLoading() {
                 <SkeletonLoader width={120} height={36} className="rounded-md" />
             </div>
 
+            <MarketplaceFooter />
         </div>
     )
 }

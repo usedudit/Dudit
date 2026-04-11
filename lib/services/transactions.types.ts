@@ -31,4 +31,27 @@ export interface ERPTransaction {
   transferGroupId?: string
   referenceNote?: string
   notes?: string
+
+  /* ── Raw DB fields for edit mode ── */
+  /** Canonical DB status: "paid" | "pending" */
+  rawStatus?: "paid" | "pending" | string
+  origin?: "manual" | "system" | "gateway"
+  accountId?: string | null
+  categoryId?: string | null
+  subcategoryId?: string | null
+  contactId?: string | null
+  customerId?: string | null
+  recurringId?: string | null
+  /** Raw ISO payment_date from DB */
+  paymentDateRaw?: string | null
+  /** Raw ISO due_date from DB */
+  dueDateRaw?: string | null
+
+  /* ── Virtual recurring occurrence fields ── */
+  /** True when this item is a virtual recurring occurrence (not yet in DB) */
+  isRecurringOccurrence?: boolean
+  /** The recurring template ID this occurrence belongs to */
+  recurringTemplateId?: string
+  /** The exact date of this occurrence (ISO yyyy-MM-dd) */
+  occurrenceDate?: string
 }

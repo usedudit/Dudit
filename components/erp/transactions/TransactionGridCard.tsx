@@ -11,6 +11,8 @@ interface TransactionGridCardProps {
     transaction: ERPTransaction
     selected: boolean
     onSelect: (id: string) => void
+    onEdit?: (transaction: ERPTransaction) => void
+    onMarkAsPaid?: (transaction: ERPTransaction) => void
 }
 
 const getPaymentIcon = (paymentType: string) => {
@@ -22,8 +24,9 @@ const getPaymentIcon = (paymentType: string) => {
 }
 
 const TransactionGridCard = React.memo(
-    ({ transaction, selected, onSelect }: TransactionGridCardProps) => {
+    ({ transaction, selected, onSelect, onEdit, onMarkAsPaid }: TransactionGridCardProps) => {
         const PaymentIcon = getPaymentIcon(transaction.paymentType)
+        const isRecurring = !!transaction.recurringId || !!transaction.isRecurringOccurrence
 
         return (
             <motion.div
@@ -42,6 +45,11 @@ const TransactionGridCard = React.memo(
                                 <h3 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate shrink">
                                     {transaction.description}
                                 </h3>
+                                {isRecurring && (
+                                    <span className="inline-flex items-center h-4 px-1.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700/40 whitespace-nowrap shrink-0">
+                                        Recorrente
+                                    </span>
+                                )}
                                 <Badge variant={transaction.statusVariant} className="whitespace-nowrap scale-90 shrink-0">
                                     {transaction.status}
                                 </Badge>
@@ -52,7 +60,7 @@ const TransactionGridCard = React.memo(
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-1.5 mt-1">
+                        <div className="flex items-center gap-1.5">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body truncate">
                                 {transaction.paymentType}
                             </span>
@@ -94,7 +102,11 @@ const TransactionGridCard = React.memo(
                         </div>
 
                         <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                            <ActionsDropdown onView={() => { }} onEdit={() => { }} onDelete={() => { }} />
+                            <ActionsDropdown
+                                onEdit={transaction.isRecurringOccurrence ? undefined : (onEdit ? () => onEdit(transaction) : undefined)}
+                                onCancel={transaction.isRecurringOccurrence && onMarkAsPaid ? () => onMarkAsPaid(transaction) : undefined}
+                                cancelLabel={transaction.isRecurringOccurrence ? "Marcar como pago" : undefined}
+                            />
                         </div>
                     </div>
                 </div>

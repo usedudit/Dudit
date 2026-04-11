@@ -705,7 +705,7 @@ const PaymentModal = ({
                                     className="w-full h-full flex flex-col items-center justify-center p-8 text-center"
                                 >
                                     <div className="w-32 h-32 rounded-full bg-brand-red flex items-center justify-center mb-6 relative">
-                                        <div className="absolute inset-0 rounded-full bg-white"></div>
+                                        <div className="absolute inset-0 rounded-full bg-brand-red"></div>
                                         <CancelCircleIcon size={56} className="text-white" />
                                     </div>
                                     <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">Não foi possível concluir a venda</h2>

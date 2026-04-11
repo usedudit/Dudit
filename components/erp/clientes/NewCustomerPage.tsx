@@ -12,7 +12,9 @@ import {
     FormDropdown,
     RadioButton,
     Input as FormInput,
-    Checkbox as FormCheckbox
+    Checkbox as FormCheckbox,
+    PhoneInput,
+    EmailInput
 } from "@/components/reusable"
 import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { CpfCnpjInput } from "@/components/reusable/Inputs/CpfCnpjInput"
@@ -468,8 +470,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                 <section>
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Contato</h3>
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                                        <FormInput label="E-mail" type="email" placeholder="email@exemplo.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-                                                        <FormInput label="Celular (WhatsApp)" placeholder="(00) 00000-0000" value={mobile} onChange={(e) => setMobile(e.target.value)} />
+                                                        <EmailInput label="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
+                                                        <PhoneInput label="Celular (WhatsApp)" value={mobile} onChange={(e) => setMobile(e.target.value)} />
                                                         <FormInput label="Telefone Fixo" placeholder="(00) 0000-0000" value={phone} onChange={(e) => setPhone(e.target.value)} />
                                                         <FormInput label="Site" placeholder="www.site.com.br" value={website} onChange={(e) => setWebsite(e.target.value)} />
                                                     </div>
@@ -500,10 +502,9 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                         <div className="grid grid-cols-2 gap-3 flex-row items-center pt-1.5 pb-1.5">
                                                             <NumberInputWithCheckbox
                                                                 label="Número"
-                                                                value={number}
                                                                 number={number}
                                                                 noNumber={noNumber}
-                                                                onNumberChange={e => setNumber(e.target.value)}
+                                                                onNumberChange={val => setNumber(val)}
                                                                 onNoNumberChange={checked => { setNoNumber(checked); if (checked) setNumber(""); }}
                                                             />
                                                             <FormInput label="Complemento" placeholder="Apto, Bloco, etc." value={complement} onChange={e => setComplement(e.target.value)} />
@@ -552,10 +553,9 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 <div className="grid grid-cols-2 gap-3 flex-row items-center">
                                                                     <NumberInputWithCheckbox
                                                                         label="Número"
-                                                                        value={billingNumber}
                                                                         number={billingNumber}
                                                                         noNumber={billingNoNumber}
-                                                                        onNumberChange={e => setBillingNumber(e.target.value)}
+                                                                        onNumberChange={val => setBillingNumber(val)}
                                                                         onNoNumberChange={checked => { setBillingNoNumber(checked); if (checked) setBillingNumber(""); }}
                                                                     />
                                                                     <FormInput label="Complemento" placeholder="Apto, Bloco, etc." value={billingComplement} onChange={e => setBillingComplement(e.target.value)} />

@@ -56,10 +56,9 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                             <div className="grid grid-cols-2 gap-3 flex-row items-center pt-1.5 pb-1.5">
                                 <NumberInputWithCheckbox
                                     label="Número"
-                                    value={number}
                                     number={number}
                                     noNumber={noNumber}
-                                    onNumberChange={(e: any) => setNumber(e.target.value)}
+                                    onNumberChange={val => setNumber(val)}
                                     onNoNumberChange={checked => { setNoNumber(checked); if (checked) setNumber(""); }}
                                 />
                                 <Input label="Complemento" placeholder="Apto, Bloco, etc." value={complement} onChange={(e: any) => setComplement(e.target.value)} />

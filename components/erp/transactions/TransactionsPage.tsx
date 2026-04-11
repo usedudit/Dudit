@@ -22,6 +22,10 @@ import TransactionListItem from "./TransactionListItem"
 import TransactionGridCard from "./TransactionGridCard"
 import CreateTransactionPage, { type CategoryItem, type AccountItem } from "./CreateTransactionPage"
 import type { ERPTransaction, TransactionTab } from "../../../lib/services/transactions.types"
+import type { RecurringOccurrence } from "@/app/actions/erp/recurring-transactions"
+import { markRecurringOccurrenceAsPaidAction } from "@/app/actions/erp/transactions"
+import { useRouter } from "next/navigation"
+import { useNotification } from "@/hooks/use-notification"
 
 interface FilterState {
     status: string[]
@@ -43,11 +47,11 @@ const ITEMS_PER_PAGE = 8
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
     { id: "transaction", label: "Descrição", align: "left", width: "300px" },
     { id: "category", label: "Categoria", align: "left", width: "170px" },
-    { id: "contact", label: "Cliente / Fornecedor", align: "left", width: "220px" },
+    { id: "contact", label: "Contato", align: "left", width: "220px" },
     { id: "date", label: "Data", align: "left", width: "170px" },
     { id: "dueDate", label: "Vencimento", align: "left", width: "170px" },
-    { id: "status", label: "Status", align: "left", width: "150px" },
     { id: "amount", label: "Valor", align: "right", width: "160px" },
+    { id: "status", label: "Status", align: "center", width: "150px" },
     { id: "actions", label: "Ações", align: "center", width: "80px" },
 ]
 
@@ -64,12 +68,16 @@ export default function TransactionsPage({
     partnerId,
     categories = [],
     accounts = [],
+    recurringOccurrences = [],
 }: {
     transactions: ERPTransaction[]
     partnerId: string
     categories?: CategoryItem[]
     accounts?: AccountItem[]
+    recurringOccurrences?: RecurringOccurrence[]
 }) {
+    const router = useRouter()
+    const { success: notifySuccess, error: notifyError } = useNotification()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
 
@@ -82,6 +90,8 @@ export default function TransactionsPage({
     const [selection, setSelection] = useState({ ids: new Set<string>() })
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
     const [showCreateTransaction, setShowCreateTransaction] = useState(false)
+    const [editingTransaction, setEditingTransaction] = useState<ERPTransaction | null>(null)
+    const [markingAsPaid, setMarkingAsPaid] = useState(false)
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
@@ -110,7 +120,55 @@ export default function TransactionsPage({
     const filteredTransactions = useMemo(() => {
         const term = search.trim().toLowerCase()
 
-        let result = transactions.filter((item) => {
+        // Convert recurring occurrences to ERPTransaction shape for Previstos tab
+        const virtualItems: ERPTransaction[] = recurringOccurrences.map((occ) => {
+            const dateObj = new Date(`${occ.occurrenceDate}T12:00:00`)
+            const now = new Date()
+            const diffTime = dateObj.getTime() - now.getTime()
+            const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+            const dateLabel = dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
+            const dateShort = dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
+            return {
+                id: `virt-${occ.recurringId}-${occ.occurrenceDate}`,
+                displayId: "",
+                description: occ.description,
+                category: "Recorrência",
+                contactName: "—",
+                contactType: (occ.contactType || "other") as ERPTransaction["contactType"],
+                dueDate: dateLabel,
+                dueDateShort: dateShort,
+                dueDateTime: "",
+                dateNote: "-",
+                createdAtDate: "",
+                createdAtTime: "",
+                daysUntilDue,
+                isOverdue: daysUntilDue < 0,
+                paymentType: "Não informado",
+                status: "Pendente",
+                statusVariant: daysUntilDue < 0 ? "red" : "orange",
+                amount: occ.amount,
+                transactionType: occ.type as ERPTransaction["transactionType"],
+                ledgerDirection: occ.type === "income" ? "in" : "out",
+                rawStatus: "pending",
+                origin: "system",
+                accountId: occ.accountId,
+                categoryId: occ.categoryId,
+                subcategoryId: occ.subcategoryId,
+                contactId: occ.contactId,
+                customerId: occ.customerId,
+                recurringId: occ.recurringId,
+                // Virtual occurrence fields
+                isRecurringOccurrence: true,
+                recurringTemplateId: occ.recurringTemplateId,
+                occurrenceDate: occ.occurrenceDate,
+                dueDateRaw: occ.dueDate,
+            }
+        })
+
+        // Merge real transactions with virtual recurring items
+        const allItems = [...transactions, ...virtualItems]
+
+        let result = allItems.filter((item) => {
             const matchesSearch =
                 !term ||
                 item.description.toLowerCase().includes(term) ||
@@ -118,9 +176,9 @@ export default function TransactionsPage({
                 item.contactName.toLowerCase().includes(term) ||
                 item.category.toLowerCase().includes(term)
 
-            const isPrevisto = item.status === "Pendente" || item.isOverdue || item.status === "Atrasado" || (item.transactionType !== 'adjustment' && item.transactionType !== 'transfer' && !['recebido', 'pago', 'paid'].includes(item.status.toLowerCase()))
-            
-            const matchesTab = activeTab === "Transações" ? !isPrevisto : isPrevisto
+            const isPrevisto = item.isRecurringOccurrence || item.status === "Pendente" || item.isOverdue || item.status === "Atrasado" || (item.transactionType !== 'adjustment' && item.transactionType !== 'transfer' && !['recebido', 'pago', 'paid'].includes(item.status.toLowerCase()))
+
+            const matchesTab = activeTab === "Transações" ? (!isPrevisto && !item.isRecurringOccurrence) : isPrevisto
 
             const matchesStatus = filters.status.length === 0 || filters.status.includes(item.status)
             const matchesCategory = filters.category.length === 0 || filters.category.includes(item.category)
@@ -170,15 +228,17 @@ export default function TransactionsPage({
                 return sortConfig.direction === "asc" ? comparison : -comparison
             })
         } else if (activeTab === "Previstos") {
+            // ALWAYS sort previstos by due_date ASC
             result = [...result].sort((a, b) => {
-                const aDate = new Date(a.dueDate).getTime()
-                const bDate = new Date(b.dueDate).getTime()
-                return aDate - bDate
+                // Use occurrenceDate for virtual items, dueDateRaw for real transactions
+                const aDate = a.occurrenceDate || a.dueDateRaw || a.dueDate
+                const bDate = b.occurrenceDate || b.dueDateRaw || b.dueDate
+                return String(aDate).localeCompare(String(bDate))
             })
         }
 
         return result
-    }, [transactions, search, activeTab, filters, sortConfig])
+    }, [transactions, recurringOccurrences, search, activeTab, filters, sortConfig])
 
     const paginatedTransactions = filteredTransactions.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
     const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE))
@@ -203,10 +263,42 @@ export default function TransactionsPage({
         setPage(1)
     }, [search, activeTab, filters])
 
-    if (showCreateTransaction) {
+    const handleEditTransaction = useCallback((transaction: ERPTransaction) => {
+        setEditingTransaction(transaction)
+    }, [])
+
+    const handleMarkAsPaid = useCallback(async (transaction: ERPTransaction) => {
+        if (!transaction.recurringTemplateId || !transaction.occurrenceDate) return
+        if (markingAsPaid) return
+        setMarkingAsPaid(true)
+        try {
+            const res = await markRecurringOccurrenceAsPaidAction({
+                partnerId,
+                recurringId: transaction.recurringTemplateId,
+                occurrenceDate: transaction.occurrenceDate,
+                accountId: transaction.accountId,
+            })
+            if (!res.success) {
+                notifyError(res.error || "Erro ao marcar como pago")
+                return
+            }
+            if ((res as any).alreadyPaid) {
+                notifySuccess("Esta ocorrência já foi paga.")
+            } else {
+                notifySuccess("Ocorrência marcada como paga!")
+            }
+            router.refresh()
+        } catch {
+            notifyError("Erro ao marcar como pago")
+        } finally {
+            setMarkingAsPaid(false)
+        }
+    }, [partnerId, markingAsPaid, router, notifySuccess, notifyError])
+
+    if (showCreateTransaction || editingTransaction) {
         return (
             <motion.div
-                key="create-transaction"
+                key={editingTransaction ? `edit-${editingTransaction.id}` : "create-transaction"}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -217,8 +309,15 @@ export default function TransactionsPage({
                     partnerId={partnerId}
                     categories={categories}
                     accounts={accounts}
-                    onClose={() => setShowCreateTransaction(false)}
-                    onSuccess={() => setShowCreateTransaction(false)}
+                    editTransaction={editingTransaction || undefined}
+                    onClose={() => {
+                        setShowCreateTransaction(false)
+                        setEditingTransaction(null)
+                    }}
+                    onSuccess={() => {
+                        setShowCreateTransaction(false)
+                        setEditingTransaction(null)
+                    }}
                 />
             </motion.div>
         )
@@ -332,47 +431,55 @@ export default function TransactionsPage({
                                     <div className="flex flex-col w-full">
                                         {paginatedTransactions.map((transaction) => {
                                             const PaymentIcon = getPaymentIcon(transaction.paymentType)
+                                            const isRecurring = !!transaction.recurringId || !!transaction.isRecurringOccurrence
 
                                             return (
                                                 <div
                                                     key={transaction.id}
-                                                    className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 flex items-start gap-4"
+                                                    className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 flex items-start gap-3"
+                                                    onClick={() => {
+                                                        if (transaction.isRecurringOccurrence) {
+                                                            handleMarkAsPaid(transaction)
+                                                        } else {
+                                                            handleEditTransaction(transaction)
+                                                        }
+                                                    }}
                                                 >
+                                                    <div className="shrink-0 pt-0.5" onClick={(e) => e.stopPropagation()}>
+                                                        <Checkbox checked={selection.ids.has(transaction.id)} onChange={() => handleSelectRow(transaction.id)} />
+                                                    </div>
                                                     <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                                                         <div className="flex justify-between items-start gap-3">
                                                             <div className="min-w-0">
-                                                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                                                                    {transaction.description}
-                                                                </h3>
-                                                                <span className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
-                                                                    {transaction.displayId} • {transaction.contactName}
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                        {transaction.description}
+                                                                    </h3>
+                                                                    {isRecurring && (
+                                                                        <span className="inline-flex items-center h-4 px-1.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700/40 whitespace-nowrap shrink-0">
+                                                                            Recorrente
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <span className="flex items-center gap-1.5 text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mt-0.5">
+                                                                    <PaymentIcon className="w-3.5 h-3.5 shrink-0" />
+                                                                    <span>{transaction.paymentType} • {transaction.contactName}</span>
                                                                 </span>
                                                             </div>
 
-                                                            <span className={`inline-flex items-center justify-center h-8 px-3 rounded-full text-[12px] font-semibold whitespace-nowrap border ${transaction.isOverdue ? "text-brand-red border-brand-red/15 bg-brand-red/5" : "text-brand-inactive-text dark:text-dark-body border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/60"}`}>
-                                                                {transaction.dueDateShort}
-                                                            </span>
+                                                            <div className="flex flex-col items-end gap-2 shrink-0">
+                                                                <span className={`inline-flex items-center justify-center h-8 px-3 rounded-full text-[12px] font-semibold whitespace-nowrap border ${transaction.isOverdue ? "text-brand-red border-brand-red/15 bg-brand-red/5" : "text-brand-inactive-text dark:text-dark-body border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/60"}`}>
+                                                                    {transaction.dueDateShort}
+                                                                </span>
+                                                                <Badge variant={transaction.statusVariant} className="whitespace-nowrap">
+                                                                    {transaction.status}
+                                                                </Badge>
+                                                            </div>
                                                         </div>
 
                                                         <div className={`text-[16px] font-bold ${transaction.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}>
                                                             {transaction.ledgerDirection === "in" ? "+ " : "- "}
                                                             {formatCurrency(transaction.amount)}
-                                                        </div>
-
-                                                        <div className="flex items-center justify-between gap-4 mt-1">
-                                                            <div className="flex flex-col gap-2 min-w-0">
-                                                                <div className="flex items-center gap-2 text-sm text-brand-inactive-text dark:text-dark-body">
-                                                                    <PaymentIcon className="w-4 h-4 shrink-0" />
-                                                                    <span className="truncate">{transaction.paymentType}</span>
-                                                                </div>
-                                                                <Badge variant={transaction.statusVariant} className="w-fit whitespace-nowrap">
-                                                                    {transaction.status}
-                                                                </Badge>
-                                                            </div>
-
-                                                            <div className="shrink-0 pt-1">
-                                                                <Checkbox checked={selection.ids.has(transaction.id)} onChange={() => handleSelectRow(transaction.id)} />
-                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -387,6 +494,8 @@ export default function TransactionsPage({
                                                 transaction={transaction}
                                                 selected={selection.ids.has(transaction.id)}
                                                 onSelect={handleSelectRow}
+                                                onEdit={handleEditTransaction}
+                                                onMarkAsPaid={handleMarkAsPaid}
                                             />
                                         ))}
                                     </div>
@@ -450,6 +559,8 @@ export default function TransactionsPage({
                                                             columns={COLUMNS}
                                                             selected={selection.ids.has(transaction.id)}
                                                             onSelect={handleSelectRow}
+                                                            onEdit={handleEditTransaction}
+                                                            onMarkAsPaid={handleMarkAsPaid}
                                                         />
                                                     ))}
                                                 </tbody>

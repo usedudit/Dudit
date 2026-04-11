@@ -39,6 +39,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { formatCurrency } from "@/lib/utils"
 import {
     createManualTransactionAction,
+    updateManualTransactionAction,
     createTransferPairAction,
     adjustAccountBalanceViaTransactionAction,
 } from "@/app/actions/erp/transactions"
@@ -71,6 +72,8 @@ interface CreateTransactionPageProps {
     accounts: AccountItem[]
     onClose: () => void
     onSuccess?: () => void
+    /** When set, the page operates in edit mode with pre-filled data */
+    editTransaction?: import("../../../lib/services/transactions.types").ERPTransaction
 }
 
 type ContactType = "customer" | "supplier" | "service" | "employee" | "partner" | "other"
@@ -160,6 +163,7 @@ export default function CreateTransactionPage({
     accounts,
     onClose,
     onSuccess,
+    editTransaction,
 }: CreateTransactionPageProps) {
     const router = useRouter()
     const { success, error } = useNotification()
@@ -168,20 +172,27 @@ export default function CreateTransactionPage({
     const [activeTab, setActiveTab] = useState("general")
     const [isSaving, setIsSaving] = useState(false)
 
-    const [txKind, setTxKind] = useState<TxKind>("income")
-    const [amount, setAmount] = useState(0)
-    const [description, setDescription] = useState("")
-    const [categoryId, setCategoryId] = useState<string | undefined>(undefined)
-    const [subcategoryId, setSubcategoryId] = useState<string | undefined>(undefined)
-    const [dueDate, setDueDate] = useState(() => format(new Date(), "yyyy-MM-dd"))
-    const [paymentDate, setPaymentDate] = useState(() => format(new Date(), "yyyy-MM-dd"))
-    const [status, setStatus] = useState<"pending" | "paid">("pending")
-    const [accountId, setAccountId] = useState<string | undefined>(undefined)
+    /* ── Edit mode computed flags ── */
+    const isEditMode = !!editTransaction
+    const isPaidTransaction = isEditMode && String(editTransaction.rawStatus || "").toLowerCase() === "paid"
+    const isSystemGatewayOrigin = isEditMode && ["system", "gateway"].includes(String(editTransaction.origin || "").toLowerCase())
+    const lockFinancialFields = isPaidTransaction || isSystemGatewayOrigin
+    const isRecurringTransaction = isEditMode && !!editTransaction.recurringId
+
+    const [txKind, setTxKind] = useState<TxKind>(() => editTransaction?.transactionType || "income")
+    const [amount, setAmount] = useState(() => editTransaction ? editTransaction.amount : 0)
+    const [description, setDescription] = useState(() => editTransaction?.description || "")
+    const [categoryId, setCategoryId] = useState<string | undefined>(() => editTransaction?.categoryId ?? undefined)
+    const [subcategoryId, setSubcategoryId] = useState<string | undefined>(() => editTransaction?.subcategoryId ?? undefined)
+    const [dueDate, setDueDate] = useState(() => editTransaction?.dueDateRaw ? editTransaction.dueDateRaw.slice(0, 10) : format(new Date(), "yyyy-MM-dd"))
+    const [paymentDate, setPaymentDate] = useState(() => editTransaction?.paymentDateRaw ? editTransaction.paymentDateRaw.slice(0, 10) : format(new Date(), "yyyy-MM-dd"))
+    const [status, setStatus] = useState<"pending" | "paid">(() => editTransaction ? (String(editTransaction.rawStatus || "").toLowerCase() === "paid" ? "paid" : "pending") : "pending")
+    const [accountId, setAccountId] = useState<string | undefined>(() => editTransaction?.accountId ?? undefined)
     const [fromAccountId, setFromAccountId] = useState<string | undefined>(undefined)
     const [toAccountId, setToAccountId] = useState<string | undefined>(undefined)
     const [paymentType, setPaymentType] = useState<string>("Pix")
     const [contactType, setContactType] = useState<ContactType>("customer")
-    const [notes, setNotes] = useState("")
+    const [notes, setNotes] = useState(() => editTransaction?.notes || "")
 
     const [contactRows, setContactRows] = useState<TransactionContactRow[]>([])
     const [contactsLoading, setContactsLoading] = useState(false)
@@ -192,8 +203,8 @@ export default function CreateTransactionPage({
     const [showDiscardModal, setShowDiscardModal] = useState(false)
 
     const [adjustmentTargetBalance, setAdjustmentTargetBalance] = useState(0)
-    const [refundKind, setRefundKind] = useState<"expense_refund" | "revenue_refund">("expense_refund")
-    const [referenceNote, setReferenceNote] = useState("")
+    const [refundKind, setRefundKind] = useState<"expense_refund" | "revenue_refund">(() => editTransaction?.refundKind || "expense_refund")
+    const [referenceNote, setReferenceNote] = useState(() => editTransaction?.referenceNote || "")
 
     const [enableRecurrence, setEnableRecurrence] = useState(false)
     const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurringFrequency>("monthly")
@@ -327,7 +338,7 @@ export default function CreateTransactionPage({
     }, [contactType])
 
     useEffect(() => {
-        if (txKind === "adjustment") setStatus("paid")
+        if (txKind === "adjustment" || txKind === "transfer") setStatus("paid")
     }, [txKind])
 
     useEffect(() => {
@@ -603,6 +614,51 @@ export default function CreateTransactionPage({
             return
         }
         setFieldErrors(new Set())
+
+        /* ── EDIT MODE: update existing transaction ── */
+        if (isEditMode && editTransaction) {
+            setIsSaving(true)
+            try {
+                const cp = contactPayload()
+                const patch: Record<string, unknown> = {}
+
+                // Always allow these
+                patch.description = description.trim()
+                patch.categoryId = categoryId || null
+                patch.subcategoryId = subcategoryId || null
+                patch.notes = notes || null
+
+                // Only allow financial fields if NOT locked
+                if (!lockFinancialFields) {
+                    patch.amount = amount
+                    patch.accountId = accountId || null
+                    patch.contactId = cp.contactId
+                    patch.customerId = cp.customerId
+                    patch.contactType = cp.contactTypeResolved
+                    patch.paymentType = paymentType
+                    patch.dueDate = dueDate
+                    patch.paymentDate = status === "paid" ? paymentDate : null
+                    patch.transactionDate = dueDate
+                    patch.status = status
+                }
+
+                const res = await updateManualTransactionAction(
+                    editTransaction.id,
+                    partnerId,
+                    patch as any,
+                )
+                if (!res.success) return error(res.error || "Erro ao atualizar transação")
+                success("Transação atualizada com sucesso!")
+                onSuccess?.()
+                router.refresh()
+                onClose()
+            } finally {
+                setIsSaving(false)
+            }
+            return
+        }
+
+        /* ── CREATE MODE (original logic below) ── */
 
         if (txKind === "transfer") {
             const fromBal = getAccountBalance(fromAccountId)
@@ -962,7 +1018,7 @@ export default function CreateTransactionPage({
                         onChange={(e) => setReferenceNote(e.target.value)}
                         placeholder="Ex: Pedido #1234, NF, despesa anterior…"
                     />
-                    <DatePicker label="Data de vencimento" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} />
+                    <DatePicker label="Data" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} />
                 </section>
             )}
 
@@ -973,6 +1029,7 @@ export default function CreateTransactionPage({
                         label="Valor"
                         value={amount}
                         onChange={setAmount}
+                        disabled={lockFinancialFields}
                         error={fieldErrors.has("amount")}
                         errorMessage={fieldErrors.has("amount") ? "Valor obrigatório" : undefined}
                     />
@@ -1014,15 +1071,16 @@ export default function CreateTransactionPage({
                         />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <DatePicker label="Data de vencimento" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} />
+                        <DatePicker label="Data de vencimento" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} disabled={lockFinancialFields} />
                         <DatePicker
                             label="Data do pagamento"
                             value={paymentDate}
                             onChange={(d) => setPaymentDate(toYmd(d))}
-                            disabled={status !== "paid"}
+                            disabled={status !== "paid" || lockFinancialFields}
                         />
                     </div>
 
+                    {!isEditMode && (
                     <div className="rounded-2xl border border-brand-border dark:border-dark-border p-4 space-y-4 bg-brand-gray/25 dark:bg-dark-border/15">
                         <Checkbox
                             name="enable_recurrence"
@@ -1103,6 +1161,17 @@ export default function CreateTransactionPage({
                             </>
                         )}
                     </div>
+                    )}
+
+                    {isEditMode && isRecurringTransaction && (
+                        <div className="rounded-2xl border border-indigo-200 dark:border-indigo-700/40 p-4 bg-indigo-50/50 dark:bg-indigo-900/10">
+                            <p className="text-sm font-semibold text-indigo-700 dark:text-indigo-400 mb-1">Transação recorrente</p>
+                            <p className="text-xs text-indigo-600/70 dark:text-indigo-400/60 leading-relaxed">
+                                Esta transação faz parte de uma recorrência. Campos financeiros estão bloqueados.
+                                Para alterar valores futuros, edite a recorrência diretamente.
+                            </p>
+                        </div>
+                    )}
                 </section>
             )}
         </>
@@ -1115,9 +1184,9 @@ export default function CreateTransactionPage({
                     {txKind === "transfer" ? "Status" : txKind === "adjustment" ? "Status e conta" : "Status e conta"}
                 </h3>
                 <div className="space-y-4">
-                    {txKind === "adjustment" ? (
+                    {txKind === "adjustment" || txKind === "transfer" ? (
                         <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                            O ajuste é confirmado ao salvar e atualiza o saldo da conta.
+                            O {txKind === "transfer" ? "lançamento" : "ajuste"} é efetivado ao salvar e atualiza o saldo da conta.
                         </p>
                     ) : (
                         <div>
@@ -1125,12 +1194,13 @@ export default function CreateTransactionPage({
                                 Situação
                             </label>
                             <div className="grid grid-cols-2 gap-2 mt-2">
-                                <Button variant={status === "paid" ? "default" : "outline"} onClick={() => setStatus("paid")}>
-                                    {txKind === "transfer" ? "Efetivado" : paidLabel}
+                                <Button variant={status === "paid" ? "default" : "outline"} onClick={() => setStatus("paid")} disabled={lockFinancialFields}>
+                                    {paidLabel}
                                 </Button>
                                 <Button
                                     variant={status === "pending" ? "default" : "outline"}
                                     onClick={() => setStatus("pending")}
+                                    disabled={lockFinancialFields}
                                 >
                                     Pendente
                                 </Button>
@@ -1144,7 +1214,8 @@ export default function CreateTransactionPage({
                             options={accountOptions}
                             value={accountId}
                             onChange={(v) => setAccountId(v)}
-                            actionItem={accountAction}
+                            disabled={lockFinancialFields}
+                            actionItem={lockFinancialFields ? undefined : accountAction}
                             error={fieldErrors.has("accountId")}
                             errorMessage={fieldErrors.has("accountId") ? "Selecione a conta" : undefined}
                         />
@@ -1271,12 +1342,16 @@ export default function CreateTransactionPage({
                                         <h1
                                             className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-300 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}
                                         >
-                                            Nova Transação
+                                            {isEditMode ? "Editar Transação" : "Nova Transação"}
                                         </h1>
                                         <div
                                             className={`text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}
                                         >
-                                            Registre e organize os lançamentos do seu financeiro.
+                                            {isEditMode
+                                                ? lockFinancialFields
+                                                    ? "Campos financeiros bloqueados. Apenas descrição e categoria podem ser editados."
+                                                    : "Edite os campos desejados e salve."
+                                                : "Registre e organize os lançamentos do seu financeiro."}
                                         </div>
                                     </div>
 
@@ -1286,7 +1361,7 @@ export default function CreateTransactionPage({
                                         </Button>
                                         <Button onClick={handleSave} disabled={isSaving}>
                                             <SaveIcon className="w-4.5 h-4.5 mr-2" />
-                                            {isSaving ? "Salvando..." : "Salvar Lançamento"}
+                                            {isSaving ? "Salvando..." : isEditMode ? "Salvar Alterações" : "Salvar Lançamento"}
                                         </Button>
                                     </div>
                                 </div>
@@ -1295,7 +1370,6 @@ export default function CreateTransactionPage({
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger
                                             value="general"
-                                            className="px-0 pb-3"
                                             badge={
                                                 fieldErrors.size > 0 ? (
                                                     <span
@@ -1307,12 +1381,8 @@ export default function CreateTransactionPage({
                                         >
                                             Dados gerais
                                         </TabsTrigger>
-                                        <TabsTrigger value="attachments" className="px-0 pb-3">
-                                            Anexos
-                                        </TabsTrigger>
-                                        <TabsTrigger value="notes" className="px-0 pb-3">
-                                            Observações
-                                        </TabsTrigger>
+                                        <TabsTrigger value="attachments">Anexos</TabsTrigger>
+                                        <TabsTrigger value="notes">Observações</TabsTrigger>
                                     </TabsList>
                                 </div>
                             </div>
@@ -1338,8 +1408,9 @@ export default function CreateTransactionPage({
                                                             <button
                                                                 key={b.id}
                                                                 type="button"
-                                                                onClick={() => setTxKind(b.id)}
-                                                                className={`snap-start shrink-0 flex-[0_0_calc(85%-0.5rem)] max-w-[320px] sm:flex-[0_0_280px] flex items-center justify-between p-4 rounded-2xl transition-all border text-left ${txKind === b.id
+                                                                disabled={isEditMode}
+                                                                onClick={() => !isEditMode && setTxKind(b.id)}
+                                                                className={`snap-start shrink-0 flex-[0_0_calc(85%-0.5rem)] max-w-[320px] sm:flex-[0_0_280px] flex items-center justify-between p-4 rounded-2xl transition-all border text-left ${isEditMode ? "opacity-60 cursor-not-allowed" : ""} ${txKind === b.id
                                                                     ? b.activeClass
                                                                     : "bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border border-brand-border dark:border-dark-border"
                                                                     }`}
@@ -1369,8 +1440,9 @@ export default function CreateTransactionPage({
                                                         <button
                                                             key={b.id}
                                                             type="button"
-                                                            onClick={() => setTxKind(b.id)}
-                                                            className={`flex items-center justify-between p-4 rounded-2xl transition-all border text-left ${txKind === b.id
+                                                            disabled={isEditMode}
+                                                            onClick={() => !isEditMode && setTxKind(b.id)}
+                                                            className={`flex items-center justify-between p-4 rounded-2xl transition-all border text-left ${isEditMode ? "opacity-60 cursor-not-allowed" : ""} ${txKind === b.id
                                                                 ? b.activeClass
                                                                 : "bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border border-brand-border dark:border-dark-border"
                                                                 }`}
@@ -1443,7 +1515,7 @@ export default function CreateTransactionPage({
                         </Button>
                         <Button onClick={handleSave} disabled={isSaving} className="flex-1 h-[48px]">
                             <SaveIcon className="w-4 h-4 mr-2" />
-                            {isSaving ? "Salvando..." : "Salvar"}
+                            {isSaving ? "Salvando..." : isEditMode ? "Salvar Alterações" : "Salvar"}
                         </Button>
                     </div>
                 </Tabs>

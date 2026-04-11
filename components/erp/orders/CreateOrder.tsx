@@ -514,16 +514,23 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         }
     }
 
-    const buildOrderPayload = (paymentOverrides?: { paymentStatus?: 'paid' | 'partially_paid' | 'unpaid'; paidAmount?: number; paymentMethod?: string; paymentBreakdown?: PaymentBreakdownEntry[] }) => ({
+    const buildOrderPayload = (paymentOverrides?: { paymentStatus?: 'paid' | 'partially_paid' | 'unpaid'; paidAmount?: number; paymentMethod?: string; paymentBreakdown?: PaymentBreakdownEntry[] }) => {
+        const finalPaymentStatus = paymentOverrides?.paymentStatus || paymentStatus;
+        let finalDeliveryStatus = deliveryStatus;
+        if (!editOrderId && finalPaymentStatus === 'paid' && deliveryMethod === 'pickup' && deliveryStatus === 'not_sent') {
+            finalDeliveryStatus = 'delivered';
+        }
+
+        return {
         partnerId,
         customerId: selectedCustomer?.id,
         customerName: selectedCustomer ? selectedCustomer.name : "Consumidor final",
         salesChannel,
         deliveryMethod,
-        paymentStatus: paymentOverrides?.paymentStatus || paymentStatus,
+        paymentStatus: finalPaymentStatus,
         paymentMethod: paymentOverrides?.paymentMethod || (editOrderId ? originalPaymentMethod : "pendente"),
         paymentBreakdown: paymentOverrides?.paymentBreakdown || originalPaymentBreakdown,
-        deliveryStatus: deliveryStatus as any,
+        deliveryStatus: finalDeliveryStatus as any,
         paidAmount: paymentOverrides?.paidAmount,
         address: deliveryMethod === 'delivery' ? {
             zipCode: cep,
@@ -550,7 +557,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         totalAmount,
         notes,
         csrf_token: csrfToken || undefined
-    })
+    }
+}
 
     const submitOrder = async (paymentOverrides?: { paymentStatus?: 'paid' | 'partially_paid' | 'unpaid'; paidAmount?: number; paymentMethod?: string; paymentBreakdown?: PaymentBreakdownEntry[] }) => {
         setIsSaving(true)
