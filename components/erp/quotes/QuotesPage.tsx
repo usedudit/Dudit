@@ -6,7 +6,7 @@ import { useMediaQuery } from "../hooks"
 import { useStore } from "@/lib/store-context"
 
 // Components
-import { Button, IconPlaceholder, AlertModal, Badge, Checkbox } from "@/components/reusable"
+import { Button, IconPlaceholder, AlertModal, Badge, Checkbox, BadgeVariant } from "@/components/reusable"
 import { formatCurrency, formatDate } from "@/lib/utils";
 import QuoteSkeleton from "./QuoteSkeleton"
 import { deleteQuoteAction, batchDeleteQuotesAction, batchUpdateQuotesStatusAction } from "@/app/actions/erp/quotes"
@@ -28,6 +28,9 @@ import {
     ArrowUpDownIcon,
     TrashIcon,
     EditIcon,
+    FileIcon,
+    TelegramIcon,
+    ClockIcon
 } from "@/lib/icons"
 import { useRouter } from "next/navigation"
 
@@ -40,7 +43,8 @@ interface Quote {
     customer_id: string | null;
     total_amount: number;
     statusLabel: string;
-    statusColor: any;
+    statusColor: BadgeVariant;
+    statusIcon?: React.ReactElement<any> | null;
     formattedIssueDate: string;
     formattedExpirationDate: string | null;
     items_count: number;
@@ -143,14 +147,14 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
 
         const filtered = currentQuotes
             .map((q: any): Quote => {
-                const statusMap: Record<string, { label: string; color: string }> = {
-                    draft: { label: "Rascunho", color: "gray" },
-                    sent: { label: "Enviado", color: "blue" },
-                    approved: { label: "Aprovado", color: "green" },
-                    rejected: { label: "Rejeitado", color: "red" },
-                    expired: { label: "Expirado", color: "orange" },
+                const statusMap: Record<string, { label: string; color: BadgeVariant; icon?: React.ReactElement | null }> = {
+                    draft: { label: "Rascunho", color: "gray", icon: <FileIcon size={12} /> },
+                    sent: { label: "Enviado", color: "blue", icon: <TelegramIcon size={12} /> },
+                    approved: { label: "Aprovado", color: "green", icon: null },
+                    rejected: { label: "Rejeitado", color: "red", icon: null },
+                    expired: { label: "Expirado", color: "orange", icon: <ClockIcon size={12} /> },
                 }
-                const statusInfo = statusMap[q.status] || { label: q.status, color: "gray" }
+                const statusInfo = statusMap[q.status] || { label: q.status, color: "gray", icon: null }
 
                 let parsedIssueDate;
                 let formattedIssueDate = "";
@@ -178,6 +182,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                     total_amount: Number(q.total),
                     statusLabel: statusInfo.label,
                     statusColor: statusInfo.color,
+                    statusIcon: statusInfo.icon,
                     formattedIssueDate,
                     formattedExpirationDate,
                     created_at_time: parsedIssueDate ? parsedIssueDate.getTime() : 0,
@@ -497,7 +502,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                                     >
                                         <IconPlaceholder
                                             placeholderType="image"
-                                            imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
+                                            imageSrc="https://img.dudit.com.br/static/mascots/Orcamentos.png"
                                             imageAlt="Sem orçamentos"
                                             title="Você ainda não tem orçamentos"
                                             subtitle="Seus orçamentos aparecerão aqui assim que você criá-los."
@@ -552,7 +557,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                                                                             {q.customer_name} • {q.formattedIssueDate}
                                                                         </span>
                                                                     </div>
-                                                                    <Badge variant={q.statusColor} className="shrink-0 text-[10px] h-5 px-1.5">
+                                                                    <Badge variant={q.statusColor} icon={q.statusIcon ?? undefined} className="shrink-0 text-[10px] h-5 px-1.5">
                                                                         {q.statusLabel}
                                                                     </Badge>
                                                                 </div>
@@ -622,14 +627,16 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                                                                                 }));
                                                                             }}
                                                                         >
-                                                                            <div className={`flex items-center gap-1.5 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
-                                                                                {col.label}
+                                                                            <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                                <span>{col.label}</span>
                                                                                 {isSortable && (
-                                                                                    <ArrowUpDownIcon
-                                                                                        size={14}
-                                                                                        className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
-                                                                                            } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
-                                                                                    />
+                                                                                    <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                                                        <ArrowUpDownIcon
+                                                                                            size={14}
+                                                                                            className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
+                                                                                                } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
+                                                                                        />
+                                                                                    </div>
                                                                                 )}
                                                                             </div>
                                                                         </th>

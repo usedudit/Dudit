@@ -54,7 +54,8 @@ const QuoteGridCard = React.memo(
                                 <div className="flex items-center shrink-0">
                                     <Badge
                                         variant={quote.statusColor}
-                                        className="whitespace-nowrap scale-90 shrink-0"
+                                        icon={quote.statusIcon ?? undefined}
+                                        className="font-medium px-2 py-0.5 mt-[1px]"
                                     >
                                         {quote.statusLabel}
                                     </Badge>

@@ -9,7 +9,9 @@ import {
     ArrowRightIcon,
     UploadIcon,
     EditIcon,
-    ThreeDotsIcon
+    ThreeDotsIcon,
+    TelegramIcon,
+    ClockIcon
 } from '@/lib/icons';
 import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, Tooltip, AlertModal, InfoCard } from '@/components/reusable';
 import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction } from '@/app/actions/erp/quotes';
@@ -77,10 +79,10 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
 
     const getStatusInfo = (s: string) => {
         switch (s) {
-            case 'sent': return { label: 'Enviado', variant: 'blue' as const, icon: <UploadIcon size={12} />, color: 'bg-blue-500' };
-            case 'approved': return { label: 'Aprovado', variant: 'green' as const, icon: <CancelCircleIcon size={12} />, color: 'bg-green-500' };
-            case 'rejected': return { label: 'Rejeitado', variant: 'red' as const, icon: <CancelCircleIcon size={12} />, color: 'bg-red-500' };
-            case 'expired': return { label: 'Expirado', variant: 'orange' as const, icon: <AlertTriangleIcon size={12} />, color: 'bg-orange-500' };
+            case 'sent': return { label: 'Enviado', variant: 'blue' as const, icon: <TelegramIcon size={12} />, color: 'bg-blue-500' };
+            case 'approved': return { label: 'Aprovado', variant: 'green' as const, icon: undefined, color: 'bg-green-500' };
+            case 'rejected': return { label: 'Rejeitado', variant: 'red' as const, icon: undefined, color: 'bg-red-500' };
+            case 'expired': return { label: 'Expirado', variant: 'orange' as const, icon: <ClockIcon size={12} />, color: 'bg-orange-500' };
             case 'draft': return { label: 'Rascunho', variant: 'gray' as const, icon: <FileIcon size={12} />, color: 'bg-gray-400' };
             default: return { label: s, variant: 'gray' as const, icon: <FileIcon size={12} />, color: 'bg-gray-400' };
         }
@@ -186,7 +188,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                                 <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                     {/* Title hidden on mobile, shown on md+ */}
                                     <span className="hidden md:inline truncate">{pageTitle}</span>
-                                    <Badge variant={statusInfo.variant}>
+                                    <Badge variant={statusInfo.variant} icon={statusInfo.icon}>
                                         {statusInfo.label}
                                     </Badge>
                                 </h1>
@@ -318,9 +320,12 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                                 ))}
                             </div>
 
-                            {/* Financial Summary */}
-                            <div className="bg-[#F9FAFB] dark:bg-gray-800/20 rounded-2xl p-6 border border-brand-border dark:border-dark-border">
-                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading mb-4 border-b border-brand-border dark:border-dark-border pb-3">Resumo Financeiro</h3>
+                            <div className="mt-8">
+                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Resumo Financeiro</h3>
+                                </div>
+
                                 <div className="space-y-3">
                                     <div className="flex justify-between items-center text-[14px]">
                                         <span className="text-brand-inactive-text dark:text-dark-body font-medium">Subtotal ({quote.items?.length || 0} itens)</span>
@@ -424,7 +429,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
 };
 
 const QuoteItem = ({ image, name, sku, qty, price, total }: any) => (
-    <div className="flex items-start gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0 hover:bg-brand-gray/20 transition-colors px-2 rounded-xl text-left group">
+    <div className="flex items-start gap-4 p-3">
         <div className="w-16 h-16 rounded-xl bg-brand-gray/50 dark:bg-dark-border/50 border border-brand-border dark:border-dark-border overflow-hidden shrink-0 flex items-center justify-center p-1">
             <img
                 src={image}

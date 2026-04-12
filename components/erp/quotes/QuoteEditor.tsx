@@ -9,7 +9,9 @@ import {
     AlertCircleIcon,
     ClockIcon,
     CheckCircleIcon,
-    EditIcon
+    EditIcon,
+    FileIcon,
+    TelegramIcon
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import QuantitySelector from '@/components/reusable/QuantitySelector';
@@ -81,11 +83,11 @@ const QuoteEditor = (props: QuoteEditorProps) => {
     const [nameErrors, setNameErrors] = React.useState<Record<number, boolean>>({});
     const [priceErrors, setPriceErrors] = React.useState<Record<number, boolean>>({});
     const statusOptions = [
-        { value: 'draft', label: 'Rascunho', icon: ClockIcon, color: 'text-gray-500' },
-        { value: 'pending', label: 'Pendente', icon: ClockIcon, color: 'text-amber-500' },
+        { value: 'draft', label: 'Rascunho', icon: FileIcon, color: 'text-gray-500' },
+        { value: 'sent', label: 'Enviado', icon: TelegramIcon, color: 'text-blue-500' },
         { value: 'approved', label: 'Aprovado', icon: CheckCircleIcon, color: 'text-green-500' },
         { value: 'rejected', label: 'Recusado', icon: AlertCircleIcon, color: 'text-red-500' },
-        { value: 'expired', label: 'Expirado', icon: AlertCircleIcon, color: 'text-brand-inactive-text' },
+        { value: 'expired', label: 'Expirado', icon: ClockIcon, color: 'text-brand-orange' },
     ];
 
     const currentStatus = statusOptions.find(o => o.value === props.status) || statusOptions[0];
@@ -244,8 +246,8 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                             <MoneyInput
                                                                 name={`item-price-${index}`}
                                                                 value={item.price}
-                                                                onChange={(e: any) => {
-                                                                    props.updateItemPrice(index, parseFloat(e.target.value) || 0)
+                                                                onChange={(val: number) => {
+                                                                    props.updateItemPrice(index, val)
                                                                     if (priceErrors[index]) {
                                                                         setPriceErrors(prev => ({ ...prev, [index]: false }))
                                                                     }
@@ -393,13 +395,11 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                     <div className="flex items-center gap-4 mt-2">
                                                         <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} max={item.isManual ? undefined : Math.max(0, Number(item.stock ?? 0))} size="sm" />
                                                         <div className="flex-1 max-w-[140px]">
-                                                            <Input
+                                                            <MoneyInput
                                                                 name={`item-price-mobile-${index}`}
-                                                                type="number"
-                                                                prefix="R$"
                                                                 value={item.price}
-                                                                onChange={(e: any) => {
-                                                                    props.updateItemPrice(index, parseFloat(e.target.value) || 0);
+                                                                onChange={(val: number) => {
+                                                                    props.updateItemPrice(index, val);
                                                                     if (priceErrors[index]) {
                                                                         setPriceErrors(prev => ({ ...prev, [index]: false }));
                                                                     }
@@ -571,11 +571,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                     </div>
                                 </div>
                                 {!props.isReadOnly && (
-                                    <Button
-                                        variant="outline"
-                                        className="text-xs font-bold text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 border-red-100 dark:border-red-900/30 h-9"
-                                        onClick={() => props.setSelectedCustomer(null)}
-                                    >
+                                    <Button variant="outlinered" onClick={() => props.setSelectedCustomer(null)}>
                                         Remover
                                     </Button>
                                 )}

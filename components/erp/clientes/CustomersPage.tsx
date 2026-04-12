@@ -516,14 +516,16 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
                                                                         }));
                                                                     }}
                                                                 >
-                                                                    <div className={`flex items-center gap-1.5 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
-                                                                        {col.label}
+                                                                    <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                        <span>{col.label}</span>
                                                                         {isSortable && (
-                                                                            <ArrowUpDownIcon
-                                                                                size={14}
-                                                                                className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
-                                                                                    } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
-                                                                            />
+                                                                            <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                                                <ArrowUpDownIcon
+                                                                                    size={14}
+                                                                                    className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
+                                                                                        } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
+                                                                                />
+                                                                            </div>
                                                                         )}
                                                                     </div>
                                                                 </th>

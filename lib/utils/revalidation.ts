@@ -66,6 +66,7 @@ export async function revalidateQuotes(partnerId: string) {
     safeRevalidateTag(partnerId)
   }
   safeRevalidateTag("quotes")
+  revalidatePath("/erp/quotes")
 }
 
 /**

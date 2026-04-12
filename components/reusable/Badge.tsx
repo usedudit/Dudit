@@ -1,7 +1,7 @@
 import React from "react"
 import { CheckCircleIcon, CancelCircleIcon, AlertTriangleIcon, BlockedIcon } from "@/lib/icons"
 
-type BadgeVariant =
+export type BadgeVariant =
   | "green"
   | "red"
   | "orange"

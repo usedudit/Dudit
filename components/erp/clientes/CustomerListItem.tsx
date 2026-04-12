@@ -108,10 +108,16 @@ const CustomerListItem = React.memo(
       }
     }
 
+    const getJustifyClass = (align?: string) => {
+      if (align === "center") return "justify-center"
+      if (align === "right") return "justify-end"
+      return "justify-start"
+    }
+
     const getAlignClass = (align?: string) => {
-      if (align === "center") return "text-center justify-center"
-      if (align === "right") return "text-right justify-end"
-      return "text-left justify-start"
+      if (align === "center") return "text-center"
+      if (align === "right") return "text-right"
+      return "text-left"
     }
 
     return (
@@ -133,7 +139,9 @@ const CustomerListItem = React.memo(
             key={col.id}
             className={`p-2 border-b border-brand-border dark:border-dark-border ${getAlignClass(col.align)}`}
           >
-            {renderCellContent(col.id)}
+            <div className={`flex items-center w-full min-w-0 ${getJustifyClass(col.align)}`}>
+              {renderCellContent(col.id)}
+            </div>
           </td>
         ))}
       </motion.tr>

@@ -146,6 +146,7 @@ const StockMovementPageControls: React.FC<StockMovementPageControlsProps> = ({
                             <Input
                                 name="search"
                                 placeholder="Buscar movimentações..."
+                                prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                 value={search}
                                 onChange={(e) => onSearchChange(e.target.value)}
                                 className="h-[42px]"

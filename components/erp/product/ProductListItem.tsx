@@ -89,7 +89,7 @@ const ProductListItem = React.memo(
                 case "stock":
                     return (
                         <div className="w-full">
-                            <div className="flex items-center gap-1.5 justify-start">
+                            <div className={`flex items-center gap-1.5 ${getJustifyClass(columns.find(c => c.id === 'stock')?.align)}`}>
                                 <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
                                     {stock} {product.unit || "UN"}
                                 </span>
@@ -99,7 +99,7 @@ const ProductListItem = React.memo(
                                 </span>
                             </div>
                             {variationsCount > 0 && (
-                                <div className="text-left">
+                                <div className={`${getAlignClass(columns.find(c => c.id === 'stock')?.align)}`}>
                                     <span className="text-[11px] font-bold text-brand-green underline decoration-brand-green/30">
                                         {variationsCount} {variationsCount === 1 ? "variação" : "variações"}
                                     </span>
@@ -153,10 +153,16 @@ const ProductListItem = React.memo(
             }
         }
 
+        const getJustifyClass = (align?: string) => {
+            if (align === "center") return "justify-center"
+            if (align === "right") return "justify-end"
+            return "justify-start"
+        }
+
         const getAlignClass = (align?: string) => {
-            if (align === "center") return "text-center justify-center"
-            if (align === "right") return "text-right justify-end"
-            return "text-left justify-start"
+            if (align === "center") return "text-center"
+            if (align === "right") return "text-right"
+            return "text-left"
         }
 
         return (
@@ -178,7 +184,9 @@ const ProductListItem = React.memo(
                         key={col.id}
                         className={`p-2 border-b border-brand-border dark:border-dark-border ${getAlignClass(col.align)}`}
                     >
-                        {renderCellContent(col.id)}
+                        <div className={`flex items-center w-full min-w-0 ${getJustifyClass(col.align)}`}>
+                            {renderCellContent(col.id)}
+                        </div>
                     </td>
                 ))}
             </motion.tr>

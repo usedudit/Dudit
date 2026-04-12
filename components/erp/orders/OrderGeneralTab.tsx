@@ -262,8 +262,8 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                             <MoneyInput
                                                                 name={`item-price-${index}`}
                                                                 value={item.unitPrice}
-                                                                onChange={(e: any) => {
-                                                                    updateItemPrice(index, parseFloat(e.target.value) || 0)
+                                                                onChange={(val: number) => {
+                                                                    updateItemPrice(index, val)
                                                                     if (priceErrors[index]) {
                                                                         setPriceErrors(prev => ({ ...prev, [index]: false }));
                                                                     }
@@ -418,13 +418,11 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                         size="sm"
                                                     />
                                                     <div className="flex-1 max-w-[140px]">
-                                                        <Input
+                                                        <MoneyInput
                                                             name={`item-price-mobile-${index}`}
-                                                            type="number"
-                                                            prefix="R$"
                                                             value={item.unitPrice}
-                                                            onChange={(e: any) => {
-                                                                updateItemPrice(index, parseFloat(e.target.value) || 0)
+                                                            onChange={(val: number) => {
+                                                                updateItemPrice(index, val)
                                                                 if (priceErrors[index]) {
                                                                     setPriceErrors(prev => ({ ...prev, [index]: false }));
                                                                 }

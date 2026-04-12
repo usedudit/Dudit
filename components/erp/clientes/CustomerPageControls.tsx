@@ -149,6 +149,7 @@ const CustomerPageControls: React.FC<CustomerPageControlsProps> = ({
                             <Input
                                 name="search"
                                 placeholder="Buscar clientes..."
+                                prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                 value={search}
                                 onChange={(e) => onSearchChange(e.target.value)}
                                 className="h-[42px]"

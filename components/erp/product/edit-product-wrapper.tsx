@@ -46,25 +46,13 @@ export function EditProductWrapper({ product, suppliers, partnerId, onDuplicate 
         setIsSaving(true)
 
         try {
+            // productData contains the full payload object from AddProductPage.tsx
+            const { partnerId, storeId, pending_variants, ...restData } = productData
+
             const result = await updateProductAction({
                 productId: product.id,
-                name: productData.name,
-                description: productData.description,
-                category: productData.category,
-                subcategory: productData.subcategory,
-                brand: productData.brand,
-                sku: productData.sku,
-                gtin: productData.gtin,
-                unit: productData.unidade,
-                product_type: productData.productType,
-                condition: productData.condicao,
-                cost_price: productData.costPrice,
-                price: productData.price,
-                stock_quantity: productData.stock,
-                min_stock: 10,
-                location: productData.localizacao,
-                images: productData.images || [],
-                is_active: productData.status === "Active",
+                ...restData,
+                is_active: productData.isActive, // fallback in case AddProductPage doesn't have it mapped perfectly for old callers
             })
 
             if (result.success) {

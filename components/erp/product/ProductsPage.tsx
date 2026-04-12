@@ -435,28 +435,19 @@ export default function ProductsPage({
                     }
                 }
 
-                const savedProduct = 'data' in res ? res.data : null
+                toast({ title: "Sucesso" })
+                
+                // For NEW products, we might want to add them immediately
+                // For UPDATED products, we rely on invalidateQueries to fetch theJoined records (names, etc)
+                queryClient.invalidateQueries({ queryKey: productsQueryKey })
 
-                if (savedProduct) {
-                    const nextProducts =
-                        ui.formMode === "add"
-                            ? [savedProduct, ...data.products]
-                            : selection.product?.id
-                                ? data.products.map((prod) =>
-                                    prod.id === selection.product?.id
-                                        ? { ...prod, ...savedProduct }
-                                        : prod
-                                )
-                                : data.products
-
+                if (ui.formMode === "add" && res.data) {
+                    const nextProducts = [res.data, ...data.products]
                     queryClient.setQueryData(productsQueryKey, nextProducts)
                     setData((p) => ({ ...p, products: nextProducts }))
                 }
 
-                toast({ title: "Sucesso" })
-                queryClient.invalidateQueries({ queryKey: productsQueryKey })
-
-                // Fecha form IMEDIATAMENTE — sem esperar refresh
+                // Close form and return to list
                 setUi((p) => ({ ...p, pageState: "list", isSaving: false }))
                 setSelection((p) => ({ ...p, duplicate: null }))
 
@@ -845,14 +836,16 @@ export default function ProductsPage({
                                                                             }));
                                                                         }}
                                                                     >
-                                                                        <div className={`flex items-center gap-1.5 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
-                                                                            {col.label}
+                                                                        <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                            <span>{col.label}</span>
                                                                             {isSortable && (
-                                                                                <ArrowUpDownIcon
-                                                                                    size={14}
-                                                                                    className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
-                                                                                        } ${isSorted && ui.sort?.direction === 'desc' ? 'rotate-180' : ''}`}
-                                                                                />
+                                                                                <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                                                    <ArrowUpDownIcon
+                                                                                        size={14}
+                                                                                        className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
+                                                                                            } ${isSorted && ui.sort?.direction === 'desc' ? 'rotate-180' : ''}`}
+                                                                                    />
+                                                                                </div>
                                                                             )}
                                                                         </div>
                                                                     </th>

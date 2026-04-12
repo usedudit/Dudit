@@ -144,6 +144,7 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
                             <Input
                                 name="search"
                                 placeholder="Buscar transações..."
+                                prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                 value={search}
                                 onChange={(e) => onSearchChange(e.target.value)}
                                 className="h-[42px]"

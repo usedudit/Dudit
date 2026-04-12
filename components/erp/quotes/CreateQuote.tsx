@@ -668,72 +668,72 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         <FadeIn>
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
-                    <div className="flex-1 w-full h-full relative pb-20 md:pb-0">
-                        <div className="flex flex-col lg:flex-row w-full h-full">
+                    <div className="flex-1 w-full h-full relative pb-20 md:pb-0 flex flex-col overflow-hidden">
+                        {/* Sticky Header Shared Between Columns */}
+                        <div className="shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 ease-in-out">
+                            <div className="px-4 md:px-6 pt-4 md:pt-6">
 
-                            {/* LEFT SIDE - EDITOR */}
-                            <div
-                                className="w-full lg:w-1/2 flex flex-col border-r-0 lg:border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background overflow-y-auto no-scrollbar"
-                                ref={scrollContainerRef}
-                                onScroll={handleScroll}
-                            >
-                                {/* Sticky Header inside Left Side */}
-                                <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 ease-in-out">
-                                    <div className="px-4 md:px-6 pt-4 md:pt-6">
+                                <div className="flex items-start justify-between">
+                                    <div className="flex items-center gap-4 min-w-0">
+                                        {/* Back button */}
+                                        <Button
+                                            variant="filled"
+                                            onClick={handleBackWithSafety}
+                                            className={`shrink-0 flex items-center justify-center transition-all duration-300 ${isScrolled ? "w-8 h-8" : "w-10 h-10"}`}
+                                        >
+                                            <ChevronLeftIcon className={`${isScrolled ? "w-4 h-4" : "w-5 h-5"} text-brand-inactive-text dark:text-dark-body`} />
+                                        </Button>
 
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex items-center gap-4 min-w-0">
-                                                {/* Back button */}
-                                                <Button
-                                                    variant="filled"
-                                                    onClick={handleBackWithSafety}
-                                                    className={`shrink-0 flex items-center justify-center transition-all duration-300 ${isScrolled ? "w-8 h-8" : "w-10 h-10"}`}
-                                                >
-                                                    <ChevronLeftIcon className={`${isScrolled ? "w-4 h-4" : "w-5 h-5"} text-brand-inactive-text dark:text-dark-body`} />
-                                                </Button>
+                                        <div className="flex flex-col gap-0.5 overflow-hidden min-w-0">
+                                            <h1 className={`font-bold transition-all duration-300 ease-in-out flex items-center gap-3 ${isScrolled ? "text-lg" : "text-xl md:text-2xl"}`}>
+                                                <span className="truncate">{pageTitle}</span>
+                                                {mode === "edit" && (
+                                                    <Badge variant="gray" icon={<EditIcon />}>Editando</Badge>
+                                                )}
+                                            </h1>
 
-                                                <div className="flex flex-col gap-0.5 overflow-hidden min-w-0">
-                                                    <h1 className={`font-bold transition-all duration-300 ease-in-out flex items-center gap-3 ${isScrolled ? "text-lg" : "text-xl md:text-2xl"}`}>
-                                                        <span className="truncate">{pageTitle}</span>
-                                                        {mode === "edit" && (
-                                                            <Badge variant="gray" icon={<EditIcon />}>Editando</Badge>
-                                                        )}
-                                                    </h1>
-
-                                                    <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[14px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-0.5"}`}>
-                                                        {mode === 'create' && "Crie uma proposta comercial para seu cliente"}
-                                                        {mode === 'duplicate' && "Crie uma nova proposta a partir de uma existente"}
-                                                        {mode === 'edit' && "Edite os detalhes da sua proposta comercial"}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Desktop action buttons */}
-                                            <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                                <Button variant="outline" onClick={handleBackWithSafety} disabled={isSaving} className={isScrolled ? "h-9 px-3 text-xs" : ""}>
-                                                    Cancelar
-                                                </Button>
-                                                <Button onClick={handleSave} disabled={isSaving} isLoading={isSaving} className={isScrolled ? "h-9 px-4 text-xs" : ""}>
-                                                    {!isSaving && <SaveIcon className={`${isScrolled ? "w-3.5 h-3.5" : "w-[18px] h-[18px]"} mr-2`} />}
-                                                    {mode === 'edit' ? "Salvar" : "Salvar"}
-                                                </Button>
+                                            <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[14px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-0.5"}`}>
+                                                {mode === 'create' && "Crie uma proposta comercial para seu cliente"}
+                                                {mode === 'duplicate' && "Crie uma nova proposta a partir de uma existente"}
+                                                {mode === 'edit' && "Edite os detalhes da sua proposta comercial"}
                                             </div>
                                         </div>
+                                    </div>
 
-                                        {/* Tabs */}
-                                        <div className={`w-full transition-all duration-300 ${isScrolled ? "mt-3" : "mt-6"}`}>
-                                            <TabsList className="bg-transparent p-0 w-full justify-start border-b-0 h-auto gap-6">
-                                                <TabsTrigger value="Dados Gerais" className={`px-0 transition-all duration-300 ${isScrolled ? "pb-2 text-[13px]" : "pb-3 text-sm"}`}>
-                                                    Dados Gerais
-                                                    {getTabErrorCount("Dados Gerais") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
-                                                </TabsTrigger>
-                                                <TabsTrigger value="Observações" className={`px-0 transition-all duration-300 ${isScrolled ? "pb-2 text-[13px]" : "pb-3 text-sm"}`}>Observações</TabsTrigger>
-                                                <TabsTrigger value="Visualização" className={`px-0 transition-all duration-300 md:hidden ${isScrolled ? "pb-2 text-[13px]" : "pb-3 text-sm"}`}>Visualização</TabsTrigger>
-                                            </TabsList>
-                                        </div>
+                                    {/* Desktop action buttons */}
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                        <Button variant="outline" onClick={handleBackWithSafety} disabled={isSaving} className={isScrolled ? "h-9 px-3 text-xs" : ""}>
+                                            Cancelar
+                                        </Button>
+                                        <Button onClick={handleSave} disabled={isSaving} isLoading={isSaving} className={isScrolled ? "h-9 px-4 text-xs" : ""}>
+                                            {!isSaving && <SaveIcon className={`${isScrolled ? "w-3.5 h-3.5" : "w-[18px] h-[18px]"} mr-2`} />}
+                                            {mode === 'edit' ? "Salvar" : "Salvar"}
+                                        </Button>
                                     </div>
                                 </div>
 
+                                {/* Tabs */}
+                                <div className={`w-full transition-all duration-300 ${isScrolled ? "mt-3" : "mt-6"}`}>
+                                    <TabsList className="bg-transparent p-0 w-full justify-start border-b-0 h-auto gap-6 focus-visible:ring-0">
+                                        <TabsTrigger value="Dados Gerais" className={`px-0 transition-all duration-300 ${activeTab === 'Dados Gerais' ? 'text-brand-primary' : ''} ${isScrolled ? "pb-2 text-[13px]" : "pb-3 text-sm"}`}>
+                                            Dados Gerais
+                                            {getTabErrorCount("Dados Gerais") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                        </TabsTrigger>
+                                        <TabsTrigger value="Observações" className={`px-0 transition-all duration-300 ${activeTab === 'Observações' ? 'text-brand-primary' : ''} ${isScrolled ? "pb-2 text-[13px]" : "pb-3 text-sm"}`}>Observações</TabsTrigger>
+                                        <TabsTrigger value="Visualização" className={`px-0 transition-all duration-300 md:hidden ${activeTab === 'Visualização' ? 'text-brand-primary' : ''} ${isScrolled ? "pb-2 text-[13px]" : "pb-3 text-sm"}`}>Visualização</TabsTrigger>
+                                    </TabsList>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 flex flex-col lg:flex-row w-full overflow-hidden">
+
+                            {/* LEFT SIDE - EDITOR */}
+                            <div
+                                className="w-full lg:w-1/2 flex flex-col shrink-0 border-r-0 lg:border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background overflow-y-auto no-scrollbar"
+                                ref={scrollContainerRef}
+                                onScroll={handleScroll}
+                            >
                                 <div className={`flex-1 pt-4 pb-12 px-4 md:px-6 ${activeTab === 'Visualização' ? 'hidden lg:block' : 'block'}`}>
                                     <QuoteEditor
                                         searchQuery={productBucket.searchQuery}
@@ -791,7 +791,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                             </div>
 
                             {/* RIGHT SIDE / BELOW - PREVIEW */}
-                            <div className={`w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 overflow-y-auto no-scrollbar ${activeTab === 'Visualização' ? 'flex flex-col flex-1 min-h-[1000px] lg:min-h-0' : 'hidden lg:flex flex-col'}`}>
+                            <div className={`w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 overflow-auto no-scrollbar ${activeTab === 'Visualização' ? 'flex flex-col flex-1 h-full lg:min-h-0' : 'hidden lg:flex flex-col'}`}>
                                 <QuotePreview
                                     invoiceNumber={quoteCode || (mode === 'create' ? 'ORC-0000' : 'N/A')}
                                     quoteDate={quoteDate}
