@@ -18,8 +18,16 @@ import {
     MoneyIcon,
 } from "@/lib/icons"
 import type { TransactionTab } from "../../../lib/services/transactions.types"
+import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
+import {
+    EMPTY_DATE_PERIOD,
+    isDatePeriodFilterActive,
+    summarizeDatePeriodFilter,
+} from "@/lib/utils/filter-date-period"
 
 interface TransactionFilterState {
+    recurringOnly: boolean
+    datePeriod: DatePeriodFilterValue
     status: string[]
     category: string[]
     paymentType: string[]
@@ -91,6 +99,22 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
                     label="Pagamento"
                     value={filters.paymentType.join(", ")}
                     onRemove={() => setFilters((prev) => ({ ...prev, paymentType: [] }))}
+                />
+            )}
+            {filters.recurringOnly && (
+                <FilterChip
+                    label="Recorrente"
+                    value="Apenas recorrentes"
+                    onRemove={() => setFilters((prev) => ({ ...prev, recurringOnly: false }))}
+                />
+            )}
+            {isDatePeriodFilterActive(filters.datePeriod) && (
+                <FilterChip
+                    label="Período"
+                    value={summarizeDatePeriodFilter(filters.datePeriod) || ""}
+                    onRemove={() =>
+                        setFilters((prev) => ({ ...prev, datePeriod: { ...EMPTY_DATE_PERIOD } }))
+                    }
                 />
             )}
         </AnimatePresence>

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   },
 }
 
-// No need for force-dynamic — the page uses cookies() via auth which already makes it dynamic.
+// No need for force-dynamic - the page uses cookies() via auth which already makes it dynamic.
 
 export default async function CartPage() {
   // Use cached auth layer instead of raw supabase call

@@ -7,7 +7,7 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { AccessDenied } from "@/components/erp/access-denied"
 
 export default async function StockMovementsPage() {
-  // Layout already guarantees auth + valid context — just read cached data
+  // Layout already guarantees auth + valid context - just read cached data
   const context = await getCurrentPartnerContext()
   if (!context) redirect("")
 

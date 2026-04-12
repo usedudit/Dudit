@@ -218,7 +218,7 @@ const ReportsList = ({ initialData }: ReportsListProps) => {
                 <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
             )}
 
-            {/* Resolve Modal — DefaultModal */}
+            {/* Resolve Modal - DefaultModal */}
             <DefaultModal
                 isOpen={!!resolveTarget}
                 onClose={() => { setResolveTarget(null); setActionReason("") }}
@@ -254,7 +254,7 @@ const ReportsList = ({ initialData }: ReportsListProps) => {
                 </div>
             </DefaultModal>
 
-            {/* Dismiss Modal — DefaultModal */}
+            {/* Dismiss Modal - DefaultModal */}
             <DefaultModal
                 isOpen={!!dismissTarget}
                 onClose={() => { setDismissTarget(null); setActionReason("") }}

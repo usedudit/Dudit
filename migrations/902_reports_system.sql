@@ -1,5 +1,5 @@
 -- ============================================================================
--- ADVANCED ADMIN FEATURES — Reports, Risk Score, needs_images
+-- ADVANCED ADMIN FEATURES - Reports, Risk Score, needs_images
 -- Run AFTER 901_admin_panel_columns.sql
 -- ============================================================================
 

@@ -72,7 +72,7 @@ async function isSessionFresh(): Promise<boolean> {
  * Returns password security info for the authenticated user.
  * Frontend uses this to decide which UI to render.
  *
- * NEVER exposes sensitive data — only boolean flags and display provider.
+ * NEVER exposes sensitive data - only boolean flags and display provider.
  */
 export async function getPasswordSecurityInfo(): Promise<{
     hasPassword: boolean
@@ -119,7 +119,7 @@ export async function changePasswordAction(data: {
         return { error: csrfValidation.error || "Token CSRF inválido" }
     }
 
-    // 3. Authentication — userId comes ONLY from server session
+    // 3. Authentication - userId comes ONLY from server session
     const user = await requireUser()
 
     // 4. Session freshness check

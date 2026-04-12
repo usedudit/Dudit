@@ -606,7 +606,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
         </div>
       </div>
 
-      {/* Banner — rounded a partir de md */}
+      {/* Banner - rounded a partir de md */}
       <div className="w-full h-[220px] md:rounded-[24px] md:mb-4 overflow-hidden relative">
         <img
           src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80&w=1400"
@@ -775,7 +775,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
               </div>
             </div>
 
-            {/* Seções do sidebar — desktop only */}
+            {/* Seções do sidebar - desktop only */}
             <div className="hidden lg:block">
               {activeSection === "info" && (
                 <div>

@@ -18,9 +18,16 @@ import {
     ArrowUpIcon,
     ArrowDownIcon,
 } from "@/lib/icons"
+import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
+import {
+    EMPTY_DATE_PERIOD,
+    isDatePeriodFilterActive,
+    summarizeDatePeriodFilter,
+} from "@/lib/utils/filter-date-period"
 
 interface FilterState {
     movement_type: string[]
+    datePeriod: DatePeriodFilterValue
 }
 
 interface StockMovementPageControlsProps {
@@ -78,6 +85,16 @@ const StockMovementPageControls: React.FC<StockMovementPageControlsProps> = ({
                     value={filters.movement_type.join(", ")}
                     // @ts-ignore
                     onRemove={() => setFilters((prev) => ({ ...prev, movement_type: [] }))}
+                />
+            )}
+            {isDatePeriodFilterActive(filters.datePeriod) && (
+                <FilterChip
+                    label="Período"
+                    value={summarizeDatePeriodFilter(filters.datePeriod) || ""}
+                    // @ts-ignore
+                    onRemove={() =>
+                        setFilters((prev) => ({ ...prev, datePeriod: { ...EMPTY_DATE_PERIOD } }))
+                    }
                 />
             )}
         </AnimatePresence>

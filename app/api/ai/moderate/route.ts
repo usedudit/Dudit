@@ -36,7 +36,7 @@ const MAX_TEXTS = 5
 const MAX_TEXT_LENGTH = 10_000
 
 // ============================================================================
-// SAFETY CATEGORY MAP — LLAMA GUARD 3
+// SAFETY CATEGORY MAP - LLAMA GUARD 3
 // ============================================================================
 const SAFETY_CATEGORIES: Record<string, string> = {
   s1: "Violência",
@@ -66,7 +66,7 @@ async function sha256(input: string): Promise<string> {
 }
 
 // ============================================================================
-// TEXT MODERATION — LLAMA GUARD 3
+// TEXT MODERATION - LLAMA GUARD 3
 // ============================================================================
 async function moderateTexts(texts: string[]) {
   console.log("[MODERATION TEXT] Batch size:", texts.length)

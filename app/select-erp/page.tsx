@@ -26,7 +26,7 @@ export default async function SelectErpPage() {
         redirect("/erp/dashboard")
     }
 
-    // Multiple ERPs — show selection screen
+    // Multiple ERPs - show selection screen
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 p-4">
             <div className="w-full max-w-lg">

@@ -69,7 +69,7 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
   const [isScrolled, setIsScrolled] = useState(false)
   const [isPending, startTransition] = useTransition()
 
-  // DERIVED VALUES — useMemo instead of useState+useEffect to avoid extra re-render
+  // DERIVED VALUES - useMemo instead of useState+useEffect to avoid extra re-render
   const { userName, fullName } = useMemo(() => {
     if (user) {
       if (profile?.full_name) {
@@ -146,7 +146,7 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // ✅ FIX: prefetch removido do focus — era o principal gerador de _rsc requests extras na Vercel.
+  // ✅ FIX: prefetch removido do focus - era o principal gerador de _rsc requests extras na Vercel.
   // Se quiser manter prefetch, use no hover do botão de busca (não no focus do input).
   const handleSearchFocus = useCallback(() => {
     setIsSearchInputFocused(true)

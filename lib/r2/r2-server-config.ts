@@ -3,7 +3,7 @@ import "server-only"
 import { r2PublicConfig } from "./r2-public"
 
 /**
- * R2 server credentials — NEVER import from client code.
+ * R2 server credentials - NEVER import from client code.
  * Protected by "server-only" guard.
  */
 export function getR2ServerConfig() {

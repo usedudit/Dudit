@@ -561,7 +561,7 @@ export default function ProductsPage({
                 }
             }
 
-            // 3. Prepare Updates — O(1) lookup via Map (was O(n²) with .find())
+            // 3. Prepare Updates - O(1) lookup via Map (was O(n²) with .find())
             const productsMap = new Map(data.products.map(p => [p.id, p]))
             const updates = ids.map(id => {
                 const product = productsMap.get(id)

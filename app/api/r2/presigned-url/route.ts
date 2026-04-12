@@ -26,7 +26,7 @@ export const runtime = "nodejs"
  */
 export async function POST(req: NextRequest) {
   try {
-    // 1. AUTHENTICATION — strict, throws on failure
+    // 1. AUTHENTICATION - strict, throws on failure
     const user = await requireUser()
 
     // 2. VALIDATE R2 CONFIG
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 4. VALIDATE MIME TYPE — strict allowlist
+    // 4. VALIDATE MIME TYPE - strict allowlist
     if (!ALLOWED_MIME_TYPES.includes(contentType as any)) {
       return NextResponse.json(
         { error: `Tipo de arquivo não permitido. Permitidos: ${ALLOWED_MIME_TYPES.join(", ")}` },
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 5. VALIDATE FILE EXTENSION — allowlist + dangerous blocklist
+    // 5. VALIDATE FILE EXTENSION - allowlist + dangerous blocklist
     const ext = filename.toLowerCase().substring(filename.lastIndexOf("."))
     if (DANGEROUS_EXTENSIONS.includes(ext as any)) {
       return NextResponse.json(
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 7. VALIDATE FILE SIZE — enforce 5MB max
+    // 7. VALIDATE FILE SIZE - enforce 5MB max
     if (fileSize && typeof fileSize === "number") {
       if (fileSize > MAX_FILE_SIZE) {
         const maxMB = (MAX_FILE_SIZE / (1024 * 1024)).toFixed(0)
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 8. GENERATE PRESIGNED URL — user-scoped key, short expiry
+    // 8. GENERATE PRESIGNED URL - user-scoped key, short expiry
     const result = await generateSignedUploadUrl({
       fileName: filename,
       fileType: contentType,

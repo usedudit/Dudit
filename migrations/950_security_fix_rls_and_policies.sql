@@ -61,7 +61,7 @@ $$;
 -- Adds team member access (via partner_users) to all tenant-scoped policies.
 -- Destructive ops (DELETE/UPDATE sensitive) require OWNER or ADMIN role.
 
--- Products: SELECT — owners + team members
+-- Products: SELECT - owners + team members
 DROP POLICY IF EXISTS products_select_policy ON products;
 CREATE POLICY products_select_policy ON products
   FOR SELECT USING (
@@ -72,7 +72,7 @@ CREATE POLICY products_select_policy ON products
     )
   );
 
--- Products: INSERT — owners + team members with OWNER/ADMIN/MANAGER role
+-- Products: INSERT - owners + team members with OWNER/ADMIN/MANAGER role
 DROP POLICY IF EXISTS products_insert_policy ON products;
 CREATE POLICY products_insert_policy ON products
   FOR INSERT WITH CHECK (
@@ -85,7 +85,7 @@ CREATE POLICY products_insert_policy ON products
     )
   );
 
--- Products: UPDATE — owners + team OWNER/ADMIN/MANAGER
+-- Products: UPDATE - owners + team OWNER/ADMIN/MANAGER
 DROP POLICY IF EXISTS products_update_policy ON products;
 CREATE POLICY products_update_policy ON products
   FOR UPDATE USING (
@@ -107,7 +107,7 @@ CREATE POLICY products_update_policy ON products
     )
   );
 
--- Products: DELETE — owners + team OWNER/ADMIN only
+-- Products: DELETE - owners + team OWNER/ADMIN only
 DROP POLICY IF EXISTS products_delete_policy ON products;
 CREATE POLICY products_delete_policy ON products
   FOR DELETE USING (

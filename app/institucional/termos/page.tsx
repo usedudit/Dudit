@@ -36,7 +36,7 @@ export default function TermsPage() {
                 Termos de Uso
               </h1>
               <p className="text-brand-inactive-text text-lg">
-                Versão 1.1 — Última atualização: Março de 2026
+                Versão 1.1 - Última atualização: Março de 2026
               </p>
             </motion.div>
           </div>
@@ -68,7 +68,7 @@ export default function TermsPage() {
                   O SERVIÇO (MERO INTERMEDIADOR)
                 </h2>
                 <div className="space-y-4 md:pl-14 pl-6 border-l-2 border-brand-gray">
-                  <p><strong>1.1.</strong> A DUDIT é uma plataforma tecnológica (modelo SaaS — Software as a Service) que fornece ferramentas de gestão empresarial (ERP) e uma vitrine digital para conectar Parceiros e Usuários.</p>
+                  <p><strong>1.1.</strong> A DUDIT é uma plataforma tecnológica (modelo SaaS - Software as a Service) que fornece ferramentas de gestão empresarial (ERP) e uma vitrine digital para conectar Parceiros e Usuários.</p>
                   <p><strong>1.2. Isenção de Responsabilidade:</strong> A DUDIT atua exclusivamente como provedora de infraestrutura tecnológica. A DUDIT não é proprietária, fornecedora, transportadora ou garantidora dos produtos ou serviços anunciados pelos Parceiros.</p>
                   <p><strong>1.3. Responsabilidade Integral do Parceiro:</strong> O Parceiro é o único e exclusivo responsável por: veracidade das informações do anúncio; entrega do produto ou prestação do serviço; qualidade, garantia, troca e reembolso; atendimento ao consumidor; cumprimento do Código de Defesa do Consumidor (Lei 8.078/90); emissão de documentos fiscais exigidos por lei.</p>
                   <p><strong>1.4. Rescisão por Violação:</strong> A DUDIT reserva-se o direito de suspender ou encerrar qualquer conta, sem aviso prévio e sem direito a reembolso proporcional, em casos de violação destes Termos, fraude comprovada, uso indevido da plataforma ou conduta que cause dano a terceiros ou à reputação da DUDIT.</p>
@@ -188,7 +188,7 @@ export default function TermsPage() {
 
             <div className="mt-20 pt-12 border-t border-brand-border text-center">
               <p className="text-brand-inactive-text italic">
-                DUDIT — Lucélia/SP — dudit.com.br
+                DUDIT - Lucélia/SP - dudit.com.br
               </p>
             </div>
           </div>

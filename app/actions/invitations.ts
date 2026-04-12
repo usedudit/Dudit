@@ -123,7 +123,7 @@ export async function createInvitation(input: {
         }
 
         // SECURITY FIX (LOW-04): Targeted email lookup instead of listing all users
-        // admin.auth.admin.listUsers() loads ALL users — use direct profile query instead
+        // admin.auth.admin.listUsers() loads ALL users - use direct profile query instead
         const { data: matchingProfile } = await admin
             .from("user_profiles")
             .select("user_id")
@@ -157,7 +157,7 @@ export async function createInvitation(input: {
             return { success: false, error: "Já existe um convite pendente para este e-mail nesta equipe." }
         }
 
-        // 2. Validate role authority (GENERIC error — don't leak inviterRole)
+        // 2. Validate role authority (GENERIC error - don't leak inviterRole)
         if (!canUserInviteRole(inviterRole, input.role)) {
             return {
                 success: false,
@@ -165,7 +165,7 @@ export async function createInvitation(input: {
             }
         }
 
-        // 2.5 Subscription limit check — enforce user limits before inviting
+        // 2.5 Subscription limit check - enforce user limits before inviting
         const { checkLimit } = await import("@/lib/services/subscription.service")
         const limitCheck = await checkLimit(input.partnerId, "users")
         if (!limitCheck.allowed) {
@@ -272,7 +272,7 @@ export async function acceptInvitation(
             return { success: false, error: GENERIC_INVALID_TOKEN_MSG }
         }
 
-        // 5. Check if already used, revoked, or expired — generic message for all
+        // 5. Check if already used, revoked, or expired - generic message for all
         if (invitation.used_at || invitation.revoked_at || new Date(invitation.expires_at) < new Date()) {
             await antiTimingJitter()
             return { success: false, error: GENERIC_INVALID_TOKEN_MSG }
@@ -539,7 +539,7 @@ export async function validateInvitation(rawToken: string): Promise<{
             }).catch(() => { })
         }
 
-        // MASK EMAIL: Only return masked version — NEVER the exact email to the client
+        // MASK EMAIL: Only return masked version - NEVER the exact email to the client
         let maskedEmail = undefined
         if (invitation.email) {
             const emailParts = invitation.email.split("@")
@@ -557,7 +557,7 @@ export async function validateInvitation(rawToken: string): Promise<{
             partnerName: partner?.store_name || "Loja",
             role: invitation.role,
             email: maskedEmail,
-            // NOTE: exactEmail deliberately REMOVED — email comparison happens
+            // NOTE: exactEmail deliberately REMOVED - email comparison happens
             // server-side only in acceptInvitation to prevent information disclosure
         }
     } catch (error) {

@@ -85,7 +85,7 @@ const FinancialAccountCard = React.memo(
                             <span className="text-[13px]">
                                 Saldo atual:{" "}
                                 <span className="font-bold text-brand-green">
-                                    {current === null ? "—" : formatCurrency(current)}
+                                    {current === null ? "-" : formatCurrency(current)}
                                 </span>
                             </span>
                         </div>

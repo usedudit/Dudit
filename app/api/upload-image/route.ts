@@ -49,7 +49,7 @@ async function handleUpload(request: NextRequest) {
     }
 
     // =============================
-    // Auth — STRICT (throws on failure)
+    // Auth - STRICT (throws on failure)
     // =============================
     const user = await requireUser()
 
@@ -140,7 +140,7 @@ async function handleUpload(request: NextRequest) {
     }
 
     // =============================
-    // VALIDATE MIME TYPE — strict allowlist
+    // VALIDATE MIME TYPE - strict allowlist
     // =============================
     if (!ALLOWED_UPLOAD_MIME_TYPES.includes(mimeType)) {
       return NextResponse.json(
@@ -150,7 +150,7 @@ async function handleUpload(request: NextRequest) {
     }
 
     // =============================
-    // MAGIC BYTES VALIDATION — prevent MIME spoofing
+    // MAGIC BYTES VALIDATION - prevent MIME spoofing
     // =============================
 
     if (process.env.NODE_ENV === 'development') {
@@ -214,7 +214,7 @@ async function handleUpload(request: NextRequest) {
     const prefix = uploadType === "partner-logo" ? "partner-logos/" : "products/"
 
     // =============================
-    // Signed URL — user-scoped, short expiry
+    // Signed URL - user-scoped, short expiry
     // =============================
     let signedUrl
     try {
@@ -223,7 +223,7 @@ async function handleUpload(request: NextRequest) {
         fileType: mimeType,
         userId: user.id,
         prefix: prefix,
-        expiresIn: 120, // 2 minutes — enough for server-side upload
+        expiresIn: 120, // 2 minutes - enough for server-side upload
       })
     } catch (error) {
       console.error("Erro ao gerar signed URL", error)
@@ -234,7 +234,7 @@ async function handleUpload(request: NextRequest) {
     }
 
     // =============================
-    // Upload — set correct Content-Type for browser safety
+    // Upload - set correct Content-Type for browser safety
     // if directUpload is requested (or universally for direct upload mode), return the uploadUrl
     // =============================
     const isDirect = request.nextUrl.searchParams.get("directUpload") === "true"

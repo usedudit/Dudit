@@ -115,7 +115,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                 <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
                     <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
-                        {/* Back button — desktop only */}
+                        {/* Back button - desktop only */}
                         <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                             <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                 <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
@@ -251,7 +251,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                         {/* RIGHT COLUMN - SIDEBAR */}
                         <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-l-0 xl:border-l border-brand-border dark:border-dark-border space-y-8">
 
-                            {/* Additional Info — InfoCard */}
+                            {/* Additional Info - InfoCard */}
                             <div>
                                 <InfoCard
                                     color="gray"

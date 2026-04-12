@@ -46,7 +46,7 @@ export async function searchProductsForMovement(query: string) {
     }
 }
 
-// Legacy single-item action — preserved for backward compat (undo, triggers)
+// Legacy single-item action - preserved for backward compat (undo, triggers)
 export async function createStockMovementAction(data: {
     productId: string
     variantId?: string | null

@@ -136,7 +136,7 @@ async function _getPartnerStats(partnerId: string) {
   }
 }
 
-// React cache() wrappers — deduplicate within SSR request
+// React cache() wrappers - deduplicate within SSR request
 export const getPartnerProfile = cache(_getPartnerProfile)
 export const getPartnerProducts = cache(_getPartnerProducts)
 export const getPartnerServices = cache(_getPartnerServices)
@@ -282,7 +282,7 @@ export const getCachedPartnerReviews = async (partnerId: string) => {
 export async function updatePartnerAction(partnerId: string, data: any) {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
-  // SECURITY: Verify ownership — only partner owner can update
+  // SECURITY: Verify ownership - only partner owner can update
   const currentUser = await requireUser()
   if (!currentUser) {
     return { error: "Não autenticado" }

@@ -6,7 +6,7 @@ import { getCurrentUser } from "@/lib/auth/server-user"
 import { MarketplaceSearchType } from "@/lib/types/marketplace"
 
 // --- 1. PRODUTOS DA HOME (LISTAGEM) ---
-// NO unstable_cache — Redis is the single source of truth.
+// NO unstable_cache - Redis is the single source of truth.
 // searchMarketplaceDirect already uses react.cache() for per-request deduplication.
 export const getCachedHomeProducts = async () => {
   const t0 = performance.now()
@@ -88,7 +88,7 @@ async function _getMarketplaceProduct(id: string) {
   return data
 }
 
-// --- VARIANTES (DIRECT — NO CACHE) ---
+// --- VARIANTES (DIRECT - NO CACHE) ---
 async function _getProductVariants(productId: string) {
   const supabase = getAdminClient()
   const { data } = await supabase
@@ -100,7 +100,7 @@ async function _getProductVariants(productId: string) {
   return data || []
 }
 
-// --- REVIEWS (DIRECT — NO CACHE) ---
+// --- REVIEWS (DIRECT - NO CACHE) ---
 async function _getProductReviews(productId: string) {
   const supabase = getAdminClient()
   const { data } = await supabase
@@ -115,7 +115,7 @@ async function _getProductReviews(productId: string) {
   return data || []
 }
 
-// React cache() wrappers — deduplicate within SSR request
+// React cache() wrappers - deduplicate within SSR request
 // (generateMetadata + page component share the same result)
 export const getMarketplaceProduct = cache(_getMarketplaceProduct)
 export const getProductVariants = cache(_getProductVariants)
@@ -125,7 +125,7 @@ export const getProductReviews = cache(_getProductReviews)
 // CACHED FUNCTIONS (kept for home/explore pages)
 // =============================================
 
-// --- 2. DETALHES DO PRODUTO (CACHED — for detail pages & SEO) ---
+// --- 2. DETALHES DO PRODUTO (CACHED - for detail pages & SEO) ---
 /**
  * Fetches product data with Next.js tags for invalidation.
  * The product detail page uses this to ensure real-time updates via Supabase Webhooks.
@@ -230,7 +230,7 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
   return fn()
 }
 
-// NO unstable_cache — Redis is the single source of truth.
+// NO unstable_cache - Redis is the single source of truth.
 // searchMarketplaceDirect already uses react.cache() for per-request deduplication.
 export const getCachedExploreProducts = async (query: string, type: MarketplaceSearchType) => {
   return await searchMarketplaceDirect(query, type, {

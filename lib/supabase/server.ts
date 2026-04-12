@@ -36,7 +36,7 @@ export async function createClient(): Promise<any> {
 
 /**
  * Creates a privileged Supabase client using the service role key.
- * Bypasses RLS — use ONLY for server-side admin operations.
+ * Bypasses RLS - use ONLY for server-side admin operations.
  *
  * SECURITY:
  * - Throws if called from client-side code

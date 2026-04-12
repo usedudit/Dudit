@@ -7,6 +7,7 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { formatTime } from "@/lib/utils/formatters"
+import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 
 type DbTransaction = {
     id: string
@@ -93,6 +94,22 @@ function isLedgerConfirmedStatus(status: string | null | undefined): boolean {
     return ["paid", "pago", "recebido", "confirmed", "confirmado", "efetivado"].includes(s)
 }
 
+async function paymentMethodDisplayLabel(
+    supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+    partnerId: string,
+    methodId: string | null | undefined,
+): Promise<string | null> {
+    if (!methodId) return null
+    const { data } = await supabase
+        .from("payment_methods")
+        .select("name, payment_type")
+        .eq("id", methodId)
+        .eq("partner_id", partnerId)
+        .maybeSingle()
+    if (!data?.name) return null
+    return formatPaymentMethodLabel(data.name, data.payment_type)
+}
+
 function numFinanceBalance(v: unknown): number {
     if (v === null || v === undefined) return 0
     const n = Number(v)
@@ -151,7 +168,7 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
             .from("transactions")
             .select(`
         id, description, category, amount, due_date, payment_date, created_at, status, notes, payment_type, transaction_type, contact_id, customer_id, contact_type,
-        transfer_group_id, refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id,
+        transfer_group_id, refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id, payment_method_id,
         transaction_contacts(name, type)
       `)
             .eq("partner_id", partnerId)
@@ -217,6 +234,22 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
             }
         }
 
+        const paymentMethodIds = Array.from(
+            new Set(txs.map((t) => t.payment_method_id).filter(Boolean)),
+        ) as string[]
+        const paymentMethodLabelById = new Map<string, string>()
+        if (paymentMethodIds.length > 0) {
+            const { data: pmRows } = await supabase
+                .from("payment_methods")
+                .select("id, name, payment_type")
+                .eq("partner_id", partnerId)
+                .in("id", paymentMethodIds)
+            for (const pm of pmRows || []) {
+                const label = formatPaymentMethodLabel(pm.name, pm.payment_type)
+                paymentMethodLabelById.set(pm.id, label || "Não informado")
+            }
+        }
+
         const now = new Date()
         const nowTime = now.getTime()
         const mapped: ERPTransaction[] = txs.map((t) => {
@@ -232,7 +265,7 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
             const customerName = order?.buyer_id ? customerById.get(order.buyer_id)?.name : null
             const salesContactName = customerName || order?.customer_name || "Cliente"
             const linkedCustomerName = t.customer_id ? customerById.get(t.customer_id)?.name : null
-            const fallbackContact = t.transaction_contacts?.name || "—"
+            const fallbackContact = t.transaction_contacts?.name || "-"
             const manualCustomerName = linkedCustomerName || "Cliente"
 
             return {
@@ -256,7 +289,10 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
                 createdAtTime: formatTime(t.created_at || now.toISOString()),
                 daysUntilDue,
                 isOverdue,
-                paymentType: t.payment_type || "Não informado",
+                paymentType:
+                    (t.payment_method_id && paymentMethodLabelById.get(t.payment_method_id)) ||
+                    (t.payment_type ? formatPaymentMethodLabel(t.payment_type, null) : "") ||
+                    "Não informado",
                 status: toDisplayStatus(t.status, t.transaction_type, t.refund_kind, isOverdue),
                 statusVariant: toStatusVariant(t.status, isOverdue),
                 amount: Math.abs(Number(t.amount || 0)),
@@ -311,7 +347,7 @@ export type CreateManualTransactionInput = {
     referenceNote?: string | null
 }
 
-/** Canonical status check — ALWAYS use DB values, never UI-displayed strings */
+/** Canonical status check - ALWAYS use DB values, never UI-displayed strings */
 function isStatusPaid(status?: string | null): boolean {
     return String(status || "").toLowerCase() === "paid"
 }
@@ -545,7 +581,7 @@ export async function updateManualTransactionAction(
             !!current.recurring_id && systemGateway && !paid
         if (isRecurringSystemPending) {
             throw new Error(
-                "Esta linha vem da recorrência. Edite o modelo em Previstos ou use «Marcar como pago» — não altere este lançamento pendente.",
+                "Esta linha vem da recorrência. Edite o modelo em Previstos ou use «Marcar como pago» - não altere este lançamento pendente.",
             )
         }
 
@@ -698,8 +734,10 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
 
         const accountId = input.accountId || rec.account_id || null
         const nowIso = new Date().toISOString()
+        const resolvedPmId = input.paymentMethodId || rec.payment_method_id || null
+        const paymentTypeLabel = await paymentMethodDisplayLabel(supabase, input.partnerId, resolvedPmId)
 
-        // Check if a pending transaction already exists (from cron) — upgrade it to paid
+        // Check if a pending transaction already exists (from cron) - upgrade it to paid
         const { data: pendingTx } = await supabase
             .from("transactions")
             .select("id, status, account_id")
@@ -711,14 +749,14 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
 
         if (pendingTx) {
             // Upgrade pending → paid
-            const pm = input.paymentMethodId || rec.payment_method_id || null
             const { data: updated, error: updErr } = await supabase
                 .from("transactions")
                 .update({
                     status: "paid",
                     payment_date: nowIso,
                     account_id: accountId,
-                    payment_method_id: pm,
+                    payment_method_id: resolvedPmId,
+                    payment_type: paymentTypeLabel,
                     updated_at: nowIso,
                 })
                 .eq("id", pendingTx.id)
@@ -758,12 +796,12 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
             original_amount: rec.amount,
             interest_amount: 0,
             fee_amount: 0,
-            payment_type: null as string | null,
+            payment_type: paymentTypeLabel,
             transaction_type: rec.type,
             account_id: accountId,
             origin: "system" as const,
             recurring_id: rec.id,
-            payment_method_id: input.paymentMethodId || rec.payment_method_id || null,
+            payment_method_id: resolvedPmId,
         }
 
         const { data: newTx, error: insertErr } = await supabase
@@ -829,7 +867,7 @@ export async function adjustAccountBalanceViaTransactionAction(input: {
 
         const datePart = (input.transactionDateYmd || new Date().toISOString().slice(0, 10)).slice(0, 10)
         const transactionTs = new Date(`${datePart}T12:00:00`).toISOString()
-        const desc = (input.description && input.description.trim()) || `Ajuste de saldo — ${acc.name}`
+        const desc = (input.description && input.description.trim()) || `Ajuste de saldo - ${acc.name}`
 
         const res = await createManualTransactionAction({
             partnerId: input.partnerId,

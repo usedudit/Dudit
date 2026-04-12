@@ -7,7 +7,7 @@ export default async function AdminDashboardPage() {
     try {
         stats = await getAdminDashboardStats()
     } catch {
-        // Stats fetch failed — dashboard will show zeros
+        // Stats fetch failed - dashboard will show zeros
     }
 
     return (

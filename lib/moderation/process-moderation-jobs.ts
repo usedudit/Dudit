@@ -1,5 +1,5 @@
 /**
- * Processamento de moderação assíncrona — Production-grade.
+ * Processamento de moderação assíncrona - Production-grade.
  *
  * Garantias:
  * - Atomic claim via RPC (FOR UPDATE SKIP LOCKED)
@@ -85,7 +85,7 @@ export async function processPendingModerationJobs(): Promise<ModerationMetrics>
     // 2. Process each job
     for (const job of claimedJobs) {
         // Time guard: stop if near serverless timeout
-        // NÃO libera job — cron futuro reclama via processing timeout (5min)
+        // NÃO libera job - cron futuro reclama via processing timeout (5min)
         const elapsed = performance.now() - batchStart
         if (elapsed > MAX_EXECUTION_MS) {
             structuredLog("time_guard", {
@@ -127,7 +127,7 @@ export async function processPendingModerationJobs(): Promise<ModerationMetrics>
 
             // 5. Distinguish infra failure vs content decision
             if ((moderation as any).infraFailure) {
-                // Infra failure — retry with backoff
+                // Infra failure - retry with backoff
                 await handleRetry(admin, job, "Cloudflare AI infrastructure failure", metrics)
                 structuredLog("job_infra_failure", {
                     job_id: job.id,
@@ -170,7 +170,7 @@ export async function processPendingModerationJobs(): Promise<ModerationMetrics>
                 ms: Math.round(performance.now() - jobStart),
             })
         } catch (error: any) {
-            // Unexpected error — treat as infra failure, retry
+            // Unexpected error - treat as infra failure, retry
             await handleRetry(admin, job, error.message || "Unknown error", metrics)
             structuredLog("job_error", {
                 job_id: job.id,
@@ -198,7 +198,7 @@ async function handleRetry(
     const nextRetry = job.retry_count + 1
 
     if (nextRetry >= MAX_RETRIES) {
-        // Max retries exceeded — produto FICA pending_moderation
+        // Max retries exceeded - produto FICA pending_moderation
         // Admin deve resolver manualmente
         await admin
             .from("moderation_jobs")

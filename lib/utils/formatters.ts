@@ -20,7 +20,7 @@ export function formatCurrency(value: number | string): string {
 export function formatDate(date: Date | string | number): string {
   if (!date) return ""
   const d = new Date(date)
-  return new Intl.DateTimeFormat("pt-BR").format(d)
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo" }).format(d)
 }
 
 /**
@@ -64,11 +64,12 @@ export function formatDateTime(date: Date | string | number): string {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
   }).format(d)
 }
 
 /**
- * Formats a date as HH:mm.
+ * Formats a date as HH:mm (America/Sao_Paulo).
  */
 export function formatTime(date: Date | string | number): string {
   if (!date) return ""
@@ -76,7 +77,30 @@ export function formatTime(date: Date | string | number): string {
   return new Intl.DateTimeFormat("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
   }).format(d)
+}
+
+/**
+ * Calendar-day difference: dueYmd (YYYY-MM-DD) minus "today" in America/Sao_Paulo.
+ * 0 = vence hoje, 1 = vence amanhã, negative = already passed that calendar day.
+ */
+export function diffCalendarDaysInSaoPaulo(dueYmd: string): number {
+  const trimmed = dueYmd.slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return 0
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date())
+  const y = Number(parts.find((p) => p.type === "year")?.value)
+  const m = Number(parts.find((p) => p.type === "month")?.value)
+  const d = Number(parts.find((p) => p.type === "day")?.value)
+  const todayMs = Date.UTC(y, m - 1, d)
+  const [dy, dm, dd] = trimmed.split("-").map(Number)
+  const dueMs = Date.UTC(dy, dm - 1, dd)
+  return Math.round((dueMs - todayMs) / 86400000)
 }
 
 /**

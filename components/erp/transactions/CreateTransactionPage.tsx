@@ -1080,7 +1080,7 @@ export default function CreateTransactionPage({
                         label="Saldo atual"
                         readOnly
                         disabled
-                        value={accountId ? formatCurrency(getAccountBalance(accountId)) : "—"}
+                        value={accountId ? formatCurrency(getAccountBalance(accountId)) : "-"}
                     />
                     <MoneyInput
                         label="Novo saldo"
@@ -1828,7 +1828,7 @@ export default function CreateTransactionPage({
                                             partnerId,
                                             accountId: fromAccountId,
                                             newBalance: adjustFromTransferNewBalance,
-                                            description: `Ajuste de saldo — ${transferFromAccountName}`,
+                                            description: `Ajuste de saldo - ${transferFromAccountName}`,
                                             transactionDateYmd: dueDate,
                                         })
                                         if (!res.success) return error(res.error || "Erro ao ajustar saldo")

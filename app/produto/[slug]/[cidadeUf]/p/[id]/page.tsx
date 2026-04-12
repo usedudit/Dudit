@@ -15,7 +15,7 @@ import { getUserSessionData } from "@/lib/data/user"
 import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
-// Removed force-dynamic — getCurrentUser() calls cookies() which already makes this dynamic
+// Removed force-dynamic - getCurrentUser() calls cookies() which already makes this dynamic
 export const dynamicParams = true
 
 export async function generateStaticParams() {

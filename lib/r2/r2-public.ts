@@ -1,5 +1,5 @@
 /**
- * R2 public configuration — SAFE for client-side import.
+ * R2 public configuration - SAFE for client-side import.
  * Only uses NEXT_PUBLIC_ environment variables.
  */
 export const r2PublicConfig = {

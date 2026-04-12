@@ -1,16 +1,20 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
+import { format } from "date-fns"
 import { Button, Checkbox, Input } from "@/components/reusable"
+import { DatePicker } from "@/components/reusable/DatePicker"
+import { Switch } from "@/components/reusable/Switch"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { Accordion } from "./Accordion"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { XIcon } from "@/lib/icons"
+import { DATE_PERIOD_PRESETS, EMPTY_DATE_PERIOD, type DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 
 // --- Tipos de Configuração do Filtro ---
 
-export type FilterType = "checkbox-list" | "range"
+export type FilterType = "checkbox-list" | "range" | "date-period" | "switch"
 
 export interface FilterSectionConfig {
   id: string
@@ -23,6 +27,10 @@ export interface FilterSectionConfig {
     minPlaceholder?: string
     maxPlaceholder?: string
   }
+  /** Rótulo ao lado do switch (type: switch) */
+  switchLabel?: string
+  /** Presets do período; default = DATE_PERIOD_PRESETS (type: date-period) */
+  datePresetOptions?: string[]
 }
 
 interface FilterSheetProps {
@@ -74,6 +82,18 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
     }))
   }
 
+  const datePeriodValue = (key: string): DatePeriodFilterValue =>
+    localFilters[key] || { ...EMPTY_DATE_PERIOD }
+
+  const setDatePeriod = (key: string, next: DatePeriodFilterValue) => {
+    setLocalFilters((prev) => ({ ...prev, [key]: next }))
+  }
+
+  const toYmd = (d: unknown): string => {
+    if (!d || !(d instanceof Date) || isNaN(d.getTime())) return ""
+    return format(d, "yyyy-MM-dd")
+  }
+
   const content = (
     <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
       <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center">
@@ -85,6 +105,88 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
 
       <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-2">
         {sections.map((section) => {
+          if (section.type === "switch") {
+            const checked = !!localFilters[section.id]
+            return (
+              <Accordion key={section.id} title={section.title} defaultOpen>
+                <div className="flex items-center justify-between gap-3 px-2 py-1">
+                  <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
+                    {section.switchLabel || ""}
+                  </span>
+                  <Switch
+                    checked={checked}
+                    onCheckedChange={(c) =>
+                      setLocalFilters((prev) => ({ ...prev, [section.id]: c }))
+                    }
+                  />
+                </div>
+              </Accordion>
+            )
+          }
+
+          if (section.type === "date-period") {
+            const presets = section.datePresetOptions?.length
+              ? section.datePresetOptions
+              : [...DATE_PERIOD_PRESETS]
+            const v = datePeriodValue(section.id)
+            const selected = v.presets || []
+
+            return (
+              <Accordion key={section.id} title={section.title} defaultOpen>
+                <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-2 px-1">
+                  Atalhos ou período personalizado (limpa o outro ao escolher).
+                </p>
+                {presets.map((opt) => {
+                  const isOn = selected.includes(opt)
+                  return (
+                    <label
+                      key={opt}
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-border cursor-pointer transition-colors"
+                    >
+                      <Checkbox
+                        checked={isOn}
+                        onChange={() =>
+                          setDatePeriod(section.id, {
+                            presets: isOn ? [] : [opt],
+                            from: "",
+                            to: "",
+                          })
+                        }
+                      />
+                      <span className="text-sm dark:text-dark-heading">{opt}</span>
+                    </label>
+                  )
+                })}
+                <div className="mt-3 space-y-3 pt-2 border-t border-brand-border dark:border-dark-border">
+                  <DatePicker
+                    label="De (opcional)"
+                    value={v.from || undefined}
+                    onChange={(d: Date | undefined) =>
+                      setDatePeriod(section.id, {
+                        presets: [],
+                        from: toYmd(d),
+                        to: v.to,
+                      })
+                    }
+                    placeholder="Data inicial"
+                  />
+                  <DatePicker
+                    label="Até (opcional)"
+                    value={v.to || undefined}
+                    onChange={(d: Date | undefined) =>
+                      setDatePeriod(section.id, {
+                        presets: [],
+                        from: v.from,
+                        to: toYmd(d),
+                      })
+                    }
+                    placeholder="Data final"
+                  />
+                </div>
+              </Accordion>
+            )
+          }
+
           // Renderização de Range (Min/Max)
           if (section.type === "range" && section.rangeConfig) {
             const { minKey, maxKey } = section.rangeConfig

@@ -85,7 +85,7 @@ CREATE TRIGGER trg_update_quote_subtotal
 -- WHY: The column-filtered trigger `BEFORE UPDATE OF subtotal, ...` DOES fire
 -- when the subtotal is updated by another trigger (PostgreSQL doesn't
 -- distinguish trigger-initiated vs user-initiated UPDATEs). However, removing
--- the column filter is strictly safer — it guarantees total recalculation on
+-- the column filter is strictly safer - it guarantees total recalculation on
 -- ANY quote update, including edge cases like manual SQL fixes.
 --
 -- Performance impact: negligible. The function body is O(1) arithmetic.
@@ -124,7 +124,7 @@ BEGIN
 END;
 $$;
 
--- Remove column filter — fire on ALL updates to quotes
+-- Remove column filter - fire on ALL updates to quotes
 DROP TRIGGER IF EXISTS trg_recalc_quote_total ON quotes;
 CREATE TRIGGER trg_recalc_quote_total
   BEFORE INSERT OR UPDATE
@@ -211,7 +211,7 @@ CREATE INDEX IF NOT EXISTS idx_quotes_partner_expiration
 -- ─── FIX 5: Explicit Failure in Lock Trigger (No Silent Override) ──────────
 --
 -- WHY: The previous version silently overwrote all fields to OLD values when
--- a status change happened on a finalized quote. This masked bugs — if
+-- a status change happened on a finalized quote. This masked bugs - if
 -- someone passed extra field changes alongside a status change, those changes
 -- would be silently dropped. Explicit failure is safer: RAISE EXCEPTION if
 -- any non-status field was modified alongside a status change.
@@ -233,7 +233,7 @@ BEGIN
     RAISE EXCEPTION 'Orçamento com status "%" não pode ser editado. Duplique-o para criar uma nova versão.', OLD.status;
   END IF;
 
-  -- Status IS changing — validate the transition
+  -- Status IS changing - validate the transition
   IF OLD.status = 'approved' AND NEW.status NOT IN ('expired') THEN
     RAISE EXCEPTION 'Orçamento aprovado só pode ser marcado como expirado';
   END IF;
@@ -258,7 +258,7 @@ BEGIN
     RAISE EXCEPTION 'Não é permitido alterar campos de um orçamento com status "%". Apenas mudanças de status são aceitas.', OLD.status;
   END IF;
 
-  -- Only status + updated_at are changing — allow it
+  -- Only status + updated_at are changing - allow it
   RETURN NEW;
 END;
 $$;
@@ -287,10 +287,10 @@ CREATE TRIGGER trg_lock_finalized_quote
 -- NO CHANGES NEEDED.
 
 
--- ─── FIX 7: Safety Net — Full Recalculation Function ────────────────────────
+-- ─── FIX 7: Safety Net - Full Recalculation Function ────────────────────────
 --
 -- WHY: Even with perfect incremental logic, bugs can happen (manual SQL edits,
--- failed transactions, etc). This function is a REPAIR TOOL — never called in
+-- failed transactions, etc). This function is a REPAIR TOOL - never called in
 -- normal flow, only invoked manually or via admin panel when inconsistencies
 -- are detected.
 --
@@ -324,7 +324,7 @@ BEGIN
     RAISE EXCEPTION 'Quote not found: %', p_quote_id;
   END IF;
 
-  -- Recalculate subtotal from items (full SUM — only for repair)
+  -- Recalculate subtotal from items (full SUM - only for repair)
   SELECT COALESCE(SUM(qi.total_price), 0) INTO v_correct_subtotal
   FROM quote_items qi WHERE qi.quote_id = p_quote_id;
 
@@ -368,7 +368,7 @@ BEGIN
 END;
 $$;
 
--- Bulk repair function — scans ALL quotes and fixes inconsistencies
+-- Bulk repair function - scans ALL quotes and fixes inconsistencies
 CREATE OR REPLACE FUNCTION recalculate_all_quote_totals()
 RETURNS TABLE(
   quote_id UUID,

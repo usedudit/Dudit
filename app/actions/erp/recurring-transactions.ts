@@ -5,6 +5,7 @@ import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 
 export type RecurringFrequency = "daily" | "weekly" | "monthly" | "yearly"
 export type RecurringType = "income" | "expense"
@@ -433,7 +434,7 @@ export async function generateRecurringOccurrencesAction(partnerId: string) {
 
     const catById = new Map<string, string>((cats || []).map((c: { id: string; name: string }) => [c.id, c.name]))
     const contactById = new Map<string, string>(
-      (tcontacts || []).map((c: { id: string; name: string | null }) => [c.id, c.name || "—"]),
+      (tcontacts || []).map((c: { id: string; name: string | null }) => [c.id, c.name || "-"]),
     )
     const customerById = new Map<string, string>(
       (customers || []).map((c: { id: string; name: string | null }) => [c.id, c.name || "Cliente"]),
@@ -454,15 +455,17 @@ export async function generateRecurringOccurrencesAction(partnerId: string) {
         ? (catById.get(String(tpl.category_id)) || "Sem categoria")
         : "Sem categoria"
 
-      let contactName = "—"
+      let contactName = "-"
       if (tpl.customer_id) {
         contactName = customerById.get(String(tpl.customer_id)) || "Cliente"
       } else if (tpl.contact_id) {
-        contactName = contactById.get(String(tpl.contact_id)) || "—"
+        contactName = contactById.get(String(tpl.contact_id)) || "-"
       }
 
       const pmRow = tpl.payment_method_id ? pmById.get(String(tpl.payment_method_id)) : undefined
-      const paymentDisplay = pmRow ? `${pmRow.name}${pmRow.payment_type ? ` (${pmRow.payment_type})` : ""}` : "Não informado"
+      const paymentDisplay = pmRow
+        ? formatPaymentMethodLabel(pmRow.name, pmRow.payment_type) || "Não informado"
+        : "Não informado"
 
       let currentIso = new Date(tpl.start_date as string).toISOString()
       let safety = 0

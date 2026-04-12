@@ -46,7 +46,7 @@ export function useProductForm({ initialProduct, selectedStore, onSave, onBack }
         console.log("Collecting images for moderation...")
         const imageKeysForModeration = (productData.images || []).slice(0, 2)
 
-        // IDs may be empty for guest users — the server action resolves via getCurrentPartnerContext()
+        // IDs may be empty for guest users - the server action resolves via getCurrentPartnerContext()
         let partnerId = selectedStore?.partner_id || ""
         let storeId = selectedStore?.id || ""
 

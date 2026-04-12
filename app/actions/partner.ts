@@ -213,7 +213,7 @@ export async function updatePartnerAction(
     return { error: csrfValidation.error || "Token CSRF inválido" }
   }
 
-  // SECURITY: Verify ownership — only owner can update their partner
+  // SECURITY: Verify ownership - only owner can update their partner
   const currentUser = await requireUser()
   if (!currentUser) {
     return { error: "Não autenticado" }

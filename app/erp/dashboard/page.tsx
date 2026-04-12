@@ -3,7 +3,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { getAllUserPartnerAccess, getCurrentPartnerContext } from "@/lib/auth/partner-context"
 
 export default async function ERPDashboardPage() {
-  // Layout already guarantees auth + valid context — just read cached data
+  // Layout already guarantees auth + valid context - just read cached data
   const context = await getCurrentPartnerContext()
   const allAccess = await getAllUserPartnerAccess()
   const activeStore = allAccess.find((s: typeof allAccess[number]) => s.partnerId === context!.partnerId)

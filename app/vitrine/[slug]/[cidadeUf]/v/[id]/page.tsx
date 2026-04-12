@@ -15,7 +15,7 @@ import {
   getPartnerStats,
 } from "@/app/actions/marketplace/partners"
 
-// Removed force-dynamic — getCurrentUser() calls cookies() which already makes this dynamic
+// Removed force-dynamic - getCurrentUser() calls cookies() which already makes this dynamic
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }): Promise<Metadata> {
   const { id } = await params
@@ -61,7 +61,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function VendorPage({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }) {
   const { id, slug: currentSlug, cidadeUf: currentCidadeUf } = await params
 
-  // PERFORMANCE: Busca TUDO em paralelo — incluindo auth
+  // PERFORMANCE: Busca TUDO em paralelo - incluindo auth
   const [user, partner, products, services, reviews, statsBase] = await Promise.all([
     getCurrentUser(),
     getPartnerProfile(id),

@@ -90,7 +90,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
       const token = await getCsrfToken()
       await updateCartQuantityAction(cartItemId, newQty, token)
       invalidateCartCache()
-      // Removed router.refresh() — optimistic state update handles UI
+      // Removed router.refresh() - optimistic state update handles UI
     } catch {
       setOptimisticItems(prev => ({ ...prev, [cartItemId]: { ...prev[cartItemId], quantity: currentQty } }))
     } finally {
@@ -107,7 +107,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
       const token = await getCsrfToken()
       await removeFromCartAction(cartItemId, token)
       invalidateCartCache()
-      // Removed router.refresh() — item removal is handled by server action revalidation
+      // Removed router.refresh() - item removal is handled by server action revalidation
     } finally {
       setLoading(null)
       isActionInProgress.current = false
@@ -124,7 +124,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
       const token = await getCsrfToken()
       await toggleCartSelectionAction(cartItemId, token)
       invalidateCartCache()
-      // Removed router.refresh() — optimistic state update handles UI
+      // Removed router.refresh() - optimistic state update handles UI
     } catch {
       setOptimisticItems(prev => ({ ...prev, [cartItemId]: { ...prev[cartItemId], selected: currentSelected } }))
     } finally {
@@ -150,7 +150,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
       const token = await getCsrfToken()
       await toggleCartPartnerSelectionAction(partnerId, newState, token)
       invalidateCartCache()
-      // Removed router.refresh() — optimistic state update handles UI
+      // Removed router.refresh() - optimistic state update handles UI
     } catch {
       // Revert items to original state
       const revert: Record<string, { selected: boolean }> = {}
@@ -313,7 +313,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                 return (
                   <div key={partnerId} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                     <div className="lg:col-span-8 bg-white dark:bg-dark-surface rounded-[12px] border border-brand-border overflow-hidden">
-                      {/* Header do vendedor — clicável para expand/collapse */}
+                      {/* Header do vendedor - clicável para expand/collapse */}
                       <div
                         className="px-6 py-4 border-b border-brand-border flex items-center justify-between bg-brand-gray cursor-pointer"
                         onClick={() => toggleVendor(partnerId)}

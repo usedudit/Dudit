@@ -54,7 +54,7 @@ BEGIN
     RETURN COALESCE(NEW, OLD);
   END IF;
 
-  -- Single atomic UPDATE — implicit row lock, no lost updates
+  -- Single atomic UPDATE - implicit row lock, no lost updates
   UPDATE quotes
   SET subtotal = GREATEST(subtotal + delta, 0)
   WHERE id = target_quote_id;
@@ -252,7 +252,7 @@ CREATE TRIGGER trg_qi_02_set_defaults
 -- ── Quote Items AFTER trigger (already created above as trg_qi_03_update_subtotal) ──
 
 
--- ─── FIX 5: Sent Quotes — Item Editability Decision ────────────────────────
+-- ─── FIX 5: Sent Quotes - Item Editability Decision ────────────────────────
 --
 -- DECISION: Keep 'sent' quotes EDITABLE.
 --

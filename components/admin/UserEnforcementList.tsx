@@ -129,7 +129,7 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
 
     return (
         <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-            {/* Search bar — matches ERP style */}
+            {/* Search bar - matches ERP style */}
             <div className="flex items-center gap-3 mb-6 px-4 md:px-8">
                 <div className="max-w-[220px]">
                     <Input
@@ -242,12 +242,12 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
                 )}
             </div>
 
-            {/* Pagination — reusable component same as ERP */}
+            {/* Pagination - reusable component same as ERP */}
             {totalPages > 1 && (
                 <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
             )}
 
-            {/* Ban Modal — uses DefaultModal with form */}
+            {/* Ban Modal - uses DefaultModal with form */}
             <DefaultModal
                 isOpen={!!banTarget}
                 onClose={() => { setBanTarget(null); setBanReason(""); setBanDuration(7); setBanConfirmed(false) }}
@@ -297,7 +297,7 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
                 </div>
             </DefaultModal>
 
-            {/* Unban Modal — uses AlertModal */}
+            {/* Unban Modal - uses AlertModal */}
             <AlertModal
                 isOpen={!!unbanTarget}
                 onClose={() => setUnbanTarget(null)}

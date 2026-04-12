@@ -284,7 +284,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                 <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
             )}
 
-            {/* Disable ERP Modal — DefaultModal with form */}
+            {/* Disable ERP Modal - DefaultModal with form */}
             <DefaultModal
                 isOpen={!!disableTarget}
                 onClose={() => { setDisableTarget(null); setDisableReason(""); setDisableDuration(30); setDisableConfirmed(false) }}
@@ -334,7 +334,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                 </div>
             </DefaultModal>
 
-            {/* Enable ERP — AlertModal */}
+            {/* Enable ERP - AlertModal */}
             <AlertModal
                 isOpen={!!enableTarget}
                 onClose={() => setEnableTarget(null)}
@@ -345,7 +345,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                 variant="warning"
             />
 
-            {/* Suspend — AlertModal */}
+            {/* Suspend - AlertModal */}
             <AlertModal
                 isOpen={!!suspendTarget}
                 onClose={() => setSuspendTarget(null)}
@@ -356,7 +356,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                 variant="danger"
             />
 
-            {/* Unsuspend — AlertModal */}
+            {/* Unsuspend - AlertModal */}
             <AlertModal
                 isOpen={!!unsuspendTarget}
                 onClose={() => setUnsuspendTarget(null)}

@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js"
 
 /**
  * Singleton admin (service role) Supabase client.
- * Bypasses RLS — use ONLY for server-side admin operations.
+ * Bypasses RLS - use ONLY for server-side admin operations.
  *
  * This module-level singleton avoids re-creating the client on every call,
  * reducing overhead in serverless environments.

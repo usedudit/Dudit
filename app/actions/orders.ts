@@ -72,7 +72,7 @@ export async function createOrderAction(data: {
 
   // ========================================================================
   // SECURITY FIX (CRIT-02): Server-side price verification
-  // Fetch the actual price from the database — NEVER trust client totalAmount
+  // Fetch the actual price from the database - NEVER trust client totalAmount
   // ========================================================================
   let serverPrice: number
   let itemName: string = "Item"
@@ -241,7 +241,7 @@ export async function updateOrderAction(
     paid: ["shipped", "delivered", "cancelled"],
     shipped: ["delivered", "cancelled"],
     delivered: ["cancelled"],
-    cancelled: [], // status final — não pode ser alterado
+    cancelled: [], // status final - não pode ser alterado
   }
 
   const allowed = allowedTransitions[currentOrder.situation] || []
@@ -317,7 +317,7 @@ export async function deleteOrderAction(orderId: string, csrf_token?: string) {
 
   const supabase = await getSupabaseServerClient()
 
-  // SECURITY: Delete parent FIRST — if this fails, children stay intact.
+  // SECURITY: Delete parent FIRST - if this fails, children stay intact.
   // Previously children were deleted first, causing orphaned data if parent delete failed.
   const { error } = await supabase.from("orders").delete().eq("id", orderId)
 
@@ -325,7 +325,7 @@ export async function deleteOrderAction(orderId: string, csrf_token?: string) {
     return { error: error.message }
   }
 
-  // Children cleanup (order_items, stock_movements) — safe because parent is already gone.
+  // Children cleanup (order_items, stock_movements) - safe because parent is already gone.
   // If these fail, the data is orphaned but not a security risk.
   await supabase.from("order_items").delete().eq("order_id", orderId)
   await supabase.from("stock_movements").delete().eq("order_id", orderId)

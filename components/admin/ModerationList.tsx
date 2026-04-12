@@ -175,7 +175,7 @@ function ProductDetailPanel({
                     </div>
                 </div>
 
-                {/* Reject images — DefaultModal with reason input */}
+                {/* Reject images - DefaultModal with reason input */}
                 <DefaultModal
                     isOpen={showRejectImagesModal}
                     onClose={() => { setShowRejectImagesModal(false); setRejectReason("") }}
@@ -215,7 +215,7 @@ function ProductDetailPanel({
                     </div>
                 </DefaultModal>
 
-                {/* Full reject — DefaultModal with reason input */}
+                {/* Full reject - DefaultModal with reason input */}
                 <DefaultModal
                     isOpen={showFullRejectModal}
                     onClose={() => { setShowFullRejectModal(false); setRejectReason("") }}

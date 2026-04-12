@@ -14,7 +14,7 @@ CREATE INDEX IF NOT EXISTS idx_partner_invitations_active
   ON partner_invitations(token_hash)
   WHERE used_at IS NULL AND revoked_at IS NULL;
 
--- ─── 2. Audit Logs — Add missing columns to existing table ─────────────────
+-- ─── 2. Audit Logs - Add missing columns to existing table ─────────────────
 -- Existing schema: id, table_name, action, user_id, old_values, new_values,
 --                  ip_address, created_at
 -- We add: partner_id, target_user_id for multi-tenant audit scoping.

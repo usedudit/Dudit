@@ -77,7 +77,7 @@ export async function setPendingInviteToken(token: string): Promise<void> {
     const cookieStore = await cookies()
     cookieStore.set(PENDING_INVITE_COOKIE, token, {
         ...COOKIE_OPTIONS,
-        maxAge: 60 * 30, // 30 minutes — enough for auth flow
+        maxAge: 60 * 30, // 30 minutes - enough for auth flow
     })
 }
 

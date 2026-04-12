@@ -88,7 +88,7 @@ export function StoreProvider({ children, partnerId: propPartnerId }: { children
     } finally {
       setIsLoading(false)
     }
-    // supabase ref is stable via useRef — no need to include it
+    // supabase ref is stable via useRef - no need to include it
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [partnerId])
 

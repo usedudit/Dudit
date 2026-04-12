@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { ActionsDropdown, Badge, Checkbox } from "@/components/reusable"
 import { CreditCardIcon, FileIcon, MoneyIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
+import { DueDateCountdown } from "@/lib/utils/transaction-due-countdown"
 import type { ERPTransaction } from "../../../lib/services/transactions.types"
 
 interface TransactionGridCardProps {
@@ -46,7 +47,7 @@ const TransactionGridCard = React.memo(
                                     {transaction.description}
                                 </h3>
                                 {isRecurring && (
-                                    <Badge variant="purple" className="whitespace-nowrap">
+                                    <Badge variant="purple" className="whitespace-nowrap scale-90 shrink-0">
                                         Recorrente
                                     </Badge>
                                 )}
@@ -85,11 +86,12 @@ const TransactionGridCard = React.memo(
                             </span>
                         </div>
 
-                        <div className="flex flex-col gap-0.5 items-end shrink-0">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body text-right">Vencimento</span>
+                        <div className="flex flex-col gap-0.5 items-end shrink-0 text-right">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Vencimento</span>
                             <span className={`text-sm font-bold ${transaction.isOverdue ? "text-brand-red" : "text-brand-dark dark:text-dark-heading"}`}>
                                 {transaction.dueDateShort}
                             </span>
+                            <DueDateCountdown transaction={transaction} align="right" />
                         </div>
                     </div>
 

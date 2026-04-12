@@ -5,7 +5,7 @@
  * SECURITY:
  * - Authentication via requireUser() (strict)
  * - Multi-tenant isolation: users can only delete their own files
- * - Key must start with users/{userId}/ — enforced via validateKeyOwnership()
+ * - Key must start with users/{userId}/ - enforced via validateKeyOwnership()
  */
 
 import { NextRequest, NextResponse } from "next/server"
@@ -34,7 +34,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // 3. MULTI-TENANT ISOLATION — user can only delete their own files
+    // 3. MULTI-TENANT ISOLATION - user can only delete their own files
     if (!validateKeyOwnership(key, user.id)) {
       console.warn(
         `[SECURITY] User ${user.id} attempted to delete file outside their scope: ${key}`

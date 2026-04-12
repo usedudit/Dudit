@@ -1,5 +1,5 @@
 /**
- * Subscription Service — Central service for plan lookups, feature flags, and limit enforcement.
+ * Subscription Service - Central service for plan lookups, feature flags, and limit enforcement.
  *
  * Uses in-memory cache (30s TTL for partner plans, 60s for all plans) to minimize DB hits.
  * All functions use getAdminClient() (server-side only, bypasses RLS).
@@ -103,7 +103,7 @@ async function getFreePlan(): Promise<Plan> {
     .single()
 
   if (error || !data) {
-    // Hardcoded emergency fallback — should never happen in practice
+    // Hardcoded emergency fallback - should never happen in practice
     console.error("[SUBSCRIPTION] Free plan not found in database, using emergency fallback")
     return {
       id: "00000000-0000-0000-0000-000000000000",
@@ -231,7 +231,7 @@ export async function getLimit(partnerId: string, limitName: string): Promise<nu
   const value = plan.limits_json[limitName]
 
   if (value === undefined || value === null) {
-    // Unknown limit — default to 0 (deny by default)
+    // Unknown limit - default to 0 (deny by default)
     console.warn(`[SUBSCRIPTION] Unknown limit "${limitName}" for plan "${plan.slug}"`)
     return 0
   }

@@ -237,7 +237,7 @@ const ADMIN_PERMISSIONS: PartnerRoutePermissions = {
 
 const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     dashboard: full,
-    // Vendas — full ops, can cancel but CANNOT refund
+    // Vendas - full ops, can cancel but CANNOT refund
     orders: withSpecific(full, {
         can_cancel_order: true, can_refund: false, can_update_status: true,
         can_assign_delivery: true, can_view_values: true,
@@ -250,13 +250,13 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     invoices: full,
     pos: withSpecific(full, { can_discount: true, can_cancel_sale: true }),
     quotes: full,
-    // Produtos — full
+    // Produtos - full
     products: withSpecific(full, { can_adjust_stock: true, can_import_products: true }),
     stock_movements: full,
     import_notes: withSpecific(full, { can_import_products: true }),
     suppliers: full,
     cadastros_produtos: full,
-    // Serviços — full
+    // Serviços - full
     appointments: withSpecific(full, {
         can_assign_technician: true, can_cancel_appointment: true,
         can_update_appointment_status: true,
@@ -265,7 +265,7 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     cadastros_services: full,
     // Clientes
     customers: full,
-    // Financeiro — view only, no approve/delete
+    // Financeiro - view only, no approve/delete
     financial_transactions: withSpecific(viewOnly, { can_approve_payment: false, can_view_reports: true }),
     financial_dashboard: viewOnly,
     financial_dre: withSpecific(viewOnly, { can_view_dre: true }),
@@ -276,7 +276,7 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     // Marketing
     marketing_coupons: full,
     cadastros_marketing: full,
-    // Config — limited team management, no integrations/subscription
+    // Config - limited team management, no integrations/subscription
     settings: viewOnly,
     settings_business: withSpecific(viewOnly, { can_edit_business_data: true }),
     settings_integrations: noAccess,
@@ -288,7 +288,7 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
 
 const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     dashboard: viewOnly,
-    // Vendas — create/edit orders, update status, no cancel/refund
+    // Vendas - create/edit orders, update status, no cancel/refund
     orders: withSpecific(crud, {
         can_cancel_order: false, can_refund: false, can_update_status: true,
         can_assign_delivery: false, can_view_values: true,
@@ -298,34 +298,34 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     invoices: viewOnly,
     pos: withSpecific(crud, { can_discount: false, can_cancel_sale: false }),
     quotes: crud,
-    // Produtos — view only
+    // Produtos - view only
     products: withSpecific(viewOnly, { can_adjust_stock: false, can_import_products: false }),
     stock_movements: viewOnly,
     import_notes: noAccess,
     suppliers: noAccess,
     cadastros_produtos: viewOnly,
-    // Serviços — view only (cannot create/edit services)
-    // Agendamentos — create/edit, update status, no cancel
+    // Serviços - view only (cannot create/edit services)
+    // Agendamentos - create/edit, update status, no cancel
     appointments: withSpecific(crud, {
         can_assign_technician: false, can_cancel_appointment: false,
         can_update_appointment_status: true,
     }),
     services: viewOnly,
     cadastros_services: viewOnly,
-    // Clientes — view/create (for POS/orders)
+    // Clientes - view/create (for POS/orders)
     customers: crud,
-    // Financeiro — no access
+    // Financeiro - no access
     financial_transactions: noAccess,
     financial_dashboard: noAccess,
     financial_dre: noAccess,
     cadastros_financeiro: noAccess,
-    // Vitrine — no access
+    // Vitrine - no access
     store_customize: noAccess,
     store_reviews: noAccess,
-    // Marketing — no access
+    // Marketing - no access
     marketing_coupons: noAccess,
     cadastros_marketing: noAccess,
-    // Config — no access
+    // Config - no access
     settings: noAccess,
     settings_business: noAccess,
     settings_integrations: noAccess,
@@ -337,7 +337,7 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
 
 const DELIVERY_PERMISSIONS: PartnerRoutePermissions = {
     dashboard: noAccess,
-    // Vendas — view assigned orders only, update delivery status
+    // Vendas - view assigned orders only, update delivery status
     orders: withSpecific(viewOnly, {
         can_cancel_order: false, can_refund: false, can_update_status: true,
         can_assign_delivery: false, can_view_values: false,
@@ -350,30 +350,30 @@ const DELIVERY_PERMISSIONS: PartnerRoutePermissions = {
     invoices: noAccess,
     pos: noAccess,
     quotes: noAccess,
-    // Produtos — no access
+    // Produtos - no access
     products: noAccess,
     stock_movements: noAccess,
     import_notes: noAccess,
     suppliers: noAccess,
     cadastros_produtos: noAccess,
-    // Serviços — no access
+    // Serviços - no access
     appointments: noAccess,
     services: noAccess,
     cadastros_services: noAccess,
-    // Clientes — no access
+    // Clientes - no access
     customers: noAccess,
-    // Financeiro — no access
+    // Financeiro - no access
     financial_transactions: noAccess,
     financial_dashboard: noAccess,
     financial_dre: noAccess,
     cadastros_financeiro: noAccess,
-    // Vitrine — no access
+    // Vitrine - no access
     store_customize: noAccess,
     store_reviews: noAccess,
-    // Marketing — no access
+    // Marketing - no access
     marketing_coupons: noAccess,
     cadastros_marketing: noAccess,
-    // Config — no access
+    // Config - no access
     settings: noAccess,
     settings_business: noAccess,
     settings_integrations: noAccess,

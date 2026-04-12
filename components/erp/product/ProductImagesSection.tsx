@@ -150,7 +150,7 @@ function ProductImagesSection({
                                     </div>
                                 )}
 
-                                {/* Badge de Moderação Bloqueada — só aparece se a imagem foi bloqueada */}
+                                {/* Badge de Moderação Bloqueada - só aparece se a imagem foi bloqueada */}
                                 {blockedImages.has(index) && !uploadingImages.has(index) && (
                                     <div className={`absolute top-2 ${index === 0 ? "right-10" : "right-2"} z-10`}>
                                         <Tooltip text="Aguardando aprovação para exibição pública.">

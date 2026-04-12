@@ -3,7 +3,7 @@
 /**
  * Report / Denúncia server actions.
  *
- * USER-FACING: createReport() — any authenticated user can report
+ * USER-FACING: createReport() - any authenticated user can report
  * ADMIN-FACING: getReports(), resolveReport(), dismissReport()
  *
  * Anti-spam: unique constraint (reporter_user_id, target_type, target_id)
@@ -190,7 +190,7 @@ export async function getReports(
     }
 }
 
-// ─── Resolve Report (admin validates — risk_score +5) ───────────────────────
+// ─── Resolve Report (admin validates - risk_score +5) ───────────────────────
 
 export async function resolveReport(
     reportId: string,

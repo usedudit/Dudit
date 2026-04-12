@@ -192,12 +192,12 @@ export function ERPSidebar() {
                     });
                 }
 
-                // Direct link item (no submenu) — check access
+                // Direct link item (no submenu) - check access
                 if (newItem.href && !newItem.submenu) {
                     return canAccess(newItem.href) ? newItem : null
                 }
 
-                // Submenu item — filter sub-items and hide if none remain
+                // Submenu item - filter sub-items and hide if none remain
                 if (newItem.submenu) {
                     const filteredSub = newItem.submenu.filter(sub => canAccess(sub.href))
                     if (filteredSub.length === 0) return null

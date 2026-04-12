@@ -90,7 +90,7 @@ async function verifyEntityOwnership(
   } else if (entityType === "supplier") {
     await requireSupplierOwnership(entityId)
   } else if (entityType === "store") {
-    // Stores belong to a partner — resolve partner_id and check access
+    // Stores belong to a partner - resolve partner_id and check access
     const supabase = await getSupabaseServerClient()
     const { data: store } = await supabase.from("stores").select("partner_id").eq("id", entityId).single()
     if (!store) throw new Error("Loja não encontrada")

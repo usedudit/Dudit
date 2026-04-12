@@ -8,6 +8,8 @@ import Pagination from "@/components/reusable/Pagination"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { formatCurrency } from "@/lib/utils"
+import { diffCalendarDaysInSaoPaulo } from "@/lib/utils/formatters"
+import { DueDateCountdown } from "@/lib/utils/transaction-due-countdown"
 import {
     PlusIcon,
     ExportFileIcon,
@@ -26,8 +28,35 @@ import type { RecurringOccurrence } from "@/app/actions/erp/recurring-transactio
 import { markRecurringOccurrenceAsPaidAction } from "@/app/actions/erp/transactions"
 import { useRouter } from "next/navigation"
 import { useNotification } from "@/hooks/use-notification"
+import {
+    EMPTY_DATE_PERIOD,
+    resolveDatePeriodBounds,
+    ymdInBounds,
+    msToBrazilYmd,
+    isDatePeriodFilterActive,
+    type DatePeriodFilterValue,
+} from "@/lib/utils/filter-date-period"
+
+function ymdFromRaw(raw: string | null | undefined): string | null {
+    if (!raw) return null
+    const t = new Date(raw as string).getTime()
+    if (Number.isNaN(t)) return String(raw).slice(0, 10)
+    return msToBrazilYmd(t)
+}
+
+/** Previstos: vencimento/ocorrência. Transações: pagamento efetivo, senão vencimento. */
+function transactionFilterYmd(item: ERPTransaction, tab: TransactionTab): string | null {
+    if (tab === "Previstos") {
+        if (item.occurrenceDate) return item.occurrenceDate.slice(0, 10)
+        return ymdFromRaw(item.dueDateRaw)
+    }
+    if (item.paymentDateRaw) return ymdFromRaw(item.paymentDateRaw)
+    return ymdFromRaw(item.dueDateRaw)
+}
 
 interface FilterState {
+    recurringOnly: boolean
+    datePeriod: DatePeriodFilterValue
     status: string[]
     category: string[]
     paymentType: string[]
@@ -37,6 +66,8 @@ type SortKey = "transaction" | "category" | "contact" | "date" | "payment" | "st
 type SortDirection = "asc" | "desc"
 
 const INITIAL_FILTERS: FilterState = {
+    recurringOnly: false,
+    datePeriod: { ...EMPTY_DATE_PERIOD },
     status: [],
     category: [],
     paymentType: [],
@@ -116,21 +147,60 @@ export default function TransactionsPage({
         return () => window.removeEventListener("resize", checkScroll)
     }, [checkScroll, viewMode, transactions])
 
-    const filterSections: FilterSectionConfig[] = [
-        { id: "status", title: "Status", type: "checkbox-list", options: Array.from(new Set(transactions.map((item) => item.status))) },
-        { id: "category", title: "Categoria", type: "checkbox-list", options: Array.from(new Set(transactions.map((item) => item.category))) },
-        { id: "paymentType", title: "Meio de Pagamento", type: "checkbox-list", options: Array.from(new Set(transactions.map((item) => item.paymentType))) },
-    ]
+    const paymentTypeOptions = useMemo(() => {
+        const s = new Set<string>()
+        for (const t of transactions) {
+            if (t.paymentType) s.add(t.paymentType)
+        }
+        for (const o of recurringOccurrences) {
+            if (o.paymentDisplay) s.add(o.paymentDisplay)
+        }
+        return Array.from(s).sort((a, b) => a.localeCompare(b, "pt-BR"))
+    }, [transactions, recurringOccurrences])
+
+    const statusFilterOptions = useMemo(() => {
+        const s = new Set(transactions.map((item) => item.status))
+        if (recurringOccurrences.length > 0) s.add("Pendente")
+        return Array.from(s)
+    }, [transactions, recurringOccurrences])
+
+    const filterSections: FilterSectionConfig[] = useMemo(
+        () => [
+            {
+                id: "recurringOnly",
+                title: "Recorrência",
+                type: "switch",
+                switchLabel: "Apenas recorrentes",
+            },
+            {
+                id: "datePeriod",
+                title:
+                    activeTab === "Previstos"
+                        ? "Período (vencimento / ocorrência)"
+                        : "Período (data de pagamento)",
+                type: "date-period",
+            },
+            { id: "status", title: "Status", type: "checkbox-list", options: statusFilterOptions },
+            {
+                id: "category",
+                title: "Categoria",
+                type: "checkbox-list",
+                options: Array.from(new Set(transactions.map((item) => item.category))),
+            },
+            { id: "paymentType", title: "Meio de Pagamento", type: "checkbox-list", options: paymentTypeOptions },
+        ],
+        [paymentTypeOptions, statusFilterOptions, transactions, activeTab],
+    )
 
     const filteredTransactions = useMemo(() => {
         const term = search.trim().toLowerCase()
+        const { startYmd, endYmd } = resolveDatePeriodBounds(filters.datePeriod)
+        const dateBoundsActive = startYmd !== null || endYmd !== null
 
         // Convert recurring occurrences to ERPTransaction shape for Previstos tab
         const virtualItems: ERPTransaction[] = recurringOccurrences.map((occ) => {
             const dateObj = new Date(`${occ.occurrenceDate}T12:00:00`)
-            const now = new Date()
-            const diffTime = dateObj.getTime() - now.getTime()
-            const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+            const daysUntilDue = diffCalendarDaysInSaoPaulo(occ.occurrenceDate)
             const dateLabel = dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: "America/Sao_Paulo" })
             const dateShort = dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: "America/Sao_Paulo" })
             return {
@@ -138,7 +208,7 @@ export default function TransactionsPage({
                 displayId: "",
                 description: occ.description,
                 category: occ.categoryName || "Sem categoria",
-                contactName: occ.contactName || "—",
+                contactName: occ.contactName || "-",
                 contactType: (occ.contactType || "other") as ERPTransaction["contactType"],
                 dueDate: dateLabel,
                 dueDateShort: dateShort,
@@ -146,8 +216,8 @@ export default function TransactionsPage({
                 dateNote: "-",
                 createdAtDate: "",
                 createdAtTime: "",
-                daysUntilDue: -999, // We hide remaining days for virtual occurrences
-                isOverdue: false,
+                daysUntilDue,
+                isOverdue: daysUntilDue < 0,
                 paymentType: occ.paymentDisplay || "Não informado",
                 status: "Pendente",
                 statusVariant: daysUntilDue < 0 ? "red" : "orange",
@@ -189,8 +259,20 @@ export default function TransactionsPage({
             const matchesStatus = filters.status.length === 0 || filters.status.includes(item.status)
             const matchesCategory = filters.category.length === 0 || filters.category.includes(item.category)
             const matchesPayment = filters.paymentType.length === 0 || filters.paymentType.includes(item.paymentType)
+            const ymd = transactionFilterYmd(item, activeTab)
+            const matchesDate = !dateBoundsActive || ymdInBounds(ymd, startYmd, endYmd)
+            const matchesRecurring =
+                !filters.recurringOnly || !!(item.recurringId || item.isRecurringOccurrence)
 
-            return matchesSearch && matchesTab && matchesStatus && matchesCategory && matchesPayment
+            return (
+                matchesSearch &&
+                matchesTab &&
+                matchesStatus &&
+                matchesCategory &&
+                matchesPayment &&
+                matchesDate &&
+                matchesRecurring
+            )
         })
 
         if (sortConfig) {
@@ -259,7 +341,13 @@ export default function TransactionsPage({
 
     const paginatedTransactions = filteredTransactions.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
     const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE))
-    const hasActiveFilters = search.length > 0 || filters.status.length > 0 || filters.category.length > 0 || filters.paymentType.length > 0
+    const hasActiveFilters =
+        search.length > 0 ||
+        filters.status.length > 0 ||
+        filters.category.length > 0 ||
+        filters.paymentType.length > 0 ||
+        filters.recurringOnly ||
+        isDatePeriodFilterActive(filters.datePeriod)
     const hasTransactions = transactions.length > 0
 
     const handleSelectRow = useCallback((id: string) => {
@@ -484,7 +572,7 @@ export default function TransactionsPage({
                                                                         {transaction.description}
                                                                     </h3>
                                                                     {isRecurring && (
-                                                                        <Badge variant="purple" className="whitespace-nowrap">
+                                                                        <Badge variant="purple" className="whitespace-nowrap scale-90 shrink-0">
                                                                             Recorrente
                                                                         </Badge>
                                                                     )}
@@ -495,10 +583,11 @@ export default function TransactionsPage({
                                                                 </span>
                                                             </div>
 
-                                                            <div className="flex flex-col items-end gap-2 shrink-0">
+                                                            <div className="flex flex-col items-end gap-1 shrink-0 text-right min-w-[100px]">
                                                                 <span className={`inline-flex items-center justify-center h-8 px-3 rounded-full text-[12px] font-semibold whitespace-nowrap border ${transaction.isOverdue ? "text-brand-red border-brand-red/15 bg-brand-red/5" : "text-brand-inactive-text dark:text-dark-body border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/60"}`}>
                                                                     {transaction.dueDateShort}
                                                                 </span>
+                                                                <DueDateCountdown transaction={transaction} align="right" />
                                                                 <Badge variant={transaction.statusVariant} className="whitespace-nowrap">
                                                                     {transaction.status}
                                                                 </Badge>

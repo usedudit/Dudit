@@ -229,7 +229,7 @@ CREATE POLICY quotes_delete_policy ON quotes
     )
   );
 
--- ── Quote Items RLS (uses denormalized partner_id — NO JOINs) ─────────────
+-- ── Quote Items RLS (uses denormalized partner_id - NO JOINs) ─────────────
 
 -- SELECT: Owner + all team members
 CREATE POLICY qi_select_policy ON quote_items

@@ -17,7 +17,7 @@ function fetchCSRFTokenSingleton(): Promise<string | null> {
     return Promise.resolve(cachedToken)
   }
 
-  // Deduplicate concurrent requests — reuse in-flight promise
+  // Deduplicate concurrent requests - reuse in-flight promise
   if (inflightPromise) return inflightPromise
 
   inflightPromise = fetch("/api/csrf-token")

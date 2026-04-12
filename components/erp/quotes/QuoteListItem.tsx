@@ -90,7 +90,7 @@ const QuoteListItem = React.memo(
                 case "expiration_date":
                     return (
                         <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-                            {quote.formattedExpirationDate || "—"}
+                            {quote.formattedExpirationDate || "-"}
                         </span>
                     )
 

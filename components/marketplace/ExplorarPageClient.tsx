@@ -84,7 +84,7 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
         return all
     }, [data, initialResults, currentType, type])
 
-    // HARDENED IntersectionObserver — single trigger with double-fire protection
+    // HARDENED IntersectionObserver - single trigger with double-fire protection
     const isFetchingRef = useRef(false)
     useEffect(() => {
         if (!hasNextPage || isFetchingNextPage) return

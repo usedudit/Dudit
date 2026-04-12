@@ -16,10 +16,17 @@ import {
     CancelCircleIcon,
     TruckIcon,
 } from "@/lib/icons"
+import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
+import {
+    EMPTY_DATE_PERIOD,
+    isDatePeriodFilterActive,
+    summarizeDatePeriodFilter,
+} from "@/lib/utils/filter-date-period"
 
 interface FilterState {
     status: string[]
     channel: string[]
+    datePeriod: DatePeriodFilterValue
 }
 
 interface OrderPageControlsProps {
@@ -85,6 +92,16 @@ const OrderPageControls: React.FC<OrderPageControlsProps> = ({
                     value={filters.channel.join(", ")}
                     // @ts-ignore
                     onRemove={() => setFilters((prev) => ({ ...prev, channel: [] }))}
+                />
+            )}
+            {isDatePeriodFilterActive(filters.datePeriod) && (
+                <FilterChip
+                    label="Período"
+                    value={summarizeDatePeriodFilter(filters.datePeriod) || ""}
+                    // @ts-ignore
+                    onRemove={() =>
+                        setFilters((prev) => ({ ...prev, datePeriod: { ...EMPTY_DATE_PERIOD } }))
+                    }
                 />
             )}
         </AnimatePresence>

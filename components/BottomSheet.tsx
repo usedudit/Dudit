@@ -89,7 +89,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
                                 ref={sheetRef}
                                 style={{ y }}
                                 drag="y"
-                                // Impede arrastar pra cima (y negativo) — o scroll interno cuida disso
+                                // Impede arrastar pra cima (y negativo) - o scroll interno cuida disso
                                 // Permite arrastar pra baixo livremente para fechar
                                 dragConstraints={{ top: 0, bottom: 0 }}
                                 dragElastic={{ top: 0.05, bottom: 0.8 }}
@@ -105,7 +105,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
                                 className="relative w-full bg-white dark:bg-dark-background rounded-t-3xl shadow-2xl flex flex-col max-h-[90vh] pointer-events-auto"
                             >
 
-                                {/* Handle — área de drag, não permite scroll aqui */}
+                                {/* Handle - área de drag, não permite scroll aqui */}
                                 <div className="shrink-0 p-4 cursor-grab active:cursor-grabbing">
 
                                     <div className="w-10 h-1.5 bg-gray-300 rounded-full mx-auto mb-3" />
@@ -118,7 +118,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
 
                                 </div>
 
-                                {/* Conteúdo scrollável — overflow-y-auto cuida do resto */}
+                                {/* Conteúdo scrollável - overflow-y-auto cuida do resto */}
                                 <div
                                     ref={contentRef}
                                     // onPointerDown para o evento aqui pra não competir com o drag da sheet

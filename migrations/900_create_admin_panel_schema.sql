@@ -1,5 +1,5 @@
 -- ============================================================================
--- ADMIN PANEL SCHEMA — Production-Grade Security
+-- ADMIN PANEL SCHEMA - Production-Grade Security
 -- ============================================================================
 -- Tables: admin_roles, admin_audit_logs, admin_step_up_tokens
 -- Plus: role-scoped RLS on existing tables for dual protection
@@ -24,7 +24,7 @@ COMMENT ON COLUMN public.admin_roles.scopes IS 'Fine-grained scopes: moderation,
 
 ALTER TABLE public.admin_roles ENABLE ROW LEVEL SECURITY;
 
--- No RLS policies for anon/authenticated — only service-role can access.
+-- No RLS policies for anon/authenticated - only service-role can access.
 -- This means regular users (even if they somehow guess the table) get zero rows.
 
 
@@ -43,11 +43,11 @@ CREATE TABLE IF NOT EXISTS public.admin_audit_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-COMMENT ON TABLE public.admin_audit_logs IS 'Immutable audit log for all admin actions. INSERT only — no UPDATE, no DELETE.';
+COMMENT ON TABLE public.admin_audit_logs IS 'Immutable audit log for all admin actions. INSERT only - no UPDATE, no DELETE.';
 
 ALTER TABLE public.admin_audit_logs ENABLE ROW LEVEL SECURITY;
 
--- No RLS policies for anon/authenticated — only service-role can insert.
+-- No RLS policies for anon/authenticated - only service-role can insert.
 -- Immutability is enforced by the trigger below.
 
 -- Index for efficient querying
@@ -100,7 +100,7 @@ COMMENT ON TABLE public.admin_step_up_tokens IS 'Short-lived tokens for step-up 
 
 ALTER TABLE public.admin_step_up_tokens ENABLE ROW LEVEL SECURITY;
 
--- No RLS policies for anon/authenticated — only service-role can access.
+-- No RLS policies for anon/authenticated - only service-role can access.
 
 -- Index for efficient lookup
 CREATE INDEX IF NOT EXISTS idx_admin_step_up_tokens_user_id ON public.admin_step_up_tokens(user_id);
@@ -147,7 +147,7 @@ COMMENT ON TABLE public.admin_actions IS 'Admin action queue for destructive ope
 
 ALTER TABLE public.admin_actions ENABLE ROW LEVEL SECURITY;
 
--- No RLS policies for anon/authenticated — only service-role can access.
+-- No RLS policies for anon/authenticated - only service-role can access.
 
 CREATE INDEX IF NOT EXISTS idx_admin_actions_status ON public.admin_actions(status);
 CREATE INDEX IF NOT EXISTS idx_admin_actions_schedule ON public.admin_actions(schedule_for) WHERE status = 'scheduled';

@@ -27,7 +27,7 @@ export interface SignedUrlResponse {
 export interface UploadConfig {
   fileName: string
   fileType: string
-  /** User ID from requireUser() — REQUIRED for multi-tenant isolation */
+  /** User ID from requireUser() - REQUIRED for multi-tenant isolation */
   userId: string
   prefix?: string
   expiresIn?: number
@@ -154,7 +154,7 @@ export async function generateSignedUploadUrl(
       Bucket: serverConfig.bucketName,
       Key: key,
       ContentType: fileType,
-      // No ACL — R2 access is controlled via bucket settings and presigned URLs
+      // No ACL - R2 access is controlled via bucket settings and presigned URLs
     })
 
     const uploadUrl = await getSignedUrl(client, command, {

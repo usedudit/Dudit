@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { ActionsDropdown, Badge, Checkbox } from "@/components/reusable"
 import { CreditCardIcon, FileIcon, MoneyIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
+import { DueDateCountdown } from "@/lib/utils/transaction-due-countdown"
 import type { ERPTransaction } from "../../../lib/services/transactions.types"
 
 interface ColumnDef {
@@ -43,7 +44,7 @@ const TransactionListItem = React.memo(
                                     {transaction.description}
                                 </span>
                                 {(transaction.recurringId || transaction.isRecurringOccurrence) && (
-                                    <Badge variant="purple" className="whitespace-nowrap">
+                                    <Badge variant="purple" className="whitespace-nowrap scale-90 shrink-0">
                                         Recorrente
                                     </Badge>
                                 )}
@@ -83,23 +84,11 @@ const TransactionListItem = React.memo(
 
                 case "dueDate":
                     return (
-                        <div className="flex flex-col text-left">
+                        <div className="flex flex-col text-left gap-0.5">
                             <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
                                 {transaction.dueDate}
                             </span>
-                            {transaction.status.toLowerCase().includes("pago") || transaction.status.toLowerCase().includes("recebido") || transaction.daysUntilDue === -999 ? null : transaction.daysUntilDue === 0 && !transaction.isOverdue ? (
-                                <span className="text-xs font-bold text-brand-yellow">
-                                    Vence hoje
-                                </span>
-                            ) : transaction.isOverdue ? (
-                                <span className="text-xs font-bold text-brand-red">
-                                    Atrasado
-                                </span>
-                            ) : (
-                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                    Faltam {transaction.daysUntilDue} dias
-                                </span>
-                            )}
+                            <DueDateCountdown transaction={transaction} />
                         </div>
                     )
 

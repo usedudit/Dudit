@@ -4,13 +4,13 @@
  * Admin moderation server actions.
  *
  * SECURITY PATTERN (every action):
- * 1. requireAdmin(minRole) — app-level auth
- * 2. requireRateLimit — rate limiting
- * 3. re-fetch entity — anti-IDOR
- * 4. whitelisted mutation — mass-assignment protection
- * 5. audit log — immutable append
+ * 1. requireAdmin(minRole) - app-level auth
+ * 2. requireRateLimit - rate limiting
+ * 3. re-fetch entity - anti-IDOR
+ * 4. whitelisted mutation - mass-assignment protection
+ * 5. audit log - immutable append
  *
- * Uses authenticated Supabase client (RLS enforced — dual protection).
+ * Uses authenticated Supabase client (RLS enforced - dual protection).
  * Service-role only for audit log writes and R2 image deletion.
  */
 
@@ -238,7 +238,7 @@ export async function rejectFlaggedImages(
     // Build detailed reason for deleted_reason / moderation_reason
     const detailedReason = `${removedCount} ${imageWord} ${removedWord} por "${reason.trim()}" do produto "${entity.name}" em ${formatBrazilDateTime()}`
 
-    // SAFETY CHECK: if no images remain, don't approve — product needs at least 1 image
+    // SAFETY CHECK: if no images remain, don't approve - product needs at least 1 image
     if (remainingImages.length === 0) {
         // Update product: remove images, keep pending status, save reason
         const { error: updateError } = await supabase
@@ -286,7 +286,7 @@ export async function rejectFlaggedImages(
         }
     }
 
-    // Images still remain — remove flagged, approve product
+    // Images still remain - remove flagged, approve product
     const { error: updateError } = await supabase
         .from("products")
         .update({

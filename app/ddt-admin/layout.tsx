@@ -25,7 +25,7 @@ export default async function AdminLayout({
 }) {
     // SECURITY: Server-side admin role verification.
     // requireAdmin() checks auth session + admin_roles table.
-    // If user is not an admin, redirect to home (not an error page — don't leak info).
+    // If user is not an admin, redirect to home (not an error page - don't leak info).
     try {
         await requireAdmin()
     } catch {

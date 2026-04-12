@@ -30,6 +30,14 @@ import {
 } from "@/lib/icons"
 import { useRouter } from "next/navigation"
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
+import {
+    EMPTY_DATE_PERIOD,
+    resolveDatePeriodBounds,
+    ymdInBounds,
+    msToBrazilYmd,
+    isDatePeriodFilterActive,
+    type DatePeriodFilterValue,
+} from "@/lib/utils/filter-date-period"
 
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import AlertModal from "../../reusable/AlertModal"
@@ -66,6 +74,7 @@ interface Order {
 interface FilterState {
     status: string[]
     channel: string[]
+    datePeriod: DatePeriodFilterValue
 }
 
 type SortKey = "order_id" | "total" | "status" | "customer" | "date" | "channel";
@@ -74,6 +83,7 @@ type SortDirection = "asc" | "desc";
 const INITIAL_FILTERS: FilterState = {
     status: [],
     channel: [],
+    datePeriod: { ...EMPTY_DATE_PERIOD },
 }
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
@@ -156,15 +166,28 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
         return () => window.removeEventListener("resize", checkScroll)
     }, [checkScroll, effectiveViewMode, effectiveOrders])
 
-    const filterSections: FilterSectionConfig[] = [
-        { id: "status", title: "Status", type: "checkbox-list", options: ["Pago", "Pendente", "Enviado", "Cancelado", "Em análise"] },
-        { id: "channel", title: "Canal", type: "checkbox-list", options: Array.from(new Set(effectiveOrders?.map((o: any) => o.order_source || "Venda Direta") || [])) as string[] },
-    ]
+    const filterSections: FilterSectionConfig[] = useMemo(
+        () => [
+            { id: "datePeriod", title: "Data do pedido", type: "date-period" },
+            { id: "status", title: "Status", type: "checkbox-list", options: ["Pago", "Pendente", "Enviado", "Cancelado", "Em análise"] },
+            {
+                id: "channel",
+                title: "Canal",
+                type: "checkbox-list",
+                options: Array.from(
+                    new Set(effectiveOrders?.map((o: any) => o.order_source || "Venda Direta") || []),
+                ) as string[],
+            },
+        ],
+        [effectiveOrders],
+    )
 
     const filteredOrders: Order[] = useMemo(() => {
         if (!effectiveOrders) return []
 
         const term = debouncedSearch.toLowerCase()
+        const { startYmd, endYmd } = resolveDatePeriodBounds(filters.datePeriod)
+        const dateBoundsActive = startYmd !== null || endYmd !== null
 
         const result = effectiveOrders
             .map((o: any): Order => {
@@ -224,8 +247,10 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
 
                 const statusFilterMatch = filters.status.length === 0 || filters.status.includes(o.statusLabel)
                 const channelFilterMatch = filters.channel.length === 0 || filters.channel.includes(o.order_source)
+                const orderYmd = msToBrazilYmd(o.created_at_time)
+                const matchesDate = !dateBoundsActive || ymdInBounds(orderYmd, startYmd, endYmd)
 
-                return tabMatch && statusFilterMatch && channelFilterMatch
+                return tabMatch && statusFilterMatch && channelFilterMatch && matchesDate
             })
 
         let sortedResult = result
@@ -256,7 +281,11 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
     const totalPages = Math.ceil(filteredOrders.length / itemsPerPage)
     const paginated = filteredOrders.slice((page - 1) * itemsPerPage, page * itemsPerPage)
 
-    const hasActiveFilters = filters.status.length > 0 || filters.channel.length > 0 || debouncedSearch.length > 0
+    const hasActiveFilters =
+        filters.status.length > 0 ||
+        filters.channel.length > 0 ||
+        debouncedSearch.length > 0 ||
+        isDatePeriodFilterActive(filters.datePeriod)
     const hasOrders = (effectiveOrders?.length || 0) > 0
 
     // Handlers

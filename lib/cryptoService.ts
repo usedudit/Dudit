@@ -71,7 +71,7 @@ const derivedKeyCache = new Map<string, Buffer>()
 
 /**
  * Reads the MASTER_KEY for a given version from environment.
- * Throws immediately if the key is missing or too short — no fallback.
+ * Throws immediately if the key is missing or too short - no fallback.
  */
 function getMasterKey(version: KeyVersion): Buffer {
   const envVarName = `MASTER_KEY_${version.toUpperCase()}`
@@ -93,8 +93,8 @@ function getMasterKey(version: KeyVersion): Buffer {
 /**
  * Derives a 32-byte AES-256 key from the versioned MASTER_KEY using HKDF-SHA256.
  *
- * - version:  "v1" or "v2" — selects which MASTER_KEY to use
- * - context:  "cpf" or "mercadopago" — provides domain separation via HKDF info
+ * - version:  "v1" or "v2" - selects which MASTER_KEY to use
+ * - context:  "cpf" or "mercadopago" - provides domain separation via HKDF info
  *
  * Results are cached in memory so HKDF runs at most once per (version, context).
  */
@@ -162,7 +162,7 @@ function parseVersionedPayload(data: string): { version: KeyVersion; body: strin
  * - AuthTag: 16-byte (128-bit) authentication tag protects integrity.
  *
  * @param data    - The plaintext string to encrypt (must be non-empty)
- * @param context - "cpf" or "mercadopago" — determines the derived key
+ * @param context - "cpf" or "mercadopago" - determines the derived key
  * @returns       - Versioned, base64-encoded encrypted string
  */
 export function encrypt(data: string, context: CryptoContext): string {
@@ -198,7 +198,7 @@ export function encrypt(data: string, context: CryptoContext): string {
  * - No silent fallback to another version.
  *
  * @param data    - The versioned encrypted string (e.g., "v1:AbCdEf...")
- * @param context - "cpf" or "mercadopago" — must match the context used to encrypt
+ * @param context - "cpf" or "mercadopago" - must match the context used to encrypt
  * @returns       - The original plaintext string
  * @throws        - If version is unsupported, data is corrupted, or wrong context
  */

@@ -277,7 +277,7 @@ export async function createProductComprehensiveAction(data: {
 
         const finalStoreId = storeResult
 
-        // 3.5 Subscription limit check — enforce product and image limits before creating
+        // 3.5 Subscription limit check - enforce product and image limits before creating
         const [limitCheck, imagesLimitCheck] = await Promise.all([
             checkLimit(finalPartnerId, "products"),
             checkLimit(finalPartnerId, "total_images", (data.images?.length || 0)),
@@ -632,7 +632,7 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         const adminUpdate = getAdminClient()
         await adminUpdate.from('products').update({ moderation_status: payload.moderation_status }).eq('id', productId)
 
-        // Criar moderation job se necessário (cron processa) — reuses same admin client
+        // Criar moderation job se necessário (cron processa) - reuses same admin client
         if (needsTextRemoderation) {
             Promise.resolve(
                 adminUpdate.from('moderation_jobs').insert({
@@ -1366,7 +1366,7 @@ export const getERPProductsPageData = cache(async () => {
     const partnerId = context.partnerId
 
     // Use cached products with explicit column selection (12 cols vs 40+ from SELECT *)
-    // Variant count is fetched inline — no second query needed
+    // Variant count is fetched inline - no second query needed
     const products = await getCachedProducts(partnerId)
 
     return {

@@ -15,11 +15,16 @@ import {
     CancelCircleIcon,
     ExportFileIcon
 } from "@/lib/icons"
+import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
+import {
+    EMPTY_DATE_PERIOD,
+    isDatePeriodFilterActive,
+    summarizeDatePeriodFilter,
+} from "@/lib/utils/filter-date-period"
 
 interface FilterState {
     status: string[]
-    period: string[]
-    expiration: string[]
+    issuePeriod: DatePeriodFilterValue
 }
 
 interface QuotePageControlsProps {
@@ -79,20 +84,14 @@ const QuotePageControls: React.FC<QuotePageControlsProps> = ({
                     onRemove={() => setFilters((prev) => ({ ...prev, status: [] }))}
                 />
             )}
-            {filters.period.length > 0 && (
+            {isDatePeriodFilterActive(filters.issuePeriod) && (
                 <FilterChip
-                    label="Período"
-                    value={filters.period.join(", ")}
+                    label="Emissão"
+                    value={summarizeDatePeriodFilter(filters.issuePeriod) || ""}
                     // @ts-ignore
-                    onRemove={() => setFilters((prev) => ({ ...prev, period: [] }))}
-                />
-            )}
-            {filters.expiration.length > 0 && (
-                <FilterChip
-                    label="Vencimento"
-                    value={filters.expiration.join(", ")}
-                    // @ts-ignore
-                    onRemove={() => setFilters((prev) => ({ ...prev, expiration: [] }))}
+                    onRemove={() =>
+                        setFilters((prev) => ({ ...prev, issuePeriod: { ...EMPTY_DATE_PERIOD } }))
+                    }
                 />
             )}
         </AnimatePresence>

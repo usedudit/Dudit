@@ -3,7 +3,7 @@
  *
  * Writes to admin_audit_logs via service-role client (append-only, non-destructive).
  * This is the ONLY place service-role is used for mutations in the admin panel.
- * The audit_logs table has no UPDATE/DELETE — immutability enforced by DB trigger.
+ * The audit_logs table has no UPDATE/DELETE - immutability enforced by DB trigger.
  *
  * @module admin/audit
  */
@@ -38,7 +38,7 @@ async function getUserAgent(): Promise<string> {
 async function getSessionId(): Promise<string | null> {
     try {
         const headersList = await headers()
-        // Extract session hint from cookie — not the full JWT, just an identifier
+        // Extract session hint from cookie - not the full JWT, just an identifier
         const cookieHeader = headersList.get("cookie") || ""
         const sessionMatch = cookieHeader.match(/sb-[^=]+-auth-token\.0=([^;]{8})/)
         return sessionMatch ? `sess_${sessionMatch[1]}` : null

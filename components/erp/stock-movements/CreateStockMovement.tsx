@@ -226,7 +226,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                         <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300">
                             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
-                                {/* Back button — desktop only */}
+                                {/* Back button - desktop only */}
                                 <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-300 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                     <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
@@ -404,7 +404,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                             )}
                                                         </div>
 
-                                                        {/* Items List — Desktop Table */}
+                                                        {/* Items List - Desktop Table */}
                                                         {items.length > 0 && (
                                                             <div className="hidden md:block w-full overflow-x-auto pb-4 custom-scrollbar">
                                                                 <table className="w-full text-left border-separate border-spacing-0">
@@ -458,7 +458,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                             </div>
                                                         )}
 
-                                                        {/* Items List — Mobile */}
+                                                        {/* Items List - Mobile */}
                                                         {items.length > 0 && (
                                                             <div className="block md:hidden space-y-2">
                                                                 {items.map((item, index) => (
@@ -560,7 +560,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                     </AnimatePresence>
                                 </div>
 
-                                {/* Sidebar Column — Projeção de Estoque */}
+                                {/* Sidebar Column - Projeção de Estoque */}
                                 {activeTab === 'Geral' && (
                                     <div className="hidden lg:block col-span-12 lg:col-span-4 border-l border-brand-border dark:border-dark-border pl-12 space-y-8">
                                         <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-all duration-300">

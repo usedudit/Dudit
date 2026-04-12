@@ -1,5 +1,5 @@
 /**
- * Mercado Pago Subscriptions Integration — Platform-level subscription management.
+ * Mercado Pago Subscriptions Integration - Platform-level subscription management.
  *
  * Uses PLATFORM credentials (MP_SUBSCRIPTION_CLIENT_ID / MP_SUBSCRIPTION_CLIENT_SECRET),
  * NOT partner OAuth tokens. The subscription flow is: partner pays Dudit.

@@ -128,9 +128,9 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
     const additional = Number(quote.additional_costs || 0);
     const total = Number(quote.total || 0);
 
-    const formattedIssueDate = quote.issue_date ? formatDate(quote.issue_date) : '—';
+    const formattedIssueDate = quote.issue_date ? formatDate(quote.issue_date) : '-';
 
-    const formattedExpiryDate = quote.expiration_date ? formatDate(quote.expiration_date) : '—';
+    const formattedExpiryDate = quote.expiration_date ? formatDate(quote.expiration_date) : '-';
 
     const getTimelineSteps = (status: string) => {
         const baseDateObj = quote.created_at ? new Date(quote.created_at) : (quote.issue_date ? new Date(quote.issue_date + 'T12:00:00') : new Date());
@@ -175,7 +175,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                 <div className={`sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out`}>
                     <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
-                        {/* Back button — desktop only */}
+                        {/* Back button - desktop only */}
                         <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                             <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                 <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />

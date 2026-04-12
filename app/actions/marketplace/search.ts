@@ -22,7 +22,7 @@ function extractFirstVariantFallback(variants: any[] | null | undefined, basePri
 /**
  * FUNÇÃO DIRETA para uso em Server Components (SSR).
  * Sem rate limiting, sem overhead de serialização de Server Action.
- * NÃO EXPOSTA como export de "use server" — só pode ser importada pelo servidor.
+ * NÃO EXPOSTA como export de "use server" - só pode ser importada pelo servidor.
  */
 
 export const searchMarketplaceDirect = cache(async (
@@ -127,7 +127,7 @@ async function _searchMarketplaceCore(
 
 
 /**
- * CORE interno — lógica pura de busca original. Sem rate limiting.
+ * CORE interno - lógica pura de busca original. Sem rate limiting.
  */
 async function _searchMarketplaceInternal(
     query: string,

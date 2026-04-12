@@ -741,7 +741,7 @@ export default function FinancialCategoriesPage({
                             disabled
                             value={(() => {
                                 const a = accounts.find((x) => x.id === accountModal.item.id)
-                                return a ? formatCurrency(accountCurrentNum(a)) : "—"
+                                return a ? formatCurrency(accountCurrentNum(a)) : "-"
                             })()}
                         />
                     ) : (
@@ -851,7 +851,7 @@ export default function FinancialCategoriesPage({
                                         partnerId,
                                         accountId: acc.id,
                                         newBalance: adjustBalanceModal.newBalance,
-                                        description: `Ajuste de saldo — ${acc.name}`,
+                                        description: `Ajuste de saldo - ${acc.name}`,
                                     })
                                     if (!res.success) {
                                         error(res.error || "Erro ao ajustar saldo")

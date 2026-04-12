@@ -20,6 +20,14 @@ import QuotePageControls from "./QuotePageControls"
 import CreateQuote from "./CreateQuote"
 import QuoteDetail from "./QuoteDetail"
 import { useNotification } from "@/hooks/use-notification"
+import {
+    EMPTY_DATE_PERIOD,
+    resolveDatePeriodBounds,
+    ymdInBounds,
+    msToBrazilYmd,
+    isDatePeriodFilterActive,
+    type DatePeriodFilterValue,
+} from "@/lib/utils/filter-date-period"
 
 // Icons
 import {
@@ -55,14 +63,12 @@ interface Quote {
 
 interface FilterState {
     status: string[]
-    period: string[]
-    expiration: string[]
+    issuePeriod: DatePeriodFilterValue
 }
 
 const INITIAL_FILTERS: FilterState = {
     status: [],
-    period: [],
-    expiration: []
+    issuePeriod: { ...EMPTY_DATE_PERIOD },
 }
 
 type SortKey = 'quote_id' | 'customer' | 'issue_date' | 'expiration_date' | 'total' | 'status';
@@ -137,13 +143,15 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
 
     const filterSections: FilterSectionConfig[] = [
         { id: "status", title: "Status", type: "checkbox-list", options: ["Rascunho", "Enviado", "Aprovado", "Rejeitado", "Expirado"] },
-        { id: "period", title: "Período Emissão", type: "checkbox-list", options: ["Últimos 7 dias", "Últimos 30 dias", "Mês Atual", "Ano Atual"] },
+        { id: "issuePeriod", title: "Período de emissão", type: "date-period" },
     ]
 
     const filteredQuotes: Quote[] = useMemo(() => {
         if (!currentQuotes) return []
 
         const term = debouncedSearch.toLowerCase()
+        const { startYmd, endYmd } = resolveDatePeriodBounds(filters.issuePeriod)
+        const dateBoundsActive = startYmd !== null || endYmd !== null
 
         const filtered = currentQuotes
             .map((q: any): Quote => {
@@ -206,9 +214,10 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                 else if (activeTab === "Expirados") tabMatch = q.status === "expired"
 
                 const statusFilterMatch = filters.status.length === 0 || filters.status.includes(q.statusLabel)
-                const periodFilterMatch = true
+                const issueYmd = msToBrazilYmd(q.created_at_time)
+                const matchesIssue = !dateBoundsActive || ymdInBounds(issueYmd, startYmd, endYmd)
 
-                return tabMatch && statusFilterMatch && periodFilterMatch
+                return tabMatch && statusFilterMatch && matchesIssue
             })
 
         const result = [...filtered]
@@ -259,13 +268,16 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
         }
 
         return result;
-    }, [rawQuotes, debouncedSearch, activeTab, filters, sortConfig])
+    }, [currentQuotes, debouncedSearch, activeTab, filters, sortConfig])
 
     const isServerPaginated = (totalQuotes !== undefined)
     const totalPages = isServerPaginated ? Math.ceil(totalQuotes / limit) : Math.ceil(filteredQuotes.length / itemsPerPage)
     const paginated = isServerPaginated ? filteredQuotes : filteredQuotes.slice((page - 1) * itemsPerPage, page * itemsPerPage)
 
-    const hasActiveFilters = filters.status.length > 0 || filters.period.length > 0 || filters.expiration.length > 0 || debouncedSearch.length > 0
+    const hasActiveFilters =
+        filters.status.length > 0 ||
+        isDatePeriodFilterActive(filters.issuePeriod) ||
+        debouncedSearch.length > 0
     const hasQuotes = (rawQuotes?.length || 0) > 0
 
     // Handlers

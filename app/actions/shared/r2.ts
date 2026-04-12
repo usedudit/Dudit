@@ -43,7 +43,7 @@ export async function deleteImageFromR2Action(imageKey: string) {
       }
     }
 
-    // 3. MULTI-TENANT ISOLATION — only allow deleting own files
+    // 3. MULTI-TENANT ISOLATION - only allow deleting own files
     if (!validateKeyOwnership(key, user.id)) {
       console.warn(
         `[SECURITY] User ${user.id} attempted to delete file outside their scope: ${key}`

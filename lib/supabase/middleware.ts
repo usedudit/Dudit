@@ -196,7 +196,7 @@ export async function middleware(request: NextRequest) {
   response.headers.set("X-Permitted-Cross-Domain-Policies", "none")
 
 
-  // 4. CACHE-CONTROL HEADERS (Route-aware) — Must be set BEFORE auth block
+  // 4. CACHE-CONTROL HEADERS (Route-aware) - Must be set BEFORE auth block
   // Public marketplace pages: edge-cacheable with stale-while-revalidate
   // Private/auth pages: never cached
   const PRIVATE_PREFIXES = ["/erp", "/account", "/auth", "/cart", "/profile", "/my-orders", "/api", "/dashboard", "/payment", "/ddt-admin"]

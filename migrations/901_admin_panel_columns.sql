@@ -1,5 +1,5 @@
 -- ============================================================================
--- ADMIN PANEL — Missing columns for real data integration
+-- ADMIN PANEL - Missing columns for real data integration
 -- Run AFTER 900_create_admin_panel_schema.sql
 -- ============================================================================
 

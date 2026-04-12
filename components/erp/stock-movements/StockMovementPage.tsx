@@ -23,6 +23,14 @@ import { undoStockMovementAction, undoBatchStockMovementsAction, getStockMovemen
 import { useNotification } from '@/hooks/use-notification';
 import { useMediaQuery } from '@/components/erp/hooks';
 import { FadeIn } from '@/components/animations/FadeIn';
+import {
+    EMPTY_DATE_PERIOD,
+    resolveDatePeriodBounds,
+    ymdInBounds,
+    msToBrazilYmd,
+    isDatePeriodFilterActive,
+    type DatePeriodFilterValue,
+} from '@/lib/utils/filter-date-period';
 
 interface StockMovementPageProps {
     partnerId: string;
@@ -58,8 +66,12 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
     const [searchTerm, setSearchTerm] = useState('');
     const [page, setPage] = useState(1);
     const [viewMode, setViewModeState] = useState<'grid' | 'list'>(isMobile ? 'grid' : 'list');
-    const [filters, setFilters] = useState({
-        movement_type: [] as string[],
+    const [filters, setFilters] = useState<{
+        movement_type: string[];
+        datePeriod: DatePeriodFilterValue;
+    }>({
+        movement_type: [],
+        datePeriod: { ...EMPTY_DATE_PERIOD },
     });
     const [modals, setModals] = useState({
         filter: false,
@@ -93,6 +105,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
     }, [checkScroll, viewMode, initialMovements]);
 
     const filterSections: FilterSectionConfig[] = [
+        { id: "datePeriod", title: "Data da movimentação", type: "date-period" },
         {
             id: "movement_type",
             title: "Tipo de Movimentação",
@@ -101,7 +114,8 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
         },
     ];
 
-    const hasActiveFilters = filters.movement_type.length > 0;
+    const hasActiveFilters =
+        filters.movement_type.length > 0 || isDatePeriodFilterActive(filters.datePeriod);
     const isFiltered = searchTerm !== "" || hasActiveFilters;
 
     const handleViewDetails = async (id: string) => {
@@ -222,6 +236,9 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
     }, [initialMovements]);
 
     const filteredMovements = useMemo(() => {
+        const { startYmd, endYmd } = resolveDatePeriodBounds(filters.datePeriod);
+        const dateBoundsActive = startYmd !== null || endYmd !== null;
+
         let result = activeTab !== 'all'
             ? formattedMovements.filter(mov => mov.type === activeTab)
             : formattedMovements;
@@ -238,6 +255,12 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
 
         if (filters.movement_type.length > 0) {
             result = result.filter(mov => filters.movement_type.some(f => mov.reason.includes(f)));
+        }
+
+        if (dateBoundsActive) {
+            result = result.filter(mov =>
+                ymdInBounds(msToBrazilYmd(mov.rawDate), startYmd, endYmd),
+            );
         }
 
         if (sortConfig) {
@@ -276,7 +299,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
 
     const handleClearFilters = () => {
         setSearchTerm("");
-        setFilters({ movement_type: [] });
+        setFilters({ movement_type: [], datePeriod: { ...EMPTY_DATE_PERIOD } });
     };
 
     const columns: { id: string; label: string; align: "left" | "center" | "right"; width?: string }[] = [
@@ -541,7 +564,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                 sections={filterSections}
                 filters={filters}
                 setFilters={setFilters as any}
-                onClear={() => setFilters({ movement_type: [] })}
+                onClear={() => setFilters({ movement_type: [], datePeriod: { ...EMPTY_DATE_PERIOD } })}
             />
 
             {/* Single undo modal */}

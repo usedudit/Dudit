@@ -99,7 +99,7 @@ export function LabelGenerator({ products }: { products: Product[] }) {
                       <label htmlFor={product.id} className="flex-1 cursor-pointer text-sm">
                         <p className="font-medium">{product.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          SKU: {product.sku || "—"} | {formatCurrency(product.price)}
+                          SKU: {product.sku || "-"} | {formatCurrency(product.price)}
                         </p>
                       </label>
                     </div>

@@ -84,7 +84,7 @@ CREATE POLICY "partner_users_select" ON partner_users
   );
 
 -- partner_users: only service role inserts (via admin client)
--- No insert policy for anon/authenticated — server actions use admin client
+-- No insert policy for anon/authenticated - server actions use admin client
 
 -- partner_invitations: members can read invitations for their partner
 CREATE POLICY "partner_invitations_select" ON partner_invitations

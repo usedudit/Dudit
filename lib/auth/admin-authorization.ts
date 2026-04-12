@@ -34,7 +34,7 @@ function hasMinimumRole(userRole: AdminRole, requiredRole: AdminRole): boolean {
  *
  * SECURITY: Reads from admin_roles via service-role client
  * because RLS blocks anon/authenticated access to this table.
- * This is a READ-ONLY operation — safe to use service-role.
+ * This is a READ-ONLY operation - safe to use service-role.
  */
 export const getAdminRole = cache(async (): Promise<AdminUser | null> => {
     const user = await getCurrentUser()

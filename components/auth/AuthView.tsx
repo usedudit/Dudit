@@ -165,7 +165,7 @@ export default function AuthView({
                 }
 
                 // SECURITY FIX (CRIT-01): User profile is now created automatically
-                // by a database trigger on auth.users — no client action needed.
+                // by a database trigger on auth.users - no client action needed.
 
                 setVerifyContext("signup")
                 setMode("verify-email")

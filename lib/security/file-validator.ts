@@ -28,7 +28,7 @@ const IMAGE_MAGIC_BYTES: Record<string, number[][]> = {
     [0x52, 0x49, 0x46, 0x46], // RIFF (WebP container)
   ],
   "image/avif": [
-    // AVIF uses ISOBMFF — magic at offset 4: "ftyp"
+    // AVIF uses ISOBMFF - magic at offset 4: "ftyp"
     // We check bytes 4-7 for "ftyp" (0x66, 0x74, 0x79, 0x70)
   ],
 }

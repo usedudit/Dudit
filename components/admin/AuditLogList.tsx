@@ -203,7 +203,7 @@ const AuditLogList = ({ initialData }: AuditLogListProps) => {
                                                     ? String(log.metadata.reason)
                                                     : log.metadata?.action
                                                         ? String(log.metadata.action)
-                                                        : "—"}
+                                                        : "-"}
                                             </div>
                                         </td>
                                         <td className="p-4 border-b border-brand-border dark:border-dark-border">

@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // 4. VALIDATE MIME TYPE — strict allowlist
+    // 4. VALIDATE MIME TYPE - strict allowlist
     if (!ALLOWED_MIME_TYPES.includes(fileType as any)) {
       return NextResponse.json(
         { error: `Tipo de arquivo não permitido. Permitidos: ${ALLOWED_MIME_TYPES.join(", ")}` },
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // 5. VALIDATE EXTENSION — allowlist + dangerous blocklist
+    // 5. VALIDATE EXTENSION - allowlist + dangerous blocklist
     const ext = fileName.toLowerCase().substring(fileName.lastIndexOf("."))
     if (DANGEROUS_EXTENSIONS.includes(ext as any)) {
       return NextResponse.json(
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // 6. GENERATE SIGNED URL — user-scoped, short expiry
+    // 6. GENERATE SIGNED URL - user-scoped, short expiry
     // Prefix is determined server-side, NOT from client input
     const result = await generateSignedUploadUrl({
       fileName,

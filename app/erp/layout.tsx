@@ -33,7 +33,7 @@ export default async function ERPLayout({
 }: {
   children: React.ReactNode
 }) {
-  await requireUser() // Ensure authenticated — single auth call for the entire ERP tree
+  await requireUser() // Ensure authenticated - single auth call for the entire ERP tree
   const user = await getCurrentUser()
 
   const userProfile = user ? {

@@ -399,7 +399,7 @@ export async function checkoutCartAction(
   await requireRateLimit(RateLimitCategory.ORDER_CREATE)
 
   // Validação CSRF
-  // SECURITY: CSRF validation is mandatory — cannot be skipped
+  // SECURITY: CSRF validation is mandatory - cannot be skipped
   const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
   const csrfValidation = await requireCSRF(csrf_token)
   if (!csrfValidation.valid) {

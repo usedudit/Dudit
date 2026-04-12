@@ -89,7 +89,7 @@ export async function createFinanceAccountAction(data: {
         partnerId: data.partnerId,
         transactionType: "adjustment",
         amount: targetCurrent,
-        description: `Saldo inicial — ${data.name.trim()}`,
+        description: `Saldo inicial - ${data.name.trim()}`,
         category: "Ajuste de saldo",
         categoryId: null,
         subcategoryId: null,

@@ -19,7 +19,7 @@ export function SimpleSettingsSubPage({ title, description, onBack }: SimpleSett
         {/* Sticky Header */}
         <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
           <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 py-6 flex items-center justify-between">
-            {/* Back button — desktop only */}
+            {/* Back button - desktop only */}
             <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500`}>
               <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
                 <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />

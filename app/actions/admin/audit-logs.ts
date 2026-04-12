@@ -2,7 +2,7 @@
 
 /**
  * Admin audit log query actions.
- * Read-only — no mutations. Uses service-role for reading
+ * Read-only - no mutations. Uses service-role for reading
  * (admin_audit_logs has no RLS for authenticated users).
  */
 

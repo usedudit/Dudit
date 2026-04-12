@@ -38,9 +38,9 @@ import { getCurrentUser } from "@/lib/auth/server-user"
 export { getCurrentUser }
 
 /**
- * Strict authentication check — use in ALL state-changing server actions.
+ * Strict authentication check - use in ALL state-changing server actions.
  * REDIRECTS to /auth/login if no user session exists.
- * NEVER returns null — guarantees a valid User.
+ * NEVER returns null - guarantees a valid User.
  *
  * Performance: Uses React cache() to deduplicate within the same request.
  */
@@ -80,7 +80,7 @@ export const getCurrentPartner = cache(async (resolvedUser?: User | any): Promis
 })
 
 /**
- * Strict partner lookup — THROWS if user is not authenticated or not a partner.
+ * Strict partner lookup - THROWS if user is not authenticated or not a partner.
  * Guarantees a valid partner record belonging to the authenticated user.
  *
  * Performance: Uses cached getCurrentPartner to avoid duplicate queries.
