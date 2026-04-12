@@ -20,6 +20,7 @@ interface TransactionListItemProps {
     columns: ColumnDef[]
     selected: boolean
     onSelect: (id: string) => void
+    onOpenDetail?: (transaction: ERPTransaction) => void
     onEdit?: (transaction: ERPTransaction) => void
     onMarkAsPaid?: (transaction: ERPTransaction) => void
 }
@@ -33,7 +34,7 @@ const getPaymentIcon = (paymentType: string) => {
 }
 
 const TransactionListItem = React.memo(
-    ({ transaction, columns, selected, onSelect, onEdit, onMarkAsPaid }: TransactionListItemProps) => {
+    ({ transaction, columns, selected, onSelect, onOpenDetail, onEdit, onMarkAsPaid }: TransactionListItemProps) => {
         const renderCellContent = (colId: string) => {
             switch (colId) {
                 case "transaction":
@@ -142,6 +143,11 @@ const TransactionListItem = React.memo(
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
+                onClick={(e) => {
+                    const el = e.target as HTMLElement
+                    if (el.closest("input") || el.closest(".action-btn")) return
+                    onOpenDetail?.(transaction)
+                }}
             >
                 <td
                     className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12"
@@ -166,7 +172,8 @@ const TransactionListItem = React.memo(
     (prev, next) =>
         prev.transaction === next.transaction &&
         prev.selected === next.selected &&
-        prev.columns === next.columns
+        prev.columns === next.columns &&
+        prev.onOpenDetail === next.onOpenDetail
 )
 
 TransactionListItem.displayName = "TransactionListItem"

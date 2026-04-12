@@ -23,6 +23,7 @@ import TransactionPageControls from "./TransactionPageControls"
 import TransactionListItem from "./TransactionListItem"
 import TransactionGridCard from "./TransactionGridCard"
 import CreateTransactionPage, { type CategoryItem, type AccountItem } from "./CreateTransactionPage"
+import TransactionDetailView from "./TransactionDetailView"
 import type { ERPTransaction, TransactionTab } from "../../../lib/services/transactions.types"
 import type { RecurringOccurrence } from "@/app/actions/erp/recurring-transactions"
 import { markRecurringOccurrenceAsPaidAction } from "@/app/actions/erp/transactions"
@@ -127,6 +128,7 @@ export default function TransactionsPage({
     const [showCreateTransaction, setShowCreateTransaction] = useState(false)
     const [editingTransaction, setEditingTransaction] = useState<ERPTransaction | null>(null)
     const [editingRecurringTemplateId, setEditingRecurringTemplateId] = useState<string | null>(null)
+    const [viewingTransactionId, setViewingTransactionId] = useState<string | null>(null)
     const [markingAsPaid, setMarkingAsPaid] = useState(false)
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
@@ -376,6 +378,23 @@ export default function TransactionsPage({
         }
     }, [])
 
+    const handleCloseTransactionDetail = useCallback(() => {
+        setViewingTransactionId(null)
+    }, [])
+
+    const handleEditFromTransactionDetail = useCallback(
+        (id: string) => {
+            const t = transactions.find((x) => x.id === id)
+            if (!t) {
+                notifyError("Erro", "Transação não está na página atual. Volte à lista e abra novamente para editar.")
+                return
+            }
+            setViewingTransactionId(null)
+            setEditingTransaction(t)
+        },
+        [transactions, notifyError],
+    )
+
     const handleMarkAsPaid = useCallback(async (transaction: ERPTransaction) => {
         if (!transaction.recurringTemplateId || !transaction.occurrenceDate) return
         if (markingAsPaid) return
@@ -404,6 +423,40 @@ export default function TransactionsPage({
             setMarkingAsPaid(false)
         }
     }, [partnerId, markingAsPaid, router, notifySuccess, notifyError])
+
+    const handleOpenTransactionDetail = useCallback(
+        (transaction: ERPTransaction) => {
+            if (transaction.isRecurringOccurrence) {
+                void handleMarkAsPaid(transaction)
+                return
+            }
+            setViewingTransactionId(transaction.id)
+            setShowCreateTransaction(false)
+            setEditingTransaction(null)
+            setEditingRecurringTemplateId(null)
+        },
+        [handleMarkAsPaid],
+    )
+
+    if (viewingTransactionId) {
+        return (
+            <motion.div
+                key={`tx-detail-${viewingTransactionId}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="w-full h-full min-h-[70vh]"
+            >
+                <TransactionDetailView
+                    transactionId={viewingTransactionId}
+                    partnerId={partnerId}
+                    onBack={handleCloseTransactionDetail}
+                    onEdit={handleEditFromTransactionDetail}
+                />
+            </motion.div>
+        )
+    }
 
     if (showCreateTransaction || editingTransaction || editingRecurringTemplateId) {
         return (
@@ -553,13 +606,7 @@ export default function TransactionsPage({
                                                 <div
                                                     key={transaction.id}
                                                     className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 flex items-start gap-3"
-                                                    onClick={() => {
-                                                        if (transaction.isRecurringOccurrence) {
-                                                            handleMarkAsPaid(transaction)
-                                                        } else {
-                                                            handleEditTransaction(transaction)
-                                                        }
-                                                    }}
+                                                    onClick={() => handleOpenTransactionDetail(transaction)}
                                                 >
                                                     <div className="shrink-0 pt-0.5" onClick={(e) => e.stopPropagation()}>
                                                         <Checkbox checked={selection.ids.has(transaction.id)} onChange={() => handleSelectRow(transaction.id)} />
@@ -611,6 +658,7 @@ export default function TransactionsPage({
                                                 transaction={transaction}
                                                 selected={selection.ids.has(transaction.id)}
                                                 onSelect={handleSelectRow}
+                                                onOpenDetail={handleOpenTransactionDetail}
                                                 onEdit={handleEditTransaction}
                                                 onMarkAsPaid={handleMarkAsPaid}
                                             />
@@ -680,6 +728,7 @@ export default function TransactionsPage({
                                                             columns={COLUMNS}
                                                             selected={selection.ids.has(transaction.id)}
                                                             onSelect={handleSelectRow}
+                                                            onOpenDetail={handleOpenTransactionDetail}
                                                             onEdit={handleEditTransaction}
                                                             onMarkAsPaid={handleMarkAsPaid}
                                                         />

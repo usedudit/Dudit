@@ -378,6 +378,7 @@ export const BusinessDataSubPage = ({
                                                                     onChange={() => toggleArrayItem("channels", opt.value)}
                                                                 />
                                                             }
+                                                            className="py-4 px-6 gap-4"
                                                         />
                                                     ))}
                                                 </div>

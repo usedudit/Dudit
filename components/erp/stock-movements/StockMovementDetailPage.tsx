@@ -24,7 +24,7 @@ interface MovementItemData {
         currentStock: number;
     };
     quantity: number;
-    type: 'in' | 'out';
+    type: string;
 }
 
 interface StockMovement {
@@ -40,7 +40,7 @@ interface StockMovement {
         previousStock: number;
         currentStock: number;
     };
-    type: 'in' | 'out';
+    type: string;
     quantity: number;
     reason: string;
     user: string;
@@ -188,7 +188,9 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
 
                                 {/* Bottom: Product Items (White) */}
                                 <div className="bg-white dark:bg-dark-surface">
-                                    {displayItems.map((item, index) => (
+                                    {displayItems.map((item, index) => {
+                                        const lineIn = item.type === 'in';
+                                        return (
                                         <div key={item.id}>
                                             {index > 0 && (
                                                 <div className="h-px bg-brand-border dark:bg-dark-border mx-6" />
@@ -212,8 +214,8 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                                                 <span className="text-brand-inactive-text dark:text-dark-body">•</span>
                                                                 <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{item.product.category}</span>
                                                                 <span className="text-brand-inactive-text dark:text-dark-body">•</span>
-                                                                <span className={`text-sm font-bold ${isIn ? 'text-brand-green' : 'text-brand-red'}`}>
-                                                                    {isIn ? '+' : '-'}{item.quantity}
+                                                                <span className={`text-sm font-bold ${lineIn ? 'text-brand-green' : 'text-brand-red'}`}>
+                                                                    {lineIn ? '+' : '-'}{item.quantity}
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -236,13 +238,14 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
 
                                                         <div className="text-center md:text-left">
                                                             <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Pós-Mov.</div>
-                                                            <div className={`text-md font-bold ${isIn ? 'text-brand-green' : 'text-brand-red'}`}>{item.product.currentStock} un</div>
+                                                            <div className={`text-md font-bold ${lineIn ? 'text-brand-green' : 'text-brand-red'}`}>{item.product.currentStock} un</div>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    ))}
+                                    );
+                                    })}
                                 </div>
                             </div>
 

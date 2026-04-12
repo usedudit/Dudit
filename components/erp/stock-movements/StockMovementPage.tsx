@@ -120,6 +120,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
 
     const handleViewDetails = async (id: string) => {
         setSelectedMovementId(id);
+        setDetailedMovement(null);
         setIsDetailLoading(true);
         try {
             const res = await getStockMovementDetails(id);
@@ -322,12 +323,15 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
 
     if (selectedMovementId) {
         const localData = formattedMovements.find(m => m.id === selectedMovementId) || null;
-        const movementToShow = detailedMovement?.id === selectedMovementId ? detailedMovement : localData;
+        const detailsReady = detailedMovement?.id === selectedMovementId;
+        const movementToShow = isDetailLoading
+            ? null
+            : (detailsReady ? detailedMovement : localData);
 
         return (
             <StockMovementDetailPage
                 movement={movementToShow}
-                isLoading={isDetailLoading && !movementToShow}
+                isLoading={isDetailLoading}
                 onBack={() => {
                     setSelectedMovementId(null);
                     setDetailedMovement(null);

@@ -78,12 +78,20 @@ export function msToBrazilYmd(ms: number): string {
   }).format(new Date(ms))
 }
 
+/** Converte YYYY-MM-DD (valor interno do filtro) para DD-MM-YYYY na UI. */
+export function formatYmdToDmy(ymd: string): string {
+  const raw = (ymd || "").trim().slice(0, 10)
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw)
+  if (!m) return ymd
+  return `${m[3]}-${m[2]}-${m[1]}`
+}
+
 /** Texto curto para chip de filtro ativo */
 export function summarizeDatePeriodFilter(period: DatePeriodFilterValue): string | null {
   if (period.presets.length > 0) return period.presets.join(", ")
-  if (period.from && period.to) return `${period.from} — ${period.to}`
-  if (period.from) return `A partir de ${period.from}`
-  if (period.to) return `Até ${period.to}`
+  if (period.from && period.to) return `${formatYmdToDmy(period.from)} — ${formatYmdToDmy(period.to)}`
+  if (period.from) return `A partir de ${formatYmdToDmy(period.from)}`
+  if (period.to) return `Até ${formatYmdToDmy(period.to)}`
   return null
 }
 

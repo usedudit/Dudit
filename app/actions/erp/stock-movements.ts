@@ -248,13 +248,18 @@ export async function getStockMovementDetails(id: string) {
 
         if (itemsError) {
             console.error("getStockMovementDetails items query error:", itemsError)
-            return errorResponse("Erro ao buscar itens da movimentaÃ§Ã£o")
+            return errorResponse("Erro ao buscar itens da movimentação")
         }
 
         // Resolve user name
         const userNamePromise = data.created_by
-            ? supabase.from("user_profiles").select("full_name").eq("user_id", data.created_by).single().then((r: any) => r.data?.full_name || data.created_by)
-            : Promise.resolve('Sistema')
+            ? supabase
+                .from("user_profiles")
+                .select("full_name")
+                .eq("user_id", data.created_by)
+                .maybeSingle()
+                .then((r: any) => r.data?.full_name?.trim() || "Usuário")
+            : Promise.resolve("Sistema")
 
         const userName = await userNamePromise
 
@@ -292,7 +297,6 @@ export async function getStockMovementDetails(id: string) {
             type: item.quantity > 0 ? 'in' : 'out',
         }))
 
-        const movementType = data.movement_type === 'out' ? 'out' : 'in'
         const totalQuantity = items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0)
 
         return successResponse({
@@ -301,7 +305,7 @@ export async function getStockMovementDetails(id: string) {
             date: `${dateStr}, ${timeStr}`,
             items,
             items_count: items.length,
-            type: movementType,
+            type: data.movement_type,
             quantity: totalQuantity,
             reason: reason,
             user: userName,

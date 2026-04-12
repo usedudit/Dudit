@@ -133,9 +133,6 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
 
             return (
               <Accordion key={section.id} title={section.title} defaultOpen>
-                <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-2 px-1">
-                  Atalhos ou período personalizado (limpa o outro ao escolher).
-                </p>
                 {presets.map((opt) => {
                   const isOn = selected.includes(opt)
                   return (
@@ -159,7 +156,7 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
                 })}
                 <div className="mt-3 space-y-3 pt-2 border-t border-brand-border dark:border-dark-border">
                   <DatePicker
-                    label="De (opcional)"
+                    label="De"
                     value={v.from || undefined}
                     onChange={(d: Date | undefined) =>
                       setDatePeriod(section.id, {
@@ -171,7 +168,7 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
                     placeholder="Data inicial"
                   />
                   <DatePicker
-                    label="Até (opcional)"
+                    label="Até"
                     value={v.to || undefined}
                     onChange={(d: Date | undefined) =>
                       setDatePeriod(section.id, {

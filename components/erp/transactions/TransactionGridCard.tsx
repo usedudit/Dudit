@@ -12,6 +12,7 @@ interface TransactionGridCardProps {
     transaction: ERPTransaction
     selected: boolean
     onSelect: (id: string) => void
+    onOpenDetail?: (transaction: ERPTransaction) => void
     onEdit?: (transaction: ERPTransaction) => void
     onMarkAsPaid?: (transaction: ERPTransaction) => void
 }
@@ -25,7 +26,7 @@ const getPaymentIcon = (paymentType: string) => {
 }
 
 const TransactionGridCard = React.memo(
-    ({ transaction, selected, onSelect, onEdit, onMarkAsPaid }: TransactionGridCardProps) => {
+    ({ transaction, selected, onSelect, onOpenDetail, onEdit, onMarkAsPaid }: TransactionGridCardProps) => {
         const PaymentIcon = getPaymentIcon(transaction.paymentType)
         const isRecurring = !!transaction.recurringId || !!transaction.isRecurringOccurrence
 
@@ -34,6 +35,7 @@ const TransactionGridCard = React.memo(
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-dark/90 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
+                onClick={() => onOpenDetail?.(transaction)}
             >
                 <div className="flex gap-4 mb-2">
                     <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
@@ -117,7 +119,8 @@ const TransactionGridCard = React.memo(
     },
     (prev, next) =>
         prev.selected === next.selected &&
-        prev.transaction === next.transaction
+        prev.transaction === next.transaction &&
+        prev.onOpenDetail === next.onOpenDetail
 )
 
 TransactionGridCard.displayName = "TransactionGridCard"

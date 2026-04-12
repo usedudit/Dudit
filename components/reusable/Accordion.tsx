@@ -40,7 +40,7 @@ export const Accordion: React.FC<AccordionProps> = ({
     : "flex items-center justify-between w-full py-4 text-sm font-semibold text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border/30 px-2 rounded-lg transition-colors"
 
   return (
-    <div className={`last:border-0 ${!triggerClass ? "border-b border-brand-border dark:border-dark-border" : ""}`}>
+    <div className={`last:border-0 pb-2 ${!triggerClass ? "border-b border-brand-border dark:border-dark-border" : ""}`}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}

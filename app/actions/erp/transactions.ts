@@ -6,8 +6,10 @@ import type { ERPTransaction } from "@/lib/services/transactions.types"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
-import { formatTime } from "@/lib/utils/formatters"
+import { formatTime, formatDateTime, formatDayMonth } from "@/lib/utils/formatters"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
+import { getCurrentUser } from "@/lib/auth/server-user"
+import { createTransactionHistoryEntry, getTransactionHistoryEntries } from "@/lib/services/transaction-history.service"
 
 type DbTransaction = {
     id: string
@@ -92,6 +94,66 @@ function toDisplayStatus(
 function isLedgerConfirmedStatus(status: string | null | undefined): boolean {
     const s = String(status || "").toLowerCase()
     return ["paid", "pago", "recebido", "confirmed", "confirmado", "efetivado"].includes(s)
+}
+
+function isCancelledStatus(status: string | null | undefined): boolean {
+    return String(status || "").toLowerCase().includes("cancel")
+}
+
+function buildTransactionUpdateHistoryLines(patch: Partial<CreateManualTransactionInput>): string[] {
+    const lines: string[] = []
+    if (patch.description !== undefined) lines.push("alterou a descrição.")
+    if (patch.amount !== undefined) lines.push("alterou o valor.")
+    if (patch.category !== undefined) lines.push("alterou a categoria.")
+    if (patch.categoryId !== undefined) lines.push("alterou a categoria.")
+    if (patch.subcategoryId !== undefined) lines.push("alterou a subcategoria.")
+    if (patch.accountId !== undefined) lines.push("alterou a conta financeira.")
+    if (patch.contactId !== undefined) lines.push("alterou o contato.")
+    if (patch.customerId !== undefined) lines.push("alterou o cliente vinculado.")
+    if (patch.contactType !== undefined) lines.push("alterou o tipo de contato.")
+    if (patch.paymentType !== undefined) lines.push("alterou o meio de pagamento.")
+    if (patch.dueDate !== undefined) lines.push("alterou a data de vencimento.")
+    if (patch.paymentDate !== undefined) lines.push("alterou a data de pagamento.")
+    if (patch.transactionDate !== undefined) lines.push("alterou a data da transação.")
+    if (patch.status !== undefined) lines.push("alterou o status.")
+    if (patch.notes !== undefined) lines.push("alterou as observações.")
+    if (patch.refundKind !== undefined) lines.push("alterou o tipo de reembolso.")
+    if (patch.referenceNote !== undefined) lines.push("alterou a referência.")
+    return lines
+}
+
+function transactionTypeLabel(tt: string | null | undefined): string {
+    switch (String(tt || "").toLowerCase()) {
+        case "income":
+            return "Receita"
+        case "expense":
+            return "Despesa"
+        case "transfer":
+            return "Transferência"
+        case "adjustment":
+            return "Ajuste"
+        case "refund":
+            return "Reembolso"
+        default:
+            return tt || "Transação"
+    }
+}
+
+function originLabel(origin: string | null | undefined): string {
+    const o = String(origin || "").toLowerCase()
+    if (o === "system") return "Sistema"
+    if (o === "gateway") return "Gateway"
+    return "Manual"
+}
+
+function contactCardTitleFromType(contactType: string | null | undefined): string {
+    const c = String(contactType || "").toLowerCase()
+    if (c === "customer" || c === "cliente") return "Cliente"
+    if (c === "supplier" || c === "fornecedor") return "Fornecedor"
+    if (c === "service") return "Prestador de serviço"
+    if (c === "employee" || c === "funcionario") return "Funcionário"
+    if (c === "partner") return "Parceiro"
+    return "Contato"
 }
 
 async function paymentMethodDisplayLabel(
@@ -375,6 +437,9 @@ export async function createManualTransactionAction(input: CreateManualTransacti
 
         await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
         const supabase = await getSupabaseServerClient()
+        const {
+            data: { user },
+        } = await supabase.auth.getUser()
 
         if (input.transactionType === "transfer") {
             throw new Error("Use a ação de transferência para movimentar entre contas.")
@@ -425,6 +490,7 @@ export async function createManualTransactionAction(input: CreateManualTransacti
             origin: input.origin || "manual",
             refund_kind: input.transactionType === "refund" ? input.refundKind ?? null : null,
             reference_note: input.referenceNote?.trim() || null,
+            created_by_user_id: user?.id ?? null,
         }
 
         const { data, error } = await supabase.from("transactions").insert(payload).select("*").single()
@@ -436,6 +502,18 @@ export async function createManualTransactionAction(input: CreateManualTransacti
             status: String(status),
             refund_kind: input.refundKind,
         })
+
+        try {
+            await createTransactionHistoryEntry({
+                transactionId: data.id,
+                partnerId: input.partnerId,
+                actorUserId: user?.id ?? null,
+                entryType: "created",
+                changeLines: ["criou esta transação."],
+            })
+        } catch (historyError) {
+            console.error("[transactions_history] createManualTransactionAction:", historyError)
+        }
 
         return { success: true, data }
     } catch (e: any) {
@@ -461,6 +539,9 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
 
         await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
         const supabase = await getSupabaseServerClient()
+        const {
+            data: { user: transferUser },
+        } = await supabase.auth.getUser()
 
         const amt = Number(input.amount || 0)
         if (!(amt > 0)) throw new Error("Valor deve ser maior que zero.")
@@ -533,7 +614,10 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
             subcategory_id: null,
         }
 
-        const { data, error } = await supabase.from("transactions").insert([outRow, inRow]).select("*")
+        const outRowWithCreator = { ...outRow, created_by_user_id: transferUser?.id ?? null }
+        const inRowWithCreator = { ...inRow, created_by_user_id: transferUser?.id ?? null }
+
+        const { data, error } = await supabase.from("transactions").insert([outRowWithCreator, inRowWithCreator]).select("*")
         if (error) throw error
 
         if (isLedgerConfirmedStatus(status)) {
@@ -547,6 +631,20 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
                 amount: amt,
                 status,
             })
+        }
+
+        for (const row of data || []) {
+            try {
+                await createTransactionHistoryEntry({
+                    transactionId: row.id,
+                    partnerId: input.partnerId,
+                    actorUserId: transferUser?.id ?? null,
+                    entryType: "created",
+                    changeLines: ["registrou lançamento de transferência entre contas."],
+                })
+            } catch (historyError) {
+                console.error("[transactions_history] createTransferPairAction:", historyError)
+            }
         }
 
         return { success: true, data, transferGroupId }
@@ -644,6 +742,23 @@ export async function updateManualTransactionAction(
             .select("*")
             .single()
         if (error) throw error
+
+        const historyLines = buildTransactionUpdateHistoryLines(patch)
+        if (historyLines.length > 0) {
+            try {
+                const user = await getCurrentUser()
+                await createTransactionHistoryEntry({
+                    transactionId,
+                    partnerId,
+                    actorUserId: user?.id ?? null,
+                    entryType: "updated",
+                    changeLines: historyLines,
+                })
+            } catch (historyError) {
+                console.error("[transactions_history] updateManualTransactionAction:", historyError)
+            }
+        }
+
         return { success: true, data }
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao atualizar transação" }
@@ -664,7 +779,8 @@ export async function getTransactionForEditAction(transactionId: string, partner
                 id, description, category, amount, due_date, payment_date, created_at,
                 status, notes, payment_type, transaction_type, contact_id, customer_id,
                 contact_type, transfer_group_id, refund_kind, reference_note, origin,
-                account_id, category_id, subcategory_id, recurring_id, transaction_date
+                account_id, category_id, subcategory_id, recurring_id, transaction_date,
+                payment_method_id
             `)
             .eq("id", transactionId)
             .eq("partner_id", partnerId)
@@ -695,6 +811,9 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
 
         await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
         const supabase = await getSupabaseServerClient()
+        const {
+            data: { user: markPaidUser },
+        } = await supabase.auth.getUser()
 
         // Fetch the recurring template
         const { data: rec, error: recErr } = await supabase
@@ -774,6 +893,17 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
                 "[recurring] occurrence_marked_paid",
                 JSON.stringify({ recurringId: input.recurringId, occurrenceDate: input.occurrenceDate }),
             )
+            try {
+                await createTransactionHistoryEntry({
+                    transactionId: pendingTx.id,
+                    partnerId: input.partnerId,
+                    actorUserId: markPaidUser?.id ?? null,
+                    entryType: "updated",
+                    changeLines: ["marcou esta ocorrência como paga."],
+                })
+            } catch (historyError) {
+                console.error("[transactions_history] markRecurringOccurrenceAsPaidAction:", historyError)
+            }
             return { success: true, data: updated }
         }
 
@@ -802,6 +932,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
             origin: "system" as const,
             recurring_id: rec.id,
             payment_method_id: resolvedPmId,
+            created_by_user_id: markPaidUser?.id ?? null,
         }
 
         const { data: newTx, error: insertErr } = await supabase
@@ -828,6 +959,19 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
             "[recurring] occurrence_marked_paid",
             JSON.stringify({ recurringId: input.recurringId, occurrenceDate: input.occurrenceDate }),
         )
+        if (newTx?.id) {
+            try {
+                await createTransactionHistoryEntry({
+                    transactionId: newTx.id,
+                    partnerId: input.partnerId,
+                    actorUserId: markPaidUser?.id ?? null,
+                    entryType: "created",
+                    changeLines: ["marcou esta ocorrência como paga."],
+                })
+            } catch (historyError) {
+                console.error("[transactions_history] markRecurringOccurrenceAsPaidAction:", historyError)
+            }
+        }
         return { success: true, data: newTx }
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao marcar como pago" }
@@ -894,6 +1038,313 @@ export async function adjustAccountBalanceViaTransactionAction(input: {
         return { success: true, data: res.data }
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao ajustar saldo" }
+    }
+}
+
+export async function getTransactionHistoryAction(transactionId: string, partnerId: string) {
+    try {
+        await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+        const entries = await getTransactionHistoryEntries(transactionId, partnerId)
+        return { success: true as const, data: entries }
+    } catch (e: any) {
+        return { success: false as const, error: e.message || "Erro ao carregar histórico" }
+    }
+}
+
+export type TransactionDetailPayload = {
+    id: string
+    headerTitle: string
+    statusLabel: string
+    statusVariant: ERPTransaction["statusVariant"]
+    isRecurring: boolean
+    paymentMethodSubtitle: string
+    paymentDateSubtitle: string | null
+    creatorName: string
+    originLabel: string
+    typeBannerLabel: string
+    timeline: {
+        step1: { label: string; date: string; time: string; active: boolean }
+        step2: { label: string; date: string; time: string; active: boolean; danger: boolean }
+    }
+    items: Array<{
+        id: string
+        title: string
+        sku: string
+        quantity: number
+        unitPrice: number
+        lineTotal: number
+        image: string | null
+    }>
+    categoryLine: string
+    subcategoryLine: string | null
+    accountLine: string | null
+    dueDateLine: string | null
+    paymentDateLine: string | null
+    notesLine: string | null
+    amount: number
+    ledgerDirection: ERPTransaction["ledgerDirection"]
+    contactCard: { title: string; name: string; email: string | null; phone: string | null }
+    canEdit: boolean
+}
+
+export async function getTransactionDetailsAction(
+    transactionId: string,
+    partnerId: string,
+): Promise<{ success: true; data: TransactionDetailPayload } | { success: false; error: string }> {
+    try {
+        await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+        const supabase = await getSupabaseServerClient()
+
+        const { data: t, error } = await supabase
+            .from("transactions")
+            .select(
+                `
+        id, description, category, amount, due_date, payment_date, created_at, updated_at, status, notes,
+        payment_type, transaction_type, contact_id, customer_id, contact_type, transfer_group_id,
+        refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id,
+        payment_method_id, transaction_date, created_by_user_id,
+        transaction_contacts(name, type, description)
+      `,
+            )
+            .eq("id", transactionId)
+            .eq("partner_id", partnerId)
+            .single()
+
+        if (error || !t) {
+            return { success: false, error: "Transação não encontrada." }
+        }
+
+        const row = t as any
+        const now = new Date()
+        const dueBase = row.due_date || row.payment_date || row.created_at
+        const dateObj = new Date(dueBase)
+        const isOverdue = String(row.status || "").toLowerCase() !== "paid" && dateObj.getTime() < now.getTime()
+
+        const statusLabel = toDisplayStatus(row.status, row.transaction_type, row.refund_kind, isOverdue)
+        const statusVariant = toStatusVariant(row.status, isOverdue)
+        const paymentSubtitle =
+            (row.payment_method_id && (await paymentMethodDisplayLabel(supabase, partnerId, row.payment_method_id))) ||
+            (row.payment_type ? formatPaymentMethodLabel(row.payment_type, null) : "") ||
+            "Não informado"
+
+        let creatorName = "Sistema"
+        if (row.created_by_user_id) {
+            const { data: creatorProf } = await supabase
+                .from("user_profiles")
+                .select("full_name")
+                .eq("user_id", row.created_by_user_id)
+                .maybeSingle()
+            if (creatorProf?.full_name?.trim()) creatorName = creatorProf.full_name.trim()
+        }
+
+        let accountLine: string | null = null
+        if (row.account_id) {
+            const { data: acc } = await supabase
+                .from("finance_accounts")
+                .select("name")
+                .eq("id", row.account_id)
+                .eq("partner_id", partnerId)
+                .maybeSingle()
+            accountLine = acc?.name || null
+        }
+
+        let subcategoryLine: string | null = null
+        if (row.subcategory_id) {
+            const { data: sub } = await supabase
+                .from("financial_categories")
+                .select("name")
+                .eq("id", row.subcategory_id)
+                .eq("partner_id", partnerId)
+                .maybeSingle()
+            subcategoryLine = sub?.name || null
+        }
+
+        const headerTitle =
+            row.category === "Vendas" ? `Venda - ${row.description}` : String(row.description || "").trim() || "Transação"
+
+        const paid = isStatusPaid(row.status)
+        const cancelled = isCancelledStatus(row.status)
+        const step2Label = cancelled
+            ? "Cancelado"
+            : paid
+              ? row.transaction_type === "income" ||
+                  (row.transaction_type === "refund" && row.refund_kind === "expense_refund")
+                ? "Recebido"
+                : "Pago"
+              : "Pendente"
+
+        const timeline = {
+            step1: {
+                label: "Criado",
+                date: formatDayMonth(row.created_at),
+                time: formatTime(row.created_at),
+                active: true,
+            },
+            step2: {
+                label: step2Label,
+                date:
+                    cancelled || !paid
+                        ? ""
+                        : row.payment_date
+                          ? formatDayMonth(row.payment_date)
+                          : formatDayMonth(row.created_at),
+                time: paid && row.payment_date ? formatTime(row.payment_date) : "",
+                active: paid || cancelled,
+                danger: cancelled,
+            },
+        }
+
+        let items: TransactionDetailPayload["items"] = []
+        let salesOrder: { buyer_id?: string | null; customer_name?: string | null } | null = null
+
+        if (row.category === "Vendas" && row.description) {
+            const { data: ord } = await supabase
+                .from("orders")
+                .select(
+                    `
+          id,
+          buyer_id,
+          customer_name,
+          order_items (
+            id,
+            quantity,
+            product_price,
+            subtotal,
+            product_name,
+            sku,
+            products ( images )
+          )
+        `,
+                )
+                .eq("partner_id", partnerId)
+                .eq("order_number", String(row.description).trim())
+                .maybeSingle()
+
+            salesOrder = ord as any
+            const oi = (ord as any)?.order_items
+            if (Array.isArray(oi) && oi.length > 0) {
+                items = oi.map((item: any) => {
+                    const img =
+                        Array.isArray(item.products?.images) && item.products.images[0]
+                            ? String(item.products.images[0])
+                            : null
+                    const qty = Number(item.quantity || 0)
+                    const unit = Number(item.product_price || 0)
+                    const sub = Number(item.subtotal ?? qty * unit)
+                    return {
+                        id: String(item.id),
+                        title: String(item.product_name || "Item"),
+                        sku: String(item.sku || "N/A"),
+                        quantity: qty,
+                        unitPrice: unit,
+                        lineTotal: sub,
+                        image: img,
+                    }
+                })
+            }
+        }
+
+        if (items.length === 0) {
+            const amt = Math.abs(Number(row.amount || 0))
+            items = [
+                {
+                    id: row.id,
+                    title: headerTitle,
+                    sku: transactionTypeLabel(row.transaction_type),
+                    quantity: 1,
+                    unitPrice: amt,
+                    lineTotal: amt,
+                    image: null,
+                },
+            ]
+        }
+
+        let contactCard: TransactionDetailPayload["contactCard"] = {
+            title: "Contato",
+            name: "-",
+            email: null,
+            phone: null,
+        }
+
+        if (row.category === "Vendas" && row.description && salesOrder) {
+            const ord = salesOrder
+            if (ord?.buyer_id) {
+                const { data: cust } = await supabase
+                    .from("customers")
+                    .select("name, email, phone")
+                    .eq("id", ord.buyer_id)
+                    .eq("partner_id", partnerId)
+                    .maybeSingle()
+                contactCard = {
+                    title: "Cliente",
+                    name: cust?.name || ord.customer_name || "Cliente",
+                    email: cust?.email ?? null,
+                    phone: cust?.phone ?? null,
+                }
+            } else if (ord?.customer_name) {
+                contactCard = {
+                    title: "Cliente",
+                    name: ord.customer_name,
+                    email: null,
+                    phone: null,
+                }
+            }
+        } else if (row.customer_id) {
+            const { data: cust } = await supabase
+                .from("customers")
+                .select("name, email, phone")
+                .eq("id", row.customer_id)
+                .eq("partner_id", partnerId)
+                .maybeSingle()
+            contactCard = {
+                title: "Cliente",
+                name: cust?.name || "Cliente",
+                email: cust?.email ?? null,
+                phone: cust?.phone ?? null,
+            }
+        } else if (row.contact_id && row.transaction_contacts?.name) {
+            contactCard = {
+                title: contactCardTitleFromType(row.contact_type || row.transaction_contacts?.type),
+                name: row.transaction_contacts.name,
+                email: null,
+                phone: null,
+            }
+        }
+
+        const systemGateway = isSystemOrGatewayOrigin(row.origin)
+        const lockedRecurring = !!row.recurring_id && systemGateway && !isStatusPaid(row.status)
+        const canEdit = !lockedRecurring
+
+        const paymentDateSubtitle = row.payment_date ? formatDateTime(row.payment_date) : null
+
+        const payload: TransactionDetailPayload = {
+            id: row.id,
+            headerTitle,
+            statusLabel,
+            statusVariant,
+            isRecurring: !!row.recurring_id,
+            paymentMethodSubtitle: paymentSubtitle,
+            paymentDateSubtitle,
+            creatorName,
+            originLabel: originLabel(row.origin),
+            typeBannerLabel: transactionTypeLabel(row.transaction_type),
+            timeline,
+            items,
+            categoryLine: row.category || "Outros",
+            subcategoryLine,
+            accountLine,
+            dueDateLine: row.due_date ? formatDateLabel(row.due_date) : null,
+            paymentDateLine: row.payment_date ? formatDateTime(row.payment_date) : null,
+            notesLine: row.notes ? String(row.notes) : null,
+            amount: Math.abs(Number(row.amount || 0)),
+            ledgerDirection: ledgerDirectionFromRow(row as DbTransaction),
+            contactCard,
+            canEdit,
+        }
+
+        return { success: true, data: payload }
+    } catch (e: any) {
+        return { success: false, error: e.message || "Erro ao carregar transação" }
     }
 }
 

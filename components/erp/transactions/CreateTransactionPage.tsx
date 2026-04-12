@@ -1298,12 +1298,8 @@ export default function CreateTransactionPage({
                     )}
 
                     {isEditMode && isRecurringTransaction && (
-                        <div className="rounded-2xl border border-indigo-200 dark:border-indigo-700/40 p-4 bg-indigo-50/50 dark:bg-indigo-900/10">
-                            <p className="text-sm font-semibold text-indigo-700 dark:text-indigo-400 mb-1">Transação recorrente</p>
-                            <p className="text-xs text-indigo-600/70 dark:text-indigo-400/60 leading-relaxed">
-                                Esta transação faz parte de uma recorrência. Campos financeiros estão bloqueados.
-                                Para alterar valores futuros, edite a recorrência diretamente.
-                            </p>
+                        <div>
+                            <InfoCard message="Esta transação faz parte de uma recorrência. Campos financeiros estão bloqueados. Para alterar valores futuros, edite a recorrência diretamente." color="blue" />
                         </div>
                     )}
                 </section>

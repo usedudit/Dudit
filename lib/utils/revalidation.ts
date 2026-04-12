@@ -57,6 +57,11 @@ export async function revalidateOrderHistory(orderId: string) {
   safeRevalidateTag(TAGS.orderHistory(orderId))
 }
 
+export async function revalidateTransactionHistory(transactionId: string) {
+  if (!transactionId) return
+  safeRevalidateTag(TAGS.transactionHistory(transactionId))
+}
+
 /**
  * Revalida dados de ORÇAMENTOS
  */
