@@ -431,10 +431,14 @@ export async function generateRecurringOccurrencesAction(partnerId: string) {
         : Promise.resolve({ data: [] as { id: string; name: string; payment_type: string | null }[] }),
     ])
 
-    const catById = new Map((cats || []).map((c: { id: string; name: string }) => [c.id, c.name]))
-    const contactById = new Map((tcontacts || []).map((c: { id: string; name: string | null }) => [c.id, c.name || "—"]))
-    const customerById = new Map((customers || []).map((c: { id: string; name: string | null }) => [c.id, c.name || "Cliente"]))
-    const pmById = new Map(
+    const catById = new Map<string, string>((cats || []).map((c: { id: string; name: string }) => [c.id, c.name]))
+    const contactById = new Map<string, string>(
+      (tcontacts || []).map((c: { id: string; name: string | null }) => [c.id, c.name || "—"]),
+    )
+    const customerById = new Map<string, string>(
+      (customers || []).map((c: { id: string; name: string | null }) => [c.id, c.name || "Cliente"]),
+    )
+    const pmById = new Map<string, { id: string; name: string; payment_type: string | null }>(
       (pms || []).map((p: { id: string; name: string; payment_type: string | null }) => [p.id, p]),
     )
 
