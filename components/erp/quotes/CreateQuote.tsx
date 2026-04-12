@@ -10,7 +10,19 @@ import SelectCustomerSheet from '../clientes/SelectCustomerSheet';
 import SelectVariantSheet from './SelectVariantSheet';
 import { useNotification } from '@/hooks/use-notification';
 import { useStore } from '@/lib/store-context';
-import { createQuoteAction, getQuoteDetailsAction, getPartnerAddressAction, getNextQuoteNumberAction } from '@/app/actions/erp/quotes';
+import {
+    createQuoteAction,
+    getQuoteDetailsAction,
+    getPartnerAddressAction,
+    getNextQuoteNumberAction,
+    updateQuoteAction,
+    updateQuoteStatusAction,
+    addQuoteItemAction,
+    updateQuoteItemAction,
+    deleteQuoteItemAction,
+    duplicateQuoteAction,
+} from '@/app/actions/erp/quotes';
+import { getQuoteEditCaps, QUOTE_DEFAULT_CUSTOMER_LABEL } from "@/lib/quotes/quote-edit-rules";
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders";
 import { useProductBucket } from "../hooks";
 import { useSidebar } from '@/lib/sidebar-context';
@@ -74,12 +86,20 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     // Quote State
     const [quoteItems, setQuoteItems] = useState<any[]>([]);
     const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+    /** Observações exibidas ao cliente na proposta (campo `notes` no banco). */
     const [internalNote, setInternalNote] = useState('');
+    /** Observações internas da equipe (`internal_notes`). */
+    const [staffInternalNotes, setStaffInternalNotes] = useState('');
 
     // Settings State
     const [quoteDate, setQuoteDate] = useState(new Date().toISOString().split('T')[0]);
     const [expiryDate, setExpiryDate] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
     const [status, setStatus] = useState('draft');
+
+    const editCaps = useMemo(() => {
+        if (mode === "create" || mode === "duplicate") return getQuoteEditCaps("draft", false);
+        return getQuoteEditCaps(status, Boolean(existingQuote?.converted));
+    }, [mode, status, existingQuote?.converted]);
 
     // Layout Settings State
     const [primaryColor, setPrimaryColor] = useState('#113833');
@@ -171,6 +191,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
                     // Map items
                     const items = q.items.map((item: any) => ({
+                        quoteItemId: item.id,
                         id: item.product_id || `legacy-${item.id}`,
                         rowId: `item-${item.id}`,
                         name: item.custom_name || item.products?.name || 'Item sem nome',
@@ -187,9 +208,10 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     setQuoteItems(items);
                     setSelectedCustomer(q.customers);
                     setInternalNote(q.notes || '');
+                    setStaffInternalNotes((q as { internal_notes?: string | null }).internal_notes || '');
                     setQuoteDate(q.issue_date);
                     setExpiryDate(q.expiration_date);
-                    setStatus(q.status);
+                    setStatus(mode === "duplicate" ? "draft" : q.status);
                     setDiscount(q.discount_value?.toString() || '');
                     setDiscountType(q.discount_type === 'percentage' ? '%' : 'R$');
                     setShippingFee(q.shipping_cost?.toString() || '');
@@ -200,9 +222,10 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                         items,
                         customer: q.customers,
                         note: q.notes || '',
+                        internalStaff: (q as { internal_notes?: string | null }).internal_notes || '',
                         date: q.issue_date,
                         expiry: q.expiration_date,
-                        status: q.status,
+                        status: mode === "duplicate" ? "draft" : q.status,
                         discount: q.discount_value?.toString() || '',
                         discountType: q.discount_type === 'percentage' ? '%' : 'R$',
                         shipping: q.shipping_cost?.toString() || '',
@@ -225,6 +248,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         items: quoteItems,
         customer: selectedCustomer,
         note: internalNote,
+        internalStaff: staffInternalNotes,
         date: quoteDate,
         expiry: expiryDate,
         status,
@@ -232,7 +256,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         discountType,
         shipping: shippingFee,
         others: otherCosts
-    }), [quoteItems, selectedCustomer, internalNote, quoteDate, expiryDate, status, discount, discountType, shippingFee, otherCosts]);
+    }), [quoteItems, selectedCustomer, internalNote, staffInternalNotes, quoteDate, expiryDate, status, discount, discountType, shippingFee, otherCosts]);
 
     const isDirty = useMemo(() => {
         if (!originalQuoteData) return mode === 'create' && quoteItems.length > 0;
@@ -247,6 +271,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
             currentData.shipping !== originalQuoteData.shipping ||
             currentData.others !== originalQuoteData.others ||
             currentData.note !== originalQuoteData.note ||
+            currentData.internalStaff !== originalQuoteData.internalStaff ||
             currentData.customer?.id !== originalQuoteData.customer?.id ||
             currentData.items.length !== originalQuoteData.items.length
         ) {
@@ -621,13 +646,156 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
         setIsSaving(true);
         try {
+            if (mode === "edit" && existingQuote?.id) {
+                if (!originalQuoteData) {
+                    notifyError("Aguarde", "Os dados do orçamento ainda estão carregando.");
+                    return;
+                }
+
+                if (status !== originalQuoteData.status) {
+                    const stRes = await updateQuoteStatusAction({
+                        quoteId: existingQuote.id,
+                        partnerId,
+                        status: status as "draft" | "sent" | "approved" | "rejected" | "expired" | "cancelled",
+                    });
+                    if (!stRes.success) {
+                        notifyError("Status", (stRes as { error?: string }).error || "Não foi possível atualizar o status.");
+                        return;
+                    }
+                }
+
+                const upRes = await updateQuoteAction({
+                    quoteId: existingQuote.id,
+                    partnerId,
+                    customerId: selectedCustomer?.id ?? null,
+                    issueDate: quoteDate,
+                    expirationDate: expiryDate,
+                    notes: internalNote,
+                    internalNotes: staffInternalNotes,
+                    discountType: discountType === "%" ? "percentage" : "fixed",
+                    discountValue: Number(discount) || 0,
+                    shippingCost: Number(shippingFee) || 0,
+                    additionalCosts: Number(otherCosts) || 0,
+                });
+                if (!upRes.success) {
+                    notifyError("Erro ao salvar", (upRes as { error?: string }).error || "Ocorreu um erro inesperado.");
+                    return;
+                }
+
+                const origItems: any[] = originalQuoteData.items || [];
+                const origById = new Map<string, any>(
+                    origItems.filter((x: any) => x.quoteItemId).map((x: any) => [x.quoteItemId, x]),
+                );
+
+                for (let idx = 0; idx < quoteItems.length; idx++) {
+                    const cur = quoteItems[idx];
+                    if (!cur.quoteItemId) {
+                        const addRes = await addQuoteItemAction({
+                            quoteId: existingQuote.id,
+                            partnerId,
+                            productId: cur.isBlank ? null : cur.id,
+                            customName: cur.isBlank ? cur.name : undefined,
+                            description: undefined,
+                            quantity: cur.qty,
+                            unitPrice: cur.price,
+                            sortOrder: idx,
+                        });
+                        if (!addRes.success) {
+                            notifyError("Item", (addRes as { error?: string }).error || "Erro ao adicionar item.");
+                            return;
+                        }
+                        continue;
+                    }
+                    const o = origById.get(cur.quoteItemId);
+                    if (!o) continue;
+                    const changed =
+                        Number(o.qty) !== Number(cur.qty) ||
+                        Number(o.price) !== Number(cur.price) ||
+                        String(o.name || "") !== String(cur.name || "");
+                    if (changed) {
+                        const upd = await updateQuoteItemAction({
+                            itemId: cur.quoteItemId,
+                            partnerId,
+                            customName: cur.isManual || cur.isBlank ? cur.name : undefined,
+                            quantity: cur.qty,
+                            unitPrice: cur.price,
+                            sortOrder: idx,
+                        });
+                        if (!upd.success) {
+                            notifyError("Item", (upd as { error?: string }).error || "Erro ao atualizar item.");
+                            return;
+                        }
+                    }
+                }
+
+                for (const o of origItems) {
+                    if (!o.quoteItemId) continue;
+                    if (!quoteItems.some((c: any) => c.quoteItemId === o.quoteItemId)) {
+                        const del = await deleteQuoteItemAction(o.quoteItemId, partnerId);
+                        if (!del.success) {
+                            notifyError("Item", (del as { error?: string }).error || "Erro ao remover item.");
+                            return;
+                        }
+                    }
+                }
+
+                const res = await getQuoteDetailsAction(existingQuote.id, partnerId);
+                if (res.success && res.data) {
+                    const q = res.data as any;
+                    const items = (q.items || []).map((item: any) => ({
+                        quoteItemId: item.id,
+                        id: item.product_id || `legacy-${item.id}`,
+                        rowId: `item-${item.id}`,
+                        name: item.custom_name || item.products?.name || "Item sem nome",
+                        sku: item.products?.sku || "N/A",
+                        price: Number(item.unit_price),
+                        qty: Number(item.quantity),
+                        stock: Number(item.products?.stock_available ?? item.products?.stock_quantity ?? 0),
+                        image: item.products?.images?.[0] || "https://img.dudit.com.br/static/Placeholder.png",
+                        isEditing: false,
+                        isBlank: !item.product_id,
+                        isManual: !item.product_id,
+                    }));
+                    setQuoteItems(items);
+                    setSelectedCustomer(q.customers);
+                    setInternalNote(q.notes || "");
+                    setStaffInternalNotes(q.internal_notes || "");
+                    setQuoteDate(q.issue_date);
+                    setExpiryDate(q.expiration_date);
+                    setStatus(q.status);
+                    setDiscount(q.discount_value?.toString() || "");
+                    setDiscountType(q.discount_type === "percentage" ? "%" : "R$");
+                    setShippingFee(q.shipping_cost?.toString() || "");
+                    setOtherCosts(q.additional_costs?.toString() || "");
+                    setOriginalQuoteData({
+                        items,
+                        customer: q.customers,
+                        note: q.notes || "",
+                        internalStaff: q.internal_notes || "",
+                        date: q.issue_date,
+                        expiry: q.expiration_date,
+                        status: q.status,
+                        discount: q.discount_value?.toString() || "",
+                        discountType: q.discount_type === "percentage" ? "%" : "R$",
+                        shipping: q.shipping_cost?.toString() || "",
+                        others: q.additional_costs?.toString() || "",
+                    });
+                }
+
+                notifySuccess("Alterações salvas!", "O orçamento foi salvo com sucesso.");
+                router.refresh();
+                onBack();
+                return;
+            }
+
             const result = await createQuoteAction({
                 partnerId: partnerId,
                 customerId: selectedCustomer?.id,
                 issueDate: quoteDate,
                 expirationDate: expiryDate,
                 notes: internalNote,
-                discountType: discountType === '%' ? 'percentage' : 'fixed',
+                internalNotes: staffInternalNotes,
+                discountType: discountType === "%" ? "percentage" : "fixed",
                 discountValue: Number(discount) || 0,
                 shippingCost: Number(shippingFee) || 0,
                 additionalCosts: Number(otherCosts) || 0,
@@ -636,12 +804,12 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     customName: item.isBlank ? item.name : undefined,
                     quantity: item.qty,
                     unitPrice: item.price,
-                    sortOrder: idx
-                }))
+                    sortOrder: idx,
+                })),
             });
 
             if (result.success) {
-                notifySuccess(mode === 'edit' ? "Alterações salvas!" : "Orçamento criado!",
+                notifySuccess(mode === "edit" ? "Alterações salvas!" : "Orçamento criado!",
                     "O orçamento foi salvo com sucesso.");
                 router.refresh();
                 onBack();
@@ -655,6 +823,34 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
             setIsSaving(false);
         }
     };
+
+    const handleReopenQuote = useCallback(async () => {
+        if (!existingQuote?.id) return;
+        const stRes = await updateQuoteStatusAction({
+            quoteId: existingQuote.id,
+            partnerId,
+            status: "draft",
+        });
+        if (stRes.success) {
+            setStatus("draft");
+            notifySuccess("Orçamento reaberto", "Agora você pode editar itens e valores.");
+            router.refresh();
+        } else {
+            notifyError("Erro", (stRes as { error?: string }).error || "Não foi possível reabrir.");
+        }
+    }, [existingQuote?.id, partnerId, notifySuccess, notifyError, router]);
+
+    const handleDuplicateFromEditor = useCallback(async () => {
+        if (!existingQuote?.id) return;
+        const dup = await duplicateQuoteAction(existingQuote.id);
+        if (dup.success) {
+            notifySuccess("Cópia criada", "Um novo rascunho foi gerado a partir deste orçamento.");
+            router.refresh();
+            onBack();
+        } else {
+            notifyError("Erro", (dup as { error?: string }).error || "Não foi possível duplicar.");
+        }
+    }, [existingQuote?.id, notifySuccess, notifyError, router, onBack]);
 
     const getTabErrorCount = useCallback((tab: string) => {
         return REQUIRED_FIELDS.filter(({ field, tab: fieldTab }) => fieldTab === tab && fieldErrors.has(field)).length
@@ -773,6 +969,11 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                         setStatus={setStatus}
                                         internalNote={internalNote}
                                         setInternalNote={setInternalNote}
+                                        staffInternalNotes={staffInternalNotes}
+                                        setStaffInternalNotes={setStaffInternalNotes}
+                                        editCaps={editCaps}
+                                        onReopenQuote={mode === "edit" ? handleReopenQuote : undefined}
+                                        onDuplicateQuote={mode === "edit" ? handleDuplicateFromEditor : undefined}
                                         primaryColor={primaryColor}
                                         setPrimaryColor={setPrimaryColor}
                                         secondaryColor={secondaryColor}

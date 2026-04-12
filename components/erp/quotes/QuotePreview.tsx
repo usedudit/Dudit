@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { QUOTE_DEFAULT_CUSTOMER_LABEL } from "@/lib/quotes/quote-edit-rules";
 
 interface QuotePreviewProps {
     invoiceNumber: string;
@@ -190,7 +191,9 @@ const QuotePreview = ({
                                                             {selectedCustomer.phone && <p>{selectedCustomer.phone}</p>}
                                                         </div>
                                                     ) : (
-                                                        <p className="text-xs text-gray-400">Nenhum cliente selecionado</p>
+                                                        <div className="text-xs text-gray-600 space-y-1">
+                                                            <p className="font-bold text-black">{QUOTE_DEFAULT_CUSTOMER_LABEL}</p>
+                                                        </div>
                                                     )}
                                                 </div>
                                             </div>

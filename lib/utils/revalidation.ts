@@ -65,13 +65,21 @@ export async function revalidateTransactionHistory(transactionId: string) {
 /**
  * Revalida dados de ORÇAMENTOS
  */
-export async function revalidateQuotes(partnerId: string) {
+export async function revalidateQuotes(partnerId: string, quoteId?: string) {
   if (partnerId) {
     safeRevalidateTag(TAGS.quotes(partnerId))
     safeRevalidateTag(partnerId)
   }
+  if (quoteId) {
+    safeRevalidateTag(`quote-${quoteId}`)
+  }
   safeRevalidateTag("quotes")
   revalidatePath("/erp/quotes")
+}
+
+export async function revalidateQuoteHistory(quoteId: string) {
+  if (!quoteId) return
+  safeRevalidateTag(TAGS.quoteHistory(quoteId))
 }
 
 /**

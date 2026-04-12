@@ -32,6 +32,8 @@ type ERPOrderPayload = {
     partnerId: string
     customerId?: string
     customerName?: string
+    /** When set, enforces at most one ERP order per quote (unique index). */
+    sourceQuoteId?: string | null
     salesChannel?: string
     deliveryMethod: 'delivery' | 'pickup'
     paymentStatus: 'paid' | 'partially_paid' | 'unpaid'
@@ -687,6 +689,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             partner_id: partnerId,
             buyer_id: data.customerId || null,
             customer_name: data.customerName || null,
+            source_quote_id: data.sourceQuoteId || null,
             order_source: buildOrderSource(data.salesChannel, data.deliveryMethod),
             delivery_type: data.deliveryMethod,
             situation: paymentState.situation,

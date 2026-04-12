@@ -24,7 +24,7 @@ export interface BulkActionPayload {
     stockIgnoreNegative?: boolean
     visibilityMode?: 'publish' | 'hide'
     imageFile?: File | null
-    status?: 'draft' | 'sent' | 'approved' | 'rejected' | 'expired'
+    status?: 'draft' | 'sent' | 'approved' | 'rejected' | 'expired' | 'cancelled'
     orderStatus?: string
 }
 
@@ -99,7 +99,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
     const [priceConfig, setPriceConfig] = useState({ mode: 'percent_inc', value: 0, onlyPublished: false })
     const [stockConfig, setStockConfig] = useState({ mode: 'add', value: 0, ignoreNegative: false })
     const [visConfig, setVisConfig] = useState<'publish' | 'hide'>('publish')
-    const [statusConfig, setStatusConfig] = useState<'draft' | 'sent' | 'approved' | 'rejected' | 'expired'>('sent')
+    const [statusConfig, setStatusConfig] = useState<'draft' | 'sent' | 'approved' | 'rejected' | 'expired' | 'cancelled'>('sent')
     const [orderStatusConfig, setOrderStatusConfig] = useState<string>('')
     const [imageState, setImageState] = useState<{ file: File | null, preview: string | null }>({ file: null, preview: null })
 
@@ -350,6 +350,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                     { value: 'approved', label: 'Aprovado' },
                     { value: 'rejected', label: 'Rejeitado' },
                     { value: 'expired', label: 'Expirado' },
+                    { value: 'cancelled', label: 'Cancelado' },
                 ]
                 return (
                     <div className="space-y-1 pt-2">

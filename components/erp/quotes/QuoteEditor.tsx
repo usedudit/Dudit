@@ -18,6 +18,7 @@ import QuantitySelector from '@/components/reusable/QuantitySelector';
 import { Button, Input, TabsContent, FormDropdown, MoneyInput, PercentageInput, DatePicker, ThreeDotsLoader, IconPlaceholder, Pagination } from '@/components/reusable';
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { formatCurrency } from "@/lib/utils";
+import { QUOTE_DEFAULT_CUSTOMER_LABEL, type QuoteEditCaps } from "@/lib/quotes/quote-edit-rules";
 
 interface QuoteEditorProps {
     searchQuery: string;
@@ -56,6 +57,11 @@ interface QuoteEditorProps {
     setStatus: (val: string) => void;
     internalNote: string;
     setInternalNote: (val: string) => void;
+    staffInternalNotes: string;
+    setStaffInternalNotes: (val: string) => void;
+    editCaps?: QuoteEditCaps | null;
+    onReopenQuote?: () => void;
+    onDuplicateQuote?: () => void;
 
     // Layout Props
     primaryColor: string;
@@ -88,9 +94,21 @@ const QuoteEditor = (props: QuoteEditorProps) => {
         { value: 'approved', label: 'Aprovado', icon: CheckCircleIcon, color: 'text-green-500' },
         { value: 'rejected', label: 'Recusado', icon: AlertCircleIcon, color: 'text-red-500' },
         { value: 'expired', label: 'Expirado', icon: ClockIcon, color: 'text-brand-orange' },
+        { value: 'cancelled', label: 'Cancelado', icon: AlertCircleIcon, color: 'text-gray-500' },
     ];
 
     const currentStatus = statusOptions.find(o => o.value === props.status) || statusOptions[0];
+
+    const caps = props.editCaps
+    const itemsLocked = Boolean(props.isReadOnly || (caps && !caps.canEditItems))
+    const customerLocked = Boolean(props.isReadOnly || (caps && !caps.canEditCustomer))
+    const issueDateLocked = Boolean(props.isReadOnly || (caps && !caps.canEditIssueDate))
+    const expiryLocked = Boolean(props.isReadOnly || (caps && !caps.canEditExpirationDate))
+    const financialLocked = Boolean(props.isReadOnly || (caps && !caps.canEditDiscountShipping))
+    const proposalNotesLocked = Boolean(props.isReadOnly || (caps && !caps.canEditProposalNotes))
+    const internalNotesLocked = Boolean(props.isReadOnly || (caps && !caps.canEditInternalNotes))
+    const statusLocked = Boolean(props.isReadOnly || (caps && !caps.canChangeStatus))
+    const layoutLocked = Boolean(props.isReadOnly || (caps && !caps.canEditLightFields))
 
     useEffect(() => {
         if (currentPage > totalPages && totalPages > 0) {
@@ -114,12 +132,30 @@ const QuoteEditor = (props: QuoteEditorProps) => {
             <TabsContent value="Dados Gerais" className="mt-0 focus-visible:outline-none">
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
 
+                    {caps?.bannerMessage && !props.isReadOnly && (
+                        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+                            <p className="font-medium mb-2">{caps.bannerMessage}</p>
+                            <div className="flex flex-wrap gap-2">
+                                {caps.showReopenCta && props.onReopenQuote && (
+                                    <Button type="button" variant="outline" className="h-9 text-xs" onClick={props.onReopenQuote}>
+                                        Reabrir como rascunho
+                                    </Button>
+                                )}
+                                {caps.showDuplicateCta && props.onDuplicateQuote && (
+                                    <Button type="button" variant="outline" className="h-9 text-xs" onClick={props.onDuplicateQuote}>
+                                        Duplicar orçamento
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     {/* 1. PRODUCT SEARCH & TABLE */}
                     <div className="mb-8">
                         <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading mb-6">Itens da Proposta</h3>
 
                         <div ref={searchRef} className="relative mb-6">
-                            {!props.isReadOnly && (
+                            {!itemsLocked && (
                                 <Input
                                     label=""
                                     name="productSearch"
@@ -148,7 +184,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                             )}
 
                             <AnimatePresence>
-                                {props.isProductSearchOpen && props.searchQuery && !props.isReadOnly && (
+                                {props.isProductSearchOpen && props.searchQuery && !itemsLocked && (
                                     <motion.div
                                         initial={{ opacity: 0, y: 5 }}
                                         animate={{ opacity: 1, y: 0 }}
@@ -195,7 +231,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                             <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-44">Preço Unit.</th>
                                             <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36">Qtd.</th>
                                             <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-right w-36">Total</th>
-                                            {!props.isReadOnly && <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-24 rounded-r-lg">Ações</th>}
+                                            {!itemsLocked && <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-24 rounded-r-lg">Ações</th>}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -255,12 +291,13 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                                 className="mb-0"
                                                                 error={hasPriceError}
                                                                 errorMessage="Preço obrigatório"
+                                                                disabled={itemsLocked}
                                                             />
                                                         </div>
                                                     </td>
                                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
                                                         <div className="flex justify-center">
-                                                            <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} max={item.isManual ? undefined : Math.max(0, Number(item.stock ?? 0))} size="md" />
+                                                            <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} max={item.isManual ? undefined : Math.max(0, Number(item.stock ?? 0))} size="md" disabled={itemsLocked} />
                                                         </div>
                                                     </td>
                                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right">
@@ -268,7 +305,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                             {formatCurrency(item.price * item.qty)}
                                                         </span>
                                                     </td>
-                                                    {!props.isReadOnly && (
+                                                    {!itemsLocked && (
                                                         <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
                                                             <div className="flex justify-center gap-2">
                                                                 {item.isEditing ? (
@@ -356,7 +393,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                     <p className="text-[11px] font-medium text-brand-inactive-text pr-2 truncate">
                                                         {item.isEditing ? (item.sku ? `${item.sku} • ` : '') : `${item.sku || 'Sem SKU'} • `}{item.qty} un • {formatCurrency(item.price)}
                                                     </p>
-                                                    {!props.isReadOnly && (
+                                                    {!itemsLocked && (
                                                         <div className="flex items-center gap-1">
                                                             {item.isEditing ? (
                                                                 <button
@@ -391,7 +428,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                     )}
                                                 </div>
 
-                                                {!props.isReadOnly && (
+                                                {!itemsLocked && (
                                                     <div className="flex items-center gap-4 mt-2">
                                                         <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} max={item.isManual ? undefined : Math.max(0, Number(item.stock ?? 0))} size="sm" />
                                                         <div className="flex-1 max-w-[140px]">
@@ -458,7 +495,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                 <p className="text-[11px] font-medium text-brand-inactive-text pr-2 truncate">
                                                     {item.sku || 'Sem SKU'} • {item.qty} un • {formatCurrency(item.price)}
                                                 </p>
-                                                {!props.isReadOnly && (
+                                                {!itemsLocked && (
                                                     <div className="flex items-center gap-1">
                                                         {item.isEditing ? (
                                                             <button
@@ -491,7 +528,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                 )}
                                             </div>
 
-                                            {!props.isReadOnly && (
+                                            {!itemsLocked && (
                                                 <div className="flex items-center gap-4 mt-2">
                                                     <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} max={item.isBlank ? undefined : Math.max(0, Number(item.stock ?? 0))} size="md" />
                                                     <div className="flex items-center flex-1 max-w-[120px]">
@@ -523,17 +560,17 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                     icon={SearchIcon}
                                     title="Nenhum produto adicionado"
                                     subtitle="Busque produtos no campo acima ou cadastre um item avulso manualmente."
-                                    itemButton={{
+                                    itemButton={!itemsLocked ? {
                                         text: "Adicionar item manual",
                                         action: props.addBlankItem,
                                         variant: "outline",
-                                    }}
+                                    } : undefined}
                                 />
                             </div>
                         )}
 
                         {/* Add Item Link (When list has items) */}
-                        {!props.isReadOnly && props.quoteItems.length > 0 && (
+                        {!itemsLocked && props.quoteItems.length > 0 && (
                             <Button
                                 type="button"
                                 variant="link"
@@ -570,7 +607,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                         </span>
                                     </div>
                                 </div>
-                                {!props.isReadOnly && (
+                                {!customerLocked && (
                                     <Button variant="outlinered" onClick={() => props.setSelectedCustomer(null)}>
                                         Remover
                                     </Button>
@@ -579,9 +616,9 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                         ) : (
                             <IconPlaceholder
                                 icon={UserIcon}
-                                title="Nenhum cliente selecionado"
-                                subtitle={props.isReadOnly ? "Nenhum cliente vinculado a esta proposta." : "Selecione um cliente para vincular à proposta."}
-                                itemButton={!props.isReadOnly ? {
+                                title={QUOTE_DEFAULT_CUSTOMER_LABEL}
+                                subtitle={props.isReadOnly ? "Nenhum cliente cadastrado vinculado; exibição usa o nome padrão." : "Sem cliente cadastrado — a proposta usa o nome padrão. Selecione um cliente para vincular dados de contato."}
+                                itemButton={!customerLocked ? {
                                     text: "Selecionar Cliente",
                                     action: () => props.setIsCustomerSheetOpen(true),
                                     variant: "outline"
@@ -606,7 +643,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                         props.setQuoteDate(d.toISOString().split('T')[0]);
                                     }
                                 }}
-                                disabled={props.isReadOnly}
+                                disabled={issueDateLocked}
                             />
 
                             <DatePicker
@@ -618,7 +655,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                         props.setExpiryDate(d.toISOString().split('T')[0]);
                                     }
                                 }}
-                                disabled={props.isReadOnly}
+                                disabled={expiryLocked}
                             />
 
                             <div className="flex flex-col gap-1.5">
@@ -627,7 +664,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                     value={props.status}
                                     setValue={props.setStatus}
                                     options={statusOptions.map(o => ({ value: o.value, label: o.label }))}
-                                    disabled={props.isReadOnly}
+                                    disabled={statusLocked}
                                 />
                             </div>
                         </div>
@@ -640,12 +677,12 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                         label="Desconto"
                                         value={props.discount}
                                         onChange={(val) => props.setDiscount(val.toString())}
-                                        disabled={props.isReadOnly}
+                                        disabled={financialLocked}
                                         suffix={
                                             <div className="flex items-center gap-1.5 border-l border-brand-border dark:border-dark-border ml-2 pl-2">
-                                                <button type="button" onClick={() => props.setDiscountType('R$')} className="text-[11px] font-black text-brand-primary">R$</button>
+                                                <button type="button" disabled={financialLocked} onClick={() => !financialLocked && props.setDiscountType('R$')} className="text-[11px] font-black text-brand-primary disabled:opacity-40">R$</button>
                                                 <div className="w-[1px] h-3 bg-brand-border dark:border-dark-border" />
-                                                <button type="button" onClick={() => props.setDiscountType('%')} className="text-[11px] font-bold text-brand-inactive-text hover:text-brand-dark transition-colors">%</button>
+                                                <button type="button" disabled={financialLocked} onClick={() => !financialLocked && props.setDiscountType('%')} className="text-[11px] font-bold text-brand-inactive-text hover:text-brand-dark transition-colors disabled:opacity-40">%</button>
                                             </div>
                                         }
                                     />
@@ -654,12 +691,12 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                         label="Desconto"
                                         value={props.discount}
                                         onChange={(val) => props.setDiscount(val.toString())}
-                                        disabled={props.isReadOnly}
+                                        disabled={financialLocked}
                                         suffix={
                                             <div className="flex items-center gap-1.5 border-l border-brand-border dark:border-dark-border ml-2 pl-2">
-                                                <button type="button" onClick={() => props.setDiscountType('R$')} className="text-[11px] font-bold text-brand-inactive-text hover:text-brand-dark transition-colors">R$</button>
+                                                <button type="button" disabled={financialLocked} onClick={() => !financialLocked && props.setDiscountType('R$')} className="text-[11px] font-bold text-brand-inactive-text hover:text-brand-dark transition-colors disabled:opacity-40">R$</button>
                                                 <div className="w-[1px] h-3 bg-brand-border dark:border-dark-border" />
-                                                <button type="button" onClick={() => props.setDiscountType('%')} className="text-[11px] font-black text-brand-primary">%</button>
+                                                <button type="button" disabled={financialLocked} onClick={() => !financialLocked && props.setDiscountType('%')} className="text-[11px] font-black text-brand-primary disabled:opacity-40">%</button>
                                             </div>
                                         }
                                     />
@@ -670,14 +707,14 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 label="Frete"
                                 value={Number(props.shippingFee) || 0}
                                 onChange={(val) => props.setShippingFee(val.toString())}
-                                disabled={props.isReadOnly}
+                                disabled={financialLocked}
                             />
 
                             <MoneyInput
                                 label="Outros Custos"
                                 value={Number(props.otherCosts) || 0}
                                 onChange={(val) => props.setOtherCosts(val.toString())}
-                                disabled={props.isReadOnly}
+                                disabled={financialLocked}
                             />
                         </div>
                     </div>
@@ -702,7 +739,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                 value={props.primaryColor}
                                                 onChange={(e) => props.setPrimaryColor(e.target.value)}
                                                 className="absolute inset-0 w-[150%] h-[150%] -translate-x-1/4 -translate-y-1/4 p-0 border-0 cursor-pointer"
-                                                disabled={props.isReadOnly}
+                                                disabled={layoutLocked}
                                             />
                                         </div>
                                         <span className="text-[13px] font-bold tracking-wider uppercase text-brand-inactive-text dark:text-dark-body">{props.primaryColor}</span>
@@ -717,7 +754,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                 value={props.secondaryColor}
                                                 onChange={(e) => props.setSecondaryColor(e.target.value)}
                                                 className="absolute inset-0 w-[150%] h-[150%] -translate-x-1/4 -translate-y-1/4 p-0 border-0 cursor-pointer"
-                                                disabled={props.isReadOnly}
+                                                disabled={layoutLocked}
                                             />
                                         </div>
                                         <span className="text-[13px] font-bold tracking-wider uppercase text-brand-inactive-text dark:text-dark-body">{props.secondaryColor}</span>
@@ -731,7 +768,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 value={props.quoteTitle}
                                 onChange={(e) => props.setQuoteTitle(e.target.value)}
                                 placeholder="EX: ORÇAMENTO"
-                                disabled={props.isReadOnly}
+                                disabled={layoutLocked}
                             />
 
                             <Input
@@ -740,7 +777,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 value={props.quoteSubtitle}
                                 onChange={(e) => props.setQuoteSubtitle(e.target.value)}
                                 placeholder="Ex: Proposta Comercial"
-                                disabled={props.isReadOnly}
+                                disabled={layoutLocked}
                             />
                         </div>
                     </div>
@@ -749,16 +786,32 @@ const QuoteEditor = (props: QuoteEditorProps) => {
 
             <TabsContent value="Observações" className="mt-0 focus-visible:outline-none">
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
-                    <div className="bg-white dark:bg-dark-surface p-0">
-                        <label className="block text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Observações da Proposta</label>
-                        <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border p-5 h-[350px]">
-                            <textarea
-                                className="w-full h-full bg-transparent border-none text-[15px] text-brand-dark dark:text-dark-heading leading-relaxed focus:outline-none resize-none placeholder:text-brand-inactive-text disabled:opacity-70 font-medium"
-                                placeholder="Adicione termos, condições ou notas para o cliente..."
-                                value={props.internalNote}
-                                onChange={(e) => props.setInternalNote(e.target.value)}
-                                disabled={props.isReadOnly}
-                            ></textarea>
+                    <div className="bg-white dark:bg-dark-surface p-0 space-y-8">
+                        <div>
+                            <label className="block text-lg font-bold text-brand-dark dark:text-dark-heading mb-2">Observações da Proposta</label>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-4">Texto visível ao cliente na proposta / PDF.</p>
+                            <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border p-5 h-[280px]">
+                                <textarea
+                                    className="w-full h-full bg-transparent border-none text-[15px] text-brand-dark dark:text-dark-heading leading-relaxed focus:outline-none resize-none placeholder:text-brand-inactive-text disabled:opacity-70 font-medium"
+                                    placeholder="Adicione termos, condições ou notas para o cliente..."
+                                    value={props.internalNote}
+                                    onChange={(e) => props.setInternalNote(e.target.value)}
+                                    disabled={proposalNotesLocked}
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-lg font-bold text-brand-dark dark:text-dark-heading mb-2">Observações internas</label>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-4">Uso interno da equipe; não aparecem na proposta ao cliente.</p>
+                            <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border p-5 h-[200px]">
+                                <textarea
+                                    className="w-full h-full bg-transparent border-none text-[15px] text-brand-dark dark:text-dark-heading leading-relaxed focus:outline-none resize-none placeholder:text-brand-inactive-text disabled:opacity-70 font-medium"
+                                    placeholder="Notas internas, lembretes, histórico comercial..."
+                                    value={props.staffInternalNotes}
+                                    onChange={(e) => props.setStaffInternalNotes(e.target.value)}
+                                    disabled={internalNotesLocked}
+                                />
+                            </div>
                         </div>
                     </div>
                 </motion.div>

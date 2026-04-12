@@ -6,9 +6,54 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
+import { revalidateOrders } from "@/lib/utils/revalidation"
 import { revalidateQuotes } from "@/lib/utils/revalidation"
+import { createQuoteHistoryEntry, getQuoteHistoryEntries } from "@/lib/services/quote-history.service"
+import { createOrderHistoryEntry } from "@/lib/services/order-history.service"
+import { createERPOrderAction } from "@/app/actions/erp/orders"
+import {
+    getQuoteEditCaps,
+    MSG_APPROVED_FINANCIAL,
+    MSG_REJECTED_EXPIRED_CANCELLED,
+    MSG_SENT_FINANCIAL,
+    canEditFinancialFields,
+    normalizeQuoteStatus,
+    QUOTE_DEFAULT_CUSTOMER_LABEL,
+} from "@/lib/quotes/quote-edit-rules"
 import { checkLimit, increment_usage_counter, decrement_usage_counter } from "@/lib/services/subscription.service"
 import { withTelemetry } from "@/lib/utils/action-logger"
+
+function quoteItemsEditBlockedMessage(status: string): string {
+    const s = normalizeQuoteStatus(status)
+    if (s === "sent") return MSG_SENT_FINANCIAL
+    if (s === "approved") return MSG_APPROVED_FINANCIAL
+    if (s === "rejected" || s === "expired" || s === "cancelled") return MSG_REJECTED_EXPIRED_CANCELLED
+    return "Itens do orçamento só podem ser alterados em rascunho."
+}
+
+async function assertQuoteAllowsItemEdits(
+    supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+    quoteId: string,
+    partnerId: string,
+) {
+    const { data: row, error } = await supabase
+        .from("quotes")
+        .select("status, converted")
+        .eq("id", quoteId)
+        .eq("partner_id", partnerId)
+        .single()
+
+    if (error || !row) {
+        return "Orçamento não encontrado" as const
+    }
+    if (row.converted) {
+        return "Este orçamento já foi convertido em pedido e não pode ser alterado." as const
+    }
+    if (!canEditFinancialFields(String(row.status || ""))) {
+        return quoteItemsEditBlockedMessage(String(row.status || ""))
+    }
+    return null
+}
 
 type QuoteItemPayload = {
     productId?: string | null
@@ -172,6 +217,8 @@ export async function createQuoteAction(data: {
     issueDate?: string
     expirationDate?: string | null
     notes?: string
+    /** Observações internas (não vão para o cliente na proposta). */
+    internalNotes?: string | null
     discountType?: "fixed" | "percentage"
     discountValue?: number
     shippingCost?: number
@@ -220,10 +267,11 @@ export async function createQuoteAction(data: {
                 p_partner_id: data.partnerId,
                 p_user_id: user.id,
                 p_customer_id: data.customerId || null,
-                p_status: 'draft',
+                p_status: "draft",
                 p_issue_date: data.issueDate || new Date().toISOString().split("T")[0],
                 p_expiration_date: data.expirationDate || null,
                 p_notes: data.notes || null,
+                p_internal_notes: data.internalNotes ?? null,
                 p_discount_type: data.discountType || "fixed",
                 p_discount_value: data.discountValue || 0,
                 p_shipping_cost: data.shippingCost || 0,
@@ -243,12 +291,26 @@ export async function createQuoteAction(data: {
                 .eq("id", quoteResult.id)
                 .single()
 
-            await revalidateQuotes(data.partnerId)
+            const newQuoteId = updatedQuote?.id || quoteResult.id
+
+            await revalidateQuotes(data.partnerId, newQuoteId)
 
             increment_usage_counter(data.partnerId, "quotes_month_count").catch(console.error)
 
+            try {
+                await createQuoteHistoryEntry({
+                    quoteId: newQuoteId,
+                    partnerId: data.partnerId,
+                    actorUserId: user.id,
+                    entryType: "created",
+                    changeLines: [`criou o orçamento ${updatedQuote?.quote_number || quoteResult.quote_number || ""}`.trim()],
+                })
+            } catch (historyError) {
+                console.error("[quotes_history] createQuoteAction:", historyError)
+            }
+
             return successResponse({
-                id: updatedQuote?.id || quoteResult.id,
+                id: newQuoteId,
                 quote_number: updatedQuote?.quote_number || quoteResult.quote_number,
                 total: updatedQuote?.total || 0,
             })
@@ -268,6 +330,7 @@ export async function updateQuoteAction(data: {
     issueDate?: string
     expirationDate?: string | null
     notes?: string
+    internalNotes?: string | null
     discountType?: "fixed" | "percentage"
     discountValue?: number
     shippingCost?: number
@@ -288,7 +351,9 @@ export async function updateQuoteAction(data: {
 
             const { data: currentQuote, error: currentQuoteError } = await supabase
                 .from("quotes")
-                .select("shipping_cost, additional_costs, discount_value")
+                .select(
+                    "status, customer_id, issue_date, expiration_date, notes, internal_notes, discount_type, discount_value, shipping_cost, additional_costs, converted",
+                )
                 .eq("id", data.quoteId)
                 .eq("partner_id", data.partnerId)
                 .single()
@@ -297,6 +362,12 @@ export async function updateQuoteAction(data: {
                 console.error("[updateQuoteAction] Error fetching current quote:", currentQuoteError)
                 return errorResponse("OrÃ§amento nÃ£o encontrado")
             }
+
+            if (currentQuote.converted) {
+                return errorResponse("Este orçamento já foi convertido em pedido e não pode ser editado.")
+            }
+
+            const caps = getQuoteEditCaps(String(currentQuote.status || "draft"), Boolean(currentQuote.converted))
 
             const payloadValidationError = validateQuotePayload(
                 existingItemsResult.items,
@@ -308,19 +379,50 @@ export async function updateQuoteAction(data: {
                 return errorResponse(payloadValidationError)
             }
 
-            const updatePayload: any = {}
+            const updatePayload: Record<string, unknown> = {}
             if (data.customerId !== undefined) updatePayload.customer_id = data.customerId || null
             if (data.issueDate) updatePayload.issue_date = data.issueDate
             if (data.expirationDate !== undefined) updatePayload.expiration_date = data.expirationDate || null
             if (data.notes !== undefined) updatePayload.notes = data.notes || null
+            if (data.internalNotes !== undefined) updatePayload.internal_notes = data.internalNotes || null
             if (data.discountType) updatePayload.discount_type = data.discountType
             if (data.discountValue !== undefined) updatePayload.discount_value = data.discountValue
             if (data.shippingCost !== undefined) updatePayload.shipping_cost = data.shippingCost
             if (data.additionalCosts !== undefined) updatePayload.additional_costs = data.additionalCosts
 
+            const fieldCap: Record<string, keyof typeof caps> = {
+                customer_id: "canEditCustomer",
+                issue_date: "canEditIssueDate",
+                expiration_date: "canEditExpirationDate",
+                notes: "canEditProposalNotes",
+                internal_notes: "canEditInternalNotes",
+                discount_type: "canEditDiscountShipping",
+                discount_value: "canEditDiscountShipping",
+                shipping_cost: "canEditDiscountShipping",
+                additional_costs: "canEditDiscountShipping",
+            }
+
+            for (const key of Object.keys(updatePayload)) {
+                const capKey = fieldCap[key]
+                if (!capKey) continue
+                if (!caps[capKey]) {
+                    const st = normalizeQuoteStatus(String(currentQuote.status))
+                    if (st === "sent") return errorResponse(MSG_SENT_FINANCIAL)
+                    if (st === "approved") return errorResponse(MSG_APPROVED_FINANCIAL)
+                    if (st === "rejected" || st === "expired" || st === "cancelled") {
+                        return errorResponse(MSG_REJECTED_EXPIRED_CANCELLED)
+                    }
+                    return errorResponse("Este orçamento não pode ser alterado no status atual.")
+                }
+            }
+
+            if (Object.keys(updatePayload).length === 0) {
+                return successResponse({ id: data.quoteId, noop: true })
+            }
+
             const { error } = await supabase
                 .from("quotes")
-                .update(updatePayload)
+                .update(updatePayload as any)
                 .eq("id", data.quoteId)
                 .eq("partner_id", data.partnerId)
 
@@ -329,7 +431,20 @@ export async function updateQuoteAction(data: {
                 return errorResponse(error.message)
             }
 
-            await revalidateQuotes(data.partnerId)
+            await revalidateQuotes(data.partnerId, data.quoteId)
+
+            try {
+                await createQuoteHistoryEntry({
+                    quoteId: data.quoteId,
+                    partnerId: data.partnerId,
+                    actorUserId: user.id,
+                    entryType: "updated",
+                    changeLines: ["atualizou os dados do orçamento"],
+                })
+            } catch (historyError) {
+                console.error("[quotes_history] updateQuoteAction:", historyError)
+            }
+
             return successResponse({ id: data.quoteId })
         } catch (err: any) {
             console.error("[updateQuoteAction] Error:", err)
@@ -343,7 +458,7 @@ export async function updateQuoteAction(data: {
 export async function updateQuoteStatusAction(data: {
     quoteId: string
     partnerId: string
-    status: "draft" | "sent" | "approved" | "rejected" | "expired"
+    status: "draft" | "sent" | "approved" | "rejected" | "expired" | "cancelled"
 }) {
     return withTelemetry("updateQuoteStatusAction", async () => {
         await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -357,7 +472,7 @@ export async function updateQuoteStatusAction(data: {
 
             const { data: current, error: fetchError } = await supabase
                 .from("quotes")
-                .select("status, updated_at")
+                .select("status, updated_at, converted")
                 .eq("id", data.quoteId)
                 .eq("partner_id", data.partnerId)
                 .single()
@@ -366,13 +481,18 @@ export async function updateQuoteStatusAction(data: {
                 return errorResponse("Orçamento não encontrado")
             }
 
+            if (current.converted) {
+                return errorResponse("Este orçamento já foi convertido em pedido.")
+            }
+
             // Define allowed transitions
             const allowedTransitions: Record<string, string[]> = {
-                draft: ["sent", "approved", "rejected"],
-                sent: ["approved", "rejected", "draft"],
-                approved: ["expired"],
-                rejected: ["draft"], // allow reopening rejected quotes as draft
-                expired: ["draft"], // allow reopening expired quotes as draft
+                draft: ["sent", "approved", "rejected", "cancelled"],
+                sent: ["approved", "rejected", "draft", "cancelled", "expired"],
+                approved: ["expired", "cancelled"],
+                rejected: ["draft"],
+                expired: ["draft"],
+                cancelled: ["draft"],
             }
 
             const allowed = allowedTransitions[current.status] || []
@@ -398,7 +518,30 @@ export async function updateQuoteStatusAction(data: {
                 return errorResponse(error.message || "O or\u00e7amento foi modificado por outro usu\u00e1rio. Atualize a p\u00e1gina.")
             }
 
-            await revalidateQuotes(data.partnerId)
+            await revalidateQuotes(data.partnerId, data.quoteId)
+
+            const statusLabels: Record<string, string> = {
+                draft: "Rascunho",
+                sent: "Enviado",
+                approved: "Aprovado",
+                rejected: "Rejeitado",
+                expired: "Expirado",
+                cancelled: "Cancelado",
+            }
+            try {
+                await createQuoteHistoryEntry({
+                    quoteId: data.quoteId,
+                    partnerId: data.partnerId,
+                    actorUserId: user.id,
+                    entryType: "status_changed",
+                    changeLines: [
+                        `alterou o status de ${statusLabels[current.status] || current.status} para ${statusLabels[data.status] || data.status}`,
+                    ],
+                })
+            } catch (historyError) {
+                console.error("[quotes_history] updateQuoteStatusAction:", historyError)
+            }
+
             return successResponse({ id: data.quoteId, status: data.status })
         } catch (err: any) {
             console.error("[updateQuoteStatusAction] Error:", err)
@@ -434,7 +577,7 @@ export async function deleteQuoteAction(quoteId: string) {
                 return errorResponse(error.message)
             }
 
-            await revalidateQuotes(ctx.partnerId)
+            await revalidateQuotes(ctx.partnerId, quoteId)
 
             // Decrement usage counter (fire-and-forget)
             decrement_usage_counter(ctx.partnerId, "quotes_month_count").catch(console.error)
@@ -467,6 +610,13 @@ export async function duplicateQuoteAction(quoteId: string) {
 
             const supabase = await getSupabaseServerClient()
 
+            const { data: sourceMeta } = await supabase
+                .from("quotes")
+                .select("quote_number")
+                .eq("id", quoteId)
+                .eq("partner_id", ctx.partnerId)
+                .maybeSingle()
+
             // Call Transaction RPC Function
             const { data: newQuote, error: rpcError } = await supabase.rpc('duplicate_quote_with_items', {
                 p_quote_id: quoteId,
@@ -479,13 +629,36 @@ export async function duplicateQuoteAction(quoteId: string) {
                 return errorResponse(rpcError?.message || "Erro fatal ao duplicar orçamento.")
             }
 
-            await revalidateQuotes(ctx.partnerId)
+            const created = newQuote as { id: string; quote_number: string }
+            const sourceLabel = sourceMeta?.quote_number || quoteId
+
+            await revalidateQuotes(ctx.partnerId, created.id)
+            await revalidateQuotes(ctx.partnerId, quoteId)
 
             increment_usage_counter(ctx.partnerId, "quotes_month_count").catch(console.error)
 
+            try {
+                await createQuoteHistoryEntry({
+                    quoteId: created.id,
+                    partnerId: ctx.partnerId,
+                    actorUserId: user.id,
+                    entryType: "duplicated",
+                    changeLines: [`criou este orçamento duplicando o orçamento ${sourceLabel}`],
+                })
+                await createQuoteHistoryEntry({
+                    quoteId,
+                    partnerId: ctx.partnerId,
+                    actorUserId: user.id,
+                    entryType: "duplicated",
+                    changeLines: [`duplicou para o novo orçamento ${created.quote_number}`],
+                })
+            } catch (historyError) {
+                console.error("[quotes_history] duplicateQuoteAction:", historyError)
+            }
+
             return successResponse({
-                id: newQuote.id,
-                quote_number: newQuote.quote_number,
+                id: created.id,
+                quote_number: created.quote_number,
             })
         } catch (err: any) {
             console.error("[duplicateQuoteAction] Error:", err)
@@ -524,6 +697,9 @@ export async function addQuoteItemAction(data: {
         }
 
         const supabase = await getSupabaseServerClient()
+
+        const itemGuard = await assertQuoteAllowsItemEdits(supabase, data.quoteId, data.partnerId)
+        if (itemGuard) return errorResponse(itemGuard)
 
         const { data: item, error } = await supabase
             .from("quote_items")
@@ -586,7 +762,7 @@ export async function updateQuoteItemAction(data: {
         const supabase = await getSupabaseServerClient()
         const { data: existingItem, error: existingItemError } = await supabase
             .from("quote_items")
-            .select("id, product_id, custom_name, unit_price")
+            .select("id, quote_id, product_id, custom_name, unit_price")
             .eq("id", data.itemId)
             .eq("partner_id", data.partnerId)
             .single()
@@ -595,6 +771,9 @@ export async function updateQuoteItemAction(data: {
             console.error("[updateQuoteItemAction] Error fetching current item:", existingItemError)
             return errorResponse("Item do orÃ§amento nÃ£o encontrado")
         }
+
+        const itemGuard = await assertQuoteAllowsItemEdits(supabase, existingItem.quote_id, data.partnerId)
+        if (itemGuard) return errorResponse(itemGuard)
 
         if (!existingItem.product_id) {
             const resolvedCustomName = data.customName !== undefined ? data.customName : existingItem.custom_name
@@ -645,6 +824,20 @@ export async function deleteQuoteItemAction(itemId: string, partnerId: string) {
         await requirePartnerAccessWithPermission(partnerId, "quotes", "edit", user)
 
         const supabase = await getSupabaseServerClient()
+
+        const { data: row, error: rowError } = await supabase
+            .from("quote_items")
+            .select("quote_id")
+            .eq("id", itemId)
+            .eq("partner_id", partnerId)
+            .single()
+
+        if (rowError || !row) {
+            return errorResponse("Item do orçamento não encontrado")
+        }
+
+        const itemGuard = await assertQuoteAllowsItemEdits(supabase, row.quote_id, partnerId)
+        if (itemGuard) return errorResponse(itemGuard)
 
         const { error } = await supabase
             .from("quote_items")
@@ -798,6 +991,321 @@ export async function searchProductsForQuotes(query: string) {
 
 import { getQuoteWithItemsCached } from "@/lib/data/quotes"
 
+function quoteIsEffectivelyExpired(quote: { status: string; expiration_date: string | null }) {
+    if (quote.status === "expired") return true
+    if (!quote.expiration_date) return false
+    const exp = new Date(`${quote.expiration_date}T12:00:00`)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    exp.setHours(0, 0, 0, 0)
+    return exp < today && (quote.status === "draft" || quote.status === "sent")
+}
+
+function pickPrimaryCustomerAddress(addresses: any[] | undefined | null) {
+    if (!addresses?.length) return null
+    return addresses.find((a) => a.address_type === "primary" || a.is_default) || addresses[0]
+}
+
+function buildConversionOrderNotes(quoteNumber: string, quoteNotes: string | null | undefined) {
+    const header = `Pedido criado a partir do orçamento ${quoteNumber}.`
+    const body = (quoteNotes || "").trim()
+    return body ? `${header}\n\n${body}` : header
+}
+
+// ─── CONVERT QUOTE → ERP ORDER ───────────────────────────────────────────────
+
+export async function convertQuoteToOrderAction(data: {
+    quoteId: string
+    partnerId: string
+    csrf_token?: string
+    /** Required when quote.status is `sent` (conversion without formal approval). */
+    acknowledgeUnapprovedConversion?: boolean
+}) {
+    return withTelemetry("convertQuoteToOrderAction", async () => {
+        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+
+        try {
+            const user = await requireUser()
+            await requirePartnerAccessWithPermission(data.partnerId, "quotes", "edit", user)
+            await requirePartnerAccessWithPermission(data.partnerId, "orders", "create", user)
+
+            const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
+            const csrfValidation = await requireCSRF(data.csrf_token)
+            if (!csrfValidation.valid) {
+                return errorResponse(csrfValidation.error || "Token CSRF inválido")
+            }
+
+            const supabase = await getSupabaseServerClient()
+
+            const { data: existingOrder, error: existingOrderError } = await supabase
+                .from("orders")
+                .select("id, order_number")
+                .eq("source_quote_id", data.quoteId)
+                .maybeSingle()
+
+            if (existingOrderError) {
+                console.error("[convertQuoteToOrderAction] existing order lookup:", existingOrderError)
+                return errorResponse(existingOrderError.message)
+            }
+
+            if (existingOrder?.id) {
+                await supabase
+                    .from("quotes")
+                    .update({
+                        converted: true,
+                        converted_at: new Date().toISOString(),
+                        converted_order_id: existingOrder.id,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq("id", data.quoteId)
+                    .eq("partner_id", data.partnerId)
+                    .eq("converted", false)
+
+                await revalidateQuotes(data.partnerId, data.quoteId)
+                await revalidateOrders(data.partnerId)
+                return successResponse({
+                    orderId: existingOrder.id,
+                    orderNumber: existingOrder.order_number,
+                    alreadyConverted: true,
+                })
+            }
+
+            const { data: quote, error: quoteError } = await supabase
+                .from("quotes")
+                .select(`
+                    id,
+                    partner_id,
+                    customer_id,
+                    status,
+                    expiration_date,
+                    converted,
+                    converted_order_id,
+                    quote_number,
+                    notes,
+                    subtotal,
+                    discount_type,
+                    discount_value,
+                    shipping_cost,
+                    additional_costs,
+                    total,
+                    customers ( id, name, addresses(*) )
+                `)
+                .eq("id", data.quoteId)
+                .eq("partner_id", data.partnerId)
+                .single()
+
+            if (quoteError || !quote) {
+                return errorResponse("Orçamento não encontrado")
+            }
+
+            if (quote.converted && quote.converted_order_id) {
+                const { data: existingConvertedOrder } = await supabase
+                    .from("orders")
+                    .select("order_number")
+                    .eq("id", quote.converted_order_id)
+                    .maybeSingle()
+
+                await revalidateQuotes(data.partnerId, data.quoteId)
+                await revalidateOrders(data.partnerId)
+                return successResponse({
+                    orderId: quote.converted_order_id,
+                    orderNumber: existingConvertedOrder?.order_number ?? null,
+                    alreadyConverted: true,
+                })
+            }
+
+            if (quote.converted) {
+                return errorResponse("Este orçamento já foi convertido em pedido.")
+            }
+
+            if (quote.status === "draft" || quote.status === "rejected") {
+                return errorResponse("Não é possível converter um orçamento em rascunho ou rejeitado.")
+            }
+
+            if (quote.status === "cancelled") {
+                return errorResponse("Não é possível converter um orçamento cancelado.")
+            }
+
+            if (quoteIsEffectivelyExpired(quote)) {
+                return errorResponse("Não é possível converter um orçamento expirado.")
+            }
+
+            if (quote.status !== "sent" && quote.status !== "approved") {
+                return errorResponse("Só é possível converter orçamentos com status Enviado ou Aprovado.")
+            }
+
+            if (quote.status === "sent" && !data.acknowledgeUnapprovedConversion) {
+                return errorResponse(
+                    "Para converter um orçamento enviado sem aprovação formal, confirme a ação no diálogo.",
+                )
+            }
+
+            const { data: rawItems, error: itemsError } = await supabase
+                .from("quote_items")
+                .select("product_id, custom_name, quantity, unit_price, sort_order, product_name_snapshot, products(name)")
+                .eq("quote_id", data.quoteId)
+                .eq("partner_id", data.partnerId)
+                .order("sort_order", { ascending: true })
+
+            if (itemsError) {
+                console.error("[convertQuoteToOrderAction] items:", itemsError)
+                return errorResponse(itemsError.message)
+            }
+
+            const quoteItems = rawItems || []
+            if (quoteItems.length === 0) {
+                return errorResponse("Este orçamento não possui itens para gerar um pedido.")
+            }
+
+            const erpItems = quoteItems.map((row: any, idx: number) => ({
+                productId: row.product_id || null,
+                variantId: null as string | null,
+                customName:
+                    (row.custom_name && String(row.custom_name).trim())
+                    || (row.product_name_snapshot && String(row.product_name_snapshot).trim())
+                    || (row.products?.name && String(row.products.name).trim())
+                    || "Item",
+                quantity: Number(row.quantity || 0),
+                unitPrice: Number(row.unit_price || 0),
+                sortOrder: Number(row.sort_order ?? idx),
+            }))
+
+            const primaryAddress = pickPrimaryCustomerAddress(quote.customers?.addresses)
+            const hasFullDeliveryAddress = Boolean(
+                primaryAddress?.street
+                && primaryAddress?.number
+                && primaryAddress?.neighborhood
+                && primaryAddress?.city
+                && primaryAddress?.state
+                && primaryAddress?.zip_code,
+            )
+
+            const orderPayload = {
+                partnerId: data.partnerId,
+                customerId: quote.customers?.id || quote.customer_id || undefined,
+                customerName: quote.customers?.name || QUOTE_DEFAULT_CUSTOMER_LABEL,
+                sourceQuoteId: data.quoteId,
+                salesChannel: "Orçamento",
+                deliveryMethod: hasFullDeliveryAddress ? ("delivery" as const) : ("pickup" as const),
+                paymentStatus: "unpaid" as const,
+                deliveryStatus: "not_sent" as const,
+                paymentMethod: "pendente",
+                paymentBreakdown: [] as { method: string; amount: number }[],
+                address: hasFullDeliveryAddress && primaryAddress
+                    ? {
+                        zipCode: String(primaryAddress.zip_code || ""),
+                        street: String(primaryAddress.street || ""),
+                        number: String(primaryAddress.number || ""),
+                        complement: primaryAddress.complement ? String(primaryAddress.complement) : undefined,
+                        neighborhood: String(primaryAddress.neighborhood || ""),
+                        city: String(primaryAddress.city || ""),
+                        state: String(primaryAddress.state || ""),
+                    }
+                    : undefined,
+                items: erpItems,
+                subtotal: Number(quote.subtotal || 0),
+                discountValue: Number(quote.discount_value || 0),
+                discountType: (quote.discount_type === "percentage" ? "percentage" : "fixed") as "fixed" | "percentage",
+                shippingCost: Number(quote.shipping_cost || 0),
+                additionalCosts: Number(quote.additional_costs || 0),
+                totalAmount: Number(quote.total || 0),
+                notes: buildConversionOrderNotes(String(quote.quote_number || ""), quote.notes),
+                csrf_token: data.csrf_token,
+            }
+
+            const orderResult = await createERPOrderAction(orderPayload as any)
+
+            if (!orderResult || !("success" in orderResult) || !orderResult.success) {
+                const errMsg = orderResult && "error" in orderResult ? String(orderResult.error) : "Erro ao criar pedido"
+                return errorResponse(errMsg)
+            }
+
+            const newOrderId = orderResult.orderId as string
+            const withoutApproval = quote.status === "sent"
+
+            const { error: quoteUpdateError } = await supabase
+                .from("quotes")
+                .update({
+                    converted: true,
+                    converted_at: new Date().toISOString(),
+                    converted_without_approval: withoutApproval,
+                    converted_order_id: newOrderId,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("id", data.quoteId)
+                .eq("partner_id", data.partnerId)
+                .eq("converted", false)
+
+            if (quoteUpdateError) {
+                console.error("[convertQuoteToOrderAction] quote update:", quoteUpdateError)
+                return errorResponse(
+                    "O pedido foi criado, mas não foi possível atualizar o orçamento. Atualize a página ou entre em contato com o suporte.",
+                )
+            }
+
+            const historyLines = [
+                `converteu o orçamento em pedido (${orderResult.orderNumber || newOrderId})`,
+            ]
+            if (withoutApproval) {
+                historyLines.push("Orçamento convertido sem aprovação formal")
+            }
+
+            try {
+                await createQuoteHistoryEntry({
+                    quoteId: data.quoteId,
+                    partnerId: data.partnerId,
+                    actorUserId: user.id,
+                    entryType: "converted_to_order",
+                    changeLines: historyLines,
+                })
+            } catch (historyError) {
+                console.error("[quotes_history] convertQuoteToOrderAction:", historyError)
+            }
+
+            try {
+                await createOrderHistoryEntry({
+                    orderId: newOrderId,
+                    partnerId: data.partnerId,
+                    actorUserId: user.id,
+                    entryType: "quote_conversion",
+                    changeLines: [
+                        `Pedido originado do orçamento ${quote.quote_number || data.quoteId}.`,
+                    ],
+                })
+            } catch (historyError) {
+                console.error("[orders_history] convertQuoteToOrderAction:", historyError)
+            }
+
+            await revalidateQuotes(data.partnerId, data.quoteId)
+            await revalidateOrders(data.partnerId)
+
+            return successResponse({
+                orderId: newOrderId,
+                orderNumber: orderResult.orderNumber,
+                alreadyConverted: false,
+            })
+        } catch (err: any) {
+            console.error("[convertQuoteToOrderAction] Error:", err)
+            return errorResponse(err.message || "Erro interno ao converter orçamento")
+        }
+    })
+}
+
+// ─── QUOTE HISTORY (AUDIT) ─────────────────────────────────────────────────
+
+export async function getQuoteHistoryAction(quoteId: string, partnerId: string) {
+    try {
+        const user = await requireUser()
+        await requirePartnerAccessWithPermission(partnerId, "quotes", "view", user)
+
+        const entries = await getQuoteHistoryEntries(quoteId, partnerId)
+        return successResponse(entries)
+    } catch (err: any) {
+        console.error("[getQuoteHistoryAction] Error:", err)
+        return errorResponse(err.message || "Erro interno ao buscar histórico do orçamento")
+    }
+}
+
 // ─── GET QUOTE DETAILS ──────────────────────────────────────────────────────
 
 export async function getQuoteDetailsAction(quoteId: string, partnerId: string) {
@@ -891,7 +1399,7 @@ export async function batchDeleteQuotesAction(quoteIds: string[]) {
 }
 
 // ─── BATCH UPDATE QUOTE STATUS ──────────────────────────────────────────────
-export async function batchUpdateQuotesStatusAction(quoteIds: string[], status: "draft" | "sent" | "approved" | "rejected" | "expired") {
+export async function batchUpdateQuotesStatusAction(quoteIds: string[], status: "draft" | "sent" | "approved" | "rejected" | "expired" | "cancelled") {
     return withTelemetry("batchUpdateQuotesStatusAction", async () => {
         await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
@@ -903,6 +1411,26 @@ export async function batchUpdateQuotesStatusAction(quoteIds: string[], status: 
             await requirePartnerAccessWithPermission(ctx.partnerId, "quotes", "edit", user)
 
             const supabase = await getSupabaseServerClient()
+
+            const { data: convertedRows, error: convertedError } = await supabase
+                .from("quotes")
+                .select("id")
+                .in("id", quoteIds)
+                .eq("partner_id", ctx.partnerId)
+                .eq("converted", true)
+
+            if (convertedError) {
+                console.error("[batchUpdateQuotesStatusAction] converted check:", convertedError)
+                return errorResponse(convertedError.message)
+            }
+
+            if (convertedRows && convertedRows.length > 0) {
+                return errorResponse(
+                    convertedRows.length === 1
+                        ? "Um orçamento selecionado já foi convertido em pedido. Remova-o da seleção para alterar o status em massa."
+                        : `${convertedRows.length} orçamentos selecionados já foram convertidos em pedido. Remova-os da seleção para alterar o status em massa.`,
+                )
+            }
 
             const { error } = await supabase
                 .from("quotes")
@@ -919,6 +1447,9 @@ export async function batchUpdateQuotesStatusAction(quoteIds: string[], status: 
             }
 
             await revalidateQuotes(ctx.partnerId)
+            for (const id of quoteIds) {
+                await revalidateQuotes(ctx.partnerId, id)
+            }
             return successResponse({ count: quoteIds.length, status })
         } catch (err: any) {
             console.error("[batchUpdateQuotesStatusAction] Error:", err)

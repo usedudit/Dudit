@@ -14,7 +14,9 @@ import {
     ClockIcon
 } from '@/lib/icons';
 import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, Tooltip, AlertModal, InfoCard } from '@/components/reusable';
-import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction } from '@/app/actions/erp/quotes';
+import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction, convertQuoteToOrderAction, getQuoteHistoryAction } from '@/app/actions/erp/quotes';
+import { useCSRFToken } from "@/hooks/use-csrf-token"
+import { QuoteHistoryTab, type QuoteHistoryEntryRow } from "./QuoteHistoryTab"
 import { useNotification } from "@/hooks/use-notification";
 import CustomerCard from '@/components/reusable/CustomerCard';
 import { useSidebar } from "@/lib/sidebar-context";
@@ -39,7 +41,12 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
     const [loading, setLoading] = useState(!initialQuote);
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showUnapprovedConvertModal, setShowUnapprovedConvertModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isConverting, setIsConverting] = useState(false);
+    const [historyEntries, setHistoryEntries] = useState<QuoteHistoryEntryRow[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const csrfToken = useCSRFToken();
     const { success: notifySuccess, error: notifyError } = useNotification();
     const router = useRouter();
     const { setHeaderOverride } = useSidebar();
@@ -65,6 +72,75 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
         }
         load();
     }, [quoteId, partnerId]);
+
+    useEffect(() => {
+        let cancelled = false;
+        async function loadHistory() {
+            setHistoryLoading(true);
+            const res = await getQuoteHistoryAction(quoteId, partnerId);
+            if (!cancelled && res.success && res.data) {
+                setHistoryEntries(
+                    (res.data as any[]).map((e) => ({
+                        id: e.id,
+                        actor_name: e.actor_name,
+                        change_lines: e.change_lines,
+                        created_at: e.created_at,
+                    }))
+                );
+            }
+            if (!cancelled) setHistoryLoading(false);
+        }
+        loadHistory();
+        return () => { cancelled = true; };
+    }, [quoteId, partnerId]);
+
+    const runConvert = async (acknowledgeUnapprovedConversion: boolean) => {
+        setIsConverting(true);
+        try {
+            const res = await convertQuoteToOrderAction({
+                quoteId,
+                partnerId,
+                csrf_token: csrfToken || undefined,
+                acknowledgeUnapprovedConversion,
+            });
+            if (res.success && res.data) {
+                const d = res.data as { orderId: string; orderNumber?: string | null; alreadyConverted?: boolean };
+                notifySuccess(
+                    d.alreadyConverted ? "Pedido já existente" : "Pedido criado",
+                    d.alreadyConverted
+                        ? "Este orçamento já havia sido convertido. Abrindo o pedido."
+                        : `Venda ${d.orderNumber || d.orderId} criada com sucesso.`
+                );
+                setQuote((prev: any) =>
+                    prev
+                        ? {
+                            ...prev,
+                            converted: true,
+                            converted_order_id: d.orderId,
+                        }
+                        : prev
+                );
+                router.refresh();
+                router.push(`/erp/orders/${d.orderId}`);
+            } else {
+                notifyError("Não foi possível converter", res.error || "Erro desconhecido");
+            }
+        } catch {
+            notifyError("Erro", "Falha de conexão ao converter o orçamento.");
+        } finally {
+            setIsConverting(false);
+            setShowUnapprovedConvertModal(false);
+        }
+    };
+
+    const handleConvertClick = () => {
+        if (!quote || quote.converted) return;
+        if (quote.status === "sent") {
+            setShowUnapprovedConvertModal(true);
+            return;
+        }
+        void runConvert(false);
+    };
 
     const handleStatusChange = async (newStatus: any) => {
         const res = await updateQuoteStatusAction({ quoteId, partnerId, status: newStatus });
@@ -120,6 +196,11 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
 
     if (loading) return <div className="h-full flex items-center justify-center bg-white dark:bg-dark-surface"><ThreeDotsLoader /></div>;
     if (!quote) return null;
+
+    const canConvertToOrder =
+        (quote.status === "approved" || quote.status === "sent")
+        && !quote.converted
+        && quote.status !== "expired";
 
     const statusInfo = getStatusInfo(quote.status);
     const subtotal = Number(quote.subtotal || 0);
@@ -230,36 +311,53 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
 
                             {/* Quote Status Card */}
                             <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
-                                <div className={`p-6 border-b text-left ${quote.status === 'approved' ? 'bg-green-50 dark:bg-green-900/10 border-green-100 dark:border-green-900/20' :
-                                    quote.status === 'rejected' ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/20' :
-                                        'bg-[#eff6ff] dark:bg-blue-900/20 border-blue-100 dark:border-blue-900/30'
+                                <div className={`p-6 border-b text-left ${quote.converted ? 'bg-slate-50 dark:bg-slate-900/20 border-slate-200 dark:border-slate-800' :
+                                    quote.status === 'approved' ? 'bg-green-50 dark:bg-green-900/10 border-green-100 dark:border-green-900/20' :
+                                        quote.status === 'rejected' ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/20' :
+                                            'bg-[#eff6ff] dark:bg-blue-900/20 border-blue-100 dark:border-blue-900/30'
                                     }`}>
-                                    <div className="flex justify-between items-start">
+                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
                                         <div>
-                                            <h3 className={`font-bold text-lg mb-1 ${quote.status === 'approved' ? 'text-green-900 dark:text-green-100' :
-                                                quote.status === 'rejected' ? 'text-red-900 dark:text-red-100' :
-                                                    'text-blue-900 dark:text-blue-100'
+                                            <h3 className={`font-bold text-lg mb-1 ${quote.converted ? 'text-slate-900 dark:text-slate-100' :
+                                                quote.status === 'approved' ? 'text-green-900 dark:text-green-100' :
+                                                    quote.status === 'rejected' ? 'text-red-900 dark:text-red-100' :
+                                                        'text-blue-900 dark:text-blue-100'
                                                 }`}>
-                                                {quote.status === 'approved' ? 'Orçamento Aprovado' :
-                                                    quote.status === 'rejected' ? 'Orçamento Recusado' :
-                                                        quote.status === 'draft' ? 'Aguardando Revisão' :
-                                                            'Aguardando Aprovação'}
+                                                {quote.converted ? 'Convertido em pedido' :
+                                                    quote.status === 'approved' ? 'Orçamento Aprovado' :
+                                                        quote.status === 'rejected' ? 'Orçamento Recusado' :
+                                                            quote.status === 'draft' ? 'Aguardando Revisão' :
+                                                                'Aguardando Aprovação'}
                                             </h3>
-                                            <p className={`text-sm ${quote.status === 'approved' ? 'text-green-700 dark:text-green-300' :
-                                                quote.status === 'rejected' ? 'text-red-700 dark:text-red-300' :
-                                                    'text-blue-700 dark:text-blue-300'
+                                            <p className={`text-sm ${quote.converted ? 'text-slate-700 dark:text-slate-300' :
+                                                quote.status === 'approved' ? 'text-green-700 dark:text-green-300' :
+                                                    quote.status === 'rejected' ? 'text-red-700 dark:text-red-300' :
+                                                        'text-blue-700 dark:text-blue-300'
                                                 }`}>
-                                                {quote.status === 'approved' ? 'Esta proposta foi aprovada e já pode ser convertida em pedido.' :
-                                                    quote.status === 'rejected' ? 'Esta proposta foi recusada pelo cliente.' :
-                                                        'Esta proposta foi enviada ao cliente e aguarda resposta.'}
+                                                {quote.converted
+                                                    ? "Este orçamento já gerou um pedido no ERP. Use o botão abaixo para abrir a venda."
+                                                    : quote.status === 'approved' ? 'Esta proposta foi aprovada e já pode ser convertida em pedido.' :
+                                                        quote.status === 'rejected' ? 'Esta proposta foi recusada pelo cliente.' :
+                                                            'Esta proposta foi enviada ao cliente e aguarda resposta.'}
                                             </p>
+                                            {quote.converted && quote.converted_order_id && (
+                                                <Button
+                                                    variant="outline"
+                                                    className="mt-3 h-[36px] text-xs"
+                                                    onClick={() => router.push(`/erp/orders/${quote.converted_order_id}`)}
+                                                >
+                                                    Abrir pedido <ArrowRightIcon size={14} className="ml-1" />
+                                                </Button>
+                                            )}
                                         </div>
-                                        {quote.status !== 'rejected' && quote.status !== 'approved' && (
+                                        {canConvertToOrder && (
                                             <Button
                                                 variant="default"
-                                                className="bg-blue-600 hover:bg-blue-700 text-white border-none h-[38px] text-xs px-6"
+                                                className="bg-blue-600 hover:bg-blue-700 text-white border-none h-[38px] text-xs px-6 shrink-0"
+                                                disabled={isConverting}
+                                                onClick={handleConvertClick}
                                             >
-                                                Converter em Pedido <ArrowRightIcon size={14} className="ml-1" />
+                                                {isConverting ? "Convertendo…" : "Converter em Pedido"} <ArrowRightIcon size={14} className="ml-1" />
                                             </Button>
                                         )}
                                     </div>
@@ -362,6 +460,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                                     <FormDropdown
                                         value={quote.status}
                                         setValue={handleStatusChange}
+                                        disabled={Boolean(quote.converted)}
                                         options={[
                                             { value: 'draft', label: 'Rascunho' },
                                             { value: 'sent', label: 'Enviado' },
@@ -384,6 +483,10 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                                 message={<span className="whitespace-pre-wrap">{quote.notes || "Nenhuma observação ou termo adicional vinculado a este orçamento."}</span>}
                                 color="gray"
                             />
+
+                            <div className="text-left">
+                                <QuoteHistoryTab entries={historyEntries} loading={historyLoading} />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -399,6 +502,18 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                 cancelText="Cancelar"
                 variant="danger"
                 isLoading={isDeleting}
+            />
+
+            <AlertModal
+                isOpen={showUnapprovedConvertModal}
+                onClose={() => setShowUnapprovedConvertModal(false)}
+                onConfirm={() => void runConvert(true)}
+                title="Converter sem aprovação formal?"
+                description="Este orçamento está apenas como Enviado, não como Aprovado. Tem certeza de que deseja gerar o pedido assim mesmo? O sistema registrará que a conversão ocorreu sem aprovação formal."
+                confirmText="Sim, converter"
+                cancelText="Cancelar"
+                variant="warning"
+                isLoading={isConverting}
             />
 
             {/* Mobile Bottom Action Bar */}
@@ -419,6 +534,17 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                         </Button>
                     }
                 />
+                {canConvertToOrder && (
+                    <Button
+                        variant="default"
+                        className="flex-1 whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white border-none"
+                        disabled={isConverting}
+                        onClick={handleConvertClick}
+                    >
+                        <ArrowRightIcon className="w-4 h-4 mr-2" />
+                        {isConverting ? "…" : "Converter"}
+                    </Button>
+                )}
                 <Button onClick={() => onEditQuote && onEditQuote(quote)} className="flex-1 whitespace-nowrap">
                     <EditIcon className="w-4 h-4 mr-2" />
                     Editar orçamento
