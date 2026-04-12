@@ -31,6 +31,7 @@ type DbTransaction = {
     category_id?: string | null
     subcategory_id?: string | null
     recurring_id?: string | null
+    payment_method_id?: string | null
     transaction_contacts?: {
         name: string | null
         type: ERPTransaction["contactType"] | null
@@ -54,12 +55,12 @@ function ledgerDirectionFromRow(t: DbTransaction): ERPTransaction["ledgerDirecti
 
 function formatDateLabel(value: string) {
     const d = new Date(value)
-    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
+    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: "America/Sao_Paulo" })
 }
 
 function formatDateShort(value: string) {
     const d = new Date(value)
-    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
+    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: "America/Sao_Paulo" })
 }
 
 function toStatusVariant(status: string, isOverdue: boolean): ERPTransaction["statusVariant"] {
@@ -274,6 +275,7 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
                 contactId: t.contact_id ?? null,
                 customerId: t.customer_id ?? null,
                 recurringId: t.recurring_id ?? null,
+                paymentMethodId: t.payment_method_id ?? null,
                 paymentDateRaw: t.payment_date ?? null,
                 dueDateRaw: t.due_date ?? null,
             }
@@ -298,6 +300,7 @@ export type CreateManualTransactionInput = {
     customerId?: string | null
     contactType?: "customer" | "supplier" | "service" | "employee" | "partner" | "other" | null
     paymentType?: string | null
+    paymentMethodId?: string | null
     dueDate?: string | null
     paymentDate?: string | null
     transactionDate?: string | null
@@ -378,6 +381,7 @@ export async function createManualTransactionAction(input: CreateManualTransacti
             status,
             notes: input.notes ?? null,
             payment_type: input.paymentType || null,
+            payment_method_id: input.paymentMethodId || null,
             original_amount: absAmount,
             interest_amount: null,
             fee_amount: 0,
@@ -411,6 +415,7 @@ export type CreateTransferPairInput = {
     description?: string | null
     transactionDate: string
     status?: "pending" | "paid"
+    paymentMethodId?: string | null
 }
 
 export async function createTransferPairAction(input: CreateTransferPairInput) {
@@ -639,6 +644,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
     recurringId: string
     occurrenceDate: string // yyyy-MM-dd
     accountId?: string | null
+    paymentMethodId?: string | null
 }) {
     try {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -745,6 +751,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
             account_id: accountId,
             origin: "system" as const,
             recurring_id: rec.id,
+            payment_method_id: input.paymentMethodId || rec.payment_method_id || null,
         }
 
         const { data: newTx, error: insertErr } = await supabase

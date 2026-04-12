@@ -43,9 +43,9 @@ const TransactionListItem = React.memo(
                                     {transaction.description}
                                 </span>
                                 {(transaction.recurringId || transaction.isRecurringOccurrence) && (
-                                    <span className="inline-flex items-center h-4 px-1.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700/40 whitespace-nowrap shrink-0">
+                                    <Badge variant="purple" className="whitespace-nowrap">
                                         Recorrente
-                                    </span>
+                                    </Badge>
                                 )}
                             </div>
                             <div className="flex items-center gap-1.5 text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
@@ -87,7 +87,7 @@ const TransactionListItem = React.memo(
                             <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
                                 {transaction.dueDate}
                             </span>
-                            {transaction.daysUntilDue === 0 && !transaction.isOverdue ? (
+                            {transaction.status.toLowerCase().includes("pago") || transaction.status.toLowerCase().includes("recebido") || transaction.daysUntilDue === -999 ? null : transaction.daysUntilDue === 0 && !transaction.isOverdue ? (
                                 <span className="text-xs font-bold text-brand-yellow">
                                     Vence hoje
                                 </span>
@@ -124,7 +124,7 @@ const TransactionListItem = React.memo(
                     return (
                         <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
                             <ActionsDropdown
-                                onEdit={transaction.isRecurringOccurrence ? undefined : (onEdit ? () => onEdit(transaction) : undefined)}
+                                onEdit={onEdit ? () => onEdit(transaction) : undefined}
                                 onCancel={transaction.isRecurringOccurrence && onMarkAsPaid ? () => onMarkAsPaid(transaction) : undefined}
                                 cancelLabel={transaction.isRecurringOccurrence ? "Marcar como pago" : undefined}
                             />

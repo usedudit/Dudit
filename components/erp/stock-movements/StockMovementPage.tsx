@@ -284,7 +284,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
         { id: "reason", label: "Motivo", align: "left" },
         { id: "reference", label: "Referência", align: "left" },
         { id: "date", label: "Data", align: "left", width: "160px" },
-        { id: "type", label: "Tipo", align: "center", width: "120px" },
+        { id: "type", label: "Tipo", align: "center", width: "160px" },
         { id: "actions", label: "Ações", align: "center", width: "80px" },
     ];
 

@@ -172,10 +172,10 @@ export default function FinancialCategoriesPage({
 
     useEffect(() => {
         if (activeTab !== "contacts") return
-        ;(async () => {
-            const res = await listAllTransactionContactsAction(partnerId)
-            if (res.success) setContacts(res.data)
-        })()
+            ; (async () => {
+                const res = await listAllTransactionContactsAction(partnerId)
+                if (res.success) setContacts(res.data)
+            })()
     }, [activeTab, partnerId])
 
     const filteredCategoryItems = useMemo(() => {
@@ -213,8 +213,8 @@ export default function FinancialCategoriesPage({
         activeTab === "accounts"
             ? filteredAccounts
             : activeTab === "contacts"
-              ? filteredContacts
-              : filteredCategoryItems
+                ? filteredContacts
+                : filteredCategoryItems
 
     const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE)
     const paginatedItems = filteredItems.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
@@ -557,7 +557,7 @@ export default function FinancialCategoriesPage({
                                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8"
                             >
                                 {(paginatedItems as TransactionContactRow[]).map((item) => (
-                                    <FinancialContactCard key={item.id} item={item} onClick={() => {}} />
+                                    <FinancialContactCard key={item.id} item={item} onClick={() => { }} />
                                 ))}
                             </motion.div>
                         ) : (
@@ -723,16 +723,13 @@ export default function FinancialCategoriesPage({
                         rows={3}
                     />
 
-                    <Input
+                    <MoneyInput
                         label="Saldo inicial"
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="0,00"
                         value={accountModal.item.initialBalanceStr}
-                        onChange={(e) =>
+                        onChange={(val) =>
                             setAccountModal((prev) => ({
                                 ...prev,
-                                item: { ...prev.item, initialBalanceStr: e.target.value },
+                                item: { ...prev.item, initialBalanceStr: String(val) },
                             }))
                         }
                     />

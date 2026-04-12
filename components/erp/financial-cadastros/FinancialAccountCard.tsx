@@ -9,8 +9,8 @@ import { MoneyIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 
 const TYPE_LABELS: Record<string, string> = {
-    cash: "Caixa",
     bank: "Conta bancária",
+    cash: "Caixa",
     wallet: "Carteira digital",
 }
 

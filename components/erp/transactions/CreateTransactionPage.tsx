@@ -164,7 +164,10 @@ export default function CreateTransactionPage({
     onClose,
     onSuccess,
     editTransaction,
-}: CreateTransactionPageProps) {
+    editRecurringTemplateId,
+    editRecurringTemplate,
+    paymentMethods = [],
+}: CreateTransactionPageProps & { editRecurringTemplateId?: string, editRecurringTemplate?: any, paymentMethods?: any[] }) {
     const router = useRouter()
     const { success, error } = useNotification()
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -173,25 +176,27 @@ export default function CreateTransactionPage({
     const [isSaving, setIsSaving] = useState(false)
 
     /* ── Edit mode computed flags ── */
-    const isEditMode = !!editTransaction
-    const isPaidTransaction = isEditMode && String(editTransaction.rawStatus || "").toLowerCase() === "paid"
-    const isSystemGatewayOrigin = isEditMode && ["system", "gateway"].includes(String(editTransaction.origin || "").toLowerCase())
+    const isEditMode = !!editTransaction || !!editRecurringTemplate
+    const isRecurringTemplateEdit = !!editRecurringTemplate
+    const isPaidTransaction = !!editTransaction && String(editTransaction.rawStatus || "").toLowerCase() === "paid"
+    const isSystemGatewayOrigin = !!editTransaction && ["system", "gateway"].includes(String(editTransaction.origin || "").toLowerCase())
     const lockFinancialFields = isPaidTransaction || isSystemGatewayOrigin
-    const isRecurringTransaction = isEditMode && !!editTransaction.recurringId
+    const isRecurringTransaction = !!editTransaction && !!editTransaction.recurringId
 
-    const [txKind, setTxKind] = useState<TxKind>(() => editTransaction?.transactionType || "income")
-    const [amount, setAmount] = useState(() => editTransaction ? editTransaction.amount : 0)
-    const [description, setDescription] = useState(() => editTransaction?.description || "")
-    const [categoryId, setCategoryId] = useState<string | undefined>(() => editTransaction?.categoryId ?? undefined)
-    const [subcategoryId, setSubcategoryId] = useState<string | undefined>(() => editTransaction?.subcategoryId ?? undefined)
+    const [txKind, setTxKind] = useState<TxKind>(() => editRecurringTemplate ? (editRecurringTemplate.type || "income") : editTransaction?.transactionType || "income")
+    const [amount, setAmount] = useState(() => editRecurringTemplate ? editRecurringTemplate.amount : editTransaction ? editTransaction.amount : 0)
+    const [description, setDescription] = useState(() => editRecurringTemplate?.description || editTransaction?.description || "")
+    const [categoryId, setCategoryId] = useState<string | undefined>(() => editRecurringTemplate?.category_id ?? editTransaction?.categoryId ?? undefined)
+    const [subcategoryId, setSubcategoryId] = useState<string | undefined>(() => editRecurringTemplate?.subcategory_id ?? editTransaction?.subcategoryId ?? undefined)
     const [dueDate, setDueDate] = useState(() => editTransaction?.dueDateRaw ? editTransaction.dueDateRaw.slice(0, 10) : format(new Date(), "yyyy-MM-dd"))
     const [paymentDate, setPaymentDate] = useState(() => editTransaction?.paymentDateRaw ? editTransaction.paymentDateRaw.slice(0, 10) : format(new Date(), "yyyy-MM-dd"))
-    const [status, setStatus] = useState<"pending" | "paid">(() => editTransaction ? (String(editTransaction.rawStatus || "").toLowerCase() === "paid" ? "paid" : "pending") : "pending")
-    const [accountId, setAccountId] = useState<string | undefined>(() => editTransaction?.accountId ?? undefined)
+    const [status, setStatus] = useState<"pending" | "paid">(() => editRecurringTemplate ? "pending" : editTransaction ? (String(editTransaction.rawStatus || "").toLowerCase() === "paid" ? "paid" : "pending") : "pending")
+    const [accountId, setAccountId] = useState<string | undefined>(() => editRecurringTemplate?.account_id ?? editTransaction?.accountId ?? undefined)
     const [fromAccountId, setFromAccountId] = useState<string | undefined>(undefined)
     const [toAccountId, setToAccountId] = useState<string | undefined>(undefined)
     const [paymentType, setPaymentType] = useState<string>("Pix")
-    const [contactType, setContactType] = useState<ContactType>("customer")
+    const [paymentMethodId, setPaymentMethodId] = useState<string | undefined>(() => editRecurringTemplate?.payment_method_id ?? editTransaction?.paymentMethodId ?? paymentMethods?.[0]?.id ?? undefined)
+    const [contactType, setContactType] = useState<ContactType>(() => editRecurringTemplate?.contact_type || "customer")
     const [notes, setNotes] = useState(() => editTransaction?.notes || "")
 
     const [contactRows, setContactRows] = useState<TransactionContactRow[]>([])
@@ -206,14 +211,14 @@ export default function CreateTransactionPage({
     const [refundKind, setRefundKind] = useState<"expense_refund" | "revenue_refund">(() => editTransaction?.refundKind || "expense_refund")
     const [referenceNote, setReferenceNote] = useState(() => editTransaction?.referenceNote || "")
 
-    const [enableRecurrence, setEnableRecurrence] = useState(false)
-    const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurringFrequency>("monthly")
-    const [recurrenceInterval, setRecurrenceInterval] = useState(1)
+    const [enableRecurrence, setEnableRecurrence] = useState(() => !!editRecurringTemplate)
+    const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurringFrequency>(() => editRecurringTemplate?.frequency || "monthly")
+    const [recurrenceInterval, setRecurrenceInterval] = useState(() => editRecurringTemplate?.interval_value || 1)
     const [recurrenceNextRunYmd, setRecurrenceNextRunYmd] = useState(() =>
-        ymdAfterAddingPeriod(format(new Date(), "yyyy-MM-dd"), "monthly", 1),
+        editRecurringTemplate?.start_date?.slice(0, 10) || ymdAfterAddingPeriod(format(new Date(), "yyyy-MM-dd"), "monthly", 1),
     )
-    const [recurrenceEndYmd, setRecurrenceEndYmd] = useState("")
-    const [recurrenceMonthlyLastDay, setRecurrenceMonthlyLastDay] = useState(false)
+    const [recurrenceEndYmd, setRecurrenceEndYmd] = useState(() => editRecurringTemplate?.end_date?.slice(0, 10) || "")
+    const [recurrenceMonthlyLastDay, setRecurrenceMonthlyLastDay] = useState(() => !!editRecurringTemplate?.use_last_day)
 
     const [quickModal, setQuickModal] = useState<QuickModal>(null)
     const [quickSaving, setQuickSaving] = useState(false)
@@ -615,6 +620,40 @@ export default function CreateTransactionPage({
         }
         setFieldErrors(new Set())
 
+        /* ── EDIT MODE: update existing recurring template ── */
+        if (isRecurringTemplateEdit && editRecurringTemplateId) {
+            setIsSaving(true)
+            try {
+                const cp = contactPayload()
+                const { updateRecurringTransactionAction } = await import("@/app/actions/erp/recurring-transactions")
+                const patch: Record<string, unknown> = {
+                    amount,
+                    description: description.trim(),
+                    frequency: recurrenceFrequency,
+                    interval_value: recurrenceInterval,
+                    use_last_day: recurrenceMonthlyLastDay,
+                    account_id: accountId || null,
+                    category_id: categoryId || null,
+                    subcategory_id: subcategoryId || null,
+                    contact_id: cp.contactId,
+                    customer_id: cp.customerId,
+                    contact_type: cp.contactTypeResolved,
+                    payment_method_id: paymentMethodId,
+                    start_date: recurrenceNextRunYmd,
+                    end_date: recurrenceEndYmd || null,
+                }
+                const res = await updateRecurringTransactionAction(editRecurringTemplateId, partnerId, patch)
+                if (!res.success) return error(res.error || "Erro ao atualizar recorrência")
+                success("Recorrência atualizada!")
+                onSuccess?.()
+                router.refresh()
+                onClose()
+            } finally {
+                setIsSaving(false)
+            }
+            return
+        }
+
         /* ── EDIT MODE: update existing transaction ── */
         if (isEditMode && editTransaction) {
             setIsSaving(true)
@@ -635,7 +674,7 @@ export default function CreateTransactionPage({
                     patch.contactId = cp.contactId
                     patch.customerId = cp.customerId
                     patch.contactType = cp.contactTypeResolved
-                    patch.paymentType = paymentType
+                    patch.paymentMethodId = paymentMethodId
                     patch.dueDate = dueDate
                     patch.paymentDate = status === "paid" ? paymentDate : null
                     patch.transactionDate = dueDate
@@ -684,6 +723,7 @@ export default function CreateTransactionPage({
                     description: description.trim() || null,
                     transactionDate: dueDate,
                     status,
+                    paymentMethodId: paymentMethodId || null,
                 })
                 if (!res.success) return error(res.error || "Erro ao transferir")
                 success("Transferência registrada!")
@@ -824,6 +864,7 @@ export default function CreateTransactionPage({
                 customerId: cp.customerId,
                 contactType: cp.contactTypeResolved,
                 paymentType,
+                paymentMethodId,
                 dueDate,
                 paymentDate: status === "paid" ? paymentDate : null,
                 transactionDate: dueDate,
@@ -1224,14 +1265,13 @@ export default function CreateTransactionPage({
                     {isIncomeExpense && (
                         <FormCombobox
                             label="Forma de pagamento"
-                            options={[
-                                { value: "Pix", label: "Pix" },
-                                { value: "Boleto", label: "Boleto" },
-                                { value: "Cartão", label: "Cartão" },
-                                { value: "Dinheiro", label: "Dinheiro" },
-                            ]}
-                            value={paymentType}
-                            onChange={(v) => setPaymentType(v)}
+                            options={paymentMethods!.map(pm => ({ value: pm.id, label: pm.name }))}
+                            value={paymentMethodId || ""}
+                            onChange={(v) => {
+                                setPaymentMethodId(v)
+                                const pm = paymentMethods!.find(p => p.id === v)
+                                if (pm) setPaymentType(pm.payment_type || "Pix")
+                            }}
                         />
                     )}
 

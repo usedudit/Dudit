@@ -52,7 +52,7 @@ const FinancialCategoryCard = React.memo(
                             </div>
                         </div>
 
-                        <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mt-1">
+                        <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
                             {type === "categories" && "Categoria financeira"}
                             {type === "subcategories" && (
                                 <span className="flex items-center gap-1">

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Tabs, TabsList, TabsTrigger, Badge, Button, AlertModal } from '@/components/reusable';
 import { FadeIn } from '@/components/animations/FadeIn';
-import { ChevronLeftIcon, SaveIcon } from '@/lib/icons';
+import { ChevronLeftIcon, EditIcon, SaveIcon } from '@/lib/icons';
 import QuoteEditor from './QuoteEditor';
 import QuotePreview from './QuotePreview';
 import SelectCustomerSheet from '../clientes/SelectCustomerSheet';
@@ -696,9 +696,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                                     <h1 className={`font-bold transition-all duration-300 ease-in-out flex items-center gap-3 ${isScrolled ? "text-lg" : "text-xl md:text-2xl"}`}>
                                                         <span className="truncate">{pageTitle}</span>
                                                         {mode === "edit" && (
-                                                            <Badge variant="gray">
-                                                                Editando
-                                                            </Badge>
+                                                            <Badge variant="gray" icon={<EditIcon />}>Editando</Badge>
                                                         )}
                                                     </h1>
 

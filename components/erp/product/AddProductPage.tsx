@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } from "react"
 import { Tabs, TabsList, TabsTrigger, Button, Badge, Tooltip, Input, Combobox, ActionsDropdown } from "@/components/reusable"
-import { ChevronLeftIcon, TrashIcon, ThreeDotsIcon, DuplicateIcon, EditIcon, SaveIcon, ShareIcon } from "@/lib/icons"
+import { ChevronLeftIcon, ThreeDotsIcon, EditIcon, SaveIcon } from "@/lib/icons"
 import type { Product } from "@/lib/types/product"
 import { useToast } from "@/components/ui/use-toast"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
@@ -599,7 +599,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             {/* Title hidden on mobile, shown on md+ */}
                                             <span className="hidden md:inline truncate">{pageTitle}</span>
                                             {internalMode === "edit" && (
-                                                <Badge variant="gray" className="text-sm font-normal h-fit whitespace-nowrap px-2 py-0.5 hidden md:inline-flex">
+                                                <Badge variant="orange" icon={<EditIcon />} className="text-sm font-normal h-fit whitespace-nowrap px-2 py-0.5 hidden md:inline-flex">
                                                     Editando
                                                 </Badge>
                                             )}

@@ -56,7 +56,7 @@ const MetadataCard = React.memo(({ item, type, categories, onEdit, onDelete }: M
                     </div>
 
                     {/* Subtitle / Details */}
-                    <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mt-1">
+                    <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
                         {type === "categories" && "Categoria Principal"}
                         {type === "subcategories" && (
                             <span className="flex items-center gap-1">

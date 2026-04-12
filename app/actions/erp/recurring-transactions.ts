@@ -47,6 +47,7 @@ export async function createRecurringTransactionAction(input: {
   contactId?: string | null
   customerId?: string | null
   contactType?: RecurringContactType | null
+  paymentMethodId?: string | null
 }) {
   try {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -81,6 +82,7 @@ export async function createRecurringTransactionAction(input: {
         contact_id: contactId,
         customer_id: customerId,
         contact_type: contactTypeResolved,
+        payment_method_id: input.paymentMethodId ?? null,
         active: true,
       })
       .select("*")
@@ -116,7 +118,7 @@ export async function updateRecurringTransactionAction(
     // Changes only apply from now forward: set effective_from_date if not already set
     const hasFinancialChange = ["amount", "description", "category_id", "subcategory_id",
       "account_id", "contact_id", "customer_id", "contact_type", "frequency",
-      "interval_value", "week_days", "month_day", "use_last_day"].some(k => k in payload)
+      "interval_value", "week_days", "month_day", "use_last_day", "payment_method_id"].some(k => k in payload)
     if (hasFinancialChange && !payload.effective_from_date) {
       payload.effective_from_date = new Date().toISOString()
     }
@@ -280,6 +282,7 @@ export type RecurringOccurrence = {
   contactId: string | null
   customerId: string | null
   contactType: RecurringContactType | null
+  paymentMethodId: string | null
 }
 
 /**
@@ -372,6 +375,7 @@ export async function generateRecurringOccurrencesAction(partnerId: string) {
               contactId: tpl.contact_id || null,
               customerId: tpl.customer_id || null,
               contactType: tpl.contact_type || null,
+              paymentMethodId: tpl.payment_method_id || null,
             })
           }
         }

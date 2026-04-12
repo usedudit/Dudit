@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, Checkbox, IconPlaceholder, Badge } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
@@ -69,12 +69,16 @@ export default function TransactionsPage({
     categories = [],
     accounts = [],
     recurringOccurrences = [],
+    recurringTemplates = [],
+    paymentMethods = [],
 }: {
     transactions: ERPTransaction[]
     partnerId: string
     categories?: CategoryItem[]
     accounts?: AccountItem[]
     recurringOccurrences?: RecurringOccurrence[]
+    recurringTemplates?: any[]
+    paymentMethods?: any[]
 }) {
     const router = useRouter()
     const { success: notifySuccess, error: notifyError } = useNotification()
@@ -91,6 +95,7 @@ export default function TransactionsPage({
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
     const [showCreateTransaction, setShowCreateTransaction] = useState(false)
     const [editingTransaction, setEditingTransaction] = useState<ERPTransaction | null>(null)
+    const [editingRecurringTemplateId, setEditingRecurringTemplateId] = useState<string | null>(null)
     const [markingAsPaid, setMarkingAsPaid] = useState(false)
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
@@ -126,8 +131,8 @@ export default function TransactionsPage({
             const now = new Date()
             const diffTime = dateObj.getTime() - now.getTime()
             const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-            const dateLabel = dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
-            const dateShort = dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
+            const dateLabel = dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: "America/Sao_Paulo" })
+            const dateShort = dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: "America/Sao_Paulo" })
             return {
                 id: `virt-${occ.recurringId}-${occ.occurrenceDate}`,
                 displayId: "",
@@ -141,8 +146,8 @@ export default function TransactionsPage({
                 dateNote: "-",
                 createdAtDate: "",
                 createdAtTime: "",
-                daysUntilDue,
-                isOverdue: daysUntilDue < 0,
+                daysUntilDue: -999, // We hide remaining days for virtual occurrences
+                isOverdue: false,
                 paymentType: "Não informado",
                 status: "Pendente",
                 statusVariant: daysUntilDue < 0 ? "red" : "orange",
@@ -264,7 +269,11 @@ export default function TransactionsPage({
     }, [search, activeTab, filters])
 
     const handleEditTransaction = useCallback((transaction: ERPTransaction) => {
-        setEditingTransaction(transaction)
+        if (transaction.isRecurringOccurrence && transaction.recurringTemplateId) {
+            setEditingRecurringTemplateId(transaction.recurringTemplateId)
+        } else {
+            setEditingTransaction(transaction)
+        }
     }, [])
 
     const handleMarkAsPaid = useCallback(async (transaction: ERPTransaction) => {
@@ -295,10 +304,10 @@ export default function TransactionsPage({
         }
     }, [partnerId, markingAsPaid, router, notifySuccess, notifyError])
 
-    if (showCreateTransaction || editingTransaction) {
+    if (showCreateTransaction || editingTransaction || editingRecurringTemplateId) {
         return (
             <motion.div
-                key={editingTransaction ? `edit-${editingTransaction.id}` : "create-transaction"}
+                key={editingRecurringTemplateId ? `edit-rec-${editingRecurringTemplateId}` : editingTransaction ? `edit-${editingTransaction.id}` : "create-transaction"}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -309,14 +318,20 @@ export default function TransactionsPage({
                     partnerId={partnerId}
                     categories={categories}
                     accounts={accounts}
+                    paymentMethods={paymentMethods}
                     editTransaction={editingTransaction || undefined}
+                    editRecurringTemplateId={editingRecurringTemplateId || undefined}
+                    editRecurringTemplate={editingRecurringTemplateId ? recurringTemplates.find((t: any) => t.id === editingRecurringTemplateId) : undefined}
                     onClose={() => {
                         setShowCreateTransaction(false)
                         setEditingTransaction(null)
+                        setEditingRecurringTemplateId(null)
                     }}
                     onSuccess={() => {
                         setShowCreateTransaction(false)
                         setEditingTransaction(null)
+                        setEditingRecurringTemplateId(null)
+                        router.refresh()
                     }}
                 />
             </motion.div>
@@ -456,9 +471,9 @@ export default function TransactionsPage({
                                                                         {transaction.description}
                                                                     </h3>
                                                                     {isRecurring && (
-                                                                        <span className="inline-flex items-center h-4 px-1.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700/40 whitespace-nowrap shrink-0">
+                                                                        <Badge variant="purple" className="whitespace-nowrap">
                                                                             Recorrente
-                                                                        </span>
+                                                                        </Badge>
                                                                     )}
                                                                 </div>
                                                                 <span className="flex items-center gap-1.5 text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mt-0.5">

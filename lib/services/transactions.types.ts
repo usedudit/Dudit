@@ -42,6 +42,7 @@ export interface ERPTransaction {
   contactId?: string | null
   customerId?: string | null
   recurringId?: string | null
+  paymentMethodId?: string | null
   /** Raw ISO payment_date from DB */
   paymentDateRaw?: string | null
   /** Raw ISO due_date from DB */

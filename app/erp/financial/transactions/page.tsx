@@ -7,7 +7,8 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { getFinancialTransactionsAction } from "@/app/actions/erp/transactions"
 import { getFinancialCategoriesAction } from "@/app/actions/erp/financial-category-metadata"
 import { getFinanceAccountsAction } from "@/app/actions/erp/finance-accounts"
-import { generateRecurringOccurrencesAction } from "@/app/actions/erp/recurring-transactions"
+import { generateRecurringOccurrencesAction, getRecurringTransactionsAction } from "@/app/actions/erp/recurring-transactions"
+import { getPaymentMethodsAction } from "@/app/actions/payment-methods"
 
 export const dynamic = "force-dynamic"
 
@@ -19,11 +20,13 @@ export default async function FinancialTransactionsRoute() {
   const { allowed } = await checkPartnerPermission(partnerId, "financial", "view")
   if (!allowed) return <AccessDenied />
 
-  const [txResult, categoriesResult, accountsResult, recurringResult] = await Promise.all([
+  const [txResult, categoriesResult, accountsResult, recurringResult, recurringTemplatesResult, paymentMethodsResult] = await Promise.all([
     getFinancialTransactionsAction(partnerId),
     getFinancialCategoriesAction(partnerId),
     getFinanceAccountsAction(partnerId),
     generateRecurringOccurrencesAction(partnerId),
+    getRecurringTransactionsAction(partnerId),
+    getPaymentMethodsAction(partnerId),
   ])
 
   if (!txResult.success) return <AccessDenied />
@@ -31,6 +34,8 @@ export default async function FinancialTransactionsRoute() {
   const categories = categoriesResult.success && categoriesResult.data ? categoriesResult.data.categories : []
   const accounts = accountsResult.success && accountsResult.data ? accountsResult.data.accounts : []
   const recurringOccurrences = recurringResult.success ? recurringResult.data : []
+  const recurringTemplates = recurringTemplatesResult?.success ? recurringTemplatesResult.data : []
+  const paymentMethods = paymentMethodsResult?.methods || []
 
   return (
     <>
@@ -42,6 +47,8 @@ export default async function FinancialTransactionsRoute() {
           categories={categories}
           accounts={accounts}
           recurringOccurrences={recurringOccurrences}
+          recurringTemplates={recurringTemplates as any}
+          paymentMethods={paymentMethods as any}
         />
       </FadeIn>
     </>

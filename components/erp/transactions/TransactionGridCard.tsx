@@ -46,9 +46,9 @@ const TransactionGridCard = React.memo(
                                     {transaction.description}
                                 </h3>
                                 {isRecurring && (
-                                    <span className="inline-flex items-center h-4 px-1.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700/40 whitespace-nowrap shrink-0">
+                                    <Badge variant="purple" className="whitespace-nowrap">
                                         Recorrente
-                                    </span>
+                                    </Badge>
                                 )}
                                 <Badge variant={transaction.statusVariant} className="whitespace-nowrap scale-90 shrink-0">
                                     {transaction.status}
@@ -103,7 +103,7 @@ const TransactionGridCard = React.memo(
 
                         <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                             <ActionsDropdown
-                                onEdit={transaction.isRecurringOccurrence ? undefined : (onEdit ? () => onEdit(transaction) : undefined)}
+                                onEdit={onEdit ? () => onEdit(transaction) : undefined}
                                 onCancel={transaction.isRecurringOccurrence && onMarkAsPaid ? () => onMarkAsPaid(transaction) : undefined}
                                 cancelLabel={transaction.isRecurringOccurrence ? "Marcar como pago" : undefined}
                             />
