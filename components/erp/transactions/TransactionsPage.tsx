@@ -137,8 +137,8 @@ export default function TransactionsPage({
                 id: `virt-${occ.recurringId}-${occ.occurrenceDate}`,
                 displayId: "",
                 description: occ.description,
-                category: "Recorrência",
-                contactName: "—",
+                category: occ.categoryName || "Sem categoria",
+                contactName: occ.contactName || "—",
                 contactType: (occ.contactType || "other") as ERPTransaction["contactType"],
                 dueDate: dateLabel,
                 dueDateShort: dateShort,
@@ -148,7 +148,7 @@ export default function TransactionsPage({
                 createdAtTime: "",
                 daysUntilDue: -999, // We hide remaining days for virtual occurrences
                 isOverdue: false,
-                paymentType: "Não informado",
+                paymentType: occ.paymentDisplay || "Não informado",
                 status: "Pendente",
                 statusVariant: daysUntilDue < 0 ? "red" : "orange",
                 amount: occ.amount,
@@ -162,6 +162,7 @@ export default function TransactionsPage({
                 contactId: occ.contactId,
                 customerId: occ.customerId,
                 recurringId: occ.recurringId,
+                paymentMethodId: occ.paymentMethodId ?? null,
                 // Virtual occurrence fields
                 isRecurringOccurrence: true,
                 recurringTemplateId: occ.recurringTemplateId,
@@ -210,10 +211,21 @@ export default function TransactionsPage({
                         aVal = a.contactName
                         bVal = b.contactName
                         break
-                    case "date":
-                        aVal = new Date(a.dueDate).getTime()
-                        bVal = new Date(b.dueDate).getTime()
+                    case "date": {
+                        const at = a.occurrenceDate
+                            ? new Date(`${a.occurrenceDate}T12:00:00`).getTime()
+                            : a.dueDateRaw
+                              ? new Date(a.dueDateRaw).getTime()
+                              : new Date(a.dueDate).getTime()
+                        const bt = b.occurrenceDate
+                            ? new Date(`${b.occurrenceDate}T12:00:00`).getTime()
+                            : b.dueDateRaw
+                              ? new Date(b.dueDateRaw).getTime()
+                              : new Date(b.dueDate).getTime()
+                        aVal = at
+                        bVal = bt
                         break
+                    }
                     case "payment":
                         aVal = a.paymentType
                         bVal = b.paymentType
@@ -286,6 +298,7 @@ export default function TransactionsPage({
                 recurringId: transaction.recurringTemplateId,
                 occurrenceDate: transaction.occurrenceDate,
                 accountId: transaction.accountId,
+                paymentMethodId: transaction.paymentMethodId ?? null,
             })
             if (!res.success) {
                 notifyError(res.error || "Erro ao marcar como pago")

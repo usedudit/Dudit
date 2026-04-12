@@ -42,6 +42,7 @@ import {
     updateManualTransactionAction,
     createTransferPairAction,
     adjustAccountBalanceViaTransactionAction,
+    markRecurringOccurrenceAsPaidAction,
 } from "@/app/actions/erp/transactions"
 import { createFinancialCategoryAction } from "@/app/actions/erp/financial-category-metadata"
 import { createFinanceAccountAction, type FinanceAccountType } from "@/app/actions/erp/finance-accounts"
@@ -52,6 +53,7 @@ import {
 } from "@/app/actions/erp/transaction-contacts"
 import {
     createRecurringTransactionAction,
+    cancelRecurringTransactionAction,
     type RecurringFrequency,
 } from "@/app/actions/erp/recurring-transactions"
 
@@ -188,7 +190,10 @@ export default function CreateTransactionPage({
     const [description, setDescription] = useState(() => editRecurringTemplate?.description || editTransaction?.description || "")
     const [categoryId, setCategoryId] = useState<string | undefined>(() => editRecurringTemplate?.category_id ?? editTransaction?.categoryId ?? undefined)
     const [subcategoryId, setSubcategoryId] = useState<string | undefined>(() => editRecurringTemplate?.subcategory_id ?? editTransaction?.subcategoryId ?? undefined)
-    const [dueDate, setDueDate] = useState(() => editTransaction?.dueDateRaw ? editTransaction.dueDateRaw.slice(0, 10) : format(new Date(), "yyyy-MM-dd"))
+    const [dueDate, setDueDate] = useState(() =>
+        editRecurringTemplate?.start_date?.slice(0, 10) ||
+            (editTransaction?.dueDateRaw ? editTransaction.dueDateRaw.slice(0, 10) : format(new Date(), "yyyy-MM-dd")),
+    )
     const [paymentDate, setPaymentDate] = useState(() => editTransaction?.paymentDateRaw ? editTransaction.paymentDateRaw.slice(0, 10) : format(new Date(), "yyyy-MM-dd"))
     const [status, setStatus] = useState<"pending" | "paid">(() => editRecurringTemplate ? "pending" : editTransaction ? (String(editTransaction.rawStatus || "").toLowerCase() === "paid" ? "paid" : "pending") : "pending")
     const [accountId, setAccountId] = useState<string | undefined>(() => editRecurringTemplate?.account_id ?? editTransaction?.accountId ?? undefined)
@@ -206,6 +211,7 @@ export default function CreateTransactionPage({
     const [customerSheetOpen, setCustomerSheetOpen] = useState(false)
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(() => new Set())
     const [showDiscardModal, setShowDiscardModal] = useState(false)
+    const [cancelRecurringOpen, setCancelRecurringOpen] = useState(false)
 
     const [adjustmentTargetBalance, setAdjustmentTargetBalance] = useState(0)
     const [refundKind, setRefundKind] = useState<"expense_refund" | "revenue_refund">(() => editTransaction?.refundKind || "expense_refund")
@@ -343,6 +349,23 @@ export default function CreateTransactionPage({
     }, [contactType])
 
     useEffect(() => {
+        if (!editRecurringTemplate) return
+        if (editRecurringTemplate.customer_id) {
+            setContactType("customer")
+            setSelectedCustomer({
+                id: editRecurringTemplate.customer_id,
+                name: "Cliente",
+            })
+            setSelectedContactId(undefined)
+            return
+        }
+        if (editRecurringTemplate.contact_id && editRecurringTemplate.contact_type) {
+            setContactType(editRecurringTemplate.contact_type as ContactType)
+            pendingSelectContactIdRef.current = editRecurringTemplate.contact_id
+        }
+    }, [editRecurringTemplate])
+
+    useEffect(() => {
         if (txKind === "adjustment" || txKind === "transfer") setStatus("paid")
     }, [txKind])
 
@@ -411,9 +434,9 @@ export default function CreateTransactionPage({
     }, [isIncomeExpense])
 
     useEffect(() => {
-        if (!enableRecurrence || !isIncomeExpense) return
-        setRecurrenceNextRunYmd(ymdAfterAddingPeriod(dueDate, recurrenceFrequency, recurrenceInterval))
-    }, [enableRecurrence, dueDate, recurrenceFrequency, recurrenceInterval, isIncomeExpense])
+        if (!enableRecurrence || !isIncomeExpense || isRecurringTemplateEdit) return
+        setRecurrenceNextRunYmd(dueDate)
+    }, [enableRecurrence, dueDate, isIncomeExpense, isRecurringTemplateEdit])
 
     const dueDateYmdParts = useMemo(() => {
         const [y, m, d] = dueDate.split("-").map(Number)
@@ -556,13 +579,15 @@ export default function CreateTransactionPage({
             if (!description.trim()) e.add("description")
             if (!(amount > 0)) e.add("amount")
             if (!accountId) e.add("accountId")
-            if (enableRecurrence) {
-                if (!recurrenceNextRunYmd) e.add("recurrenceNextRunYmd")
-                if (recurrenceEndYmd.trim()) {
-                    const nextIso = toMiddayIsoFromYmd(recurrenceNextRunYmd)
-                    const endIso = toMiddayIsoFromYmd(recurrenceEndYmd.trim())
-                    if (new Date(endIso) < new Date(nextIso)) e.add("recurrenceEndYmd")
-                }
+            if (enableRecurrence && !isRecurringTemplateEdit && recurrenceEndYmd.trim()) {
+                const startIso = toMiddayIsoFromYmd(dueDate)
+                const endIso = toMiddayIsoFromYmd(recurrenceEndYmd.trim())
+                if (new Date(endIso) < new Date(startIso)) e.add("recurrenceEndYmd")
+            }
+            if (isRecurringTemplateEdit && recurrenceEndYmd.trim()) {
+                const startIso = toMiddayIsoFromYmd(recurrenceNextRunYmd)
+                const endIso = toMiddayIsoFromYmd(recurrenceEndYmd.trim())
+                if (new Date(endIso) < new Date(startIso)) e.add("recurrenceEndYmd")
             }
         }
         return e
@@ -575,6 +600,8 @@ export default function CreateTransactionPage({
         accountId,
         isIncomeExpense,
         enableRecurrence,
+        isRecurringTemplateEdit,
+        dueDate,
         recurrenceNextRunYmd,
         recurrenceEndYmd,
         adjustmentTargetBalance,
@@ -626,12 +653,21 @@ export default function CreateTransactionPage({
             try {
                 const cp = contactPayload()
                 const { updateRecurringTransactionAction } = await import("@/app/actions/erp/recurring-transactions")
+                const anchorYmd = recurrenceNextRunYmd
+                const anchorParts = anchorYmd.split("-").map(Number)
+                const rMonth = anchorParts[1] || 1
+                const rDay = anchorParts[2] || 1
+                const startIso = toMiddayIsoFromYmd(anchorYmd)
                 const patch: Record<string, unknown> = {
                     amount,
                     description: description.trim(),
                     frequency: recurrenceFrequency,
                     interval_value: recurrenceInterval,
                     use_last_day: recurrenceMonthlyLastDay,
+                    week_days: recurrenceFrequency === "weekly" ? [parseYmdToLocalNoon(anchorYmd).getDay()] : null,
+                    month_day: recurrenceFrequency === "monthly" && !recurrenceMonthlyLastDay ? rDay : null,
+                    year_month: recurrenceFrequency === "yearly" ? rMonth : null,
+                    year_day: recurrenceFrequency === "yearly" ? rDay : null,
                     account_id: accountId || null,
                     category_id: categoryId || null,
                     subcategory_id: subcategoryId || null,
@@ -639,8 +675,9 @@ export default function CreateTransactionPage({
                     customer_id: cp.customerId,
                     contact_type: cp.contactTypeResolved,
                     payment_method_id: paymentMethodId,
-                    start_date: recurrenceNextRunYmd,
-                    end_date: recurrenceEndYmd || null,
+                    start_date: startIso,
+                    next_run_date: startIso,
+                    end_date: recurrenceEndYmd.trim() ? toMiddayIsoFromYmd(recurrenceEndYmd.trim()) : null,
                 }
                 const res = await updateRecurringTransactionAction(editRecurringTemplateId, partnerId, patch)
                 if (!res.success) return error(res.error || "Erro ao atualizar recorrência")
@@ -820,7 +857,6 @@ export default function CreateTransactionPage({
             if (enableRecurrence) {
                 const iv = Math.max(Math.floor(Number(recurrenceInterval) || 1), 1)
                 const startIso = toMiddayIsoFromYmd(dueDate)
-                const nextIso = toMiddayIsoFromYmd(recurrenceNextRunYmd)
                 const endIso = recurrenceEndYmd.trim() ? toMiddayIsoFromYmd(recurrenceEndYmd.trim()) : null
 
                 const recRes = await createRecurringTransactionAction({
@@ -840,15 +876,36 @@ export default function CreateTransactionPage({
                     yearDay: recurrenceFrequency === "yearly" ? dueDateYmdParts.day : null,
                     startDate: startIso,
                     endDate: endIso,
-                    nextRunDate: nextIso,
+                    nextRunDate: startIso,
                     accountId: accountId || null,
                     categoryId: categoryId || null,
                     subcategoryId: subcategoryId || null,
                     contactId: cp.contactId,
                     customerId: cp.customerId,
                     contactType: cp.contactTypeResolved,
+                    paymentMethodId: paymentMethodId || null,
                 })
                 if (!recRes.success) return error(recRes.error || "Erro ao criar recorrência")
+                const newId = (recRes.data as { id?: string } | undefined)?.id
+                if (status === "paid" && newId) {
+                    const paidRes = await markRecurringOccurrenceAsPaidAction({
+                        partnerId,
+                        recurringId: newId,
+                        occurrenceDate: dueDate.slice(0, 10),
+                        accountId: accountId || null,
+                        paymentMethodId: paymentMethodId || null,
+                    })
+                    if (!paidRes.success) return error(paidRes.error || "Erro ao registrar pagamento da ocorrência")
+                }
+                success(
+                    status === "paid"
+                        ? "Recorrência criada e primeira ocorrência marcada como paga!"
+                        : "Recorrência criada! Próximas ocorrências aparecem em Previstos.",
+                )
+                onSuccess?.()
+                router.refresh()
+                onClose()
+                return
             }
 
             const res = await createManualTransactionAction({
@@ -874,7 +931,7 @@ export default function CreateTransactionPage({
             })
 
             if (!res.success) return error(res.error || "Erro ao salvar transação")
-            success(enableRecurrence ? "Transação criada e recorrência ativa!" : "Transação criada com sucesso!")
+            success("Transação criada com sucesso!")
             onSuccess?.()
             router.refresh()
             onClose()
@@ -882,6 +939,28 @@ export default function CreateTransactionPage({
             setIsSaving(false)
         }
     }
+
+    const handleConfirmCancelRecurring = useCallback(() => {
+        if (!editRecurringTemplateId) return
+        void (async () => {
+            setIsSaving(true)
+            try {
+                const res = await cancelRecurringTransactionAction(editRecurringTemplateId, partnerId)
+                if (!res.success) {
+                    error(res.error || "Erro ao cancelar")
+                    setCancelRecurringOpen(false)
+                    return
+                }
+                success("Recorrência cancelada. O histórico de pagamentos foi preservado.")
+                setCancelRecurringOpen(false)
+                onSuccess?.()
+                router.refresh()
+                onClose()
+            } finally {
+                setIsSaving(false)
+            }
+        })()
+    }, [editRecurringTemplateId, partnerId, error, success, onSuccess, router, onClose])
 
     const typeButtons: {
         id: TxKind
@@ -1111,97 +1190,111 @@ export default function CreateTransactionPage({
                             }}
                         />
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <DatePicker label="Data de vencimento" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} disabled={lockFinancialFields} />
-                        <DatePicker
-                            label="Data do pagamento"
-                            value={paymentDate}
-                            onChange={(d) => setPaymentDate(toYmd(d))}
-                            disabled={status !== "paid" || lockFinancialFields}
-                        />
-                    </div>
+                    {!isRecurringTemplateEdit && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <DatePicker label="Data de vencimento" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} disabled={lockFinancialFields} />
+                            <DatePicker
+                                label="Data do pagamento"
+                                value={paymentDate}
+                                onChange={(d) => setPaymentDate(toYmd(d))}
+                                disabled={status !== "paid" || lockFinancialFields}
+                            />
+                        </div>
+                    )}
 
-                    {!isEditMode && (
-                    <div className="rounded-2xl border border-brand-border dark:border-dark-border p-4 space-y-4 bg-brand-gray/25 dark:bg-dark-border/15">
-                        <Checkbox
-                            name="enable_recurrence"
-                            checked={enableRecurrence}
-                            onChange={setEnableRecurrence}
-                            label={
-                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                    Criar recorrência
-                                </span>
-                            }
-                        />
-                        {enableRecurrence && (
-                            <>
-                                <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                                    Só para receita e despesa. Este lançamento é salvo agora; as próximas ocorrências são
-                                    geradas automaticamente (cron) na data de &quot;próxima execução&quot;. Transferência,
-                                    ajuste e reembolso não têm recorrência.
-                                </p>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <FormDropdown
-                                        label="Frequência"
-                                        options={[
-                                            { value: "daily", label: "Diário" },
-                                            { value: "weekly", label: "Semanal" },
-                                            { value: "monthly", label: "Mensal" },
-                                            { value: "yearly", label: "Anual" },
-                                        ]}
-                                        value={recurrenceFrequency}
-                                        setValue={(v) => setRecurrenceFrequency(v as RecurringFrequency)}
-                                    />
-                                    <Input
-                                        label="A cada (intervalo)"
-                                        type="number"
-                                        min={1}
-                                        max={365}
-                                        value={recurrenceInterval}
-                                        onChange={(e) =>
-                                            setRecurrenceInterval(Math.max(1, Number(e.target.value) || 1))
-                                        }
-                                    />
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <DatePicker
-                                        label="Próxima execução automática"
-                                        value={recurrenceNextRunYmd}
-                                        onChange={(d) => setRecurrenceNextRunYmd(toYmd(d))}
-                                        error={fieldErrors.has("recurrenceNextRunYmd")}
-                                        errorMessage={
-                                            fieldErrors.has("recurrenceNextRunYmd")
-                                                ? "Defina a próxima execução"
-                                                : undefined
-                                        }
-                                    />
-                                    <DatePicker
-                                        label="Encerrar em (opcional)"
-                                        value={recurrenceEndYmd}
-                                        onChange={(d) => setRecurrenceEndYmd(toYmd(d))}
-                                        error={fieldErrors.has("recurrenceEndYmd")}
-                                        errorMessage={
-                                            fieldErrors.has("recurrenceEndYmd")
-                                                ? "Data final deve ser após a próxima execução"
-                                                : undefined
-                                        }
-                                    />
-                                </div>
-                                {recurrenceFrequency === "monthly" && (
-                                    <Checkbox
-                                        name="recurrence_month_last"
-                                        checked={recurrenceMonthlyLastDay}
-                                        onChange={setRecurrenceMonthlyLastDay}
-                                        label={
-                                            <span className="text-sm text-brand-dark dark:text-dark-heading">
-                                                Sempre no último dia do mês
-                                            </span>
-                                        }
-                                    />
-                                )}
-                            </>
-                        )}
-                    </div>
+                    {isIncomeExpense && (!isEditMode || isRecurringTemplateEdit) && (
+                        <div className="rounded-2xl border border-brand-border dark:border-dark-border p-4 space-y-4 bg-brand-gray/25 dark:bg-dark-border/15">
+                            {!isRecurringTemplateEdit && (
+                                <Checkbox
+                                    name="enable_recurrence"
+                                    checked={enableRecurrence}
+                                    onChange={setEnableRecurrence}
+                                    label={
+                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                            Criar recorrência
+                                        </span>
+                                    }
+                                />
+                            )}
+                            {isRecurringTemplateEdit && (
+                                <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Regra de recorrência</p>
+                            )}
+                            {(enableRecurrence || isRecurringTemplateEdit) && (
+                                <>
+                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                                        {isRecurringTemplateEdit
+                                            ? "Alterações passam a valer para ocorrências futuras. Pagamentos já confirmados não são alterados."
+                                            : "A data de vencimento acima é a primeira ocorrência. As próximas datas aparecem em Previstos e seguem a frequência abaixo."}
+                                    </p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <FormDropdown
+                                            label="Frequência"
+                                            options={[
+                                                { value: "daily", label: "Diário" },
+                                                { value: "weekly", label: "Semanal" },
+                                                { value: "monthly", label: "Mensal" },
+                                                { value: "yearly", label: "Anual" },
+                                            ]}
+                                            value={recurrenceFrequency}
+                                            setValue={(v) => setRecurrenceFrequency(v as RecurringFrequency)}
+                                        />
+                                        <Input
+                                            label="A cada (intervalo)"
+                                            type="number"
+                                            min={1}
+                                            max={365}
+                                            value={recurrenceInterval}
+                                            onChange={(e) =>
+                                                setRecurrenceInterval(Math.max(1, Number(e.target.value) || 1))
+                                            }
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        {isRecurringTemplateEdit && (
+                                            <DatePicker
+                                                label="Data inicial (1ª ocorrência)"
+                                                value={recurrenceNextRunYmd}
+                                                onChange={(d) => setRecurrenceNextRunYmd(toYmd(d))}
+                                            />
+                                        )}
+                                        <DatePicker
+                                            label="Encerrar em (opcional)"
+                                            value={recurrenceEndYmd}
+                                            onChange={(d) => setRecurrenceEndYmd(toYmd(d))}
+                                            error={fieldErrors.has("recurrenceEndYmd")}
+                                            errorMessage={
+                                                fieldErrors.has("recurrenceEndYmd")
+                                                    ? "Data final deve ser igual ou após a data inicial"
+                                                    : undefined
+                                            }
+                                        />
+                                    </div>
+                                    {recurrenceFrequency === "monthly" && (
+                                        <Checkbox
+                                            name="recurrence_month_last"
+                                            checked={recurrenceMonthlyLastDay}
+                                            onChange={setRecurrenceMonthlyLastDay}
+                                            label={
+                                                <span className="text-sm text-brand-dark dark:text-dark-heading">
+                                                    Sempre no último dia do mês
+                                                </span>
+                                            }
+                                        />
+                                    )}
+                                    {isRecurringTemplateEdit && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="w-full border-brand-red/40 text-brand-red hover:bg-brand-red/5"
+                                            onClick={() => setCancelRecurringOpen(true)}
+                                            disabled={isSaving}
+                                        >
+                                            Cancelar recorrência
+                                        </Button>
+                                    )}
+                                </>
+                            )}
+                        </div>
                     )}
 
                     {isEditMode && isRecurringTransaction && (
@@ -1228,6 +1321,10 @@ export default function CreateTransactionPage({
                     {txKind === "adjustment" || txKind === "transfer" ? (
                         <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
                             O {txKind === "transfer" ? "lançamento" : "ajuste"} é efetivado ao salvar e atualiza o saldo da conta.
+                        </p>
+                    ) : isRecurringTemplateEdit ? (
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                            O pagamento de cada data é feito em Previstos («Marcar como pago»). Este formulário atualiza apenas o modelo da recorrência.
                         </p>
                     ) : (
                         <div>
@@ -1382,7 +1479,7 @@ export default function CreateTransactionPage({
                                         <h1
                                             className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-300 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}
                                         >
-                                            {isEditMode ? "Editar Transação" : "Nova Transação"}
+                                            {isRecurringTemplateEdit ? "Editar recorrência" : isEditMode ? "Editar Transação" : "Nova Transação"}
                                         </h1>
                                         <div
                                             className={`text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}
@@ -1785,6 +1882,16 @@ export default function CreateTransactionPage({
                     title="Descartar alterações?"
                     description="Você tem dados não salvos. Se sair agora, eles serão perdidos."
                     confirmText="Sair sem salvar"
+                    variant="warning"
+                />
+
+                <AlertModal
+                    isOpen={cancelRecurringOpen}
+                    onClose={() => setCancelRecurringOpen(false)}
+                    onConfirm={handleConfirmCancelRecurring}
+                    title="Cancelar recorrência?"
+                    description="Nenhum pagamento já registrado será apagado. Novas ocorrências deixarão de ser geradas."
+                    confirmText="Cancelar recorrência"
                     variant="warning"
                 />
             </div>

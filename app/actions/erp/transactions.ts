@@ -541,6 +541,13 @@ export async function updateManualTransactionAction(
 
         const paid = isStatusPaid(current.status)
         const systemGateway = isSystemOrGatewayOrigin(current.origin)
+        const isRecurringSystemPending =
+            !!current.recurring_id && systemGateway && !paid
+        if (isRecurringSystemPending) {
+            throw new Error(
+                "Esta linha vem da recorrência. Edite o modelo em Previstos ou use «Marcar como pago» — não altere este lançamento pendente.",
+            )
+        }
 
         // Build payload with strict field-level locking
         const payload: Record<string, unknown> = {}
@@ -679,8 +686,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
             return { success: true, data: existing, alreadyPaid: true }
         }
 
-        // Resolve category name
-        let categoryName = "Recorrência"
+        let categoryName = "Sem categoria"
         if (rec.category_id) {
             const { data: cat } = await supabase
                 .from("financial_categories")
@@ -705,12 +711,14 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
 
         if (pendingTx) {
             // Upgrade pending → paid
+            const pm = input.paymentMethodId || rec.payment_method_id || null
             const { data: updated, error: updErr } = await supabase
                 .from("transactions")
                 .update({
                     status: "paid",
                     payment_date: nowIso,
                     account_id: accountId,
+                    payment_method_id: pm,
                     updated_at: nowIso,
                 })
                 .eq("id", pendingTx.id)
@@ -724,6 +732,10 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
                 amount: rec.amount,
                 status: "paid",
             })
+            console.info(
+                "[recurring] occurrence_marked_paid",
+                JSON.stringify({ recurringId: input.recurringId, occurrenceDate: input.occurrenceDate }),
+            )
             return { success: true, data: updated }
         }
 
@@ -774,6 +786,10 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
             status: "paid",
         })
 
+        console.info(
+            "[recurring] occurrence_marked_paid",
+            JSON.stringify({ recurringId: input.recurringId, occurrenceDate: input.occurrenceDate }),
+        )
         return { success: true, data: newTx }
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao marcar como pago" }
