@@ -60,6 +60,7 @@ function transactionFilterYmd(item: ERPTransaction, tab: TransactionTab): string
 
 interface FilterState {
     recurringOnly: boolean
+    installmentOnly: boolean
     datePeriod: DatePeriodFilterValue
     status: string[]
     category: string[]
@@ -71,6 +72,7 @@ type SortDirection = "asc" | "desc"
 
 const INITIAL_FILTERS: FilterState = {
     recurringOnly: false,
+    installmentOnly: false,
     datePeriod: { ...EMPTY_DATE_PERIOD },
     status: [],
     category: [],
@@ -181,6 +183,12 @@ export default function TransactionsPage({
                 switchLabel: "Apenas recorrentes",
             },
             {
+                id: "installmentOnly",
+                title: "Parcelado",
+                type: "switch",
+                switchLabel: "Apenas parcelados",
+            },
+            {
                 id: "datePeriod",
                 title:
                     activeTab === "Previstos"
@@ -271,6 +279,8 @@ export default function TransactionsPage({
             const matchesDate = !dateBoundsActive || ymdInBounds(ymd, startYmd, endYmd)
             const matchesRecurring =
                 !filters.recurringOnly || !!(item.recurringId || item.isRecurringOccurrence)
+            const matchesInstallment =
+                !filters.installmentOnly || !!item.installmentGroupId
 
             return (
                 matchesSearch &&
@@ -279,7 +289,8 @@ export default function TransactionsPage({
                 matchesCategory &&
                 matchesPayment &&
                 matchesDate &&
-                matchesRecurring
+                matchesRecurring &&
+                matchesInstallment
             )
         })
 
@@ -388,6 +399,7 @@ export default function TransactionsPage({
         filters.category.length > 0 ||
         filters.paymentType.length > 0 ||
         filters.recurringOnly ||
+        filters.installmentOnly ||
         isDatePeriodFilterActive(filters.datePeriod)
     const hasTransactions = transactions.length > 0
 

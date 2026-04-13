@@ -922,6 +922,7 @@ export async function createInstallmentGroupAction(input: {
     partnerId: string
     transactionType: "income" | "expense"
     description: string
+    categoryLabel?: string
     totalAmount: number
     installmentsCount: number
     frequency: "daily" | "weekly" | "monthly" | "yearly"
