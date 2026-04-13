@@ -75,7 +75,13 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
     }
     if (!detail) return null
 
-    const timelineSteps = [detail.timeline.step1, detail.timeline.step2]
+    const timelineSteps: Array<{
+        label: string
+        date: string
+        time: string
+        active: boolean
+        danger?: boolean
+    }> = [detail.timeline.step1, detail.timeline.step2]
     const activeCount = timelineSteps.filter((s) => s.active).length
     const progressPct = timelineSteps.length > 1 ? ((Math.max(activeCount, 1) - 1) / (timelineSteps.length - 1)) * 100 : 0
 
