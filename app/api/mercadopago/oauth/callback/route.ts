@@ -7,6 +7,10 @@ import { getCurrentUser } from "@/lib/auth/authorization"
 import { encrypt } from "@/lib/cryptoService"
 import { validateOAuthState } from "@/lib/security/oauth-state"
 
+function normalizeBaseUrl(rawUrl: string): string {
+  return rawUrl.endsWith("/") ? rawUrl.slice(0, -1) : rawUrl
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const code = searchParams.get("code")
@@ -52,7 +56,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL("/erp/settings?mp_error=unauthorized", request.url))
     }
 
-    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"}/api/mercadopago/oauth/callback`
+    const appUrl = normalizeBaseUrl(process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin)
+    const redirectUri = `${appUrl}/api/mercadopago/oauth/callback`
 
 
 

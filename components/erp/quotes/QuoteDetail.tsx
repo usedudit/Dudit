@@ -103,28 +103,32 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                 csrf_token: csrfToken || undefined,
                 acknowledgeUnapprovedConversion,
             });
-            if (res.success && res.data) {
-                const d = res.data as { orderId: string; orderNumber?: string | null; alreadyConverted?: boolean };
-                notifySuccess(
-                    d.alreadyConverted ? "Pedido já existente" : "Pedido criado",
-                    d.alreadyConverted
-                        ? "Este orçamento já havia sido convertido. Abrindo o pedido."
-                        : `Venda ${d.orderNumber || d.orderId} criada com sucesso.`
-                );
-                setQuote((prev: any) =>
-                    prev
-                        ? {
-                            ...prev,
-                            converted: true,
-                            converted_order_id: d.orderId,
-                        }
-                        : prev
-                );
-                router.refresh();
-                router.push(`/erp/orders/${d.orderId}`);
-            } else {
+            if (!res.success) {
                 notifyError("Não foi possível converter", res.error || "Erro desconhecido");
+                return;
             }
+            if (!res.data) {
+                notifyError("Não foi possível converter", "Resposta inválida ao converter o orçamento.");
+                return;
+            }
+            const d = res.data as { orderId: string; orderNumber?: string | null; alreadyConverted?: boolean };
+            notifySuccess(
+                d.alreadyConverted ? "Pedido já existente" : "Pedido criado",
+                d.alreadyConverted
+                    ? "Este orçamento já havia sido convertido. Abrindo o pedido."
+                    : `Venda ${d.orderNumber || d.orderId} criada com sucesso.`
+            );
+            setQuote((prev: any) =>
+                prev
+                    ? {
+                        ...prev,
+                        converted: true,
+                        converted_order_id: d.orderId,
+                    }
+                    : prev
+            );
+            router.refresh();
+            router.push(`/erp/orders/${d.orderId}`);
         } catch {
             notifyError("Erro", "Falha de conexão ao converter o orçamento.");
         } finally {

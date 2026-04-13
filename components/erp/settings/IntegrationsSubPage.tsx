@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation"
 import { Button, InfoCard } from "@/components/reusable"
 import { CheckCircleIcon, ChevronLeftIcon } from "@/lib/icons"
 import { disconnectMercadoPagoAction } from "@/app/actions/mercadopago"
-import { generateOAuthState } from "@/lib/security/oauth-state"
 import { FadeIn } from "@/components/animations/FadeIn"
 
 // ─── Integration Card (same style as IntegrationsPage.tsx) ───────────────────
@@ -79,27 +78,9 @@ export const IntegrationsSubPage = ({
   }, [])
 
   const handleConnect = async () => {
-    const clientId = process.env.NEXT_PUBLIC_MP_CLIENT_ID
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== "undefined" ? window.location.origin : "")
-
-    if (!clientId) {
-      alert("Mercado Pago não configurado. Entre em contato com o suporte.")
-      return
-    }
-
-    if (!appUrl) {
-      alert("URL da aplicação não configurada.")
-      return
-    }
-
     setIsLoading(true)
     try {
-      const signedState = await generateOAuthState(partner.id, partner.user_id)
-      const redirectUri = `${appUrl}/api/mercadopago/oauth/callback`
-
-      const authUrl = `https://auth.mercadopago.com.br/authorization?client_id=${clientId}&response_type=code&platform_id=mp&state=${encodeURIComponent(signedState)}&redirect_uri=${encodeURIComponent(redirectUri)}`
-
-      window.location.href = authUrl
+      window.location.href = "/api/mercadopago/oauth/start"
     } catch (err) {
       alert("Erro ao iniciar conexão com Mercado Pago. Tente novamente.")
       setIsLoading(false)
