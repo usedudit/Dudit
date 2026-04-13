@@ -1,13 +1,14 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useTransition, useRef } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
 import { motion } from "framer-motion"
-import { Button, Input as FormInput, Checkbox as FormCheckbox, Badge, Spinner, DefaultModal, ActionsDropdown, FormDropdown, MoneyInput, AlertModal, IconPlaceholder } from "@/components/reusable"
+import { Button, Input as FormInput, Checkbox as FormCheckbox, Badge, Spinner, ActionsDropdown, AlertModal, IconPlaceholder } from "@/components/reusable"
 import { SearchIcon, PlusIcon, ThreeDotsIcon, CreditCardIcon, MoneyIcon, QRCodeIcon, ChevronLeftIcon } from "@/lib/icons"
-import { createPaymentMethodAction, updatePaymentMethodAction, deletePaymentMethodAction } from "@/app/actions/payment-methods"
+import { getPaymentMethodsAction, updatePaymentMethodAction, deletePaymentMethodAction } from "@/app/actions/payment-methods"
 import { useNotification } from "@/hooks/use-notification"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency } from "@/lib/utils"
+import { PaymentMethodDialog } from "@/components/erp/payment-method-dialog"
 
 interface PaymentMethodsSubPageProps {
     partner: any
@@ -17,7 +18,6 @@ interface PaymentMethodsSubPageProps {
 
 export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: PaymentMethodsSubPageProps) {
     const { success: notifySuccess, error: notifyError } = useNotification()
-    const [isPending, startTransition] = useTransition()
     const [methods, setMethods] = useState<any[]>(paymentMethods || [])
     const [search, setSearch] = useState("")
     const [debouncedSearch, setDebouncedSearch] = useState("")
@@ -25,7 +25,6 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
 
     const [paymentModalOpen, setPaymentModalOpen] = useState(false)
     const [editingPayment, setEditingPayment] = useState<any | null>(null)
-    const [isSavingPayment, setIsSavingPayment] = useState(false)
 
     const [isTogglingStatus, setIsTogglingStatus] = useState<Set<string>>(new Set())
     const [isDeletingMethod, setIsDeletingMethod] = useState<Set<string>>(new Set())
@@ -55,52 +54,6 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
             m.card_brand?.toLowerCase().includes(term)
         ))
     }, [debouncedSearch, methods])
-
-    const handleSavePaymentMethod = async (data: any) => {
-        startTransition(async () => {
-            setIsSavingPayment(true)
-            try {
-                if (editingPayment && editingPayment.id) {
-                    const res = await updatePaymentMethodAction(editingPayment.id, {
-                        name: data.name,
-                        isActive: data.isActive,
-                        cardBrand: data.cardBrand,
-                        maxInstallments: data.maxInstallments,
-                        feeType: data.feeType,
-                        percentageRate: data.percentageRate,
-                        fixedAmount: data.fixedAmount,
-                        receivingDays: data.receivingDays,
-                        discountPercent: data.discountPercent
-                    })
-                    if (res.success) {
-                        const updatedMethod = {
-                            ...editingPayment,
-                            ...data,
-                            is_active: data.isActive,
-                            payment_type: data.paymentType // Ensure correct mapping
-                        }
-                        setMethods(prev => prev.map(m => m.id === editingPayment.id ? updatedMethod : m))
-                        notifySuccess("Método atualizado!")
-                        setPaymentModalOpen(false)
-                    } else notifyError(res.error || "Erro ao atualizar")
-                } else {
-                    const res = await createPaymentMethodAction({
-                        partnerId: partner.id,
-                        ...data
-                    })
-                    if (res.success) {
-                        setMethods(prev => [...prev, res.method])
-                        notifySuccess("Método adicionado!")
-                        setPaymentModalOpen(false)
-                    } else notifyError(res.error || "Erro ao adicionar")
-                }
-            } catch {
-                notifyError("Erro ao salvar método")
-            } finally {
-                setIsSavingPayment(false)
-            }
-        })
-    }
 
     const handleDeletePaymentMethod = async (id: string) => {
         setIsDeletingMethod(prev => new Set(prev).add(id))
@@ -152,7 +105,9 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
     const getPaymentIcon = (type: string) => {
         switch (type) {
             case "pix": return <QRCodeIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-            case "dinheiro": return <MoneyIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+            case "dinheiro":
+            case "cash":
+                return <MoneyIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
             default: return <CreditCardIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
         }
     }
@@ -202,11 +157,11 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
             <td className="p-3">
                 <div className="flex flex-col">
                     <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                        {method.percentage_rate ? `${method.percentage_rate}%` : "-"}
+                        {(method.fee_percent ?? method.percentage_rate) ? `${method.fee_percent ?? method.percentage_rate}%` : "-"}
                     </span>
-                    {method.fixed_amount > 0 && (
+                    {(method.fee_fixed ?? method.fixed_amount) > 0 && (
                         <span className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                            + {formatCurrency(method.fixed_amount)}
+                            + {formatCurrency(method.fee_fixed ?? method.fixed_amount)}
                         </span>
                     )}
                 </div>
@@ -274,7 +229,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                     <div className="flex items-end justify-between gap-2 mt-0.5">
                         <div className="flex items-center gap-2">
                             <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
-                                Taxa: {method.percentage_rate ? `${method.percentage_rate}%` : "0%"}
+                                Taxa: {(method.fee_percent ?? method.percentage_rate) ? `${method.fee_percent ?? method.percentage_rate}%` : "0%"}
                             </span>
                             <span className="text-brand-inactive-text dark:text-dark-border">•</span>
                             <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
@@ -422,114 +377,18 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                 </div>
 
                 {/* Payment Modal */}
-                <DefaultModal
-                    isOpen={paymentModalOpen}
-                    onClose={() => setPaymentModalOpen(false)}
-                    title={editingPayment ? "Editar Método" : "Novo Método"}
-                >
-                    <div className="space-y-6 pt-2 pb-2">
-                        <FormInput
-                            label="Nome de exibição"
-                            placeholder="Ex: Cartão de Crédito Visa"
-                            value={editingPayment?.name || ""}
-                            onChange={(e: any) => setEditingPayment((prev: any) => ({ ...prev, name: e.target.value }))}
-                        />
-
-                        <div className="grid grid-cols-12 gap-4">
-                            <div className="col-span-8">
-                                <FormDropdown
-                                    label="Tipo de pagamento"
-                                    options={[
-                                        { value: "dinheiro", label: "Dinheiro" },
-                                        { value: "pix", label: "Pix" },
-                                        { value: "credito", label: "C. Crédito" },
-                                        { value: "debito", label: "C. Débito" },
-                                    ]}
-                                    value={editingPayment?.payment_type || "credito"}
-                                    setValue={(val) => setEditingPayment((prev: any) => ({ ...prev, payment_type: val }))}
-                                />
-                            </div>
-                            <div className="col-span-4">
-                                <MoneyInput
-                                    label="Desconto (%)"
-                                    value={editingPayment?.discount_percent || 0}
-                                    onChange={(val: number) => setEditingPayment((prev: any) => ({ ...prev, discount_percent: val }))}
-                                />
-                            </div>
-                        </div>
-
-                        {(editingPayment?.payment_type === "credito" || editingPayment?.payment_type === "debito") && (
-                            <div className="grid grid-cols-2 gap-4">
-                                <FormDropdown
-                                    label="Bandeira"
-                                    options={[
-                                        { value: "visa", label: "Visa" },
-                                        { value: "mastercard", label: "Mastercard" },
-                                        { value: "elo", label: "Elo" },
-                                        { value: "hipercard", label: "Hipercard" },
-                                        { value: "amex", label: "Amex" },
-                                        { value: "other", label: "Outra" },
-                                    ]}
-                                    value={editingPayment?.card_brand || "visa"}
-                                    setValue={(val) => setEditingPayment((prev: any) => ({ ...prev, card_brand: val }))}
-                                />
-                                {editingPayment?.payment_type === "credito" && (
-                                    <FormInput
-                                        label="Parcelas máx."
-                                        type="number"
-                                        value={editingPayment?.max_installments || 1}
-                                        onChange={(e: any) => setEditingPayment((prev: any) => ({ ...prev, max_installments: parseInt(e.target.value) }))}
-                                    />
-                                )}
-                            </div>
-                        )}
-
-                        <div className="bg-brand-gray/30 dark:bg-dark-border/10 rounded-xl p-5 border border-brand-border dark:border-dark-border">
-                            <h4 className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider mb-4">Taxas da Operadora</h4>
-                            <div className="grid grid-cols-2 gap-4">
-                                <MoneyInput
-                                    label="Taxa (%)"
-                                    value={editingPayment?.percentage_rate || 0}
-                                    onChange={(val: number) => setEditingPayment((prev: any) => ({ ...prev, percentage_rate: val }))}
-                                />
-                                <MoneyInput
-                                    label="Fixa (R$)"
-                                    value={editingPayment?.fixed_amount || 0}
-                                    onChange={(val: number) => setEditingPayment((prev: any) => ({ ...prev, fixed_amount: val }))}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col gap-3 pt-2">
-                            <Button
-                                className="w-full h-12 text-base font-bold bg-brand-green hover:bg-brand-green/90 text-white rounded-full shadow-lg shadow-brand-green/20"
-                                onClick={() => handleSavePaymentMethod({
-                                    name: editingPayment?.name || "",
-                                    paymentType: editingPayment?.payment_type || "credito",
-                                    cardBrand: editingPayment?.card_brand,
-                                    maxInstallments: editingPayment?.max_installments,
-                                    feeType: "both",
-                                    percentageRate: editingPayment?.percentage_rate || 0,
-                                    fixedAmount: editingPayment?.fixed_amount || 0,
-                                    receivingDays: editingPayment?.receiving_days || 0,
-                                    discountPercent: editingPayment?.discount_percent || 0,
-                                    isActive: editingPayment?.is_active ?? true
-                                })}
-                                disabled={isSavingPayment}
-                            >
-                                {isSavingPayment ? "Salvando..." : "Salvar"}
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="w-full h-12 text-base font-bold bg-transparent border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body rounded-full"
-                                onClick={() => setPaymentModalOpen(false)}
-                                disabled={isSavingPayment}
-                            >
-                                Cancelar
-                            </Button>
-                        </div>
-                    </div>
-                </DefaultModal>
+                <PaymentMethodDialog
+                    open={paymentModalOpen}
+                    onClose={async (shouldReload?: boolean) => {
+                        setPaymentModalOpen(false)
+                        if (shouldReload) {
+                            const result = await getPaymentMethodsAction(partner.id)
+                            if (result.methods) setMethods(result.methods)
+                        }
+                    }}
+                    partnerId={partner.id}
+                    editingMethod={editingPayment}
+                />
 
                 <AlertModal
                     isOpen={!!methodToDelete}

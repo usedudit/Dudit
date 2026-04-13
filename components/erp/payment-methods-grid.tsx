@@ -80,11 +80,15 @@ export function PaymentMethodsGrid({ partnerId, methods, onUpdate }: PaymentMeth
   const getPaymentTypeLabel = (type: string) => {
     const types: Record<string, string> = {
       dinheiro: "Dinheiro",
+      cash: "Dinheiro",
       pix: "PIX",
       credito: "Cartão de Crédito",
+      credit_card: "Cartão de Crédito",
       debito: "Cartão de Débito",
+      debit_card: "Cartão de Débito",
       vale_alimentacao: "Vale Alimentação",
       vale_refeicao: "Vale Refeição",
+      other: "Outros",
       outros: "Outros",
     }
     return types[type] || type

@@ -22,9 +22,15 @@ interface PaymentMethodsManagerProps {
 
 const paymentTypeLabels: Record<string, string> = {
   dinheiro: "Dinheiro",
+  cash: "Dinheiro",
   pix: "PIX",
   cartao_credito: "Cartão de Crédito",
+  credito: "Cartão de Crédito",
+  credit_card: "Cartão de Crédito",
   cartao_debito: "Cartão de Débito",
+  debito: "Cartão de Débito",
+  debit_card: "Cartão de Débito",
+  other: "Outros",
   vale_alimentacao: "Vale Alimentação",
   vale_refeicao: "Vale Refeição",
   outros: "Outros",

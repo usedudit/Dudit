@@ -103,15 +103,22 @@ export const CustomerSchema = z.object({
 export const PaymentMethodSchema = z.object({
   partnerId: z.string().uuid(),
   name: z.string().min(1).max(100),
-  paymentType: z.enum(["dinheiro", "pix", "credito", "debito", "vale_alimentacao", "vale_refeicao", "outros"]),
-  cardBrand: z.string().max(50).optional().nullable(),
+  paymentType: z.enum(["pix", "credit_card", "debit_card", "cash", "other"]),
+  pixKeyType: z.enum(["cpf", "cnpj", "email", "phone", "random"]).optional().nullable(),
+  pixKey: z.string().max(255).optional().nullable(),
+  usePartnerPixData: z.boolean().optional(),
   isActive: z.boolean(),
-  feeType: z.enum(["percentage", "fixed", "both"]).optional().nullable(),
-  percentageRate: z.number().min(0).max(100).optional().nullable(),
-  fixedAmount: z.number().min(0).optional().nullable(),
+  feePercent: z.number().min(0).max(100).optional().nullable(),
+  feeFixed: z.number().min(0).optional().nullable(),
   receivingDays: z.number().int().min(0).max(365).optional().nullable(),
+  feeBearer: z.enum(["merchant", "customer"]).optional(),
+  supportsInstallments: z.boolean().optional(),
   maxInstallments: z.number().int().min(1).max(24).optional().nullable(),
   discountPercent: z.number().min(0).max(100).optional().nullable(),
+  installmentFees: z.array(z.object({
+    installmentNumber: z.number().int().min(1).max(24),
+    feePercent: z.number().min(0).max(100),
+  })).optional(),
 })
 
 // Perfil de Usuário

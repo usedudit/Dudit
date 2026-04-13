@@ -7,21 +7,29 @@ import { Button } from "@/components/reusable"
 import { Input, Checkbox } from "@/components/reusable"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { createPaymentMethodAction, updatePaymentMethodAction } from "@/app/actions/payment-methods"
+import {
+  createPaymentMethodAction,
+  getPaymentMethodDetailsAction,
+  updatePaymentMethodAction,
+} from "@/app/actions/payment-methods"
 
 interface PaymentMethod {
   id: string
   name: string
-  payment_type: string
-  card_brand?: string | null
+  type?: string
+  payment_type?: string
   is_active: boolean
+  fee_percent?: number | null
+  fee_fixed?: number | null
+  fee_bearer?: "merchant" | "customer"
+  supports_installments?: boolean
   max_installments?: number
-  fee_type?: string
-  percentage_rate?: number
-  fixed_amount?: number
   receiving_days?: number
   discount_percent?: number | null
+  pix_key_type?: "cpf" | "cnpj" | "email" | "phone" | "random" | null
+  pix_key?: string | null
+  use_partner_pix_data?: boolean
+  installment_fees?: Array<{ installment_number: number; fee_percent: number }>
 }
 
 interface PaymentMethodDialogProps {
@@ -32,68 +40,104 @@ interface PaymentMethodDialogProps {
   onSuccess?: (newMethod?: any) => void
 }
 
-const cardBrands = [
-  { value: "visa", label: "Visa" },
-  { value: "mastercard", label: "Mastercard" },
-  { value: "american_express", label: "American Express" },
-  { value: "elo", label: "Elo" },
-  { value: "hipercard", label: "Hipercard" },
-  { value: "diners_club", label: "Diners Club" },
-  { value: "aura", label: "Aura" },
-  { value: "cabal", label: "Cabal" },
-  { value: "sorocredi", label: "Sorocredi" },
-  { value: "outros", label: "Outros" },
-]
-
 export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }: PaymentMethodDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false)
 
   const [formData, setFormData] = useState({
     name: "",
-    payment_type: "dinheiro",
-    card_brand: "",
+    payment_type: "cash",
     is_active: true,
-    max_installments: 12,
-    fee_type: "percentage",
-    percentage_rate: 0,
-    fixed_amount: 0,
+    max_installments: 1,
+    supports_installments: false,
+    fee_percent: 0,
+    fee_fixed: 0,
+    fee_bearer: "merchant" as "merchant" | "customer",
     receiving_days: 0,
     discount_percent: 0,
+    pix_key_type: "email" as "cpf" | "cnpj" | "email" | "phone" | "random",
+    pix_key: "",
+    use_partner_pix_data: false,
+    installment_fees: [{ installment_number: 1, fee_percent: 0 }] as Array<{ installment_number: number; fee_percent: number }>,
   })
 
+  const buildInstallments = (maxInstallments: number, existing?: Array<{ installment_number: number; fee_percent: number }>) => {
+    const map = new Map<number, number>((existing || []).map((row) => [row.installment_number, row.fee_percent]))
+    return Array.from({ length: maxInstallments }).map((_, idx) => ({
+      installment_number: idx + 1,
+      fee_percent: map.get(idx + 1) ?? 0,
+    }))
+  }
+
   useEffect(() => {
-    if (editingMethod && open) {
-      setFormData({
-        name: editingMethod.name,
-        payment_type: editingMethod.payment_type,
-        card_brand: editingMethod.card_brand || "",
-        is_active: editingMethod.is_active,
-        max_installments: editingMethod.max_installments || 12,
-        fee_type: editingMethod.fee_type || "percentage",
-        percentage_rate: editingMethod.percentage_rate || 0,
-        fixed_amount: editingMethod.fixed_amount || 0,
-        receiving_days: editingMethod.receiving_days || 0,
-        discount_percent: editingMethod.discount_percent || 0,
-      })
-    } else if (!editingMethod && open) {
+    if (!open) return
+    if (!editingMethod) {
       setFormData({
         name: "",
-        payment_type: "dinheiro",
-        card_brand: "",
+        payment_type: "cash",
         is_active: true,
-        max_installments: 12,
-        fee_type: "percentage",
-        percentage_rate: 0,
-        fixed_amount: 0,
+        max_installments: 1,
+        supports_installments: false,
+        fee_percent: 0,
+        fee_fixed: 0,
+        fee_bearer: "merchant",
         receiving_days: 0,
         discount_percent: 0,
+        pix_key_type: "email",
+        pix_key: "",
+        use_partner_pix_data: false,
+        installment_fees: [{ installment_number: 1, fee_percent: 0 }],
       })
+      setError(null)
+      return
     }
-    setError(null)
+
+    setIsLoadingDetails(true)
+    getPaymentMethodDetailsAction(editingMethod.id)
+      .then((res: any) => {
+        const full = res?.method || editingMethod
+        const resolvedType = full.type || full.payment_type || "cash"
+        const maxInstallments = Number(full.max_installments || 1)
+        setFormData({
+          name: full.name || "",
+          payment_type: resolvedType,
+          is_active: full.is_active ?? true,
+          max_installments: maxInstallments,
+          supports_installments: Boolean(full.supports_installments || maxInstallments > 1),
+          fee_percent: Number(full.fee_percent || 0),
+          fee_fixed: Number(full.fee_fixed || 0),
+          fee_bearer: full.fee_bearer || "merchant",
+          receiving_days: Number(full.receiving_days || 0),
+          discount_percent: Number(full.discount_percent || 0),
+          pix_key_type: full.pix_key_type || "email",
+          pix_key: full.pix_key || "",
+          use_partner_pix_data: Boolean(full.use_partner_pix_data),
+          installment_fees: buildInstallments(maxInstallments, full.installment_fees),
+        })
+      })
+      .finally(() => setIsLoadingDetails(false))
   }, [editingMethod, open])
 
-  const showCardFields = formData.payment_type === "credito" || formData.payment_type === "debito"
+  const isPix = formData.payment_type === "pix"
+  const isCreditCard = formData.payment_type === "credit_card"
+  const showFeeFields = formData.payment_type === "pix" || formData.payment_type === "debit_card"
+
+  useEffect(() => {
+    if (!isCreditCard) {
+      setFormData((prev) => ({
+        ...prev,
+        supports_installments: false,
+        max_installments: 1,
+        installment_fees: [{ installment_number: 1, fee_percent: 0 }],
+      }))
+      return
+    }
+    setFormData((prev) => ({
+      ...prev,
+      installment_fees: buildInstallments(prev.max_installments || 1, prev.installment_fees),
+    }))
+  }, [isCreditCard, formData.max_installments])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -106,25 +150,32 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
       return
     }
 
-    if (showCardFields && !formData.card_brand) {
-      setError("Selecione a bandeira do cartão")
+    if (formData.max_installments > 24) {
+      setError("O máximo de parcelas permitido é 24")
       setIsLoading(false)
       return
     }
 
     try {
+      const payload = {
+        name: formData.name,
+        isActive: formData.is_active,
+        paymentType: formData.payment_type,
+        feePercent: showFeeFields || isCreditCard ? formData.fee_percent : 0,
+        feeFixed: showFeeFields || isCreditCard ? formData.fee_fixed : 0,
+        receivingDays: formData.receiving_days,
+        discountPercent: formData.discount_percent,
+        feeBearer: formData.fee_bearer,
+        supportsInstallments: isCreditCard ? formData.supports_installments : false,
+        maxInstallments: isCreditCard && formData.supports_installments ? formData.max_installments : 1,
+        installmentFees: isCreditCard && formData.supports_installments ? formData.installment_fees : [],
+        pixKeyType: isPix ? formData.pix_key_type : null,
+        pixKey: isPix ? formData.pix_key : null,
+        usePartnerPixData: isPix ? formData.use_partner_pix_data : false,
+      }
+
       if (editingMethod) {
-        const result = await updatePaymentMethodAction(editingMethod.id, {
-          name: formData.name,
-          isActive: formData.is_active,
-          cardBrand: showCardFields ? formData.card_brand : null,
-          maxInstallments: formData.payment_type === "credito" ? formData.max_installments : null,
-          feeType: formData.fee_type,
-          percentageRate: formData.percentage_rate,
-          fixedAmount: formData.fixed_amount,
-          receivingDays: formData.receiving_days,
-          discountPercent: formData.discount_percent,
-        })
+        const result = await updatePaymentMethodAction(editingMethod.id, payload)
 
         if (result.error) {
           setError(result.error)
@@ -134,15 +185,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
       } else {
         const result = await createPaymentMethodAction({
           partnerId,
-          name: formData.name,
-          paymentType: formData.payment_type,
-          cardBrand: showCardFields ? formData.card_brand : null,
-          maxInstallments: formData.payment_type === "credito" ? formData.max_installments : null,
-          feeType: formData.fee_type,
-          percentageRate: formData.percentage_rate,
-          fixedAmount: formData.fixed_amount,
-          receivingDays: formData.receiving_days,
-          discountPercent: formData.discount_percent,
+          ...payload,
         })
 
         if (result.error) {
@@ -165,6 +208,9 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
           <DialogTitle>{editingMethod ? "Editar" : "Adicionar"} Método de Pagamento</DialogTitle>
         </DialogHeader>
 
+        {isLoadingDetails ? (
+          <div className="text-sm text-muted-foreground py-8">Carregando dados do método...</div>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
             <div className="grid gap-2">
@@ -183,59 +229,147 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
               <Label htmlFor="payment_type">Tipo de Pagamento*</Label>
               <Select
                 value={formData.payment_type}
-                onValueChange={(value) => setFormData({ ...formData, payment_type: value, card_brand: "" })}
-                disabled={!!editingMethod}
+                onValueChange={(value) => setFormData({ ...formData, payment_type: value })}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                  <SelectItem value="cash">Dinheiro</SelectItem>
                   <SelectItem value="pix">PIX</SelectItem>
-                  <SelectItem value="credito">Cartão de Crédito</SelectItem>
-                  <SelectItem value="debito">Cartão de Débito</SelectItem>
-                  <SelectItem value="vale_alimentacao">Vale Alimentação</SelectItem>
-                  <SelectItem value="vale_refeicao">Vale Refeição</SelectItem>
-                  <SelectItem value="outros">Outros</SelectItem>
+                  <SelectItem value="credit_card">Cartão de Crédito</SelectItem>
+                  <SelectItem value="debit_card">Cartão de Débito</SelectItem>
+                  <SelectItem value="other">Outros</SelectItem>
                 </SelectContent>
               </Select>
-              {editingMethod && (
-                <p className="text-xs text-muted-foreground">O tipo não pode ser alterado após a criação</p>
-              )}
             </div>
 
-            {showCardFields && (
-              <div className="grid gap-2">
-                <Label htmlFor="card_brand">Bandeira do Cartão*</Label>
-                <Select
-                  value={formData.card_brand}
-                  onValueChange={(value) => setFormData({ ...formData, card_brand: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a bandeira" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cardBrands.map((brand) => (
-                      <SelectItem key={brand.value} value={brand.value}>
-                        {brand.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            {isPix && (
+              <>
+                <div className="grid gap-2">
+                  <Label htmlFor="pix_key_type">Tipo da chave PIX</Label>
+                  <Select
+                    value={formData.pix_key_type}
+                    onValueChange={(value: any) => setFormData({ ...formData, pix_key_type: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cpf">CPF</SelectItem>
+                      <SelectItem value="cnpj">CNPJ</SelectItem>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="phone">Telefone</SelectItem>
+                      <SelectItem value="random">Chave aleatória</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pix_key">Chave PIX</Label>
+                  <Input
+                    id="pix_key"
+                    name="pix_key"
+                    value={formData.pix_key}
+                    onChange={(e) => setFormData({ ...formData, pix_key: e.target.value })}
+                    disabled={formData.use_partner_pix_data}
+                    placeholder="Informe a chave PIX"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="use_partner_pix_data"
+                    checked={formData.use_partner_pix_data}
+                    onChange={(checked) => setFormData({ ...formData, use_partner_pix_data: checked as boolean })}
+                  />
+                  <Label htmlFor="use_partner_pix_data">Usar dados do parceiro automaticamente</Label>
+                </div>
+                <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+                  Atenção! O sistema não valida a chave PIX. Por favor, informe a chave correta.
+                </div>
+              </>
             )}
 
-            {formData.payment_type === "credito" && (
+            {isCreditCard && (
+              <>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="supports_installments"
+                    checked={formData.supports_installments}
+                    onChange={(checked) => setFormData({ ...formData, supports_installments: checked as boolean })}
+                  />
+                  <Label htmlFor="supports_installments">Aceita parcelamento</Label>
+                </div>
+                {formData.supports_installments && (
+                  <>
+                    <div className="grid gap-2">
+                      <Label htmlFor="max_installments">Máximo de parcelas</Label>
+                      <Input
+                        id="max_installments"
+                        type="number"
+                        min="1"
+                        max="24"
+                        value={formData.max_installments}
+                        onChange={(e) => {
+                          const nextMax = Math.max(1, Math.min(24, Number(e.target.value || 1)))
+                          setFormData((prev) => ({
+                            ...prev,
+                            max_installments: nextMax,
+                            installment_fees: buildInstallments(nextMax, prev.installment_fees),
+                          }))
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Taxa por parcela (%)</Label>
+                      <div className="space-y-2">
+                        {formData.installment_fees.map((row, index) => (
+                          <div key={row.installment_number} className="grid grid-cols-2 gap-2">
+                            <Input value={`${row.installment_number}x`} disabled />
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              value={row.fee_percent}
+                              onChange={(e) => {
+                                const next = [...formData.installment_fees]
+                                next[index] = { ...row, fee_percent: Number(e.target.value || 0) }
+                                setFormData({ ...formData, installment_fees: next })
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            {showFeeFields && (
               <div className="grid gap-2">
-                <Label htmlFor="max_installments">Máximo de Parcelas</Label>
+                <Label htmlFor="fee_percent">Taxa percentual (%)</Label>
                 <Input
-                  id="max_installments"
-                  name="max_installments"
+                  id="fee_percent"
                   type="number"
-                  min="1"
-                  max="24"
-                  value={formData.max_installments}
-                  onChange={(e) => setFormData({ ...formData, max_installments: Number.parseInt(e.target.value) })}
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={formData.fee_percent}
+                  onChange={(e) => setFormData({ ...formData, fee_percent: Number(e.target.value || 0) })}
+                />
+              </div>
+            )}
+            {showFeeFields && (
+              <div className="grid gap-2">
+                <Label htmlFor="fee_fixed">Taxa fixa</Label>
+                <Input
+                  id="fee_fixed"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.fee_fixed}
+                  onChange={(e) => setFormData({ ...formData, fee_fixed: Number(e.target.value || 0) })}
                 />
               </div>
             )}
@@ -252,7 +386,22 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
           </div>
 
           <div className="space-y-4 border-t pt-4">
-            <h3 className="font-semibold">Desconto do Cliente</h3>
+            <h3 className="font-semibold">Configurações de taxa</h3>
+            <div className="grid gap-2">
+              <Label htmlFor="fee_bearer">Quem paga a taxa?</Label>
+              <Select
+                value={formData.fee_bearer}
+                onValueChange={(value: "merchant" | "customer") => setFormData({ ...formData, fee_bearer: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="merchant">Empresa (absorve)</SelectItem>
+                  <SelectItem value="customer">Cliente (acrescenta no valor)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid gap-2">
               <Label htmlFor="discount_percent">Desconto (%)</Label>
               <Input
@@ -267,84 +416,6 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                 placeholder="0,00"
               />
               <p className="text-xs text-muted-foreground">Desconto automático aplicado ao cliente para este método</p>
-            </div>
-          </div>
-
-          <div className="space-y-4 border-t pt-4">
-            <h3 className="font-semibold">Informações de Taxas</h3>
-            <p className="text-sm text-muted-foreground">
-              Configure as taxas que serão aplicadas neste método de pagamento
-            </p>
-
-            <div className="grid gap-2">
-              <Label>Tipo da taxa</Label>
-              <RadioGroup
-                value={formData.fee_type}
-                onValueChange={(value) => setFormData({ ...formData, fee_type: value })}
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="percentage" id="percentage" />
-                  <Label htmlFor="percentage">Alíquota (%)</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="fixed" id="fixed" />
-                  <Label htmlFor="fixed">Fixa (R$)</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="both" id="both" />
-                  <Label htmlFor="both">Alíquota + Fixa</Label>
-                </div>
-              </RadioGroup>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {(formData.fee_type === "percentage" || formData.fee_type === "both") && (
-                <div className="grid gap-2">
-                  <Label htmlFor="percentage_rate">Valor alíquota (%)</Label>
-                  <Input
-                    id="percentage_rate"
-                    name="percentage_rate"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={formData.percentage_rate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, percentage_rate: Number.parseFloat(e.target.value) || 0 })
-                    }
-                    placeholder="0,00"
-                  />
-                </div>
-              )}
-
-              {(formData.fee_type === "fixed" || formData.fee_type === "both") && (
-                <div className="grid gap-2">
-                  <Label htmlFor="fixed_amount">Valor fixo (R$)</Label>
-                  <Input
-                    id="fixed_amount"
-                    name="fixed_amount"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.fixed_amount}
-                    onChange={(e) => setFormData({ ...formData, fixed_amount: Number.parseFloat(e.target.value) || 0 })}
-                    placeholder="0,00"
-                  />
-                </div>
-              )}
-
-              <div className="grid gap-2">
-                <Label htmlFor="receiving_days">Prazo de recebimento (dias)</Label>
-                <Input
-                  id="receiving_days"
-                  name="receiving_days"
-                  type="number"
-                  min="0"
-                  value={formData.receiving_days}
-                  onChange={(e) => setFormData({ ...formData, receiving_days: Number.parseInt(e.target.value) || 0 })}
-                  placeholder="0"
-                />
-              </div>
             </div>
           </div>
 
@@ -365,6 +436,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
             </Button>
           </div>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   )
