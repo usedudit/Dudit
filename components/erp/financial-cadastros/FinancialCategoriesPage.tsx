@@ -41,6 +41,7 @@ interface FinancialCategoriesPageProps {
         id: string
         name: string
         parent_id: string | null
+        category_type?: "income" | "expense" | null
         is_active: boolean
         created_at: string
     }[]
@@ -66,6 +67,10 @@ function accountCurrentNum(item: FinanceAccountRow): number {
     if (v === null || v === undefined) return 0
     const n = Number(v)
     return Number.isFinite(n) ? n : 0
+}
+
+function normalizeName(value: string) {
+    return value.trim().replace(/\s+/g, " ").toLowerCase()
 }
 
 type FinContactModalType = "supplier" | "service" | "employee" | "partner" | "other"
@@ -94,13 +99,14 @@ export default function FinancialCategoriesPage({
             name: string
             is_active: boolean
             parentId: string | null
+            categoryType: "income" | "expense"
         }
         isSaving: boolean
     }>({
         isOpen: false,
         mode: "add",
         type: "category",
-        item: { name: "", is_active: true, parentId: null },
+        item: { name: "", is_active: true, parentId: null, categoryType: "income" },
         isSaving: false,
     })
 
@@ -252,7 +258,7 @@ export default function FinancialCategoriesPage({
             isOpen: true,
             mode: "add",
             type,
-            item: { name: "", is_active: true, parentId: null },
+            item: { name: "", is_active: true, parentId: null, categoryType: "income" },
             isSaving: false,
         })
         setNameError(false)
@@ -264,7 +270,13 @@ export default function FinancialCategoriesPage({
             isOpen: true,
             mode: "edit",
             type,
-            item: { id: item.id, name: item.name, is_active: item.is_active, parentId: item.parent_id },
+            item: {
+                id: item.id,
+                name: item.name,
+                is_active: item.is_active,
+                parentId: item.parent_id,
+                categoryType: (item.category_type as "income" | "expense" | null) || "income",
+            },
             isSaving: false,
         })
         setNameError(false)
@@ -311,6 +323,15 @@ export default function FinancialCategoriesPage({
             return
         }
         setNameError(false)
+        const categoryNameKey = normalizeName(item.name)
+        const duplicatedCategory = categories.some((c) => {
+            if (mode === "edit" && item.id && c.id === item.id) return false
+            return normalizeName(c.name) === categoryNameKey
+        })
+        if (duplicatedCategory) {
+            error("Já existe uma categoria/subcategoria com esse nome.")
+            return
+        }
 
         setModal((prev) => ({ ...prev, isSaving: true }))
         try {
@@ -320,6 +341,7 @@ export default function FinancialCategoriesPage({
                     partnerId,
                     name: item.name,
                     parentId: type === "subcategory" ? item.parentId : null,
+                    categoryType: type === "subcategory" ? undefined : item.categoryType,
                 })
             } else {
                 if (!item.id) {
@@ -330,6 +352,7 @@ export default function FinancialCategoriesPage({
                     name: item.name,
                     isActive: item.is_active,
                     parentId: type === "subcategory" ? item.parentId : null,
+                    categoryType: type === "subcategory" ? undefined : item.categoryType,
                 })
             }
 
@@ -355,6 +378,15 @@ export default function FinancialCategoriesPage({
             return
         }
         setAccountNameError(false)
+        const accountNameKey = normalizeName(item.name)
+        const duplicatedAccount = accounts.some((a) => {
+            if (mode === "edit" && item.id && a.id === item.id) return false
+            return normalizeName(a.name) === accountNameKey
+        })
+        if (duplicatedAccount) {
+            error("Já existe uma conta com esse nome.")
+            return
+        }
 
         const initialBal = parseMoneyInput(item.initialBalanceStr)
 
@@ -401,6 +433,12 @@ export default function FinancialCategoriesPage({
     const handleSaveContact = async () => {
         if (!contactModal.name.trim()) {
             error("O nome é obrigatório")
+            return
+        }
+        const contactNameKey = normalizeName(contactModal.name)
+        const duplicatedContact = contacts.some((c) => normalizeName(c.name) === contactNameKey && c.type === contactModal.type)
+        if (duplicatedContact) {
+            error("Já existe um contato com esse nome para esse tipo.")
             return
         }
         setContactModal((prev) => ({ ...prev, saving: true }))
@@ -615,7 +653,7 @@ export default function FinancialCategoriesPage({
                             setModal((prev) => ({
                                 ...prev,
                                 type: val as "category" | "subcategory",
-                                item: { ...prev.item, parentId: null },
+                                item: { ...prev.item, parentId: null, categoryType: "income" },
                             }))
                         }
                         disabled={modal.mode === "edit"}
@@ -650,6 +688,23 @@ export default function FinancialCategoriesPage({
                                 }
                             />
                         </div>
+                    )}
+
+                    {modal.type === "category" && (
+                        <FormDropdown
+                            label="Tipo da categoria"
+                            options={[
+                                { value: "income", label: "Receita" },
+                                { value: "expense", label: "Despesa" },
+                            ]}
+                            value={modal.item.categoryType}
+                            setValue={(v) =>
+                                setModal((prev) => ({
+                                    ...prev,
+                                    item: { ...prev.item, categoryType: v as "income" | "expense" },
+                                }))
+                            }
+                        />
                     )}
 
                     <Checkbox

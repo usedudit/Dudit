@@ -135,7 +135,7 @@ export async function createTransactionFromOrder(
                 contact_id: contactId,
                 contact_type: "customer",
                 amount,
-                due_date: paymentDate,
+                due_date: null,
                 payment_date: paymentDate,
                 status: "paid",
                 notes: null,

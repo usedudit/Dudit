@@ -560,6 +560,60 @@ export async function registerPartner(data: any) {
       { partner_id: newPartner.id, name: "PIX", payment_type: "pix", is_active: true }
     ])
 
+    // 5. Categorias financeiras padrão
+    const defaultCategories = [
+      { name: "Vendas", category_type: "income" as const },
+      { name: "Outras receitas", category_type: "income" as const },
+      { name: "Moradia / Estrutura", category_type: "expense" as const },
+      { name: "Alimentação", category_type: "expense" as const },
+      { name: "Transporte", category_type: "expense" as const },
+      { name: "Negócio", category_type: "expense" as const },
+      { name: "Financeiro", category_type: "expense" as const },
+      { name: "Impostos", category_type: "expense" as const },
+      { name: "Outros", category_type: "expense" as const },
+    ]
+    const { data: insertedCategories } = await supabaseAdmin
+      .from("financial_categories")
+      .insert(
+        defaultCategories.map((item) => ({
+          partner_id: newPartner.id,
+          name: item.name,
+          category_type: item.category_type,
+          parent_id: null,
+          is_active: true,
+        })),
+      )
+      .select("id, name")
+
+    const byName = new Map((insertedCategories || []).map((c: any) => [c.name, c.id]))
+    const vendasId = byName.get("Vendas")
+    const negocioId = byName.get("Negócio")
+
+    const defaultSubcategories: Array<{ name: string; parent_id: string; category_type: "income" | "expense" }> = []
+    if (vendasId) {
+      defaultSubcategories.push(
+        { name: "Produtos", parent_id: vendasId, category_type: "income" },
+        { name: "Serviços", parent_id: vendasId, category_type: "income" },
+      )
+    }
+    if (negocioId) {
+      defaultSubcategories.push(
+        { name: "Marketing", parent_id: negocioId, category_type: "expense" },
+        { name: "Ferramentas", parent_id: negocioId, category_type: "expense" },
+      )
+    }
+    if (defaultSubcategories.length > 0) {
+      await supabaseAdmin.from("financial_categories").insert(
+        defaultSubcategories.map((item) => ({
+          partner_id: newPartner.id,
+          name: item.name,
+          parent_id: item.parent_id,
+          category_type: item.category_type,
+          is_active: true,
+        })),
+      )
+    }
+
     revalidatePath("/erp")
 
     return { success: true, partnerId: newPartner.id }

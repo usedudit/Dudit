@@ -48,6 +48,11 @@ const TransactionGridCard = React.memo(
                                 <h3 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate shrink">
                                     {transaction.description}
                                 </h3>
+                                {transaction.isInstallmentGroup && (
+                                    <Badge variant="orange" className="whitespace-nowrap scale-90 shrink-0">
+                                        Parcelado
+                                    </Badge>
+                                )}
                                 {isRecurring && (
                                     <Badge variant="purple" className="whitespace-nowrap scale-90 shrink-0">
                                         Recorrente
@@ -107,7 +112,7 @@ const TransactionGridCard = React.memo(
 
                         <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                             <ActionsDropdown
-                                onEdit={onEdit ? () => onEdit(transaction) : undefined}
+                                onEdit={transaction.isInstallmentGroup ? undefined : onEdit ? () => onEdit(transaction) : undefined}
                                 onCancel={transaction.isRecurringOccurrence && onMarkAsPaid ? () => onMarkAsPaid(transaction) : undefined}
                                 cancelLabel={transaction.isRecurringOccurrence ? "Marcar como pago" : undefined}
                             />

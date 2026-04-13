@@ -7,7 +7,7 @@ import { ActionsDropdown } from "@/components/reusable/Accordion"
 import { Package, SubcategoryIcon } from "@/lib/icons"
 
 interface FinancialCategoryCardProps {
-    item: { id: string; name: string; parent_id: string | null; is_active: boolean; created_at: string }
+    item: { id: string; name: string; parent_id: string | null; category_type?: "income" | "expense" | null; is_active: boolean; created_at: string }
     type: "categories" | "subcategories"
     categories?: { id: string; name: string; parent_id: string | null }[]
     onEdit: () => void
@@ -53,7 +53,14 @@ const FinancialCategoryCard = React.memo(
                         </div>
 
                         <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
-                            {type === "categories" && "Categoria financeira"}
+                            {type === "categories" && (
+                                <span>
+                                    Categoria financeira •{" "}
+                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                        {item.category_type === "expense" ? "Despesa" : "Receita"}
+                                    </span>
+                                </span>
+                            )}
                             {type === "subcategories" && (
                                 <span className="flex items-center gap-1">
                                     Subcategoria de{" "}

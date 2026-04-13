@@ -79,7 +79,7 @@ const ProductGridCard = React.memo(
                                 </h3>
                                 <Badge
                                     variant={product.is_active ? "green" : "red"}
-                                    className="whitespace-nowrap scale-90"
+                                    className="whitespace-nowrap scale-90 shrink-0"
                                 >
                                     {product.is_active ? "Ativo" : "Inativo"}
                                 </Badge>

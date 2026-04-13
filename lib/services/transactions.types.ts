@@ -55,4 +55,11 @@ export interface ERPTransaction {
   recurringTemplateId?: string
   /** The exact date of this occurrence (ISO yyyy-MM-dd) */
   occurrenceDate?: string
+  installmentGroupId?: string | null
+  installmentNumber?: number | null
+  installmentGroupDescription?: string | null
+  installmentTotalCount?: number | null
+  isInstallmentGroup?: boolean
+  installmentPendingCount?: number
+  installmentPaidCount?: number
 }

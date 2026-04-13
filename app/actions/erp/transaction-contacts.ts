@@ -14,6 +14,10 @@ export type TransactionContactRow = {
 
 const CONTACT_TYPES = new Set(["customer", "supplier", "service", "employee", "partner", "other"])
 
+function normalizeName(value: string) {
+    return value.trim().replace(/\s+/g, " ")
+}
+
 export async function listAllTransactionContactsAction(
     partnerId: string,
 ): Promise<{ success: true; data: TransactionContactRow[] } | { success: false; error: string }> {
@@ -72,13 +76,24 @@ export async function createTransactionContactAction(input: {
         await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
         if (!input.name?.trim()) throw new Error("O nome é obrigatório.")
         if (!CONTACT_TYPES.has(input.type)) throw new Error("Tipo de contato inválido.")
+        const normalizedName = normalizeName(input.name)
 
         const supabase = await getSupabaseServerClient()
+        const { data: duplicate } = await supabase
+            .from("transaction_contacts")
+            .select("id")
+            .eq("partner_id", input.partnerId)
+            .ilike("name", normalizedName)
+            .eq("type", input.type)
+            .limit(1)
+            .maybeSingle()
+        if (duplicate?.id) throw new Error("Já existe um contato com esse nome para esse tipo.")
+
         const { data, error } = await supabase
             .from("transaction_contacts")
             .insert({
                 partner_id: input.partnerId,
-                name: input.name.trim(),
+                name: normalizedName,
                 type: input.type,
                 description: input.description?.trim() || null,
             })

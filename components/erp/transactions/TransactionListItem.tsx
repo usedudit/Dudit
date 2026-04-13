@@ -44,6 +44,11 @@ const TransactionListItem = React.memo(
                                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate leading-tight">
                                     {transaction.description}
                                 </span>
+                                {transaction.isInstallmentGroup && (
+                                    <Badge variant="orange" className="whitespace-nowrap scale-90 shrink-0">
+                                        Parcelado
+                                    </Badge>
+                                )}
                                 {(transaction.recurringId || transaction.isRecurringOccurrence) && (
                                     <Badge variant="purple" className="whitespace-nowrap scale-90 shrink-0">
                                         Recorrente
@@ -114,7 +119,7 @@ const TransactionListItem = React.memo(
                     return (
                         <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
                             <ActionsDropdown
-                                onEdit={onEdit ? () => onEdit(transaction) : undefined}
+                                onEdit={transaction.isInstallmentGroup ? undefined : onEdit ? () => onEdit(transaction) : undefined}
                                 onCancel={transaction.isRecurringOccurrence && onMarkAsPaid ? () => onMarkAsPaid(transaction) : undefined}
                                 cancelLabel={transaction.isRecurringOccurrence ? "Marcar como pago" : undefined}
                             />

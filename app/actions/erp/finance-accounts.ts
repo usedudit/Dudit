@@ -16,7 +16,7 @@ export async function getFinanceAccountsAction(partnerId: string) {
     const { data, error } = await supabase
       .from("finance_accounts")
       .select(
-        "id, name, type, description, initial_balance, current_balance, is_active, created_at, updated_at",
+        "id, name, type, description, initial_balance, current_balance, is_active, created_at, updated_at, is_system_managed, integration_source",
       )
       .eq("partner_id", partnerId)
       .order("name")
@@ -41,6 +41,10 @@ function parseOptionalBalance(v: unknown): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+function normalizeName(value: string) {
+  return value.trim().replace(/\s+/g, " ")
+}
+
 export async function createFinanceAccountAction(data: {
   partnerId: string
   name: string
@@ -48,6 +52,8 @@ export async function createFinanceAccountAction(data: {
   description?: string | null
   initialBalance: number
   currentBalance?: number | null
+  isSystemManaged?: boolean
+  integrationSource?: string | null
 }) {
   try {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -58,6 +64,16 @@ export async function createFinanceAccountAction(data: {
 
     if (!data.name?.trim()) throw new Error("O nome é obrigatório.")
     if (!["cash", "bank", "wallet"].includes(data.type)) throw new Error("Tipo de conta inválido.")
+    const normalizedName = normalizeName(data.name)
+
+    const { data: duplicate } = await supabase
+      .from("finance_accounts")
+      .select("id")
+      .eq("partner_id", data.partnerId)
+      .ilike("name", normalizedName)
+      .limit(1)
+      .maybeSingle()
+    if (duplicate?.id) throw new Error("Já existe uma conta com esse nome.")
 
     const initial = parseBalance(data.initialBalance)
     const explicitCurrent =
@@ -69,14 +85,16 @@ export async function createFinanceAccountAction(data: {
       .from("finance_accounts")
       .insert({
         partner_id: data.partnerId,
-        name: data.name.trim(),
+        name: normalizedName,
         type: data.type,
         description: data.description?.trim() || null,
         initial_balance: initial,
         current_balance: 0,
+        is_system_managed: data.isSystemManaged ?? false,
+        integration_source: data.integrationSource ?? null,
       })
       .select(
-        "id, name, type, description, initial_balance, current_balance, is_active, created_at, updated_at",
+        "id, name, type, description, initial_balance, current_balance, is_active, created_at, updated_at, is_system_managed, integration_source",
       )
       .single()
 
@@ -110,7 +128,7 @@ export async function createFinanceAccountAction(data: {
 
     const { data: refreshed } = await supabase
       .from("finance_accounts")
-      .select("id, name, type, description, initial_balance, current_balance, is_active, created_at, updated_at")
+      .select("id, name, type, description, initial_balance, current_balance, is_active, created_at, updated_at, is_system_managed, integration_source")
       .eq("id", inserted.id)
       .single()
 
@@ -138,8 +156,39 @@ export async function updateFinanceAccountAction(
     await requirePartnerAccessWithPermission(partnerId, "financial", "edit")
     const supabase = await getSupabaseServerClient()
 
+    const { data: account, error: accErr } = await supabase
+      .from("finance_accounts")
+      .select("id, is_system_managed, integration_source")
+      .eq("id", id)
+      .eq("partner_id", partnerId)
+      .single()
+    if (accErr || !account) throw new Error("Conta não encontrada.")
+
+    if (account.is_system_managed && account.integration_source === "mercadopago") {
+      const { data: partner } = await supabase
+        .from("partners")
+        .select("mp_user_id")
+        .eq("id", partnerId)
+        .single()
+      if (partner?.mp_user_id) {
+        throw new Error("A conta Mercado Pago não pode ser editada enquanto a integração estiver conectada.")
+      }
+    }
+
     const payload: Record<string, unknown> = {}
-    if (data.name !== undefined) payload.name = data.name.trim()
+    if (data.name !== undefined) {
+      const normalizedName = normalizeName(data.name)
+      const { data: duplicate } = await supabase
+        .from("finance_accounts")
+        .select("id")
+        .eq("partner_id", partnerId)
+        .ilike("name", normalizedName)
+        .neq("id", id)
+        .limit(1)
+        .maybeSingle()
+      if (duplicate?.id) throw new Error("Já existe uma conta com esse nome.")
+      payload.name = normalizedName
+    }
     if (data.type !== undefined) {
       if (!["cash", "bank", "wallet"].includes(data.type)) throw new Error("Tipo de conta inválido.")
       payload.type = data.type
@@ -154,7 +203,7 @@ export async function updateFinanceAccountAction(
       .eq("id", id)
       .eq("partner_id", partnerId)
       .select(
-        "id, name, type, description, initial_balance, current_balance, is_active, created_at, updated_at",
+        "id, name, type, description, initial_balance, current_balance, is_active, created_at, updated_at, is_system_managed, integration_source",
       )
       .single()
 
@@ -169,6 +218,25 @@ export async function deleteFinanceAccountAction(id: string, partnerId: string) 
   try {
     await requirePartnerAccessWithPermission(partnerId, "financial", "edit")
     const supabase = await getSupabaseServerClient()
+
+    const { data: account, error: accErr } = await supabase
+      .from("finance_accounts")
+      .select("id, is_system_managed, integration_source")
+      .eq("id", id)
+      .eq("partner_id", partnerId)
+      .single()
+    if (accErr || !account) throw new Error("Conta não encontrada.")
+
+    if (account.is_system_managed && account.integration_source === "mercadopago") {
+      const { data: partner } = await supabase
+        .from("partners")
+        .select("mp_user_id")
+        .eq("id", partnerId)
+        .single()
+      if (partner?.mp_user_id) {
+        throw new Error("A conta Mercado Pago não pode ser excluída enquanto a integração estiver conectada.")
+      }
+    }
 
     const { error } = await supabase.from("finance_accounts").delete().eq("id", id).eq("partner_id", partnerId)
 

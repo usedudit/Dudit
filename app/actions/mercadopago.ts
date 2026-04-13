@@ -35,6 +35,16 @@ export async function disconnectMercadoPagoAction() {
     return { error: error.message }
   }
 
+  await supabase
+    .from("finance_accounts")
+    .update({
+      is_system_managed: false,
+      integration_source: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("partner_id", partner.id)
+    .eq("integration_source", "mercadopago")
+
   revalidatePath("/erp/settings")
   return { success: true }
 }

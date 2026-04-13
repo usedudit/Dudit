@@ -112,7 +112,7 @@ export const IntegrationsSubPage = ({
 
           {/* Sticky Header */}
           <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
-            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
               {/* Back button - desktop only */}
               <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>

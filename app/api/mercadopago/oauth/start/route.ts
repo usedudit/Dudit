@@ -11,21 +11,30 @@ function normalizeBaseUrl(rawUrl: string): string {
 }
 
 export async function GET(request: NextRequest) {
+  // ✅ base URL segura
+  const appUrl = normalizeBaseUrl(
+    process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
+  )
+
   try {
     const user = await getCurrentUser()
+
     if (!user) {
-      return NextResponse.redirect(new URL("/auth/login", request.url))
+      return NextResponse.redirect(`${appUrl}/auth/login`)
     }
 
     const clientId = process.env.NEXT_PUBLIC_MP_CLIENT_ID
+
     if (!clientId) {
-      return NextResponse.redirect(new URL("/erp/settings?mp_error=missing_client_id", request.url))
+      return NextResponse.redirect(
+        `${appUrl}/erp/settings?mp_error=missing_client_id`
+      )
     }
 
-    const appUrl = normalizeBaseUrl(process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin)
     const redirectUri = `${appUrl}/api/mercadopago/oauth/callback`
 
     const supabase = await getSupabaseServerClient()
+
     const { data: partner } = await supabase
       .from("partners")
       .select("id, user_id")
@@ -33,12 +42,20 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (!partner) {
-      return NextResponse.redirect(new URL("/erp/settings?mp_error=partner_not_found", request.url))
+      return NextResponse.redirect(
+        `${appUrl}/erp/settings?mp_error=partner_not_found`
+      )
     }
 
-    const signedState = await generateOAuthState(partner.id, partner.user_id)
+    const signedState = await generateOAuthState(
+      partner.id,
+      partner.user_id
+    )
 
-    const authUrl = new URL("https://auth.mercadopago.com.br/authorization")
+    const authUrl = new URL(
+      "https://auth.mercadopago.com.br/authorization"
+    )
+
     authUrl.searchParams.set("client_id", clientId)
     authUrl.searchParams.set("response_type", "code")
     authUrl.searchParams.set("platform_id", "mp")
@@ -48,6 +65,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(authUrl)
   } catch (error) {
     console.error("Mercado Pago OAuth start error:", error)
-    return NextResponse.redirect(new URL("/erp/settings?mp_error=oauth_start_failed", request.url))
+
+    return NextResponse.redirect(
+      `${appUrl}/erp/settings?mp_error=oauth_start_failed`
+    )
   }
 }

@@ -14,6 +14,7 @@ import { createTransactionHistoryEntry, getTransactionHistoryEntries } from "@/l
 type DbTransaction = {
     id: string
     description: string
+    categoryLabel?: string
     category: string
     amount: number
     due_date: string | null
@@ -35,10 +36,19 @@ type DbTransaction = {
     subcategory_id?: string | null
     recurring_id?: string | null
     payment_method_id?: string | null
+    installment_group_id?: string | null
+    installment_number?: number | null
     transaction_contacts?: {
         name: string | null
         type: ERPTransaction["contactType"] | null
     } | null
+}
+
+type InstallmentGroupRow = {
+    id: string
+    description: string
+    total_amount: number
+    installments_count: number
 }
 
 function ledgerDirectionFromRow(t: DbTransaction): ERPTransaction["ledgerDirection"] {
@@ -112,6 +122,7 @@ function buildTransactionUpdateHistoryLines(patch: Partial<CreateManualTransacti
     if (patch.customerId !== undefined) lines.push("alterou o cliente vinculado.")
     if (patch.contactType !== undefined) lines.push("alterou o tipo de contato.")
     if (patch.paymentType !== undefined) lines.push("alterou o meio de pagamento.")
+    if (patch.paymentMethodId !== undefined) lines.push("alterou o meio de pagamento.")
     if (patch.dueDate !== undefined) lines.push("alterou a data de vencimento.")
     if (patch.paymentDate !== undefined) lines.push("alterou a data de pagamento.")
     if (patch.transactionDate !== undefined) lines.push("alterou a data da transação.")
@@ -178,6 +189,28 @@ function numFinanceBalance(v: unknown): number {
     return Number.isFinite(n) ? n : 0
 }
 
+function isMissingCreatedByUserIdColumnError(error: any): boolean {
+    const message = String(error?.message || "").toLowerCase()
+    return message.includes("created_by_user_id") && message.includes("transactions")
+}
+
+async function insertTransactionsWithOptionalCreator(
+    supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+    payload: Record<string, unknown> | Record<string, unknown>[],
+) {
+    const firstTry = await supabase.from("transactions").insert(payload).select("*")
+    if (!firstTry.error) return firstTry
+    if (!isMissingCreatedByUserIdColumnError(firstTry.error)) return firstTry
+
+    const dropCreator = (row: Record<string, unknown>) => {
+        const cloned = { ...row }
+        delete cloned.created_by_user_id
+        return cloned
+    }
+    const retriedPayload = Array.isArray(payload) ? payload.map(dropCreator) : dropCreator(payload)
+    return await supabase.from("transactions").insert(retriedPayload).select("*")
+}
+
 async function applyFinanceAccountBalanceAfterInsert(
     supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
     partnerId: string,
@@ -230,7 +263,7 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
             .from("transactions")
             .select(`
         id, description, category, amount, due_date, payment_date, created_at, status, notes, payment_type, transaction_type, contact_id, customer_id, contact_type,
-        transfer_group_id, refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id, payment_method_id,
+        transfer_group_id, refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id, payment_method_id, installment_group_id, installment_number,
         transaction_contacts(name, type)
       `)
             .eq("partner_id", partnerId)
@@ -312,6 +345,21 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
             }
         }
 
+        const installmentGroupIds = Array.from(
+            new Set(txs.map((t) => t.installment_group_id).filter(Boolean)),
+        ) as string[]
+        const installmentGroupById = new Map<string, InstallmentGroupRow>()
+        if (installmentGroupIds.length > 0) {
+            const { data: groups } = await supabase
+                .from("installment_groups")
+                .select("id, description, total_amount, installments_count")
+                .eq("partner_id", partnerId)
+                .in("id", installmentGroupIds)
+            for (const g of groups || []) {
+                installmentGroupById.set(g.id, g as InstallmentGroupRow)
+            }
+        }
+
         const now = new Date()
         const nowTime = now.getTime()
         const mapped: ERPTransaction[] = txs.map((t) => {
@@ -376,6 +424,14 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
                 paymentMethodId: t.payment_method_id ?? null,
                 paymentDateRaw: t.payment_date ?? null,
                 dueDateRaw: t.due_date ?? null,
+                installmentGroupId: t.installment_group_id ?? null,
+                installmentNumber: t.installment_number ?? null,
+                installmentGroupDescription: t.installment_group_id
+                    ? installmentGroupById.get(t.installment_group_id)?.description || null
+                    : null,
+                installmentTotalCount: t.installment_group_id
+                    ? Number(installmentGroupById.get(t.installment_group_id)?.installments_count || 0) || null
+                    : null,
             }
         })
 
@@ -407,6 +463,8 @@ export type CreateManualTransactionInput = {
     origin?: "manual" | "system" | "gateway"
     refundKind?: "expense_refund" | "revenue_refund" | null
     referenceNote?: string | null
+    installmentGroupId?: string | null
+    installmentNumber?: number | null
 }
 
 /** Canonical status check - ALWAYS use DB values, never UI-displayed strings */
@@ -417,6 +475,17 @@ function isStatusPaid(status?: string | null): boolean {
 function isSystemOrGatewayOrigin(origin?: string | null): boolean {
     const o = String(origin || "").toLowerCase()
     return o === "system" || o === "gateway"
+}
+
+function normalizeOrderPaymentMethodLabel(value: string | null | undefined): string {
+    const raw = String(value || "").trim()
+    if (!raw) return "Não informado"
+    const norm = raw.toLowerCase()
+    if (norm === "pix") return "Pix"
+    if (norm === "dinheiro") return "Dinheiro"
+    if (norm.includes("cart")) return "Cartão"
+    if (norm.includes("boleto")) return "Boleto"
+    return raw
 }
 
 /** Fields that are NEVER editable on paid/confirmed transactions */
@@ -490,11 +559,15 @@ export async function createManualTransactionAction(input: CreateManualTransacti
             origin: input.origin || "manual",
             refund_kind: input.transactionType === "refund" ? input.refundKind ?? null : null,
             reference_note: input.referenceNote?.trim() || null,
+            installment_group_id: input.installmentGroupId || null,
+            installment_number: input.installmentNumber ?? null,
             created_by_user_id: user?.id ?? null,
         }
 
-        const { data, error } = await supabase.from("transactions").insert(payload).select("*").single()
-        if (error) throw error
+        const inserted = await insertTransactionsWithOptionalCreator(supabase, payload)
+        if (inserted.error) throw inserted.error
+        const data = (inserted.data || [])[0]
+        if (!data) throw new Error("Erro ao criar transação")
 
         await applyFinanceAccountBalanceAfterInsert(supabase, input.partnerId, input.accountId, {
             transaction_type: input.transactionType,
@@ -617,8 +690,9 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
         const outRowWithCreator = { ...outRow, created_by_user_id: transferUser?.id ?? null }
         const inRowWithCreator = { ...inRow, created_by_user_id: transferUser?.id ?? null }
 
-        const { data, error } = await supabase.from("transactions").insert([outRowWithCreator, inRowWithCreator]).select("*")
-        if (error) throw error
+        const inserted = await insertTransactionsWithOptionalCreator(supabase, [outRowWithCreator, inRowWithCreator])
+        if (inserted.error) throw inserted.error
+        const data = inserted.data || []
 
         if (isLedgerConfirmedStatus(status)) {
             await applyFinanceAccountBalanceAfterInsert(supabase, input.partnerId, input.fromAccountId, {
@@ -667,7 +741,7 @@ export async function updateManualTransactionAction(
 
         const { data: current, error: currentError } = await supabase
             .from("transactions")
-            .select("id, partner_id, status, origin, recurring_id")
+            .select("id, partner_id, status, origin, recurring_id, installment_group_id, category, description, payment_method_id")
             .eq("id", transactionId)
             .eq("partner_id", partnerId)
             .single()
@@ -683,6 +757,13 @@ export async function updateManualTransactionAction(
             )
         }
 
+        const isInstallmentNonPending =
+            !!(current as any).installment_group_id &&
+            String(current.status || "").toLowerCase() !== "pending"
+        if (isInstallmentNonPending) {
+            throw new Error("Apenas parcelas pendentes podem ser editadas.")
+        }
+
         // Build payload with strict field-level locking
         const payload: Record<string, unknown> = {}
         const patchKeys = Object.keys(patch) as (keyof CreateManualTransactionInput)[]
@@ -696,6 +777,15 @@ export async function updateManualTransactionAction(
             if (systemGateway && LOCKED_FIELDS_SYSTEM_GATEWAY.has(key)) {
                 throw new Error(`Campo "${key}" não pode ser editado em transação do sistema/gateway.`)
             }
+        }
+
+        const isSalesTransaction = String(current.category || "").toLowerCase() === "vendas"
+        if (isSalesTransaction && (
+            patch.contactId !== undefined ||
+            patch.customerId !== undefined ||
+            patch.contactType !== undefined
+        )) {
+            throw new Error("Não é permitido alterar o contato de transações geradas por venda.")
         }
 
         // Pending transactions: allow all editable fields
@@ -718,6 +808,7 @@ export async function updateManualTransactionAction(
             if (patch.customerId !== undefined) payload.customer_id = patch.customerId
             if (patch.contactType !== undefined) payload.contact_type = patch.contactType
             if (patch.paymentType !== undefined) payload.payment_type = patch.paymentType
+            if (patch.paymentMethodId !== undefined) payload.payment_method_id = patch.paymentMethodId
             if (patch.dueDate !== undefined) payload.due_date = patch.dueDate
             if (patch.paymentDate !== undefined) payload.payment_date = patch.paymentDate
             if (patch.transactionDate !== undefined) payload.transaction_date = patch.transactionDate
@@ -742,6 +833,30 @@ export async function updateManualTransactionAction(
             .select("*")
             .single()
         if (error) throw error
+
+        if (isSalesTransaction && (patch.paymentMethodId !== undefined || patch.paymentType !== undefined)) {
+            let nextOrderPaymentMethod = patch.paymentType || null
+            if (patch.paymentMethodId !== undefined && patch.paymentMethodId) {
+                const { data: paymentMethod } = await supabase
+                    .from("payment_methods")
+                    .select("name")
+                    .eq("id", patch.paymentMethodId)
+                    .eq("partner_id", partnerId)
+                    .maybeSingle()
+                nextOrderPaymentMethod = paymentMethod?.name || nextOrderPaymentMethod
+            }
+            if (nextOrderPaymentMethod) {
+                const normalized = normalizeOrderPaymentMethodLabel(nextOrderPaymentMethod)
+                await supabase
+                    .from("orders")
+                    .update({
+                        payment_method: normalized,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq("partner_id", partnerId)
+                    .eq("order_number", String(current.description || "").trim())
+            }
+        }
 
         const historyLines = buildTransactionUpdateHistoryLines(patch)
         if (historyLines.length > 0) {
@@ -780,7 +895,7 @@ export async function getTransactionForEditAction(transactionId: string, partner
                 status, notes, payment_type, transaction_type, contact_id, customer_id,
                 contact_type, transfer_group_id, refund_kind, reference_note, origin,
                 account_id, category_id, subcategory_id, recurring_id, transaction_date,
-                payment_method_id
+                payment_method_id, installment_group_id, installment_number
             `)
             .eq("id", transactionId)
             .eq("partner_id", partnerId)
@@ -790,6 +905,170 @@ export async function getTransactionForEditAction(transactionId: string, partner
         return { success: true as const, data }
     } catch (e: any) {
         return { success: false as const, error: e.message || "Erro ao carregar transação" }
+    }
+}
+
+function addInstallmentDate(anchor: Date, frequency: "daily" | "weekly" | "monthly" | "yearly", interval: number, steps: number): Date {
+    const d = new Date(anchor)
+    const total = Math.max(1, interval) * Math.max(0, steps)
+    if (frequency === "daily") d.setDate(d.getDate() + total)
+    else if (frequency === "weekly") d.setDate(d.getDate() + (7 * total))
+    else if (frequency === "monthly") d.setMonth(d.getMonth() + total)
+    else d.setFullYear(d.getFullYear() + total)
+    return d
+}
+
+export async function createInstallmentGroupAction(input: {
+    partnerId: string
+    transactionType: "income" | "expense"
+    description: string
+    totalAmount: number
+    installmentsCount: number
+    frequency: "daily" | "weekly" | "monthly" | "yearly"
+    interval: number
+    startDate: string
+    categoryId?: string | null
+    subcategoryId?: string | null
+    accountId?: string | null
+    contactId?: string | null
+    customerId?: string | null
+    contactType?: "customer" | "supplier" | "service" | "employee" | "partner" | "other" | null
+    paymentType?: string | null
+    paymentMethodId?: string | null
+    notes?: string | null
+}) {
+    try {
+        await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const supabase = await getSupabaseServerClient()
+        const {
+            data: { user },
+        } = await supabase.auth.getUser()
+
+        const count = Math.floor(Number(input.installmentsCount) || 0)
+        if (!(count >= 1)) throw new Error("Informe a quantidade de parcelas.")
+        if (count > 48) throw new Error("Máximo de 48 parcelas.")
+        const totalAmount = Number(input.totalAmount || 0)
+        if (!(totalAmount > 0)) throw new Error("Valor total deve ser maior que zero.")
+
+        const interval = Math.max(1, Math.floor(Number(input.interval) || 1))
+        const startDate = new Date(`${input.startDate}T12:00:00`)
+        if (Number.isNaN(startDate.getTime())) throw new Error("Data inicial inválida.")
+
+        const eachAmount = Math.round((totalAmount / count) * 100) / 100
+        const amountDiff = Math.round((totalAmount - (eachAmount * count)) * 100) / 100
+
+        const { data: group, error: groupErr } = await supabase
+            .from("installment_groups")
+            .insert({
+                partner_id: input.partnerId,
+                description: input.description.trim(),
+                total_amount: totalAmount,
+                installments_count: count,
+                frequency: input.frequency,
+                interval: interval,
+                interval_value: interval,
+                start_date: startDate.toISOString(),
+                category_id: input.categoryId || null,
+                subcategory_id: input.subcategoryId || null,
+                account_id: input.accountId || null,
+                contact_id: input.contactId || null,
+                payment_method_id: input.paymentMethodId || null,
+                created_by_user_id: user?.id ?? null,
+            })
+            .select("id")
+            .single()
+        if (groupErr || !group?.id) throw groupErr || new Error("Erro ao criar grupo parcelado.")
+
+        const transactionsPayload = Array.from({ length: count }).map((_, index) => {
+            const installmentNumber = index + 1
+            const due = addInstallmentDate(startDate, input.frequency, interval, index)
+            const lineAmount = installmentNumber === count ? Math.round((eachAmount + amountDiff) * 100) / 100 : eachAmount
+            return {
+                partner_id: input.partnerId,
+                description: input.description.trim(),
+                category: input.categoryLabel || "Parcelado",
+                category_id: input.categoryId || null,
+                subcategory_id: input.subcategoryId || null,
+                account_id: input.accountId || null,
+                contact_id: input.customerId ? null : (input.contactId || null),
+                customer_id: input.customerId || null,
+                contact_type: input.customerId ? "customer" : (input.contactType || null),
+                amount: lineAmount,
+                due_date: due.toISOString().slice(0, 10),
+                payment_date: null,
+                transaction_date: due.toISOString(),
+                status: "pending",
+                notes: input.notes ?? null,
+                payment_type: input.paymentType || null,
+                payment_method_id: input.paymentMethodId || null,
+                original_amount: lineAmount,
+                interest_amount: null,
+                fee_amount: 0,
+                transaction_type: input.transactionType,
+                origin: "manual",
+                installment_group_id: group.id,
+                installment_number: installmentNumber,
+                created_by_user_id: user?.id ?? null,
+            }
+        })
+
+        const inserted = await insertTransactionsWithOptionalCreator(supabase, transactionsPayload)
+        if (inserted.error) throw inserted.error
+
+        return { success: true as const, data: { groupId: group.id, createdCount: (inserted.data || []).length } }
+    } catch (e: any) {
+        return { success: false as const, error: e.message || "Erro ao criar parcelamento" }
+    }
+}
+
+export async function getInstallmentGroupDetailsAction(input: { partnerId: string; installmentGroupId: string }) {
+    try {
+        await requirePartnerAccessWithPermission(input.partnerId, "financial", "view")
+        const supabase = await getSupabaseServerClient()
+
+        const { data: group, error: groupErr } = await supabase
+            .from("installment_groups")
+            .select("id, description, total_amount, installments_count")
+            .eq("id", input.installmentGroupId)
+            .eq("partner_id", input.partnerId)
+            .single()
+        if (groupErr || !group) throw groupErr || new Error("Grupo de parcelas não encontrado.")
+
+        const { data: rows, error: rowsErr } = await supabase
+            .from("transactions")
+            .select("id, description, amount, original_amount, due_date, payment_date, status, installment_number")
+            .eq("partner_id", input.partnerId)
+            .eq("installment_group_id", input.installmentGroupId)
+            .order("installment_number", { ascending: true })
+        if (rowsErr) throw rowsErr
+
+        return {
+            success: true as const,
+            data: {
+                group,
+                installments: (rows || []).map((row) => {
+                    const paid = String(row.status || "").toLowerCase() === "paid"
+                    const now = new Date()
+                    const due = row.due_date ? new Date(`${row.due_date}T12:00:00`) : null
+                    const overdue = !paid && !!due && due.getTime() < now.getTime()
+                    const original = Math.abs(Number(row.original_amount ?? row.amount ?? 0))
+                    const paidAmount = paid ? original : 0
+                    return {
+                        id: row.id,
+                        description: row.description,
+                        installmentNumber: row.installment_number,
+                        originalAmount: original,
+                        paidAmount,
+                        remainingAmount: Math.max(0, original - paidAmount),
+                        dueDate: row.due_date,
+                        paymentDate: row.payment_date,
+                        status: paid ? "paid" : overdue ? "overdue" : "pending",
+                    }
+                }),
+            },
+        }
+    } catch (e: any) {
+        return { success: false as const, error: e.message || "Erro ao carregar detalhe do parcelado" }
     }
 }
 
@@ -935,11 +1214,9 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
             created_by_user_id: markPaidUser?.id ?? null,
         }
 
-        const { data: newTx, error: insertErr } = await supabase
-            .from("transactions")
-            .insert(payload)
-            .select("*")
-            .single()
+        const insertRes = await insertTransactionsWithOptionalCreator(supabase, payload)
+        const newTx = (insertRes.data || [])[0]
+        const insertErr = insertRes.error
 
         if (insertErr) {
             // Handle unique constraint violation gracefully (idempotent)
@@ -1095,7 +1372,7 @@ export async function getTransactionDetailsAction(
         await requirePartnerAccessWithPermission(partnerId, "financial", "view")
         const supabase = await getSupabaseServerClient()
 
-        const { data: t, error } = await supabase
+        let txQuery = await supabase
             .from("transactions")
             .select(
                 `
@@ -1109,6 +1386,25 @@ export async function getTransactionDetailsAction(
             .eq("id", transactionId)
             .eq("partner_id", partnerId)
             .single()
+        if (txQuery.error && isMissingCreatedByUserIdColumnError(txQuery.error)) {
+            txQuery = await supabase
+                .from("transactions")
+                .select(
+                    `
+        id, description, category, amount, due_date, payment_date, created_at, updated_at, status, notes,
+        payment_type, transaction_type, contact_id, customer_id, contact_type, transfer_group_id,
+        refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id,
+        payment_method_id, transaction_date,
+        transaction_contacts(name, type, description)
+      `,
+                )
+                .eq("id", transactionId)
+                .eq("partner_id", partnerId)
+                .single()
+        }
+
+        const t = txQuery.data
+        const error = txQuery.error
 
         if (error || !t) {
             return { success: false, error: "Transação não encontrada." }

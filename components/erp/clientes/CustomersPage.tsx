@@ -68,8 +68,8 @@ const COLUMNS = [
     { id: "orders", label: "Pedidos", align: "center" as const, width: "100px" },
     { id: "total_spent", label: "Total Gasto", align: "right" as const, width: "150px" },
     { id: "store_credit", label: "Crédito", align: "right" as const, width: "130px" },
-    { id: "status", label: "Status", align: "center" as const, width: "120px" },
     { id: "last_order", label: "Último Pedido", align: "left" as const, width: "160px" },
+    { id: "status", label: "Status", align: "center" as const, width: "120px" },
     { id: "actions", label: "Ações", align: "center" as const, width: "80px" },
 ]
 

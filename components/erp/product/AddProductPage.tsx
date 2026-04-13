@@ -878,8 +878,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
                     <div className="space-y-6 pt-4 pb-2">
                         {metadataModal.type === "subcategory" && (
                             <div className="space-y-1.5">
-                                <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Categoria Pai</label>
                                 <Combobox
+                                label="Categoria Pai"
                                     options={categoryOptions}
                                     value={metadataModal.parentId || ""}
                                     onChange={(v: string) => setMetadataModal(prev => ({ ...prev, parentId: v }))}
@@ -889,8 +889,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
                         )}
 
                         <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Nome</label>
                             <Input
+                                label="Nome"
                                 placeholder="Digite o nome..."
                                 value={metadataModal.name}
                                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setMetadataModal(prev => ({ ...prev, name: e.target.value }))}

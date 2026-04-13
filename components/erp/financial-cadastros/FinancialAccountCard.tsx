@@ -24,6 +24,8 @@ export interface FinanceAccountRow {
     is_active: boolean
     created_at: string
     updated_at?: string
+    is_system_managed?: boolean
+    integration_source?: string | null
 }
 
 function num(v: number | string | null | undefined): number {
@@ -67,6 +69,11 @@ const FinancialAccountCard = React.memo(
                                 <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading leading-tight truncate pr-1 flex items-center gap-1.5">
                                     {item.name}
                                 </h3>
+                                {item.integration_source === "mercadopago" && item.is_system_managed && (
+                                    <Badge variant="blue" className="whitespace-nowrap scale-90 shrink-0">
+                                        Mercado Pago
+                                    </Badge>
+                                )}
                                 <Badge
                                     variant={item.is_active ? "green" : "red"}
                                     className="whitespace-nowrap scale-90 shrink-0"

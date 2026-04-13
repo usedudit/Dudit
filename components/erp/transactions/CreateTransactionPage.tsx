@@ -43,6 +43,7 @@ import {
     createTransferPairAction,
     adjustAccountBalanceViaTransactionAction,
     markRecurringOccurrenceAsPaidAction,
+    createInstallmentGroupAction,
 } from "@/app/actions/erp/transactions"
 import { createFinancialCategoryAction } from "@/app/actions/erp/financial-category-metadata"
 import { createFinanceAccountAction, type FinanceAccountType } from "@/app/actions/erp/finance-accounts"
@@ -57,7 +58,7 @@ import {
     type RecurringFrequency,
 } from "@/app/actions/erp/recurring-transactions"
 
-export type CategoryItem = { id: string; name: string; parent_id: string | null }
+export type CategoryItem = { id: string; name: string; parent_id: string | null; category_type?: "income" | "expense" | null }
 export type AccountItem = {
     id: string
     name: string
@@ -79,6 +80,7 @@ interface CreateTransactionPageProps {
 }
 
 type ContactType = "customer" | "supplier" | "service" | "employee" | "partner" | "other"
+type TransactionMode = "single" | "installment" | "recurring"
 
 type QuickModal = null | "category" | "subcategory" | "account" | "contact"
 
@@ -87,6 +89,10 @@ function toYmd(d: Date | string | undefined): string {
     const date = d instanceof Date ? d : new Date(d)
     if (isNaN(date.getTime())) return ""
     return format(date, "yyyy-MM-dd")
+}
+
+function normalizeName(value: string) {
+    return value.trim().replace(/\s+/g, " ").toLowerCase()
 }
 
 function parseYmdToLocalNoon(ymd: string): Date {
@@ -106,6 +112,13 @@ function ymdAfterAddingPeriod(anchorYmd: string, frequency: RecurringFrequency, 
 
 function toMiddayIsoFromYmd(ymd: string): string {
     return parseYmdToLocalNoon(ymd).toISOString()
+}
+
+function installmentFrequencyLabel(frequency: RecurringFrequency, interval: number): string {
+    const iv = Math.max(Math.floor(Number(interval) || 1), 1)
+    const unit =
+        frequency === "daily" ? "dia" : frequency === "weekly" ? "semana" : frequency === "monthly" ? "mês" : "ano"
+    return iv === 1 ? `${unit}` : `${iv} ${unit}s`
 }
 
 const FormCombobox = ({
@@ -184,6 +197,7 @@ export default function CreateTransactionPage({
     const isSystemGatewayOrigin = !!editTransaction && ["system", "gateway"].includes(String(editTransaction.origin || "").toLowerCase())
     const lockFinancialFields = isPaidTransaction || isSystemGatewayOrigin
     const isRecurringTransaction = !!editTransaction && !!editTransaction.recurringId
+    const isSalesOrigin = !!editTransaction && String(editTransaction.category || "").toLowerCase() === "vendas"
 
     const [txKind, setTxKind] = useState<TxKind>(() => editRecurringTemplate ? (editRecurringTemplate.type || "income") : editTransaction?.transactionType || "income")
     const [amount, setAmount] = useState(() => editRecurringTemplate ? editRecurringTemplate.amount : editTransaction ? editTransaction.amount : 0)
@@ -218,6 +232,7 @@ export default function CreateTransactionPage({
     const [referenceNote, setReferenceNote] = useState(() => editTransaction?.referenceNote || "")
 
     const [enableRecurrence, setEnableRecurrence] = useState(() => !!editRecurringTemplate)
+    const [transactionMode, setTransactionMode] = useState<TransactionMode>(() => (editRecurringTemplate ? "recurring" : "single"))
     const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurringFrequency>(() => editRecurringTemplate?.frequency || "monthly")
     const [recurrenceInterval, setRecurrenceInterval] = useState(() => editRecurringTemplate?.interval_value || 1)
     const [recurrenceNextRunYmd, setRecurrenceNextRunYmd] = useState(() =>
@@ -225,6 +240,9 @@ export default function CreateTransactionPage({
     )
     const [recurrenceEndYmd, setRecurrenceEndYmd] = useState(() => editRecurringTemplate?.end_date?.slice(0, 10) || "")
     const [recurrenceMonthlyLastDay, setRecurrenceMonthlyLastDay] = useState(() => !!editRecurringTemplate?.use_last_day)
+    const [installmentsCount, setInstallmentsCount] = useState(2)
+    const [installmentFrequency, setInstallmentFrequency] = useState<RecurringFrequency>("monthly")
+    const [installmentInterval, setInstallmentInterval] = useState(1)
 
     const [quickModal, setQuickModal] = useState<QuickModal>(null)
     const [quickSaving, setQuickSaving] = useState(false)
@@ -280,7 +298,11 @@ export default function CreateTransactionPage({
         if (fromAccountId || toAccountId) return true
         if (selectedContactId) return true
         if (selectedCustomer) return true
+        if (transactionMode !== "single") return true
         if (enableRecurrence) return true
+        if (installmentsCount !== 2) return true
+        if (installmentFrequency !== "monthly") return true
+        if (installmentInterval !== 1) return true
         if (status !== "pending") return true
         if (paymentType !== "Pix") return true
         if (contactType !== "customer") return true
@@ -305,7 +327,11 @@ export default function CreateTransactionPage({
         toAccountId,
         selectedContactId,
         selectedCustomer,
+        transactionMode,
         enableRecurrence,
+        installmentsCount,
+        installmentFrequency,
+        installmentInterval,
         status,
         paymentType,
         contactType,
@@ -343,6 +369,8 @@ export default function CreateTransactionPage({
 
     const isIncomeExpense = txKind === "income" || txKind === "expense"
     const needsContactPanel = isIncomeExpense || txKind === "refund"
+    const recurringModeEnabled = transactionMode === "recurring"
+    const installmentModeEnabled = transactionMode === "installment"
 
     useEffect(() => {
         if (contactType !== "customer") setSelectedCustomer(null)
@@ -380,6 +408,11 @@ export default function CreateTransactionPage({
     )
 
     const parentCategories = useMemo(() => categories.filter((c) => !c.parent_id), [categories])
+    const visibleParentCategories = useMemo(() => {
+        if (txKind === "income") return parentCategories.filter((c) => c.category_type === "income")
+        if (txKind === "expense") return parentCategories.filter((c) => c.category_type === "expense")
+        return parentCategories
+    }, [parentCategories, txKind])
     const childCategories = useMemo(() => {
         if (!categoryId) return []
         return categories.filter((c) => c.parent_id === categoryId)
@@ -434,6 +467,16 @@ export default function CreateTransactionPage({
     }, [isIncomeExpense])
 
     useEffect(() => {
+        if (!isIncomeExpense) {
+            setTransactionMode("single")
+            setEnableRecurrence(false)
+            return
+        }
+        if (transactionMode === "recurring") setEnableRecurrence(true)
+        else setEnableRecurrence(false)
+    }, [isIncomeExpense, transactionMode])
+
+    useEffect(() => {
         if (!enableRecurrence || !isIncomeExpense || isRecurringTemplateEdit) return
         setRecurrenceNextRunYmd(dueDate)
     }, [enableRecurrence, dueDate, isIncomeExpense, isRecurringTemplateEdit])
@@ -478,12 +521,15 @@ export default function CreateTransactionPage({
     const handleQuickSave = async () => {
         if (quickModal === "category") {
             if (!quickName.trim()) return error("Nome obrigatório")
+            const key = normalizeName(quickName)
+            if (categories.some((c) => normalizeName(c.name) === key)) return error("Já existe uma categoria com esse nome.")
             setQuickSaving(true)
             try {
                 const res = await createFinancialCategoryAction({
                     partnerId,
                     name: quickName.trim(),
                     parentId: null,
+                    categoryType: txKind === "expense" ? "expense" : "income",
                 })
                 if (!res.success) return error(res.error || "Erro")
                 success("Categoria criada")
@@ -497,6 +543,8 @@ export default function CreateTransactionPage({
         if (quickModal === "subcategory") {
             if (!quickName.trim()) return error("Nome obrigatório")
             if (!categoryId) return error("Categoria pai obrigatória")
+            const key = normalizeName(quickName)
+            if (categories.some((c) => normalizeName(c.name) === key)) return error("Já existe uma subcategoria com esse nome.")
             setQuickSaving(true)
             try {
                 const res = await createFinancialCategoryAction({
@@ -515,6 +563,8 @@ export default function CreateTransactionPage({
         }
         if (quickModal === "account") {
             if (!quickName.trim()) return error("Nome obrigatório")
+            const key = normalizeName(quickName)
+            if (accounts.some((a) => normalizeName(a.name) === key)) return error("Já existe uma conta com esse nome.")
             setQuickSaving(true)
             try {
                 const res = await createFinanceAccountAction({
@@ -535,6 +585,10 @@ export default function CreateTransactionPage({
         }
         if (quickModal === "contact") {
             if (!quickName.trim()) return error("Nome obrigatório")
+            const key = normalizeName(quickName)
+            if (contactRows.some((c) => normalizeName(c.name) === key && c.type === newContactModalType)) {
+                return error("Já existe um contato com esse nome para esse tipo.")
+            }
             setQuickSaving(true)
             try {
                 const res = await createTransactionContactAction({
@@ -579,6 +633,9 @@ export default function CreateTransactionPage({
             if (!description.trim()) e.add("description")
             if (!(amount > 0)) e.add("amount")
             if (!accountId) e.add("accountId")
+            if (installmentModeEnabled) {
+                if (!(installmentsCount >= 1) || installmentsCount > 48) e.add("installmentsCount")
+            }
             if (enableRecurrence && !isRecurringTemplateEdit && recurrenceEndYmd.trim()) {
                 const startIso = toMiddayIsoFromYmd(dueDate)
                 const endIso = toMiddayIsoFromYmd(recurrenceEndYmd.trim())
@@ -599,6 +656,8 @@ export default function CreateTransactionPage({
         description,
         accountId,
         isIncomeExpense,
+        installmentModeEnabled,
+        installmentsCount,
         enableRecurrence,
         isRecurringTemplateEdit,
         dueDate,
@@ -712,9 +771,9 @@ export default function CreateTransactionPage({
                     patch.customerId = cp.customerId
                     patch.contactType = cp.contactTypeResolved
                     patch.paymentMethodId = paymentMethodId
-                    patch.dueDate = dueDate
+                    patch.dueDate = isSalesOrigin ? null : dueDate
                     patch.paymentDate = status === "paid" ? paymentDate : null
-                    patch.transactionDate = dueDate
+                    patch.transactionDate = isSalesOrigin ? paymentDate : dueDate
                     patch.status = status
                 }
 
@@ -854,7 +913,7 @@ export default function CreateTransactionPage({
         const cp = contactPayload()
         setIsSaving(true)
         try {
-            if (enableRecurrence) {
+            if (recurringModeEnabled && enableRecurrence) {
                 const iv = Math.max(Math.floor(Number(recurrenceInterval) || 1), 1)
                 const startIso = toMiddayIsoFromYmd(dueDate)
                 const endIso = recurrenceEndYmd.trim() ? toMiddayIsoFromYmd(recurrenceEndYmd.trim()) : null
@@ -902,6 +961,39 @@ export default function CreateTransactionPage({
                         ? "Recorrência criada e primeira ocorrência marcada como paga!"
                         : "Recorrência criada! Próximas ocorrências aparecem em Previstos.",
                 )
+                onSuccess?.()
+                router.refresh()
+                onClose()
+                return
+            }
+
+            if (installmentModeEnabled) {
+                const iv = Math.max(Math.floor(Number(installmentInterval) || 1), 1)
+                const count = Math.max(1, Math.floor(Number(installmentsCount) || 1))
+                if (count > 48) return error("Máximo de 48 parcelas.")
+
+                const installmentRes = await createInstallmentGroupAction({
+                    partnerId,
+                    transactionType: txKind,
+                    description: description.trim(),
+                    categoryLabel: selectedCategoryName,
+                    totalAmount: amount,
+                    installmentsCount: count,
+                    frequency: installmentFrequency,
+                    interval: iv,
+                    startDate: dueDate,
+                    categoryId: categoryId || null,
+                    subcategoryId: subcategoryId || null,
+                    accountId: accountId || null,
+                    contactId: cp.contactId,
+                    customerId: cp.customerId,
+                    contactType: cp.contactTypeResolved,
+                    paymentType,
+                    paymentMethodId: paymentMethodId || null,
+                    notes: notes || null,
+                })
+                if (!installmentRes.success) return error(installmentRes.error || "Erro ao criar parcelamento")
+                success("Parcelamento criado com sucesso!")
                 onSuccess?.()
                 router.refresh()
                 onClose()
@@ -1165,7 +1257,7 @@ export default function CreateTransactionPage({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormCombobox
                             label="Categoria"
-                            options={parentCategories.map((c) => ({ value: c.id, label: c.name }))}
+                            options={visibleParentCategories.map((c) => ({ value: c.id, label: c.name }))}
                             value={categoryId}
                             onChange={(v) => {
                                 setCategoryId(v)
@@ -1192,7 +1284,11 @@ export default function CreateTransactionPage({
                     </div>
                     {!isRecurringTemplateEdit && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <DatePicker label="Data de vencimento" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} disabled={lockFinancialFields} />
+                            {!isSalesOrigin ? (
+                                <DatePicker label="Data de vencimento" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} disabled={lockFinancialFields} />
+                            ) : (
+                                <Input label="Data de vencimento" value="Nao se aplica para vendas" readOnly disabled />
+                            )}
                             <DatePicker
                                 label="Data do pagamento"
                                 value={paymentDate}
@@ -1205,6 +1301,7 @@ export default function CreateTransactionPage({
                     {isIncomeExpense && (!isEditMode || isRecurringTemplateEdit) && (
                         <div className="rounded-2xl border border-brand-border dark:border-dark-border p-4 space-y-4 bg-brand-gray/25 dark:bg-dark-border/15">
                             {!isRecurringTemplateEdit && (
+                                recurringModeEnabled && (
                                 <Checkbox
                                     name="enable_recurrence"
                                     checked={enableRecurrence}
@@ -1215,11 +1312,12 @@ export default function CreateTransactionPage({
                                         </span>
                                     }
                                 />
+                                )
                             )}
                             {isRecurringTemplateEdit && (
                                 <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Regra de recorrência</p>
                             )}
-                            {(enableRecurrence || isRecurringTemplateEdit) && (
+                            {(recurringModeEnabled && (enableRecurrence || isRecurringTemplateEdit)) && (
                                 <>
                                     <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
                                         {isRecurringTemplateEdit
@@ -1294,6 +1392,45 @@ export default function CreateTransactionPage({
                                     )}
                                 </>
                             )}
+                            {!isRecurringTemplateEdit && installmentModeEnabled && (
+                                <>
+                                    <InfoCard
+                                        message={`Todas as parcelas serão geradas na hora (${installmentsCount}x, a cada ${installmentFrequencyLabel(installmentFrequency, installmentInterval)}).`}
+                                        color="gray"
+                                    />
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <Input
+                                            label="Número de parcelas"
+                                            type="number"
+                                            min={1}
+                                            max={48}
+                                            value={installmentsCount}
+                                            onChange={(e) => setInstallmentsCount(Math.max(1, Number(e.target.value) || 1))}
+                                            error={fieldErrors.has("installmentsCount")}
+                                            errorMessage={fieldErrors.has("installmentsCount") ? "Máximo de 48 parcelas" : undefined}
+                                        />
+                                        <FormDropdown
+                                            label="Frequência"
+                                            options={[
+                                                { value: "daily", label: "Diário" },
+                                                { value: "weekly", label: "Semanal" },
+                                                { value: "monthly", label: "Mensal" },
+                                                { value: "yearly", label: "Anual" },
+                                            ]}
+                                            value={installmentFrequency}
+                                            setValue={(v) => setInstallmentFrequency(v as RecurringFrequency)}
+                                        />
+                                        <Input
+                                            label="A cada (intervalo)"
+                                            type="number"
+                                            min={1}
+                                            max={24}
+                                            value={installmentInterval}
+                                            onChange={(e) => setInstallmentInterval(Math.max(1, Number(e.target.value) || 1))}
+                                        />
+                                    </div>
+                                </>
+                            )}
                         </div>
                     )}
 
@@ -1314,6 +1451,18 @@ export default function CreateTransactionPage({
                     {txKind === "transfer" ? "Status" : txKind === "adjustment" ? "Status e conta" : "Status e conta"}
                 </h3>
                 <div className="space-y-4">
+                    {isIncomeExpense && !isRecurringTemplateEdit && !isEditMode && (
+                        <FormDropdown
+                            label="Modo"
+                            options={[
+                                { value: "single", label: "Single" },
+                                { value: "installment", label: "Installment" },
+                                { value: "recurring", label: "Recurring" },
+                            ]}
+                            value={transactionMode}
+                            setValue={(v) => setTransactionMode(v as TransactionMode)}
+                        />
+                    )}
                     {txKind === "adjustment" || txKind === "transfer" ? (
                         <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
                             O {txKind === "transfer" ? "lançamento" : "ajuste"} é efetivado ao salvar e atualiza o saldo da conta.
@@ -1394,6 +1543,7 @@ export default function CreateTransactionPage({
                         ]}
                         value={contactType}
                         setValue={(v) => setContactType(v as ContactType)}
+                        disabled={isSalesOrigin}
                     />
                     <div className="mt-4">
                         {contactType === "customer" ? (
@@ -1415,6 +1565,7 @@ export default function CreateTransactionPage({
                                     variant="outline"
                                     className="w-full"
                                     onClick={() => setCustomerSheetOpen(true)}
+                                    disabled={isSalesOrigin}
                                 >
                                     Selecionar cliente
                                 </Button>
@@ -1438,12 +1589,18 @@ export default function CreateTransactionPage({
                                 options={contactComboboxOptions}
                                 value={selectedContactId}
                                 onChange={(v) => setSelectedContactId(v)}
+                                disabled={isSalesOrigin}
                                 actionItem={{
                                     label: "Criar novo contato",
                                     icon: <PlusIcon className="w-4 h-4" />,
                                     onClick: openQuickContact,
                                 }}
                             />
+                        )}
+                        {isSalesOrigin && (
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-2">
+                                O contato não pode ser alterado em transações geradas por venda.
+                            </p>
                         )}
                     </div>
                 </SidebarCard>
