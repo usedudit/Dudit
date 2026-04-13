@@ -16,9 +16,11 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code")
   const state = searchParams.get("state") // partner ID
   const error = searchParams.get("error")
+  const errorDescription = searchParams.get("error_description")
 
   if (error) {
-    return NextResponse.redirect(new URL(`/erp/settings?mp_error=${encodeURIComponent(error)}`, request.url))
+    const mpError = errorDescription ? `${error}: ${errorDescription}` : error
+    return NextResponse.redirect(new URL(`/erp/settings?mp_error=${encodeURIComponent(mpError)}`, request.url))
   }
 
   if (!code || !state) {
@@ -100,12 +102,15 @@ export async function GET(request: NextRequest) {
 
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.json().catch(() => null)
+      const detailedError = errorData?.error_description
+        ? `${errorData?.error || "oauth_error"}:${errorData.error_description}`
+        : (errorData?.error || `status_${tokenResponse.status}`)
       console.error({
         event: "oauth_token_exchange_failed",
         status: tokenResponse.status,
         code: errorData?.error
       })
-      return NextResponse.redirect(new URL("/erp/settings?mp_error=token_exchange_failed", request.url))
+      return NextResponse.redirect(new URL(`/erp/settings?mp_error=${encodeURIComponent(detailedError)}`, request.url))
     }
 
     const tokenData = (await tokenResponse.json()) as MercadoPagoTokenResponse
