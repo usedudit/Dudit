@@ -1047,7 +1047,17 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
             success: true as const,
             data: {
                 group,
-                installments: (rows || []).map((row) => {
+                installments: (rows || []).map(
+                    (row: {
+                        id: string
+                        description: string | null
+                        amount: number | string | null
+                        original_amount: number | string | null
+                        due_date: string | null
+                        payment_date: string | null
+                        status: string | null
+                        installment_number: number | null
+                    }) => {
                     const paid = String(row.status || "").toLowerCase() === "paid"
                     const now = new Date()
                     const due = row.due_date ? new Date(`${row.due_date}T12:00:00`) : null

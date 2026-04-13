@@ -8,6 +8,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { calculatePaymentAmounts } from "@/lib/payments/calculation"
 import { toCanonicalPaymentType, toLegacyPaymentType } from "@/lib/payments/payment-method"
+import { decryptCPF, encryptCPF } from "@/lib/crypto"
 
 type InstallmentFeeInput = { installmentNumber: number; feePercent: number }
 
@@ -37,15 +38,52 @@ async function resolvePixKeyFromPartner(
   const supabase = await getSupabaseServerClient()
   const { data: partner } = await supabase
     .from("partners")
-    .select("cpf, cnpj, email, phone")
+    .select("cpf, cpf_encrypted, cnpj, email, phone")
     .eq("id", partnerId)
     .single()
 
   if (!partner) return null
-  if (pixKeyType === "cpf") return partner.cpf || null
+  if (pixKeyType === "cpf") {
+    if (partner.cpf_encrypted) {
+      try {
+        return await decryptCPF(partner.cpf_encrypted)
+      } catch {
+        return null
+      }
+    }
+    return partner.cpf || null
+  }
   if (pixKeyType === "cnpj") return partner.cnpj || null
   if (pixKeyType === "email") return partner.email || null
   return partner.phone || null
+}
+
+async function encryptPixKeyIfNeeded(
+  pixKeyType: UpsertPaymentMethodInput["pixKeyType"],
+  pixKey: string | null | undefined,
+) {
+  const normalized = String(pixKey || "").trim()
+  if (!normalized) return null
+  if (pixKeyType !== "cpf") return normalized
+  try {
+    return await encryptCPF(normalized)
+  } catch {
+    throw new Error("Erro ao criptografar CPF da chave PIX")
+  }
+}
+
+async function decryptPixKeyIfNeeded(
+  pixKeyType: "cpf" | "cnpj" | "email" | "phone" | "random" | null | undefined,
+  pixKey: string | null | undefined,
+) {
+  if (!pixKey) return null
+  if (pixKeyType !== "cpf") return pixKey
+  if (!String(pixKey).startsWith("v")) return pixKey
+  try {
+    return await decryptCPF(pixKey)
+  } catch {
+    return null
+  }
 }
 
 function sanitizeInstallmentFees(input: InstallmentFeeInput[] | undefined, maxInstallments: number) {
@@ -119,12 +157,14 @@ export async function getPaymentMethodDetailsAction(methodId: string) {
 
   if (methodRes.error) return { error: methodRes.error.message }
   if (feesRes.error) return { error: feesRes.error.message }
+  const decryptedPixKey = await decryptPixKeyIfNeeded(methodRes.data.pix_key_type, methodRes.data.pix_key)
 
   return {
     success: true,
     method: {
       ...methodRes.data,
       type: methodRes.data.type || toCanonicalPaymentType(methodRes.data.payment_type),
+      pix_key: decryptedPixKey,
       installment_fees: feesRes.data || [],
     },
   }
@@ -182,13 +222,14 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
   const validatedInstallmentFees = sanitizeInstallmentFees(data.installmentFees, maxInstallments)
   const isPix = canonicalType === "pix"
   const resolvedPixKey = data.usePartnerPixData ? await resolvePixKeyFromPartner(data.partnerId, data.pixKeyType) : data.pixKey
+  const persistedPixKey = isPix ? await encryptPixKeyIfNeeded(data.pixKeyType, resolvedPixKey || null) : null
 
   const validation = PaymentMethodSchema.safeParse({
     partnerId: data.partnerId,
     name: data.name,
     paymentType: canonicalType,
     pixKeyType: isPix ? data.pixKeyType : null,
-    pixKey: isPix ? resolvedPixKey : null,
+    pixKey: isPix ? persistedPixKey : null,
     usePartnerPixData: isPix ? Boolean(data.usePartnerPixData) : false,
     isActive: true,
     feePercent: data.feePercent ?? 0,
@@ -226,7 +267,7 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
       fee_bearer: data.feeBearer || "merchant",
       supports_installments: supportsInstallments,
       pix_key_type: isPix ? (data.pixKeyType || null) : null,
-      pix_key: isPix ? (resolvedPixKey || null) : null,
+      pix_key: isPix ? persistedPixKey : null,
       use_partner_pix_data: isPix ? Boolean(data.usePartnerPixData) : false,
     })
     .select()
@@ -274,7 +315,7 @@ export async function updatePaymentMethodAction(
   const supabase = await getSupabaseServerClient()
   const { data: method } = await supabase
     .from("payment_methods")
-    .select("partner_id")
+    .select("partner_id, type, payment_type")
     .eq("id", methodId)
     .single()
 
@@ -316,7 +357,13 @@ export async function updatePaymentMethodAction(
   if (data.supportsInstallments !== undefined) updateData.supports_installments = data.supportsInstallments
   if (data.pixKeyType !== undefined) updateData.pix_key_type = data.pixKeyType
   if (data.usePartnerPixData !== undefined) updateData.use_partner_pix_data = data.usePartnerPixData
-  if (data.pixKey !== undefined) updateData.pix_key = data.pixKey
+  const effectiveType = toCanonicalPaymentType(data.paymentType || method.type || method.payment_type)
+  if (effectiveType === "pix" && data.usePartnerPixData) {
+    const keyFromPartner = await resolvePixKeyFromPartner(method.partner_id, data.pixKeyType || null)
+    updateData.pix_key = await encryptPixKeyIfNeeded(data.pixKeyType || null, keyFromPartner)
+  } else if (data.pixKey !== undefined) {
+    updateData.pix_key = await encryptPixKeyIfNeeded(data.pixKeyType || null, data.pixKey)
+  }
 
   const { error: methodError } = await supabase
     .from("payment_methods")
