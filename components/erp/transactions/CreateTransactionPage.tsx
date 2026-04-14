@@ -287,6 +287,37 @@ export default function CreateTransactionPage({
     )
 
     const isDirty = useMemo(() => {
+        if (isEditMode) {
+            const iTxKind = editRecurringTemplate ? (editRecurringTemplate.type || "income") : editTransaction?.transactionType || "income"
+            const iAmount = editRecurringTemplate ? editRecurringTemplate.amount : editTransaction ? editTransaction.amount : 0
+            const iDescription = editRecurringTemplate?.description || editTransaction?.description || ""
+            const iCategoryId = editRecurringTemplate?.category_id ?? editTransaction?.categoryId ?? undefined
+            const iSubcategoryId = editRecurringTemplate?.subcategory_id ?? editTransaction?.subcategoryId ?? undefined
+            const iAccountId = editRecurringTemplate?.account_id ?? editTransaction?.accountId ?? undefined
+            const iNotes = editTransaction?.notes || ""
+            const iStatus = editRecurringTemplate ? "pending" : editTransaction ? (String(editTransaction.rawStatus || "").toLowerCase() === "paid" ? "paid" : "pending") : "pending"
+            const iPaymentMethodId = editRecurringTemplate?.payment_method_id ?? editTransaction?.paymentMethodId ?? paymentMethods?.[0]?.id ?? undefined
+            const iDueDate = editRecurringTemplate?.start_date?.slice(0, 10) || (editTransaction?.dueDateRaw ? editTransaction.dueDateRaw.slice(0, 10) : defaultDayYmd)
+            const iPaymentDate = editTransaction?.paymentDateRaw ? editTransaction.paymentDateRaw.slice(0, 10) : defaultDayYmd
+            const iContactType = editRecurringTemplate?.contact_type || "customer"
+
+            if (txKind !== iTxKind) return true
+            if (amount !== iAmount) return true
+            if (description !== iDescription) return true
+            if (categoryId !== iCategoryId) return true
+            if (subcategoryId !== iSubcategoryId) return true
+            if (accountId !== iAccountId) return true
+            if (notes !== iNotes) return true
+            if (status !== iStatus) return true
+            if (paymentMethodId !== iPaymentMethodId) return true
+            if (dueDate !== iDueDate) return true
+            if (paymentDate !== iPaymentDate) return true
+            if (contactType !== iContactType) return true
+            
+            return false
+        }
+
+        // Original logic for create mode
         if (description.trim()) return true
         if (txKind === "adjustment") {
             if (accountId && Math.abs(adjustmentTargetBalance - getAccountBalance(accountId)) > 0.005) return true
@@ -316,6 +347,10 @@ export default function CreateTransactionPage({
         if (recurrenceNextRunYmd !== defaultRecurrenceNext) return true
         return false
     }, [
+        isEditMode,
+        paymentMethods,
+        editTransaction,
+        editRecurringTemplate,
         description,
         amount,
         notes,
@@ -333,6 +368,7 @@ export default function CreateTransactionPage({
         installmentFrequency,
         installmentInterval,
         status,
+        paymentMethodId,
         paymentType,
         contactType,
         referenceNote,

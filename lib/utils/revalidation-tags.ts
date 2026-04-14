@@ -14,6 +14,7 @@ export const TAGS = {
   quotes: (partnerId?: string) => partnerId ? `partner-${partnerId}-quotes` : 'quotes',
   quoteHistory: (quoteId: string) => `quote-${quoteId}-history`,
   stockMovements: (partnerId?: string) => partnerId ? `partner-${partnerId}-stock-movements` : 'stock-movements',
+  transactions: (partnerId?: string) => partnerId ? `partner-${partnerId}-transactions` : 'transactions',
   marketplace: 'marketplace',
   categories: 'marketplace-categories',
 

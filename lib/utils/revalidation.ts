@@ -121,6 +121,16 @@ export async function revalidateStockMovements(partnerId: string) {
 }
 
 /**
+ * Revalida dados de TRANSAÇÕES FINANCEIRAS
+ */
+export async function revalidateTransactions(partnerId: string) {
+  if (partnerId) {
+    safeRevalidateTag(TAGS.transactions(partnerId))
+  }
+  safeRevalidateTag("transactions")
+}
+
+/**
  * Revalida dados do CARRINHO
  */
 export async function revalidateCart(userId?: string) {

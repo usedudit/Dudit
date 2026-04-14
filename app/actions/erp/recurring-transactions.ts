@@ -86,7 +86,7 @@ export async function getRecurringTransactionsAction(partnerId: string) {
     const supabase = await getSupabaseServerClient()
     const { data, error } = await supabase
       .from("recurring_transactions")
-      .select("*")
+      .select("id, partner_id, type, amount, description, frequency, interval_value, week_days, month_day, use_last_day, year_month, year_day, start_date, end_date, next_run_date, account_id, category_id, subcategory_id, contact_id, customer_id, contact_type, payment_method_id, active, status, effective_from_date, created_at")
       .eq("partner_id", partnerId)
       .order("created_at", { ascending: false })
     if (error) throw error
@@ -378,59 +378,52 @@ export type RecurringOccurrence = {
  * that already have any ledger row for this recurring_id (paid or legacy pending).
  */
 export async function generateRecurringOccurrencesAction(partnerId: string) {
+  const actionStart = performance.now()
   try {
     await requirePartnerAccessWithPermission(partnerId, "financial", "view")
     const supabase = await getSupabaseServerClient()
 
-    const { data: templates, error: tplErr } = await supabase
-      .from("recurring_transactions")
-      .select("*")
-      .eq("partner_id", partnerId)
-      .eq("active", true)
-      .eq("status", "active")
-    if (tplErr) throw tplErr
-    if (!templates || templates.length === 0) return { success: true, data: [] as RecurringOccurrence[] }
+    // ── Single bulk RPC call replaces N×400 serial round trips ─────────
+    const t1 = performance.now()
+    const { data: bulkRows, error: rpcErr } = await supabase.rpc(
+      "generate_recurring_occurrences_bulk",
+      {
+        p_partner_id: partnerId,
+        p_ceiling_date: toYmdFromTs(
+          new Date(new Date().setMonth(new Date().getMonth() + 3)),
+        ),
+      },
+    )
+    if (rpcErr) throw rpcErr
+    console.log(`[PERF] recurringOccurrences.bulkRpc ${Math.round(performance.now() - t1)}ms (${(bulkRows || []).length} raw occurrences)`)
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const ceiling = new Date(today)
-    ceiling.setMonth(ceiling.getMonth() + 3)
-    const ceilingYmd = toYmdFromTs(ceiling)
-
-    const recurringIds = templates.map((t: { id: string }) => t.id)
-
-    const { data: existingTxs } = await supabase
-      .from("transactions")
-      .select("recurring_id, due_date")
-      .in("recurring_id", recurringIds)
-
-    const occupied = new Set<string>()
-    for (const tx of existingTxs || []) {
-      if (tx.recurring_id && tx.due_date) {
-        const ds = typeof tx.due_date === "string" ? tx.due_date.slice(0, 10) : toYmdFromTs(tx.due_date as string)
-        occupied.add(`${tx.recurring_id}|${ds}`)
-      }
+    if (!bulkRows || bulkRows.length === 0) {
+      console.log(`[PERF] generateRecurringOccurrences took ${Math.round(performance.now() - actionStart)}ms (0 occurrences)`)
+      return { success: true, data: [] as RecurringOccurrence[] }
     }
 
-    const categoryIds = [...new Set(templates.map((t: { category_id: string | null }) => t.category_id).filter(Boolean))]
-    const contactIds = [...new Set(templates.map((t: { contact_id: string | null }) => t.contact_id).filter(Boolean))]
-    const customerIds = [...new Set(templates.map((t: { customer_id: string | null }) => t.customer_id).filter(Boolean))]
-    const pmIds = [...new Set(templates.map((t: { payment_method_id: string | null }) => t.payment_method_id).filter(Boolean))]
+    // ── Resolve display names via batched lookups ──────────────────────
+    const t2 = performance.now()
+    const categoryIds = [...new Set(bulkRows.map((r: any) => r.category_id).filter(Boolean))] as string[]
+    const contactIds = [...new Set(bulkRows.map((r: any) => r.contact_id).filter(Boolean))] as string[]
+    const customerIds = [...new Set(bulkRows.map((r: any) => r.customer_id).filter(Boolean))] as string[]
+    const pmIds = [...new Set(bulkRows.map((r: any) => r.payment_method_id).filter(Boolean))] as string[]
 
     const [{ data: cats }, { data: tcontacts }, { data: customers }, { data: pms }] = await Promise.all([
       categoryIds.length
-        ? supabase.from("financial_categories").select("id,name").in("id", categoryIds as string[])
+        ? supabase.from("financial_categories").select("id,name").in("id", categoryIds)
         : Promise.resolve({ data: [] as { id: string; name: string }[] }),
       contactIds.length
-        ? supabase.from("transaction_contacts").select("id,name").in("id", contactIds as string[])
+        ? supabase.from("transaction_contacts").select("id,name").in("id", contactIds)
         : Promise.resolve({ data: [] as { id: string; name: string | null }[] }),
       customerIds.length
-        ? supabase.from("customers").select("id,name").in("id", customerIds as string[]).eq("partner_id", partnerId)
+        ? supabase.from("customers").select("id,name").in("id", customerIds).eq("partner_id", partnerId)
         : Promise.resolve({ data: [] as { id: string; name: string | null }[] }),
       pmIds.length
-        ? supabase.from("payment_methods").select("id,name,payment_type").in("id", pmIds as string[]).eq("partner_id", partnerId)
+        ? supabase.from("payment_methods").select("id,name,payment_type").in("id", pmIds).eq("partner_id", partnerId)
         : Promise.resolve({ data: [] as { id: string; name: string; payment_type: string | null }[] }),
     ])
+    console.log(`[PERF] recurringOccurrences.lookups ${Math.round(performance.now() - t2)}ms`)
 
     const catById = new Map<string, string>((cats || []).map((c: { id: string; name: string }) => [c.id, c.name]))
     const contactById = new Map<string, string>(
@@ -443,83 +436,54 @@ export async function generateRecurringOccurrencesAction(partnerId: string) {
       (pms || []).map((p: { id: string; name: string; payment_type: string | null }) => [p.id, p]),
     )
 
-    const allOccurrences: RecurringOccurrence[] = []
+    // ── Map bulk rows to RecurringOccurrence[] ─────────────────────────
+    const allOccurrences: RecurringOccurrence[] = (bulkRows as any[]).map((row) => {
+      const rid = String(row.recurring_id)
+      const ymd = typeof row.occurrence_date === "string"
+        ? row.occurrence_date.slice(0, 10)
+        : toYmdFromTs(row.occurrence_date)
 
-    for (const tpl of templates as Record<string, unknown>[]) {
-      const tplId = String(tpl.id)
-      const startYmd = toYmdFromTs(tpl.start_date as string)
-      const endYmdCap = tpl.end_date ? toYmdFromTs(tpl.end_date as string) : ceilingYmd
-      const endYmd = endYmdCap < ceilingYmd ? endYmdCap : ceilingYmd
-
-      const categoryName = tpl.category_id
-        ? (catById.get(String(tpl.category_id)) || "Sem categoria")
+      const categoryName = row.category_id
+        ? (catById.get(String(row.category_id)) || "Sem categoria")
         : "Sem categoria"
 
       let contactName = "-"
-      if (tpl.customer_id) {
-        contactName = customerById.get(String(tpl.customer_id)) || "Cliente"
-      } else if (tpl.contact_id) {
-        contactName = contactById.get(String(tpl.contact_id)) || "-"
+      if (row.customer_id) {
+        contactName = customerById.get(String(row.customer_id)) || "Cliente"
+      } else if (row.contact_id) {
+        contactName = contactById.get(String(row.contact_id)) || "-"
       }
 
-      const pmRow = tpl.payment_method_id ? pmById.get(String(tpl.payment_method_id)) : undefined
+      const pmRow = row.payment_method_id ? pmById.get(String(row.payment_method_id)) : undefined
       const paymentDisplay = pmRow
         ? formatPaymentMethodLabel(pmRow.name, pmRow.payment_type) || "Não informado"
         : "Não informado"
 
-      let currentIso = new Date(tpl.start_date as string).toISOString()
-      let safety = 0
-      const maxSteps = 400
-
-      while (safety < maxSteps) {
-        safety++
-        const ymd = toYmdFromTs(currentIso)
-        if (ymd > endYmd) break
-        if (ymd < startYmd) {
-          const nextEarly = await rpcFinancialNextRunDate(supabase, tpl, currentIso)
-          if (!nextEarly) break
-          const nextT = new Date(nextEarly).getTime()
-          const curT = new Date(currentIso).getTime()
-          if (nextT <= curT) break
-          currentIso = nextEarly
-          continue
-        }
-
-        const key = `${tplId}|${ymd}`
-        if (!occupied.has(key)) {
-          allOccurrences.push({
-            recurringId: tplId,
-            recurringTemplateId: tplId,
-            occurrenceDate: ymd,
-            dueDate: ymd,
-            isVirtual: true,
-            description: String(tpl.description || ""),
-            amount: Number(tpl.amount),
-            type: tpl.type as RecurringType,
-            frequency: tpl.frequency as RecurringFrequency,
-            accountId: (tpl.account_id as string | null) || null,
-            categoryId: (tpl.category_id as string | null) || null,
-            subcategoryId: (tpl.subcategory_id as string | null) || null,
-            categoryName,
-            contactId: (tpl.contact_id as string | null) || null,
-            customerId: (tpl.customer_id as string | null) || null,
-            contactType: (tpl.contact_type as RecurringContactType | null) || null,
-            contactName,
-            paymentMethodId: (tpl.payment_method_id as string | null) || null,
-            paymentDisplay,
-          })
-        }
-
-        const nextIso = await rpcFinancialNextRunDate(supabase, tpl, currentIso)
-        if (!nextIso) break
-        const nextTime = new Date(nextIso).getTime()
-        const curTime = new Date(currentIso).getTime()
-        if (nextTime <= curTime) break
-        currentIso = nextIso
+      return {
+        recurringId: rid,
+        recurringTemplateId: rid,
+        occurrenceDate: ymd,
+        dueDate: ymd,
+        isVirtual: true as const,
+        description: String(row.description || ""),
+        amount: Number(row.amount),
+        type: row.type as RecurringType,
+        frequency: row.frequency as RecurringFrequency,
+        accountId: row.account_id || null,
+        categoryId: row.category_id || null,
+        subcategoryId: row.subcategory_id || null,
+        categoryName,
+        contactId: row.contact_id || null,
+        customerId: row.customer_id || null,
+        contactType: (row.contact_type as RecurringContactType | null) || null,
+        contactName,
+        paymentMethodId: row.payment_method_id || null,
+        paymentDisplay,
       }
-    }
+    })
 
     allOccurrences.sort((a, b) => a.occurrenceDate.localeCompare(b.occurrenceDate))
+    console.log(`[PERF] generateRecurringOccurrences took ${Math.round(performance.now() - actionStart)}ms (${allOccurrences.length} occurrences)`)
     logRecurring("occurrences_generated", { partnerId, count: allOccurrences.length })
     return { success: true, data: allOccurrences }
   } catch (e: any) {

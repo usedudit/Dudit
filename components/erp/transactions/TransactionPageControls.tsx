@@ -27,6 +27,7 @@ import {
 
 interface TransactionFilterState {
     recurringOnly: boolean
+    installmentOnly: boolean
     datePeriod: DatePeriodFilterValue
     status: string[]
     category: string[]
@@ -224,4 +225,4 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
     )
 }
 
-export default TransactionPageControls
+export default React.memo(TransactionPageControls)

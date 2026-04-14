@@ -168,7 +168,9 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
         feeBearer: formData.fee_bearer,
         supportsInstallments: isCreditCard ? formData.supports_installments : false,
         maxInstallments: isCreditCard && formData.supports_installments ? formData.max_installments : 1,
-        installmentFees: isCreditCard && formData.supports_installments ? formData.installment_fees : [],
+        installmentFees: isCreditCard && formData.supports_installments
+          ? formData.installment_fees.map((row) => ({ installmentNumber: row.installment_number, feePercent: row.fee_percent }))
+          : [],
         pixKeyType: isPix ? formData.pix_key_type : null,
         pixKey: isPix ? formData.pix_key : null,
         usePartnerPixData: isPix ? formData.use_partner_pix_data : false,

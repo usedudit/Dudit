@@ -592,14 +592,14 @@ export async function registerPartner(data: any) {
     const defaultSubcategories: Array<{ name: string; parent_id: string; category_type: "income" | "expense" }> = []
     if (vendasId) {
       defaultSubcategories.push(
-        { name: "Produtos", parent_id: vendasId, category_type: "income" },
-        { name: "Serviços", parent_id: vendasId, category_type: "income" },
+        { name: "Produtos", parent_id: vendasId as string, category_type: "income" },
+        { name: "Serviços", parent_id: vendasId as string, category_type: "income" },
       )
     }
     if (negocioId) {
       defaultSubcategories.push(
-        { name: "Marketing", parent_id: negocioId, category_type: "expense" },
-        { name: "Ferramentas", parent_id: negocioId, category_type: "expense" },
+        { name: "Marketing", parent_id: negocioId as string, category_type: "expense" },
+        { name: "Ferramentas", parent_id: negocioId as string, category_type: "expense" },
       )
     }
     if (defaultSubcategories.length > 0) {

@@ -10,6 +10,7 @@ import { formatTime, formatDateTime, formatDayMonth } from "@/lib/utils/formatte
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { createTransactionHistoryEntry, getTransactionHistoryEntries } from "@/lib/services/transaction-history.service"
+import { revalidateTransactions } from "@/lib/utils/revalidation"
 
 type DbTransaction = {
     id: string
@@ -254,112 +255,134 @@ async function applyFinanceAccountBalanceAfterInsert(
         .eq("partner_id", partnerId)
 }
 
-export async function getFinancialTransactionsAction(partnerId: string): Promise<{ success: true; data: ERPTransaction[] } | { success: false; error: string }> {
+export async function getFinancialTransactionsAction(
+    partnerId: string,
+    options?: { page?: number; pageSize?: number }
+): Promise<{ success: true; data: ERPTransaction[]; totalCount: number } | { success: false; error: string }> {
+    const actionStart = performance.now()
     try {
         await requirePartnerAccessWithPermission(partnerId, "financial", "view")
         const supabase = await getSupabaseServerClient()
 
-        const { data, error } = await supabase
+        const page = Math.max(1, options?.page ?? 1)
+        const pageSize = options?.pageSize ?? 50
+        const offset = (page - 1) * pageSize
+
+        // ── Step 1: Main query with pagination ──────────────────────────
+        const t1 = performance.now()
+        const { data, error, count } = await supabase
             .from("transactions")
             .select(`
         id, description, category, amount, due_date, payment_date, created_at, status, notes, payment_type, transaction_type, contact_id, customer_id, contact_type,
         transfer_group_id, refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id, payment_method_id, installment_group_id, installment_number,
         transaction_contacts(name, type)
-      `)
+      `, { count: "exact" })
             .eq("partner_id", partnerId)
             .order("created_at", { ascending: false })
+            .range(offset, offset + pageSize - 1)
 
         if (error) throw error
         const txs = (data || []) as unknown as DbTransaction[]
+        const totalCount = count ?? 0
+        console.log(`[PERF] transactions.query ${Math.round(performance.now() - t1)}ms (${txs.length} rows, total ${totalCount})`)
 
-        // Para vendas: resolve cliente direto de orders -> customers (sem transaction_contacts).
-        const salesOrderNumbers = Array.from(
-            new Set(
-                txs
-                    .filter((t) => t.category === "Vendas")
-                    .map((t) => String(t.description || "").trim())
-                    .filter(Boolean),
-            ),
-        )
+        // ── Step 2: Collect all IDs for secondary lookups ───────────────
+        const salesOrderNumbers: string[] = []
+        const allCustomerIds = new Set<string>()
+        const paymentMethodIds = new Set<string>()
+        const installmentGroupIds = new Set<string>()
 
-        const orderByNumber = new Map<string, { buyer_id: string | null; customer_name: string | null }>()
-        if (salesOrderNumbers.length > 0) {
-            const { data: orders } = await supabase
+        for (const t of txs) {
+            if (t.category === "Vendas" && t.description?.trim()) {
+                salesOrderNumbers.push(String(t.description).trim())
+            }
+            if (t.customer_id) allCustomerIds.add(t.customer_id)
+            if (t.payment_method_id) paymentMethodIds.add(t.payment_method_id)
+            if (t.installment_group_id) allCustomerIds.add(t.installment_group_id) // will be filtered separately
+            if (t.installment_group_id) installmentGroupIds.add(t.installment_group_id)
+        }
+
+        // ── Step 3: Parallel secondary lookups ──────────────────────────
+        const t2 = performance.now()
+
+        // Orders lookup (for sales transactions)
+        const ordersPromise = salesOrderNumbers.length > 0
+            ? supabase
                 .from("orders")
                 .select("order_number, buyer_id, customer_name")
                 .eq("partner_id", partnerId)
-                .in("order_number", salesOrderNumbers)
+                .in("order_number", [...new Set(salesOrderNumbers)])
+                .then((r: any) => r.data || [])
+            : Promise.resolve([] as { order_number: string; buyer_id: string | null; customer_name: string | null }[])
 
-            for (const o of orders || []) {
-                orderByNumber.set(String(o.order_number), { buyer_id: o.buyer_id, customer_name: o.customer_name })
-            }
+        // Payment methods lookup
+        const pmIdsArr = [...paymentMethodIds]
+        const paymentMethodsPromise = pmIdsArr.length > 0
+            ? supabase
+                .from("payment_methods")
+                .select("id, name, payment_type")
+                .eq("partner_id", partnerId)
+                .in("id", pmIdsArr)
+                .then((r: any) => r.data || [])
+            : Promise.resolve([] as { id: string; name: string; payment_type: string | null }[])
+
+        // Installment groups lookup
+        const igIdsArr = [...installmentGroupIds]
+        const installmentGroupsPromise = igIdsArr.length > 0
+            ? supabase
+                .from("installment_groups")
+                .select("id, description, total_amount, installments_count")
+                .eq("partner_id", partnerId)
+                .in("id", igIdsArr)
+                .then((r: any) => r.data || [])
+            : Promise.resolve([] as InstallmentGroupRow[])
+
+        const [orders, pmRows, installmentGroups] = await Promise.all([
+            ordersPromise,
+            paymentMethodsPromise,
+            installmentGroupsPromise,
+        ])
+
+        // Build order lookup and collect buyer IDs into the customer set
+        const orderByNumber = new Map<string, { buyer_id: string | null; customer_name: string | null }>()
+        for (const o of orders) {
+            orderByNumber.set(String(o.order_number), { buyer_id: o.buyer_id, customer_name: o.customer_name })
+            if (o.buyer_id) allCustomerIds.add(o.buyer_id)
         }
 
-        const buyerIds = Array.from(
-            new Set(
-                Array.from(orderByNumber.values())
-                    .map((o) => o.buyer_id)
-                    .filter(Boolean),
-            ),
-        ) as string[]
+        // Remove installment group IDs that were accidentally added to customer set
+        for (const igId of installmentGroupIds) {
+            allCustomerIds.delete(igId)
+        }
 
+        // Single merged customer lookup (combines buyer IDs + linked customer IDs)
+        const customerIds = [...allCustomerIds]
         const customerById = new Map<string, { name: string | null }>()
-        if (buyerIds.length > 0) {
+        if (customerIds.length > 0) {
             const { data: customers } = await supabase
                 .from("customers")
                 .select("id, name")
                 .eq("partner_id", partnerId)
-                .in("id", buyerIds)
+                .in("id", customerIds)
             for (const c of customers || []) customerById.set(c.id, { name: c.name })
         }
 
-        const linkedCustomerIds = Array.from(
-            new Set(
-                txs.map((t) => t.customer_id).filter(Boolean),
-            ),
-        ) as string[]
-        if (linkedCustomerIds.length > 0) {
-            const { data: linkedCustomers } = await supabase
-                .from("customers")
-                .select("id, name")
-                .eq("partner_id", partnerId)
-                .in("id", linkedCustomerIds)
-            for (const c of linkedCustomers || []) {
-                if (!customerById.has(c.id)) customerById.set(c.id, { name: c.name })
-            }
-        }
-
-        const paymentMethodIds = Array.from(
-            new Set(txs.map((t) => t.payment_method_id).filter(Boolean)),
-        ) as string[]
+        // Build payment method label map
         const paymentMethodLabelById = new Map<string, string>()
-        if (paymentMethodIds.length > 0) {
-            const { data: pmRows } = await supabase
-                .from("payment_methods")
-                .select("id, name, payment_type")
-                .eq("partner_id", partnerId)
-                .in("id", paymentMethodIds)
-            for (const pm of pmRows || []) {
-                const label = formatPaymentMethodLabel(pm.name, pm.payment_type)
-                paymentMethodLabelById.set(pm.id, label || "Não informado")
-            }
+        for (const pm of pmRows) {
+            const label = formatPaymentMethodLabel(pm.name, pm.payment_type)
+            paymentMethodLabelById.set(pm.id, label || "Não informado")
         }
 
-        const installmentGroupIds = Array.from(
-            new Set(txs.map((t) => t.installment_group_id).filter(Boolean)),
-        ) as string[]
+        // Build installment group map
         const installmentGroupById = new Map<string, InstallmentGroupRow>()
-        if (installmentGroupIds.length > 0) {
-            const { data: groups } = await supabase
-                .from("installment_groups")
-                .select("id, description, total_amount, installments_count")
-                .eq("partner_id", partnerId)
-                .in("id", installmentGroupIds)
-            for (const g of groups || []) {
-                installmentGroupById.set(g.id, g as InstallmentGroupRow)
-            }
+        for (const g of installmentGroups) {
+            installmentGroupById.set(g.id, g as InstallmentGroupRow)
         }
 
+        console.log(`[PERF] transactions.lookups ${Math.round(performance.now() - t2)}ms`)
+
+        // ── Step 4: Map to ERPTransaction ───────────────────────────────
         const now = new Date()
         const nowTime = now.getTime()
         const mapped: ERPTransaction[] = txs.map((t) => {
@@ -435,7 +458,8 @@ export async function getFinancialTransactionsAction(partnerId: string): Promise
             }
         })
 
-        return { success: true, data: mapped }
+        console.log(`[PERF] getFinancialTransactions took ${Math.round(performance.now() - actionStart)}ms (${txs.length} rows, page ${page})`)
+        return { success: true, data: mapped, totalCount }
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao carregar transações" }
     }
@@ -588,6 +612,7 @@ export async function createManualTransactionAction(input: CreateManualTransacti
             console.error("[transactions_history] createManualTransactionAction:", historyError)
         }
 
+        await revalidateTransactions(input.partnerId)
         return { success: true, data }
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao criar transação" }
@@ -721,6 +746,7 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
             }
         }
 
+        await revalidateTransactions(input.partnerId)
         return { success: true, data, transferGroupId }
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao criar transferência" }
@@ -874,6 +900,7 @@ export async function updateManualTransactionAction(
             }
         }
 
+        await revalidateTransactions(partnerId)
         return { success: true, data }
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao atualizar transação" }
@@ -1016,6 +1043,7 @@ export async function createInstallmentGroupAction(input: {
         const inserted = await insertTransactionsWithOptionalCreator(supabase, transactionsPayload)
         if (inserted.error) throw inserted.error
 
+        await revalidateTransactions(input.partnerId)
         return { success: true as const, data: { groupId: group.id, createdCount: (inserted.data || []).length } }
     } catch (e: any) {
         return { success: false as const, error: e.message || "Erro ao criar parcelamento" }
@@ -1194,6 +1222,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
             } catch (historyError) {
                 console.error("[transactions_history] markRecurringOccurrenceAsPaidAction:", historyError)
             }
+            await revalidateTransactions(input.partnerId)
             return { success: true, data: updated }
         }
 
@@ -1260,6 +1289,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
                 console.error("[transactions_history] markRecurringOccurrenceAsPaidAction:", historyError)
             }
         }
+        await revalidateTransactions(input.partnerId)
         return { success: true, data: newTx }
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao marcar como pago" }

@@ -199,7 +199,7 @@ export async function calculatePaymentMethodAmountsAction(input: {
       feePercent: Number(method.fee_percent || 0),
       feeFixed: Number(method.fee_fixed || 0),
       feeBearer: (method.fee_bearer || "merchant") as "merchant" | "customer",
-      installmentFees: (fees || []).map((row) => ({
+      installmentFees: (fees || []).map((row: any) => ({
         installmentNumber: row.installment_number,
         feePercent: Number(row.fee_percent || 0),
       })),

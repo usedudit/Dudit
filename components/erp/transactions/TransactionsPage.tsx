@@ -102,6 +102,7 @@ const getPaymentIcon = (paymentType: string) => {
 
 export default function TransactionsPage({
     transactions,
+    totalCount,
     partnerId,
     categories = [],
     accounts = [],
@@ -110,6 +111,7 @@ export default function TransactionsPage({
     paymentMethods = [],
 }: {
     transactions: ERPTransaction[]
+    totalCount?: number
     partnerId: string
     categories?: CategoryItem[]
     accounts?: AccountItem[]
@@ -123,6 +125,7 @@ export default function TransactionsPage({
     const isTablet = useMediaQuery("(max-width: 1024px)")
 
     const [search, setSearch] = useState("")
+    const [debouncedSearch, setDebouncedSearch] = useState("")
     const [activeTab, setActiveTab] = useState<TransactionTab>("Transações")
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const [page, setPage] = useState(1)
@@ -156,6 +159,12 @@ export default function TransactionsPage({
         window.addEventListener("resize", checkScroll)
         return () => window.removeEventListener("resize", checkScroll)
     }, [checkScroll, viewMode, transactions])
+
+    // ── Search debounce (300ms) ──────────────────────────────────────
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(search), 300)
+        return () => clearTimeout(timer)
+    }, [search])
 
     const paymentTypeOptions = useMemo(() => {
         const s = new Set<string>()
@@ -201,7 +210,7 @@ export default function TransactionsPage({
                 id: "category",
                 title: "Categoria",
                 type: "checkbox-list",
-                options: Array.from(new Set(transactions.map((item) => item.category))),
+                options: Array.from(new Set(transactions.map((item) => item.category))).sort((a, b) => a.localeCompare(b, "pt-BR")),
             },
             { id: "paymentType", title: "Meio de Pagamento", type: "checkbox-list", options: paymentTypeOptions },
         ],
@@ -209,7 +218,7 @@ export default function TransactionsPage({
     )
 
     const filteredTransactions = useMemo(() => {
-        const term = search.trim().toLowerCase()
+        const term = debouncedSearch.trim().toLowerCase()
         const { startYmd, endYmd } = resolveDatePeriodBounds(filters.datePeriod)
         const dateBoundsActive = startYmd !== null || endYmd !== null
 
@@ -389,10 +398,14 @@ export default function TransactionsPage({
         }
 
         return result
-    }, [transactions, recurringOccurrences, search, activeTab, filters, sortConfig])
+    }, [transactions, recurringOccurrences, debouncedSearch, activeTab, filters, sortConfig])
 
-    const paginatedTransactions = filteredTransactions.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
-    const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE))
+    const { paginatedTransactions, totalPages } = useMemo(() => {
+        const paginated = filteredTransactions.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+        const pages = Math.max(1, Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE))
+        return { paginatedTransactions: paginated, totalPages: pages }
+    }, [filteredTransactions, page])
+
     const hasActiveFilters =
         search.length > 0 ||
         filters.status.length > 0 ||

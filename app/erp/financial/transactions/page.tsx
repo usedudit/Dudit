@@ -43,6 +43,7 @@ export default async function FinancialTransactionsRoute() {
       <FadeIn className="p-4">
         <TransactionsPage
           transactions={txResult.data}
+          totalCount={(txResult as any).totalCount ?? txResult.data.length}
           partnerId={partnerId}
           categories={categories}
           accounts={accounts}
