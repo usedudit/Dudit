@@ -261,7 +261,9 @@ export async function getFinancialTransactionsAction(
 ): Promise<{ success: true; data: ERPTransaction[]; totalCount: number } | { success: false; error: string }> {
     const actionStart = performance.now()
     try {
+        const authStart = performance.now()
         await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+        console.log(`[PERF] transactions.auth ${Math.round(performance.now() - authStart)}ms`)
         const supabase = await getSupabaseServerClient()
 
         const page = Math.max(1, options?.page ?? 1)
@@ -528,11 +530,8 @@ export async function createManualTransactionAction(input: CreateManualTransacti
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-        await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
         const supabase = await getSupabaseServerClient()
-        const {
-            data: { user },
-        } = await supabase.auth.getUser()
 
         if (input.transactionType === "transfer") {
             throw new Error("Use a ação de transferência para movimentar entre contas.")
@@ -585,7 +584,7 @@ export async function createManualTransactionAction(input: CreateManualTransacti
             reference_note: input.referenceNote?.trim() || null,
             installment_group_id: input.installmentGroupId || null,
             installment_number: input.installmentNumber ?? null,
-            created_by_user_id: user?.id ?? null,
+            created_by_user_id: userId,
         }
 
         const inserted = await insertTransactionsWithOptionalCreator(supabase, payload)
@@ -604,7 +603,7 @@ export async function createManualTransactionAction(input: CreateManualTransacti
             await createTransactionHistoryEntry({
                 transactionId: data.id,
                 partnerId: input.partnerId,
-                actorUserId: user?.id ?? null,
+                actorUserId: userId,
                 entryType: "created",
                 changeLines: ["criou esta transação."],
             })
@@ -635,11 +634,8 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-        await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
         const supabase = await getSupabaseServerClient()
-        const {
-            data: { user: transferUser },
-        } = await supabase.auth.getUser()
 
         const amt = Number(input.amount || 0)
         if (!(amt > 0)) throw new Error("Valor deve ser maior que zero.")
@@ -712,8 +708,8 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
             subcategory_id: null,
         }
 
-        const outRowWithCreator = { ...outRow, created_by_user_id: transferUser?.id ?? null }
-        const inRowWithCreator = { ...inRow, created_by_user_id: transferUser?.id ?? null }
+        const outRowWithCreator = { ...outRow, created_by_user_id: userId }
+        const inRowWithCreator = { ...inRow, created_by_user_id: userId }
 
         const inserted = await insertTransactionsWithOptionalCreator(supabase, [outRowWithCreator, inRowWithCreator])
         if (inserted.error) throw inserted.error
@@ -732,19 +728,17 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
             })
         }
 
-        for (const row of data || []) {
-            try {
-                await createTransactionHistoryEntry({
+        await Promise.allSettled(
+            (data || []).map((row: any) =>
+                createTransactionHistoryEntry({
                     transactionId: row.id,
                     partnerId: input.partnerId,
-                    actorUserId: transferUser?.id ?? null,
+                    actorUserId: userId,
                     entryType: "created",
                     changeLines: ["registrou lançamento de transferência entre contas."],
-                })
-            } catch (historyError) {
-                console.error("[transactions_history] createTransferPairAction:", historyError)
-            }
-        }
+                }).catch(err => console.error("[transactions_history] createTransferPairAction:", err))
+            )
+        )
 
         await revalidateTransactions(input.partnerId)
         return { success: true, data, transferGroupId }
@@ -966,11 +960,8 @@ export async function createInstallmentGroupAction(input: {
     notes?: string | null
 }) {
     try {
-        await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
         const supabase = await getSupabaseServerClient()
-        const {
-            data: { user },
-        } = await supabase.auth.getUser()
 
         const count = Math.floor(Number(input.installmentsCount) || 0)
         if (!(count >= 1)) throw new Error("Informe a quantidade de parcelas.")
@@ -1001,7 +992,7 @@ export async function createInstallmentGroupAction(input: {
                 account_id: input.accountId || null,
                 contact_id: input.contactId || null,
                 payment_method_id: input.paymentMethodId || null,
-                created_by_user_id: user?.id ?? null,
+                created_by_user_id: userId,
             })
             .select("id")
             .single()
@@ -1036,7 +1027,7 @@ export async function createInstallmentGroupAction(input: {
                 origin: "manual",
                 installment_group_id: group.id,
                 installment_number: installmentNumber,
-                created_by_user_id: user?.id ?? null,
+                created_by_user_id: userId,
             }
         })
 
@@ -1127,11 +1118,8 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-        await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
         const supabase = await getSupabaseServerClient()
-        const {
-            data: { user: markPaidUser },
-        } = await supabase.auth.getUser()
 
         // Fetch the recurring template
         const { data: rec, error: recErr } = await supabase
@@ -1215,7 +1203,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
                 await createTransactionHistoryEntry({
                     transactionId: pendingTx.id,
                     partnerId: input.partnerId,
-                    actorUserId: markPaidUser?.id ?? null,
+                    actorUserId: userId,
                     entryType: "updated",
                     changeLines: ["marcou esta ocorrência como paga."],
                 })
@@ -1251,7 +1239,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
             origin: "system" as const,
             recurring_id: rec.id,
             payment_method_id: resolvedPmId,
-            created_by_user_id: markPaidUser?.id ?? null,
+            created_by_user_id: userId,
         }
 
         const insertRes = await insertTransactionsWithOptionalCreator(supabase, payload)
@@ -1281,7 +1269,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
                 await createTransactionHistoryEntry({
                     transactionId: newTx.id,
                     partnerId: input.partnerId,
-                    actorUserId: markPaidUser?.id ?? null,
+                    actorUserId: userId,
                     entryType: "created",
                     changeLines: ["marcou esta ocorrência como paga."],
                 })

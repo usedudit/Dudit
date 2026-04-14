@@ -110,8 +110,6 @@ function sanitizeInstallmentFees(input: InstallmentFeeInput[] | undefined, maxIn
 }
 
 export async function getPaymentMethodsAction(partnerId: string) {
-  await requireUser()
-
   await requirePartnerAccessWithPermission(partnerId, "financial", "view")
 
   const supabase = await getSupabaseServerClient()
@@ -212,8 +210,6 @@ export async function calculatePaymentMethodAmountsAction(input: {
 export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) {
   await requireRateLimit(RateLimitCategory.PAYMENT)
 
-  await requireUser()
-
   await requirePartnerAccessWithPermission(data.partnerId, "financial", "create")
 
   const canonicalType = toCanonicalPaymentType(data.paymentType)
@@ -310,8 +306,6 @@ export async function updatePaymentMethodAction(
 ) {
   await requireRateLimit(RateLimitCategory.PAYMENT)
 
-  await requireUser()
-
   const supabase = await getSupabaseServerClient()
   const { data: method } = await supabase
     .from("payment_methods")
@@ -405,8 +399,6 @@ export async function updatePaymentMethodAction(
 
 export async function deletePaymentMethodAction(methodId: string) {
   await requireRateLimit(RateLimitCategory.PAYMENT)
-
-  const user = await requireUser()
 
   const supabase = await getSupabaseServerClient()
   const { data: method } = await supabase

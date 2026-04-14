@@ -1,8 +1,7 @@
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getCategoriesData, getAccountsData } from "@/lib/data/financial-data"
 import FinancialCategoriesPage from "@/components/erp/financial-cadastros/FinancialCategoriesPage"
-import { redirect } from "next/navigation"
-import { getCurrentUser, checkPartnerPermission } from "@/lib/auth/authorization"
+import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -11,13 +10,8 @@ export const dynamic = "force-dynamic"
 export const revalidate = 0
 
 export default async function FinancialCategoriesRoute() {
-  const user = await getCurrentUser()
-  if (!user) return <AccessDenied />
-
   const context = await getCurrentPartnerContext()
-  if (!context) {
-    redirect("/select-erp")
-  }
+  if (!context) return <AccessDenied />
   const partnerId = context.partnerId
 
   const { allowed } = await checkPartnerPermission(partnerId, "financial", "view")

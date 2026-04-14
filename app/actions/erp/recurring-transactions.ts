@@ -380,7 +380,9 @@ export type RecurringOccurrence = {
 export async function generateRecurringOccurrencesAction(partnerId: string) {
   const actionStart = performance.now()
   try {
+    const authStart = performance.now()
     await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+    console.log(`[PERF] recurringOccurrences.auth ${Math.round(performance.now() - authStart)}ms`)
     const supabase = await getSupabaseServerClient()
 
     // ── Single bulk RPC call replaces N×400 serial round trips ─────────

@@ -22,7 +22,7 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
   }
 
   return (
-    <div className="flex-none pb-6 pt-2 flex justify-center z-40 bg-white dark:bg-dark-background md:relative md:bg-transparent fixed bottom-0 left-0 w-full border-t border-brand-border dark:border-dark-border md:border-0 shadow-lg md:shadow-none">
+    <div className="flex-none pb-4 pt-4 flex justify-center z-40 bg-white dark:bg-dark-background md:relative md:bg-transparent fixed bottom-0 left-0 w-full border-t border-brand-border dark:border-dark-border md:border-0 shadow-lg md:shadow-none">
       <AnimatePresence>
         {totalPages > 1 && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} className="flex items-center gap-2">

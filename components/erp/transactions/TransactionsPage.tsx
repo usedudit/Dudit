@@ -670,7 +670,7 @@ export default function TransactionsPage({
                     hasActiveFilters={hasActiveFilters}
                 />
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-8 px-4 md:px-8">
+                <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
                     <AnimatePresence mode="wait">
                         {!hasTransactions ? (
                             <motion.div

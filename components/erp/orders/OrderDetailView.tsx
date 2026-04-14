@@ -253,7 +253,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Itens do Pedido</h3>
                                             <div className="space-y-4">
                                                 {(order.order_items || []).map((item: any) => (
-                                                    <div key={item.id} className="flex items-start gap-4 p-3">
+                                                    <div key={item.id} className="flex items-start gap-4">
                                                         <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
                                                             <img
                                                                 src={getR2ImageUrl(item.image, "thumbnail")}
@@ -304,10 +304,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                     />
                                                 )}
 
-                                                <PaymentRow
-                                                    label="Subtotal"
-                                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{`${itemsLabel} • ${formatCurrency(subtotalValue)}`}</span>}
-                                                />
+                                                <PaymentRow label="Subtotal" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{`${itemsLabel} • ${formatCurrency(subtotalValue)}`}</span>} />
 
                                                 <PaymentRow
                                                     label="Tipo de Entrega"
@@ -315,14 +312,14 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
                                                             {order.delivery_type === "pickup" ? "Retirada no local" : "Entrega no endereco"} •{" "}
                                                             <span className={Number(order.shipping_cost || 0) <= 0 ? "text-brand-green" : "text-brand-dark dark:text-dark-heading"}>
-                                                                {Number(order.shipping_cost || 0) <= 0 ? "Gratis" : formatCurrency(order.shipping_cost || 0)}
+                                                                {Number(order.shipping_cost || 0) <= 0 ? "Grátis" : formatCurrency(order.shipping_cost || 0)}
                                                             </span>
                                                         </span>
                                                     }
                                                 />
 
                                                 {Number(order.additional_costs || 0) > 0 && (
-                                                    <PaymentRow label="Custos Adicionais" value={formatCurrency(order.additional_costs)} />
+                                                    <PaymentRow label="Custos Adicionais" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(order.additional_costs)}</span>} />
                                                 )}
 
                                                 {Number(order.discount_value || 0) > 0 && (

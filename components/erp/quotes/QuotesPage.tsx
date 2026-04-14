@@ -499,7 +499,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                             />
                         )}
 
-                        <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-8 px-4 md:px-8">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
                             <AnimatePresence mode="wait">
                                 {isLoading ? (
                                     <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
