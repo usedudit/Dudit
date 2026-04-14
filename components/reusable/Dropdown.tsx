@@ -83,13 +83,18 @@ export const Dropdown: React.FC<DropdownProps> = ({
 
             const styles: React.CSSProperties = {
                 position: "fixed",
-                width: width && width !== "w-full" ? width : `${rect.width}px`, // A largura já é calculada aqui
             }
 
             if (shouldOpenUpward) {
                 styles.bottom = `${window.innerHeight - rect.top + 4}px`
             } else {
                 styles.top = `${rect.bottom + 4}px`
+            }
+
+            if (width && width !== "w-full") {
+                styles.width = width.startsWith("w-") ? "auto" : width
+            } else {
+                styles.width = `${rect.width}px`
             }
 
             if (align === "right") {
@@ -103,9 +108,8 @@ export const Dropdown: React.FC<DropdownProps> = ({
 
     useEffect(() => {
         if (isMounted && !isMobile) {
-            // Calcula a largura assim que o menu é montado
-            updatePosition()
             const timer = setTimeout(() => {
+                updatePosition()
                 setIsOpen(true)
             }, 10)
             return () => clearTimeout(timer)

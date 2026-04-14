@@ -4,11 +4,14 @@ import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { getFinancialTransactionsAction } from "@/app/actions/erp/transactions"
-import { getFinancialCategoriesAction } from "@/app/actions/erp/financial-category-metadata"
-import { getFinanceAccountsAction } from "@/app/actions/erp/finance-accounts"
-import { generateRecurringOccurrencesAction, getRecurringTransactionsAction } from "@/app/actions/erp/recurring-transactions"
-import { getPaymentMethodsAction } from "@/app/actions/payment-methods"
+import {
+  getTransactionsData,
+  getCategoriesData,
+  getAccountsData,
+  getRecurringOccurrencesData,
+  getRecurringTemplatesData,
+  getPaymentMethodsData,
+} from "@/lib/data/financial-data"
 
 export const dynamic = "force-dynamic"
 
@@ -21,12 +24,12 @@ export default async function FinancialTransactionsRoute() {
   if (!allowed) return <AccessDenied />
 
   const [txResult, categoriesResult, accountsResult, recurringResult, recurringTemplatesResult, paymentMethodsResult] = await Promise.all([
-    getFinancialTransactionsAction(partnerId),
-    getFinancialCategoriesAction(partnerId),
-    getFinanceAccountsAction(partnerId),
-    generateRecurringOccurrencesAction(partnerId),
-    getRecurringTransactionsAction(partnerId),
-    getPaymentMethodsAction(partnerId),
+    getTransactionsData(partnerId),
+    getCategoriesData(partnerId),
+    getAccountsData(partnerId),
+    getRecurringOccurrencesData(partnerId),
+    getRecurringTemplatesData(partnerId),
+    getPaymentMethodsData(partnerId),
   ])
 
   if (!txResult.success) return <AccessDenied />

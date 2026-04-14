@@ -1,6 +1,5 @@
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { getFinancialCategoriesAction } from "@/app/actions/erp/financial-category-metadata"
-import { getFinanceAccountsAction } from "@/app/actions/erp/finance-accounts"
+import { getCategoriesData, getAccountsData } from "@/lib/data/financial-data"
 import FinancialCategoriesPage from "@/components/erp/financial-cadastros/FinancialCategoriesPage"
 import { redirect } from "next/navigation"
 import { getCurrentUser, checkPartnerPermission } from "@/lib/auth/authorization"
@@ -25,8 +24,8 @@ export default async function FinancialCategoriesRoute() {
   if (!allowed) return <AccessDenied />
 
   const [catResult, accResult] = await Promise.all([
-    getFinancialCategoriesAction(partnerId),
-    getFinanceAccountsAction(partnerId),
+    getCategoriesData(partnerId),
+    getAccountsData(partnerId),
   ])
 
   if (!catResult.success || !catResult.data) {
