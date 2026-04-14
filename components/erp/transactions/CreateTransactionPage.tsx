@@ -65,6 +65,7 @@ export type AccountItem = {
     name: string
     type: string
     is_active: boolean
+    is_default?: boolean
     current_balance?: number | string | null
 }
 
@@ -212,7 +213,11 @@ export default function CreateTransactionPage({
     )
     const [paymentDate, setPaymentDate] = useState(() => editTransaction?.paymentDateRaw ? editTransaction.paymentDateRaw.slice(0, 10) : format(new Date(), "yyyy-MM-dd"))
     const [status, setStatus] = useState<"pending" | "paid">(() => editRecurringTemplate ? "pending" : editTransaction ? (String(editTransaction.rawStatus || "").toLowerCase() === "paid" ? "paid" : "pending") : "pending")
-    const [accountId, setAccountId] = useState<string | undefined>(() => editRecurringTemplate?.account_id ?? editTransaction?.accountId ?? undefined)
+    const [accountId, setAccountId] = useState<string | undefined>(() => {
+        const explicitId = editRecurringTemplate?.account_id ?? editTransaction?.accountId ?? undefined
+        if (explicitId) return explicitId
+        return accounts.find((acc) => acc.is_default && acc.is_active)?.id ?? undefined
+    })
     const [fromAccountId, setFromAccountId] = useState<string | undefined>(undefined)
     const [toAccountId, setToAccountId] = useState<string | undefined>(undefined)
     const [paymentType, setPaymentType] = useState<string>("Pix")
@@ -797,9 +802,12 @@ export default function CreateTransactionPage({
 
                 // Always allow these
                 patch.description = description.trim()
-                patch.categoryId = categoryId || null
-                patch.subcategoryId = subcategoryId || null
                 patch.notes = notes || null
+
+                if (!isPaidTransaction) {
+                    patch.categoryId = categoryId || null
+                    patch.subcategoryId = subcategoryId || null
+                }
 
                 // Only allow financial fields if NOT locked
                 if (!lockFinancialFields) {
@@ -810,9 +818,7 @@ export default function CreateTransactionPage({
                     patch.contactType = cp.contactTypeResolved
                     patch.paymentMethodId = paymentMethodId
                     patch.dueDate = isSalesOrigin ? null : dueDate
-                    patch.paymentDate = status === "paid" ? paymentDate : null
                     patch.transactionDate = isSalesOrigin ? paymentDate : dueDate
-                    patch.status = status
                 }
 
                 const res = await updateManualTransactionAction(
@@ -1301,7 +1307,8 @@ export default function CreateTransactionPage({
                                 setCategoryId(v)
                                 setSubcategoryId(undefined)
                             }}
-                            actionItem={{
+                            disabled={isPaidTransaction}
+                            actionItem={isPaidTransaction ? undefined : {
                                 label: "Criar nova categoria",
                                 icon: <PlusIcon className="w-4 h-4" />,
                                 onClick: openQuickCategory,
@@ -1313,7 +1320,8 @@ export default function CreateTransactionPage({
                             value={subcategoryId}
                             onChange={(v) => setSubcategoryId(v)}
                             placeholder="Selecione"
-                            actionItem={{
+                            disabled={isPaidTransaction}
+                            actionItem={isPaidTransaction ? undefined : {
                                 label: "Criar nova subcategoria",
                                 icon: <PlusIcon className="w-4 h-4" />,
                                 onClick: openQuickSubcategory,
@@ -1515,13 +1523,13 @@ export default function CreateTransactionPage({
                                 Situação
                             </label>
                             <div className="grid grid-cols-2 gap-2 mt-2">
-                                <Button variant={status === "paid" ? "default" : "outline"} onClick={() => setStatus("paid")} disabled={lockFinancialFields}>
+                                <Button variant={status === "paid" ? "default" : "outline"} onClick={() => setStatus("paid")} disabled={lockFinancialFields || isEditMode}>
                                     {paidLabel}
                                 </Button>
                                 <Button
                                     variant={status === "pending" ? "default" : "outline"}
                                     onClick={() => setStatus("pending")}
-                                    disabled={lockFinancialFields}
+                                    disabled={lockFinancialFields || isEditMode}
                                 >
                                     Pendente
                                 </Button>
@@ -1677,7 +1685,7 @@ export default function CreateTransactionPage({
                                         >
                                             {isEditMode
                                                 ? lockFinancialFields
-                                                    ? "Campos financeiros bloqueados. Apenas descrição e categoria podem ser editados."
+                                                    ? "Campos financeiros bloqueados. Apenas descrição e observações podem ser editadas."
                                                     : "Edite os campos desejados e salve."
                                                 : "Registre e organize os lançamentos do seu financeiro."}
                                         </div>

@@ -224,7 +224,6 @@ export async function GET(request: NextRequest) {
           partner_id: partnerId,
           name: "Mercado Pago",
           type: "wallet",
-          description: "Conta criada automaticamente pela integração do Mercado Pago.",
           initial_balance: 0,
           current_balance: 0,
           is_active: true,

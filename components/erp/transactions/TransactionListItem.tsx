@@ -23,6 +23,7 @@ interface TransactionListItemProps {
     onOpenDetail?: (transaction: ERPTransaction) => void
     onEdit?: (transaction: ERPTransaction) => void
     onMarkAsPaid?: (transaction: ERPTransaction) => void
+    onSettleInstallmentGroup?: (transaction: ERPTransaction) => void
 }
 
 const getPaymentIcon = (paymentType: string) => {
@@ -34,7 +35,7 @@ const getPaymentIcon = (paymentType: string) => {
 }
 
 const TransactionListItem = React.memo(
-    ({ transaction, columns, selected, onSelect, onOpenDetail, onEdit, onMarkAsPaid }: TransactionListItemProps) => {
+    ({ transaction, columns, selected, onSelect, onOpenDetail, onEdit, onMarkAsPaid, onSettleInstallmentGroup }: TransactionListItemProps) => {
         const renderCellContent = (colId: string) => {
             switch (colId) {
                 case "transaction":
@@ -44,9 +45,14 @@ const TransactionListItem = React.memo(
                                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate leading-tight">
                                     {transaction.description}
                                 </span>
-                                {transaction.isInstallmentGroup && (
+                                {transaction.installmentGroupId && (
                                     <Badge variant="orange" className="whitespace-nowrap scale-90 shrink-0">
                                         Parcelado
+                                    </Badge>
+                                )}
+                                {!transaction.isInstallmentGroup && transaction.installmentNumber && transaction.installmentTotalCount && (
+                                    <Badge variant="gray" className="whitespace-nowrap scale-90 shrink-0">
+                                        {transaction.installmentNumber}/{transaction.installmentTotalCount}
                                     </Badge>
                                 )}
                                 {(transaction.recurringId || transaction.isRecurringOccurrence) && (
@@ -120,8 +126,16 @@ const TransactionListItem = React.memo(
                         <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
                             <ActionsDropdown
                                 onEdit={transaction.isInstallmentGroup ? undefined : onEdit ? () => onEdit(transaction) : undefined}
-                                onCancel={transaction.isRecurringOccurrence && onMarkAsPaid ? () => onMarkAsPaid(transaction) : undefined}
-                                cancelLabel={transaction.isRecurringOccurrence ? "Marcar como pago" : undefined}
+                                onCancel={
+                                    transaction.isInstallmentGroup
+                                        ? (onSettleInstallmentGroup ? () => onSettleInstallmentGroup(transaction) : undefined)
+                                        : (transaction.isRecurringOccurrence && onMarkAsPaid ? () => onMarkAsPaid(transaction) : undefined)
+                                }
+                                cancelLabel={
+                                    transaction.isInstallmentGroup
+                                        ? "Quitar tudo"
+                                        : (transaction.isRecurringOccurrence ? "Marcar como pago" : undefined)
+                                }
                             />
                         </div>
                     )

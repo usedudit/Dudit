@@ -4,7 +4,7 @@ import React, { useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
-    Input, Button, FormDropdown,
+    Input, Button, FormDropdown, Combobox,
     CustomerCard, IconPlaceholder, DatePicker, Pagination,
     ThreeDotsLoader,
     MoneyInput,
@@ -42,6 +42,8 @@ interface OrderGeneralTabProps {
     deliveryMethod: string
     paymentStatus: string
     deliveryStatus: string
+    financeAccountId: string
+    accountOptions: Array<{ value: string; label: string }>
     remainingPaymentAmount?: number
     manualItemNameErrors?: Set<number>
     manualItemPriceErrors?: Set<number>
@@ -69,14 +71,14 @@ interface OrderGeneralTabProps {
     setOrderDate: (val: string) => void
     setSalesChannel: (val: string) => void
     setDeliveryMethod: (val: any) => void
-    setPaymentStatus: (val: any) => void
+    setFinanceAccountId: (val: string) => void
     setDeliveryStatus: (val: string) => void
+    onCreateAccount: () => void
     handleSaveOrder: () => void
 
     // Options
     salesChannelOptions: any[]
     deliveryMethodOptions: any[]
-    statusOptions: any[]
     deliveryStatusOptions: any[]
 
     fieldErrors?: Set<string>
@@ -86,15 +88,15 @@ interface OrderGeneralTabProps {
 export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     items, searchQuery, isProductSearchOpen, isSearching, searchResults,
     subtotal, discountAmount, discountValue, discountType, shippingFee, otherCosts, totalAmount,
-    selectedCustomer, orderDate, salesChannel, deliveryMethod, paymentStatus, deliveryStatus, isSaving,
+    selectedCustomer, orderDate, salesChannel, deliveryMethod, paymentStatus, deliveryStatus, financeAccountId, accountOptions, isSaving,
     remainingPaymentAmount = 0,
     manualItemNameErrors = new Set<number>(),
     manualItemPriceErrors = new Set<number>(),
     setSearchQuery, setIsProductSearchOpen, handleSearchProduct, onSearchFocus, addProductToOrder,
     updateItemField, updateItemPrice, updateItemQty, resolveItemQuantityMax, toggleItemEdit, removeItem, addBlankItem,
     setShippingFee, setOtherCosts, setDiscountValue, setDiscountType, setSelectedCustomer, setIsCustomerSheetOpen,
-    setOrderDate, setSalesChannel, setDeliveryMethod, setPaymentStatus, setDeliveryStatus, handleSaveOrder,
-    salesChannelOptions, deliveryMethodOptions, statusOptions, deliveryStatusOptions,
+    setOrderDate, setSalesChannel, setDeliveryMethod, setFinanceAccountId, setDeliveryStatus, onCreateAccount, handleSaveOrder,
+    salesChannelOptions, deliveryMethodOptions, deliveryStatusOptions,
     fieldErrors, setFieldErrors
 }) => {
     const searchRef = useRef<HTMLDivElement>(null);
@@ -662,11 +664,22 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 options={deliveryMethodOptions}
                             />
 
-                            <FormDropdown
-                                label="Status de Pagamento"
-                                value={paymentStatus}
-                                setValue={(val: any) => setPaymentStatus(val)}
-                                options={statusOptions}
+                            <Combobox
+                                label="Conta de recebimento"
+                                value={financeAccountId || undefined}
+                                onChange={(val) => {
+                                    setFinanceAccountId(val)
+                                    if (setFieldErrors) {
+                                        setFieldErrors((prev) => {
+                                            const next = new Set(prev)
+                                            next.delete("financeAccountId")
+                                            return next
+                                        })
+                                    }
+                                }}
+                                options={accountOptions}
+                                actionItem={{ label: "Criar conta", onClick: onCreateAccount }}
+                                error={fieldErrors?.has("financeAccountId")}
                             />
 
                             <FormDropdown

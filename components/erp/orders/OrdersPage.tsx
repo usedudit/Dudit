@@ -226,7 +226,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     created_at_time: new Date(o.order_date || o.created_at).getTime(),
                     situation: o.situation,
                     previousSituationBeforeCancel: o.previous_situation_before_cancel || null,
-                    canEdit: o.situation !== "paid" && o.previous_situation_before_cancel !== "paid",
+                    canEdit: o.situation !== "cancelled",
                     canReopen: o.situation === "cancelled"
                 }
             })
@@ -294,7 +294,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
     }
     const handleEditOrder = (order: Order) => {
         if (!order.canEdit) {
-            toast({ title: "Edição bloqueada", description: "Pedidos pagos não podem mais ser editados.", variant: "destructive" })
+            toast({ title: "Edição bloqueada", description: "Pedidos cancelados não podem ser editados.", variant: "destructive" })
             return
         }
         setSelectedOrderId(order.originalId)

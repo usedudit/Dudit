@@ -16,7 +16,7 @@ export async function getFinanceAccountsAction(partnerId: string) {
     const { data, error } = await supabase
       .from("finance_accounts")
       .select(
-        "id, name, type, description, initial_balance, current_balance, is_active, created_at, updated_at, is_system_managed, integration_source",
+        "id, name, type, initial_balance, current_balance, is_active, is_default, created_at, updated_at, is_system_managed, integration_source",
       )
       .eq("partner_id", partnerId)
       .order("name")
@@ -49,11 +49,11 @@ export async function createFinanceAccountAction(data: {
   partnerId: string
   name: string
   type: FinanceAccountType
-  description?: string | null
   initialBalance: number
   currentBalance?: number | null
   isSystemManaged?: boolean
   integrationSource?: string | null
+  isDefault?: boolean
 }) {
   try {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -87,16 +87,43 @@ export async function createFinanceAccountAction(data: {
         partner_id: data.partnerId,
         name: normalizedName,
         type: data.type,
-        description: data.description?.trim() || null,
         initial_balance: initial,
         current_balance: 0,
         is_system_managed: data.isSystemManaged ?? false,
         integration_source: data.integrationSource ?? null,
+        is_default: Boolean(data.isDefault),
       })
       .select(
-        "id, name, type, description, initial_balance, current_balance, is_active, created_at, updated_at, is_system_managed, integration_source",
+        "id, name, type, initial_balance, current_balance, is_active, is_default, created_at, updated_at, is_system_managed, integration_source",
       )
       .single()
+    if (!inserted.integration_source || inserted.integration_source !== "mercadopago") {
+      if (Boolean(data.isDefault)) {
+        await supabase
+          .from("finance_accounts")
+          .update({ is_default: false })
+          .eq("partner_id", data.partnerId)
+          .neq("id", inserted.id)
+          .or("integration_source.is.null,integration_source.neq.mercadopago")
+      } else {
+        const { count } = await supabase
+          .from("finance_accounts")
+          .select("id", { count: "exact", head: true })
+          .eq("partner_id", data.partnerId)
+          .eq("is_default", true)
+          .neq("id", inserted.id)
+          .or("integration_source.is.null,integration_source.neq.mercadopago")
+
+        if (!count) {
+          await supabase
+            .from("finance_accounts")
+            .update({ is_default: true })
+            .eq("id", inserted.id)
+            .eq("partner_id", data.partnerId)
+        }
+      }
+    }
+
 
     if (error) throw error
 
@@ -128,7 +155,7 @@ export async function createFinanceAccountAction(data: {
 
     const { data: refreshed } = await supabase
       .from("finance_accounts")
-      .select("id, name, type, description, initial_balance, current_balance, is_active, created_at, updated_at, is_system_managed, integration_source")
+      .select("id, name, type, initial_balance, current_balance, is_active, is_default, created_at, updated_at, is_system_managed, integration_source")
       .eq("id", inserted.id)
       .single()
 
@@ -144,9 +171,9 @@ export async function updateFinanceAccountAction(
   data: {
     name?: string
     type?: FinanceAccountType
-    description?: string | null
     initialBalance?: number
     isActive?: boolean
+    isDefault?: boolean
   },
 ) {
   try {
@@ -193,9 +220,9 @@ export async function updateFinanceAccountAction(
       if (!["cash", "bank", "wallet"].includes(data.type)) throw new Error("Tipo de conta inválido.")
       payload.type = data.type
     }
-    if (data.description !== undefined) payload.description = data.description?.trim() || null
     if (data.initialBalance !== undefined) payload.initial_balance = parseBalance(data.initialBalance)
     if (data.isActive !== undefined) payload.is_active = data.isActive
+    if (data.isDefault !== undefined) payload.is_default = data.isDefault
 
     const { data: updated, error } = await supabase
       .from("finance_accounts")
@@ -203,11 +230,21 @@ export async function updateFinanceAccountAction(
       .eq("id", id)
       .eq("partner_id", partnerId)
       .select(
-        "id, name, type, description, initial_balance, current_balance, is_active, created_at, updated_at, is_system_managed, integration_source",
+        "id, name, type, initial_balance, current_balance, is_active, is_default, created_at, updated_at, is_system_managed, integration_source",
       )
       .single()
 
     if (error) throw error
+
+    if (updated.integration_source !== "mercadopago" && data.isDefault === true) {
+      await supabase
+        .from("finance_accounts")
+        .update({ is_default: false })
+        .eq("partner_id", partnerId)
+        .neq("id", id)
+        .or("integration_source.is.null,integration_source.neq.mercadopago")
+    }
+
     return { success: true, data: updated }
   } catch (error: any) {
     return { success: false, error: error.message }

@@ -101,6 +101,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const subtotalValue = Number(order.total_amount || 0) - Number(order.shipping_cost || 0) - Number(order.additional_costs || 0) + Number(order.discount_value || 0)
     const cleanNotes = String(order.notes || "").replace(/\n*Pedido cancelado por:[\s\S]*$/, "").trim()
     const cancelNote = (String(order.notes || "").match(/Pedido cancelado por:[\s\S]*$/)?.[0] || "").trim()
+    const changeAmount = Math.max(0, Number(order.paid_amount || 0) - Number(order.total_amount || 0))
 
     const getTimelineSteps = (status: string) => {
         const baseDate = formatDayMonth(order.created_at)
@@ -169,12 +170,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                         onShare={() => { }}
                                     />
 
-                                    {order.situation !== "paid" && (
-                                        <Button onClick={() => onEditOrder(order)} className="whitespace-nowrap">
-                                            <EditIcon className="w-[18px] h-[18px] mr-2" />
-                                            Editar Venda
-                                        </Button>
-                                    )}
+                                    <Button onClick={() => onEditOrder(order)} className="whitespace-nowrap">
+                                        <EditIcon className="w-[18px] h-[18px] mr-2" />
+                                        Editar Venda
+                                    </Button>
                                 </div>
                             </div>
 
@@ -202,7 +201,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
                                                             {order.order_source === "Marketplace"
                                                                 ? (order.order_source || "Marketplace")
-                                                                : (order.seller_name || "Venda automatica")}
+                                                                : (order.seller_name || "Não informado")}
                                                         </div>
                                                     </div>
                                                     {order.order_source !== "Marketplace" && (
@@ -328,6 +327,12 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         value={<span className="text-brand-red font-bold">- {formatCurrency(order.discount_value)}</span>}
                                                     />
                                                 )}
+                                                {changeAmount > 0.009 && (
+                                                    <PaymentRow
+                                                        label="Troco"
+                                                        value={<span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{formatCurrency(changeAmount)}</span>}
+                                                    />
+                                                )}
 
                                                 <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
                                                     <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>
@@ -381,12 +386,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                             </Button>
                         }
                     />
-                    {order.situation !== "paid" && (
-                        <Button onClick={() => onEditOrder(order)} className="flex-1 whitespace-nowrap">
-                            <EditIcon className="w-4 h-4 mr-2" />
-                            Editar Venda
-                        </Button>
-                    )}
+                    <Button onClick={() => onEditOrder(order)} className="flex-1 whitespace-nowrap">
+                        <EditIcon className="w-4 h-4 mr-2" />
+                        Editar Venda
+                    </Button>
                 </div>
             </Tabs>
         </FadeIn>

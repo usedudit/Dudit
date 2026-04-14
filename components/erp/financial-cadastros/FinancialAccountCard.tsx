@@ -18,10 +18,10 @@ export interface FinanceAccountRow {
     id: string
     name: string
     type: string
-    description: string | null
     initial_balance: number | string
     current_balance: number | string | null
     is_active: boolean
+    is_default?: boolean
     created_at: string
     updated_at?: string
     is_system_managed?: boolean
@@ -80,6 +80,11 @@ const FinancialAccountCard = React.memo(
                                 >
                                     {item.is_active ? "Ativo" : "Inativo"}
                                 </Badge>
+                                {item.is_default ? (
+                                    <Badge variant="dark" className="whitespace-nowrap scale-90 shrink-0">
+                                        Padrão
+                                    </Badge>
+                                ) : null}
                             </div>
                         </div>
 
@@ -98,10 +103,6 @@ const FinancialAccountCard = React.memo(
                         </div>
                     </div>
                 </div>
-
-                {item.description ? (
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body line-clamp-2 mb-2">{item.description}</p>
-                ) : null}
 
                 <div className="mt-auto pt-4 border-t border-brand-border dark:border-dark-border flex gap-3 items-end justify-between">
                     <div className="flex flex-col gap-0.5">

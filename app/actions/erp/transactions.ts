@@ -107,6 +107,10 @@ function isLedgerConfirmedStatus(status: string | null | undefined): boolean {
     return ["paid", "pago", "recebido", "confirmed", "confirmado", "efetivado"].includes(s)
 }
 
+function isStatusPending(status: string | null | undefined): boolean {
+    return String(status || "").toLowerCase() === "pending"
+}
+
 function isCancelledStatus(status: string | null | undefined): boolean {
     return String(status || "").toLowerCase().includes("cancel")
 }
@@ -225,6 +229,24 @@ async function applyFinanceAccountBalanceAfterInsert(
 ) {
     if (!accountId) return
     if (!isLedgerConfirmedStatus(row.status)) return
+    await applyFinanceAccountBalanceDelta(supabase, partnerId, accountId, {
+        transaction_type: row.transaction_type,
+        amount: row.amount,
+        refund_kind: row.refund_kind,
+    })
+}
+
+async function applyFinanceAccountBalanceDelta(
+    supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+    partnerId: string,
+    accountId: string | null | undefined,
+    row: {
+        transaction_type: string
+        amount: number | string
+        refund_kind?: string | null
+    },
+) {
+    if (!accountId) return
 
     const rawAmt = Number(row.amount || 0)
     let delta = 0
@@ -386,14 +408,14 @@ export async function getFinancialTransactionsAction(
 
         // ── Step 4: Map to ERPTransaction ───────────────────────────────
         const now = new Date()
-        const nowTime = now.getTime()
+        const todayYmd = now.toISOString().slice(0, 10)
         const mapped: ERPTransaction[] = txs.map((t) => {
             const baseDate = t.due_date || t.payment_date || t.created_at
-            const dateObj = new Date(baseDate)
-            const isOverdue = String(t.status || "").toLowerCase() !== "paid" && dateObj.getTime() < nowTime
+            const baseDateObj = new Date(baseDate)
+            const dueYmd = t.due_date ? String(t.due_date).slice(0, 10) : null
+            const isOverdue = isStatusPending(t.status) && !!dueYmd && dueYmd < todayYmd
             
-            const createdDateObj = t.created_at ? new Date(t.created_at) : now
-            const diffTime = dateObj.getTime() - nowTime
+            const diffTime = baseDateObj.getTime() - now.getTime()
             const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
             const order = t.category === "Vendas" ? orderByNumber.get(String(t.description || "").trim()) : null
@@ -501,17 +523,6 @@ function isStatusPaid(status?: string | null): boolean {
 function isSystemOrGatewayOrigin(origin?: string | null): boolean {
     const o = String(origin || "").toLowerCase()
     return o === "system" || o === "gateway"
-}
-
-function normalizeOrderPaymentMethodLabel(value: string | null | undefined): string {
-    const raw = String(value || "").trim()
-    if (!raw) return "Não informado"
-    const norm = raw.toLowerCase()
-    if (norm === "pix") return "Pix"
-    if (norm === "dinheiro") return "Dinheiro"
-    if (norm.includes("cart")) return "Cartão"
-    if (norm.includes("boleto")) return "Boleto"
-    return raw
 }
 
 /** Fields that are NEVER editable on paid/confirmed transactions */
@@ -777,13 +788,6 @@ export async function updateManualTransactionAction(
             )
         }
 
-        const isInstallmentNonPending =
-            !!(current as any).installment_group_id &&
-            String(current.status || "").toLowerCase() !== "pending"
-        if (isInstallmentNonPending) {
-            throw new Error("Apenas parcelas pendentes podem ser editadas.")
-        }
-
         // Build payload with strict field-level locking
         const payload: Record<string, unknown> = {}
         const patchKeys = Object.keys(patch) as (keyof CreateManualTransactionInput)[]
@@ -808,34 +812,42 @@ export async function updateManualTransactionAction(
             throw new Error("Não é permitido alterar o contato de transações geradas por venda.")
         }
 
-        // Pending transactions: allow all editable fields
-        // Paid transactions: only description, category, subcategory, notes
+        const ALLOWED_PENDING_KEYS = new Set<keyof CreateManualTransactionInput>([
+            "description",
+            "categoryId",
+            "subcategoryId",
+            "accountId",
+            "contactId",
+            "customerId",
+            "contactType",
+            "dueDate",
+            "notes",
+        ])
+        const ALLOWED_PAID_KEYS = new Set<keyof CreateManualTransactionInput>([
+            "description",
+            "notes",
+        ])
+
+        const allowedKeys = paid ? ALLOWED_PAID_KEYS : ALLOWED_PENDING_KEYS
+        for (const key of patchKeys) {
+            if (!allowedKeys.has(key)) {
+                throw new Error(`Campo "${key}" não pode ser editado quando status é ${paid ? "paid" : "pending"}.`)
+            }
+        }
+
         if (paid) {
             if (patch.description !== undefined) payload.description = patch.description?.trim()
-            if (patch.category !== undefined) payload.category = patch.category
-            if (patch.categoryId !== undefined) payload.category_id = patch.categoryId
-            if (patch.subcategoryId !== undefined) payload.subcategory_id = patch.subcategoryId
             if (patch.notes !== undefined) payload.notes = patch.notes
         } else {
-            // Pending: all safe fields editable
             if (patch.description !== undefined) payload.description = patch.description?.trim()
-            if (patch.amount !== undefined) payload.amount = Number(patch.amount || 0)
-            if (patch.category !== undefined) payload.category = patch.category
             if (patch.categoryId !== undefined) payload.category_id = patch.categoryId
             if (patch.subcategoryId !== undefined) payload.subcategory_id = patch.subcategoryId
             if (!systemGateway && patch.accountId !== undefined) payload.account_id = patch.accountId
             if (patch.contactId !== undefined) payload.contact_id = patch.contactId
             if (patch.customerId !== undefined) payload.customer_id = patch.customerId
             if (patch.contactType !== undefined) payload.contact_type = patch.contactType
-            if (patch.paymentType !== undefined) payload.payment_type = patch.paymentType
-            if (patch.paymentMethodId !== undefined) payload.payment_method_id = patch.paymentMethodId
             if (patch.dueDate !== undefined) payload.due_date = patch.dueDate
-            if (patch.paymentDate !== undefined) payload.payment_date = patch.paymentDate
-            if (patch.transactionDate !== undefined) payload.transaction_date = patch.transactionDate
-            if (patch.status !== undefined) payload.status = patch.status
             if (patch.notes !== undefined) payload.notes = patch.notes
-            if (patch.refundKind !== undefined) payload.refund_kind = patch.refundKind
-            if (patch.referenceNote !== undefined) payload.reference_note = patch.referenceNote
         }
 
         // NEVER allow these fields to be mutated via patch
@@ -853,30 +865,6 @@ export async function updateManualTransactionAction(
             .select("*")
             .single()
         if (error) throw error
-
-        if (isSalesTransaction && (patch.paymentMethodId !== undefined || patch.paymentType !== undefined)) {
-            let nextOrderPaymentMethod = patch.paymentType || null
-            if (patch.paymentMethodId !== undefined && patch.paymentMethodId) {
-                const { data: paymentMethod } = await supabase
-                    .from("payment_methods")
-                    .select("name")
-                    .eq("id", patch.paymentMethodId)
-                    .eq("partner_id", partnerId)
-                    .maybeSingle()
-                nextOrderPaymentMethod = paymentMethod?.name || nextOrderPaymentMethod
-            }
-            if (nextOrderPaymentMethod) {
-                const normalized = normalizeOrderPaymentMethodLabel(nextOrderPaymentMethod)
-                await supabase
-                    .from("orders")
-                    .update({
-                        payment_method: normalized,
-                        updated_at: new Date().toISOString(),
-                    })
-                    .eq("partner_id", partnerId)
-                    .eq("order_number", String(current.description || "").trim())
-            }
-        }
 
         const historyLines = buildTransactionUpdateHistoryLines(patch)
         if (historyLines.length > 0) {
@@ -1062,6 +1050,22 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
             .order("installment_number", { ascending: true })
         if (rowsErr) throw rowsErr
 
+        const transactionIds = (rows || []).map((row: any) => row.id).filter(Boolean)
+        const paymentByTxId = new Map<string, number>()
+        if (transactionIds.length > 0) {
+            const { data: payments, error: paymentsErr } = await supabase
+                .from("transaction_payments")
+                .select("transaction_id, amount")
+                .eq("partner_id", input.partnerId)
+                .in("transaction_id", transactionIds)
+            if (paymentsErr) throw paymentsErr
+            for (const payment of payments || []) {
+                const txId = String((payment as any).transaction_id || "")
+                const amount = Number((payment as any).amount || 0)
+                paymentByTxId.set(txId, (paymentByTxId.get(txId) || 0) + amount)
+            }
+        }
+
         return {
             success: true as const,
             data: {
@@ -1082,23 +1086,240 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
                     const due = row.due_date ? new Date(`${row.due_date}T12:00:00`) : null
                     const overdue = !paid && !!due && due.getTime() < now.getTime()
                     const original = Math.abs(Number(row.original_amount ?? row.amount ?? 0))
-                    const paidAmount = paid ? original : 0
+                    const paymentTotal = paymentByTxId.get(row.id) || 0
+                    const paidAmount = Math.min(original, Math.max(0, paymentTotal))
+                    const remainingAmount = Math.max(0, original - paidAmount)
                     return {
                         id: row.id,
                         description: row.description,
                         installmentNumber: row.installment_number,
                         originalAmount: original,
                         paidAmount,
-                        remainingAmount: Math.max(0, original - paidAmount),
+                        remainingAmount,
                         dueDate: row.due_date,
                         paymentDate: row.payment_date,
-                        status: paid ? "paid" : overdue ? "overdue" : "pending",
+                        status: paid || remainingAmount <= 0 ? "paid" : overdue ? "overdue" : "pending",
                     }
                 }),
             },
         }
     } catch (e: any) {
         return { success: false as const, error: e.message || "Erro ao carregar detalhe do parcelado" }
+    }
+}
+
+export async function recordInstallmentPaymentAction(input: {
+    partnerId: string
+    transactionId: string
+    paymentAmount: number
+    interestAmount?: number
+    discountAmount?: number
+    paymentMethodId?: string | null
+}) {
+    try {
+        const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
+
+        const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const supabase = await getSupabaseServerClient()
+
+        const { data: tx, error: txErr } = await supabase
+            .from("transactions")
+            .select("id, status, partner_id, installment_group_id, original_amount, amount, transaction_type, refund_kind, account_id")
+            .eq("id", input.transactionId)
+            .eq("partner_id", input.partnerId)
+            .single()
+        if (txErr || !tx) throw new Error(txErr?.message || "Parcela não encontrada.")
+        if (!tx.installment_group_id) throw new Error("Pagamento parcial é permitido apenas para parcelas.")
+        if (!isStatusPending(tx.status)) throw new Error("A parcela já está quitada.")
+
+        const paymentAmount = Number(input.paymentAmount || 0)
+        const interestAmount = Number(input.interestAmount || 0)
+        const discountAmount = Number(input.discountAmount || 0)
+        const finalPaid = Math.round((paymentAmount + interestAmount - discountAmount) * 100) / 100
+        if (!(finalPaid > 0)) throw new Error("O valor final pago deve ser maior que zero.")
+
+        const { data: existingPayments, error: paymentsErr } = await supabase
+            .from("transaction_payments")
+            .select("amount")
+            .eq("partner_id", input.partnerId)
+            .eq("transaction_id", input.transactionId)
+        if (paymentsErr) throw paymentsErr
+
+        const paidSoFar = (existingPayments || []).reduce((acc, row: any) => acc + Number(row.amount || 0), 0)
+        const originalAmount = Math.abs(Number(tx.original_amount ?? tx.amount ?? 0))
+        const remainingAmount = Math.max(0, originalAmount - paidSoFar)
+        const paidAfter = paidSoFar + finalPaid
+        const fullyPaid = paidAfter + 0.0001 >= originalAmount
+        const nowIso = new Date().toISOString()
+
+        const { error: insertPaymentErr } = await supabase
+            .from("transaction_payments")
+            .insert({
+                partner_id: input.partnerId,
+                transaction_id: input.transactionId,
+                amount: finalPaid,
+                payment_method_id: input.paymentMethodId || null,
+                created_by_user_id: userId,
+                created_at: nowIso,
+            })
+        if (insertPaymentErr) throw insertPaymentErr
+
+        await applyFinanceAccountBalanceDelta(supabase, input.partnerId, tx.account_id, {
+            transaction_type: tx.transaction_type,
+            amount: finalPaid,
+            refund_kind: tx.refund_kind,
+        })
+
+        if (fullyPaid) {
+            const { error: updateErr } = await supabase
+                .from("transactions")
+                .update({
+                    status: "paid",
+                    payment_date: nowIso,
+                    updated_at: nowIso,
+                })
+                .eq("id", input.transactionId)
+                .eq("partner_id", input.partnerId)
+            if (updateErr) throw updateErr
+        }
+
+        try {
+            await createTransactionHistoryEntry({
+                transactionId: input.transactionId,
+                partnerId: input.partnerId,
+                actorUserId: userId,
+                entryType: "updated",
+                changeLines: [
+                    fullyPaid
+                        ? "registrou pagamento e quitou a parcela."
+                        : "registrou pagamento parcial da parcela.",
+                ],
+            })
+        } catch (historyError) {
+            console.error("[transactions_history] recordInstallmentPaymentAction:", historyError)
+        }
+
+        await revalidateTransactions(input.partnerId)
+        return {
+            success: true as const,
+            data: {
+                originalAmount,
+                paidSoFar,
+                remainingBefore: remainingAmount,
+                paidNow: finalPaid,
+                remainingAfter: Math.max(0, originalAmount - paidAfter),
+                fullyPaid,
+            },
+        }
+    } catch (e: any) {
+        return { success: false as const, error: e.message || "Erro ao registrar pagamento da parcela" }
+    }
+}
+
+export async function settleInstallmentGroupAction(input: {
+    partnerId: string
+    installmentGroupId: string
+}) {
+    try {
+        const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
+
+        const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const supabase = await getSupabaseServerClient()
+        const nowIso = new Date().toISOString()
+
+        const { data: txRows, error: txErr } = await supabase
+            .from("transactions")
+            .select("id, status, amount, original_amount, account_id, transaction_type, refund_kind")
+            .eq("partner_id", input.partnerId)
+            .eq("installment_group_id", input.installmentGroupId)
+        if (txErr) throw txErr
+        const rows = txRows || []
+        if (rows.length === 0) throw new Error("Nenhuma parcela encontrada para este grupo.")
+
+        const txIds = rows.map((r: any) => r.id)
+        const { data: paymentRows, error: paymentErr } = await supabase
+            .from("transaction_payments")
+            .select("transaction_id, amount")
+            .eq("partner_id", input.partnerId)
+            .in("transaction_id", txIds)
+        if (paymentErr) throw paymentErr
+
+        const paidByTx = new Map<string, number>()
+        for (const payment of paymentRows || []) {
+            const txId = String((payment as any).transaction_id || "")
+            const amount = Number((payment as any).amount || 0)
+            paidByTx.set(txId, (paidByTx.get(txId) || 0) + amount)
+        }
+
+        const paymentsToInsert: Record<string, unknown>[] = []
+        const txIdsToMarkPaid: string[] = []
+        let affectedCount = 0
+
+        for (const row of rows as any[]) {
+            const original = Math.abs(Number(row.original_amount ?? row.amount ?? 0))
+            const paidSoFar = paidByTx.get(row.id) || 0
+            const remaining = Math.max(0, Math.round((original - paidSoFar) * 100) / 100)
+            const alreadyPaid = String(row.status || "").toLowerCase() === "paid"
+
+            if (remaining <= 0) {
+                if (!alreadyPaid) txIdsToMarkPaid.push(row.id)
+                continue
+            }
+
+            paymentsToInsert.push({
+                partner_id: input.partnerId,
+                transaction_id: row.id,
+                amount: remaining,
+                payment_method_id: null,
+                created_by_user_id: userId,
+                created_at: nowIso,
+            })
+
+            await applyFinanceAccountBalanceDelta(supabase, input.partnerId, row.account_id, {
+                transaction_type: row.transaction_type,
+                amount: remaining,
+                refund_kind: row.refund_kind,
+            })
+            txIdsToMarkPaid.push(row.id)
+            affectedCount += 1
+        }
+
+        if (paymentsToInsert.length > 0) {
+            const { error: insErr } = await supabase.from("transaction_payments").insert(paymentsToInsert)
+            if (insErr) throw insErr
+        }
+
+        if (txIdsToMarkPaid.length > 0) {
+            const { error: updErr } = await supabase
+                .from("transactions")
+                .update({
+                    status: "paid",
+                    payment_date: nowIso,
+                    updated_at: nowIso,
+                })
+                .eq("partner_id", input.partnerId)
+                .in("id", txIdsToMarkPaid)
+            if (updErr) throw updErr
+        }
+
+        await Promise.allSettled(
+            txIdsToMarkPaid.map((transactionId) =>
+                createTransactionHistoryEntry({
+                    transactionId,
+                    partnerId: input.partnerId,
+                    actorUserId: userId,
+                    entryType: "updated",
+                    changeLines: ["quitou esta parcela pelo comando «Quitar tudo»."],
+                }),
+            ),
+        )
+
+        await revalidateTransactions(input.partnerId)
+        return { success: true as const, data: { settledCount: txIdsToMarkPaid.length, createdPayments: paymentsToInsert.length, affectedCount } }
+    } catch (e: any) {
+        return { success: false as const, error: e.message || "Erro ao quitar parcelado" }
     }
 }
 
@@ -1441,9 +1662,9 @@ export async function getTransactionDetailsAction(
 
         const row = t as any
         const now = new Date()
-        const dueBase = row.due_date || row.payment_date || row.created_at
-        const dateObj = new Date(dueBase)
-        const isOverdue = String(row.status || "").toLowerCase() !== "paid" && dateObj.getTime() < now.getTime()
+        const todayYmd = now.toISOString().slice(0, 10)
+        const dueYmd = row.due_date ? String(row.due_date).slice(0, 10) : null
+        const isOverdue = isStatusPending(row.status) && !!dueYmd && dueYmd < todayYmd
 
         const statusLabel = toDisplayStatus(row.status, row.transaction_type, row.refund_kind, isOverdue)
         const statusVariant = toStatusVariant(row.status, isOverdue)

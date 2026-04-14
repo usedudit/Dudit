@@ -15,6 +15,9 @@ import { useRouter } from "next/navigation"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import PaymentModal from "./PaymentModal"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
+import { createFinanceAccountAction, getFinanceAccountsAction, type FinanceAccountType } from "@/app/actions/erp/finance-accounts"
+import DefaultModal from "@/components/reusable/DefaultModal"
+import { Input, MoneyInput, Combobox, Checkbox } from "@/components/reusable"
 
 // Tabs
 import { OrderGeneralTab } from "./OrderGeneralTab"
@@ -31,6 +34,15 @@ interface CreateOrderProps {
 type PaymentBreakdownEntry = {
     method: string
     amount: number
+}
+
+type FinanceAccountOption = {
+    id: string
+    name: string
+    type: string
+    is_active: boolean
+    is_default?: boolean
+    integration_source?: string | null
 }
 
 const REQUIRED_FIELDS = [
@@ -68,6 +80,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [deliveryMethod, setDeliveryMethod] = useState<'delivery' | 'pickup'>("pickup")
     const [paymentStatus, setPaymentStatus] = useState<'paid' | 'partially_paid' | 'unpaid'>("unpaid")
     const [deliveryStatus, setDeliveryStatus] = useState('not_sent')
+    const [financeAccounts, setFinanceAccounts] = useState<FinanceAccountOption[]>([])
+    const [financeAccountId, setFinanceAccountId] = useState("")
 
     // items
     const [items, setItems] = useState<any[]>([])
@@ -104,6 +118,12 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [validationMessage, setValidationMessage] = useState("")
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
     const [wasSaleSuccessful, setWasSaleSuccessful] = useState(false)
+    const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
+    const [isSavingAccount, setIsSavingAccount] = useState(false)
+    const [newAccountName, setNewAccountName] = useState("")
+    const [newAccountType, setNewAccountType] = useState<FinanceAccountType>("cash")
+    const [newAccountInitialBalance, setNewAccountInitialBalance] = useState(0)
+    const [newAccountIsDefault, setNewAccountIsDefault] = useState(false)
 
     // --- Calculations ---
     const subtotal = useMemo(() => {
@@ -158,6 +178,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setOriginalPaymentMethod(order.payment_method || "Não informado")
                 setOriginalPaymentBreakdown(loadedPaymentBreakdown)
                 setDeliveryStatus(order.delivery_status || "not_sent")
+                setFinanceAccountId(order.finance_account_id || "")
                 setNotes(order.notes || "")
                 setShippingFee((order.shipping_cost || 0).toString())
                 setOtherCosts((order.additional_costs || 0).toString())
@@ -200,6 +221,22 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         }
         load()
     }, [editOrderId, partnerId, notifyError, normalizeSalesChannel])
+
+    useEffect(() => {
+        async function loadAccounts() {
+            const res = await getFinanceAccountsAction(partnerId)
+            if (!res.success || !res.data) return
+            const active = (res.data.accounts || []).filter((acc: FinanceAccountOption) => acc.is_active)
+            setFinanceAccounts(active)
+        }
+        loadAccounts()
+    }, [partnerId])
+
+    useEffect(() => {
+        if (editOrderId || financeAccountId || financeAccounts.length === 0) return
+        const defaultAccount = financeAccounts.find((acc) => acc.is_default)
+        if (defaultAccount?.id) setFinanceAccountId(defaultAccount.id)
+    }, [editOrderId, financeAccountId, financeAccounts])
 
     // --- Handlers ---
     const handleScroll = useCallback(() => {
@@ -431,6 +468,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         setDiscountValue(0)
         setPaymentStatus("unpaid")
         setDeliveryStatus("not_sent")
+        setFinanceAccountId("")
         setOriginalPaidAmount(0)
         setOriginalPaymentMethod("Não informado")
         setOriginalPaymentBreakdown([])
@@ -490,6 +528,13 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             setShowValidationModal(true)
             return false
         }
+        if (!financeAccountId) {
+            setFieldErrors(new Set(["financeAccountId"]))
+            setActiveTab("general")
+            setValidationMessage("Selecione a conta de recebimento da venda antes de salvar.")
+            setShowValidationModal(true)
+            return false
+        }
 
         const stockValidationMessage = validateStockAvailability(items)
         if (stockValidationMessage) {
@@ -529,6 +574,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         customerName: selectedCustomer ? selectedCustomer.name : "Consumidor final",
         salesChannel,
         deliveryMethod,
+        financeAccountId,
         paymentStatus: finalPaymentStatus,
         paymentMethod: paymentOverrides?.paymentMethod || (editOrderId ? originalPaymentMethod : "pendente"),
         paymentBreakdown: paymentOverrides?.paymentBreakdown || originalPaymentBreakdown,
@@ -648,11 +694,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         { value: "delivery", label: "Entrega / Delivery" }
     ]
 
-    const statusOptions = [
-        { value: "unpaid", label: "Não pago", color: "brand-red" },
-        { value: "paid", label: "Pago", color: "brand-green" },
-        { value: "partially_paid", label: "Parcialmente Pago", color: "brand-orange" }
-    ]
+    const accountOptions = financeAccounts.map((account) => ({
+        value: account.id,
+        label: account.name,
+    }))
 
     const deliveryStatusOptions = [
         { value: "not_sent", label: "Não enviado" },
@@ -744,6 +789,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                 deliveryMethod={deliveryMethod}
                                 paymentStatus={paymentStatus}
                                 deliveryStatus={deliveryStatus}
+                                financeAccountId={financeAccountId}
+                                accountOptions={accountOptions}
                                 remainingPaymentAmount={editOrderId ? remainingAmount : 0}
                                 manualItemNameErrors={manualItemNameErrors}
                                 manualItemPriceErrors={manualItemPriceErrors}
@@ -770,10 +817,17 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                 setDeliveryMethod={setDeliveryMethod}
                                 setPaymentStatus={setPaymentStatus}
                                 setDeliveryStatus={setDeliveryStatus}
+                                setFinanceAccountId={setFinanceAccountId}
+                                onCreateAccount={() => {
+                                    setNewAccountName("")
+                                    setNewAccountType("cash")
+                                    setNewAccountInitialBalance(0)
+                                    setNewAccountIsDefault(!financeAccounts.some((acc) => acc.integration_source !== "mercadopago"))
+                                    setIsAccountModalOpen(true)
+                                }}
                                 handleSaveOrder={handleOpenPaymentModal}
                                 salesChannelOptions={salesChannelOptions}
                                 deliveryMethodOptions={deliveryMethodOptions}
-                                statusOptions={statusOptions}
                                 deliveryStatusOptions={deliveryStatusOptions}
                                 fieldErrors={fieldErrors}
                                 setFieldErrors={setFieldErrors}
@@ -868,6 +922,75 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         />
                     )}
                 </AnimatePresence>
+
+                <DefaultModal
+                    isOpen={isAccountModalOpen}
+                    onClose={() => setIsAccountModalOpen(false)}
+                    title="Nova conta"
+                    footer={
+                        <div className="flex justify-end gap-3 w-full">
+                            <Button variant="outline" onClick={() => setIsAccountModalOpen(false)}>
+                                Cancelar
+                            </Button>
+                            <Button
+                                isLoading={isSavingAccount}
+                                onClick={async () => {
+                                    if (!newAccountName.trim()) {
+                                        notifyError("Informe o nome da conta.")
+                                        return
+                                    }
+                                    setIsSavingAccount(true)
+                                    try {
+                                        const created = await createFinanceAccountAction({
+                                            partnerId,
+                                            name: newAccountName.trim(),
+                                            type: newAccountType,
+                                            initialBalance: newAccountInitialBalance,
+                                            isDefault: newAccountIsDefault,
+                                        })
+                                        if (!created.success || !created.data) {
+                                            notifyError(created.error || "Não foi possível criar a conta.")
+                                            return
+                                        }
+                                        const refreshed = await getFinanceAccountsAction(partnerId)
+                                        if (refreshed.success && refreshed.data) {
+                                            const active = (refreshed.data.accounts || []).filter((acc: FinanceAccountOption) => acc.is_active)
+                                            setFinanceAccounts(active)
+                                        }
+                                        setFinanceAccountId(created.data.id)
+                                        setIsAccountModalOpen(false)
+                                        notifySuccess("Conta criada com sucesso.")
+                                    } finally {
+                                        setIsSavingAccount(false)
+                                    }
+                                }}
+                            >
+                                Salvar
+                            </Button>
+                        </div>
+                    }
+                >
+                    <div className="flex flex-col gap-4 p-4">
+                        <Input label="Nome" value={newAccountName} onChange={(e) => setNewAccountName(e.target.value)} />
+                        <Combobox
+                            label="Tipo"
+                            value={newAccountType}
+                            onChange={(val) => setNewAccountType(val as FinanceAccountType)}
+                            options={[
+                                { value: "cash", label: "Caixa" },
+                                { value: "bank", label: "Conta bancária" },
+                                { value: "wallet", label: "Carteira digital" },
+                            ]}
+                        />
+                        <MoneyInput label="Saldo inicial" value={newAccountInitialBalance} onChange={setNewAccountInitialBalance} />
+                        <Checkbox
+                            id="order_new_account_is_default"
+                            label="Conta padrão"
+                            checked={newAccountIsDefault}
+                            onChange={setNewAccountIsDefault}
+                        />
+                    </div>
+                </DefaultModal>
 
                 {/* Mobile Bottom Action Bar */}
                 <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">

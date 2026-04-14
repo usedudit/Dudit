@@ -29,7 +29,8 @@ import type { ERPTransaction, TransactionTab } from "../../../lib/services/trans
 import type { RecurringOccurrence } from "@/app/actions/erp/recurring-transactions"
 import { markRecurringOccurrenceAsPaidAction } from "@/app/actions/erp/transactions"
 import { getInstallmentGroupDetailsAction } from "@/app/actions/erp/transactions"
-import { updateManualTransactionAction } from "@/app/actions/erp/transactions"
+import { recordInstallmentPaymentAction } from "@/app/actions/erp/transactions"
+import { settleInstallmentGroupAction } from "@/app/actions/erp/transactions"
 import { useRouter } from "next/navigation"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import { useNotification } from "@/hooks/use-notification"
@@ -143,6 +144,31 @@ export default function TransactionsPage({
     const [openInstallmentGroupId, setOpenInstallmentGroupId] = useState<string | null>(null)
     const [installmentDetailLoading, setInstallmentDetailLoading] = useState(false)
     const [installmentDetail, setInstallmentDetail] = useState<any | null>(null)
+    const [payingInstallment, setPayingInstallment] = useState(false)
+    const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+    const [selectedInstallmentForPayment, setSelectedInstallmentForPayment] = useState<any | null>(null)
+    const [paymentAmount, setPaymentAmount] = useState("")
+    const [interestAmount, setInterestAmount] = useState("0")
+    const [discountAmount, setDiscountAmount] = useState("0")
+    const [paymentMethodId, setPaymentMethodId] = useState("")
+    const [confirmRecurringPayment, setConfirmRecurringPayment] = useState<ERPTransaction | null>(null)
+    const [confirmSettleGroup, setConfirmSettleGroup] = useState<ERPTransaction | null>(null)
+    const [settlingGroup, setSettlingGroup] = useState(false)
+    const settleSummary = useMemo(() => {
+        if (!confirmSettleGroup) return null
+        const rows = installmentDetail?.installments || []
+        if (rows.length === 0) {
+            return {
+                pendingCount: Math.max(0, Number(confirmSettleGroup.installmentPendingCount || 0)),
+                totalToSettle: 0,
+            }
+        }
+        const pendingRows = rows.filter((row: any) => row.status !== "paid")
+        return {
+            pendingCount: pendingRows.length,
+            totalToSettle: pendingRows.reduce((acc: number, row: any) => acc + Number(row.remainingAmount || 0), 0),
+        }
+    }, [confirmSettleGroup, installmentDetail])
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
@@ -306,6 +332,15 @@ export default function TransactionsPage({
         })
 
         const groupedInstallments = new Map<string, ERPTransaction[]>()
+        const fullGroupStats = new Map<string, { total: number; paid: number }>()
+        for (const tx of transactions) {
+            if (!tx.installmentGroupId) continue
+            const key = tx.installmentGroupId
+            const prev = fullGroupStats.get(key) || { total: tx.installmentTotalCount || 0, paid: 0 }
+            prev.total = Math.max(prev.total || 0, tx.installmentTotalCount || 0)
+            if (String(tx.rawStatus || "").toLowerCase() === "paid") prev.paid += 1
+            fullGroupStats.set(key, prev)
+        }
         const passthrough: ERPTransaction[] = []
         for (const item of result) {
             if (!item.isRecurringOccurrence && item.installmentGroupId) {
@@ -320,8 +355,9 @@ export default function TransactionsPage({
         const collapsedGroups: ERPTransaction[] = []
         for (const [groupId, items] of groupedInstallments) {
             const base = items[0]
-            const totalCount = base.installmentTotalCount || items.length
-            const paidCount = items.filter((x) => String(x.rawStatus || "").toLowerCase() === "paid").length
+            const fullStats = fullGroupStats.get(groupId)
+            const totalCount = fullStats?.total || base.installmentTotalCount || items.length
+            const paidCount = fullStats?.paid ?? items.filter((x) => String(x.rawStatus || "").toLowerCase() === "paid").length
             const pendingCount = Math.max(0, totalCount - paidCount)
             collapsedGroups.push({
                 ...base,
@@ -463,6 +499,12 @@ export default function TransactionsPage({
     )
 
     const handleMarkAsPaid = useCallback(async (transaction: ERPTransaction) => {
+        if (!transaction.isRecurringOccurrence) return
+        setConfirmRecurringPayment(transaction)
+    }, [])
+
+    const handleConfirmRecurringMarkAsPaid = useCallback(async () => {
+        const transaction = confirmRecurringPayment
         if (!transaction.recurringTemplateId || !transaction.occurrenceDate) return
         if (markingAsPaid) return
         setMarkingAsPaid(true)
@@ -488,8 +530,37 @@ export default function TransactionsPage({
             notifyError("Erro ao marcar como pago")
         } finally {
             setMarkingAsPaid(false)
+            setConfirmRecurringPayment(null)
         }
-    }, [partnerId, markingAsPaid, debouncedRefresh, notifySuccess, notifyError])
+    }, [partnerId, markingAsPaid, debouncedRefresh, notifySuccess, notifyError, confirmRecurringPayment])
+
+    const handleSettleInstallmentGroup = useCallback((transaction: ERPTransaction) => {
+        if (!transaction.isInstallmentGroup) return
+        setConfirmSettleGroup(transaction)
+    }, [])
+
+    const handleConfirmSettleInstallmentGroup = useCallback(async () => {
+        if (!confirmSettleGroup?.installmentGroupId) return
+        if (settlingGroup) return
+        setSettlingGroup(true)
+        try {
+            const res = await settleInstallmentGroupAction({
+                partnerId,
+                installmentGroupId: confirmSettleGroup.installmentGroupId,
+            })
+            if (!res.success) {
+                notifyError(res.error || "Erro ao quitar parcelado")
+                return
+            }
+            notifySuccess("Parcelado quitado com sucesso.")
+            setConfirmSettleGroup(null)
+            setOpenInstallmentGroupId(null)
+            setInstallmentDetail(null)
+            debouncedRefresh()
+        } finally {
+            setSettlingGroup(false)
+        }
+    }, [confirmSettleGroup, settlingGroup, partnerId, notifyError, notifySuccess, debouncedRefresh])
 
     const handleOpenTransactionDetail = useCallback(
         (transaction: ERPTransaction) => {
@@ -509,7 +580,9 @@ export default function TransactionsPage({
                 return
             }
             if (transaction.isRecurringOccurrence) {
-                void handleMarkAsPaid(transaction)
+                if (transaction.recurringTemplateId) {
+                    setEditingRecurringTemplateId(transaction.recurringTemplateId)
+                }
                 return
             }
             const existsInLoadedList = transactions.some((row) => row.id === transaction.id)
@@ -523,7 +596,7 @@ export default function TransactionsPage({
             setEditingTransaction(null)
             setEditingRecurringTemplateId(null)
         },
-        [handleMarkAsPaid, transactions, notifyError, debouncedRefresh, partnerId],
+        [transactions, notifyError, debouncedRefresh, partnerId],
     )
 
     const handleEditInstallment = useCallback((installmentId: string) => {
@@ -542,25 +615,64 @@ export default function TransactionsPage({
     }, [transactions, notifyError])
 
     const handlePayInstallment = useCallback(async (installmentId: string) => {
-        const tx = transactions.find((item) => item.id === installmentId)
-        if (!tx) return
-        if (String(tx.rawStatus || "").toLowerCase() !== "pending") {
+        const row = (installmentDetail?.installments || []).find((item: any) => item.id === installmentId)
+        if (!row) return
+        if (row.status === "paid") {
             notifyError("Parcela já está quitada.")
             return
         }
-        const today = new Date().toISOString().slice(0, 10)
-        const res = await updateManualTransactionAction(tx.id, partnerId, {
-            status: "paid",
-            paymentDate: today,
-            accountId: tx.accountId || null,
-        })
-        if (!res.success) {
-            notifyError(res.error || "Erro ao marcar parcela como paga")
+        setSelectedInstallmentForPayment(row)
+        setPaymentAmount(String(Number(row.remainingAmount || 0).toFixed(2)))
+        setInterestAmount("0")
+        setDiscountAmount("0")
+        setPaymentMethodId(paymentMethods?.[0]?.id || "")
+        setPaymentModalOpen(true)
+    }, [installmentDetail, notifyError, paymentMethods])
+
+    const handleConfirmInstallmentPayment = useCallback(async () => {
+        if (!selectedInstallmentForPayment) return
+        if (payingInstallment) return
+        const paid = Number(paymentAmount || 0)
+        const interest = Number(interestAmount || 0)
+        const discount = Number(discountAmount || 0)
+        const finalPaid = paid + interest - discount
+        if (!(finalPaid > 0)) {
+            notifyError("Informe um valor final de pagamento maior que zero.")
             return
         }
-        notifySuccess("Parcela marcada como paga.")
-        debouncedRefresh()
-    }, [transactions, notifyError, notifySuccess, partnerId, debouncedRefresh])
+        setPayingInstallment(true)
+        try {
+            const res = await recordInstallmentPaymentAction({
+                partnerId,
+                transactionId: selectedInstallmentForPayment.id,
+                paymentAmount: paid,
+                interestAmount: interest,
+                discountAmount: discount,
+                paymentMethodId: paymentMethodId || null,
+            })
+            if (!res.success) {
+                notifyError(res.error || "Erro ao registrar pagamento")
+                return
+            }
+            notifySuccess(res.data.fullyPaid ? "Parcela quitada com sucesso." : "Pagamento parcial registrado.")
+            setPaymentModalOpen(false)
+            setSelectedInstallmentForPayment(null)
+            debouncedRefresh()
+        } finally {
+            setPayingInstallment(false)
+        }
+    }, [
+        selectedInstallmentForPayment,
+        payingInstallment,
+        paymentAmount,
+        interestAmount,
+        discountAmount,
+        partnerId,
+        paymentMethodId,
+        notifyError,
+        notifySuccess,
+        debouncedRefresh,
+    ])
 
     if (viewingTransactionId) {
         return (
@@ -785,6 +897,7 @@ export default function TransactionsPage({
                                                 onOpenDetail={handleOpenTransactionDetail}
                                                 onEdit={handleEditTransaction}
                                                 onMarkAsPaid={handleMarkAsPaid}
+                                                onSettleInstallmentGroup={handleSettleInstallmentGroup}
                                             />
                                         ))}
                                     </div>
@@ -855,6 +968,7 @@ export default function TransactionsPage({
                                                             onOpenDetail={handleOpenTransactionDetail}
                                                             onEdit={handleEditTransaction}
                                                             onMarkAsPaid={handleMarkAsPaid}
+                                                            onSettleInstallmentGroup={handleSettleInstallmentGroup}
                                                         />
                                                     ))}
                                                 </tbody>
@@ -948,7 +1062,7 @@ export default function TransactionsPage({
                                         <span>Restante: {formatCurrency(row.remainingAmount || 0)}</span>
                                         <span>Vencimento: {row.dueDate || "-"}</span>
                                     </div>
-                                    {row.status === "pending" && (
+                                    {row.status !== "paid" && (
                                         <div className="mt-3 flex gap-2">
                                             <Button size="sm" variant="outline" onClick={() => handleEditInstallment(row.id)}>
                                                 Editar parcela
@@ -965,6 +1079,183 @@ export default function TransactionsPage({
                 ) : (
                     <p className="text-sm text-brand-inactive-text">Nenhum detalhe encontrado.</p>
                 )}
+            </DefaultModal>
+
+            <DefaultModal
+                isOpen={!!confirmRecurringPayment}
+                onClose={() => {
+                    if (markingAsPaid) return
+                    setConfirmRecurringPayment(null)
+                }}
+                title="Confirmar pagamento da ocorrência"
+                maxWidth="md"
+            >
+                {confirmRecurringPayment ? (
+                    <div className="space-y-4">
+                        <p className="text-sm text-brand-inactive-text">
+                            Deseja marcar esta ocorrência recorrente como paga/recebida?
+                        </p>
+                        <div className="rounded-lg border border-brand-border dark:border-dark-border p-3 text-sm">
+                            <p className="font-semibold">{confirmRecurringPayment.description}</p>
+                            <p className="text-brand-inactive-text mt-1">
+                                Valor: {formatCurrency(confirmRecurringPayment.amount)} • Data: {confirmRecurringPayment.occurrenceDate}
+                            </p>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setConfirmRecurringPayment(null)} disabled={markingAsPaid}>
+                                Cancelar
+                            </Button>
+                            <Button onClick={() => void handleConfirmRecurringMarkAsPaid()} disabled={markingAsPaid}>
+                                Confirmar
+                            </Button>
+                        </div>
+                    </div>
+                ) : null}
+            </DefaultModal>
+
+            <DefaultModal
+                isOpen={!!confirmSettleGroup}
+                onClose={() => {
+                    if (settlingGroup) return
+                    setConfirmSettleGroup(null)
+                }}
+                title="Quitar todas as parcelas"
+                maxWidth="md"
+            >
+                {confirmSettleGroup ? (
+                    <div className="space-y-4">
+                        <p className="text-sm text-brand-inactive-text">
+                            Confirma quitar todas as parcelas pendentes deste grupo? Esta ação irá registrar pagamentos, marcar as parcelas como pagas/recebidas e salvar histórico.
+                        </p>
+                        <div className="rounded-lg border border-brand-border dark:border-dark-border p-3 text-sm">
+                            <p className="font-semibold">{confirmSettleGroup.description}</p>
+                            <p className="text-brand-inactive-text mt-1">
+                                Grupo: {confirmSettleGroup.installmentGroupDescription || confirmSettleGroup.installmentGroupId}
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                            <div className="rounded-lg border border-brand-border dark:border-dark-border p-3">
+                                <p className="text-brand-inactive-text">Parcelas a quitar</p>
+                                <p className="font-semibold">{settleSummary?.pendingCount ?? 0}</p>
+                            </div>
+                            <div className="rounded-lg border border-brand-border dark:border-dark-border p-3">
+                                <p className="text-brand-inactive-text">Valor total da quitação</p>
+                                <p className="font-semibold">{formatCurrency(Number(settleSummary?.totalToSettle || 0))}</p>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setConfirmSettleGroup(null)} disabled={settlingGroup}>
+                                Cancelar
+                            </Button>
+                            <Button onClick={() => void handleConfirmSettleInstallmentGroup()} disabled={settlingGroup}>
+                                Confirmar quitação
+                            </Button>
+                        </div>
+                    </div>
+                ) : null}
+            </DefaultModal>
+
+            <DefaultModal
+                isOpen={paymentModalOpen}
+                onClose={() => {
+                    if (payingInstallment) return
+                    setPaymentModalOpen(false)
+                    setSelectedInstallmentForPayment(null)
+                }}
+                title="Registrar pagamento da parcela"
+                maxWidth="md"
+            >
+                {selectedInstallmentForPayment ? (
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                            <div className="rounded-lg border border-brand-border dark:border-dark-border p-3">
+                                <p className="text-brand-inactive-text">Valor original</p>
+                                <p className="font-semibold">{formatCurrency(Number(selectedInstallmentForPayment.originalAmount || 0))}</p>
+                            </div>
+                            <div className="rounded-lg border border-brand-border dark:border-dark-border p-3">
+                                <p className="text-brand-inactive-text">Valor restante</p>
+                                <p className="font-semibold">{formatCurrency(Number(selectedInstallmentForPayment.remainingAmount || 0))}</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Valor do pagamento</label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={paymentAmount}
+                                onChange={(e) => setPaymentAmount(e.target.value)}
+                                className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-transparent"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Juros</label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={interestAmount}
+                                onChange={(e) => setInterestAmount(e.target.value)}
+                                className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-transparent"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Desconto</label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={discountAmount}
+                                onChange={(e) => setDiscountAmount(e.target.value)}
+                                className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-transparent"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Forma de pagamento</label>
+                            <select
+                                value={paymentMethodId}
+                                onChange={(e) => setPaymentMethodId(e.target.value)}
+                                className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-transparent"
+                            >
+                                <option value="">Não informado</option>
+                                {(paymentMethods || []).map((pm: any) => (
+                                    <option key={pm.id} value={pm.id}>
+                                        {pm.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="rounded-lg border border-brand-border dark:border-dark-border p-3 text-sm">
+                            <p className="text-brand-inactive-text">Valor final pago</p>
+                            <p className="font-semibold">
+                                {formatCurrency(
+                                    Math.max(
+                                        0,
+                                        Number(paymentAmount || 0) + Number(interestAmount || 0) - Number(discountAmount || 0),
+                                    ),
+                                )}
+                            </p>
+                        </div>
+
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    if (payingInstallment) return
+                                    setPaymentModalOpen(false)
+                                    setSelectedInstallmentForPayment(null)
+                                }}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button onClick={() => void handleConfirmInstallmentPayment()} disabled={payingInstallment}>
+                                Confirmar pagamento
+                            </Button>
+                        </div>
+                    </div>
+                ) : null}
             </DefaultModal>
         </motion.div>
     )

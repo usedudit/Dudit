@@ -15,6 +15,7 @@ interface TransactionGridCardProps {
     onOpenDetail?: (transaction: ERPTransaction) => void
     onEdit?: (transaction: ERPTransaction) => void
     onMarkAsPaid?: (transaction: ERPTransaction) => void
+    onSettleInstallmentGroup?: (transaction: ERPTransaction) => void
 }
 
 const getPaymentIcon = (paymentType: string) => {
@@ -26,7 +27,7 @@ const getPaymentIcon = (paymentType: string) => {
 }
 
 const TransactionGridCard = React.memo(
-    ({ transaction, selected, onSelect, onOpenDetail, onEdit, onMarkAsPaid }: TransactionGridCardProps) => {
+    ({ transaction, selected, onSelect, onOpenDetail, onEdit, onMarkAsPaid, onSettleInstallmentGroup }: TransactionGridCardProps) => {
         const PaymentIcon = getPaymentIcon(transaction.paymentType)
         const isRecurring = !!transaction.recurringId || !!transaction.isRecurringOccurrence
 
@@ -48,9 +49,14 @@ const TransactionGridCard = React.memo(
                                 <h3 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate shrink">
                                     {transaction.description}
                                 </h3>
-                                {transaction.isInstallmentGroup && (
+                                {transaction.installmentGroupId && (
                                     <Badge variant="orange" className="whitespace-nowrap scale-90 shrink-0">
                                         Parcelado
+                                    </Badge>
+                                )}
+                                {!transaction.isInstallmentGroup && transaction.installmentNumber && transaction.installmentTotalCount && (
+                                    <Badge variant="gray" className="whitespace-nowrap scale-90 shrink-0">
+                                        {transaction.installmentNumber}/{transaction.installmentTotalCount}
                                     </Badge>
                                 )}
                                 {isRecurring && (
@@ -113,8 +119,16 @@ const TransactionGridCard = React.memo(
                         <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                             <ActionsDropdown
                                 onEdit={transaction.isInstallmentGroup ? undefined : onEdit ? () => onEdit(transaction) : undefined}
-                                onCancel={transaction.isRecurringOccurrence && onMarkAsPaid ? () => onMarkAsPaid(transaction) : undefined}
-                                cancelLabel={transaction.isRecurringOccurrence ? "Marcar como pago" : undefined}
+                                onCancel={
+                                    transaction.isInstallmentGroup
+                                        ? (onSettleInstallmentGroup ? () => onSettleInstallmentGroup(transaction) : undefined)
+                                        : (transaction.isRecurringOccurrence && onMarkAsPaid ? () => onMarkAsPaid(transaction) : undefined)
+                                }
+                                cancelLabel={
+                                    transaction.isInstallmentGroup
+                                        ? "Quitar tudo"
+                                        : (transaction.isRecurringOccurrence ? "Marcar como pago" : undefined)
+                                }
                             />
                         </div>
                     </div>

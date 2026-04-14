@@ -1171,6 +1171,18 @@ export async function convertQuoteToOrderAction(data: {
             }))
 
             const primaryAddress = pickPrimaryCustomerAddress(quote.customers?.addresses)
+            const { data: defaultFinanceAccount } = await supabase
+                .from("finance_accounts")
+                .select("id")
+                .eq("partner_id", data.partnerId)
+                .eq("is_active", true)
+                .eq("is_default", true)
+                .or("integration_source.is.null,integration_source.neq.mercadopago")
+                .limit(1)
+                .maybeSingle()
+            if (!defaultFinanceAccount?.id) {
+                return errorResponse("Defina uma conta financeira padrão para converter o orçamento em pedido.")
+            }
             const hasFullDeliveryAddress = Boolean(
                 primaryAddress?.street
                 && primaryAddress?.number
@@ -1187,6 +1199,7 @@ export async function convertQuoteToOrderAction(data: {
                 sourceQuoteId: data.quoteId,
                 salesChannel: "Orçamento",
                 deliveryMethod: hasFullDeliveryAddress ? ("delivery" as const) : ("pickup" as const),
+                financeAccountId: defaultFinanceAccount.id,
                 paymentStatus: "unpaid" as const,
                 deliveryStatus: "not_sent" as const,
                 paymentMethod: "pendente",

@@ -6,7 +6,7 @@ import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import { motion, AnimatePresence } from "framer-motion"
 import { useNotification } from "@/hooks/use-notification"
 import { PlusIcon } from "@/lib/icons"
-import { Button, IconPlaceholder, Combobox, Input, Checkbox, FormTextarea, FormDropdown, MoneyInput } from "@/components/reusable"
+import { Button, IconPlaceholder, Combobox, Input, Checkbox, FormDropdown, MoneyInput } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
 import Pagination from "@/components/reusable/Pagination"
@@ -119,9 +119,9 @@ export default function FinancialCategoriesPage({
             id?: string
             name: string
             type: FinanceAccountType
-            description: string
             initialBalanceStr: string
             is_active: boolean
+            is_default: boolean
         }
         isSaving: boolean
     }>({
@@ -130,9 +130,9 @@ export default function FinancialCategoriesPage({
         item: {
             name: "",
             type: "cash",
-            description: "",
             initialBalanceStr: "0",
             is_active: true,
+            is_default: false,
         },
         isSaving: false,
     })
@@ -201,7 +201,6 @@ export default function FinancialCategoriesPage({
             const typeLabel = ACCOUNT_TYPE_OPTIONS.find((o) => o.value === a.type)?.label ?? a.type
             return (
                 a.name.toLowerCase().includes(q) ||
-                (a.description && a.description.toLowerCase().includes(q)) ||
                 typeLabel.toLowerCase().includes(q)
             )
         })
@@ -245,9 +244,9 @@ export default function FinancialCategoriesPage({
                 item: {
                     name: "",
                     type: "cash",
-                    description: "",
                     initialBalanceStr: "0",
                     is_active: true,
+                    is_default: !accounts.some((acc) => acc.integration_source !== "mercadopago"),
                 },
                 isSaving: false,
             })
@@ -292,9 +291,9 @@ export default function FinancialCategoriesPage({
                 id: item.id,
                 name: item.name,
                 type: item.type as FinanceAccountType,
-                description: item.description ?? "",
                 initialBalanceStr: String(item.initial_balance ?? "0"),
                 is_active: item.is_active,
+                is_default: Boolean(item.is_default),
             },
             isSaving: false,
         })
@@ -400,8 +399,8 @@ export default function FinancialCategoriesPage({
                     partnerId,
                     name: item.name,
                     type: item.type,
-                    description: item.description || null,
                     initialBalance: initialBal,
+                    isDefault: item.is_default,
                 })
             } else {
                 if (!item.id) {
@@ -411,9 +410,9 @@ export default function FinancialCategoriesPage({
                 result = await updateFinanceAccountAction(item.id, partnerId, {
                     name: item.name,
                     type: item.type,
-                    description: item.description || null,
                     initialBalance: initialBal,
                     isActive: item.is_active,
+                    isDefault: item.is_default,
                 })
             }
 
@@ -767,19 +766,6 @@ export default function FinancialCategoriesPage({
                         }
                     />
 
-                    <FormTextarea
-                        name="finance_account_description"
-                        label="Descrição (opcional)"
-                        value={accountModal.item.description}
-                        onChange={(e) =>
-                            setAccountModal((prev) => ({
-                                ...prev,
-                                item: { ...prev.item, description: e.target.value },
-                            }))
-                        }
-                        rows={3}
-                    />
-
                     <MoneyInput
                         label="Saldo inicial"
                         value={accountModal.item.initialBalanceStr}
@@ -807,6 +793,19 @@ export default function FinancialCategoriesPage({
                             use &quot;Ajustar saldo&quot; no menu da conta.
                         </p>
                     )}
+
+                    <Checkbox
+                        id="finance_account_is_default"
+                        label="Conta padrão"
+                        checked={accountModal.item.is_default}
+                        disabled={accountModal.item.id ? accounts.find((acc) => acc.id === accountModal.item.id)?.integration_source === "mercadopago" : false}
+                        onChange={(checked) =>
+                            setAccountModal((prev) => ({
+                                ...prev,
+                                item: { ...prev.item, is_default: checked },
+                            }))
+                        }
+                    />
 
                     <Checkbox
                         id="finance_account_is_active"

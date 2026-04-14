@@ -17,6 +17,7 @@ interface OrderDataForTransaction {
     payment_date?: string | null
     customer_name?: string | null
     customer_contact_id?: string | null
+    finance_account_id?: string | null
 }
 
 function normalizeMethod(value?: string | null) {
@@ -126,7 +127,7 @@ export async function createTransactionFromOrder(
         const paymentDate = orderData.payment_date || now
         const entries = buildEntries(orderData)
         const contactId = await resolveTransactionContactId(supabase, orderData)
-        const accountId = await resolveMercadoPagoAccountId(supabase, orderData.partner_id, orderData.payment_provider)
+        const accountId = orderData.finance_account_id || await resolveMercadoPagoAccountId(supabase, orderData.partner_id, orderData.payment_provider)
 
         for (const [index, entry] of entries.entries()) {
             const amount = Number(entry.amount || 0)
