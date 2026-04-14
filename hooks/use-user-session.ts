@@ -61,8 +61,8 @@ export function useUserSession(serverData?: UserSessionData | null): UserSession
     shouldSkipFetch ? null : key, // Se tem dados do servidor, desativa o SWR para essa mount (Hard guard SWR way)
     fetcher,
     {
-      fallbackData: serverData || null,
-      revalidateOnMount: false,
+      fallbackData: serverData || undefined,
+      revalidateOnMount: !shouldSkipFetch, // Fetch on mount only when no server data was provided
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
       dedupingInterval: 60000,

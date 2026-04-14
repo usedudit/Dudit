@@ -815,7 +815,6 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                 setOrderDate={setOrderDate}
                                 setSalesChannel={setSalesChannel}
                                 setDeliveryMethod={setDeliveryMethod}
-                                setPaymentStatus={setPaymentStatus}
                                 setDeliveryStatus={setDeliveryStatus}
                                 setFinanceAccountId={setFinanceAccountId}
                                 onCreateAccount={() => {
