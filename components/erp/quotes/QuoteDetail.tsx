@@ -21,6 +21,7 @@ import { useNotification } from "@/hooks/use-notification";
 import CustomerCard from '@/components/reusable/CustomerCard';
 import { useSidebar } from "@/lib/sidebar-context";
 import { useRouter } from "next/navigation";
+import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { formatCurrency, formatDate, formatDayMonth, formatTime } from '@/lib/utils';
 
@@ -49,6 +50,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
     const csrfToken = useCSRFToken();
     const { success: notifySuccess, error: notifyError } = useNotification();
     const router = useRouter();
+    const debouncedRefresh = useDebouncedRefresh();
     const { setHeaderOverride } = useSidebar();
 
     const handleScroll = useCallback(() => {
@@ -127,7 +129,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                     }
                     : prev
             );
-            router.refresh();
+            debouncedRefresh();
             router.push(`/erp/orders/${d.orderId}`);
         } catch {
             notifyError("Erro", "Falha de conexão ao converter o orçamento.");
@@ -151,7 +153,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
         if (res.success) {
             setQuote((prev: any) => ({ ...prev, status: newStatus }));
             notifySuccess("Sucesso", "Status atualizado!");
-            router.refresh();
+            debouncedRefresh();
         } else {
             notifyError("Erro", res.error);
         }
@@ -185,7 +187,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
             const res = await deleteQuoteAction(quoteId);
             if (res.success) {
                 notifySuccess("Orçamento excluído", "O orçamento foi removido com sucesso.");
-                router.refresh();
+                debouncedRefresh();
                 onBack();
             } else {
                 notifyError("Erro ao excluir", "Não foi possível remover o orçamento.");

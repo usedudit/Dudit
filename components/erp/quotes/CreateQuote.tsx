@@ -28,6 +28,7 @@ import { useProductBucket } from "../hooks";
 import { useSidebar } from '@/lib/sidebar-context';
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { useRouter } from "next/navigation";
+import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh";
 
 interface CreateQuoteProps {
     partnerId: string;
@@ -45,6 +46,7 @@ const REQUIRED_FIELDS = [
 const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProps) => {
     const { success: notifySuccess, error: notifyError } = useNotification();
     const router = useRouter();
+    const debouncedRefresh = useDebouncedRefresh();
     const { selectedStore } = useStore();
     const { setHeaderOverride } = useSidebar();
     const [isSaving, setIsSaving] = useState(false);
@@ -783,7 +785,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                 }
 
                 notifySuccess("Alterações salvas!", "O orçamento foi salvo com sucesso.");
-                router.refresh();
+                debouncedRefresh();
                 onBack();
                 return;
             }
@@ -811,7 +813,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
             if (result.success) {
                 notifySuccess(mode === "edit" ? "Alterações salvas!" : "Orçamento criado!",
                     "O orçamento foi salvo com sucesso.");
-                router.refresh();
+                debouncedRefresh();
                 onBack();
             } else {
                 notifyError("Erro ao salvar", (result as any).error || "Ocorreu um erro inesperado.");
@@ -834,23 +836,23 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         if (stRes.success) {
             setStatus("draft");
             notifySuccess("Orçamento reaberto", "Agora você pode editar itens e valores.");
-            router.refresh();
+            debouncedRefresh();
         } else {
             notifyError("Erro", (stRes as { error?: string }).error || "Não foi possível reabrir.");
         }
-    }, [existingQuote?.id, partnerId, notifySuccess, notifyError, router]);
+    }, [existingQuote?.id, partnerId, notifySuccess, notifyError, debouncedRefresh]);
 
     const handleDuplicateFromEditor = useCallback(async () => {
         if (!existingQuote?.id) return;
         const dup = await duplicateQuoteAction(existingQuote.id);
         if (dup.success) {
             notifySuccess("Cópia criada", "Um novo rascunho foi gerado a partir deste orçamento.");
-            router.refresh();
+            debouncedRefresh();
             onBack();
         } else {
             notifyError("Erro", (dup as { error?: string }).error || "Não foi possível duplicar.");
         }
-    }, [existingQuote?.id, notifySuccess, notifyError, router, onBack]);
+    }, [existingQuote?.id, notifySuccess, notifyError, debouncedRefresh, onBack]);
 
     const getTabErrorCount = useCallback((tab: string) => {
         return REQUIRED_FIELDS.filter(({ field, tab: fieldTab }) => fieldTab === tab && fieldErrors.has(field)).length

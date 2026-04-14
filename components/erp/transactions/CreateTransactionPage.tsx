@@ -3,6 +3,7 @@
 import React, { useMemo, useRef, useState, useCallback, useEffect } from "react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
+import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import { format } from "date-fns"
 import {
     Tabs,
@@ -184,6 +185,7 @@ export default function CreateTransactionPage({
     paymentMethods = [],
 }: CreateTransactionPageProps & { editRecurringTemplateId?: string, editRecurringTemplate?: any, paymentMethods?: any[] }) {
     const router = useRouter()
+    const debouncedRefresh = useDebouncedRefresh()
     const { success, error } = useNotification()
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [isScrolled, setIsScrolled] = useState(false)
@@ -529,7 +531,7 @@ export default function CreateTransactionPage({
     const paidLabel =
         txKind === "expense" || (txKind === "refund" && refundKind === "revenue_refund") ? "Pago" : "Recebido"
 
-    const refreshLists = () => router.refresh()
+    const refreshLists = () => debouncedRefresh()
 
     const openQuickCategory = () => {
         setQuickName("")
@@ -778,7 +780,7 @@ export default function CreateTransactionPage({
                 if (!res.success) return error(res.error || "Erro ao atualizar recorrência")
                 success("Recorrência atualizada!")
                 onSuccess?.()
-                router.refresh()
+                debouncedRefresh()
                 onClose()
             } finally {
                 setIsSaving(false)
@@ -821,7 +823,7 @@ export default function CreateTransactionPage({
                 if (!res.success) return error(res.error || "Erro ao atualizar transação")
                 success("Transação atualizada com sucesso!")
                 onSuccess?.()
-                router.refresh()
+                debouncedRefresh()
                 onClose()
             } finally {
                 setIsSaving(false)
@@ -860,7 +862,7 @@ export default function CreateTransactionPage({
                 if (!res.success) return error(res.error || "Erro ao transferir")
                 success("Transferência registrada!")
                 onSuccess?.()
-                router.refresh()
+                debouncedRefresh()
                 onClose()
             } finally {
                 setIsSaving(false)
@@ -901,7 +903,7 @@ export default function CreateTransactionPage({
                 if (!res.success) return error(res.error || "Erro ao salvar")
                 success("Ajuste registrado!")
                 onSuccess?.()
-                router.refresh()
+                debouncedRefresh()
                 onClose()
             } finally {
                 setIsSaving(false)
@@ -938,7 +940,7 @@ export default function CreateTransactionPage({
                 if (!res.success) return error(res.error || "Erro ao salvar reembolso")
                 success("Reembolso registrado!")
                 onSuccess?.()
-                router.refresh()
+                debouncedRefresh()
                 onClose()
             } finally {
                 setIsSaving(false)
@@ -998,7 +1000,7 @@ export default function CreateTransactionPage({
                         : "Recorrência criada! Próximas ocorrências aparecem em Previstos.",
                 )
                 onSuccess?.()
-                router.refresh()
+                debouncedRefresh()
                 onClose()
                 return
             }
@@ -1031,7 +1033,7 @@ export default function CreateTransactionPage({
                 if (!installmentRes.success) return error(installmentRes.error || "Erro ao criar parcelamento")
                 success("Parcelamento criado com sucesso!")
                 onSuccess?.()
-                router.refresh()
+                debouncedRefresh()
                 onClose()
                 return
             }
@@ -1061,7 +1063,7 @@ export default function CreateTransactionPage({
             if (!res.success) return error(res.error || "Erro ao salvar transação")
             success("Transação criada com sucesso!")
             onSuccess?.()
-            router.refresh()
+            debouncedRefresh()
             onClose()
         } finally {
             setIsSaving(false)
@@ -1082,13 +1084,13 @@ export default function CreateTransactionPage({
                 success("Recorrência cancelada. O histórico de pagamentos foi preservado.")
                 setCancelRecurringOpen(false)
                 onSuccess?.()
-                router.refresh()
+                debouncedRefresh()
                 onClose()
             } finally {
                 setIsSaving(false)
             }
         })()
-    }, [editRecurringTemplateId, partnerId, error, success, onSuccess, router, onClose])
+    }, [editRecurringTemplateId, partnerId, error, success, onSuccess, debouncedRefresh, onClose])
 
     const typeButtons: {
         id: TxKind
@@ -2024,7 +2026,7 @@ export default function CreateTransactionPage({
                                         if (!res.success) return error(res.error || "Erro ao ajustar saldo")
                                         success("Saldo atualizado. Você pode concluir a transferência.")
                                         setAdjustFromTransferOpen(false)
-                                        router.refresh()
+                                        debouncedRefresh()
                                     } finally {
                                         setAdjustFromTransferSaving(false)
                                     }

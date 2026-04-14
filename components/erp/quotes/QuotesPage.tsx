@@ -41,6 +41,7 @@ import {
     ClockIcon
 } from "@/lib/icons"
 import { useRouter } from "next/navigation"
+import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 
 // --- TYPES & INTERFACES ---
 
@@ -87,6 +88,7 @@ const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; 
 export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, currentPage = 1, limit = 50 }: { quotes: any[], partnerId: string, totalQuotes?: number, currentPage?: number, limit?: number }) {
     const { success, error } = useNotification()
     const router = useRouter()
+    const debouncedRefresh = useDebouncedRefresh()
     const { isLoading: storeLoading } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
@@ -322,7 +324,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
             const res = await deleteQuoteAction(quoteToDelete.originalId)
             if (res.success) {
                 success("Orçamento excluído", "O orçamento foi removido com sucesso.")
-                router.refresh()
+                debouncedRefresh()
             } else {
                 // Revert
                 setCurrentQuotes(previousQuotes)
@@ -345,7 +347,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
             if (res.success) {
                 success("Status atualizado", `${selection.ids.size} ${selection.ids.size === 1 ? 'orçamento atualizado' : 'orçamentos atualizados'} para ${payload.status}.`)
                 setSelection({ ids: new Set() })
-                router.refresh()
+                debouncedRefresh()
             } else {
                 error("Erro", res.error || "Erro ao atualizar status em massa.")
             }
@@ -362,7 +364,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                 success("Orçamentos excluídos", `${selection.ids.size} orçamentos removidos com sucesso.`)
                 setSelection({ ids: new Set() })
                 setConfirmations(prev => ({ ...prev, bulkDelete: false }))
-                router.refresh()
+                debouncedRefresh()
             } else {
                 error("Erro", res.error || "Erro ao excluir orçamentos em massa.")
             }

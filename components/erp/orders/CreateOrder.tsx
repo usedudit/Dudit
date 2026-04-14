@@ -12,6 +12,7 @@ import SelectVariantSheet from "../quotes/SelectVariantSheet"
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
 import { useProductBucket } from "../hooks"
 import { useRouter } from "next/navigation"
+import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import PaymentModal from "./PaymentModal"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 
@@ -42,6 +43,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const { toast } = useToast()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const router = useRouter()
+    const debouncedRefresh = useDebouncedRefresh()
     const csrfToken = useCSRFToken()
 
     // --- State ---
@@ -508,7 +510,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         setIsPaymentModalOpen(false)
         if (wasSaleSuccessful) {
             resetForm()
-            router.refresh()
+            debouncedRefresh()
             setWasSaleSuccessful(false)
             onBack()
         }
@@ -570,7 +572,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
             if (result.success) {
                 notifySuccess(editOrderId ? `Pedido atualizado com sucesso!` : `Pedido criado com sucesso!`)
-                router.refresh()
+                debouncedRefresh()
                 if (editOrderId && !paymentOverrides?.paymentMethod) {
                     onBack()
                     return { success: true }

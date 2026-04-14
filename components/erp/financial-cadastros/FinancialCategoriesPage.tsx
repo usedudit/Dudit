@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import { motion, AnimatePresence } from "framer-motion"
 import { useNotification } from "@/hooks/use-notification"
 import { PlusIcon } from "@/lib/icons"
@@ -82,6 +83,7 @@ export default function FinancialCategoriesPage({
 }: FinancialCategoriesPageProps) {
     const { success, error } = useNotification()
     const router = useRouter()
+    const debouncedRefresh = useDebouncedRefresh()
 
     const [categories, setCategories] = useState(initialCategories)
     const [accounts, setAccounts] = useState<FinanceAccountRow[]>(initialAccounts)
@@ -418,7 +420,7 @@ export default function FinancialCategoriesPage({
             if (result.success) {
                 success("Cadastro salvo com sucesso!")
                 refreshData()
-                router.refresh()
+                debouncedRefresh()
                 setAccountModal((prev) => ({ ...prev, isOpen: false }))
             } else {
                 error(result.error || "Erro ao salvar")
@@ -915,7 +917,7 @@ export default function FinancialCategoriesPage({
                                     success("Saldo atualizado.")
                                     setAdjustBalanceModal({ open: false, account: null, newBalance: 0, saving: false })
                                     await refreshData()
-                                    router.refresh()
+                                    debouncedRefresh()
                                 } finally {
                                     setAdjustBalanceModal((p) => ({ ...p, saving: false }))
                                 }

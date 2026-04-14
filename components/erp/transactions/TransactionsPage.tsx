@@ -31,6 +31,7 @@ import { markRecurringOccurrenceAsPaidAction } from "@/app/actions/erp/transacti
 import { getInstallmentGroupDetailsAction } from "@/app/actions/erp/transactions"
 import { updateManualTransactionAction } from "@/app/actions/erp/transactions"
 import { useRouter } from "next/navigation"
+import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import { useNotification } from "@/hooks/use-notification"
 import {
     EMPTY_DATE_PERIOD,
@@ -120,6 +121,7 @@ export default function TransactionsPage({
     paymentMethods?: any[]
 }) {
     const router = useRouter()
+    const debouncedRefresh = useDebouncedRefresh()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
@@ -481,13 +483,13 @@ export default function TransactionsPage({
             } else {
                 notifySuccess("Ocorrência marcada como paga!")
             }
-            router.refresh()
+            debouncedRefresh()
         } catch {
             notifyError("Erro ao marcar como pago")
         } finally {
             setMarkingAsPaid(false)
         }
-    }, [partnerId, markingAsPaid, router, notifySuccess, notifyError])
+    }, [partnerId, markingAsPaid, debouncedRefresh, notifySuccess, notifyError])
 
     const handleOpenTransactionDetail = useCallback(
         (transaction: ERPTransaction) => {
@@ -513,7 +515,7 @@ export default function TransactionsPage({
             const existsInLoadedList = transactions.some((row) => row.id === transaction.id)
             if (!existsInLoadedList) {
                 notifyError("Erro", "Essa transação não está mais disponível. Atualize a página e tente novamente.")
-                router.refresh()
+                debouncedRefresh()
                 return
             }
             setViewingTransactionId(transaction.id)
@@ -521,7 +523,7 @@ export default function TransactionsPage({
             setEditingTransaction(null)
             setEditingRecurringTemplateId(null)
         },
-        [handleMarkAsPaid, transactions, notifyError, router, partnerId],
+        [handleMarkAsPaid, transactions, notifyError, debouncedRefresh, partnerId],
     )
 
     const handleEditInstallment = useCallback((installmentId: string) => {
@@ -557,8 +559,8 @@ export default function TransactionsPage({
             return
         }
         notifySuccess("Parcela marcada como paga.")
-        router.refresh()
-    }, [transactions, notifyError, notifySuccess, partnerId, router])
+        debouncedRefresh()
+    }, [transactions, notifyError, notifySuccess, partnerId, debouncedRefresh])
 
     if (viewingTransactionId) {
         return (
@@ -607,7 +609,7 @@ export default function TransactionsPage({
                         setShowCreateTransaction(false)
                         setEditingTransaction(null)
                         setEditingRecurringTemplateId(null)
-                        router.refresh()
+                        debouncedRefresh()
                     }}
                 />
             </motion.div>
