@@ -65,6 +65,12 @@ type ERPOrderPayload = {
     csrf_token?: string
 }
 
+type OrderStockItem = {
+    product_id?: string | null
+    variant_id?: string | null
+    quantity: number
+}
+
 type PaymentBreakdownEntry = {
     method: string
     amount: number
@@ -578,6 +584,73 @@ async function createFinancialTransactionsForPaidOrder(supabase: Awaited<ReturnT
     } catch (error) {
         console.error("[orders_financial] createFinancialTransactionsForPaidOrder:", error)
     }
+}
+
+async function createRefundTransactionForCancelledOrder(params: {
+    supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>
+    partnerId: string
+    orderNumber: string
+    orderId: string
+    customerId?: string | null
+    paidAmount: number
+    financeAccountId?: string | null
+    createdByUserId?: string | null
+}) {
+    const paidAmount = Math.max(0, Number(params.paidAmount || 0))
+    if (paidAmount <= 0.009) return { success: true as const }
+    if (!params.financeAccountId) {
+        return { error: "Não foi possível gerar o reembolso automático porque a venda não possui conta financeira vinculada." as const }
+    }
+
+    const { data: existingRefund } = await params.supabase
+        .from("transactions")
+        .select("id")
+        .eq("partner_id", params.partnerId)
+        .eq("transaction_type", "refund")
+        .eq("refund_kind", "revenue_refund")
+        .eq("reference_note", params.orderId)
+        .limit(1)
+        .maybeSingle()
+
+    if (existingRefund?.id) return { success: true as const }
+
+    const paymentDate = new Date().toISOString()
+    const { error } = await params.supabase
+        .from("transactions")
+        .insert({
+            partner_id: params.partnerId,
+            description: `Reembolso automático da venda ${params.orderNumber}`,
+            category: "Reembolso",
+            customer_id: params.customerId || null,
+            contact_id: null,
+            contact_type: "customer",
+            amount: paidAmount,
+            due_date: null,
+            payment_date: paymentDate,
+            transaction_date: paymentDate,
+            status: "paid",
+            notes: "Gerado automaticamente ao cancelar venda.",
+            payment_type: "Reembolso",
+            original_amount: paidAmount,
+            interest_amount: null,
+            fee_amount: 0,
+            transaction_type: "refund",
+            origin: "order_cancel",
+            refund_kind: "revenue_refund",
+            reference_note: params.orderId,
+            account_id: params.financeAccountId,
+            created_by_user_id: params.createdByUserId || null,
+        })
+
+    if (error) return { error: error.message }
+    return { success: true as const }
+}
+
+function buildReopenStockErrorMessage(items: OrderStockItem[]) {
+    const validItems = (items || []).filter((item) => item.product_id && Number(item.quantity || 0) > 0)
+    return validItems.length <= 1
+        ? "Estoque insuficiente para o item da venda."
+        : "Estoque insuficiente para um ou mais itens."
 }
 
 async function createOrderStockMovement(params: {
@@ -1167,6 +1240,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
     statusValue?: string
     cancelReason?: string
     restoreStock?: boolean
+    generateAutomaticRefund?: boolean
     userName?: string
 }) {
     const user = await requireUser()
@@ -1238,6 +1312,24 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
                     if ("error" in releaseResult) return { error: releaseResult.error }
                 }
+
+                if (payload.generateAutomaticRefund) {
+                    const refundAmount = Math.max(0, Number(order.paid_amount || 0))
+                    if (refundAmount > 0.009) {
+                        const refundResult = await createRefundTransactionForCancelledOrder({
+                            supabase,
+                            partnerId: payload.partnerId,
+                            orderNumber: order.order_number || order.id,
+                            orderId: order.id,
+                            customerId: order.buyer_id || null,
+                            paidAmount: refundAmount,
+                            financeAccountId: order.finance_account_id || null,
+                            createdByUserId: user.id,
+                        })
+
+                        if ("error" in refundResult) return { error: refundResult.error }
+                    }
+                }
             }
 
             if (payload.actionType === "reopen") {
@@ -1245,6 +1337,23 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
                 const restoredSituation = order.previous_situation_before_cancel || "pending"
                 const shouldReverseStock = Boolean(order.stock_restored_on_cancel)
+                const orderItems = (order.order_items || []) as OrderStockItem[]
+
+                if (shouldReverseStock) {
+                    const stockValidationError = await validateERPItemsStock({
+                        supabase,
+                        partnerId: payload.partnerId,
+                        items: orderItems.map((item) => ({
+                            productId: item.product_id || null,
+                            variantId: item.variant_id || null,
+                            quantity: Number(item.quantity || 0),
+                        })),
+                    })
+
+                    if (stockValidationError) {
+                        return { error: buildReopenStockErrorMessage(orderItems) }
+                    }
+                }
 
                 const { error } = await supabase
                     .from("orders")
@@ -1298,6 +1407,9 @@ export async function updateOrdersStatusInBatchAction(payload: {
                             lines.push("restaurou o estoque dos itens do pedido")
                         } else if (!order.stock_restored_on_cancel) {
                             lines.push("liberou a reserva de estoque dos itens do pedido")
+                        }
+                        if (payload.generateAutomaticRefund && Number((order as any).paid_amount || 0) > 0.009) {
+                            lines.push("gerou reembolso automático no financeiro")
                         }
                     }
 

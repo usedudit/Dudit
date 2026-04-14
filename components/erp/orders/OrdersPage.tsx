@@ -69,6 +69,7 @@ interface Order {
     previousSituationBeforeCancel?: string | null;
     canEdit: boolean;
     canReopen: boolean;
+    paidAmount: number;
 }
 
 interface FilterState {
@@ -118,6 +119,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
     const [actionModal, setActionModal] = useState<{ open: boolean; text: string }>({ open: false, text: "" })
     const [cancelReason, setCancelReason] = useState("")
     const [restoreStockOnCancel, setRestoreStockOnCancel] = useState(true)
+    const [generateAutomaticRefundOnCancel, setGenerateAutomaticRefundOnCancel] = useState(true)
     const [singleCancelId, setSingleCancelId] = useState<string | null>(null)
     const [selection, setSelection] = useState({ ids: new Set<string>() })
     const [wrapperMode, setWrapperMode] = useState<'create' | 'edit' | 'view' | null>(null)
@@ -227,7 +229,8 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     situation: o.situation,
                     previousSituationBeforeCancel: o.previous_situation_before_cancel || null,
                     canEdit: o.situation !== "cancelled",
-                    canReopen: o.situation === "cancelled"
+                    canReopen: o.situation === "cancelled",
+                    paidAmount: Number(o.paid_amount || 0)
                 }
             })
             .filter((o: Order) => {
@@ -316,8 +319,23 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
         setSingleCancelId(orderId)
         setCancelReason("")
         setRestoreStockOnCancel(true)
+        setGenerateAutomaticRefundOnCancel(true)
         setConfirmations(p => ({ ...p, bulkCancel: true }))
     }
+
+    const getCurrentCancelOrderIds = () => {
+        return singleCancelId ? [singleCancelId] : Array.from(selection.ids)
+    }
+
+    const cancellableOrdersSelection = useMemo(() => {
+        const selectedIds = new Set(getCurrentCancelOrderIds())
+        return filteredOrders.filter((order) => selectedIds.has(order.originalId))
+    }, [filteredOrders, singleCancelId, selection.ids])
+
+    const shouldShowAutomaticRefundCheckbox = useMemo(() => {
+        if (cancellableOrdersSelection.length === 0) return false
+        return cancellableOrdersSelection.every((order) => order.situation === "paid" || order.situation === "partially_paid" || order.paidAmount > 0.009)
+    }, [cancellableOrdersSelection])
 
     const handleReopenOrder = async (orderId: string) => {
         setSingleCancelId(orderId)
@@ -391,6 +409,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     actionType: 'cancel',
                     cancelReason: cancelReason.trim() || undefined,
                     restoreStock: restoreStockOnCancel,
+                    generateAutomaticRefund: shouldShowAutomaticRefundCheckbox ? generateAutomaticRefundOnCancel : false,
                     userName: currentUserName
                 })
             }
@@ -398,7 +417,14 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
             if (result.success) {
                 queryClient.invalidateQueries({ queryKey: ['erp', 'orders', partnerId] })
                 if (!singleCancelId) setSelection({ ids: new Set() })
-                toast({ title: "Sucesso", description: action === 'delete' ? "Pedidos excluídos" : "Pedidos cancelados" })
+                toast({
+                    title: "Sucesso",
+                    description: action === 'delete'
+                        ? "Pedidos excluídos"
+                        : action === 'reopen'
+                            ? "Pedidos reabertos"
+                            : "Pedidos cancelados"
+                })
             } else {
                 toast({ title: "Erro", description: result.error, variant: "destructive" })
             }
@@ -410,6 +436,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
             setSingleCancelId(null)
             setCancelReason("")
             setRestoreStockOnCancel(true)
+            setGenerateAutomaticRefundOnCancel(true)
             setActionModal({ open: false, text: "" })
         }
     }
@@ -803,6 +830,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     setSingleCancelId(null)
                     setCancelReason("")
                     setRestoreStockOnCancel(true)
+                    setGenerateAutomaticRefundOnCancel(true)
                 }}
                 onConfirm={() => confirmBulk("cancel")}
                 title={singleCancelId ? "Cancelar Pedido" : "Cancelar Pedidos"}
@@ -820,6 +848,12 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                 <Checkbox checked={restoreStockOnCancel} onChange={(checked) => setRestoreStockOnCancel(Boolean(checked))} />
                                 <span className="text-sm text-brand-dark dark:text-dark-heading">Restaurar estoque dos itens</span>
                             </label>
+                            {shouldShowAutomaticRefundCheckbox && (
+                                <label className="flex items-center gap-3 py-2 cursor-pointer">
+                                    <Checkbox checked={generateAutomaticRefundOnCancel} onChange={(checked) => setGenerateAutomaticRefundOnCancel(Boolean(checked))} />
+                                    <span className="text-sm text-brand-dark dark:text-dark-heading">Gerar reembolso automático</span>
+                                </label>
+                            )}
                         </div>
                     </div>
                 }

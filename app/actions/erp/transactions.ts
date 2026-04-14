@@ -1146,7 +1146,7 @@ export async function recordInstallmentPaymentAction(input: {
             .eq("transaction_id", input.transactionId)
         if (paymentsErr) throw paymentsErr
 
-        const paidSoFar = (existingPayments || []).reduce((acc, row: any) => acc + Number(row.amount || 0), 0)
+        const paidSoFar = (existingPayments || []).reduce((acc: number, row: { amount: number | string | null }) => acc + Number(row.amount || 0), 0)
         const originalAmount = Math.abs(Number(tx.original_amount ?? tx.amount ?? 0))
         const remainingAmount = Math.max(0, originalAmount - paidSoFar)
         const paidAfter = paidSoFar + finalPaid
