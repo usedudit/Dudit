@@ -506,7 +506,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
   if (closeDraftError) return { success: false as const, error: closeDraftError.message }
 
   for (const stockItem of stockItems) {
-    await invalidateProductCache(stockItem.product_id, input.partnerId, "update", { silent: true })
+    await invalidateProductCache(stockItem.product_id as string, input.partnerId, "update", { silent: true })
   }
   await revalidateOrders(input.partnerId)
   await revalidateTransactions(input.partnerId)
