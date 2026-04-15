@@ -4,6 +4,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { logAuditEvent } from "@/lib/services/timeline.service"
 
 type CountedEntry = {
   paymentMethodId?: string | null
@@ -88,6 +89,16 @@ export async function openCashSessionAction(input: {
     sessionId: data.id, partnerId: input.partnerId, userId: user.id, openingBalance,
   }))
 
+  await logAuditEvent({
+    partnerId: input.partnerId,
+    actorUserId: user.id,
+    entityType: "cash_session",
+    entityId: data.id,
+    actionType: "opened",
+    changeLines: [`abriu o caixa com saldo inicial de R$ ${openingBalance.toFixed(2)}.`],
+    source: "manual",
+  })
+
   return { success: true as const, data }
 }
 
@@ -152,6 +163,17 @@ export async function createCashMovementAction(input: {
   console.info("[cash_register] movement_created", JSON.stringify({
     movementId: data.id, sessionId: openSession.id, type: input.type, amount: signedAmount,
   }))
+
+  const typeLabel = input.type === "withdrawal" ? "sangria" : input.type === "refund" ? "reembolso" : "suprimento"
+  await logAuditEvent({
+    partnerId: input.partnerId,
+    actorUserId: null,
+    entityType: "cash_session",
+    entityId: openSession.id,
+    actionType: "movement",
+    changeLines: [`registrou ${typeLabel} de R$ ${Math.abs(signedAmount).toFixed(2)} — ${input.description.trim()}`],
+    source: "manual",
+  })
 
   return { success: true as const, data }
 }
@@ -301,6 +323,19 @@ export async function closeCashSessionAction(input: {
     sessionId: input.cashSessionId, partnerId: input.partnerId,
     expectedBalance: summary.data.expectedBalance, countedTotal: finalClosing, difference,
   }))
+
+  await logAuditEvent({
+    partnerId: input.partnerId,
+    actorUserId: null,
+    entityType: "cash_session",
+    entityId: input.cashSessionId,
+    actionType: "closed",
+    changeLines: [
+      `fechou o caixa com saldo contado de R$ ${finalClosing.toFixed(2)}.`,
+      ...(Math.abs(difference) > 0.009 ? [`diferença de R$ ${difference.toFixed(2)} em relação ao esperado.`] : []),
+    ],
+    source: "manual",
+  })
 
   return {
     success: true as const,

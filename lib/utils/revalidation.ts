@@ -83,6 +83,19 @@ export async function revalidateQuoteHistory(quoteId: string) {
 }
 
 /**
+ * Revalida timeline unificado de uma entidade.
+ * Also revalidates legacy history tags for backward compatibility.
+ */
+export async function revalidateEntityTimeline(entityType: string, entityId: string) {
+  if (!entityId) return
+  safeRevalidateTag(TAGS.entityTimeline(entityType, entityId))
+  // Also invalidate legacy per-entity history caches
+  if (entityType === "transaction") safeRevalidateTag(TAGS.transactionHistory(entityId))
+  if (entityType === "order") safeRevalidateTag(TAGS.orderHistory(entityId))
+  if (entityType === "quote") safeRevalidateTag(TAGS.quoteHistory(entityId))
+}
+
+/**
  * Revalida dados de CLIENTES
  */
 export async function revalidateCustomers(partnerId: string) {

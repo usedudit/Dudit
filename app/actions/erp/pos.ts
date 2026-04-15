@@ -7,6 +7,7 @@ import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { getActiveCashSessionAction } from "@/app/actions/erp/cash-register"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { logAuditEvent } from "@/lib/services/timeline.service"
 
 type DraftItemInput = {
   productId?: string | null
@@ -301,6 +302,16 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
   await revalidateOrders(input.partnerId)
   await revalidateTransactions(input.partnerId)
   await revalidateStockMovements(input.partnerId)
+
+  await logAuditEvent({
+    partnerId: input.partnerId,
+    actorUserId: user.id,
+    entityType: "sale",
+    entityId: saleId,
+    actionType: "created",
+    changeLines: [`finalizou venda PDV no valor de R$ ${paidAmount.toFixed(2)}.`],
+    source: "manual",
+  })
 
   return { success: true as const, data: { saleId } }
 }

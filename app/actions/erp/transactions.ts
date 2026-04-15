@@ -9,8 +9,9 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { formatTime, formatDateTime, formatDayMonth } from "@/lib/utils/formatters"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { getCurrentUser } from "@/lib/auth/server-user"
-import { createTransactionHistoryEntry, getTransactionHistoryEntries } from "@/lib/services/transaction-history.service"
-import { revalidateTransactions } from "@/lib/utils/revalidation"
+import { getTransactionHistoryEntries } from "@/lib/services/transaction-history.service"
+import { logAuditEvent } from "@/lib/services/timeline.service"
+import { revalidateTransactions, revalidateEntityTimeline } from "@/lib/utils/revalidation"
 import { sanitizeInput } from "@/lib/input-validator"
 
 type DbTransaction = {
@@ -622,17 +623,16 @@ export async function createManualTransactionAction(input: CreateManualTransacti
             refund_kind: input.refundKind,
         })
 
-        try {
-            await createTransactionHistoryEntry({
-                transactionId: data.id,
-                partnerId: input.partnerId,
-                actorUserId: userId,
-                entryType: "created",
-                changeLines: ["criou esta transação."],
-            })
-        } catch (historyError) {
-            console.error("[transactions_history] createManualTransactionAction:", historyError)
-        }
+        await logAuditEvent({
+            partnerId: input.partnerId,
+            actorUserId: userId,
+            entityType: "transaction",
+            entityId: data.id,
+            actionType: "created",
+            changeLines: ["criou esta transação."],
+            source: "manual",
+        })
+        await revalidateEntityTimeline("transaction", data.id)
 
         await revalidateTransactions(input.partnerId)
         return { success: true, data }
@@ -755,13 +755,15 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
 
         await Promise.allSettled(
             (data || []).map((row: any) =>
-                createTransactionHistoryEntry({
-                    transactionId: row.id,
+                logAuditEvent({
                     partnerId: input.partnerId,
                     actorUserId: userId,
-                    entryType: "created",
+                    entityType: "transaction",
+                    entityId: row.id,
+                    actionType: "created",
                     changeLines: ["registrou lançamento de transferência entre contas."],
-                }).catch(err => console.error("[transactions_history] createTransferPairAction:", err))
+                    source: "manual",
+                })
             )
         )
 
@@ -887,18 +889,17 @@ export async function updateManualTransactionAction(
 
         const historyLines = buildTransactionUpdateHistoryLines(patch)
         if (historyLines.length > 0) {
-            try {
-                const user = await getCurrentUser()
-                await createTransactionHistoryEntry({
-                    transactionId,
-                    partnerId,
-                    actorUserId: user?.id ?? null,
-                    entryType: "updated",
-                    changeLines: historyLines,
-                })
-            } catch (historyError) {
-                console.error("[transactions_history] updateManualTransactionAction:", historyError)
-            }
+            const user = await getCurrentUser()
+            await logAuditEvent({
+                partnerId,
+                actorUserId: user?.id ?? null,
+                entityType: "transaction",
+                entityId: transactionId,
+                actionType: "updated",
+                changeLines: historyLines,
+                source: "manual",
+            })
+            await revalidateEntityTimeline("transaction", transactionId)
         }
 
         await revalidateTransactions(partnerId)
@@ -1221,21 +1222,20 @@ export async function recordInstallmentPaymentAction(input: {
             if (updateErr) throw updateErr
         }
 
-        try {
-            await createTransactionHistoryEntry({
-                transactionId: input.transactionId,
-                partnerId: input.partnerId,
-                actorUserId: userId,
-                entryType: "updated",
-                changeLines: [
-                    fullyPaid
-                        ? "registrou pagamento e quitou a parcela."
-                        : "registrou pagamento parcial da parcela.",
-                ],
-            })
-        } catch (historyError) {
-            console.error("[transactions_history] recordInstallmentPaymentAction:", historyError)
-        }
+        await logAuditEvent({
+            partnerId: input.partnerId,
+            actorUserId: userId,
+            entityType: "transaction",
+            entityId: input.transactionId,
+            actionType: "installment_paid",
+            changeLines: [
+                fullyPaid
+                    ? "registrou pagamento e quitou a parcela."
+                    : "registrou pagamento parcial da parcela.",
+            ],
+            source: "manual",
+        })
+        await revalidateEntityTimeline("transaction", input.transactionId)
 
         await revalidateTransactions(input.partnerId)
         return {
@@ -1343,12 +1343,14 @@ export async function settleInstallmentGroupAction(input: {
 
         await Promise.allSettled(
             txIdsToMarkPaid.map((transactionId) =>
-                createTransactionHistoryEntry({
-                    transactionId,
+                logAuditEvent({
                     partnerId: input.partnerId,
                     actorUserId: userId,
-                    entryType: "updated",
+                    entityType: "transaction",
+                    entityId: transactionId,
+                    actionType: "settled",
                     changeLines: ["quitou esta parcela pelo comando «Quitar tudo»."],
+                    source: "manual",
                 }),
             ),
         )
@@ -1457,17 +1459,16 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
                 "[recurring] occurrence_marked_paid",
                 JSON.stringify({ recurringId: input.recurringId, occurrenceDate: input.occurrenceDate }),
             )
-            try {
-                await createTransactionHistoryEntry({
-                    transactionId: pendingTx.id,
-                    partnerId: input.partnerId,
-                    actorUserId: userId,
-                    entryType: "updated",
-                    changeLines: ["marcou esta ocorrência como paga."],
-                })
-            } catch (historyError) {
-                console.error("[transactions_history] markRecurringOccurrenceAsPaidAction:", historyError)
-            }
+            await logAuditEvent({
+                partnerId: input.partnerId,
+                actorUserId: userId,
+                entityType: "transaction",
+                entityId: pendingTx.id,
+                actionType: "paid",
+                changeLines: ["marcou esta ocorrência como paga."],
+                source: "manual",
+            })
+            await revalidateEntityTimeline("transaction", pendingTx.id)
             await revalidateTransactions(input.partnerId)
             return { success: true, data: updated }
         }
@@ -1523,17 +1524,16 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
             JSON.stringify({ recurringId: input.recurringId, occurrenceDate: input.occurrenceDate }),
         )
         if (newTx?.id) {
-            try {
-                await createTransactionHistoryEntry({
-                    transactionId: newTx.id,
-                    partnerId: input.partnerId,
-                    actorUserId: userId,
-                    entryType: "created",
-                    changeLines: ["marcou esta ocorrência como paga."],
-                })
-            } catch (historyError) {
-                console.error("[transactions_history] markRecurringOccurrenceAsPaidAction:", historyError)
-            }
+            await logAuditEvent({
+                partnerId: input.partnerId,
+                actorUserId: userId,
+                entityType: "transaction",
+                entityId: newTx.id,
+                actionType: "created",
+                changeLines: ["marcou esta ocorrência como paga."],
+                source: "manual",
+            })
+            await revalidateEntityTimeline("transaction", newTx.id)
         }
         await revalidateTransactions(input.partnerId)
         return { success: true, data: newTx }

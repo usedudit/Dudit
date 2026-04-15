@@ -1,7 +1,7 @@
 /**
  * Centralized Audit Logger for security-critical actions.
  *
- * Writes structured audit records to the `audit_logs` table.
+ * Delegates to the unified timeline service (audit_logs table).
  * Designed for multi-tenant ERP: every entry is scoped to a partner (tenant).
  *
  * Usage:
@@ -15,7 +15,7 @@
  * @module audit-logger
  */
 
-import { headers } from "next/headers"
+import { logAuditEvent } from "@/lib/services/timeline.service"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -57,28 +57,33 @@ interface AuditLogEntry {
     targetUserId?: string | null
     /** Freeform metadata for the action */
     metadata?: Record<string, unknown>
+    /** Source of the event (default: "system") */
+    source?: "system" | "webhook" | "manual"
 }
 
-// ─── IP Resolution ──────────────────────────────────────────────────────────
+// ─── Action → Human-readable message mapping ───────────────────────────────
 
-async function getClientIP(): Promise<string> {
-    try {
-        const headersList = await headers()
-        const forwarded = headersList.get("x-forwarded-for")
-        if (forwarded) return forwarded.split(",")[0].trim()
-        return headersList.get("x-real-ip") || "unknown"
-    } catch {
-        return "unknown"
-    }
-}
-
-async function getUserAgent(): Promise<string> {
-    try {
-        const headersList = await headers()
-        return headersList.get("user-agent") || "unknown"
-    } catch {
-        return "unknown"
-    }
+const ACTION_MESSAGES: Record<string, string> = {
+    "invite.created": "criou um convite para a equipe.",
+    "invite.accepted": "aceitou convite da equipe.",
+    "invite.accepted.failed": "tentativa de aceitar convite falhou.",
+    "invite.validated": "validou um convite.",
+    "invite.revoked": "revogou um convite.",
+    "invite.expired": "convite expirou.",
+    "role.changed": "alterou o cargo de um membro.",
+    "member.removed": "removeu um membro da equipe.",
+    "auth.login": "realizou login.",
+    "auth.logout": "realizou logout.",
+    "auth.2fa_enabled": "ativou autenticação de dois fatores.",
+    "auth.2fa_disabled": "desativou autenticação de dois fatores.",
+    "partner.updated": "atualizou dados do parceiro.",
+    "partner.deleted": "excluiu o parceiro.",
+    "subscription.created": "criou assinatura.",
+    "subscription.cancelled": "cancelou assinatura.",
+    "subscription.upgraded": "fez upgrade do plano.",
+    "subscription.downgraded": "fez downgrade do plano.",
+    "subscription.payment_failed": "pagamento da assinatura falhou.",
+    "subscription.status_changed": "status da assinatura alterado.",
 }
 
 // ─── Main Logger ────────────────────────────────────────────────────────────
@@ -88,21 +93,28 @@ async function getUserAgent(): Promise<string> {
  *
  * This function is fire-and-forget safe: it never throws.
  * Errors are logged to console but do not propagate.
+ *
+ * Internally delegates to logAuditEvent() from the unified timeline service.
  */
 export async function auditLog(entry: AuditLogEntry): Promise<void> {
     try {
-        const { createAdminClient } = await import("@/lib/supabase/server")
-        const admin = createAdminClient()
-        const [ip, ua] = await Promise.all([getClientIP(), getUserAgent()])
+        const changeMessage = ACTION_MESSAGES[entry.action] || "ação registrada."
+        const metadata: Record<string, unknown> = {
+            ...(entry.metadata || {}),
+        }
+        if (entry.targetUserId) {
+            metadata._targetUserId = entry.targetUserId
+        }
 
-        await admin.from("audit_logs").insert({
-            table_name: "security",
-            action: entry.action,
-            user_id: entry.actorUserId,
-            partner_id: entry.partnerId || null,
-            target_user_id: entry.targetUserId || null,
-            new_values: { ...entry.metadata, _ua: ua },
-            ip_address: ip,
+        await logAuditEvent({
+            partnerId: entry.partnerId || "",
+            actorUserId: entry.actorUserId,
+            entityType: "security",
+            entityId: null,
+            actionType: entry.action, // logAuditEvent normalizes dots → underscores
+            changeLines: [changeMessage],
+            metadata: Object.keys(metadata).length > 0 ? metadata : null,
+            source: entry.source || "system",
         })
     } catch (error) {
         // Audit logging must NEVER break the primary action.

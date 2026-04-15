@@ -9,7 +9,8 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
 import { getDeliveryStatusLabel, getPaymentStatusLabel } from "@/lib/orders/status"
-import { createOrderHistoryEntry, getOrderHistoryEntries } from "@/lib/services/order-history.service"
+import { getOrderHistoryEntries } from "@/lib/services/order-history.service"
+import { logAuditEvent } from "@/lib/services/timeline.service"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { revalidateStockMovements } from "@/lib/utils/revalidation"
 import {
@@ -871,21 +872,15 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             .eq("partner_id", partnerId)
     }
 
-    try {
-        const historyLines = [
-            "criou venda",
-        ]
-
-        await createOrderHistoryEntry({
-            orderId: order.id,
-            partnerId,
-            actorUserId: user.id,
-            entryType: "created",
-            changeLines: historyLines,
-        })
-    } catch (historyError) {
-        console.error("[orders_history] createERPOrderAction:", historyError)
-    }
+    await logAuditEvent({
+        partnerId,
+        actorUserId: user.id,
+        entityType: "order",
+        entityId: order.id,
+        actionType: "created",
+        changeLines: ["criou venda"],
+        source: "manual",
+    })
 
     increment_usage_counter(partnerId, "orders_month_count").catch(console.error)
 
@@ -1199,17 +1194,15 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         }
     }
 
-    try {
-        await createOrderHistoryEntry({
-            orderId,
-            partnerId: data.partnerId,
-            actorUserId: user.id,
-            entryType: "updated",
-            changeLines,
-        })
-    } catch (historyError) {
-        console.error("[orders_history] updateERPOrderAction:", historyError)
-    }
+    await logAuditEvent({
+        partnerId: data.partnerId,
+        actorUserId: user.id,
+        entityType: "order",
+        entityId: orderId,
+        actionType: "updated",
+        changeLines,
+        source: "manual",
+    })
 
     await invalidateInventoryItems(data.partnerId, stockItems)
     await revalidateOrders(data.partnerId)
@@ -1422,12 +1415,14 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         }
                     }
 
-                    return createOrderHistoryEntry({
-                        orderId: order.id,
+                    return logAuditEvent({
                         partnerId: payload.partnerId,
                         actorUserId: user.id,
-                        entryType: payload.actionType,
+                        entityType: "order",
+                        entityId: order.id,
+                        actionType: payload.actionType,
                         changeLines: lines,
+                        source: "manual",
                     })
                 })
             )
@@ -1572,12 +1567,14 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
                 if (lines.length === 0) return Promise.resolve()
 
-                return createOrderHistoryEntry({
-                    orderId: order.id,
+                return logAuditEvent({
                     partnerId: payload.partnerId,
                     actorUserId: user.id,
-                    entryType: payload.actionType,
+                    entityType: "order",
+                    entityId: order.id,
+                    actionType: payload.actionType,
                     changeLines: lines,
+                    source: "manual",
                 })
             })
         )

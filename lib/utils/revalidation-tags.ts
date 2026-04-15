@@ -13,6 +13,7 @@ export const TAGS = {
   suppliers: (partnerId?: string) => partnerId ? `partner-${partnerId}-suppliers` : 'suppliers',
   quotes: (partnerId?: string) => partnerId ? `partner-${partnerId}-quotes` : 'quotes',
   quoteHistory: (quoteId: string) => `quote-${quoteId}-history`,
+  entityTimeline: (entityType: string, entityId: string) => `timeline-${entityType}-${entityId}`,
   stockMovements: (partnerId?: string) => partnerId ? `partner-${partnerId}-stock-movements` : 'stock-movements',
   transactions: (partnerId?: string) => partnerId ? `partner-${partnerId}-transactions` : 'transactions',
   marketplace: 'marketplace',

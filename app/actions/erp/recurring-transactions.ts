@@ -6,6 +6,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
+import { logAuditEvent } from "@/lib/services/timeline.service"
 
 export type RecurringFrequency = "daily" | "weekly" | "monthly" | "yearly"
 export type RecurringType = "income" | "expense"
@@ -177,6 +178,19 @@ export async function createRecurringTransactionAction(input: {
       .single()
     if (error) throw error
     logRecurring("created", { id: data?.id, partnerId: input.partnerId })
+
+    if (data?.id) {
+      await logAuditEvent({
+        partnerId: input.partnerId,
+        actorUserId: null,
+        entityType: "recurring",
+        entityId: data.id,
+        actionType: "recurring_created",
+        changeLines: [`criou recorrência "${description}" de R$ ${amount.toFixed(2)} (${input.frequency}).`],
+        source: "manual",
+      })
+    }
+
     return { success: true, data }
   } catch (e: any) {
     return { success: false, error: e.message }
@@ -287,6 +301,17 @@ export async function updateRecurringTransactionAction(
       .single()
     if (error) throw error
     logRecurring("updated", { id, partnerId, keys: Object.keys(payload) })
+
+    await logAuditEvent({
+      partnerId,
+      actorUserId: null,
+      entityType: "recurring",
+      entityId: id,
+      actionType: "recurring_updated",
+      changeLines: [`atualizou recorrência (campos: ${Object.keys(payload).filter(k => k !== "updated_at" && k !== "effective_from_date").join(", ")}).`],
+      source: "manual",
+    })
+
     return { success: true, data }
   } catch (e: any) {
     return { success: false, error: e.message }
@@ -331,6 +356,17 @@ export async function cancelRecurringTransactionAction(id: string, partnerId: st
       .single()
     if (error) throw error
     logRecurring("cancelled", { id, partnerId })
+
+    await logAuditEvent({
+      partnerId,
+      actorUserId: null,
+      entityType: "recurring",
+      entityId: id,
+      actionType: "recurring_cancelled",
+      changeLines: ["cancelou esta recorrência."],
+      source: "manual",
+    })
+
     return { success: true, data }
   } catch (e: any) {
     return { success: false, error: e.message }

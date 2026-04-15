@@ -8,8 +8,8 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
 import { revalidateOrders } from "@/lib/utils/revalidation"
 import { revalidateQuotes } from "@/lib/utils/revalidation"
-import { createQuoteHistoryEntry, getQuoteHistoryEntries } from "@/lib/services/quote-history.service"
-import { createOrderHistoryEntry } from "@/lib/services/order-history.service"
+import { getQuoteHistoryEntries } from "@/lib/services/quote-history.service"
+import { logAuditEvent } from "@/lib/services/timeline.service"
 import { createERPOrderAction } from "@/app/actions/erp/orders"
 import {
     getQuoteEditCaps,
@@ -297,17 +297,15 @@ export async function createQuoteAction(data: {
 
             increment_usage_counter(data.partnerId, "quotes_month_count").catch(console.error)
 
-            try {
-                await createQuoteHistoryEntry({
-                    quoteId: newQuoteId,
-                    partnerId: data.partnerId,
-                    actorUserId: user.id,
-                    entryType: "created",
-                    changeLines: [`criou o orçamento ${updatedQuote?.quote_number || quoteResult.quote_number || ""}`.trim()],
-                })
-            } catch (historyError) {
-                console.error("[quotes_history] createQuoteAction:", historyError)
-            }
+            await logAuditEvent({
+                partnerId: data.partnerId,
+                actorUserId: user.id,
+                entityType: "quote",
+                entityId: newQuoteId,
+                actionType: "created",
+                changeLines: [`criou o orçamento ${updatedQuote?.quote_number || quoteResult.quote_number || ""}`.trim()],
+                source: "manual",
+            })
 
             return successResponse({
                 id: newQuoteId,
@@ -433,17 +431,15 @@ export async function updateQuoteAction(data: {
 
             await revalidateQuotes(data.partnerId, data.quoteId)
 
-            try {
-                await createQuoteHistoryEntry({
-                    quoteId: data.quoteId,
-                    partnerId: data.partnerId,
-                    actorUserId: user.id,
-                    entryType: "updated",
-                    changeLines: ["atualizou os dados do orçamento"],
-                })
-            } catch (historyError) {
-                console.error("[quotes_history] updateQuoteAction:", historyError)
-            }
+            await logAuditEvent({
+                partnerId: data.partnerId,
+                actorUserId: user.id,
+                entityType: "quote",
+                entityId: data.quoteId,
+                actionType: "updated",
+                changeLines: ["atualizou os dados do orçamento"],
+                source: "manual",
+            })
 
             return successResponse({ id: data.quoteId })
         } catch (err: any) {
@@ -528,19 +524,17 @@ export async function updateQuoteStatusAction(data: {
                 expired: "Expirado",
                 cancelled: "Cancelado",
             }
-            try {
-                await createQuoteHistoryEntry({
-                    quoteId: data.quoteId,
-                    partnerId: data.partnerId,
-                    actorUserId: user.id,
-                    entryType: "status_changed",
-                    changeLines: [
-                        `alterou o status de ${statusLabels[current.status] || current.status} para ${statusLabels[data.status] || data.status}`,
-                    ],
-                })
-            } catch (historyError) {
-                console.error("[quotes_history] updateQuoteStatusAction:", historyError)
-            }
+            await logAuditEvent({
+                partnerId: data.partnerId,
+                actorUserId: user.id,
+                entityType: "quote",
+                entityId: data.quoteId,
+                actionType: "status_changed",
+                changeLines: [
+                    `alterou o status de ${statusLabels[current.status] || current.status} para ${statusLabels[data.status] || data.status}`,
+                ],
+                source: "manual",
+            })
 
             return successResponse({ id: data.quoteId, status: data.status })
         } catch (err: any) {
@@ -637,24 +631,24 @@ export async function duplicateQuoteAction(quoteId: string) {
 
             increment_usage_counter(ctx.partnerId, "quotes_month_count").catch(console.error)
 
-            try {
-                await createQuoteHistoryEntry({
-                    quoteId: created.id,
-                    partnerId: ctx.partnerId,
-                    actorUserId: user.id,
-                    entryType: "duplicated",
-                    changeLines: [`criou este orçamento duplicando o orçamento ${sourceLabel}`],
-                })
-                await createQuoteHistoryEntry({
-                    quoteId,
-                    partnerId: ctx.partnerId,
-                    actorUserId: user.id,
-                    entryType: "duplicated",
-                    changeLines: [`duplicou para o novo orçamento ${created.quote_number}`],
-                })
-            } catch (historyError) {
-                console.error("[quotes_history] duplicateQuoteAction:", historyError)
-            }
+            await logAuditEvent({
+                partnerId: ctx.partnerId,
+                actorUserId: user.id,
+                entityType: "quote",
+                entityId: created.id,
+                actionType: "duplicated",
+                changeLines: [`criou este orçamento duplicando o orçamento ${sourceLabel}`],
+                source: "manual",
+            })
+            await logAuditEvent({
+                partnerId: ctx.partnerId,
+                actorUserId: user.id,
+                entityType: "quote",
+                entityId: quoteId,
+                actionType: "duplicated",
+                changeLines: [`duplicou para o novo orçamento ${created.quote_number}`],
+                source: "manual",
+            })
 
             return successResponse({
                 id: created.id,
@@ -1263,31 +1257,27 @@ export async function convertQuoteToOrderAction(data: {
                 historyLines.push("Orçamento convertido sem aprovação formal")
             }
 
-            try {
-                await createQuoteHistoryEntry({
-                    quoteId: data.quoteId,
-                    partnerId: data.partnerId,
-                    actorUserId: user.id,
-                    entryType: "converted_to_order",
-                    changeLines: historyLines,
-                })
-            } catch (historyError) {
-                console.error("[quotes_history] convertQuoteToOrderAction:", historyError)
-            }
+            await logAuditEvent({
+                partnerId: data.partnerId,
+                actorUserId: user.id,
+                entityType: "quote",
+                entityId: data.quoteId,
+                actionType: "converted_to_order",
+                changeLines: historyLines,
+                source: "manual",
+            })
 
-            try {
-                await createOrderHistoryEntry({
-                    orderId: newOrderId,
-                    partnerId: data.partnerId,
-                    actorUserId: user.id,
-                    entryType: "quote_conversion",
-                    changeLines: [
-                        `Pedido originado do orçamento ${quote.quote_number || data.quoteId}.`,
-                    ],
-                })
-            } catch (historyError) {
-                console.error("[orders_history] convertQuoteToOrderAction:", historyError)
-            }
+            await logAuditEvent({
+                partnerId: data.partnerId,
+                actorUserId: user.id,
+                entityType: "order",
+                entityId: newOrderId,
+                actionType: "quote_conversion",
+                changeLines: [
+                    `Pedido originado do orçamento ${quote.quote_number || data.quoteId}.`,
+                ],
+                source: "manual",
+            })
 
             await revalidateQuotes(data.partnerId, data.quoteId)
             await revalidateOrders(data.partnerId)
