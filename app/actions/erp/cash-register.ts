@@ -2,6 +2,8 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
+import { requireRateLimit } from "@/lib/security/require-rate-limit"
+import { RateLimitCategory } from "@/lib/rate-limiter"
 
 type CountedEntry = {
   paymentMethodId?: string | null
@@ -45,9 +47,18 @@ export async function openCashSessionAction(input: {
 }) {
   const user = await requireUser()
   await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+
+  const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+  if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
+
   const supabase = await getSupabaseServerClient()
 
-  const openingBalance = money(Math.max(0, Number(input.openingBalance || 0)))
+  const rawBalance = Number(input.openingBalance || 0)
+  if (!Number.isFinite(rawBalance)) return { success: false as const, error: "Saldo de abertura inválido." }
+  const openingBalance = money(Math.max(0, rawBalance))
+
+  // Check for existing open session for this user within this partner
+  // (DB unique partial index is the ultimate guard, this gives a better error message)
   const existing = await getOpenSession(supabase, input.partnerId, user.id)
   if (existing?.id) {
     return { success: false as const, error: "Você já possui um caixa aberto." }
@@ -65,7 +76,18 @@ export async function openCashSessionAction(input: {
     .select("*")
     .single()
 
-  if (error) return { success: false as const, error: error.message }
+  if (error) {
+    // Handle unique constraint violation gracefully (race condition)
+    if (error.code === "23505") {
+      return { success: false as const, error: "Você já possui um caixa aberto." }
+    }
+    return { success: false as const, error: error.message }
+  }
+
+  console.info("[cash_register] session_opened", JSON.stringify({
+    sessionId: data.id, partnerId: input.partnerId, userId: user.id, openingBalance,
+  }))
+
   return { success: true as const, data }
 }
 
@@ -79,6 +101,10 @@ export async function createCashMovementAction(input: {
   referenceId?: string | null
 }) {
   await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+
+  const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+  if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
+
   const supabase = await getSupabaseServerClient()
   const session = input.cashSessionId
     ? await supabase
@@ -95,15 +121,17 @@ export async function createCashMovementAction(input: {
     return { success: false as const, error: "Não existe caixa aberto para esta operação." }
   }
 
-  const rawAmount = money(Number(input.amount || 0))
-  if (rawAmount <= 0) return { success: false as const, error: "Informe um valor maior que zero." }
+  const rawAmount = Number(input.amount || 0)
+  if (!Number.isFinite(rawAmount)) return { success: false as const, error: "Valor inválido." }
+  const parsedAmount = money(rawAmount)
+  if (parsedAmount <= 0) return { success: false as const, error: "Informe um valor maior que zero." }
   if (!input.description?.trim()) return { success: false as const, error: "Descrição é obrigatória." }
 
   const signedAmount = input.type === "withdrawal"
-    ? -Math.abs(rawAmount)
+    ? -Math.abs(parsedAmount)
     : input.type === "refund"
-      ? -Math.abs(rawAmount)
-      : Math.abs(rawAmount)
+      ? -Math.abs(parsedAmount)
+      : Math.abs(parsedAmount)
 
   const { data, error } = await supabase
     .from("cash_movements")
@@ -120,6 +148,11 @@ export async function createCashMovementAction(input: {
     .single()
 
   if (error) return { success: false as const, error: error.message }
+
+  console.info("[cash_register] movement_created", JSON.stringify({
+    movementId: data.id, sessionId: openSession.id, type: input.type, amount: signedAmount,
+  }))
+
   return { success: true as const, data }
 }
 
@@ -225,6 +258,10 @@ export async function closeCashSessionAction(input: {
   notes?: string
 }) {
   await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+
+  const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+  if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
+
   const supabase = await getSupabaseServerClient()
 
   const summary = await getCashSessionCloseSummaryAction(input.partnerId, input.cashSessionId)
@@ -235,7 +272,10 @@ export async function closeCashSessionAction(input: {
   }
 
   const countedTotal = money(
-    (input.countedByMethod || []).reduce((acc, entry) => acc + Math.max(0, Number(entry.amount || 0)), 0)
+    (input.countedByMethod || []).reduce((acc, entry) => {
+      const val = Number(entry.amount || 0)
+      return acc + (Number.isFinite(val) ? Math.max(0, val) : 0)
+    }, 0)
   )
   const finalClosing = countedTotal > 0 ? countedTotal : summary.data.expectedBalance
 
@@ -255,13 +295,20 @@ export async function closeCashSessionAction(input: {
     .single()
 
   if (error) return { success: false as const, error: error.message }
+
+  const difference = money(finalClosing - summary.data.expectedBalance)
+  console.info("[cash_register] session_closed", JSON.stringify({
+    sessionId: input.cashSessionId, partnerId: input.partnerId,
+    expectedBalance: summary.data.expectedBalance, countedTotal: finalClosing, difference,
+  }))
+
   return {
     success: true as const,
     data: {
       ...data,
       expectedBalance: summary.data.expectedBalance,
       countedTotal: finalClosing,
-      difference: money(finalClosing - summary.data.expectedBalance),
+      difference,
       groupedByMethod: summary.data.groupedByMethod,
     },
   }

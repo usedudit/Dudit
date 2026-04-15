@@ -125,6 +125,22 @@ export async function createRecurringTransactionAction(input: {
 
     await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
     const supabase = await getSupabaseServerClient()
+
+    // Input validation hardening
+    const description = String(input.description || "").trim()
+    if (!description) throw new Error("Descrição é obrigatória.")
+    if (description.length > 500) throw new Error("Descrição deve ter no máximo 500 caracteres.")
+
+    const amount = Number(input.amount || 0)
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error("Valor deve ser maior que zero.")
+    if (amount > 99999999) throw new Error("Valor fora do limite permitido.")
+
+    const allowedFrequencies = ["daily", "weekly", "monthly", "yearly"]
+    if (!allowedFrequencies.includes(input.frequency)) throw new Error("Frequência inválida.")
+
+    const intervalValue = Math.max(Number(input.intervalValue || 1), 1)
+    if (!Number.isFinite(intervalValue)) throw new Error("Intervalo inválido.")
+
     const startDate = input.startDate
     const nextRunDate = input.nextRunDate || startDate
     const customerId = input.customerId?.trim() || null
@@ -135,10 +151,10 @@ export async function createRecurringTransactionAction(input: {
       .insert({
         partner_id: input.partnerId,
         type: input.type,
-        amount: input.amount,
-        description: input.description.trim(),
+        amount: amount,
+        description: description,
         frequency: input.frequency,
-        interval_value: Math.max(Number(input.intervalValue || 1), 1),
+        interval_value: intervalValue,
         week_days: input.weekDays || null,
         month_day: input.monthDay ?? null,
         use_last_day: !!input.useLastDay,
@@ -200,6 +216,42 @@ export async function updateRecurringTransactionAction(
       }
     }
     payload.updated_at = new Date().toISOString()
+
+    // Validate amount when patched
+    if (payload.amount !== undefined) {
+      const patchedAmount = Number(payload.amount || 0)
+      if (!Number.isFinite(patchedAmount) || patchedAmount <= 0) {
+        throw new Error("Valor deve ser maior que zero.")
+      }
+      if (patchedAmount > 99999999) throw new Error("Valor fora do limite permitido.")
+    }
+
+    // Validate description when patched
+    if (payload.description !== undefined) {
+      const patchedDesc = String(payload.description || "").trim()
+      if (!patchedDesc) throw new Error("Descrição é obrigatória.")
+      if (patchedDesc.length > 500) throw new Error("Descrição deve ter no máximo 500 caracteres.")
+      payload.description = patchedDesc
+    }
+
+    // Validate start_date cannot be moved to the past
+    if (payload.start_date !== undefined) {
+      const patchedStart = new Date(String(payload.start_date))
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      if (!isNaN(patchedStart.getTime()) && patchedStart < today) {
+        throw new Error("A data de início não pode ser no passado.")
+      }
+    }
+
+    // Validate interval_value
+    if (payload.interval_value !== undefined) {
+      const patchedInterval = Number(payload.interval_value || 1)
+      if (!Number.isFinite(patchedInterval) || patchedInterval < 1) {
+        throw new Error("Intervalo deve ser pelo menos 1.")
+      }
+      payload.interval_value = Math.max(patchedInterval, 1)
+    }
 
     const hasFinancialChange = [
       "amount",

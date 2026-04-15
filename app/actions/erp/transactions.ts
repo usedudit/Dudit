@@ -11,6 +11,7 @@ import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { createTransactionHistoryEntry, getTransactionHistoryEntries } from "@/lib/services/transaction-history.service"
 import { revalidateTransactions } from "@/lib/utils/revalidation"
+import { sanitizeInput } from "@/lib/input-validator"
 
 type DbTransaction = {
     id: string
@@ -236,6 +237,10 @@ async function applyFinanceAccountBalanceAfterInsert(
     })
 }
 
+/**
+ * Atomic balance update using PostgreSQL RPC with SELECT ... FOR UPDATE.
+ * Prevents concurrent balance corruption from race conditions.
+ */
 async function applyFinanceAccountBalanceDelta(
     supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
     partnerId: string,
@@ -249,6 +254,7 @@ async function applyFinanceAccountBalanceDelta(
     if (!accountId) return
 
     const rawAmt = Number(row.amount || 0)
+    if (!Number.isFinite(rawAmt) || rawAmt === 0) return
     let delta = 0
     const tt = row.transaction_type
     if (tt === "income") delta = Math.abs(rawAmt)
@@ -260,21 +266,18 @@ async function applyFinanceAccountBalanceDelta(
         else return
     } else return
 
-    const { data: acc, error: fetchErr } = await supabase
-        .from("finance_accounts")
-        .select("id, current_balance")
-        .eq("id", accountId)
-        .eq("partner_id", partnerId)
-        .single()
-    if (fetchErr || !acc) return
+    delta = Math.round(delta * 100) / 100
+    if (delta === 0) return
 
-    const cur = numFinanceBalance(acc.current_balance)
-    const next = Math.round((cur + delta) * 100) / 100
-    await supabase
-        .from("finance_accounts")
-        .update({ current_balance: next, updated_at: new Date().toISOString() })
-        .eq("id", accountId)
-        .eq("partner_id", partnerId)
+    // Use atomic RPC with FOR UPDATE locking to prevent race conditions
+    const { error: rpcError } = await supabase.rpc("apply_account_balance_delta", {
+        p_account_id: accountId,
+        p_partner_id: partnerId,
+        p_delta: delta,
+    })
+    if (rpcError) {
+        console.error("[transactions] apply_account_balance_delta RPC error:", rpcError.message)
+    }
 }
 
 export async function getFinancialTransactionsAction(
@@ -548,11 +551,20 @@ export async function createManualTransactionAction(input: CreateManualTransacti
             throw new Error("Use a ação de transferência para movimentar entre contas.")
         }
 
-        if (!input.description?.trim()) throw new Error("Descrição é obrigatória.")
+        // Input validation hardening
+        const description = String(input.description || "").trim()
+        if (!description) throw new Error("Descrição é obrigatória.")
+        if (description.length > 500) throw new Error("Descrição deve ter no máximo 500 caracteres.")
+
         const amount = Number(input.amount || 0)
+        if (!Number.isFinite(amount)) throw new Error("Valor inválido.")
+        if (Math.abs(amount) > 99999999) throw new Error("Valor fora do limite permitido.")
+
+        // Sanitize notes
+        const sanitizedNotes = input.notes ? sanitizeInput(String(input.notes), 2000) : null
 
         if (input.transactionType === "adjustment") {
-            if (!Number.isFinite(amount) || amount === 0) throw new Error("Informe um valor diferente de zero.")
+            if (amount === 0) throw new Error("Informe um valor diferente de zero.")
         } else if (input.transactionType === "refund") {
             if (!(amount > 0)) throw new Error("Valor deve ser maior que zero.")
             if (!input.refundKind) throw new Error("Selecione o tipo de reembolso.")
@@ -570,7 +582,7 @@ export async function createManualTransactionAction(input: CreateManualTransacti
 
         const payload: Record<string, unknown> = {
             partner_id: input.partnerId,
-            description: input.description.trim(),
+            description: description,
             category: input.category || "Outros",
             category_id: input.categoryId ?? null,
             subcategory_id: input.subcategoryId ?? null,
@@ -583,7 +595,7 @@ export async function createManualTransactionAction(input: CreateManualTransacti
             payment_date: input.paymentDate ?? null,
             transaction_date: transactionDate,
             status,
-            notes: input.notes ?? null,
+            notes: sanitizedNotes,
             payment_type: input.paymentType || null,
             payment_method_id: input.paymentMethodId || null,
             original_amount: absAmount,
@@ -649,11 +661,13 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
         const supabase = await getSupabaseServerClient()
 
         const amt = Number(input.amount || 0)
-        if (!(amt > 0)) throw new Error("Valor deve ser maior que zero.")
+        if (!Number.isFinite(amt) || !(amt > 0)) throw new Error("Valor deve ser maior que zero.")
+        if (amt > 99999999) throw new Error("Valor fora do limite permitido.")
         if (!input.fromAccountId || !input.toAccountId) throw new Error("Selecione origem e destino.")
         if (input.fromAccountId === input.toAccountId) throw new Error("Contas devem ser diferentes.")
 
         const transferGroupId = crypto.randomUUID()
+        const idempotencyKey = crypto.randomUUID()
         const datePart = (input.transactionDate || new Date().toISOString()).slice(0, 10)
         const transactionTs = new Date(`${datePart}T12:00:00`).toISOString()
         const status = input.status || "paid"
@@ -719,8 +733,8 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
             subcategory_id: null,
         }
 
-        const outRowWithCreator = { ...outRow, created_by_user_id: userId }
-        const inRowWithCreator = { ...inRow, created_by_user_id: userId }
+        const outRowWithCreator = { ...outRow, created_by_user_id: userId, reference_note: `transfer:${idempotencyKey}:out` }
+        const inRowWithCreator = { ...inRow, created_by_user_id: userId, reference_note: `transfer:${idempotencyKey}:in` }
 
         const inserted = await insertTransactionsWithOptionalCreator(supabase, [outRowWithCreator, inRowWithCreator])
         if (inserted.error) throw inserted.error
@@ -786,6 +800,11 @@ export async function updateManualTransactionAction(
             throw new Error(
                 "Esta linha vem da recorrência. Edite o modelo em Previstos ou use «Marcar como pago» - não altere este lançamento pendente.",
             )
+        }
+
+        // Block irreversible status downgrade: paid → pending
+        if (paid && patch.status !== undefined && !isStatusPaid(patch.status)) {
+            throw new Error("Não é permitido reverter uma transação confirmada para pendente.")
         }
 
         // Build payload with strict field-level locking
@@ -1136,7 +1155,10 @@ export async function recordInstallmentPaymentAction(input: {
         const paymentAmount = Number(input.paymentAmount || 0)
         const interestAmount = Number(input.interestAmount || 0)
         const discountAmount = Number(input.discountAmount || 0)
-        const finalPaid = Math.round((paymentAmount + interestAmount - discountAmount) * 100) / 100
+        if (!Number.isFinite(paymentAmount) || !Number.isFinite(interestAmount) || !Number.isFinite(discountAmount)) {
+            throw new Error("Valores de pagamento inválidos.")
+        }
+        let finalPaid = Math.round((paymentAmount + interestAmount - discountAmount) * 100) / 100
         if (!(finalPaid > 0)) throw new Error("O valor final pago deve ser maior que zero.")
 
         const { data: existingPayments, error: paymentsErr } = await supabase
@@ -1149,9 +1171,17 @@ export async function recordInstallmentPaymentAction(input: {
         const paidSoFar = (existingPayments || []).reduce((acc: number, row: { amount: number | string | null }) => acc + Number(row.amount || 0), 0)
         const originalAmount = Math.abs(Number(tx.original_amount ?? tx.amount ?? 0))
         const remainingAmount = Math.max(0, originalAmount - paidSoFar)
+
+        // Overpayment guard: clamp to remaining amount
+        if (finalPaid > remainingAmount + 0.01) {
+            finalPaid = Math.round(remainingAmount * 100) / 100
+            if (!(finalPaid > 0)) throw new Error("Esta parcela já está totalmente quitada.")
+        }
+
         const paidAfter = paidSoFar + finalPaid
         const fullyPaid = paidAfter + 0.0001 >= originalAmount
         const nowIso = new Date().toISOString()
+        const idempotencyKey = `installment:${input.transactionId}:${nowIso}:${finalPaid}`
 
         const { error: insertPaymentErr } = await supabase
             .from("transaction_payments")
@@ -1162,8 +1192,15 @@ export async function recordInstallmentPaymentAction(input: {
                 payment_method_id: input.paymentMethodId || null,
                 created_by_user_id: userId,
                 created_at: nowIso,
+                idempotency_key: idempotencyKey,
             })
-        if (insertPaymentErr) throw insertPaymentErr
+        if (insertPaymentErr) {
+            // Handle unique constraint violation (duplicate payment)
+            if ((insertPaymentErr as any).code === "23505") {
+                throw new Error("Este pagamento já foi registrado.")
+            }
+            throw insertPaymentErr
+        }
 
         await applyFinanceAccountBalanceDelta(supabase, input.partnerId, tx.account_id, {
             transaction_type: tx.transaction_type,

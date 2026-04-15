@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react"
 import { motion } from "framer-motion"
 import { SearchIcon, PlusIcon, MinusIcon, TrashIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
@@ -68,6 +68,52 @@ interface Props {
   }
 }
 
+// Extracted memoized component to avoid unnecessary re-renders
+const CartItemCard = memo(function CartItemCard({
+  item,
+  onChangeQty,
+  onRemove,
+}: {
+  item: CartItem
+  onChangeQty: (itemId: string, delta: number) => void
+  onRemove: (itemId: string) => void
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-brand-border p-3">
+      <div className="flex items-center gap-3">
+        <img
+          src={getR2ImageUrl(item.image, "thumbnail")}
+          alt={item.name}
+          className="w-16 h-16 rounded-xl object-cover bg-brand-gray"
+        />
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-brand-dark truncate">{item.name}</p>
+          {item.variantName && (
+            <p className="text-xs text-brand-inactive-text truncate">{item.variantName}</p>
+          )}
+          <p className="text-sm text-brand-inactive-text">{formatCurrency(item.price)}</p>
+          <div className="mt-2 flex items-center gap-2">
+            <button className="w-7 h-7 rounded-full border border-brand-border flex items-center justify-center" onClick={() => onChangeQty(item.id, -1)}>
+              <MinusIcon size={14} />
+            </button>
+            <span className="min-w-8 text-center font-bold">{String(item.qty).padStart(2, "0")}</span>
+            <button className="w-7 h-7 rounded-full bg-brand-primary text-white flex items-center justify-center" onClick={() => onChangeQty(item.id, 1)}>
+              <PlusIcon size={14} />
+            </button>
+          </div>
+        </div>
+        <div className="text-right">
+          <button className="w-8 h-8 rounded-full text-red-500 bg-red-50 flex items-center justify-center ml-auto mb-2" onClick={() => onRemove(item.id)}>
+            <TrashIcon size={14} />
+          </button>
+          <p className="text-xs text-brand-inactive-text">Total</p>
+          <p className="font-bold text-brand-dark">{formatCurrency(item.price * item.qty)}</p>
+        </div>
+      </div>
+    </div>
+  )
+})
+
 export default function POSPage({ partnerId, initialData }: Props) {
   const { success: notifySuccess, error: notifyError } = useNotification()
   const isMobile = useMediaQuery("(max-width: 1024px)")
@@ -90,6 +136,10 @@ export default function POSPage({ partnerId, initialData }: Props) {
   const [isFinalizing, setIsFinalizing] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [variantPickerProduct, setVariantPickerProduct] = useState<Product | null>(null)
+
+  // Refs for concurrency guards
+  const isFinalizingRef = useRef(false)
+  const isSavingDraftRef = useRef(false)
 
   const filteredProducts = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -115,7 +165,7 @@ export default function POSPage({ partnerId, initialData }: Props) {
     [accounts]
   )
 
-  const getCartItemStock = (item: CartItem) => {
+  const getCartItemStock = useCallback((item: CartItem) => {
     const product = products.find((p) => p.id === item.productId)
     if (!product) return 0
     if (item.variantId) {
@@ -123,9 +173,9 @@ export default function POSPage({ partnerId, initialData }: Props) {
       return Number(variant?.stock_available || 0)
     }
     return Number(product.stock_available || 0)
-  }
+  }, [products])
 
-  const addToCart = (product: Product, variantId?: string | null) => {
+  const addToCart = useCallback((product: Product, variantId?: string | null) => {
     const selectedVariant = variantId
       ? product.product_variants?.find((variant) => variant.id === variantId)
       : null
@@ -170,15 +220,16 @@ export default function POSPage({ partnerId, initialData }: Props) {
 
       return prev.map((item) => (item.id === found.id ? { ...item, qty: nextQty } : item))
     })
-  }
+  }, [products, notifyError])
 
-  const changeQty = (itemId: string, delta: number) => {
+  const changeQty = useCallback((itemId: string, delta: number) => {
     setCart((prev) => prev
       .map((item) => {
         if (item.id !== itemId) return item
         const nextQty = Math.max(0, item.qty + delta)
         const product = products.find((p) => p.id === item.productId)
-        const availableStock = getCartItemStock(item)
+        const variant = item.variantId ? product?.product_variants?.find((v) => v.id === item.variantId) : null
+        const availableStock = variant ? Number(variant.stock_available || 0) : Number(product?.stock_available || 0)
         if (
           product &&
           !product.allow_sell_without_stock &&
@@ -190,50 +241,56 @@ export default function POSPage({ partnerId, initialData }: Props) {
         return { ...item, qty: nextQty }
       })
       .filter((item) => item.qty > 0))
-  }
+  }, [products, notifyError])
 
-  const removeItem = (itemId: string) => {
+  const removeItem = useCallback((itemId: string) => {
     setCart((prev) => prev.filter((item) => item.id !== itemId))
-  }
+  }, [])
 
   const persistDraft = async () => {
     if (cart.length === 0) return null
+    if (isSavingDraftRef.current) return null
+    isSavingDraftRef.current = true
     setIsSavingDraft(true)
-    const result = await upsertPreSaleDraftAction({
-      partnerId,
-      preSaleId: activePreSaleId || undefined,
-      customerId: selectedCustomerId,
-      notes,
-      subtotal,
-      discountAmount,
-      totalAmount: total,
-      items: cart.map((item) => ({
-        productId: item.productId,
-        variantId: item.variantId,
-        variantName: item.variantName,
-        name: item.name,
-        qty: item.qty,
-        price: item.price,
-        totalPrice: item.price * item.qty,
-        image: item.image,
-      })),
-    })
-    setIsSavingDraft(false)
-    if (!result.success) {
-      notifyError(result.error || "Falha ao salvar pré-venda.")
-      return null
+    try {
+      const result = await upsertPreSaleDraftAction({
+        partnerId,
+        preSaleId: activePreSaleId || undefined,
+        customerId: selectedCustomerId,
+        notes,
+        subtotal,
+        discountAmount,
+        totalAmount: total,
+        items: cart.map((item) => ({
+          productId: item.productId,
+          variantId: item.variantId,
+          variantName: item.variantName,
+          name: item.name,
+          qty: item.qty,
+          price: item.price,
+          totalPrice: item.price * item.qty,
+          image: item.image,
+        })),
+      })
+      if (!result.success) {
+        notifyError(result.error || "Falha ao salvar pré-venda.")
+        return null
+      }
+      const saved = result.data as PreSale
+      setActivePreSaleId(saved.id)
+      setPreSales((prev) => [saved, ...prev.filter((p) => p.id !== saved.id)].slice(0, 20))
+      return saved.id
+    } finally {
+      setIsSavingDraft(false)
+      isSavingDraftRef.current = false
     }
-    const saved = result.data as PreSale
-    setActivePreSaleId(saved.id)
-    setPreSales((prev) => [saved, ...prev.filter((p) => p.id !== saved.id)].slice(0, 20))
-    return saved.id
   }
 
   useEffect(() => {
     if (cart.length === 0) return
     const timer = setTimeout(() => {
       persistDraft()
-    }, 800)
+    }, 1200)
     return () => clearTimeout(timer)
   }, [cart, selectedCustomerId, discountAmount, notes]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -279,10 +336,15 @@ export default function POSPage({ partnerId, initialData }: Props) {
       notifyError("Adicione itens para finalizar.")
       return
     }
+    // Prevent double-click finalization via ref guard
+    if (isFinalizingRef.current) return
+    isFinalizingRef.current = true
+
     let preSaleIdToFinalize = activePreSaleId
     if (!preSaleIdToFinalize) {
       const createdDraftId = await persistDraft()
       if (!createdDraftId) {
+        isFinalizingRef.current = false
         notifyError("Não foi possível gerar a pré-venda.")
         return
       }
@@ -291,24 +353,28 @@ export default function POSPage({ partnerId, initialData }: Props) {
     }
 
     setIsFinalizing(true)
-    const result = await finalizePreSaleAction({
-      partnerId,
-      preSaleId: preSaleIdToFinalize as string,
-      financeAccountId: financeAccountId || null,
-      paidAmount: total,
-      paymentMethod: "PDV",
-      paymentBreakdown: [{ method: "PDV", amount: total }],
-    })
-    setIsFinalizing(false)
-    if (!result.success) {
-      notifyError(result.error || "Não foi possível finalizar a venda.")
-      return
-    }
+    try {
+      const result = await finalizePreSaleAction({
+        partnerId,
+        preSaleId: preSaleIdToFinalize as string,
+        financeAccountId: financeAccountId || null,
+        paidAmount: total,
+        paymentMethod: "PDV",
+        paymentBreakdown: [{ method: "PDV", amount: total }],
+      })
+      if (!result.success) {
+        notifyError(result.error || "Não foi possível finalizar a venda.")
+        return
+      }
 
-    notifySuccess("Venda finalizada com sucesso.")
-    setPreSales((prev) => prev.filter((draft) => draft.id !== activePreSaleId))
-    clearCurrentOrder()
-    setMobileOpen(false)
+      notifySuccess("Venda finalizada com sucesso.")
+      setPreSales((prev) => prev.filter((draft) => draft.id !== activePreSaleId))
+      clearCurrentOrder()
+      setMobileOpen(false)
+    } finally {
+      setIsFinalizing(false)
+      isFinalizingRef.current = false
+    }
   }
 
   const cartPanel = (
@@ -320,38 +386,12 @@ export default function POSPage({ partnerId, initialData }: Props) {
 
       <div className="space-y-3 flex-1 overflow-y-auto pr-1">
         {cart.map((item) => (
-          <div key={item.id} className="bg-white rounded-2xl border border-brand-border p-3">
-            <div className="flex items-center gap-3">
-              <img
-                src={getR2ImageUrl(item.image, "thumbnail")}
-                alt={item.name}
-                className="w-16 h-16 rounded-xl object-cover bg-brand-gray"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-brand-dark truncate">{item.name}</p>
-                {item.variantName && (
-                  <p className="text-xs text-brand-inactive-text truncate">{item.variantName}</p>
-                )}
-                <p className="text-sm text-brand-inactive-text">{formatCurrency(item.price)}</p>
-                <div className="mt-2 flex items-center gap-2">
-                  <button className="w-7 h-7 rounded-full border border-brand-border flex items-center justify-center" onClick={() => changeQty(item.id, -1)}>
-                    <MinusIcon size={14} />
-                  </button>
-                  <span className="min-w-8 text-center font-bold">{String(item.qty).padStart(2, "0")}</span>
-                  <button className="w-7 h-7 rounded-full bg-brand-primary text-white flex items-center justify-center" onClick={() => changeQty(item.id, 1)}>
-                    <PlusIcon size={14} />
-                  </button>
-                </div>
-              </div>
-              <div className="text-right">
-                <button className="w-8 h-8 rounded-full text-red-500 bg-red-50 flex items-center justify-center ml-auto mb-2" onClick={() => removeItem(item.id)}>
-                  <TrashIcon size={14} />
-                </button>
-                <p className="text-xs text-brand-inactive-text">Total</p>
-                <p className="font-bold text-brand-dark">{formatCurrency(item.price * item.qty)}</p>
-              </div>
-            </div>
-          </div>
+          <CartItemCard
+            key={item.id}
+            item={item}
+            onChangeQty={changeQty}
+            onRemove={removeItem}
+          />
         ))}
       </div>
 
@@ -375,7 +415,7 @@ export default function POSPage({ partnerId, initialData }: Props) {
           <div className="flex justify-between text-brand-inactive-text"><span>Desconto</span><span>-{formatCurrency(discountAmount)}</span></div>
           <div className="flex justify-between mt-2 text-xl font-black text-brand-dark"><span>Total</span><span>{formatCurrency(total)}</span></div>
         </div>
-        <Button className="w-full h-12" onClick={finalizeSale} isLoading={isFinalizing}>Continue</Button>
+        <Button className="w-full h-12" onClick={finalizeSale} isLoading={isFinalizing} disabled={isFinalizing || cart.length === 0}>Continue</Button>
       </div>
     </div>
   )
