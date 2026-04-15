@@ -56,6 +56,7 @@ export type RouteKey =
     | "customers"
     // Financeiro
     | "financial_transactions"
+    | "cash_register"
     | "financial_dashboard"
     | "financial_dre"
     | "cadastros_financeiro"

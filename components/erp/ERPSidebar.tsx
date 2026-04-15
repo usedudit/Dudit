@@ -55,7 +55,7 @@ const navItems: NavItem[] = [
         submenu: [
             { label: "Pedidos e Vendas", href: "/erp/orders" },
             { label: "Orçamentos", href: "/erp/quotes" },
-            { label: "PDV (Frente de Caixa)", href: "/" },
+            { label: "PDV (Frente de Caixa)", href: "/erp/pos" },
             { label: "Devoluções", href: "/" },
             { label: "Expedição e Entregas", href: "/" },
         ],
@@ -91,6 +91,7 @@ const navItems: NavItem[] = [
         label: "Financeiro",
         submenu: [
             { label: "Transações", href: "/erp/financial/transactions" },
+            { label: "Caixa (PDV)", href: "/erp/cash-register" },
             { label: "Fluxo de Caixa", href: "/" },
             { label: "DRE Gerencial", href: "/" },
             { label: "Cadastros financeiros", href: "/erp/financial/cadastros-financeiro" },
