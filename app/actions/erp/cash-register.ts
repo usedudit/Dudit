@@ -279,7 +279,7 @@ export async function getCashSessionsHistoryAction(partnerId: string) {
     .limit(400)
   if (sessionError) return { success: false as const, error: sessionError.message }
 
-  const sessionIds = (sessions || []).map((session) => session.id)
+  const sessionIds = (sessions || []).map((session: any) => session.id)
   const { data: movementRows } = sessionIds.length > 0
     ? await supabase
       .from("cash_movements")
@@ -288,7 +288,7 @@ export async function getCashSessionsHistoryAction(partnerId: string) {
       .in("cash_session_id", sessionIds)
     : { data: [] as any[] }
 
-  const userIds = Array.from(new Set((sessions || []).map((session) => session.user_id).filter(Boolean)))
+  const userIds = Array.from(new Set((sessions || []).map((session: any) => session.user_id).filter(Boolean)))
   const { data: users } = userIds.length > 0
     ? await supabase
       .from("user_profiles")
@@ -305,7 +305,7 @@ export async function getCashSessionsHistoryAction(partnerId: string) {
     )
   }
 
-  const mapped = (sessions || []).map((session) => ({
+  const mapped = (sessions || []).map((session: any) => ({
     ...session,
     user_name: userMap.get(session.user_id) || "Usuário",
     total_received: movementBySession.get(session.id) || 0,
