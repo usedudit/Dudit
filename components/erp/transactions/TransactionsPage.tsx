@@ -505,7 +505,7 @@ export default function TransactionsPage({
 
     const handleConfirmRecurringMarkAsPaid = useCallback(async () => {
         const transaction = confirmRecurringPayment
-        if (!transaction.recurringTemplateId || !transaction.occurrenceDate) return
+        if (!transaction || !transaction.recurringTemplateId || !transaction.occurrenceDate) return
         if (markingAsPaid) return
         setMarkingAsPaid(true)
         try {

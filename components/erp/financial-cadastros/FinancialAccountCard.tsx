@@ -81,7 +81,7 @@ const FinancialAccountCard = React.memo(
                                     {item.is_active ? "Ativo" : "Inativo"}
                                 </Badge>
                                 {item.is_default ? (
-                                    <Badge variant="dark" className="whitespace-nowrap scale-90 shrink-0">
+                                    <Badge variant="blue" className="whitespace-nowrap scale-90 shrink-0">
                                         Padrão
                                     </Badge>
                                 ) : null}
