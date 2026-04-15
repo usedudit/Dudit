@@ -244,8 +244,8 @@ export default function POSPage({ partnerId, initialData }: Props) {
       variantId: item.variant_id ?? item.variantId ?? null,
       variantName: item.variant_name || item.variantName || null,
       name: item.name,
-      price: Number(item.unit_price ?? item.price || 0),
-      qty: Number(item.quantity ?? item.qty || 0),
+      price: Number((item.unit_price ?? item.price) || 0),
+      qty: Number((item.quantity ?? item.qty) || 0),
       image: item.image || null,
     }))
     setActivePreSaleId(preSale.id)
