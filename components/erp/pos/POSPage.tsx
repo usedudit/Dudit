@@ -108,7 +108,7 @@ const CartItemCard = memo(function CartItemCard({
   onEdit: (item: CartItem) => void
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-brand-border p-3">
+    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border p-3">
       <div className="flex items-center gap-3">
         <img
           src={getR2ImageUrl(item.image, "thumbnail")}
@@ -116,11 +116,11 @@ const CartItemCard = memo(function CartItemCard({
           className="w-16 h-16 rounded-xl object-cover bg-brand-gray"
         />
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-brand-dark truncate">{item.name}</p>
+          <p className="font-bold text-brand-dark dark:text-dark-heading truncate">{item.name}</p>
           {item.variantName && (
-            <p className="text-xs text-brand-inactive-text truncate">{item.variantName}</p>
+            <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">{item.variantName}</p>
           )}
-          <p className="text-sm text-brand-inactive-text">{formatCurrency(item.price)}</p>
+          <p className="text-sm text-brand-inactive-text dark:text-dark-body">{formatCurrency(item.price)}</p>
           <div className="mt-2 flex items-center gap-2">
             <button className="w-7 h-7 rounded-full border border-brand-border flex items-center justify-center" onClick={() => onChangeQty(item.id, -1)}>
               <MinusIcon size={14} />
@@ -133,22 +133,24 @@ const CartItemCard = memo(function CartItemCard({
         </div>
         <div className="text-right flex flex-col items-end gap-2">
           <div className="flex gap-1.5">
-            <button
-              className="w-8 h-8 rounded-full text-brand-inactive-text bg-[#F5F6F7] flex items-center justify-center hover:bg-brand-gray transition-colors"
+            <Button
+              className="w-8 h-8"
+              variant="outline"
               onClick={() => onEdit(item)}
             >
               <EditIcon size={14} />
-            </button>
-            <button
-              className="w-8 h-8 rounded-full text-red-500 bg-red-50 flex items-center justify-center hover:bg-red-100 transition-colors"
+            </Button>
+            <Button
+              className="w-8 h-8"
+              variant="outline"
               onClick={() => onRemove(item.id)}
             >
               <TrashIcon size={14} />
-            </button>
+            </Button>
           </div>
           <div className="mt-1">
-            <p className="text-[10px] text-brand-inactive-text uppercase font-bold tracking-wider">Total</p>
-            <p className="font-bold text-brand-dark">{formatCurrency(item.price * item.qty)}</p>
+            <p className="text-[10px] text-brand-inactive-text dark:text-dark-body font-bold">Total</p>
+            <p className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(item.price * item.qty)}</p>
           </div>
         </div>
       </div>
@@ -229,6 +231,7 @@ export default function POSPage({ partnerId, initialData }: Props) {
   const [isPreSaleSheetOpen, setIsPreSaleSheetOpen] = useState(false)
   const [itemToRemoveId, setItemToRemoveId] = useState<string | null>(null)
   const [editingItem, setEditingItem] = useState<CartItem | null>(null)
+  const [isNotesSheetOpen, setIsNotesSheetOpen] = useState(false)
 
   // States for Editing Item Modal
   const [editQty, setEditQty] = useState(1)
@@ -555,14 +558,13 @@ export default function POSPage({ partnerId, initialData }: Props) {
   }
 
   const cartPanel = (
-    <div className="rounded-3xl border border-brand-border bg-[#F5F6F7] p-4 md:p-5 h-full flex flex-col">
+    <div className="rounded-3xl border border-brand-border bg-brand-gray dark:bg-dark-border/50 p-4 md:p-5 h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-brand-dark font-bold text-2xl">Detail Transaction</h3>
+        <h3 className="text-brand-dark dark:text-dark-heading font-bold text-2xl">Detail Transaction</h3>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            size="sm"
-            className="bg-white rounded-full px-4 h-9 font-bold text-brand-dark"
+            className="h-9"
             onClick={persistDraft}
             isLoading={isSavingDraft}
           >
@@ -570,8 +572,7 @@ export default function POSPage({ partnerId, initialData }: Props) {
           </Button>
           <Button
             variant="outline"
-            size="sm"
-            className="bg-white rounded-full px-4 h-9 font-bold text-brand-red border-brand-border"
+            className="h-9"
             onClick={() => setIsResetAlertOpen(true)}
           >
             <TrashIcon size={16} className="mr-2" /> Reset Order
@@ -591,48 +592,48 @@ export default function POSPage({ partnerId, initialData }: Props) {
         ))}
       </div>
 
-      <div className="mt-4 rounded-3xl border border-brand-border bg-white p-3 space-y-3">
+      <div className="mt-4 rounded-3xl border border-brand-border bg-white dark:bg-dark-surface p-3 space-y-3">
         {/* Dropdown for options replaced separate inputs */}
         <div className="p-1 space-y-2">
-          <div className="flex justify-between items-center text-sm text-brand-inactive-text font-medium">
+          <div className="flex justify-between items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium">
             <span>Subtotal</span>
-            <span className="font-bold text-brand-dark">{formatCurrency(subtotal)}</span>
+            <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(subtotal)}</span>
           </div>
 
           {discountVal > 0 && (
-            <div className="flex justify-between items-center text-sm text-brand-inactive-text font-medium">
+            <div className="flex justify-between items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium">
               <span>Desconto</span>
               <span className="font-bold text-brand-red">-{formatCurrency(discountVal)}</span>
             </div>
           )}
 
           {shippingFee > 0 && (
-            <div className="flex justify-between items-center text-sm text-brand-inactive-text font-medium">
+            <div className="flex justify-between items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium">
               <span>Frete</span>
-              <span className="font-bold text-brand-dark">{formatCurrency(shippingFee)}</span>
+              <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(shippingFee)}</span>
             </div>
           )}
 
           {otherCosts > 0 && (
-            <div className="flex justify-between items-center text-sm text-brand-inactive-text font-medium">
+            <div className="flex justify-between items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium">
               <span>Outros Custos</span>
-              <span className="font-bold text-brand-dark">{formatCurrency(otherCosts)}</span>
+              <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(otherCosts)}</span>
             </div>
           )}
 
           <div className="border-t border-dashed border-brand-border pt-3 mt-2">
             <div className="flex justify-between items-end">
-              <span className="text-lg font-bold text-brand-dark tracking-tight">Total a Pagar</span>
-              <span className="text-2xl font-bold text-brand-dark leading-none tracking-tighter">
+              <span className="text-lg font-bold text-brand-dark dark:text-dark-heading tracking-tight">Total a Pagar</span>
+              <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading leading-none tracking-tighter">
                 {formatCurrency(total)}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 mt-4">
+        <div className="flex items-center gap-3 mt-4 w-full">
           <Button
-            className="flex-1 h-12"
+            className="flex-1 w-full h-12"
             onClick={finalizeSale}
             isLoading={isFinalizing}
             disabled={isFinalizing || cart.length === 0}
@@ -662,10 +663,7 @@ export default function POSPage({ partnerId, initialData }: Props) {
             }}>
               <ClockIcon size={16} /> Adicionar Frete
             </DropdownItem>
-            <DropdownItem onClick={() => {
-              const obs = prompt("Observação:")
-              if (obs) setNotes(obs)
-            }}>
+            <DropdownItem onClick={() => setIsNotesSheetOpen(true)}>
               <PlusIcon size={16} /> Adicionar Observação
             </DropdownItem>
           </Dropdown>
@@ -797,7 +795,7 @@ export default function POSPage({ partnerId, initialData }: Props) {
               .map((product) => (
                 <div
                   key={product.id}
-                  className="rounded-3xl border border-brand-border p-3 bg-white text-left transition-all"
+                  className="rounded-3xl border border-brand-border p-3 bg-white dark:bg-dark-surface text-left transition-all"
                 >
                   <div className="relative aspect-square mb-2 overflow-hidden rounded-2xl">
                     <img
@@ -810,11 +808,11 @@ export default function POSPage({ partnerId, initialData }: Props) {
                     </span>
                   </div>
                   <div>
-                    <p className="font-bold text-brand-dark truncate text-sm">{product.name}</p>
+                    <p className="font-bold text-brand-dark dark:text-dark-heading truncate text-sm">{product.name}</p>
                     {product.product_variants && product.product_variants.length > 0 && (
-                      <p className="text-[11px] text-brand-inactive-text">{product.product_variants.length} variação(ões)</p>
+                      <p className="text-sm text-brand-inactive-text">{product.product_variants.length} variação(ões)</p>
                     )}
-                    <p className="text-brand-dark font-bold mt-0.5">{formatCurrency(Number(product.price || 0))}</p>
+                    <p className="text-brand-dark dark:text-dark-heading font-bold mt-0.5">{formatCurrency(Number(product.price || 0))}</p>
 
                     <Button
                       variant="outline"
@@ -1011,11 +1009,77 @@ export default function POSPage({ partnerId, initialData }: Props) {
                 value={editQty}
                 onChange={(e: any) => setEditQty(Number(e.target.value))}
               />
-              <MoneyInput
-                label="Desconto (R$)"
-                value={editDiscount}
-                onChange={(v: number) => setEditDiscount(v)}
-              />
+              {editDiscountType === 'fixed' ? (
+                <MoneyInput
+                  label="Desconto"
+                  value={editDiscount}
+                  onChange={(v: number) => setEditDiscount(v)}
+                  suffix={
+                    <div className="flex items-center gap-2 pr-2">
+                      <div className="h-6 w-[1px] bg-brand-border dark:bg-dark-border" />
+                      <Dropdown
+                        trigger={
+                          <button className="text-brand-dark dark:text-dark-text font-bold text-sm min-w-[30px]">
+                            R$
+                          </button>
+                        }
+                        showChevron={false}
+                        align="right"
+                        width="w-40"
+                      >
+                        <DropdownItem onClick={() => setEditDiscountType('fixed')}>
+                          $ R$ (Reais)
+                        </DropdownItem>
+                        <DropdownItem onClick={() => {
+                          setEditDiscount(0)
+                          setEditDiscountType('percentage')
+                        }}>
+                          % % (Porcentagem)
+                        </DropdownItem>
+                      </Dropdown>
+                    </div>
+                  }
+                />
+              ) : (
+                <Input
+                  label="Desconto"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={editDiscount || ""}
+                  onChange={(e: any) => {
+                    let val = Number(e.target.value)
+                    if (val > 100) val = 100
+                    if (val < 0) val = 0
+                    setEditDiscount(val)
+                  }}
+                  suffix={
+                    <div className="flex items-center gap-2 pr-2">
+                      <div className="h-6 w-[1px] bg-brand-border dark:bg-dark-border" />
+                      <Dropdown
+                        trigger={
+                          <button className="text-brand-dark dark:text-dark-text font-bold text-sm min-w-[30px]">
+                            %
+                          </button>
+                        }
+                        showChevron={false}
+                        align="right"
+                        width="w-40"
+                      >
+                        <DropdownItem onClick={() => {
+                          setEditDiscount(0)
+                          setEditDiscountType('fixed')
+                        }}>
+                          $ R$ (Reais)
+                        </DropdownItem>
+                        <DropdownItem onClick={() => setEditDiscountType('percentage')}>
+                          % % (Porcentagem)
+                        </DropdownItem>
+                      </Dropdown>
+                    </div>
+                  }
+                />
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -1024,18 +1088,16 @@ export default function POSPage({ partnerId, initialData }: Props) {
                 value={editPrice}
                 onChange={(v: number) => setEditPrice(v)}
               />
-              <div>
-                <p className="text-xs font-bold text-brand-dark mb-2">Sub total</p>
-                <div className="h-[42px] flex items-center px-4 bg-[#F5F6F7] dark:bg-dark-gray rounded-lg border border-brand-border dark:border-dark-border">
-                  <p className="font-bold text-brand-dark dark:text-dark-text">
-                    {formatCurrency(
-                      (editDiscountType === 'fixed'
-                        ? Math.max(0, editPrice - editDiscount)
-                        : Math.max(0, editPrice * (1 - editDiscount / 100))) * editQty
-                    )}
-                  </p>
-                </div>
-              </div>
+              <Input
+                label="Sub total"
+                readOnly
+                value={formatCurrency(
+                  (editDiscountType === 'fixed'
+                    ? Math.max(0, editPrice - editDiscount)
+                    : Math.max(0, editPrice * (1 - editDiscount / 100))) * editQty
+                )}
+                className="bg-[#F5F6F7] dark:bg-dark-gray text-brand-dark dark:text-dark-text font-bold cursor-not-allowed border-brand-border dark:border-dark-border"
+              />
             </div>
           </div>
         )}
@@ -1153,6 +1215,33 @@ export default function POSPage({ partnerId, initialData }: Props) {
           </div>
         </div>
       </DefaultModal>
+      {isNotesSheetOpen && (
+        <DefaultModal
+          isOpen={isNotesSheetOpen}
+          onClose={() => setIsNotesSheetOpen(false)}
+          title="Adicionar Observação"
+          footer={
+            <div className="flex items-center gap-3 w-full">
+              <Button variant="outline" className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
+                Cancelar
+              </Button>
+              <Button className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
+                Confirmar
+              </Button>
+            </div>
+          }
+        >
+          <div className="pt-2">
+            <textarea
+              className="w-full h-32 p-4 rounded-xl resize-none bg-[#F5F6F7] dark:bg-dark-gray border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-text focus:outline-none focus:border-brand-primary"
+              placeholder="Digite alguma observação que sairá no pedido..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+        </DefaultModal>
+      )}
+
       <SelectCustomerSheet
         isOpen={isSelectCustomerOpen}
         onClose={() => setIsSelectCustomerOpen(false)}

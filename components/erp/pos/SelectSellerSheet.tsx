@@ -136,7 +136,7 @@ const SelectSellerSheet = ({ isOpen, onClose, onSelect }: SelectSellerSheetProps
                 onClick={onClose}
             >
                 <div
-                    className={`absolute right-0 top-0 h-full w-full max-w-[450px] bg-white dark:bg-dark-surface shadow-2xl transition-transform duration-300 ease-in-out transform ${isOpen ? "translate-x-0" : "translate-x-full"}`}
+                    className={`fixed right-4 top-4 bottom-4 w-[450px] bg-white dark:bg-dark-surface shadow-2xl rounded-2xl transition-transform duration-300 overflow-hidden ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
                     onClick={(e) => e.stopPropagation()}
                 >
                     {content}
