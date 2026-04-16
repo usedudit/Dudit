@@ -37,6 +37,8 @@ import {
 } from "@/app/actions/erp/pos"
 import { getTeamMembers } from "@/app/actions/erp/team"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
+import SelectSellerSheet from "@/components/erp/pos/SelectSellerSheet"
+import { ChevronRightIcon } from "lucide-react"
 
 type Product = {
   id: string
@@ -161,19 +163,19 @@ const PreSaleCard = ({ preSale, index, customers, onClick }: { preSale: PreSale,
   >
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-full bg-[#F5F6F7] dark:bg-dark-gray flex items-center justify-center text-brand-inactive-text">
+        <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center text-brand-inactive-text">
           <ClockIcon size={16} />
         </div>
         <span className="font-bold text-brand-dark dark:text-dark-text text-lg">Nº {index + 1}</span>
       </div>
-      <div className="bg-[#F5F6F7] px-3 py-1 rounded-md">
-        <span className="text-[10px] font-bold text-brand-inactive-text uppercase whitespace-nowrap">
+      <div className="bg-brand-gray dark:bg-dark-border/50 px-3 py-0.5 rounded-full">
+        <span className="text-[11px] font-medium text-brand-inactive-text">
           {new Date(preSale.created_at).toLocaleString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(',', ' às')}
         </span>
       </div>
     </div>
     <div className="flex items-center justify-between mt-1">
-      <span className="text-sm font-bold text-brand-inactive-text truncate max-w-[150px]">
+      <span className="text-sm font-medium text-brand-inactive-text truncate max-w-[150px]">
         {customers.find((c) => c.id === preSale.customer_id)?.name || "Cliente Balcão"}
       </span>
       <span className="text-brand-primary font-bold text-lg">
@@ -694,7 +696,7 @@ export default function POSPage({ partnerId, initialData }: Props) {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 min-h-0 flex-1">
         <div className="xl:col-span-8 min-h-0 flex flex-col">
           {/* HEADER: Combined Row */}
-          <div className="flex items-center gap-3 mb-6 bg-white dark:bg-dark-surface p-2 rounded-full border border-brand-border dark:border-dark-border shadow-sm">
+          <div className="flex items-center gap-3 mb-6">
             {/* Search Part */}
             <div className="flex-1 relative min-w-[200px]">
               <Input
@@ -729,36 +731,61 @@ export default function POSPage({ partnerId, initialData }: Props) {
             )}
 
             {/* Selectors Part */}
-            <div className="flex items-center gap-2 shrink-0 border-l border-brand-border dark:border-dark-border pl-3">
+            <div className="flex items-center gap-6 shrink-0 border-l border-brand-border dark:border-dark-border pl-6">
               {isMobile ? (
                 <>
-                  <button onClick={() => { }} className="w-10 h-10 rounded-full bg-[#F5F6F7] dark:bg-dark-gray border border-brand-border dark:border-dark-border flex items-center justify-center text-brand-dark dark:text-dark-text">
+                  <button onClick={() => setIsGlobalDiscountModalOpen(true)} className="w-10 h-10 rounded-full bg-[#F5F6F7] dark:bg-dark-gray border border-brand-border dark:border-dark-border flex items-center justify-center text-brand-dark dark:text-dark-text shadow-none">
                     <TagIcon size={18} />
                   </button>
-                  <button onClick={() => setIsSelectCustomerOpen(true)} className="w-10 h-10 rounded-full bg-[#F5F6F7] dark:bg-dark-gray border border-brand-border dark:border-dark-border flex items-center justify-center text-brand-dark dark:text-dark-text">
+                  <button onClick={() => setIsSelectCustomerOpen(true)} className="w-10 h-10 rounded-full bg-[#F5F6F7] dark:bg-dark-gray border border-brand-border dark:border-dark-border flex items-center justify-center text-brand-dark dark:text-dark-text shadow-none">
                     <UserIcon size={18} />
                   </button>
-                  <button onClick={() => setIsSelectSellerOpen(true)} className="w-10 h-10 rounded-full bg-[#F5F6F7] dark:bg-dark-gray border border-brand-border dark:border-dark-border flex items-center justify-center text-brand-dark dark:text-dark-text">
+                  <button onClick={() => setIsSelectSellerOpen(true)} className="w-10 h-10 rounded-full bg-[#F5F6F7] dark:bg-dark-gray border border-brand-border dark:border-dark-border flex items-center justify-center text-brand-dark dark:text-dark-text shadow-none">
                     <ClockIcon size={18} />
                   </button>
                 </>
               ) : (
-                <>
+                <div className="flex items-center gap-8">
+                  {/* Customer Selector */}
                   <button
                     onClick={() => setIsSelectCustomerOpen(true)}
-                    className="px-6 py-2 rounded-xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-text font-bold hover:bg-white dark:hover:bg-dark-surface transition-colors flex items-center gap-2 h-10"
+                    className="flex items-center gap-3 group transition-colors shadow-none"
                   >
-                    <UserIcon size={18} />
-                    {selectedCustomerId ? customers.find(c => c.id === selectedCustomerId)?.name : "Selecionar Cliente"}
+                    <div className="w-11 h-11 rounded-full bg-[#F5F6F7] dark:bg-dark-gray flex items-center justify-center text-brand-dark dark:text-dark-text shrink-0 border border-brand-border dark:border-dark-border shadow-none">
+                      {selectedCustomerId ? (
+                        <span className="font-bold text-lg">{customers.find(c => c.id === selectedCustomerId)?.name.charAt(0).toUpperCase()}</span>
+                      ) : (
+                        <UserIcon size={20} />
+                      )}
+                    </div>
+                    <div className="flex flex-col text-left min-w-[100px]">
+                      <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wider opacity-70">Cliente</span>
+                      <span className="text-[14px] font-bold text-slate-500 dark:text-dark-text truncate max-w-[150px]">
+                        {selectedCustomerId ? customers.find(c => c.id === selectedCustomerId)?.name : "Consumidor Final"}
+                      </span>
+                    </div>
+                    <ChevronRightIcon size={16} className="text-brand-inactive-text group-hover:text-brand-dark transition-colors" />
                   </button>
+
+                  <div className="w-[1px] h-10 bg-brand-border dark:bg-dark-border" />
+
+                  {/* Seller Selector */}
                   <button
                     onClick={() => setIsSelectSellerOpen(true)}
-                    className="px-6 py-2 rounded-xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-text font-bold hover:bg-white dark:hover:bg-dark-surface transition-colors flex items-center gap-2 h-10"
+                    className="flex items-center gap-3 group transition-colors shadow-none"
                   >
-                    <ClockIcon size={18} />
-                    {selectedSellerId ? teamMembers.find(t => t.id === selectedSellerId)?.fullName || "Vendedor" : "Selecionar Vendedor"}
+                    <div className="w-11 h-11 rounded-full bg-[#F5F6F7] dark:bg-dark-gray flex items-center justify-center text-brand-dark dark:text-dark-text shrink-0 border border-brand-border dark:border-dark-border shadow-none">
+                      <ClockIcon size={20} />
+                    </div>
+                    <div className="flex flex-col text-left min-w-[100px]">
+                      <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wider opacity-70">Vendedor</span>
+                      <span className="text-[14px] font-bold text-slate-500 dark:text-dark-text truncate max-w-[150px]">
+                        {selectedSellerId ? teamMembers.find(t => t.id === selectedSellerId)?.fullName : "Selecionar"}
+                      </span>
+                    </div>
+                    <ChevronRightIcon size={16} className="text-brand-inactive-text group-hover:text-brand-dark transition-colors" />
                   </button>
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -1024,12 +1051,7 @@ export default function POSPage({ partnerId, initialData }: Props) {
           }
         >
           <div className="space-y-6 pt-2">
-            <div>
-              <p className="text-xs font-bold text-brand-dark mb-2">Produto</p>
-              <div className="bg-[#F5F6F7] dark:bg-dark-gray p-4 rounded-2xl border border-brand-border dark:border-dark-border">
-                <p className="font-bold text-brand-dark dark:text-dark-text text-lg">{editingItem.name}</p>
-              </div>
-            </div>
+            <InfoCard color="gray" title="Produto" message={editingItem.name} />
 
             <div className="grid grid-cols-2 gap-4">
               <Input
@@ -1039,34 +1061,10 @@ export default function POSPage({ partnerId, initialData }: Props) {
                 value={editQty}
                 onChange={(e: any) => setEditQty(Number(e.target.value))}
               />
-              <Input
-                label="Desconto item"
-                name="editDiscount"
-                type="number"
+              <MoneyInput
+                label="Desconto (R$)"
                 value={editDiscount}
-                onChange={(e: any) => setEditDiscount(Number(e.target.value))}
-                suffix={
-                  <div className="flex items-center gap-2 pr-2">
-                    <div className="h-6 w-[1px] bg-brand-border dark:bg-dark-border" />
-                    <Dropdown
-                      trigger={
-                        <button className="text-brand-dark dark:text-dark-text font-bold text-sm min-w-[30px]">
-                          {editDiscountType === 'fixed' ? 'R$' : '%'}
-                        </button>
-                      }
-                      showChevron={false}
-                      align="right"
-                      width="w-40"
-                    >
-                      <DropdownItem onClick={() => setEditDiscountType('fixed')}>
-                        $ R$ (Reais)
-                      </DropdownItem>
-                      <DropdownItem onClick={() => setEditDiscountType('percentage')}>
-                        % % (Porcentagem)
-                      </DropdownItem>
-                    </Dropdown>
-                  </div>
-                }
+                onChange={(v: number) => setEditDiscount(v)}
               />
             </div>
 
@@ -1076,7 +1074,7 @@ export default function POSPage({ partnerId, initialData }: Props) {
                 <button
                   key={amt}
                   onClick={() => setEditDiscount(amt)}
-                  className="px-4 py-2 bg-brand-gray dark:bg-dark-border/30 rounded-xl text-xs font-bold text-brand-dark dark:text-dark-text hover:bg-white dark:hover:bg-dark-surface border border-transparent hover:border-brand-border transition-all"
+                  className="px-4 py-2 bg-brand-gray dark:bg-dark-border/30 rounded-xl text-xs font-bold text-brand-dark dark:text-dark-heading hover:bg-brand-border/10 transition-colors border border-transparent shadow-none"
                 >
                   R$ {amt}
                 </button>
@@ -1167,8 +1165,14 @@ export default function POSPage({ partnerId, initialData }: Props) {
               {[5, 10, 20, 50, 100].map(amt => (
                 <button
                   key={amt}
-                  onClick={() => setEditDiscount(amt)}
-                  className="px-4 py-2 bg-brand-gray dark:bg-dark-border/30 rounded-xl text-xs font-bold text-brand-dark dark:text-dark-text hover:bg-white dark:hover:bg-dark-surface border border-transparent hover:border-brand-border transition-all"
+                  onClick={() => {
+                    if (editDiscountType === 'fixed') {
+                      setEditDiscount(amt)
+                    } else {
+                      setEditDiscount((amt / total) * 100)
+                    }
+                  }}
+                  className="px-4 py-2 bg-brand-gray dark:bg-dark-border/30 rounded-xl text-xs font-bold text-brand-dark dark:text-dark-heading hover:bg-brand-border/10 transition-colors border border-transparent shadow-none"
                 >
                   R$ {amt}
                 </button>
@@ -1177,7 +1181,24 @@ export default function POSPage({ partnerId, initialData }: Props) {
           </div>
         </DefaultModal>
       )}
-      {/* Reset Order Confirmation */}
+      <SelectCustomerSheet
+        isOpen={isSelectCustomerOpen}
+        onClose={() => setIsSelectCustomerOpen(false)}
+        partnerId={partnerId}
+        onSelect={(customer: any) => {
+          setSelectedCustomerId(customer.id)
+        }}
+      />
+
+      <SelectSellerSheet
+        isOpen={isSelectSellerOpen}
+        onClose={() => setIsSelectSellerOpen(false)}
+        partnerId={partnerId}
+        onSelect={(seller: any) => {
+          setSelectedSellerId(seller.id)
+        }}
+      />
+
       {isResetAlertOpen && (
         <AlertModal
           isOpen={isResetAlertOpen}
