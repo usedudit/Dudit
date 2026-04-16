@@ -163,8 +163,8 @@ const PreSaleCard = ({ preSale, index, customers, onClick }: { preSale: PreSale,
   >
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center text-brand-inactive-text">
-          <ClockIcon size={16} />
+        <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+          <ClockIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
         </div>
         <span className="font-bold text-brand-dark dark:text-dark-text text-lg">Nº {index + 1}</span>
       </div>
@@ -751,7 +751,7 @@ export default function POSPage({ partnerId, initialData }: Props) {
                     onClick={() => setIsSelectCustomerOpen(true)}
                     className="flex items-center gap-3 group transition-colors shadow-none"
                   >
-                    <div className="w-11 h-11 rounded-full bg-[#F5F6F7] dark:bg-dark-gray flex items-center justify-center text-brand-dark dark:text-dark-text shrink-0 border border-brand-border dark:border-dark-border shadow-none">
+                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                       {selectedCustomerId ? (
                         <span className="font-bold text-lg">{customers.find(c => c.id === selectedCustomerId)?.name.charAt(0).toUpperCase()}</span>
                       ) : (
@@ -759,8 +759,8 @@ export default function POSPage({ partnerId, initialData }: Props) {
                       )}
                     </div>
                     <div className="flex flex-col text-left min-w-[100px]">
-                      <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wider opacity-70">Cliente</span>
-                      <span className="text-[14px] font-bold text-slate-500 dark:text-dark-text truncate max-w-[150px]">
+                      <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Cliente</span>
+                      <span className="text-sm font-bold text-brand-inactive-text dark:text-dark-body truncate max-w-[150px]">
                         {selectedCustomerId ? customers.find(c => c.id === selectedCustomerId)?.name : "Consumidor Final"}
                       </span>
                     </div>
@@ -774,12 +774,12 @@ export default function POSPage({ partnerId, initialData }: Props) {
                     onClick={() => setIsSelectSellerOpen(true)}
                     className="flex items-center gap-3 group transition-colors shadow-none"
                   >
-                    <div className="w-11 h-11 rounded-full bg-[#F5F6F7] dark:bg-dark-gray flex items-center justify-center text-brand-dark dark:text-dark-text shrink-0 border border-brand-border dark:border-dark-border shadow-none">
-                      <ClockIcon size={20} />
+                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                      <ClockIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                     </div>
                     <div className="flex flex-col text-left min-w-[100px]">
-                      <span className="text-[10px] font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wider opacity-70">Vendedor</span>
-                      <span className="text-[14px] font-bold text-slate-500 dark:text-dark-text truncate max-w-[150px]">
+                      <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Vendedor</span>
+                      <span className="text-sm font-bold text-brand-inactive-text dark:text-dark-body truncate max-w-[150px]">
                         {selectedSellerId ? teamMembers.find(t => t.id === selectedSellerId)?.fullName : "Selecionar"}
                       </span>
                     </div>
@@ -963,57 +963,7 @@ export default function POSPage({ partnerId, initialData }: Props) {
         </div>
       )}
 
-      {/* Select Seller Modal */}
-      {isSelectSellerOpen && (
-        <DefaultModal
-          isOpen={isSelectSellerOpen}
-          onClose={() => setIsSelectSellerOpen(false)}
-          title="Selecionar Vendedor"
-        >
-          <div className="space-y-2 mt-2">
-            {teamMembers.length === 0 && (
-              <p className="text-center py-6 text-brand-inactive-text">Nenhum vendedor encontrado.</p>
-            )}
-            {teamMembers.map((member) => (
-              <button
-                key={member.id}
-                onClick={() => {
-                  setSelectedSellerId(member.id)
-                  setIsSelectSellerOpen(false)
-                }}
-                className={`w-full flex items-center gap-4 p-3 rounded-2xl border transition-all ${selectedSellerId === member.id
-                  ? "bg-brand-gray border-brand-dark shadow-sm"
-                  : "bg-white border-brand-border hover:border-brand-dark"
-                  }`}
-              >
-                <div className="w-10 h-10 rounded-full bg-brand-gray flex items-center justify-center font-bold text-brand-dark">
-                  {member.fullName?.charAt(0).toUpperCase()}
-                </div>
-                <div className="text-left">
-                  <p className="font-bold text-brand-dark">{member.fullName}</p>
-                  <p className="text-xs text-brand-inactive-text font-medium capitalize">{member.role}</p>
-                </div>
-                {selectedSellerId === member.id && (
-                  <div className="ml-auto w-3 h-3 rounded-full bg-brand-dark" />
-                )}
-              </button>
-            ))}
-          </div>
-        </DefaultModal>
-      )}
 
-      {/* Select Customer Sheet */}
-      {isSelectCustomerOpen && (
-        <SelectCustomerSheet
-          isOpen={isSelectCustomerOpen}
-          onClose={() => setIsSelectCustomerOpen(false)}
-          partnerId={partnerId}
-          onSelect={(customer: any) => {
-            setSelectedCustomerId(customer.id)
-            setIsSelectCustomerOpen(false)
-          }}
-        />
-      )}
 
       {/* Item Removal Confirmation */}
       {itemToRemoveId && (
@@ -1034,22 +984,22 @@ export default function POSPage({ partnerId, initialData }: Props) {
       )}
 
       {/* Edit Item Modal */}
-      {editingItem && (
-        <DefaultModal
-          isOpen={!!editingItem}
-          onClose={() => setEditingItem(null)}
-          title="Editar dados do produto"
-          footer={
-            <div className="flex items-center gap-3 w-full">
-              <Button variant="outline" className="flex-1" onClick={() => setEditingItem(null)}>
-                Cancelar
-              </Button>
-              <Button className="flex-1" onClick={saveEditedItem}>
-                Salvar
-              </Button>
-            </div>
-          }
-        >
+      <DefaultModal
+        isOpen={!!editingItem}
+        onClose={() => setEditingItem(null)}
+        title="Editar dados do produto"
+        footer={
+          <div className="flex items-center gap-3 w-full">
+            <Button variant="outline" className="flex-1" onClick={() => setEditingItem(null)}>
+              Cancelar
+            </Button>
+            <Button className="flex-1" onClick={saveEditedItem}>
+              Salvar
+            </Button>
+          </div>
+        }
+      >
+        {editingItem && (
           <div className="space-y-6 pt-2">
             <InfoCard color="gray" title="Produto" message={editingItem.name} />
 
@@ -1066,19 +1016,6 @@ export default function POSPage({ partnerId, initialData }: Props) {
                 value={editDiscount}
                 onChange={(v: number) => setEditDiscount(v)}
               />
-            </div>
-
-            {/* Quick Discount Buttons */}
-            <div className="flex flex-wrap gap-2">
-              {[5, 10, 20, 50, 100].map(amt => (
-                <button
-                  key={amt}
-                  onClick={() => setEditDiscount(amt)}
-                  className="px-4 py-2 bg-brand-gray dark:bg-dark-border/30 rounded-xl text-xs font-bold text-brand-dark dark:text-dark-heading hover:bg-brand-border/10 transition-colors border border-transparent shadow-none"
-                >
-                  R$ {amt}
-                </button>
-              ))}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -1101,49 +1038,47 @@ export default function POSPage({ partnerId, initialData }: Props) {
               </div>
             </div>
           </div>
-        </DefaultModal>
-      )}
+        )}
+      </DefaultModal>
 
       {/* Global Discount Modal */}
-      {isGlobalDiscountModalOpen && (
-        <DefaultModal
-          isOpen={isGlobalDiscountModalOpen}
-          onClose={() => setIsGlobalDiscountModalOpen(false)}
-          title="Aplicar Desconto"
-          footer={
-            <div className="flex items-center gap-3 w-full">
-              <Button variant="outline" className="flex-1" onClick={() => setIsGlobalDiscountModalOpen(false)}>
-                Cancelar
-              </Button>
-              <Button className="flex-1" onClick={() => {
-                if (editDiscountType === 'fixed') {
-                  setDiscountAmount(editDiscount)
-                } else {
-                  setDiscountAmount(total * (editDiscount / 100))
-                }
-                setIsGlobalDiscountModalOpen(false)
-              }}>
-                Aplicar
-              </Button>
-            </div>
-          }
-        >
-          <div className="space-y-6 pt-2">
-            <InfoCard color="green" title="Valor total de itens" message={formatCurrency(total)} />
+      <DefaultModal
+        isOpen={isGlobalDiscountModalOpen}
+        onClose={() => setIsGlobalDiscountModalOpen(false)}
+        title="Aplicar Desconto"
+        footer={
+          <div className="flex items-center gap-3 w-full">
+            <Button variant="outline" className="flex-1" onClick={() => setIsGlobalDiscountModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button className="flex-1" onClick={() => {
+              if (editDiscountType === 'fixed') {
+                setDiscountAmount(editDiscount)
+              } else {
+                setDiscountAmount(total * (editDiscount / 100))
+              }
+              setIsGlobalDiscountModalOpen(false)
+            }}>
+              Aplicar
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-6 pt-2">
+          <InfoCard color="green" title="Valor total de itens" message={formatCurrency(total)} />
 
-            <Input
+          {editDiscountType === 'fixed' ? (
+            <MoneyInput
               label="Desconto do pedido"
-              name="globalDiscount"
-              type="number"
               value={editDiscount}
-              onChange={(e: any) => setEditDiscount(Number(e.target.value))}
+              onChange={(v: number) => setEditDiscount(v)}
               suffix={
                 <div className="flex items-center gap-2 pr-2">
                   <div className="h-6 w-[1px] bg-brand-border dark:bg-dark-border" />
                   <Dropdown
                     trigger={
                       <button className="text-brand-dark dark:text-dark-text font-bold text-sm min-w-[30px]">
-                        {editDiscountType === 'fixed' ? 'R$' : '%'}
+                        R$
                       </button>
                     }
                     showChevron={false}
@@ -1153,6 +1088,49 @@ export default function POSPage({ partnerId, initialData }: Props) {
                     <DropdownItem onClick={() => setEditDiscountType('fixed')}>
                       $ R$ (Reais)
                     </DropdownItem>
+                    <DropdownItem onClick={() => {
+                      setEditDiscount(0)
+                      setEditDiscountType('percentage')
+                    }}>
+                      % % (Porcentagem)
+                    </DropdownItem>
+                  </Dropdown>
+                </div>
+              }
+            />
+          ) : (
+            <Input
+              label="Desconto do pedido"
+              name="globalDiscount"
+              type="number"
+              min="0"
+              max="100"
+              value={editDiscount || ""}
+              onChange={(e: any) => {
+                let val = Number(e.target.value)
+                if (val > 100) val = 100
+                if (val < 0) val = 0
+                setEditDiscount(val)
+              }}
+              suffix={
+                <div className="flex items-center gap-2 pr-2">
+                  <div className="h-6 w-[1px] bg-brand-border dark:bg-dark-border" />
+                  <Dropdown
+                    trigger={
+                      <button className="text-brand-dark dark:text-dark-text font-bold text-sm min-w-[30px]">
+                        %
+                      </button>
+                    }
+                    showChevron={false}
+                    align="right"
+                    width="w-40"
+                  >
+                    <DropdownItem onClick={() => {
+                      setEditDiscount(0)
+                      setEditDiscountType('fixed')
+                    }}>
+                      $ R$ (Reais)
+                    </DropdownItem>
                     <DropdownItem onClick={() => setEditDiscountType('percentage')}>
                       % % (Porcentagem)
                     </DropdownItem>
@@ -1160,33 +1138,28 @@ export default function POSPage({ partnerId, initialData }: Props) {
                 </div>
               }
             />
+          )}
 
-            <div className="flex flex-wrap gap-2">
-              {[5, 10, 20, 50, 100].map(amt => (
-                <button
-                  key={amt}
-                  onClick={() => {
-                    if (editDiscountType === 'fixed') {
-                      setEditDiscount(amt)
-                    } else {
-                      setEditDiscount((amt / total) * 100)
-                    }
-                  }}
-                  className="px-4 py-2 bg-brand-gray dark:bg-dark-border/30 rounded-xl text-xs font-bold text-brand-dark dark:text-dark-heading hover:bg-brand-border/10 transition-colors border border-transparent shadow-none"
-                >
-                  R$ {amt}
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-2">
+            {[5, 10, 20, 50, 100].map(amt => (
+              <button
+                key={amt}
+                onClick={() => setEditDiscount(amt)}
+                className="px-4 py-2 bg-brand-gray dark:bg-dark-border/30 rounded-xl text-xs font-bold text-brand-dark dark:text-dark-heading hover:bg-brand-border/10 transition-colors border border-transparent shadow-none"
+              >
+                {editDiscountType === 'fixed' ? `R$ ${amt}` : `${amt}%`}
+              </button>
+            ))}
           </div>
-        </DefaultModal>
-      )}
+        </div>
+      </DefaultModal>
       <SelectCustomerSheet
         isOpen={isSelectCustomerOpen}
         onClose={() => setIsSelectCustomerOpen(false)}
         partnerId={partnerId}
         onSelect={(customer: any) => {
           setSelectedCustomerId(customer.id)
+          setIsSelectCustomerOpen(false)
         }}
       />
 
@@ -1195,6 +1168,7 @@ export default function POSPage({ partnerId, initialData }: Props) {
         onClose={() => setIsSelectSellerOpen(false)}
         onSelect={(seller: any) => {
           setSelectedSellerId(seller.id)
+          setIsSelectSellerOpen(false)
         }}
       />
 
