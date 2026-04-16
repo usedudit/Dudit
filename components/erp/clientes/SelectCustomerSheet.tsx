@@ -136,31 +136,27 @@ const SelectCustomerSheet = ({ isOpen, onClose, onSelect, partnerId }: SelectCus
         );
     }
 
+    if (isMobile) {
+        return (
+            <BottomSheet isOpen={isOpen} onClose={onClose}>
+                {content}
+            </BottomSheet>
+        );
+    }
+
     return (
         <Portal>
-            <AnimatePresence>
-                {isOpen && (
-                    <>
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={onClose}
-                            className="fixed inset-0 bg-black/50 z-50 transition-opacity"
-                        />
-                        <motion.div
-                            initial={{ x: "100%" }}
-                            animate={{ x: 0 }}
-                            exit={{ x: "100%" }}
-                            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                            className="fixed right-0 top-0 bottom-0 w-full max-w-[450px] bg-white dark:bg-dark-surface shadow-2xl z-[51] overflow-hidden sm:right-4 sm:top-4 sm:bottom-4 sm:rounded-2xl"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            {content}
-                        </motion.div>
-                    </>
-                )}
-            </AnimatePresence>
+            <div
+                className={`fixed inset-0 bg-black/50 z-50 transition-opacity ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                onClick={onClose}
+            >
+                <div
+                    className={`fixed right-4 top-4 bottom-4 w-[450px] bg-white dark:bg-dark-surface shadow-2xl rounded-2xl transition-transform duration-300 overflow-hidden ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {content}
+                </div>
+            </div>
         </Portal>
     );
 };

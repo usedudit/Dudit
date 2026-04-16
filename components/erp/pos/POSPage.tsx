@@ -23,6 +23,7 @@ import {
   AlertModal,
   DefaultModal,
   MoneyInput,
+  InfoCard,
 } from "@/components/reusable"
 import Dropdown from "@/components/reusable/Dropdown"
 import DropdownItem from "@/components/reusable/DropdownItem"
@@ -156,14 +157,14 @@ const CartItemCard = memo(function CartItemCard({
 const PreSaleCard = ({ preSale, index, customers, onClick }: { preSale: PreSale, index: number, customers: Customer[], onClick: () => void }) => (
   <button
     onClick={onClick}
-    className="bg-white rounded-[20px] border border-brand-border p-4 flex flex-col gap-3 hover:shadow-md transition-shadow group text-left min-w-[280px]"
+    className="bg-white dark:bg-dark-surface rounded-[20px] border border-brand-border dark:border-dark-border p-4 flex flex-col gap-3 group text-left min-w-[280px]"
   >
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-full bg-[#F5F6F7] flex items-center justify-center text-brand-inactive-text">
+        <div className="w-8 h-8 rounded-full bg-[#F5F6F7] dark:bg-dark-gray flex items-center justify-center text-brand-inactive-text">
           <ClockIcon size={16} />
         </div>
-        <span className="font-bold text-brand-dark text-lg">Nº {index + 1}</span>
+        <span className="font-bold text-brand-dark dark:text-dark-text text-lg">Nº {index + 1}</span>
       </div>
       <div className="bg-[#F5F6F7] px-3 py-1 rounded-md">
         <span className="text-[10px] font-bold text-brand-inactive-text uppercase whitespace-nowrap">
@@ -231,7 +232,9 @@ export default function POSPage({ partnerId, initialData }: Props) {
   const [editQty, setEditQty] = useState(1)
   const [editPrice, setEditPrice] = useState(0)
   const [editDiscount, setEditDiscount] = useState(0)
-  const [editDiscountType, setEditDiscountType] = useState<'fixed' | 'percentage'>('fixed')
+  const [editDiscountType, setEditDiscountType] = useState<"fixed" | "percentage">("fixed")
+
+  const [isGlobalDiscountModalOpen, setIsGlobalDiscountModalOpen] = useState(false)
 
   // Breakpoints for responsive pre-sale list
   const isXL = useMediaQuery("(min-width: 1280px)")
@@ -627,7 +630,7 @@ export default function POSPage({ partnerId, initialData }: Props) {
 
         <div className="flex items-center gap-3 mt-4">
           <Button
-            className="flex-1 h-12 rounded-full font-bold text-md"
+            className="flex-1 h-12"
             onClick={finalizeSale}
             isLoading={isFinalizing}
             disabled={isFinalizing || cart.length === 0}
@@ -648,10 +651,7 @@ export default function POSPage({ partnerId, initialData }: Props) {
             <DropdownItem onClick={() => setIsSelectCustomerOpen(true)}>
               <UserIcon size={16} /> Adicionar Cliente
             </DropdownItem>
-            <DropdownItem onClick={() => {
-              const disc = prompt("Valor do desconto:")
-              if (disc) setDiscountAmount(Number(disc))
-            }}>
+            <DropdownItem onClick={() => setIsGlobalDiscountModalOpen(true)}>
               <TagIcon size={16} /> Aplicar Desconto
             </DropdownItem>
             <DropdownItem onClick={() => {
@@ -694,23 +694,23 @@ export default function POSPage({ partnerId, initialData }: Props) {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 min-h-0 flex-1">
         <div className="xl:col-span-8 min-h-0 flex flex-col">
           {/* HEADER: Combined Row */}
-          <div className="flex items-center gap-3 mb-6 bg-white p-2 rounded-full border border-brand-border shadow-sm">
+          <div className="flex items-center gap-3 mb-6 bg-white dark:bg-dark-surface p-2 rounded-full border border-brand-border dark:border-dark-border shadow-sm">
             {/* Search Part */}
-            <div className="flex-[0.35] relative min-w-[150px]">
+            <div className="flex-1 relative min-w-[200px]">
               <Input
                 label=""
-                placeholder="Buscar..."
+                placeholder="Buscar produtos..."
                 value={search}
                 variant="full-rounded"
                 onChange={(e: any) => setSearch(e.target.value)}
                 prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                className="mb-0 border-transparent bg-transparent focus-within:bg-white"
+                className="mb-0 border-transparent bg-transparent"
               />
             </div>
 
             {/* Carousel Part (Visible on Desktop) */}
             {!isMobile && (
-              <div className="flex-1 relative overflow-hidden group border-l border-brand-border px-4">
+              <div className="flex-1 relative overflow-hidden group border-l border-brand-border dark:border-dark-border px-4">
                 <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth py-1">
                   {categories.map((cat) => (
                     <button
@@ -729,16 +729,16 @@ export default function POSPage({ partnerId, initialData }: Props) {
             )}
 
             {/* Selectors Part */}
-            <div className="flex items-center gap-2 shrink-0 border-l border-brand-border pl-3">
+            <div className="flex items-center gap-2 shrink-0 border-l border-brand-border dark:border-dark-border pl-3">
               {isMobile ? (
                 <>
-                  <button onClick={() => { }} className="w-10 h-10 rounded-full bg-[#F5F6F7] border border-brand-border flex items-center justify-center text-brand-dark">
+                  <button onClick={() => { }} className="w-10 h-10 rounded-full bg-[#F5F6F7] dark:bg-dark-gray border border-brand-border dark:border-dark-border flex items-center justify-center text-brand-dark dark:text-dark-text">
                     <TagIcon size={18} />
                   </button>
-                  <button onClick={() => setIsSelectCustomerOpen(true)} className="w-10 h-10 rounded-full bg-[#F5F6F7] border border-brand-border flex items-center justify-center text-brand-dark">
+                  <button onClick={() => setIsSelectCustomerOpen(true)} className="w-10 h-10 rounded-full bg-[#F5F6F7] dark:bg-dark-gray border border-brand-border dark:border-dark-border flex items-center justify-center text-brand-dark dark:text-dark-text">
                     <UserIcon size={18} />
                   </button>
-                  <button onClick={() => setIsSelectSellerOpen(true)} className="w-10 h-10 rounded-full bg-[#F5F6F7] border border-brand-border flex items-center justify-center text-brand-dark">
+                  <button onClick={() => setIsSelectSellerOpen(true)} className="w-10 h-10 rounded-full bg-[#F5F6F7] dark:bg-dark-gray border border-brand-border dark:border-dark-border flex items-center justify-center text-brand-dark dark:text-dark-text">
                     <ClockIcon size={18} />
                   </button>
                 </>
@@ -746,33 +746,25 @@ export default function POSPage({ partnerId, initialData }: Props) {
                 <>
                   <button
                     onClick={() => setIsSelectCustomerOpen(true)}
-                    className="flex items-center gap-2 bg-[#F5F6F7] border border-brand-border rounded-full py-1.5 pl-1.5 pr-4 hover:bg-white transition-colors"
+                    className="px-6 py-2 rounded-xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-text font-bold hover:bg-white dark:hover:bg-dark-surface transition-colors flex items-center gap-2 h-10"
                   >
-                    <div className="w-7 h-7 rounded-full bg-brand-dark flex items-center justify-center text-white text-[10px] font-bold">
-                      {selectedCustomerId ? customers.find(c => c.id === selectedCustomerId)?.name.charAt(0).toUpperCase() : "C"}
-                    </div>
-                    <span className="text-xs font-bold text-brand-dark truncate max-w-[80px]">
-                      {selectedCustomerId ? customers.find(c => c.id === selectedCustomerId)?.name : "Cliente"}
-                    </span>
+                    <UserIcon size={18} />
+                    {selectedCustomerId ? customers.find(c => c.id === selectedCustomerId)?.name : "Selecionar Cliente"}
                   </button>
                   <button
                     onClick={() => setIsSelectSellerOpen(true)}
-                    className="flex items-center gap-2 bg-[#F5F6F7] border border-brand-border rounded-full py-1.5 pl-1.5 pr-4 hover:bg-white transition-colors"
+                    className="px-6 py-2 rounded-xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-text font-bold hover:bg-white dark:hover:bg-dark-surface transition-colors flex items-center gap-2 h-10"
                   >
-                    <div className="w-7 h-7 rounded-full bg-brand-gray flex items-center justify-center text-brand-dark">
-                      <UserIcon size={14} />
-                    </div>
-                    <span className="text-xs font-bold text-brand-dark truncate max-w-[80px]">
-                      {selectedSellerId ? teamMembers.find(t => t.id === selectedSellerId)?.fullName || "Vendedor" : "Vendedor"}
-                    </span>
+                    <ClockIcon size={18} />
+                    {selectedSellerId ? teamMembers.find(t => t.id === selectedSellerId)?.fullName || "Vendedor" : "Selecionar Vendedor"}
                   </button>
                 </>
               )}
             </div>
           </div>
 
-          {/* Product Grid - Smaller Items */}
-          <div className={`mt-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 overflow-y-auto pr-1 flex-1 no-scrollbar pb-6`}>
+          {/* Product Grid - Fixed Items (No stretch) */}
+          <div className="mt-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 overflow-y-auto pr-1 no-scrollbar pb-6 items-start content-start">
             {filteredProducts
               .slice(0, (cart.length === 0 && preSales.length > 0) ? (preSaleLimit === 4 ? 8 : preSaleLimit === 3 ? 6 : preSaleLimit === 2 ? 4 : 2) : undefined)
               .map((product) => (
@@ -1020,61 +1012,87 @@ export default function POSPage({ partnerId, initialData }: Props) {
           isOpen={!!editingItem}
           onClose={() => setEditingItem(null)}
           title="Editar dados do produto"
+          footer={
+            <div className="flex items-center gap-3 w-full">
+              <Button variant="outline" className="flex-1" onClick={() => setEditingItem(null)}>
+                Cancelar
+              </Button>
+              <Button className="flex-1" onClick={saveEditedItem}>
+                Salvar
+              </Button>
+            </div>
+          }
         >
           <div className="space-y-6 pt-2">
             <div>
-              <p className="text-xs font-bold text-brand-dark mb-2 uppercase tracking-wider">Produto</p>
-              <div className="bg-[#F5F6F7] p-4 rounded-2xl border border-brand-border">
-                <p className="font-bold text-brand-dark text-lg">{editingItem.name}</p>
+              <p className="text-xs font-bold text-brand-dark mb-2">Produto</p>
+              <div className="bg-[#F5F6F7] dark:bg-dark-gray p-4 rounded-2xl border border-brand-border dark:border-dark-border">
+                <p className="font-bold text-brand-dark dark:text-dark-text text-lg">{editingItem.name}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs font-bold text-brand-dark mb-2 uppercase tracking-wider">Quantidade</p>
-                <Input
-                  label=""
-                  name="editQty"
-                  type="number"
-                  variant="full-rounded"
-                  value={editQty}
-                  onChange={(e: any) => setEditQty(Number(e.target.value))}
-                  className="mb-0 h-12"
-                />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-brand-dark mb-2 uppercase tracking-wider">Desconto item</p>
-                <div className="flex h-12 rounded-full border border-brand-border bg-white overflow-hidden">
-                  <input
-                    type="number"
-                    value={editDiscount}
-                    onChange={(e: any) => setEditDiscount(Number(e.target.value))}
-                    className="flex-1 px-4 outline-none text-brand-dark font-medium"
-                  />
-                  <button
-                    onClick={() => setEditDiscountType(editDiscountType === 'fixed' ? 'percentage' : 'fixed')}
-                    className="px-4 border-l border-brand-border bg-[#F5F6F7] text-brand-dark font-bold text-xs hover:bg-brand-gray transition-colors"
-                  >
-                    {editDiscountType === 'fixed' ? 'R$' : '%'}
-                  </button>
-                </div>
-              </div>
+              <Input
+                label="Quantidade"
+                name="editQty"
+                type="number"
+                value={editQty}
+                onChange={(e: any) => setEditQty(Number(e.target.value))}
+              />
+              <Input
+                label="Desconto item"
+                name="editDiscount"
+                type="number"
+                value={editDiscount}
+                onChange={(e: any) => setEditDiscount(Number(e.target.value))}
+                suffix={
+                  <div className="flex items-center gap-2 pr-2">
+                    <div className="h-6 w-[1px] bg-brand-border dark:bg-dark-border" />
+                    <Dropdown
+                      trigger={
+                        <button className="text-brand-dark dark:text-dark-text font-bold text-sm min-w-[30px]">
+                          {editDiscountType === 'fixed' ? 'R$' : '%'}
+                        </button>
+                      }
+                      showChevron={false}
+                      align="right"
+                      width="w-40"
+                    >
+                      <DropdownItem onClick={() => setEditDiscountType('fixed')}>
+                        $ R$ (Reais)
+                      </DropdownItem>
+                      <DropdownItem onClick={() => setEditDiscountType('percentage')}>
+                        % % (Porcentagem)
+                      </DropdownItem>
+                    </Dropdown>
+                  </div>
+                }
+              />
+            </div>
+
+            {/* Quick Discount Buttons */}
+            <div className="flex flex-wrap gap-2">
+              {[5, 10, 20, 50, 100].map(amt => (
+                <button
+                  key={amt}
+                  onClick={() => setEditDiscount(amt)}
+                  className="px-4 py-2 bg-brand-gray dark:bg-dark-border/30 rounded-xl text-xs font-bold text-brand-dark dark:text-dark-text hover:bg-white dark:hover:bg-dark-surface border border-transparent hover:border-brand-border transition-all"
+                >
+                  R$ {amt}
+                </button>
+              ))}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
+              <MoneyInput
+                label="Valor unitário"
+                value={editPrice}
+                onChange={(v: number) => setEditPrice(v)}
+              />
               <div>
-                <p className="text-xs font-bold text-brand-dark mb-2 uppercase tracking-wider">Valor unitário</p>
-                <MoneyInput
-                  label=""
-                  value={editPrice}
-                  onChange={(v: number) => setEditPrice(v)}
-                  className="mb-0 h-12"
-                />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-brand-dark mb-2 uppercase tracking-wider">Sub total</p>
-                <div className="h-12 flex items-center px-4 bg-[#F5F6F7] rounded-full border border-brand-border">
-                  <p className="font-bold text-brand-dark text-lg">
+                <p className="text-xs font-bold text-brand-dark mb-2">Sub total</p>
+                <div className="h-[42px] flex items-center px-4 bg-[#F5F6F7] dark:bg-dark-gray rounded-lg border border-brand-border dark:border-dark-border">
+                  <p className="font-bold text-brand-dark dark:text-dark-text">
                     {formatCurrency(
                       (editDiscountType === 'fixed'
                         ? Math.max(0, editPrice - editDiscount)
@@ -1084,14 +1102,77 @@ export default function POSPage({ partnerId, initialData }: Props) {
                 </div>
               </div>
             </div>
+          </div>
+        </DefaultModal>
+      )}
 
-            <div className="flex items-center gap-3 pt-4 border-t border-brand-border">
-              <Button variant="outline" className="flex-1 h-12 rounded-full font-bold" onClick={() => setEditingItem(null)}>
+      {/* Global Discount Modal */}
+      {isGlobalDiscountModalOpen && (
+        <DefaultModal
+          isOpen={isGlobalDiscountModalOpen}
+          onClose={() => setIsGlobalDiscountModalOpen(false)}
+          title="Aplicar Desconto"
+          footer={
+            <div className="flex items-center gap-3 w-full">
+              <Button variant="outline" className="flex-1" onClick={() => setIsGlobalDiscountModalOpen(false)}>
                 Cancelar
               </Button>
-              <Button className="flex-1 h-12 rounded-full font-bold" onClick={saveEditedItem}>
-                Salvar
+              <Button className="flex-1" onClick={() => {
+                if (editDiscountType === 'fixed') {
+                  setDiscountAmount(editDiscount)
+                } else {
+                  setDiscountAmount(total * (editDiscount / 100))
+                }
+                setIsGlobalDiscountModalOpen(false)
+              }}>
+                Aplicar
               </Button>
+            </div>
+          }
+        >
+          <div className="space-y-6 pt-2">
+            <InfoCard color="green" title="Valor total de itens" message={formatCurrency(total)} />
+
+            <Input
+              label="Desconto do pedido"
+              name="globalDiscount"
+              type="number"
+              value={editDiscount}
+              onChange={(e: any) => setEditDiscount(Number(e.target.value))}
+              suffix={
+                <div className="flex items-center gap-2 pr-2">
+                  <div className="h-6 w-[1px] bg-brand-border dark:bg-dark-border" />
+                  <Dropdown
+                    trigger={
+                      <button className="text-brand-dark dark:text-dark-text font-bold text-sm min-w-[30px]">
+                        {editDiscountType === 'fixed' ? 'R$' : '%'}
+                      </button>
+                    }
+                    showChevron={false}
+                    align="right"
+                    width="w-40"
+                  >
+                    <DropdownItem onClick={() => setEditDiscountType('fixed')}>
+                      $ R$ (Reais)
+                    </DropdownItem>
+                    <DropdownItem onClick={() => setEditDiscountType('percentage')}>
+                      % % (Porcentagem)
+                    </DropdownItem>
+                  </Dropdown>
+                </div>
+              }
+            />
+
+            <div className="flex flex-wrap gap-2">
+              {[5, 10, 20, 50, 100].map(amt => (
+                <button
+                  key={amt}
+                  onClick={() => setEditDiscount(amt)}
+                  className="px-4 py-2 bg-brand-gray dark:bg-dark-border/30 rounded-xl text-xs font-bold text-brand-dark dark:text-dark-text hover:bg-white dark:hover:bg-dark-surface border border-transparent hover:border-brand-border transition-all"
+                >
+                  R$ {amt}
+                </button>
+              ))}
             </div>
           </div>
         </DefaultModal>
