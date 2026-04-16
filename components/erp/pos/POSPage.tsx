@@ -13,6 +13,7 @@ import {
   ClockIcon,
   EditIcon,
   ThreeDotsIcon,
+  ChevronRightIcon
 } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -38,7 +39,6 @@ import {
 import { getTeamMembers } from "@/app/actions/erp/team"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import SelectSellerSheet from "@/components/erp/pos/SelectSellerSheet"
-import { ChevronRightIcon } from "lucide-react"
 
 type Product = {
   id: string
@@ -1193,7 +1193,6 @@ export default function POSPage({ partnerId, initialData }: Props) {
       <SelectSellerSheet
         isOpen={isSelectSellerOpen}
         onClose={() => setIsSelectSellerOpen(false)}
-        partnerId={partnerId}
         onSelect={(seller: any) => {
           setSelectedSellerId(seller.id)
         }}

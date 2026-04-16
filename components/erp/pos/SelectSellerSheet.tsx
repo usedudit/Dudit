@@ -1,7 +1,7 @@
 "use client"
 
-import React, { useState, useEffect } from 'react';
-import { SearchIcon, UserIcon, PlusIcon, XIcon, ClockIcon } from '@/lib/icons';
+import { useState, useEffect } from 'react';
+import { SearchIcon, PlusIcon, XIcon, ClockIcon } from '@/lib/icons';
 import { Button, Input, IconPlaceholder } from '@/components/reusable';
 import Portal from "@/components/Portal";
 import BottomSheet from "@/components/BottomSheet";
@@ -12,10 +12,9 @@ interface SelectSellerSheetProps {
     isOpen: boolean;
     onClose: () => void;
     onSelect: (seller: any) => void;
-    partnerId: string;
 }
 
-const SelectSellerSheet = ({ isOpen, onClose, onSelect, partnerId }: SelectSellerSheetProps) => {
+const SelectSellerSheet = ({ isOpen, onClose, onSelect }: SelectSellerSheetProps) => {
     const [search, setSearch] = useState('');
     const [members, setMembers] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -24,9 +23,9 @@ const SelectSellerSheet = ({ isOpen, onClose, onSelect, partnerId }: SelectSelle
     const fetchMembers = async () => {
         setIsLoading(true);
         try {
-            const res = await getTeamMembers(partnerId);
-            if (res.success && res.data) {
-                setMembers(res.data);
+            const res = await getTeamMembers();
+            if (res.members) {
+                setMembers(res.members);
             }
         } catch (error) {
             console.error(error);
@@ -41,7 +40,7 @@ const SelectSellerSheet = ({ isOpen, onClose, onSelect, partnerId }: SelectSelle
         }
     }, [isOpen]);
 
-    const filteredMembers = members.filter(member => 
+    const filteredMembers = members.filter(member =>
         member.fullName?.toLowerCase().includes(search.toLowerCase()) ||
         member.email?.toLowerCase().includes(search.toLowerCase())
     );
