@@ -352,6 +352,12 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   }, [products])
 
   const addToCart = useCallback((product: Product, variantId?: string | null) => {
+    if (!isCashierOpen) {
+      notifyError("Abra o caixa para adicionar itens no PDV.")
+      setIsOpenCashModalOpen(true)
+      return
+    }
+
     const selectedVariant = variantId
       ? product.product_variants?.find((variant) => variant.id === variantId)
       : null
@@ -396,7 +402,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
 
       return prev.map((item) => (item.id === found.id ? { ...item, qty: nextQty } : item))
     })
-  }, [products, notifyError])
+  }, [isCashierOpen, notifyError])
 
   const changeQty = useCallback((itemId: string, delta: number) => {
     setCart((prev) => prev
@@ -726,7 +732,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     </div>
   )
 
-  if (!isCashierOpen) {
+  if (!isCashierOpen && filteredProducts.length < 0) {
     return (
       <div className="h-full flex items-center justify-center bg-white">
         <IconPlaceholder
@@ -807,6 +813,19 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full flex flex-col gap-4">
+      {!isCashierOpen && (
+        <div className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="font-bold">Caixa fechado</p>
+              <p>Os produtos ficam visíveis. Abra o caixa só para adicionar itens e finalizar vendas.</p>
+            </div>
+            <Button onClick={() => setIsOpenCashModalOpen(true)} className="shrink-0">
+              Abrir o Caixa
+            </Button>
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 min-h-0 flex-1">
         <div className="xl:col-span-8 min-h-0 flex flex-col">
           {/* HEADER: Combined Row */}
@@ -925,6 +944,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                   </div>
                   <div>
                     <p className="font-bold text-brand-dark dark:text-dark-heading truncate text-sm">{product.name}</p>
+                    {product.sku && <p className="text-xs text-brand-inactive-text truncate">SKU: {product.sku}</p>}
                     {product.product_variants && product.product_variants.length > 0 && (
                       <p className="text-sm text-brand-inactive-text">{product.product_variants.length} variação(ões)</p>
                     )}
@@ -1393,6 +1413,69 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
           variant="danger"
         />
       )}
+
+      <DefaultModal
+        isOpen={isOpenCashModalOpen}
+        onClose={() => setIsOpenCashModalOpen(false)}
+        title="Abrir caixa"
+        footer={
+          <div className="flex items-center gap-3 w-full">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setIsOpenCashModalOpen(false)}
+              disabled={isOpeningCash}
+            >
+              Cancelar
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={async () => {
+                if (openingBalance < 0) {
+                  notifyError("Saldo inicial invÃ¡lido.")
+                  return
+                }
+                if (isOpeningCash) return
+                setIsOpeningCash(true)
+                try {
+                  const result = await openCashSessionAction({
+                    partnerId,
+                    initialAmount: openingBalance,
+                    notes: openingNotes,
+                  })
+                  if (!result.success) {
+                    notifyError(result.error || "NÃ£o foi possÃ­vel abrir o caixa.")
+                    return
+                  }
+                  notifySuccess("Caixa aberto com sucesso.")
+                  setActiveCashSession(result.data)
+                  setIsOpenCashModalOpen(false)
+                  setOpeningBalance(0)
+                  setOpeningNotes("")
+                } finally {
+                  setIsOpeningCash(false)
+                }
+              }}
+              isLoading={isOpeningCash}
+            >
+              Confirmar abertura
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4 pt-2">
+          <MoneyInput
+            label="Saldo inicial em dinheiro"
+            value={openingBalance}
+            onChange={setOpeningBalance}
+          />
+          <Input
+            label="ObservaÃ§Ãµes"
+            value={openingNotes}
+            onChange={(e: any) => setOpeningNotes(e.target.value)}
+          />
+        </div>
+      </DefaultModal>
     </motion.div>
   )
 }

@@ -86,7 +86,7 @@ export async function getPOSInitialDataAction(partnerId: string) {
   const [productsRes, customersRes, accountsRes, draftsRes, paymentMethodsRes] = await Promise.all([
     supabase
       .from("products")
-      .select("id, name, category, sku, price, stock_available, allow_sell_without_stock, images, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
+      .select("id, name, sku, price, stock_available, allow_sell_without_stock, images, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
       .eq("partner_id", partnerId)
       .eq("is_active", true)
       .order("created_at", { ascending: false })
@@ -120,19 +120,15 @@ export async function getPOSInitialDataAction(partnerId: string) {
   ])
 
   if (productsRes.error) return { success: false as const, error: productsRes.error.message }
-  if (customersRes.error) return { success: false as const, error: customersRes.error.message }
-  if (accountsRes.error) return { success: false as const, error: accountsRes.error.message }
-  if (draftsRes.error) return { success: false as const, error: draftsRes.error.message }
-  if (paymentMethodsRes.error) return { success: false as const, error: paymentMethodsRes.error.message }
 
   return {
     success: true as const,
     data: {
       products: productsRes.data || [],
-      customers: customersRes.data || [],
-      financeAccounts: accountsRes.data || [],
-      preSales: draftsRes.data || [],
-      paymentMethods: paymentMethodsRes.data || [],
+      customers: customersRes.error ? [] : (customersRes.data || []),
+      financeAccounts: accountsRes.error ? [] : (accountsRes.data || []),
+      preSales: draftsRes.error ? [] : (draftsRes.data || []),
+      paymentMethods: paymentMethodsRes.error ? [] : (paymentMethodsRes.data || []),
     },
   }
 }

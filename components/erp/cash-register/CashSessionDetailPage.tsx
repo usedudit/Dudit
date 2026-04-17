@@ -85,12 +85,12 @@ export default function CashSessionDetailPage({
   onBack,
 }: {
   partnerId: string
-  details: DetailPayload
+  details: DetailPayload | null
   isLoading?: boolean
   onBack?: () => void
 }) {
   const { success: notifySuccess, error: notifyError } = useNotification()
-  const [details, setDetails] = useState<DetailPayload>(initialDetails)
+  const [details, setDetails] = useState<DetailPayload | null>(initialDetails)
   const [tab, setTab] = useState<"geral" | "mov" | "dev">("geral")
   const session = details?.session
   const isOpen = session?.status === "open"
@@ -113,9 +113,8 @@ export default function CashSessionDetailPage({
   const [movDesc, setMovDesc] = useState("")
 
   const sangriasReforcos = useMemo(
-    () =>
-      (details.movements || []).filter((m) => m.type === "withdrawal" || m.type === "deposit"),
-    [details.movements],
+    () => (details?.movements || []).filter((m) => m.type === "withdrawal" || m.type === "deposit"),
+    [details],
   )
 
   const refresh = useCallback(async () => {
