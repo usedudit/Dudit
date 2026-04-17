@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
+import { requirePartnerAccess, requireUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { logAuditEvent } from "@/lib/services/timeline.service"
@@ -137,7 +137,7 @@ async function getOpenSessionForUser(
 
 export async function getActiveCashSessionAction(partnerId: string) {
   const user = await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+  await requirePartnerAccess(partnerId)
   const supabase = await getSupabaseServerClient()
   const session = await getOpenSessionForUser(supabase, partnerId, user.id)
   return { success: true as const, data: session || null }
@@ -150,7 +150,7 @@ export async function openCashSessionAction(input: {
   notes?: string
 }) {
   const user = await requireUser()
-  await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+  await requirePartnerAccess(input.partnerId)
 
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
@@ -211,7 +211,7 @@ export async function createCashMovementAction(input: {
   cashFinanceAccountId?: string | null
 }) {
   const user = await requireUser()
-  await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+  await requirePartnerAccess(input.partnerId)
 
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
@@ -293,7 +293,7 @@ export async function reverseCashMovementAction(input: {
   movementId: string
 }) {
   const user = await requireUser()
-  await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+  await requirePartnerAccess(input.partnerId)
 
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
@@ -337,7 +337,7 @@ export async function reverseCashMovementAction(input: {
 }
 
 export async function getCashSessionCloseSummaryAction(partnerId: string, cashSessionId: string) {
-  await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+  await requirePartnerAccess(partnerId)
   const supabase = await getSupabaseServerClient()
 
   const { data: session, error: sessionError } = await supabase
@@ -389,7 +389,7 @@ export async function closeCashSessionAction(input: {
   notes?: string
 }) {
   const user = await requireUser()
-  const access = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+  const access = await requirePartnerAccess(input.partnerId)
 
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
@@ -477,7 +477,7 @@ export async function closeCashSessionAction(input: {
 }
 
 export async function getCashSessionsHistoryAction(partnerId: string) {
-  await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+  await requirePartnerAccess(partnerId)
   const supabase = await getSupabaseServerClient()
 
   const { data: sessions, error: sessionError } = await supabase
@@ -553,7 +553,7 @@ export async function getCashSessionsHistoryAction(partnerId: string) {
 }
 
 export async function getCashSessionDetailsAction(partnerId: string, cashSessionId: string) {
-  await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+  await requirePartnerAccess(partnerId)
   const supabase = await getSupabaseServerClient()
 
   const { data: session, error: sessionError } = await supabase

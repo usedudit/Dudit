@@ -2,7 +2,6 @@ import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { getActiveCashSessionAction, getCashSessionsHistoryAction } from "@/app/actions/erp/cash-register"
 import CashRegisterPage from "@/components/erp/cash-register/CashRegisterPage"
 
@@ -13,13 +12,11 @@ export default async function CashRegisterPageServer() {
   if (!context) return <AccessDenied />
 
   const partnerId = context.partnerId
-  const [{ allowed }, historyResult, activeSessionResult] = await Promise.all([
-    checkPartnerPermission(partnerId, "financial", "view"),
+  const [historyResult, activeSessionResult] = await Promise.all([
     getCashSessionsHistoryAction(partnerId),
     getActiveCashSessionAction(partnerId),
   ])
 
-  if (!allowed) return <AccessDenied />
   if (!historyResult.success || !activeSessionResult.success) return <AccessDenied />
 
   return (
