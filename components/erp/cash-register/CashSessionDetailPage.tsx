@@ -92,6 +92,8 @@ export default function CashSessionDetailPage({
   const { success: notifySuccess, error: notifyError } = useNotification()
   const [details, setDetails] = useState<DetailPayload>(initialDetails)
   const [tab, setTab] = useState<"geral" | "mov" | "dev">("geral")
+  const session = details?.session
+  const isOpen = session?.status === "open"
 
   const [isScrolled, setIsScrolled] = useState(false)
   const scrollContainerRef = React.useRef<HTMLDivElement>(null)
@@ -99,17 +101,6 @@ export default function CashSessionDetailPage({
   const handleScroll = React.useCallback(() => {
     if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
   }, [])
-
-  if (isLoading || !details || !details.session) {
-    return (
-      <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
-        <div className="flex items-center justify-center p-8 mt-10">Carregando detalhes do caixa...</div>
-      </div>
-    )
-  }
-
-  const session = details.session
-  const isOpen = session.status === "open"
 
   const [closeOpen, setCloseOpen] = useState(false)
   const [closeSummary, setCloseSummary] = useState<any>(null)
@@ -128,9 +119,10 @@ export default function CashSessionDetailPage({
   )
 
   const refresh = useCallback(async () => {
+    if (!session?.id) return
     const res = await getCashSessionDetailsAction(partnerId, session.id)
     if (res.success) setDetails(res.data as DetailPayload)
-  }, [partnerId, session.id])
+  }, [partnerId, session?.id])
 
   useEffect(() => {
     setDetails(initialDetails)
@@ -147,6 +139,14 @@ export default function CashSessionDetailPage({
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [isOpen, closeOpen])
+
+  if (isLoading || !details || !session) {
+    return (
+      <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
+        <div className="flex items-center justify-center p-8 mt-10">Carregando detalhes do caixa...</div>
+      </div>
+    )
+  }
 
   const openCloseModal = async () => {
     const sum = await getCashSessionCloseSummaryAction(partnerId, session.id)

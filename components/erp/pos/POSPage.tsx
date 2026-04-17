@@ -47,7 +47,7 @@ type Product = {
   category?: string | null
   sku?: string | null
   price: number
-  stock_quantity: number
+  stock_available: number
   allow_sell_without_stock?: boolean
   images?: string[] | null
   product_variants?: Array<{
@@ -55,7 +55,7 @@ type Product = {
     variant_name: string
     sku?: string | null
     price_adjustment?: number | null
-    stock_quantity?: number | null
+    stock_available?: number | null
     variant_options?: Record<string, any> | null
   }>
 }
@@ -346,9 +346,9 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     if (!product) return 0
     if (item.variantId) {
       const variant = product.product_variants?.find((v) => v.id === item.variantId)
-      return Number(variant?.stock_quantity || 0)
+      return Number(variant?.stock_available || 0)
     }
-    return Number(product.stock_quantity || 0)
+    return Number(product.stock_available || 0)
   }, [products])
 
   const addToCart = useCallback((product: Product, variantId?: string | null) => {
@@ -362,8 +362,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     }
 
     const availableStock = selectedVariant
-      ? Number(selectedVariant.stock_quantity || 0)
-      : Number(product.stock_quantity || 0)
+      ? Number(selectedVariant.stock_available || 0)
+      : Number(product.stock_available || 0)
 
     if (!product.allow_sell_without_stock && availableStock <= 0) {
       notifyError(`"${product.name}" está sem estoque.`)
@@ -405,7 +405,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         const nextQty = Math.max(0, item.qty + delta)
         const product = products.find((p) => p.id === item.productId)
         const variant = item.variantId ? product?.product_variants?.find((v) => v.id === item.variantId) : null
-        const availableStock = variant ? Number(variant.stock_quantity || 0) : Number(product?.stock_quantity || 0)
+        const availableStock = variant ? Number(variant.stock_available || 0) : Number(product?.stock_available || 0)
         if (
           product &&
           !product.allow_sell_without_stock &&
@@ -874,7 +874,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                     </div>
                     <div className="flex flex-col text-left min-w-[100px]">
                       <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Cliente</span>
-                      <span className="text-sm font-bold text-brand-inactive-text dark:text-dark-body truncate max-w-[150px]">
+                      <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body truncate max-w-[150px]">
                         {selectedCustomerId ? customers.find(c => c.id === selectedCustomerId)?.name : "Consumidor Final"}
                       </span>
                     </div>
@@ -893,7 +893,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                     </div>
                     <div className="flex flex-col text-left min-w-[100px]">
                       <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Vendedor</span>
-                      <span className="text-sm font-bold text-brand-inactive-text dark:text-dark-body truncate max-w-[150px]">
+                      <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body truncate max-w-[150px]">
                         {selectedSellerId ? teamMembers.find(t => t.id === selectedSellerId)?.fullName : "Selecionar"}
                       </span>
                     </div>
@@ -920,7 +920,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                       className="w-full h-full object-cover bg-brand-gray"
                     />
                     <span className="absolute left-2 top-2 px-2 py-1 text-[11px] font-bold bg-brand-dark/80 backdrop-blur-sm text-white rounded-lg">
-                      {Math.max(0, Number(product.stock_quantity || 0))} Stock
+                      {Math.max(0, Number(product.stock_available || 0))} Stock
                     </span>
                   </div>
                   <div>
@@ -1043,7 +1043,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             <h4 className="text-xl font-bold text-brand-dark mb-4 tracking-tight">Selecionar Variação</h4>
             <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1 no-scrollbar">
               {variantPickerProduct.product_variants?.map((variant) => {
-                const variantStock = Number(variant.stock_quantity || 0)
+                const variantStock = Number(variant.stock_available || 0)
                 const variantPrice = Number(variantPickerProduct.price || 0) + Number(variant.price_adjustment || 0)
                 return (
                   <button
