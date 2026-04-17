@@ -15,7 +15,8 @@ import { useNotification } from "@/hooks/use-notification"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import Dropdown from "@/components/reusable/Dropdown"
 import DropdownItem from "@/components/reusable/DropdownItem"
-import { ThreeDotsIcon } from "@/lib/icons"
+import { ThreeDotsIcon, ChevronLeftIcon } from "@/lib/icons"
+import React from "react"
 
 type DetailPayload = {
   session: any
@@ -80,13 +81,33 @@ function formatLongDateTime(iso: string) {
 export default function CashSessionDetailPage({
   partnerId,
   details: initialDetails,
+  isLoading,
+  onBack,
 }: {
   partnerId: string
   details: DetailPayload
+  isLoading?: boolean
+  onBack?: () => void
 }) {
   const { success: notifySuccess, error: notifyError } = useNotification()
   const [details, setDetails] = useState<DetailPayload>(initialDetails)
   const [tab, setTab] = useState<"geral" | "mov" | "dev">("geral")
+
+  const [isScrolled, setIsScrolled] = useState(false)
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null)
+
+  const handleScroll = React.useCallback(() => {
+    if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
+  }, [])
+
+  if (isLoading || !details || !details.session) {
+    return (
+      <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
+        <div className="flex items-center justify-center p-8 mt-10">Carregando detalhes do caixa...</div>
+      </div>
+    )
+  }
+
   const session = details.session
   const isOpen = session.status === "open"
 
@@ -204,274 +225,306 @@ export default function CashSessionDetailPage({
   }
 
   const tabClass = (t: typeof tab) =>
-    `pb-2 text-sm font-semibold border-b-2 transition-colors ${
-      tab === t ? "text-brand-dark border-brand-dark" : "text-brand-inactive-text border-transparent"
+    `pb-2 text-sm font-semibold border-b-2 transition-colors ${tab === t ? "text-brand-dark border-brand-dark" : "text-brand-inactive-text border-transparent"
     }`
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-24">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Caixa</h1>
-        <Link href="/erp/cash-register">
-          <Button variant="outline">Voltar</Button>
-        </Link>
-      </div>
+    <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out -mx-4 -mt-4 md:-mx-8 md:-mt-8">
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth custom-scrollbar">
 
-      <div className="flex flex-wrap items-end gap-6 border-b border-brand-border">
-        <button type="button" className={tabClass("geral")} onClick={() => setTab("geral")}>
-          dados gerais
-        </button>
-        <button type="button" className={tabClass("mov")} onClick={() => setTab("mov")}>
-          sangrias e reforços
-          <span className="ml-1 text-xs font-normal text-brand-inactive-text">
-            {String(sangriasReforcos.length).padStart(2, "0")}
-          </span>
-        </button>
-        <button type="button" className={tabClass("dev")} onClick={() => setTab("dev")}>
-          devoluções
-        </button>
-      </div>
-
-      {tab === "geral" && (
-        <div className="space-y-6">
-          <div className="flex flex-wrap items-center gap-3">
-            <span
-              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
-                isOpen ? "bg-emerald-50 text-emerald-900" : "bg-rose-50 text-rose-900"
-              }`}
-            >
-              <span className={`h-2 w-2 rounded-full ${isOpen ? "bg-emerald-600" : "bg-rose-600"}`} />
-              {isOpen ? "caixa aberto" : "caixa fechado"}
-            </span>
-            <span className="text-sm text-brand-inactive-text">
-              {isOpen
-                ? `Caixa aberto em ${formatLongDateTime(session.opened_at)}`
-                : session.closed_at
-                  ? `Caixa fechado em ${formatLongDateTime(session.closed_at)}`
-                  : ""}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
-            <div>
-              <p className="text-xs text-brand-inactive-text mb-1">Abertura</p>
-              <p className="font-semibold text-brand-dark">{formatLongDateTime(session.opened_at)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-brand-inactive-text mb-1">Operador de abertura</p>
-              <p className="font-semibold text-brand-dark">{details.operators.open_name}</p>
-            </div>
-            <div>
-              <p className="text-xs text-brand-inactive-text mb-1">Troco inicial</p>
-              <p className="font-semibold text-brand-dark">{formatCurrency(details.totals.initial)}</p>
-            </div>
-
-            {!isOpen && (
-              <>
-                <div>
-                  <p className="text-xs text-brand-inactive-text mb-1">Operador de fechamento</p>
-                  <p className="font-semibold text-brand-dark">{details.operators.close_name || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-brand-inactive-text mb-1">Valor informado (contagem)</p>
-                  <p className="font-semibold text-brand-dark">
-                    {details.totals.informedDrawerTotal != null
-                      ? formatCurrency(details.totals.informedDrawerTotal)
-                      : "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-brand-inactive-text mb-1">Diferença do caixa</p>
-                  <p className="font-semibold text-brand-dark">
-                    {details.totals.difference != null ? formatCurrency(details.totals.difference) : "—"}
-                  </p>
-                </div>
-              </>
+        <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+          <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
+            {onBack && (
+              <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                  <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                </Button>
+              </div>
             )}
-
-            <div>
-              <p className="text-xs text-brand-inactive-text mb-1">Vendas (dinheiro no caixa)</p>
-              <p className="font-semibold text-brand-dark">{formatCurrency(details.totals.totalCashSales)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-brand-inactive-text mb-1">Sangrias</p>
-              <p className="font-semibold text-brand-dark">{formatCurrency(details.totals.totalWithdrawals)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-brand-inactive-text mb-1">Reforços</p>
-              <p className="font-semibold text-brand-dark">{formatCurrency(details.totals.totalDeposits)}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-brand-inactive-text mb-1">Saldo calculado (gaveta)</p>
-              <p className="font-semibold text-brand-dark">{formatCurrency(details.totals.calculatedDrawerTotal)}</p>
+            <div className="flex items-start justify-between mb-4 mt-4 xl:mt-0">
+              <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                  <span className="truncate">Caixa {session.id.slice(0, 8).toUpperCase()}</span>
+                  <Badge variant={isOpen ? "green" : "gray"} className="whitespace-nowrap scale-90 shrink-0">
+                    {isOpen ? "Aberto" : "Fechado"}
+                  </Badge>
+                </h1>
+                <div className={`text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden hidden md:block ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                  <div className="flex items-center gap-2">
+                    <span>Aberto em {formatLongDateTime(session.opened_at)}</span>
+                    <span className="text-brand-inactive-text dark:text-dark-body opacity-50">•</span>
+                    <span>Por <strong className="font-semibold text-brand-dark dark:text-dark-heading">{details.operators.open_name}</strong></span>
+                  </div>
+                </div>
+              </div>
+              {onBack && (
+                <div className="xl:hidden flex items-center gap-3 shrink-0 ml-3">
+                  <Button variant="outline" className="h-[42px] px-6" onClick={onBack}>Voltar</Button>
+                </div>
+              )}
             </div>
           </div>
+        </div>
 
-          <div className="flex flex-wrap gap-4 text-sm">
-            <button
-              type="button"
-              className="text-brand-primary font-medium hover:underline"
-              onClick={() => notifyError("Reimpressão em breve.")}
-            >
-              {isOpen ? "reimprimir cupom de abertura" : "reimprimir cupom de fechamento"}
+        <div className="max-w-[1400px] mx-auto p-4 md:p-8 pt-6">
+
+          <div className="flex flex-wrap items-end gap-6 border-b border-brand-border mb-6">
+            <button type="button" className={tabClass("geral")} onClick={() => setTab("geral")}>
+              dados gerais
             </button>
-            <Link href="/erp/transactions" className="text-brand-primary font-medium hover:underline">
-              ver relatório de movimentação do caixa
-            </Link>
+            <button type="button" className={tabClass("mov")} onClick={() => setTab("mov")}>
+              sangrias e reforços
+              <span className="ml-1 text-xs font-normal text-brand-inactive-text">
+                {String(sangriasReforcos.length).padStart(2, "0")}
+              </span>
+            </button>
+            <button type="button" className={tabClass("dev")} onClick={() => setTab("dev")}>
+              devoluções
+            </button>
           </div>
 
-          <div>
-            <h2 className="text-sm font-bold text-brand-dark mb-2">Resumo por forma de recebimento</h2>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Forma de recebimento</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  {!isOpen && <TableHead className="text-right">Valor informado</TableHead>}
-                  {!isOpen && <TableHead className="text-right">Diferença</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(details.summaryByPaymentMethod || []).map((row) => (
-                  <TableRow key={row.paymentMethodId || row.label}>
-                    <TableCell>{row.label}</TableCell>
-                    <TableCell className="text-right font-medium">{formatCurrency(row.calculated)}</TableCell>
-                    {!isOpen && (
-                      <TableCell className="text-right">
-                        {row.counted != null ? formatCurrency(row.counted) : "—"}
-                      </TableCell>
-                    )}
-                    {!isOpen && (
-                      <TableCell className="text-right">
-                        {row.difference != null ? formatCurrency(row.difference) : "—"}
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-                {(details.summaryByPaymentMethod || []).length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={isOpen ? 2 : 4} className="text-brand-inactive-text text-sm">
-                      Sem vendas em dinheiro nesta sessão.
-                    </TableCell>
-                  </TableRow>
+          {tab === "geral" && (
+            <div className="space-y-6">
+              <div className="flex flex-wrap items-center gap-3">
+                <span
+                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${isOpen ? "bg-emerald-50 text-emerald-900" : "bg-rose-50 text-rose-900"
+                    }`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${isOpen ? "bg-emerald-600" : "bg-rose-600"}`} />
+                  {isOpen ? "caixa aberto" : "caixa fechado"}
+                </span>
+                <span className="text-sm text-brand-inactive-text">
+                  {isOpen
+                    ? `Caixa aberto em ${formatLongDateTime(session.opened_at)}`
+                    : session.closed_at
+                      ? `Caixa fechado em ${formatLongDateTime(session.closed_at)}`
+                      : ""}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
+                <div>
+                  <p className="text-xs text-brand-inactive-text mb-1">Abertura</p>
+                  <p className="font-semibold text-brand-dark">{formatLongDateTime(session.opened_at)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-brand-inactive-text mb-1">Operador de abertura</p>
+                  <p className="font-semibold text-brand-dark">{details.operators.open_name}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-brand-inactive-text mb-1">Troco inicial</p>
+                  <p className="font-semibold text-brand-dark">{formatCurrency(details.totals.initial)}</p>
+                </div>
+
+                {!isOpen && (
+                  <>
+                    <div>
+                      <p className="text-xs text-brand-inactive-text mb-1">Operador de fechamento</p>
+                      <p className="font-semibold text-brand-dark">{details.operators.close_name || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-brand-inactive-text mb-1">Valor informado (contagem)</p>
+                      <p className="font-semibold text-brand-dark">
+                        {details.totals.informedDrawerTotal != null
+                          ? formatCurrency(details.totals.informedDrawerTotal)
+                          : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-brand-inactive-text mb-1">Diferença do caixa</p>
+                      <p className="font-semibold text-brand-dark">
+                        {details.totals.difference != null ? formatCurrency(details.totals.difference) : "—"}
+                      </p>
+                    </div>
+                  </>
                 )}
-                <TableRow>
-                  <TableCell className="font-bold">Total</TableCell>
-                  <TableCell className="text-right font-bold">
-                    {formatCurrency(
-                      (details.summaryByPaymentMethod || []).reduce((a, r) => a + r.calculated, 0),
+
+                <div>
+                  <p className="text-xs text-brand-inactive-text mb-1">Vendas (dinheiro no caixa)</p>
+                  <p className="font-semibold text-brand-dark">{formatCurrency(details.totals.totalCashSales)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-brand-inactive-text mb-1">Sangrias</p>
+                  <p className="font-semibold text-brand-dark">{formatCurrency(details.totals.totalWithdrawals)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-brand-inactive-text mb-1">Reforços</p>
+                  <p className="font-semibold text-brand-dark">{formatCurrency(details.totals.totalDeposits)}</p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-brand-inactive-text mb-1">Saldo calculado (gaveta)</p>
+                  <p className="font-semibold text-brand-dark">{formatCurrency(details.totals.calculatedDrawerTotal)}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-4 text-sm">
+                <button
+                  type="button"
+                  className="text-brand-primary font-medium hover:underline"
+                  onClick={() => notifyError("Reimpressão em breve.")}
+                >
+                  {isOpen ? "reimprimir cupom de abertura" : "reimprimir cupom de fechamento"}
+                </button>
+                <Link href="/erp/transactions" className="text-brand-primary font-medium hover:underline">
+                  ver relatório de movimentação do caixa
+                </Link>
+              </div>
+
+              <div>
+                <h2 className="text-sm font-bold text-brand-dark mb-2">Resumo por forma de recebimento</h2>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Forma de recebimento</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                      {!isOpen && <TableHead className="text-right">Valor informado</TableHead>}
+                      {!isOpen && <TableHead className="text-right">Diferença</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(details.summaryByPaymentMethod || []).map((row) => (
+                      <TableRow key={row.paymentMethodId || row.label}>
+                        <TableCell>{row.label}</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(row.calculated)}</TableCell>
+                        {!isOpen && (
+                          <TableCell className="text-right">
+                            {row.counted != null ? formatCurrency(row.counted) : "—"}
+                          </TableCell>
+                        )}
+                        {!isOpen && (
+                          <TableCell className="text-right">
+                            {row.difference != null ? formatCurrency(row.difference) : "—"}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                    {(details.summaryByPaymentMethod || []).length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={isOpen ? 2 : 4} className="text-brand-inactive-text text-sm">
+                          Sem vendas em dinheiro nesta sessão.
+                        </TableCell>
+                      </TableRow>
                     )}
-                  </TableCell>
-                  {!isOpen && (
-                    <TableCell className="text-right font-bold">
-                      {(details.summaryByPaymentMethod || []).some((r) => r.counted != null)
-                        ? formatCurrency(
-                            (details.summaryByPaymentMethod || []).reduce(
-                              (a, r) => a + (r.counted != null ? r.counted : 0),
-                              0,
-                            ),
-                          )
-                        : "—"}
-                    </TableCell>
-                  )}
-                  {!isOpen && (
-                    <TableCell className="text-right font-bold">
-                      {(details.summaryByPaymentMethod || []).some((r) => r.difference != null)
-                        ? formatCurrency(
-                            (details.summaryByPaymentMethod || []).reduce(
-                              (a, r) => a + (r.difference != null ? r.difference : 0),
-                              0,
-                            ),
-                          )
-                        : "—"}
-                    </TableCell>
-                  )}
-                </TableRow>
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      )}
-
-      {tab === "mov" && (
-        <div className="space-y-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10" />
-                <TableHead>Tipo</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Data</TableHead>
-                <TableHead>Responsável</TableHead>
-                <TableHead>Observação</TableHead>
-                <TableHead className="text-right">Valor</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sangriasReforcos.map((m) => {
-                const reversed = !!m.reversed_at
-                return (
-                  <TableRow key={m.id}>
-                    <TableCell>
-                      {!reversed && isOpen && (m.type === "withdrawal" || m.type === "deposit") ? (
-                        <Dropdown
-                          trigger={
-                            <button
-                              type="button"
-                              className="p-1 rounded-md border border-brand-border text-brand-dark"
-                              aria-label="Ações"
-                            >
-                              <ThreeDotsIcon size={16} />
-                            </button>
-                          }
-                          showChevron={false}
-                          width="w-44"
-                        >
-                          <DropdownItem onClick={() => handleReverse(m.id)}>Estornar (cancelar)</DropdownItem>
-                        </Dropdown>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={m.type === "deposit" ? "green" : "red"}>
-                        {m.type === "deposit" ? "reforço" : "sangria"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium">
-                        <span className={`h-2 w-2 rounded-full ${reversed ? "bg-gray-400" : "bg-emerald-600"}`} />
-                        {reversed ? "estornado" : "lançado"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-sm">{formatShortDateTime(m.created_at)}</TableCell>
-                    <TableCell className="text-sm max-w-[140px] truncate">{m.creator_name || "—"}</TableCell>
-                    <TableCell className="text-sm max-w-[200px] truncate">{m.description}</TableCell>
-                    <TableCell className="text-right font-semibold">{formatCurrency(Number(m.amount || 0))}</TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-          {sangriasReforcos.length === 0 && (
-            <p className="text-sm text-brand-inactive-text">Nenhuma sangria ou reforço registrado.</p>
-          )}
-
-          {isOpen && (
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => setMovModal("withdrawal")}>
-                + lançar nova sangria
-              </Button>
-              <Button variant="outline" onClick={() => setMovModal("deposit")}>
-                + lançar novo reforço
-              </Button>
+                    <TableRow>
+                      <TableCell className="font-bold">Total</TableCell>
+                      <TableCell className="text-right font-bold">
+                        {formatCurrency(
+                          (details.summaryByPaymentMethod || []).reduce((a, r) => a + r.calculated, 0),
+                        )}
+                      </TableCell>
+                      {!isOpen && (
+                        <TableCell className="text-right font-bold">
+                          {(details.summaryByPaymentMethod || []).some((r) => r.counted != null)
+                            ? formatCurrency(
+                              (details.summaryByPaymentMethod || []).reduce(
+                                (a, r) => a + (r.counted != null ? r.counted : 0),
+                                0,
+                              ),
+                            )
+                            : "—"}
+                        </TableCell>
+                      )}
+                      {!isOpen && (
+                        <TableCell className="text-right font-bold">
+                          {(details.summaryByPaymentMethod || []).some((r) => r.difference != null)
+                            ? formatCurrency(
+                              (details.summaryByPaymentMethod || []).reduce(
+                                (a, r) => a + (r.difference != null ? r.difference : 0),
+                                0,
+                              ),
+                            )
+                            : "—"}
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           )}
-        </div>
-      )}
 
-      {tab === "dev" && (
-        <p className="text-sm text-brand-inactive-text">Módulo de devoluções será integrado em seguida.</p>
-      )}
+          {tab === "mov" && (
+            <div className="space-y-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10" />
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Responsável</TableHead>
+                    <TableHead>Observação</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sangriasReforcos.map((m) => {
+                    const reversed = !!m.reversed_at
+                    return (
+                      <TableRow key={m.id}>
+                        <TableCell>
+                          {!reversed && isOpen && (m.type === "withdrawal" || m.type === "deposit") ? (
+                            <Dropdown
+                              trigger={
+                                <button
+                                  type="button"
+                                  className="p-1 rounded-md border border-brand-border text-brand-dark"
+                                  aria-label="Ações"
+                                >
+                                  <ThreeDotsIcon size={16} />
+                                </button>
+                              }
+                              showChevron={false}
+                              width="w-44"
+                            >
+                              <DropdownItem onClick={() => handleReverse(m.id)}>Estornar (cancelar)</DropdownItem>
+                            </Dropdown>
+                          ) : null}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={m.type === "deposit" ? "green" : "red"}>
+                            {m.type === "deposit" ? "reforço" : "sangria"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center gap-1.5 text-xs font-medium">
+                            <span className={`h-2 w-2 rounded-full ${reversed ? "bg-gray-400" : "bg-emerald-600"}`} />
+                            {reversed ? "estornado" : "lançado"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-sm">{formatShortDateTime(m.created_at)}</TableCell>
+                        <TableCell className="text-sm max-w-[140px] truncate">{m.creator_name || "—"}</TableCell>
+                        <TableCell className="text-sm max-w-[200px] truncate">{m.description}</TableCell>
+                        <TableCell className="text-right font-semibold">{formatCurrency(Number(m.amount || 0))}</TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+              {sangriasReforcos.length === 0 && (
+                <p className="text-sm text-brand-inactive-text">Nenhuma sangria ou reforço registrado.</p>
+              )}
+
+              {isOpen && (
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={() => setMovModal("withdrawal")}>
+                    + lançar nova sangria
+                  </Button>
+                  <Button variant="outline" onClick={() => setMovModal("deposit")}>
+                    + lançar novo reforço
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === "dev" && (
+            <p className="text-sm text-brand-inactive-text mb-20">Módulo de devoluções será integrado em seguida.</p>
+          )}
+
+        </div>
+      </div>
 
       {isOpen && (
         <div className="fixed bottom-6 left-6 z-20">
