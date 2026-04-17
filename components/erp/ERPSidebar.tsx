@@ -148,7 +148,6 @@ export function ERPSidebar() {
     const sellsProducts = businessInfo.sells?.includes("products") ?? true
     const sellsServices = businessInfo.sells?.includes("services") ?? false
     const sellsOnline = businessInfo.channels?.includes("online") ?? true
-    const sellsPdv = businessInfo.channels?.includes("pdv") ?? false
 
     const [isMounted, setIsMounted] = useState(false)
     const [openSubmenu, setOpenSubmenu] = useState<string | null>(null)
@@ -185,14 +184,6 @@ export function ERPSidebar() {
                 // Clone item to avoid mutating the original navItems
                 const newItem = { ...item };
 
-                // Submenu business rules filtering
-                if (newItem.submenu) {
-                    newItem.submenu = newItem.submenu.filter((sub) => {
-                        if (sub.href === "/erp/pos" && !sellsPdv) return false;
-                        return true;
-                    });
-                }
-
                 // Direct link item (no submenu) - check access
                 if (newItem.href && !newItem.submenu) {
                     return canAccess(newItem.href) ? newItem : null
@@ -208,7 +199,7 @@ export function ERPSidebar() {
                 return newItem
             })
             .filter((item): item is NavItem => item !== null)
-    }, [canAccess, sellsProducts, sellsServices, sellsOnline, sellsPdv])
+    }, [canAccess, sellsProducts, sellsServices, sellsOnline])
 
     useEffect(() => {
         setIsMounted(true)

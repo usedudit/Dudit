@@ -14,8 +14,9 @@ export default async function POSPageServer() {
   if (!context) return <AccessDenied />
 
   const partnerId = context.partnerId
+  // PDV: qualquer membro da equipe com acesso ao ERP pode usar (não exige orders.create).
   const [{ allowed }, initialDataResult, activeSessionResult] = await Promise.all([
-    checkPartnerPermission(partnerId, "orders", "create"),
+    checkPartnerPermission(partnerId, "orders", "view"),
     getPOSInitialDataAction(partnerId),
     getActiveCashSessionAction(partnerId),
   ])

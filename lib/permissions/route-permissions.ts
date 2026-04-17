@@ -397,7 +397,8 @@ const VIEWER_PERMISSIONS: PartnerRoutePermissions = {
     returns: viewOnly,
     logistics: viewOnly,
     invoices: viewOnly,
-    pos: noAccess,
+    // PDV visível para qualquer perfil com acesso a pedidos (operação no caixa não exige papel de editor).
+    pos: viewOnly,
     quotes: viewOnly,
     products: viewOnly,
     stock_movements: viewOnly,
