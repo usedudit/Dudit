@@ -39,7 +39,7 @@ function isMovementActive(row: { reversed_at?: string | null }) {
 }
 
 /** Cash drawer balance: initial + cash sales + deposits − withdrawals − refunds (active movements only). */
-export function computeDrawerBalanceCents(params: {
+function computeDrawerBalanceCents(params: {
   initialAmount: number
   movements: Array<{
     type: string
@@ -94,7 +94,7 @@ async function loadMovementsForSession(
   if (error) throw new Error(error.message)
 
   const pmIds = Array.from(
-    new Set((movements || []).map((m: { payment_method_id: string | null }) => m.payment_method_id).filter(Boolean),
+    new Set((movements || []).map((m: { payment_method_id: string | null }) => m.payment_method_id).filter(Boolean))
   ) as string[]
 
   const pmMap = new Map<string, { name: string; type: string }>()

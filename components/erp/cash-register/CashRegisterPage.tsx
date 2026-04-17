@@ -115,7 +115,7 @@ export default function CashRegisterPage({
     } else {
       for (const row of rows) {
         const key = row.paymentMethodId || "__none__"
-        init[key] = String(Number(row.calculated ?? row.total ?? 0).toFixed(2))
+        init[key] = String(Number(row.calculated ?? 0).toFixed(2))
       }
     }
     setCountedByPm(init)
@@ -289,7 +289,7 @@ export default function CashRegisterPage({
                     <MoneyInput
                       key={key}
                       label={`Contado — ${row.label}`}
-                      value={Number(countedByPm[key] ?? row.calculated ?? row.total ?? 0)}
+                      value={Number(countedByPm[key] ?? row.calculated ?? 0)}
                       onChange={(v) => setCountedByPm((prev) => ({ ...prev, [key]: String(v) }))}
                     />
                   )
