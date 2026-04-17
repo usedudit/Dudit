@@ -634,7 +634,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                     </div>
 
                     {/* --- 2. ORDER SETTINGS --- */}
-                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 flex flex-col gap-6">
+                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 flex flex-col gap-6 mt-6">
                         <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight">Configurações do Pedido</h3>
 
                         <div className="space-y-4">

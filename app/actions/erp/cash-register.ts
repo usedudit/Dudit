@@ -13,9 +13,30 @@ export type CountedPaymentMethodEntry = {
   amount: number
 }
 
+type CashMovementFallbackInput = {
+  partnerId: string
+  cashSessionId: string
+  type: "withdrawal" | "deposit"
+  description: string
+  amount: number
+  cashFinanceAccountId: string
+  userId: string
+}
+
 function money(value: number) {
   if (!Number.isFinite(value)) return 0
   return Math.round(value * 100) / 100
+}
+
+function normalizeCashMovementDescription(type: "withdrawal" | "deposit", description?: string | null) {
+  const trimmed = String(description || "").trim()
+  if (trimmed) return trimmed.slice(0, 2000)
+  return type === "withdrawal" ? "Sangria de caixa" : "Reforço de caixa"
+}
+
+function shouldFallbackCashMovementRpc(errorMessage?: string | null) {
+  const message = String(errorMessage || "").toLowerCase()
+  return message.includes("payment_date") && message.includes("timestamp with time zone") && message.includes("text")
 }
 
 async function resolveDefaultCashFinanceAccountId(
@@ -105,7 +126,7 @@ async function loadMovementsForSession(
       .eq("partner_id", partnerId)
       .in("id", pmIds)
     for (const row of methods || []) {
-      pmMap.set(row.id, { name: row.name || "—", type: row.type || "other" })
+      pmMap.set(row.id, { name: row.name || "-", type: row.type || "other" })
     }
   }
 
@@ -135,6 +156,242 @@ async function getOpenSessionForUser(
   return data
 }
 
+async function createCashMovementFallback(
+  supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+  input: CashMovementFallbackInput,
+) {
+  const nowIso = new Date().toISOString()
+  const { data: session, error: sessionError } = await supabase
+    .from("cash_sessions")
+    .select("*")
+    .eq("id", input.cashSessionId)
+    .eq("partner_id", input.partnerId)
+    .single()
+
+  if (sessionError || !session) {
+    return { success: false as const, error: sessionError?.message || "Sessão de caixa não encontrada." }
+  }
+
+  if (session.status !== "open") {
+    return { success: false as const, error: "O caixa não está aberto." }
+  }
+
+  if (input.type === "withdrawal") {
+    const existingMovements = await loadMovementsForSession(supabase, input.partnerId, input.cashSessionId)
+    const drawer = computeDrawerBalanceCents({
+      initialAmount: Number(session.initial_amount ?? session.opening_balance ?? 0),
+      movements: existingMovements as any[],
+    })
+    if (drawer.total + 0.0001 < input.amount) {
+      return { success: false as const, error: "Saldo em dinheiro insuficiente para esta sangria." }
+    }
+  }
+
+  const { data: movement, error: movementError } = await supabase
+    .from("cash_movements")
+    .insert({
+      partner_id: input.partnerId,
+      cash_session_id: input.cashSessionId,
+      type: input.type,
+      description: input.description,
+      payment_method_id: null,
+      amount: input.amount,
+      reference_id: null,
+      created_by_user_id: input.userId,
+    })
+    .select("*")
+    .single()
+
+  if (movementError || !movement) {
+    return { success: false as const, error: movementError?.message || "Falha ao registrar movimentação." }
+  }
+
+  const transactionType = input.type === "withdrawal" ? "expense" : "income"
+  const transactionNote =
+    input.type === "withdrawal" ? "Sangria de caixa registrada no PDV." : "Reforço de caixa registrado no PDV."
+
+  const { data: transaction, error: transactionError } = await supabase
+    .from("transactions")
+    .insert({
+      partner_id: input.partnerId,
+      description: input.type === "withdrawal" ? "Sangria de caixa" : "Reforço de caixa",
+      category: "Caixa PDV",
+      contact_id: null,
+      contact_type: null,
+      amount: input.amount,
+      due_date: null,
+      payment_date: nowIso,
+      transaction_date: nowIso,
+      status: "paid",
+      notes: transactionNote,
+      payment_type: "Caixa",
+      original_amount: input.amount,
+      interest_amount: null,
+      fee_amount: 0,
+      transaction_type: transactionType,
+      origin: "system",
+      reference_note: `cash_mv:${movement.id}`,
+      account_id: input.cashFinanceAccountId,
+      payment_method_id: null,
+      created_by_user_id: input.userId,
+    })
+    .select("id")
+    .single()
+
+  if (transactionError || !transaction) {
+    await supabase.from("cash_movements").delete().eq("id", movement.id)
+    return { success: false as const, error: transactionError?.message || "Falha ao registrar transação financeira." }
+  }
+
+  const { error: linkError } = await supabase
+    .from("cash_movements")
+    .update({ financial_transaction_id: transaction.id })
+    .eq("id", movement.id)
+
+  if (linkError) {
+    return { success: false as const, error: linkError.message }
+  }
+
+  const delta = transactionType === "income" ? input.amount : -input.amount
+  const { error: balanceError } = await supabase.rpc("apply_account_balance_delta", {
+    p_account_id: input.cashFinanceAccountId,
+    p_partner_id: input.partnerId,
+    p_delta: delta,
+  })
+
+  if (balanceError) {
+    return { success: false as const, error: balanceError.message || "Falha ao atualizar saldo da conta." }
+  }
+
+  return {
+    success: true as const,
+    data: {
+      ...movement,
+      financial_transaction_id: transaction.id,
+    },
+  }
+}
+
+async function reverseCashMovementFallback(
+  supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+  input: { partnerId: string; movementId: string; userId: string },
+) {
+  const nowIso = new Date().toISOString()
+  const { data: movement, error: movementError } = await supabase
+    .from("cash_movements")
+    .select("*")
+    .eq("id", input.movementId)
+    .eq("partner_id", input.partnerId)
+    .single()
+
+  if (movementError || !movement) {
+    return { success: false as const, error: movementError?.message || "Movimentação não encontrada." }
+  }
+
+  if (!["withdrawal", "deposit"].includes(String(movement.type))) {
+    return { success: false as const, error: "Somente sangrias e reforços podem ser estornados." }
+  }
+
+  if (movement.reversed_at) {
+    return { success: false as const, error: "Esta movimentação já foi estornada." }
+  }
+
+  const { data: session, error: sessionError } = await supabase
+    .from("cash_sessions")
+    .select("id, status")
+    .eq("id", movement.cash_session_id)
+    .eq("partner_id", input.partnerId)
+    .single()
+
+  if (sessionError || !session) {
+    return { success: false as const, error: sessionError?.message || "Sessão de caixa não encontrada." }
+  }
+
+  if (session.status !== "open") {
+    return { success: false as const, error: "O caixa não está aberto." }
+  }
+
+  const { data: originalTransaction, error: originalTransactionError } = movement.financial_transaction_id
+    ? await supabase
+      .from("transactions")
+      .select("id, account_id")
+      .eq("id", movement.financial_transaction_id)
+      .eq("partner_id", input.partnerId)
+      .single()
+    : { data: null, error: null }
+
+  if (originalTransactionError || !originalTransaction?.account_id) {
+    return { success: false as const, error: originalTransactionError?.message || "Conta financeira da movimentação não encontrada." }
+  }
+
+  const amount = money(Number(movement.amount || 0))
+  const reverseTransactionType = movement.type === "withdrawal" ? "income" : "expense"
+  const reverseNotes = movement.type === "withdrawal" ? "Estorno de sangria registrada no PDV." : "Estorno de reforço registrado no PDV."
+
+  const { data: reversalTransaction, error: reversalError } = await supabase
+    .from("transactions")
+    .insert({
+      partner_id: input.partnerId,
+      description: movement.type === "withdrawal" ? "Estorno de sangria" : "Estorno de reforço",
+      category: "Caixa PDV",
+      contact_id: null,
+      contact_type: null,
+      amount,
+      due_date: null,
+      payment_date: nowIso,
+      transaction_date: nowIso,
+      status: "paid",
+      notes: reverseNotes,
+      payment_type: "Caixa",
+      original_amount: amount,
+      interest_amount: null,
+      fee_amount: 0,
+      transaction_type: reverseTransactionType,
+      origin: "system",
+      reference_note: `cash_mv_rev:${movement.id}`,
+      account_id: originalTransaction.account_id,
+      payment_method_id: null,
+      created_by_user_id: input.userId,
+    })
+    .select("id")
+    .single()
+
+  if (reversalError || !reversalTransaction) {
+    return { success: false as const, error: reversalError?.message || "Falha ao registrar estorno financeiro." }
+  }
+
+  const { error: reverseUpdateError } = await supabase
+    .from("cash_movements")
+    .update({
+      reversed_at: nowIso,
+      reversed_by_user_id: input.userId,
+    })
+    .eq("id", movement.id)
+
+  if (reverseUpdateError) {
+    return { success: false as const, error: reverseUpdateError.message }
+  }
+
+  const delta = reverseTransactionType === "income" ? amount : -amount
+  const { error: balanceError } = await supabase.rpc("apply_account_balance_delta", {
+    p_account_id: originalTransaction.account_id,
+    p_partner_id: input.partnerId,
+    p_delta: delta,
+  })
+
+  if (balanceError) {
+    return { success: false as const, error: balanceError.message || "Falha ao atualizar saldo da conta." }
+  }
+
+  return {
+    success: true as const,
+    data: {
+      movement_id: movement.id,
+      reversal_transaction_id: reversalTransaction.id,
+    },
+  }
+}
+
 export async function getActiveCashSessionAction(partnerId: string) {
   const user = await requireUser()
   await requirePartnerAccess(partnerId)
@@ -145,7 +402,7 @@ export async function getActiveCashSessionAction(partnerId: string) {
 
 export async function openCashSessionAction(input: {
   partnerId: string
-  /** Troco inicial / fundo de caixa — valor de controle (não gera lançamento financeiro). */
+  /** Troco inicial / fundo de caixa - valor de controle (não gera lançamento financeiro). */
   initialAmount: number
   notes?: string
 }) {
@@ -230,24 +487,22 @@ export async function createCashMovementAction(input: {
       .eq("partner_id", input.partnerId)
       .maybeSingle()
     if (!s?.id || s.status !== "open") {
-      return { success: false as const, error: "Sessão inválida ou caixa fechado." }
+      return { success: false as const, error: "SessÃ£o invÃ¡lida ou caixa fechado." }
     }
   }
 
-  if (!sessionId) return { success: false as const, error: "Não existe caixa aberto para esta operação." }
+  if (!sessionId) return { success: false as const, error: "NÃ£o existe caixa aberto para esta operaÃ§Ã£o." }
 
   const rawAmount = Number(input.amount || 0)
   if (!Number.isFinite(rawAmount) || !(rawAmount > 0)) {
     return { success: false as const, error: "Informe um valor maior que zero." }
   }
-  if (!String(input.description || "").trim()) {
-    return { success: false as const, error: "Descrição é obrigatória." }
-  }
+  const normalizedDescription = normalizeCashMovementDescription(input.type, input.description)
 
   const cashAccountId =
     input.cashFinanceAccountId?.trim() || (await resolveDefaultCashFinanceAccountId(supabase, input.partnerId))
   if (!cashAccountId) {
-    return { success: false as const, error: "Cadastre uma conta financeira do tipo caixa para registrar sangrias e reforços." }
+    return { success: false as const, error: "Cadastre uma conta financeira do tipo caixa para registrar sangrias e reforÃ§os." }
   }
 
   const { data: rpcData, error: rpcError } = await supabase.rpc("erp_create_cash_manual_movement", {
@@ -255,23 +510,55 @@ export async function createCashMovementAction(input: {
     p_cash_session_id: sessionId,
     p_movement_type: input.type,
     p_amount: money(rawAmount),
-    p_description: input.description.trim(),
+    p_description: normalizedDescription,
     p_cash_account_id: cashAccountId,
   })
 
   if (rpcError) {
-    return { success: false as const, error: rpcError.message || "Falha ao registrar movimentação." }
+    if (!shouldFallbackCashMovementRpc(rpcError.message)) {
+      return { success: false as const, error: rpcError.message || "Falha ao registrar movimentaÃ§Ã£o." }
+    }
+
+    const fallbackResult = await createCashMovementFallback(supabase, {
+      partnerId: input.partnerId,
+      cashSessionId: sessionId,
+      type: input.type,
+      description: normalizedDescription,
+      amount: money(rawAmount),
+      cashFinanceAccountId: cashAccountId,
+      userId: user.id,
+    })
+
+    if (!fallbackResult.success) return fallbackResult
+
+    const fallbackMovementId = (fallbackResult.data as any)?.id as string | undefined
+    const fallbackTypeLabel = input.type === "withdrawal" ? "Sangria" : "ReforÃ§o"
+    await logAuditEvent({
+      partnerId: input.partnerId,
+      actorUserId: user.id,
+      entityType: "cash_session",
+      entityId: sessionId,
+      actionType: input.type === "withdrawal" ? "withdrawal_created" : "deposit_created",
+      changeLines: [`registrou ${fallbackTypeLabel.toLowerCase()} de R$ ${money(rawAmount).toFixed(2)} - ${normalizedDescription}`],
+      metadata: fallbackMovementId ? { movement_id: fallbackMovementId } : null,
+      source: "manual",
+    })
+    await revalidateEntityTimeline("cash_session", sessionId)
+    revalidatePath("/erp/cash-register")
+    revalidatePath("/erp/transactions")
+
+    return fallbackResult
   }
 
   const movementId = (rpcData as any)?.movement_id as string | undefined
-  const typeLabel = input.type === "withdrawal" ? "Sangria" : "Reforço"
+  const typeLabel = input.type === "withdrawal" ? "Sangria" : "ReforÃ§o"
   await logAuditEvent({
     partnerId: input.partnerId,
     actorUserId: user.id,
     entityType: "cash_session",
     entityId: sessionId,
     actionType: input.type === "withdrawal" ? "withdrawal_created" : "deposit_created",
-    changeLines: [`registrou ${typeLabel.toLowerCase()} de R$ ${money(rawAmount).toFixed(2)} — ${input.description.trim()}`],
+    changeLines: [`registrou ${typeLabel.toLowerCase()} de R$ ${money(rawAmount).toFixed(2)} - ${normalizedDescription}`],
     metadata: movementId ? { movement_id: movementId } : null,
     source: "manual",
   })
@@ -306,7 +593,42 @@ export async function reverseCashMovementAction(input: {
   })
 
   if (rpcError) {
-    return { success: false as const, error: rpcError.message || "Não foi possível estornar a movimentação." }
+    if (!shouldFallbackCashMovementRpc(rpcError.message)) {
+      return { success: false as const, error: rpcError.message || "NÃ£o foi possÃ­vel estornar a movimentaÃ§Ã£o." }
+    }
+
+    const fallbackResult = await reverseCashMovementFallback(supabase, {
+      partnerId: input.partnerId,
+      movementId: input.movementId,
+      userId: user.id,
+    })
+    if (!fallbackResult.success) return fallbackResult
+
+    const { data: fallbackMovement } = await supabase
+      .from("cash_movements")
+      .select("cash_session_id, description, amount, type")
+      .eq("id", input.movementId)
+      .maybeSingle()
+
+    if (fallbackMovement?.cash_session_id) {
+      await logAuditEvent({
+        partnerId: input.partnerId,
+        actorUserId: user.id,
+        entityType: "cash_session",
+        entityId: fallbackMovement.cash_session_id,
+        actionType: "movement_reversed",
+        changeLines: [
+          `estornou ${fallbackMovement.type === "withdrawal" ? "sangria" : "reforÃ§o"} de R$ ${money(Number(fallbackMovement.amount || 0)).toFixed(2)} - ${String(fallbackMovement.description || "").slice(0, 120)}`,
+        ],
+        source: "manual",
+      })
+      await revalidateEntityTimeline("cash_session", fallbackMovement.cash_session_id)
+    }
+
+    revalidatePath("/erp/cash-register")
+    revalidatePath("/erp/transactions")
+
+    return fallbackResult
   }
 
   const { data: movement } = await supabase
@@ -323,7 +645,7 @@ export async function reverseCashMovementAction(input: {
       entityId: movement.cash_session_id,
       actionType: "movement_reversed",
       changeLines: [
-        `estornou ${movement.type === "withdrawal" ? "sangria" : "reforço"} de R$ ${money(Number(movement.amount || 0)).toFixed(2)} — ${String(movement.description || "").slice(0, 120)}`,
+        `estornou ${movement.type === "withdrawal" ? "sangria" : "reforÃ§o"} de R$ ${money(Number(movement.amount || 0)).toFixed(2)} - ${String(movement.description || "").slice(0, 120)}`,
       ],
       source: "manual",
     })
@@ -482,7 +804,7 @@ export async function getCashSessionsHistoryAction(partnerId: string) {
 
   const { data: sessions, error: sessionError } = await supabase
     .from("cash_sessions")
-    .select("id, opened_by_user_id, opened_at, closed_at, initial_amount, closing_amount, calculated_amount, difference_amount, status, notes, created_at")
+    .select("id, opened_by_user_id, closed_by_user_id, opened_at, closed_at, initial_amount, closing_amount, calculated_amount, difference_amount, status, notes, created_at")
     .eq("partner_id", partnerId)
     .order("opened_at", { ascending: false })
     .limit(400)
@@ -500,7 +822,7 @@ export async function getCashSessionsHistoryAction(partnerId: string) {
   const userIds = Array.from(
     new Set(
       (sessions || [])
-        .map((s: any) => s.opened_by_user_id)
+        .flatMap((s: any) => [s.opened_by_user_id, s.closed_by_user_id])
         .filter(Boolean),
     ),
   ) as string[]
@@ -544,6 +866,8 @@ export async function getCashSessionsHistoryAction(partnerId: string) {
       initial_amount: initial,
       closing_amount: s.closing_amount ?? null,
       user_name: userMap.get(s.opened_by_user_id) || "Usuário",
+      opened_by_name: userMap.get(s.opened_by_user_id) || "Usuário",
+      closed_by_name: s.closed_by_user_id ? userMap.get(s.closed_by_user_id) || "Usuário" : null,
       drawer_movement_net: drawerDelta,
       expected_drawer_total: money(initial + drawerDelta),
     }
@@ -632,8 +956,8 @@ export async function getCashSessionDetailsAction(partnerId: string, cashSession
 
   const enrichedMovements = (movements || []).map((m: any) => ({
     ...m,
-    creator_name: m.created_by_user_id ? nameById.get(m.created_by_user_id) || "—" : "—",
-    reversed_by_name: m.reversed_by_user_id ? nameById.get(m.reversed_by_user_id) || "—" : null,
+    creator_name: m.created_by_user_id ? nameById.get(m.created_by_user_id) || "-" : "-",
+    reversed_by_name: m.reversed_by_user_id ? nameById.get(m.reversed_by_user_id) || "-" : null,
   }))
 
   const calculatedTotal =
@@ -657,8 +981,8 @@ export async function getCashSessionDetailsAction(partnerId: string, cashSession
       },
       movements: enrichedMovements,
       operators: {
-        open_name: nameById.get(session.opened_by_user_id || session.user_id) || "—",
-        close_name: session.closed_by_user_id ? nameById.get(session.closed_by_user_id) || "—" : null,
+        open_name: nameById.get(session.opened_by_user_id || session.user_id) || "-",
+        close_name: session.closed_by_user_id ? nameById.get(session.closed_by_user_id) || "-" : null,
       },
       drawer,
       summaryByPaymentMethod,

@@ -285,10 +285,10 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
   }
 
   if (!saleId) {
-    return { success: false as const, error: "Falha ao finalizar venda — nenhum ID retornado." }
+    return { success: false as const, error: "Falha ao finalizar venda - nenhum ID retornado." }
   }
 
-  // Invalidate caches (non-blocking — sale is already safely committed)
+  // Invalidate caches (non-blocking - sale is already safely committed)
   const draftItems = await supabase
     .from("sale_items")
     .select("product_id")

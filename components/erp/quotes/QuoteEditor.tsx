@@ -78,6 +78,7 @@ interface QuoteEditorProps {
     setFieldErrors?: React.Dispatch<React.SetStateAction<Set<string>>>;
     manualItemNameErrors?: Set<number>;
     manualItemPriceErrors?: Set<number>;
+    isLoadingItems?: boolean;
 }
 
 const QuoteEditor = (props: QuoteEditorProps) => {
@@ -128,7 +129,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
     }, [props.setIsProductSearchOpen]);
 
     return (
-        <div className="p-6 md:p-8 pt-4">
+        <div className="pt-4">
             <TabsContent value="Dados Gerais" className="mt-0 focus-visible:outline-none">
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
 
@@ -222,7 +223,11 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                         </div>
 
                         {/* --- ITEMS TABLE (Desktop) --- */}
-                        {props.quoteItems.length > 0 && (
+                        {props.isLoadingItems ? (
+                            <div className="flex items-center justify-center py-14">
+                                <ThreeDotsLoader />
+                            </div>
+                        ) : props.quoteItems.length > 0 && (
                             <div className="hidden md:block w-full overflow-x-auto pb-4 custom-scrollbar mb-4">
                                 <table className="w-full text-left border-separate border-spacing-0">
                                     <thead>
@@ -350,7 +355,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 </table>
                             </div>
                         )}
-                        {props.quoteItems.length > 0 && (
+                        {!props.isLoadingItems && props.quoteItems.length > 0 && (
                             <div className="block md:hidden space-y-2 mb-6">
                                 {paginatedItems.map((item, paginatedIndex) => {
                                     const index = (currentPage - 1) * ITEMS_PER_PAGE + paginatedIndex;
@@ -617,7 +622,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                             <IconPlaceholder
                                 icon={UserIcon}
                                 title={QUOTE_DEFAULT_CUSTOMER_LABEL}
-                                subtitle={props.isReadOnly ? "Nenhum cliente cadastrado vinculado; exibição usa o nome padrão." : "Sem cliente cadastrado — a proposta usa o nome padrão. Selecione um cliente para vincular dados de contato."}
+                                subtitle={props.isReadOnly ? "Nenhum cliente cadastrado vinculado; exibição usa o nome padrão." : "Sem cliente cadastrado - a proposta usa o nome padrão. Selecione um cliente para vincular dados de contato."}
                                 itemButton={!customerLocked ? {
                                     text: "Selecionar Cliente",
                                     action: () => props.setIsCustomerSheetOpen(true),

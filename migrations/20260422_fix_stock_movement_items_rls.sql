@@ -1,6 +1,6 @@
 -- ============================================================================
 -- Alinha RLS de stock_movement_items e stock_movements com o padrão ERP:
--- dono (partners.user_id) OU membro em partner_users — sem JWT partner_id.
+-- dono (partners.user_id) OU membro em partner_users - sem JWT partner_id.
 -- Permite SELECT de perfis (full_name) de colegas do mesmo parceiro.
 -- ============================================================================
 

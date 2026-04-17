@@ -82,11 +82,10 @@ export const Input: React.FC<FormInputProps> = ({
 }) => {
   const inputId = id || name || Math.random().toString(36).substring(7)
 
+  const isLocked = disabled || readOnly
+
   const borderRadiusClass =
     variant === "full-rounded" ? "rounded-full" : "rounded-lg"
-
-  const labelSpacingClass =
-    variant === "full-rounded" ? "" : "gap-2 mb-1.5"
 
   const baseInputClasses = `
     w-full h-[42px]
@@ -101,8 +100,7 @@ export const Input: React.FC<FormInputProps> = ({
     focus:border-brand-dark dark:focus:border-dark-body
     focus:bg-white dark:focus:bg-dark-surface
     transition-colors
-    disabled:bg-brand-gray dark:disabled:bg-dark-border/30
-    disabled:cursor-not-allowed
+    ${isLocked ? "cursor-not-allowed pointer-events-none opacity-80" : ""}
   `
 
   const paddingClasses = `
@@ -114,6 +112,7 @@ export const Input: React.FC<FormInputProps> = ({
   const handleFocus: React.FocusEventHandler<
     HTMLInputElement | HTMLTextAreaElement
   > = (event) => {
+    if (readOnly) return
     onFocus?.(event)
   }
 
@@ -149,14 +148,15 @@ export const Input: React.FC<FormInputProps> = ({
             onBlur={onBlur}
             onFocus={handleFocus}
             disabled={disabled}
+            readOnly={readOnly}
             required={required}
             maxLength={maxLength}
             inputMode={inputMode}
             onKeyDown={onKeyDown}
             autoFocus={autoFocus}
-            readOnly={readOnly}
             autoComplete={autoComplete}
             spellCheck={spellCheck}
+            tabIndex={readOnly ? -1 : 0}
             {...({ autoCorrect, autoCapitalize } as any)}
             rows={rows}
             className={`${baseInputClasses} px-4 py-2.5 resize-none`}
@@ -172,6 +172,7 @@ export const Input: React.FC<FormInputProps> = ({
             onBlur={onBlur}
             onFocus={handleFocus}
             disabled={disabled}
+            readOnly={readOnly}
             required={required}
             min={min}
             max={max}
@@ -182,9 +183,9 @@ export const Input: React.FC<FormInputProps> = ({
             inputMode={inputMode}
             onKeyDown={onKeyDown}
             autoFocus={autoFocus}
-            readOnly={readOnly}
             autoComplete={autoComplete}
             spellCheck={spellCheck}
+            tabIndex={readOnly ? -1 : 0}
             {...({ autoCorrect, autoCapitalize } as any)}
             className={`${baseInputClasses} ${paddingClasses}`}
           />

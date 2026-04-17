@@ -29,7 +29,7 @@ const CashSessionListItem = React.memo(
         selected,
         onSelect,
         onDetails,
-        showCheckbox = true,
+        showCheckbox = false,
     }: CashSessionListItemProps) => {
 
         const renderCellContent = (colId: string) => {

@@ -11,9 +11,10 @@ import {
     EditIcon,
     ThreeDotsIcon,
     TelegramIcon,
-    ClockIcon
+    ClockIcon,
+    CheckCircleIcon
 } from '@/lib/icons';
-import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, Tooltip, AlertModal, InfoCard } from '@/components/reusable';
+import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, Tooltip, AlertModal, InfoCard, DefaultModal, DropdownItem } from '@/components/reusable';
 import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction, convertQuoteToOrderAction, getQuoteHistoryAction } from '@/app/actions/erp/quotes';
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import { QuoteHistoryTab, type QuoteHistoryEntryRow } from "./QuoteHistoryTab"
@@ -40,7 +41,10 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [quote, setQuote] = useState<any>(initialQuote || null);
     const [loading, setLoading] = useState(!initialQuote);
+    const [isLoadingQuoteItems, setIsLoadingQuoteItems] = useState(Boolean(initialQuote));
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+    const [showStatusModal, setShowStatusModal] = useState(false);
+    const [pendingStatus, setPendingStatus] = useState(initialQuote?.status || 'draft');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showUnapprovedConvertModal, setShowUnapprovedConvertModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -62,15 +66,18 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
     // Fetch full details (with items) in background
     useEffect(() => {
         async function load() {
+            setIsLoadingQuoteItems(true);
             if (!initialQuote) setLoading(true);
             const res = await getQuoteDetailsAction(quoteId, partnerId);
             if (res.success) {
                 setQuote(res.data);
+                setPendingStatus(res.data.status || 'draft');
             } else if (!initialQuote) {
                 notifyError("Erro", res.error);
                 onBack();
             }
             setLoading(false);
+            setIsLoadingQuoteItems(false);
         }
         load();
     }, [quoteId, partnerId]);
@@ -148,15 +155,32 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
         void runConvert(false);
     };
 
-    const handleStatusChange = async (newStatus: any) => {
-        const res = await updateQuoteStatusAction({ quoteId, partnerId, status: newStatus });
+    const handleOpenStatusModal = () => {
+        if (quote?.converted) return;
+        setPendingStatus(quote?.status || 'draft');
+        setShowStatusModal(true);
+    };
+
+    const handleStatusChange = async (nextStatus?: string) => {
+        const statusToSave = nextStatus || pendingStatus;
+
+        if (!statusToSave || statusToSave === quote?.status) {
+            setShowStatusModal(false);
+            return;
+        }
+
+        setIsUpdatingStatus(true);
+        const res = await updateQuoteStatusAction({ quoteId, partnerId, status: statusToSave });
         if (res.success) {
-            setQuote((prev: any) => ({ ...prev, status: newStatus }));
+            setQuote((prev: any) => ({ ...prev, status: statusToSave }));
+            setPendingStatus(statusToSave);
             notifySuccess("Sucesso", "Status atualizado!");
             debouncedRefresh();
+            setShowStatusModal(false);
         } else {
             notifyError("Erro", res.error);
         }
+        setIsUpdatingStatus(false);
     };
 
     const getStatusInfo = (s: string) => {
@@ -293,7 +317,13 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                                     onShare={() => { }}
                                     onDelete={() => setShowDeleteModal(true)}
                                     onDuplicate={() => { }}
-                                />
+                                >
+                                    {!quote.converted && (
+                                        <DropdownItem onClick={handleOpenStatusModal}>
+                                            <CheckCircleIcon className="w-4 h-4" /> Alterar status
+                                        </DropdownItem>
+                                    )}
+                                </ActionsDropdown>
 
                                 <Button onClick={() => onEditQuote && onEditQuote(quote)} className="whitespace-nowrap">
                                     <EditIcon className="w-[18px] h-[18px] mr-2" />
@@ -411,17 +441,23 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                             </div>
 
                             <div className="space-y-0">
-                                {quote.items?.map((item: any) => (
-                                    <QuoteItem
-                                        key={item.id}
-                                        image={getR2ImageUrl(item.products?.images?.[0] || item.product?.image, "thumbnail")}
-                                        name={item.custom_name || item.products?.name || "Produto sem nome"}
-                                        sku={item.products?.sku || "N/A"}
-                                        qty={item.quantity}
-                                        price={item.unit_price}
-                                        total={item.quantity * item.unit_price}
-                                    />
-                                ))}
+                                {isLoadingQuoteItems ? (
+                                    <div className="flex items-center justify-center py-14">
+                                        <ThreeDotsLoader />
+                                    </div>
+                                ) : (
+                                    quote.items?.map((item: any) => (
+                                        <QuoteItem
+                                            key={item.id}
+                                            image={getR2ImageUrl(item.products?.images?.[0] || item.product?.image, "thumbnail")}
+                                            name={item.custom_name || item.products?.name || "Produto sem nome"}
+                                            sku={item.products?.sku || "N/A"}
+                                            qty={item.quantity}
+                                            price={item.unit_price}
+                                            total={item.quantity * item.unit_price}
+                                        />
+                                    ))
+                                )}
                             </div>
 
                             <div className="mt-8">
@@ -456,9 +492,9 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                         </div>
 
                         {/* RIGHT COLUMN - SIDEBAR */}
-                        <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-10 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
+                        <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
 
-                            {/* Status Management Card */}
+                            {false && (
                             <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 relative overflow-hidden transition-colors text-left">
                                 <div className="absolute top-0 left-0 w-full h-1 bg-brand-green dark:bg-brand-green/30"></div>
                                 <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading mb-4 mt-1">Status do Orçamento</h3>
@@ -476,6 +512,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                                     />
                                 </div>
                             </div>
+                            )}
 
                             <CustomerCard
                                 customer={quote.customers}
@@ -522,6 +559,51 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                 isLoading={isConverting}
             />
 
+            <DefaultModal
+                isOpen={showStatusModal}
+                onClose={() => {
+                    if (isUpdatingStatus) return;
+                    setShowStatusModal(false);
+                }}
+                title="Alterar status do orçamento"
+                maxWidth="md"
+                footer={
+                    <div className="flex justify-end gap-3 w-full">
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowStatusModal(false)}
+                            disabled={isUpdatingStatus}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={() => void handleStatusChange()}
+                            isLoading={isUpdatingStatus}
+                            disabled={pendingStatus === quote.status}
+                        >
+                            Salvar
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="space-y-4">
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                        Selecione o novo status para este orçamento.
+                    </p>
+                    <FormDropdown
+                        label="Status"
+                        value={pendingStatus}
+                        setValue={setPendingStatus}
+                        options={[
+                            { value: 'draft', label: 'Rascunho' },
+                            { value: 'sent', label: 'Enviado' },
+                            { value: 'approved', label: 'Aprovado' },
+                            { value: 'rejected', label: 'Rejeitado' }
+                        ]}
+                    />
+                </div>
+            </DefaultModal>
+
             {/* Mobile Bottom Action Bar */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
                 <ActionsDropdown
@@ -539,7 +621,13 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                             Opções
                         </Button>
                     }
-                />
+                >
+                    {!quote.converted && (
+                        <DropdownItem onClick={handleOpenStatusModal}>
+                            <CheckCircleIcon className="w-4 h-4" /> Alterar status
+                        </DropdownItem>
+                    )}
+                </ActionsDropdown>
                 {canConvertToOrder && (
                     <Button
                         variant="default"
@@ -561,8 +649,8 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
 };
 
 const QuoteItem = ({ image, name, sku, qty, price, total }: any) => (
-    <div className="flex items-start gap-4 p-3">
-        <div className="w-16 h-16 rounded-xl bg-brand-gray/50 dark:bg-dark-border/50 border border-brand-border dark:border-dark-border overflow-hidden shrink-0 flex items-center justify-center p-1">
+    <div className="flex items-start gap-4">
+        <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
             <img
                 src={image}
                 className="w-full h-full object-cover mix-blend-multiply dark:mix-blend-normal rounded-lg transition-transform group-hover:scale-105"
@@ -571,7 +659,7 @@ const QuoteItem = ({ image, name, sku, qty, price, total }: any) => (
             />
         </div>
         <div className="flex-1 min-w-0">
-            <div className="flex justify-between items-start mb-1 gap-2">
+            <div className="flex justify-between items-start mb-1">
                 <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{name}</h4>
                 <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">{formatCurrency(total)}</span>
             </div>

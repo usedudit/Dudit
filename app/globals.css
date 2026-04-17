@@ -604,6 +604,33 @@ tbody tr {
 /* Custom Scrollbar - RESTORED TO DEFAULT per user request */
 /* Removing custom ::-webkit-scrollbar styles */
 
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(5, 150, 105, 0.45) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(5, 150, 105, 0.32);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(5, 150, 105, 0.5);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
 /* Mobile scrollbar hide - UNIVERSAL */
 @media (pointer: coarse),
 (max-width: 1024px) {

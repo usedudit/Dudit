@@ -134,7 +134,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                 </div>
 
                                 <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                    <ActionsDropdown onPrint={() => window.print()} onShare={() => {}} />
+                                    <ActionsDropdown onPrint={() => window.print()} onShare={() => { }} />
                                     {detail.canEdit && (
                                         <Button onClick={() => onEdit(transactionId)} className="whitespace-nowrap">
                                             <EditIcon className="w-[18px] h-[18px] mr-2" />
@@ -183,25 +183,23 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                             <div key={idx} className="relative flex flex-col items-center">
                                                                 <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
                                                                     <span
-                                                                        className={`text-xs font-medium ${
-                                                                            step.active
-                                                                                ? step.danger
-                                                                                    ? "text-brand-red"
-                                                                                    : "text-brand-dark dark:text-dark-heading"
-                                                                                : "text-gray-400 dark:text-dark-body"
-                                                                        }`}
+                                                                        className={`text-xs font-medium ${step.active
+                                                                            ? step.danger
+                                                                                ? "text-brand-red"
+                                                                                : "text-brand-dark dark:text-dark-heading"
+                                                                            : "text-gray-400 dark:text-dark-body"
+                                                                            }`}
                                                                     >
                                                                         {step.label}
                                                                     </span>
                                                                 </div>
                                                                 <div
-                                                                    className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${
-                                                                        step.active
-                                                                            ? step.danger
-                                                                                ? "bg-brand-red border-brand-red"
-                                                                                : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading"
-                                                                            : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"
-                                                                    }`}
+                                                                    className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active
+                                                                        ? step.danger
+                                                                            ? "bg-brand-red border-brand-red"
+                                                                            : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading"
+                                                                        : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"
+                                                                        }`}
                                                                 >
                                                                     {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
                                                                 </div>
@@ -269,12 +267,12 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                 <PaymentRow
                                                     label="Conta"
                                                     value={
-                                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.accountLine || "—"}</span>
+                                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.accountLine || "-"}</span>
                                                     }
                                                 />
                                                 <PaymentRow
                                                     label="Data de vencimento"
-                                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.dueDateLine || "—"}</span>}
+                                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.dueDateLine || "-"}</span>}
                                                 />
                                                 {detail.paymentDateLine && (
                                                     <PaymentRow
@@ -301,7 +299,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                         </div>
                                     </div>
 
-                                    <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-10 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
+                                    <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
                                         <TransactionContactCard title={detail.contactCard.title} name={detail.contactCard.name} />
                                     </div>
                                 </div>
@@ -317,7 +315,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                 <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
                     <ActionsDropdown
                         onPrint={() => window.print()}
-                        onShare={() => {}}
+                        onShare={() => { }}
                         trigger={
                             <Button variant="outline" className="flex-1">
                                 <ThreeDotsIcon className="w-4 h-4 mr-2" />

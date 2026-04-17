@@ -396,7 +396,7 @@ DECLARE
   v_clamped_paid NUMERIC;
   v_payment_status TEXT;
   v_tx_id UUID;
-  v_now TEXT;
+  v_now TIMESTAMPTZ;
   v_entry JSONB;
   v_entry_amount NUMERIC;
   v_entry_pm_id UUID;
@@ -548,7 +548,7 @@ BEGIN
     v_payment_status := 'pending';
   END IF;
 
-  v_now := NOW()::text;
+  v_now := NOW();
 
   PERFORM 1
     FROM public.cash_sessions cs

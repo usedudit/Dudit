@@ -89,7 +89,7 @@ export function formatYmdToDmy(ymd: string): string {
 /** Texto curto para chip de filtro ativo */
 export function summarizeDatePeriodFilter(period: DatePeriodFilterValue): string | null {
   if (period.presets.length > 0) return period.presets.join(", ")
-  if (period.from && period.to) return `${formatYmdToDmy(period.from)} — ${formatYmdToDmy(period.to)}`
+  if (period.from && period.to) return `${formatYmdToDmy(period.from)} - ${formatYmdToDmy(period.to)}`
   if (period.from) return `A partir de ${formatYmdToDmy(period.from)}`
   if (period.to) return `Até ${formatYmdToDmy(period.to)}`
   return null

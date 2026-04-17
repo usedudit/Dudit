@@ -21,7 +21,7 @@ export default async function CashSessionDetailsServer({ params }: { params: { i
   return (
     <>
       <ERPPageHeader title="Detalhes do Caixa" />
-      <FadeIn className="p-4 md:p-6 h-full">
+      <FadeIn className="p-4">
         <CashSessionDetailPage partnerId={partnerId} details={detailsResult.data} />
       </FadeIn>
     </>

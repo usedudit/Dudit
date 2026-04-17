@@ -36,14 +36,12 @@ const QuoteHeader = ({
                 {/* Header Content - Control visibility on mobile */}
                 <div className={`flex items-start justify-between transition-all duration-300 ${hideOnMobile ? "hidden md:flex" : "flex"} ${isScrolled ? "py-2" : "py-4 md:py-6"}`}>
                     <div className="flex items-center gap-4 min-w-0">
-                        {/* Back button */}
-                        <Button
-                            variant="outline"
-                            onClick={onBack}
-                            className={`shrink-0 flex items-center justify-center transition-all duration-300 ${isScrolled ? "w-8 h-8" : "w-10 h-10"}`}
-                        >
-                            <ChevronLeftIcon className={`${isScrolled ? "w-4 h-4" : "w-5 h-5"} text-brand-inactive-text dark:text-dark-body`} />
-                        </Button>
+                        {/* Back button - desktop only */}
+                        <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                            <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                            </Button>
+                        </div>
 
                         <div className={`flex flex-col gap-0.5 overflow-hidden min-w-0 transition-opacity duration-300 md:opacity-100 ${!showTitle ? "opacity-0 h-0 md:h-auto overflow-hidden md:overflow-visible" : "opacity-100"}`}>
                             <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-300 truncate ${isScrolled ? "text-lg" : "text-xl md:text-2xl"}`}>

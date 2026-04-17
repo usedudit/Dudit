@@ -10,7 +10,7 @@ interface TransactionContactCardProps {
 }
 
 /**
- * Top section of CustomerCard only — same chrome (accent bar, border, padding, avatar size).
+ * Top section of CustomerCard only - same chrome (accent bar, border, padding, avatar size).
  */
 export function TransactionContactCard({ title, name, className = "" }: TransactionContactCardProps) {
     return (
@@ -28,7 +28,7 @@ export function TransactionContactCard({ title, name, className = "" }: Transact
                             <UserProfileImage fullName={name || title} className="w-10 h-10 text-base border border-white dark:border-dark-border" />
                         </div>
                         <div className="min-w-0">
-                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{name || "—"}</h4>
+                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{name || "-"}</h4>
                         </div>
                     </div>
                 </div>

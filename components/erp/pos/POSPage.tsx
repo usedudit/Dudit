@@ -1,33 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import {
-  SearchIcon,
-  PlusIcon,
-  MinusIcon,
-  TrashIcon,
-  SaveIcon,
-  UserIcon,
-  TagIcon,
-  ClockIcon,
-  EditIcon,
-  ThreeDotsIcon,
-  ChevronRightIcon
-} from "@/lib/icons"
+import { TrashIcon, ChevronRightIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import {
-  Button,
-  Input,
-  IconPlaceholder,
-  AlertModal,
-  DefaultModal,
-  MoneyInput,
-  InfoCard,
-} from "@/components/reusable"
-import Dropdown from "@/components/reusable/Dropdown"
-import DropdownItem from "@/components/reusable/DropdownItem"
+import { Button, AlertModal, DefaultModal, MoneyInput, InfoCard, Input } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useNotification } from "@/hooks/use-notification"
@@ -40,52 +18,22 @@ import { openCashSessionAction } from "@/app/actions/erp/cash-register"
 import { getTeamMembers } from "@/app/actions/erp/team"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import SelectSellerSheet from "@/components/erp/pos/SelectSellerSheet"
-
-type Product = {
-  id: string
-  name: string
-  category?: string | null
-  sku?: string | null
-  price: number
-  stock_available: number
-  allow_sell_without_stock?: boolean
-  images?: string[] | null
-  product_variants?: Array<{
-    id: string
-    variant_name: string
-    sku?: string | null
-    price_adjustment?: number | null
-    stock_available?: number | null
-    variant_options?: Record<string, any> | null
-  }>
-}
-
-type PreSale = {
-  id: string
-  customer_id: string | null
-  subtotal: number
-  discount_amount: number
-  total_amount: number
-  notes: string | null
-  status: "draft" | "completed"
-  items: any[]
-  created_at: string
-  updated_at: string
-}
-
-type Customer = { id: string; name: string }
-type FinanceAccount = { id: string; name: string; is_default?: boolean; is_active?: boolean }
-type PaymentMethodOption = { id: string; name: string; type: string; is_default?: boolean | null }
-type CartItem = {
-  id: string
-  productId: string | null
-  variantId: string | null
-  name: string
-  variantName: string | null
-  price: number
-  qty: number
-  image: string | null
-}
+import PaymentModal from "@/components/erp/orders/PaymentModal"
+import POSCartItemCard from "@/components/erp/pos/POSCartItemCard"
+import { POSMorePreSalesCard, POSPreSaleCard } from "@/components/erp/pos/POSPreSaleCard"
+import POSCashClosedView from "@/components/erp/pos/POSCashClosedView"
+import POSHeader from "@/components/erp/pos/POSHeader"
+import POSDesktopOrderPanel, { POSOrderSummaryContent } from "@/components/erp/pos/POSOrderSummaryCard"
+import type {
+  PDVCartItem as CartItem,
+  PDVCustomer as Customer,
+  PDVFinanceAccount as FinanceAccount,
+  PDVPaymentBreakdownEntry as PaymentBreakdownEntry,
+  PDVPaymentMethodOption as PaymentMethodOption,
+  PDVPreSale as PreSale,
+  PDVProduct as Product,
+} from "@/lib/types/pdv"
+import { normalizePDVPaymentMethodLabel, normalizePDVSearchTerm } from "@/lib/utils/pdv"
 
 interface Props {
   partnerId: string
@@ -99,118 +47,21 @@ interface Props {
   initialActiveSession: any | null
 }
 
-// Extracted memoized component to avoid unnecessary re-renders
-const CartItemCard = memo(function CartItemCard({
-  item,
-  onChangeQty,
-  onRemove,
-  onEdit,
-}: {
-  item: CartItem
-  onChangeQty: (itemId: string, delta: number) => void
-  onRemove: (itemId: string) => void
-  onEdit: (item: CartItem) => void
-}) {
-  return (
-    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border p-3">
-      <div className="flex items-center gap-3">
-        <img
-          src={getR2ImageUrl(item.image, "thumbnail")}
-          alt={item.name}
-          className="w-16 h-16 rounded-xl object-cover bg-brand-gray"
-        />
-        <div className="flex-1 min-w-0">
-          <p className="font-bold text-brand-dark dark:text-dark-heading truncate">{item.name}</p>
-          {item.variantName && (
-            <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">{item.variantName}</p>
-          )}
-          <p className="text-sm text-brand-inactive-text dark:text-dark-body">{formatCurrency(item.price)}</p>
-          <div className="mt-2 flex items-center gap-2">
-            <button className="w-7 h-7 rounded-full border border-brand-border flex items-center justify-center" onClick={() => onChangeQty(item.id, -1)}>
-              <MinusIcon size={14} />
-            </button>
-            <span className="min-w-8 text-center font-bold">{String(item.qty).padStart(2, "0")}</span>
-            <button className="w-7 h-7 rounded-full bg-brand-primary text-white flex items-center justify-center" onClick={() => onChangeQty(item.id, 1)}>
-              <PlusIcon size={14} />
-            </button>
-          </div>
-        </div>
-        <div className="text-right flex flex-col items-end gap-2">
-          <div className="flex gap-1.5">
-            <Button
-              className="w-8 h-8"
-              variant="outline"
-              onClick={() => onEdit(item)}
-            >
-              <EditIcon size={14} />
-            </Button>
-            <Button
-              className="w-8 h-8"
-              variant="outline"
-              onClick={() => onRemove(item.id)}
-            >
-              <TrashIcon size={14} />
-            </Button>
-          </div>
-          <div className="mt-1">
-            <p className="text-[10px] text-brand-inactive-text dark:text-dark-body font-bold">Total</p>
-            <p className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(item.price * item.qty)}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-})
-
-const PreSaleCard = ({ preSale, index, customers, onClick }: { preSale: PreSale, index: number, customers: Customer[], onClick: () => void }) => (
-  <button
-    onClick={onClick}
-    className="bg-white dark:bg-dark-surface rounded-[20px] border border-brand-border dark:border-dark-border p-4 flex flex-col gap-3 group text-left min-w-[280px]"
-  >
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-          <ClockIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-        </div>
-        <span className="font-bold text-brand-dark dark:text-dark-text text-lg">Nº {index + 1}</span>
-      </div>
-      <div className="bg-brand-gray dark:bg-dark-border/50 px-3 py-0.5 rounded-full">
-        <span className="text-[11px] font-medium text-brand-inactive-text">
-          {new Date(preSale.created_at).toLocaleString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(',', ' às')}
-        </span>
-      </div>
-    </div>
-    <div className="flex items-center justify-between mt-1">
-      <span className="text-sm font-medium text-brand-inactive-text truncate max-w-[150px]">
-        {customers.find((c) => c.id === preSale.customer_id)?.name || "Cliente Balcão"}
-      </span>
-      <span className="text-brand-primary font-bold text-lg">
-        {formatCurrency(Number(preSale.total_amount || 0))}
-      </span>
-    </div>
-  </button>
-)
-
-const MorePreSalesCard = ({ count, onClick }: { count: number, onClick: () => void }) => (
-  <button
-    onClick={onClick}
-    className="bg-white rounded-[20px] border border-brand-border p-4 flex items-center justify-center hover:shadow-md transition-shadow min-w-[100px] h-full"
-  >
-    <span className="text-brand-primary font-bold text-2xl">+{count}</span>
-  </button>
-)
+type TeamMember = {
+  id: string
+  fullName?: string | null
+}
 
 export default function POSPage({ partnerId, initialData, initialActiveSession }: Props) {
   const { success: notifySuccess, error: notifyError } = useNotification()
   const isMobile = useMediaQuery("(max-width: 1024px)")
 
-  const [products] = useState<Product[]>(initialData.products || [])
-  const [customers] = useState<Customer[]>(initialData.customers || [])
-  const [accounts] = useState<FinanceAccount[]>(initialData.financeAccounts || [])
-  const [paymentMethods] = useState<PaymentMethodOption[]>(initialData.paymentMethods || [])
+  const products = initialData.products || []
+  const customers = initialData.customers || []
+  const accounts = initialData.financeAccounts || []
+  const paymentMethods = initialData.paymentMethods || []
   const [preSales, setPreSales] = useState<PreSale[]>(initialData.preSales || [])
-  const [teamMembers, setTeamMembers] = useState<any[]>([])
-
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [activeCashSession, setActiveCashSession] = useState<any | null>(initialActiveSession || null)
 
   const isCashierOpen = !!activeCashSession?.id
@@ -218,53 +69,41 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   const [search, setSearch] = useState("")
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>(undefined)
   const [selectedSellerId, setSelectedSellerId] = useState<string | undefined>(undefined)
-  const [financeAccountId, setFinanceAccountId] = useState<string | undefined>(
-    accounts.find((account) => account.is_default)?.id || accounts[0]?.id
+  const financeAccountId = useMemo(
+    () => accounts.find((account) => account.is_default)?.id || accounts[0]?.id,
+    [accounts]
   )
-  const defaultSalePaymentMethodId = useMemo(() => {
-    const cash = paymentMethods.find((pm) => pm.type === "cash")
-    if (cash?.id) return cash.id
-    const def = paymentMethods.find((pm) => pm.is_default)
-    return def?.id || paymentMethods[0]?.id || undefined
-  }, [paymentMethods])
-  const [salePaymentMethodId, setSalePaymentMethodId] = useState<string | undefined>(undefined)
-  useEffect(() => {
-    if (salePaymentMethodId) return
-    if (defaultSalePaymentMethodId) setSalePaymentMethodId(defaultSalePaymentMethodId)
-  }, [defaultSalePaymentMethodId, salePaymentMethodId])
   const [discountAmount, setDiscountAmount] = useState(0)
-  const [discountType, setDiscountType] = useState<'fixed' | 'percentage'>('fixed')
+  const [discountType, setDiscountType] = useState<"fixed" | "percentage">("fixed")
   const [shippingFee, setShippingFee] = useState(0)
-  const [otherCosts, setOtherCosts] = useState(0)
+  const [otherCosts] = useState(0)
   const [notes, setNotes] = useState("")
   const [cart, setCart] = useState<CartItem[]>([])
   const [activePreSaleId, setActivePreSaleId] = useState<string | null>(null)
   const [isSavingDraft, setIsSavingDraft] = useState(false)
   const [isFinalizing, setIsFinalizing] = useState(false)
-  const [mobileOpen, setMobileOpen] = useState(false)
   const [variantPickerProduct, setVariantPickerProduct] = useState<Product | null>(null)
   const [isSelectCustomerOpen, setIsSelectCustomerOpen] = useState(false)
   const [isSelectSellerOpen, setIsSelectSellerOpen] = useState(false)
   const [isResetAlertOpen, setIsResetAlertOpen] = useState(false)
   const [isPreSaleSheetOpen, setIsPreSaleSheetOpen] = useState(false)
+  const [isCategorySheetOpen, setIsCategorySheetOpen] = useState(false)
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
+  const [isMobileSummarySheetOpen, setIsMobileSummarySheetOpen] = useState(false)
+  const [isMobileItemsSheetOpen, setIsMobileItemsSheetOpen] = useState(false)
   const [itemToRemoveId, setItemToRemoveId] = useState<string | null>(null)
   const [editingItem, setEditingItem] = useState<CartItem | null>(null)
   const [isNotesSheetOpen, setIsNotesSheetOpen] = useState(false)
-
   const [isOpenCashModalOpen, setIsOpenCashModalOpen] = useState(false)
   const [openingBalance, setOpeningBalance] = useState(0)
   const [openingNotes, setOpeningNotes] = useState("")
   const [isOpeningCash, setIsOpeningCash] = useState(false)
-
-  // States for Editing Item Modal
   const [editQty, setEditQty] = useState(1)
   const [editPrice, setEditPrice] = useState(0)
   const [editDiscount, setEditDiscount] = useState(0)
   const [editDiscountType, setEditDiscountType] = useState<"fixed" | "percentage">("fixed")
-
   const [isGlobalDiscountModalOpen, setIsGlobalDiscountModalOpen] = useState(false)
 
-  // Breakpoints for responsive pre-sale list
   const isXL = useMediaQuery("(min-width: 1280px)")
   const isLG = useMediaQuery("(min-width: 1024px)")
   const isMD = useMediaQuery("(min-width: 768px)")
@@ -276,11 +115,10 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     return 1
   }, [isXL, isLG, isMD])
 
-  // Categories extraction
   const categories = useMemo(() => {
     const cats = new Set<string>()
-    products.forEach((p) => {
-      if (p.category) cats.add(p.category)
+    products.forEach((product) => {
+      if (product.category) cats.add(product.category)
     })
     return ["All Product", ...Array.from(cats)]
   }, [products])
@@ -295,69 +133,80 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     loadTeam()
   }, [])
 
-  // Refs for concurrency guards
   const isFinalizingRef = useRef(false)
   const isSavingDraftRef = useRef(false)
+  const desktopScrollClass = "custom-scrollbar max-lg:hide-scrollbar"
 
   const filteredProducts = useMemo(() => {
     let result = products
-    const term = search.trim().toLowerCase()
+    const term = normalizePDVSearchTerm(search)
 
     if (selectedCategory !== "All Product") {
-      result = result.filter(p => p.category === selectedCategory)
+      result = result.filter((product) => product.category === selectedCategory)
     }
 
     if (term) {
-      result = result.filter((product) =>
-        `${product.name} ${product.sku || ""}`.toLowerCase().includes(term)
-      )
+      result = result.filter((product) => normalizePDVSearchTerm(product.name).includes(term))
     }
+
     return result
   }, [products, search, selectedCategory])
 
   const itemCount = useMemo(() => cart.reduce((acc, item) => acc + item.qty, 0), [cart])
-  const subtotal = useMemo(
-    () => cart.reduce((acc, item) => acc + (item.price * item.qty), 0),
-    [cart]
-  )
-
+  const subtotal = useMemo(() => cart.reduce((acc, item) => acc + (item.price * item.qty), 0), [cart])
   const discountVal = useMemo(() => {
-    if (discountType === 'percentage') {
+    if (discountType === "percentage") {
       return (subtotal * discountAmount) / 100
     }
     return discountAmount
   }, [subtotal, discountAmount, discountType])
-
-  const total = useMemo(() => {
-    return Math.max(0, subtotal - discountVal + shippingFee + otherCosts)
-  }, [subtotal, discountVal, shippingFee, otherCosts])
-
-  const customerOptions = useMemo(
-    () => customers.map((customer) => ({ value: customer.id, label: customer.name })),
-    [customers]
+  const total = useMemo(() => Math.max(0, subtotal - discountVal + shippingFee + otherCosts), [subtotal, discountVal, shippingFee, otherCosts])
+  const mobileCategoryLabel = selectedCategory === "All Product" ? "Categorias" : selectedCategory
+  const selectedCustomer = useMemo(
+    () => (selectedCustomerId ? customers.find((customer) => customer.id === selectedCustomerId) || null : null),
+    [customers, selectedCustomerId]
   )
-  const accountOptions = useMemo(
-    () => accounts.map((account) => ({ value: account.id, label: account.name })),
-    [accounts]
+  const paymentModalCart = useMemo(
+    () => cart.map((item) => ({
+      ...item,
+      unitPrice: item.price,
+      quantity: item.qty,
+    })),
+    [cart]
   )
 
-  const getCartItemStock = useCallback((item: CartItem) => {
-    const product = products.find((p) => p.id === item.productId)
-    if (!product) return 0
-    if (item.variantId) {
-      const variant = product.product_variants?.find((v) => v.id === item.variantId)
-      return Number(variant?.stock_available || 0)
-    }
-    return Number(product.stock_available || 0)
-  }, [products])
+  const getPaymentMethodId = useCallback((methodLabel?: string | null) => {
+    const normalizedLabel = normalizePDVSearchTerm(methodLabel)
+    if (!normalizedLabel) return null
+
+    const byType = paymentMethods.find((method) => {
+      const type = normalizePDVSearchTerm(method.type)
+      const name = normalizePDVSearchTerm(method.name)
+
+      if (normalizedLabel === "dinheiro") {
+        return type === "cash" || name.includes("dinheiro")
+      }
+
+      if (normalizedLabel === "pix") {
+        return type === "pix" || name.includes("pix")
+      }
+
+      if (normalizedLabel === "cartao" || normalizedLabel === "cartão") {
+        return ["card", "credit_card", "debit_card", "credito", "debito"].includes(type)
+          || name.includes("cartao")
+          || name.includes("cartão")
+      }
+
+      return false
+    })
+
+    if (byType?.id) return byType.id
+
+    const byName = paymentMethods.find((method) => normalizePDVSearchTerm(method.name) === normalizedLabel)
+    return byName?.id || null
+  }, [paymentMethods])
 
   const addToCart = useCallback((product: Product, variantId?: string | null) => {
-    if (!isCashierOpen) {
-      notifyError("Abra o caixa para adicionar itens no PDV.")
-      setIsOpenCashModalOpen(true)
-      return
-    }
-
     const selectedVariant = variantId
       ? product.product_variants?.find((variant) => variant.id === variantId)
       : null
@@ -402,24 +251,22 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
 
       return prev.map((item) => (item.id === found.id ? { ...item, qty: nextQty } : item))
     })
-  }, [isCashierOpen, notifyError])
+  }, [notifyError])
 
   const changeQty = useCallback((itemId: string, delta: number) => {
     setCart((prev) => prev
       .map((item) => {
         if (item.id !== itemId) return item
         const nextQty = Math.max(0, item.qty + delta)
-        const product = products.find((p) => p.id === item.productId)
-        const variant = item.variantId ? product?.product_variants?.find((v) => v.id === item.variantId) : null
+        const product = products.find((currentProduct) => currentProduct.id === item.productId)
+        const variant = item.variantId ? product?.product_variants?.find((currentVariant) => currentVariant.id === item.variantId) : null
         const availableStock = variant ? Number(variant.stock_available || 0) : Number(product?.stock_available || 0)
-        if (
-          product &&
-          !product.allow_sell_without_stock &&
-          nextQty > availableStock
-        ) {
+
+        if (product && !product.allow_sell_without_stock && nextQty > availableStock) {
           notifyError(`Estoque insuficiente para o item ${item.name}`)
           return item
         }
+
         return { ...item, qty: nextQty }
       })
       .filter((item) => item.qty > 0))
@@ -432,6 +279,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   const persistDraft = async () => {
     if (cart.length === 0) return null
     if (isSavingDraftRef.current) return null
+
     isSavingDraftRef.current = true
     setIsSavingDraft(true)
     try {
@@ -454,13 +302,15 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
           image: item.image,
         })),
       })
+
       if (!result.success) {
         notifyError(result.error || "Falha ao salvar pré-venda.")
         return null
       }
+
       const saved = result.data as PreSale
       setActivePreSaleId(saved.id)
-      setPreSales((prev) => [saved, ...prev.filter((p) => p.id !== saved.id)].slice(0, 20))
+      setPreSales((prev) => [saved, ...prev.filter((preSale) => preSale.id !== saved.id)].slice(0, 20))
       return saved.id
     } finally {
       setIsSavingDraft(false)
@@ -468,17 +318,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     }
   }
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (cart.length > 0) {
-        persistDraft()
-      }
-    }, 60000) // Changed to 1 minute
-    return () => clearInterval(timer)
-  }, [cart, selectedCustomerId, discountAmount, notes, persistDraft])
-  // eslint-disable-line react-hooks/exhaustive-deps
-
-  const loadPreSale = (preSale: PreSale) => {
+  const loadPreSale = useCallback((preSale: PreSale) => {
     const items = (Array.isArray(preSale.items) ? preSale.items : []).map((item: any) => ({
       id: crypto.randomUUID(),
       productId: item.product_id ?? item.productId ?? null,
@@ -489,21 +329,21 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       qty: Number((item.quantity ?? item.qty) || 0),
       image: item.image || null,
     }))
+
     setActivePreSaleId(preSale.id)
     setSelectedCustomerId(preSale.customer_id || undefined)
     setDiscountAmount(Number(preSale.discount_amount || 0))
     setNotes(preSale.notes || "")
     setCart(items)
-    setMobileOpen(true)
-  }
+  }, [])
 
-  const clearCurrentOrder = () => {
+  const clearCurrentOrder = useCallback(() => {
     setActivePreSaleId(null)
     setSelectedCustomerId(undefined)
     setDiscountAmount(0)
     setNotes("")
     setCart([])
-  }
+  }, [])
 
   const removeDraft = async (preSaleId: string) => {
     const result = await deletePreSaleDraftAction(partnerId, preSaleId)
@@ -511,61 +351,85 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       notifyError(result.error || "Não foi possível excluir a pré-venda.")
       return
     }
+
     setPreSales((prev) => prev.filter((item) => item.id !== preSaleId))
     if (activePreSaleId === preSaleId) clearCurrentOrder()
   }
 
-  const finalizeSale = async () => {
-    if (cart.length === 0) {
-      notifyError("Adicione itens para finalizar.")
-      return
-    }
-    // Prevent double-click finalization via ref guard
-    if (isFinalizingRef.current) return
-    isFinalizingRef.current = true
-
+  const ensurePreSaleToFinalize = async () => {
     let preSaleIdToFinalize = activePreSaleId
+
     if (!preSaleIdToFinalize) {
       const createdDraftId = await persistDraft()
       if (!createdDraftId) {
-        isFinalizingRef.current = false
         notifyError("Não foi possível gerar a pré-venda.")
-        return
+        return null
       }
       setActivePreSaleId(createdDraftId)
       preSaleIdToFinalize = createdDraftId
     }
 
+    return preSaleIdToFinalize
+  }
+
+  const handleOpenPaymentModal = useCallback(() => {
+    if (cart.length === 0) {
+      notifyError("Adicione itens para continuar.")
+      return
+    }
+
+    setIsMobileSummarySheetOpen(false)
+    setIsMobileItemsSheetOpen(false)
+    setIsPaymentModalOpen(true)
+  }, [cart.length, notifyError])
+
+  const handleConfirmPayment = async (paymentData: {
+    paymentMethod?: string
+    paymentBreakdown?: PaymentBreakdownEntry[]
+    paymentStatus?: "paid" | "partially_paid" | "unpaid"
+    paidAmount?: number
+  }) => {
+    if (cart.length === 0) {
+      return { error: "Adicione itens para finalizar." }
+    }
+
+    if (isFinalizingRef.current) return { error: "A venda já está sendo processada." }
+    isFinalizingRef.current = true
+
+    const preSaleIdToFinalize = await ensurePreSaleToFinalize()
+    if (!preSaleIdToFinalize) {
+      isFinalizingRef.current = false
+      return { error: "Não foi possível gerar a pré-venda." }
+    }
+
     setIsFinalizing(true)
     try {
-      if (paymentMethods.length > 0 && !salePaymentMethodId) {
-        notifyError("Selecione a forma de recebimento.")
-        return
-      }
-      const pm = paymentMethods.find((p) => p.id === salePaymentMethodId)
+      const paymentBreakdown = (paymentData.paymentBreakdown || []).map((entry) => ({
+        method: normalizePDVPaymentMethodLabel(entry.method),
+        amount: Number(entry.amount || 0),
+        paymentMethodId: getPaymentMethodId(entry.method),
+      }))
+
       const result = await finalizePreSaleAction({
         partnerId,
-        preSaleId: preSaleIdToFinalize as string,
+        preSaleId: preSaleIdToFinalize,
         financeAccountId: financeAccountId || null,
-        paidAmount: total,
-        paymentMethod: pm?.name || "PDV",
-        paymentBreakdown: [
-          {
-            method: pm?.name || "PDV",
-            amount: total,
-            paymentMethodId: salePaymentMethodId || null,
-          },
-        ],
+        paidAmount: Number(paymentData.paidAmount || 0),
+        paymentMethod: paymentData.paymentMethod || "pendente",
+        paymentBreakdown,
       })
+
       if (!result.success) {
         notifyError(result.error || "Não foi possível finalizar a venda.")
-        return
+        return { error: result.error || "Não foi possível finalizar a venda." }
       }
 
       notifySuccess("Venda finalizada com sucesso.")
-      setPreSales((prev) => prev.filter((draft) => draft.id !== activePreSaleId))
+      setPreSales((prev) => prev.filter((draft) => draft.id !== preSaleIdToFinalize))
       clearCurrentOrder()
-      setMobileOpen(false)
+      setIsMobileSummarySheetOpen(false)
+      setIsMobileItemsSheetOpen(false)
+      return { success: true, orderNumber: result.data?.saleId }
     } finally {
       setIsFinalizing(false)
       isFinalizingRef.current = false
@@ -573,386 +437,140 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   }
 
   useEffect(() => {
-    if (editingItem) {
-      setEditQty(editingItem.qty)
-      setEditPrice(editingItem.price)
-      setEditDiscount(0) // Reset discount when opening
-      setEditDiscountType('fixed')
-    }
+    if (!editingItem) return
+    setEditQty(editingItem.qty)
+    setEditPrice(editingItem.price)
+    setEditDiscount(0)
+    setEditDiscountType("fixed")
   }, [editingItem])
 
   const saveEditedItem = () => {
     if (!editingItem) return
+
     let finalUnitPrice = editPrice
     if (editDiscount > 0) {
-      if (editDiscountType === 'fixed') {
+      if (editDiscountType === "fixed") {
         finalUnitPrice = Math.max(0, editPrice - editDiscount)
       } else {
         finalUnitPrice = Math.max(0, editPrice * (1 - editDiscount / 100))
       }
     }
 
-    setCart((prev) => prev.map(it => it.id === editingItem.id ? { ...it, qty: editQty, price: finalUnitPrice } : it))
+    setCart((prev) => prev.map((item) => (item.id === editingItem.id ? { ...item, qty: editQty, price: finalUnitPrice } : item)))
     setEditingItem(null)
     notifySuccess("Item atualizado.")
   }
 
-  const cartPanel = (
-    <div className="rounded-3xl border border-brand-border bg-brand-gray dark:bg-dark-border/50 p-4 md:p-5 h-full flex flex-col">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-brand-dark dark:text-dark-heading font-bold text-2xl">Detail Transaction</h3>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            className="h-9"
-            onClick={persistDraft}
-            isLoading={isSavingDraft}
-          >
-            <SaveIcon size={16} className="mr-2" /> Salvar
-          </Button>
-          <Button
-            variant="outline"
-            className="h-9"
-            onClick={() => setIsResetAlertOpen(true)}
-          >
-            <TrashIcon size={16} className="mr-2" /> Reset Order
-          </Button>
-        </div>
-      </div>
+  const handleOpenCash = async () => {
+    if (openingBalance < 0) {
+      notifyError("Saldo inicial inválido.")
+      return
+    }
+    if (isOpeningCash) return
 
-      <div className="space-y-3 flex-1 overflow-y-auto pr-1">
-        {cart.map((item) => (
-          <CartItemCard
-            key={item.id}
-            item={item}
-            onChangeQty={changeQty}
-            onRemove={(id) => setItemToRemoveId(id)}
-            onEdit={(item) => setEditingItem(item)}
-          />
-        ))}
-      </div>
+    setIsOpeningCash(true)
+    try {
+      const result = await openCashSessionAction({
+        partnerId,
+        initialAmount: openingBalance,
+        notes: openingNotes,
+      })
 
-      <div className="mt-4 rounded-3xl border border-brand-border bg-white dark:bg-dark-surface p-3 space-y-3">
-        {/* Dropdown for options replaced separate inputs */}
-        <div className="p-1 space-y-2">
-          <div className="flex justify-between items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-            <span>Subtotal</span>
-            <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(subtotal)}</span>
-          </div>
+      if (!result.success) {
+        notifyError(result.error || "Não foi possível abrir o caixa.")
+        return
+      }
 
-          {discountVal > 0 && (
-            <div className="flex justify-between items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-              <span>Desconto</span>
-              <span className="font-bold text-brand-red">-{formatCurrency(discountVal)}</span>
-            </div>
-          )}
+      notifySuccess("Caixa aberto com sucesso.")
+      setActiveCashSession(result.data)
+      setIsOpenCashModalOpen(false)
+      setOpeningBalance(0)
+      setOpeningNotes("")
+    } finally {
+      setIsOpeningCash(false)
+    }
+  }
 
-          {shippingFee > 0 && (
-            <div className="flex justify-between items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-              <span>Frete</span>
-              <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(shippingFee)}</span>
-            </div>
-          )}
+  const handleShippingPrompt = useCallback(() => {
+    const fee = prompt("Valor do frete:")
+    if (fee) setShippingFee(Number(fee))
+  }, [])
 
-          {otherCosts > 0 && (
-            <div className="flex justify-between items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-              <span>Outros Custos</span>
-              <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(otherCosts)}</span>
-            </div>
-          )}
-
-          {paymentMethods.length > 0 && (
-            <div className="pt-2">
-              <label className="block text-xs font-semibold text-brand-inactive-text dark:text-dark-body mb-1">
-                Forma de recebimento
-              </label>
-              <select
-                className="w-full rounded-xl border border-brand-border bg-white dark:bg-dark-surface px-3 py-2 text-sm font-medium text-brand-dark dark:text-dark-heading"
-                value={salePaymentMethodId || ""}
-                onChange={(e) => setSalePaymentMethodId(e.target.value || undefined)}
-              >
-                {paymentMethods.map((pm) => (
-                  <option key={pm.id} value={pm.id}>
-                    {pm.name}
-                    {pm.type === "cash" ? " (afeta caixa físico)" : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div className="border-t border-dashed border-brand-border pt-3 mt-2">
-            <div className="flex justify-between items-end">
-              <span className="text-lg font-bold text-brand-dark dark:text-dark-heading tracking-tight">Total a Pagar</span>
-              <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading leading-none tracking-tighter">
-                {formatCurrency(total)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 mt-4 w-full">
-          <Button
-            className="flex-1 w-full h-12"
-            onClick={finalizeSale}
-            isLoading={isFinalizing}
-            disabled={isFinalizing || cart.length === 0}
-          >
-            Continue
-          </Button>
-
-          <Dropdown
-            trigger={
-              <Button variant="outline" className="w-12 h-12 p-0 rounded-full flex items-center justify-center border-brand-border bg-white shrink-0">
-                <ThreeDotsIcon size={20} className="text-brand-dark" />
-              </Button>
-            }
-            showChevron={false}
-            width="w-64"
-            align="right"
-          >
-            <DropdownItem onClick={() => setIsSelectCustomerOpen(true)}>
-              <UserIcon size={16} /> Adicionar Cliente
-            </DropdownItem>
-            <DropdownItem onClick={() => setIsGlobalDiscountModalOpen(true)}>
-              <TagIcon size={16} /> Aplicar Desconto
-            </DropdownItem>
-            <DropdownItem onClick={() => {
-              const fee = prompt("Valor do frete:")
-              if (fee) setShippingFee(Number(fee))
-            }}>
-              <ClockIcon size={16} /> Adicionar Frete
-            </DropdownItem>
-            <DropdownItem onClick={() => setIsNotesSheetOpen(true)}>
-              <PlusIcon size={16} /> Adicionar Observação
-            </DropdownItem>
-          </Dropdown>
-        </div>
-      </div>
+  const cartItemsList = (
+    <div className={`space-y-3 flex-1 overflow-y-auto pr-1 ${desktopScrollClass}`}>
+      {cart.map((item) => (
+        <POSCartItemCard
+          key={item.id}
+          item={item}
+          onChangeQty={changeQty}
+          onRemove={(id) => setItemToRemoveId(id)}
+          onEdit={(currentItem) => setEditingItem(currentItem)}
+        />
+      ))}
     </div>
   )
 
-  if (!isCashierOpen && filteredProducts.length < 0) {
+  if (!isCashierOpen) {
     return (
-      <div className="h-full flex items-center justify-center bg-white">
-        <IconPlaceholder
-          imageSrc="https://img.dudit.com.br/static/mascots/PDV.png"
-          title="Abrir Caixa"
-          itemButton={{
-            text: "Abrir o Caixa",
-            action: () => setIsOpenCashModalOpen(true),
-            variant: "filled",
-            className: "h-12 px-10 rounded-full font-bold text-md"
-          }}
-        />
-        <DefaultModal
-          isOpen={isOpenCashModalOpen}
-          onClose={() => setIsOpenCashModalOpen(false)}
-          title="Abrir caixa"
-          footer={
-            <div className="flex items-center gap-3 w-full">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setIsOpenCashModalOpen(false)}
-                disabled={isOpeningCash}
-              >
-                Cancelar
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={async () => {
-                  if (openingBalance < 0) {
-                    notifyError("Saldo inicial inválido.")
-                    return
-                  }
-                  if (isOpeningCash) return
-                  setIsOpeningCash(true)
-                  try {
-                    const result = await openCashSessionAction({
-                      partnerId,
-                      initialAmount: openingBalance,
-                      notes: openingNotes,
-                    })
-                    if (!result.success) {
-                      notifyError(result.error || "Não foi possível abrir o caixa.")
-                      return
-                    }
-                    notifySuccess("Caixa aberto com sucesso.")
-                    setActiveCashSession(result.data)
-                    setIsOpenCashModalOpen(false)
-                    setOpeningBalance(0)
-                    setOpeningNotes("")
-                  } finally {
-                    setIsOpeningCash(false)
-                  }
-                }}
-                isLoading={isOpeningCash}
-              >
-                Confirmar abertura
-              </Button>
-            </div>
-          }
-        >
-          <div className="space-y-4 pt-2">
-            <MoneyInput
-              label="Saldo inicial em dinheiro"
-              value={openingBalance}
-              onChange={setOpeningBalance}
-            />
-            <Input
-              label="Observações"
-              value={openingNotes}
-              onChange={(e: any) => setOpeningNotes(e.target.value)}
-            />
-          </div>
-        </DefaultModal>
-      </div>
+      <POSCashClosedView
+        isOpenCashModalOpen={isOpenCashModalOpen}
+        setIsOpenCashModalOpen={setIsOpenCashModalOpen}
+        isOpeningCash={isOpeningCash}
+        openingBalance={openingBalance}
+        setOpeningBalance={setOpeningBalance}
+        openingNotes={openingNotes}
+        setOpeningNotes={setOpeningNotes}
+        onOpenCash={handleOpenCash}
+      />
     )
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full flex flex-col gap-4">
-      {!isCashierOpen && (
-        <div className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="font-bold">Caixa fechado</p>
-              <p>Os produtos ficam visíveis. Abra o caixa só para adicionar itens e finalizar vendas.</p>
-            </div>
-            <Button onClick={() => setIsOpenCashModalOpen(true)} className="shrink-0">
-              Abrir o Caixa
-            </Button>
-          </div>
-        </div>
-      )}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 min-h-0 flex-1">
-        <div className="xl:col-span-8 min-h-0 flex flex-col">
-          {/* HEADER: Combined Row */}
-          <div className="flex items-center gap-3 mb-6">
-            {/* Search Part */}
-            <div className="flex-1 relative min-w-[200px]">
-              <Input
-                label=""
-                placeholder="Buscar produtos..."
-                value={search}
-                variant="full-rounded"
-                onChange={(e: any) => setSearch(e.target.value)}
-                prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                className="mb-0 border-transparent bg-transparent"
-              />
-            </div>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex h-full flex-col gap-4">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="flex min-h-0 flex-col xl:col-span-8 xl:pl-6">
+          <POSHeader
+            isMobile={isMobile}
+            search={search}
+            onSearchChange={setSearch}
+            categories={categories}
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+            mobileCategoryLabel={mobileCategoryLabel}
+            onOpenCategorySheet={() => setIsCategorySheetOpen(true)}
+            selectedCustomerId={selectedCustomerId}
+            customers={customers}
+            onOpenCustomerSheet={() => setIsSelectCustomerOpen(true)}
+            selectedSellerId={selectedSellerId}
+            teamMembers={teamMembers}
+            onOpenSellerSheet={() => setIsSelectSellerOpen(true)}
+          />
 
-            {/* Carousel Part (Visible on Desktop) */}
-            {!isMobile && (
-              <div className="flex-1 relative overflow-hidden group border-l border-brand-border dark:border-dark-border px-4">
-                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth py-1">
-                  {categories.map((cat) => (
-                    <button
-                      key={cat}
-                      onClick={() => setSelectedCategory(cat)}
-                      className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-bold transition-all border ${selectedCategory === cat
-                        ? "bg-brand-dark text-white border-brand-dark"
-                        : "bg-[#F5F6F7] text-brand-inactive-text border-transparent hover:border-brand-border"
-                        }`}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Selectors Part */}
-            <div className="flex items-center gap-6 shrink-0 border-l border-brand-border dark:border-dark-border pl-6">
-              {isMobile ? (
-                <>
-                  <button onClick={() => setIsGlobalDiscountModalOpen(true)} className="w-10 h-10 rounded-full bg-[#F5F6F7] dark:bg-dark-gray border border-brand-border dark:border-dark-border flex items-center justify-center text-brand-dark dark:text-dark-text shadow-none">
-                    <TagIcon size={18} />
-                  </button>
-                  <button onClick={() => setIsSelectCustomerOpen(true)} className="w-10 h-10 rounded-full bg-[#F5F6F7] dark:bg-dark-gray border border-brand-border dark:border-dark-border flex items-center justify-center text-brand-dark dark:text-dark-text shadow-none">
-                    <UserIcon size={18} />
-                  </button>
-                  <button onClick={() => setIsSelectSellerOpen(true)} className="w-10 h-10 rounded-full bg-[#F5F6F7] dark:bg-dark-gray border border-brand-border dark:border-dark-border flex items-center justify-center text-brand-dark dark:text-dark-text shadow-none">
-                    <ClockIcon size={18} />
-                  </button>
-                </>
-              ) : (
-                <div className="flex items-center gap-8">
-                  {/* Customer Selector */}
-                  <button
-                    onClick={() => setIsSelectCustomerOpen(true)}
-                    className="flex items-center gap-3 group transition-colors shadow-none"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                      {selectedCustomerId ? (
-                        <span className="font-bold text-lg">{customers.find(c => c.id === selectedCustomerId)?.name.charAt(0).toUpperCase()}</span>
-                      ) : (
-                        <UserIcon size={20} />
-                      )}
-                    </div>
-                    <div className="flex flex-col text-left min-w-[100px]">
-                      <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Cliente</span>
-                      <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body truncate max-w-[150px]">
-                        {selectedCustomerId ? customers.find(c => c.id === selectedCustomerId)?.name : "Consumidor Final"}
-                      </span>
-                    </div>
-                    <ChevronRightIcon size={16} className="text-brand-inactive-text group-hover:text-brand-dark transition-colors" />
-                  </button>
-
-                  <div className="w-[1px] h-10 bg-brand-border dark:bg-dark-border" />
-
-                  {/* Seller Selector */}
-                  <button
-                    onClick={() => setIsSelectSellerOpen(true)}
-                    className="flex items-center gap-3 group transition-colors shadow-none"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                      <ClockIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                    </div>
-                    <div className="flex flex-col text-left min-w-[100px]">
-                      <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Vendedor</span>
-                      <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body truncate max-w-[150px]">
-                        {selectedSellerId ? teamMembers.find(t => t.id === selectedSellerId)?.fullName : "Selecionar"}
-                      </span>
-                    </div>
-                    <ChevronRightIcon size={16} className="text-brand-inactive-text group-hover:text-brand-dark transition-colors" />
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Product Grid - Fixed Items (No stretch) */}
-          <div className="mt-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 overflow-y-auto pr-1 no-scrollbar pb-6 items-start content-start">
+          <div className={`mt-2 grid grid-cols-2 gap-3 overflow-y-auto pr-1 pb-24 md:grid-cols-3 xl:grid-cols-4 xl:pb-6 2xl:grid-cols-5 ${desktopScrollClass}`}>
             {filteredProducts
               .slice(0, (cart.length === 0 && preSales.length > 0) ? (preSaleLimit === 4 ? 8 : preSaleLimit === 3 ? 6 : preSaleLimit === 2 ? 4 : 2) : undefined)
               .map((product) => (
-                <div
-                  key={product.id}
-                  className="rounded-3xl border border-brand-border p-3 bg-white dark:bg-dark-surface text-left transition-all"
-                >
-                  <div className="relative aspect-square mb-2 overflow-hidden rounded-2xl">
+                <div key={product.id} className="rounded-xl border border-brand-border bg-white p-3 text-left transition-all dark:bg-dark-surface">
+                  <div className="relative mb-2 aspect-square overflow-hidden rounded-2xl">
                     <img
                       src={getR2ImageUrl(product.images?.[0] || null, "thumbnail")}
                       alt={product.name}
-                      className="w-full h-full object-cover bg-brand-gray"
+                      className="h-full w-full object-cover bg-brand-gray dark:bg-dark-border/50"
                     />
-                    <span className="absolute left-2 top-2 px-2 py-1 text-[11px] font-bold bg-brand-dark/80 backdrop-blur-sm text-white rounded-lg">
+                    <span className="absolute left-2 top-2 rounded-lg bg-brand-dark/80 px-2 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
                       {Math.max(0, Number(product.stock_available || 0))} Stock
                     </span>
                   </div>
                   <div>
-                    <p className="font-bold text-brand-dark dark:text-dark-heading truncate text-sm">{product.name}</p>
-                    {product.sku && <p className="text-xs text-brand-inactive-text truncate">SKU: {product.sku}</p>}
+                    <p className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</p>
                     {product.product_variants && product.product_variants.length > 0 && (
                       <p className="text-sm text-brand-inactive-text">{product.product_variants.length} variação(ões)</p>
                     )}
-                    <p className="text-brand-dark dark:text-dark-heading font-bold mt-0.5">{formatCurrency(Number(product.price || 0))}</p>
+                    <p className="mt-0.5 font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(product.price || 0))}</p>
 
                     <Button
                       variant="outline"
-                      className="w-full mt-3 h-9 rounded-full text-xs font-bold border-brand-border text-brand-dark hover:bg-brand-gray"
+                      className="mt-3 h-9 w-full rounded-full border-brand-border text-xs font-bold text-brand-dark hover:bg-brand-gray"
                       onClick={() => {
                         if (product.product_variants && product.product_variants.length > 0) {
                           setVariantPickerProduct(product)
@@ -968,20 +586,19 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
               ))}
           </div>
 
-          {/* Pre-sales list (Visible only if cart is empty) */}
           <AnimatePresence>
             {cart.length === 0 && preSales.length > 0 && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="mt-6 pt-6 border-t border-brand-border"
+                className="mt-auto border-t border-brand-border pt-6"
               >
-                <h4 className="font-bold text-xl text-brand-dark mb-4 tracking-tight">Pedidos em pré-venda</h4>
-                <div className="flex items-stretch gap-4 pb-2 overflow-x-auto no-scrollbar">
+                <h4 className="mb-4 text-xl font-bold tracking-tight text-brand-dark">Pedidos em pré-venda</h4>
+                <div className={`flex items-stretch gap-4 overflow-x-auto pb-2 ${desktopScrollClass}`}>
                   {preSales.slice(0, preSaleLimit).map((preSale, index) => (
                     <div key={preSale.id} className="relative group">
-                      <PreSaleCard
+                      <POSPreSaleCard
                         preSale={preSale}
                         index={index}
                         customers={customers}
@@ -990,7 +607,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                     </div>
                   ))}
                   {preSales.length > preSaleLimit && (
-                    <MorePreSalesCard
+                    <POSMorePreSalesCard
                       count={preSales.length - preSaleLimit}
                       onClick={() => setIsPreSaleSheetOpen(true)}
                     />
@@ -1001,40 +618,133 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
           </AnimatePresence>
         </div>
 
-        {!isMobile && <div className="xl:col-span-4 min-h-0">{cartPanel}</div>}
+        {!isMobile && (
+          <div className="min-h-0 xl:col-span-4">
+            <POSDesktopOrderPanel
+              itemCount={itemCount}
+              subtotal={subtotal}
+              discountVal={discountVal}
+              shippingFee={shippingFee}
+              otherCosts={otherCosts}
+              total={total}
+              isFinalizing={isFinalizing}
+              canContinue={!isFinalizing && cart.length > 0}
+              canReset={cart.length > 0}
+              onReset={() => setIsResetAlertOpen(true)}
+              onOpenItems={() => { }}
+              onOpenDiscount={() => setIsGlobalDiscountModalOpen(true)}
+              onContinue={handleOpenPaymentModal}
+              onSaveDraft={persistDraft}
+              onAddShipping={handleShippingPrompt}
+              onOpenNotes={() => setIsNotesSheetOpen(true)}
+              showItemsShortcut={false}
+            />
+            <div className="mt-4">{cartItemsList}</div>
+          </div>
+        )}
       </div>
-
       {isMobile && itemCount > 0 && (
         <button
-          className="fixed bottom-4 left-4 right-4 h-14 rounded-2xl bg-brand-primary text-white font-bold z-40 flex items-center justify-between px-4 shadow-xl"
-          onClick={() => setMobileOpen(true)}
+          className="fixed bottom-4 left-4 right-4 z-40 flex h-14 items-center justify-between rounded-[22px] bg-brand-primary px-4 font-bold text-white shadow-[0_14px_32px_rgba(5,150,105,0.28)]"
+          onClick={() => setIsMobileSummarySheetOpen(true)}
         >
           <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">{itemCount}</span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm text-brand-primary">{itemCount}</span>
             <span>Ver Pedido</span>
           </div>
           <span>{formatCurrency(total)}</span>
         </button>
       )}
 
-      {/* MODALS & SHEETS */}
-      {isMobile && mobileOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={() => setMobileOpen(false)}>
-          <div className="absolute right-0 top-0 bottom-0 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            {cartPanel}
+      <BottomSheet isOpen={isCategorySheetOpen} onClose={() => setIsCategorySheetOpen(false)}>
+        <div className="space-y-3 px-1 pb-2">
+          <div>
+            <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Selecionar categoria</h3>
+            <p className="mt-1 text-sm text-brand-inactive-text dark:text-dark-body">Escolha uma categoria para filtrar os produtos do PDV.</p>
+          </div>
+          <div className="space-y-2">
+            {categories.map((category) => (
+              <button
+                key={category}
+                type="button"
+                onClick={() => {
+                  setSelectedCategory(category)
+                  setIsCategorySheetOpen(false)
+                }}
+                className={`flex w-full items-center justify-between rounded-2xl border px-4 py-4 text-left ${selectedCategory === category
+                  ? "border-brand-primary bg-green-50 text-brand-primary"
+                  : "border-brand-border bg-white text-brand-dark dark:bg-dark-surface dark:text-dark-heading"
+                  }`}
+              >
+                <span className="font-bold">{category}</span>
+                <ChevronRightIcon className="h-4 w-4" />
+              </button>
+            ))}
           </div>
         </div>
-      )}
+      </BottomSheet>
 
-      <BottomSheet
-        isOpen={isPreSaleSheetOpen}
-        onClose={() => setIsPreSaleSheetOpen(false)}
-        title="Pedidos em Pré-venda"
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
+      <BottomSheet isOpen={isMobileSummarySheetOpen} onClose={() => setIsMobileSummarySheetOpen(false)}>
+        <div className="space-y-5 px-1 pb-2">
+          <div>
+            <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Resumo do Pedido</h3>
+          </div>
+          <POSOrderSummaryContent
+            itemCount={itemCount}
+            subtotal={subtotal}
+            discountVal={discountVal}
+            shippingFee={shippingFee}
+            otherCosts={otherCosts}
+            total={total}
+            isFinalizing={isFinalizing}
+            canContinue={!isFinalizing && cart.length > 0}
+            onOpenItems={() => {
+              setIsMobileSummarySheetOpen(false)
+              setIsMobileItemsSheetOpen(true)
+            }}
+            onOpenDiscount={() => setIsGlobalDiscountModalOpen(true)}
+            onContinue={handleOpenPaymentModal}
+            onSaveDraft={persistDraft}
+            onAddShipping={handleShippingPrompt}
+            onOpenNotes={() => setIsNotesSheetOpen(true)}
+          />
+        </div>
+      </BottomSheet>
+
+      <BottomSheet isOpen={isMobileItemsSheetOpen} onClose={() => setIsMobileItemsSheetOpen(false)}>
+        <div className="space-y-5 px-1 pb-2">
+          <div>
+            <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Itens do Pedido</h3>
+            <p className="mt-1 text-sm text-brand-inactive-text dark:text-dark-body">{itemCount} item(ns) no pedido</p>
+          </div>
+          <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1 hide-scrollbar">
+            {cart.map((item) => (
+              <POSCartItemCard
+                key={item.id}
+                item={item}
+                onChangeQty={changeQty}
+                onRemove={(id) => setItemToRemoveId(id)}
+                onEdit={(currentItem) => setEditingItem(currentItem)}
+              />
+            ))}
+          </div>
+          <Button
+            className="h-12 w-full"
+            onClick={() => {
+              setIsMobileItemsSheetOpen(false)
+              setIsMobileSummarySheetOpen(true)
+            }}
+          >
+            Voltar
+          </Button>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet isOpen={isPreSaleSheetOpen} onClose={() => setIsPreSaleSheetOpen(false)} title="Pedidos em Pré-venda">
+        <div className="grid grid-cols-1 gap-4 pt-4 md:grid-cols-2 lg:grid-cols-3">
           {preSales.map((preSale, index) => (
             <div key={preSale.id} className="relative group">
-              <PreSaleCard
+              <POSPreSaleCard
                 preSale={preSale}
                 index={index}
                 customers={customers}
@@ -1044,7 +754,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 }}
               />
               <button
-                className="absolute top-4 right-4 text-brand-red opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute right-4 top-4 text-brand-red opacity-0 transition-opacity group-hover:opacity-100"
                 onClick={(e) => {
                   e.stopPropagation()
                   removeDraft(preSale.id)
@@ -1057,11 +767,27 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         </div>
       </BottomSheet>
 
+      <AnimatePresence>
+        {isPaymentModalOpen && (
+          <PaymentModal
+            isOpen={isPaymentModalOpen}
+            onClose={() => setIsPaymentModalOpen(false)}
+            cart={paymentModalCart}
+            customer={selectedCustomer}
+            partnerId={partnerId}
+            shippingFee={shippingFee}
+            otherCosts={otherCosts}
+            discountAmount={discountVal}
+            onConfirm={handleConfirmPayment}
+          />
+        )}
+      </AnimatePresence>
+
       {variantPickerProduct && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-[32px] w-full max-w-sm p-6 shadow-2xl">
-            <h4 className="text-xl font-bold text-brand-dark mb-4 tracking-tight">Selecionar Variação</h4>
-            <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1 no-scrollbar">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-[32px] bg-white p-6 shadow-2xl">
+            <h4 className="mb-4 text-xl font-bold tracking-tight text-brand-dark">Selecionar Variação</h4>
+            <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-1 hide-scrollbar">
               {variantPickerProduct.product_variants?.map((variant) => {
                 const variantStock = Number(variant.stock_available || 0)
                 const variantPrice = Number(variantPickerProduct.price || 0) + Number(variant.price_adjustment || 0)
@@ -1069,7 +795,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                   <button
                     key={variant.id}
                     disabled={!variantPickerProduct.allow_sell_without_stock && variantStock <= 0}
-                    className="w-full bg-brand-gray border border-brand-border rounded-2xl p-4 text-left hover:border-brand-primary active:scale-95 transition-all disabled:opacity-50 flex items-center justify-between group"
+                    className="group flex w-full items-center justify-between rounded-2xl border border-brand-border bg-brand-gray p-4 text-left transition-all hover:border-brand-primary active:scale-95 disabled:opacity-50"
                     onClick={() => {
                       if (!variantPickerProduct.allow_sell_without_stock && variantStock <= 0) {
                         notifyError(`Estoque insuficiente para o item ${variantPickerProduct.name} - ${variant.variant_name}`)
@@ -1079,27 +805,24 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                       setVariantPickerProduct(null)
                     }}
                   >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-brand-dark truncate">{variant.variant_name}</p>
-                      <p className="text-xs text-brand-inactive-text font-medium mt-0.5">Disponível: {variantStock}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-bold text-brand-dark">{variant.variant_name}</p>
+                      <p className="mt-0.5 text-xs font-medium text-brand-inactive-text">Disponível: {variantStock}</p>
                     </div>
-                    <span className="font-bold text-brand-dark bg-white px-3 py-1.5 rounded-xl border border-brand-border group-hover:border-brand-primary">
+                    <span className="rounded-xl border border-brand-border bg-white px-3 py-1.5 font-bold text-brand-dark group-hover:border-brand-primary">
                       {formatCurrency(variantPrice)}
                     </span>
                   </button>
                 )
               })}
             </div>
-            <Button variant="outline" className="w-full mt-6 h-12 rounded-full font-bold" onClick={() => setVariantPickerProduct(null)}>
+            <Button variant="outline" className="mt-6 h-12 w-full rounded-full font-bold" onClick={() => setVariantPickerProduct(null)}>
               Fechar
             </Button>
           </div>
         </div>
       )}
 
-
-
-      {/* Item Removal Confirmation */}
       {itemToRemoveId && (
         <AlertModal
           isOpen={!!itemToRemoveId}
@@ -1117,13 +840,12 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         />
       )}
 
-      {/* Edit Item Modal */}
       <DefaultModal
         isOpen={!!editingItem}
         onClose={() => setEditingItem(null)}
         title="Editar dados do produto"
         footer={
-          <div className="flex items-center gap-3 w-full">
+          <div className="flex w-full items-center gap-3">
             <Button variant="outline" className="flex-1" onClick={() => setEditingItem(null)}>
               Cancelar
             </Button>
@@ -1145,112 +867,45 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 value={editQty}
                 onChange={(e: any) => setEditQty(Number(e.target.value))}
               />
-              {editDiscountType === 'fixed' ? (
-                <MoneyInput
-                  label="Desconto"
-                  value={editDiscount}
-                  onChange={(v: number) => setEditDiscount(v)}
-                  suffix={
-                    <div className="flex items-center gap-2 pr-2">
-                      <div className="h-6 w-[1px] bg-brand-border dark:bg-dark-border" />
-                      <Dropdown
-                        trigger={
-                          <button className="text-brand-dark dark:text-dark-text font-bold text-sm min-w-[30px]">
-                            R$
-                          </button>
-                        }
-                        showChevron={false}
-                        align="right"
-                        width="w-40"
-                      >
-                        <DropdownItem onClick={() => setEditDiscountType('fixed')}>
-                          $ R$ (Reais)
-                        </DropdownItem>
-                        <DropdownItem onClick={() => {
-                          setEditDiscount(0)
-                          setEditDiscountType('percentage')
-                        }}>
-                          % % (Porcentagem)
-                        </DropdownItem>
-                      </Dropdown>
-                    </div>
-                  }
-                />
-              ) : (
-                <Input
-                  label="Desconto"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={editDiscount || ""}
-                  onChange={(e: any) => {
-                    let val = Number(e.target.value)
-                    if (val > 100) val = 100
-                    if (val < 0) val = 0
-                    setEditDiscount(val)
-                  }}
-                  suffix={
-                    <div className="flex items-center gap-2 pr-2">
-                      <div className="h-6 w-[1px] bg-brand-border dark:bg-dark-border" />
-                      <Dropdown
-                        trigger={
-                          <button className="text-brand-dark dark:text-dark-text font-bold text-sm min-w-[30px]">
-                            %
-                          </button>
-                        }
-                        showChevron={false}
-                        align="right"
-                        width="w-40"
-                      >
-                        <DropdownItem onClick={() => {
-                          setEditDiscount(0)
-                          setEditDiscountType('fixed')
-                        }}>
-                          $ R$ (Reais)
-                        </DropdownItem>
-                        <DropdownItem onClick={() => setEditDiscountType('percentage')}>
-                          % % (Porcentagem)
-                        </DropdownItem>
-                      </Dropdown>
-                    </div>
-                  }
-                />
-              )}
+              <MoneyInput
+                label="Desconto"
+                value={editDiscount}
+                onChange={(value: number) => setEditDiscount(value)}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <MoneyInput
                 label="Valor unitário"
                 value={editPrice}
-                onChange={(v: number) => setEditPrice(v)}
+                onChange={(value: number) => setEditPrice(value)}
               />
               <Input
                 label="Sub total"
                 readOnly
                 value={formatCurrency(
-                  (editDiscountType === 'fixed'
+                  (editDiscountType === "fixed"
                     ? Math.max(0, editPrice - editDiscount)
                     : Math.max(0, editPrice * (1 - editDiscount / 100))) * editQty
                 )}
-                className="bg-[#F5F6F7] dark:bg-dark-gray text-brand-dark dark:text-dark-text font-bold cursor-not-allowed border-brand-border dark:border-dark-border"
+                className="flex-1 w-full"
               />
             </div>
           </div>
         )}
       </DefaultModal>
 
-      {/* Global Discount Modal */}
       <DefaultModal
         isOpen={isGlobalDiscountModalOpen}
         onClose={() => setIsGlobalDiscountModalOpen(false)}
         title="Aplicar Desconto"
         footer={
-          <div className="flex items-center gap-3 w-full">
+          <div className="flex w-full items-center gap-3">
             <Button variant="outline" className="flex-1" onClick={() => setIsGlobalDiscountModalOpen(false)}>
               Cancelar
             </Button>
             <Button className="flex-1" onClick={() => {
-              if (editDiscountType === 'fixed') {
+              if (editDiscountType === "fixed") {
                 setDiscountAmount(editDiscount)
               } else {
                 setDiscountAmount(total * (editDiscount / 100))
@@ -1264,100 +919,21 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       >
         <div className="space-y-6 pt-2">
           <InfoCard color="green" title="Valor total de itens" message={formatCurrency(total)} />
-
-          {editDiscountType === 'fixed' ? (
-            <MoneyInput
-              label="Desconto do pedido"
-              value={editDiscount}
-              onChange={(v: number) => setEditDiscount(v)}
-              suffix={
-                <div className="flex items-center gap-2 pr-2">
-                  <div className="h-6 w-[1px] bg-brand-border dark:bg-dark-border" />
-                  <Dropdown
-                    trigger={
-                      <button className="text-brand-dark dark:text-dark-text font-bold text-sm min-w-[30px]">
-                        R$
-                      </button>
-                    }
-                    showChevron={false}
-                    align="right"
-                    width="w-40"
-                  >
-                    <DropdownItem onClick={() => setEditDiscountType('fixed')}>
-                      $ R$ (Reais)
-                    </DropdownItem>
-                    <DropdownItem onClick={() => {
-                      setEditDiscount(0)
-                      setEditDiscountType('percentage')
-                    }}>
-                      % % (Porcentagem)
-                    </DropdownItem>
-                  </Dropdown>
-                </div>
-              }
-            />
-          ) : (
-            <Input
-              label="Desconto do pedido"
-              name="globalDiscount"
-              type="number"
-              min="0"
-              max="100"
-              value={editDiscount || ""}
-              onChange={(e: any) => {
-                let val = Number(e.target.value)
-                if (val > 100) val = 100
-                if (val < 0) val = 0
-                setEditDiscount(val)
-              }}
-              suffix={
-                <div className="flex items-center gap-2 pr-2">
-                  <div className="h-6 w-[1px] bg-brand-border dark:bg-dark-border" />
-                  <Dropdown
-                    trigger={
-                      <button className="text-brand-dark dark:text-dark-text font-bold text-sm min-w-[30px]">
-                        %
-                      </button>
-                    }
-                    showChevron={false}
-                    align="right"
-                    width="w-40"
-                  >
-                    <DropdownItem onClick={() => {
-                      setEditDiscount(0)
-                      setEditDiscountType('fixed')
-                    }}>
-                      $ R$ (Reais)
-                    </DropdownItem>
-                    <DropdownItem onClick={() => setEditDiscountType('percentage')}>
-                      % % (Porcentagem)
-                    </DropdownItem>
-                  </Dropdown>
-                </div>
-              }
-            />
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            {[5, 10, 20, 50, 100].map(amt => (
-              <button
-                key={amt}
-                onClick={() => setEditDiscount(amt)}
-                className="px-4 py-2 bg-brand-gray dark:bg-dark-border/30 rounded-xl text-xs font-bold text-brand-dark dark:text-dark-heading hover:bg-brand-border/10 transition-colors border border-transparent shadow-none"
-              >
-                {editDiscountType === 'fixed' ? `R$ ${amt}` : `${amt}%`}
-              </button>
-            ))}
-          </div>
+          <MoneyInput
+            label="Desconto do pedido"
+            value={editDiscount}
+            onChange={(value: number) => setEditDiscount(value)}
+          />
         </div>
       </DefaultModal>
+
       {isNotesSheetOpen && (
         <DefaultModal
           isOpen={isNotesSheetOpen}
           onClose={() => setIsNotesSheetOpen(false)}
           title="Adicionar Observação"
           footer={
-            <div className="flex items-center gap-3 w-full">
+            <div className="flex w-full items-center gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
                 Cancelar
               </Button>
@@ -1369,7 +945,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         >
           <div className="pt-2">
             <textarea
-              className="w-full h-32 p-4 rounded-xl resize-none bg-[#F5F6F7] dark:bg-dark-gray border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-text focus:outline-none focus:border-brand-primary"
+              className="h-32 w-full resize-none rounded-xl border border-brand-border bg-[#F5F6F7] p-4 text-brand-dark focus:border-brand-primary focus:outline-none dark:border-dark-border dark:bg-dark-gray dark:text-dark-text"
               placeholder="Digite alguma observação que sairá no pedido..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -1381,101 +957,35 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       <SelectCustomerSheet
         isOpen={isSelectCustomerOpen}
         onClose={() => setIsSelectCustomerOpen(false)}
-        partnerId={partnerId}
-        onSelect={(customer: any) => {
+        onSelect={(customer) => {
           setSelectedCustomerId(customer.id)
           setIsSelectCustomerOpen(false)
         }}
+        partnerId={partnerId}
       />
 
       <SelectSellerSheet
         isOpen={isSelectSellerOpen}
         onClose={() => setIsSelectSellerOpen(false)}
-        onSelect={(seller: any) => {
+        onSelect={(seller) => {
           setSelectedSellerId(seller.id)
           setIsSelectSellerOpen(false)
         }}
       />
 
-      {isResetAlertOpen && (
-        <AlertModal
-          isOpen={isResetAlertOpen}
-          onClose={() => setIsResetAlertOpen(false)}
-          onConfirm={() => {
-            clearCurrentOrder()
-            setIsResetAlertOpen(false)
-            notifySuccess("Pedido limpo com sucesso.")
-          }}
-          title="Limpar Pedido?"
-          description="Isso irá remover todos os itens do carrinho e resetar as informações do pedido. Esta ação não pode ser desfeita."
-          confirmText="Sim, Limpar"
-          cancelText="Cancelar"
-          variant="danger"
-        />
-      )}
-
-      <DefaultModal
-        isOpen={isOpenCashModalOpen}
-        onClose={() => setIsOpenCashModalOpen(false)}
-        title="Abrir caixa"
-        footer={
-          <div className="flex items-center gap-3 w-full">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => setIsOpenCashModalOpen(false)}
-              disabled={isOpeningCash}
-            >
-              Cancelar
-            </Button>
-            <Button
-              className="flex-1"
-              onClick={async () => {
-                if (openingBalance < 0) {
-                  notifyError("Saldo inicial invÃ¡lido.")
-                  return
-                }
-                if (isOpeningCash) return
-                setIsOpeningCash(true)
-                try {
-                  const result = await openCashSessionAction({
-                    partnerId,
-                    initialAmount: openingBalance,
-                    notes: openingNotes,
-                  })
-                  if (!result.success) {
-                    notifyError(result.error || "NÃ£o foi possÃ­vel abrir o caixa.")
-                    return
-                  }
-                  notifySuccess("Caixa aberto com sucesso.")
-                  setActiveCashSession(result.data)
-                  setIsOpenCashModalOpen(false)
-                  setOpeningBalance(0)
-                  setOpeningNotes("")
-                } finally {
-                  setIsOpeningCash(false)
-                }
-              }}
-              isLoading={isOpeningCash}
-            >
-              Confirmar abertura
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-4 pt-2">
-          <MoneyInput
-            label="Saldo inicial em dinheiro"
-            value={openingBalance}
-            onChange={setOpeningBalance}
-          />
-          <Input
-            label="ObservaÃ§Ãµes"
-            value={openingNotes}
-            onChange={(e: any) => setOpeningNotes(e.target.value)}
-          />
-        </div>
-      </DefaultModal>
+      <AlertModal
+        isOpen={isResetAlertOpen}
+        onClose={() => setIsResetAlertOpen(false)}
+        onConfirm={() => {
+          clearCurrentOrder()
+          setIsResetAlertOpen(false)
+        }}
+        title="Limpar pedido?"
+        description="Todos os itens adicionados serão removidos do pedido atual."
+        confirmText="Limpar"
+        cancelText="Cancelar"
+        variant="warning"
+      />
     </motion.div>
   )
 }

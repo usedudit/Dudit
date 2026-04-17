@@ -751,16 +751,16 @@ const PaymentModal = ({
                                     {/* Stats Row */}
                                     <div className="flex flex-col sm:flex-row gap-8 sm:gap-12 mb-10 mt-4 border-l-4 border-brand-dark dark:border-dark-heading pl-6">
                                         <div>
-                                            <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">total da venda</span>
+                                            <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">Total da venda</span>
                                             <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(total)}</div>
                                         </div>
                                         <div>
-                                            <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">total recebido</span>
+                                            <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">Total recebido</span>
                                             <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(totalPaidCalculated)}</div>
                                         </div>
                                         {changeAmount > 0 && (
                                             <div>
-                                                <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">troco</span>
+                                                <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">Troco</span>
                                                 <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(changeAmount)}</div>
                                             </div>
                                         )}

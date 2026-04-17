@@ -8,7 +8,7 @@ import { TAGS } from "@/lib/utils/revalidation-tags"
  * Uses unstable_cache for cross-request caching + React cache() for per-request deduplication.
  * 
  * Cache key structure is designed to allow future extension with filters/sort
- * without refactoring — simply append additional segments to the key array.
+ * without refactoring - simply append additional segments to the key array.
  * 
  * @param partnerId - The partner's UUID
  * @param page - 1-indexed page number (server page, 50 rows each)
@@ -21,7 +21,7 @@ export const getTransactionsCached = cache(async (partnerId: string, page: numbe
         async () => {
             const supabase = getAdminClient()
 
-            // Count query — isolated so it can be easily removed or switched to 'estimated'
+            // Count query - isolated so it can be easily removed or switched to 'estimated'
             const countResult = await supabase
                 .from("transactions")
                 .select("id", { count: "exact", head: true })
@@ -29,7 +29,7 @@ export const getTransactionsCached = cache(async (partnerId: string, page: numbe
 
             const totalCount = countResult.count ?? 0
 
-            // Data query — explicit field selection (no select("*"))
+            // Data query - explicit field selection (no select("*"))
             const { data, error } = await supabase
                 .from("transactions")
                 .select(`

@@ -109,5 +109,5 @@ BEGIN
 END;
 $$;
 
--- Restrict direct access — only callable via authenticated server actions
+-- Restrict direct access - only callable via authenticated server actions
 REVOKE ALL ON FUNCTION public.generate_recurring_occurrences_bulk(UUID, DATE) FROM PUBLIC;

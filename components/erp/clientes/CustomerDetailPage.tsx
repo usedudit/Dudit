@@ -460,7 +460,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                 </div>
 
                                 {/* Sidebar Column */}
-                                <div className="col-span-12 lg:col-span-4 border-l border-brand-border dark:border-dark-border lg:pl-12 space-y-10">
+                                <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
 
                                     {/* Observações utilizando o InfoCard, apenas se tiver notas */}
                                     {customer.notes && (
@@ -562,7 +562,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                             <div className="w-full h-[120px] bg-brand-gray dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group">
                                                                 <img src="https://img.dudit.com.br/static/MapLarge.png" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Mapa" />
                                                                 <div className="absolute inset-0 flex items-center justify-center">
-                                                                    <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white">
+                                                                    <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white z-10 transition-transform group-hover:scale-110">
                                                                         <div className="w-2 h-2 bg-white rounded-full"></div>
                                                                     </div>
                                                                 </div>

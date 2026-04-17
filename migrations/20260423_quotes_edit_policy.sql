@@ -100,7 +100,7 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- Mesmo status: enviado — só observações, validade, internas e conversão
+  -- Mesmo status: enviado - só observações, validade, internas e conversão
   IF OLD.status = 'sent' THEN
     IF NEW.customer_id IS DISTINCT FROM OLD.customer_id
        OR NEW.issue_date IS DISTINCT FROM OLD.issue_date

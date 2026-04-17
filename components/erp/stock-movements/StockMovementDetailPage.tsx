@@ -163,7 +163,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                 </div>
 
                 {/* Scrollable Content */}
-                <div className="max-w-[1400px] mx-auto p-4 md:p-8 pt-6">
+                <div className="max-w-[1300px] mx-auto p-4 md:p-8 pt-6">
                     <div className="grid grid-cols-12 gap-y-8 xl:gap-y-0">
 
                         {/* LEFT COLUMN - MAIN INFO */}
@@ -191,60 +191,60 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                     {displayItems.map((item, index) => {
                                         const lineIn = item.type === 'in';
                                         return (
-                                        <div key={item.id}>
-                                            {index > 0 && (
-                                                <div className="h-px bg-brand-border dark:bg-dark-border mx-6" />
-                                            )}
-                                            <div className="p-6">
-                                                <div className="flex flex-col md:flex-row md:items-center gap-6">
-                                                    <div className="flex items-start gap-5 flex-1">
-                                                        <div className="w-12 h-12 rounded-full border border-brand-border dark:border-dark-border overflow-hidden shrink-0 bg-brand-gray dark:bg-dark-border/20">
-                                                            <img
-                                                                src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
-                                                                className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"
-                                                                alt={item.product.name}
-                                                            />
-                                                        </div>
+                                            <div key={item.id}>
+                                                {index > 0 && (
+                                                    <div className="h-px bg-brand-border dark:bg-dark-border mx-6" />
+                                                )}
+                                                <div className="p-6">
+                                                    <div className="flex flex-col md:flex-row md:items-center gap-6">
+                                                        <div className="flex items-start gap-5 flex-1">
+                                                            <div className="w-12 h-12 rounded-full border border-brand-border dark:border-dark-border overflow-hidden shrink-0 bg-brand-gray dark:bg-dark-border/20">
+                                                                <img
+                                                                    src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
+                                                                    className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"
+                                                                    alt={item.product.name}
+                                                                />
+                                                            </div>
 
-                                                        <div className="flex-1 min-w-0">
-                                                            <h4 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate mb-1">{item.product.name}</h4>
+                                                            <div className="flex-1 min-w-0">
+                                                                <h4 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate mb-1">{item.product.name}</h4>
 
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{item.product.sku}</span>
-                                                                <span className="text-brand-inactive-text dark:text-dark-body">•</span>
-                                                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{item.product.category}</span>
-                                                                <span className="text-brand-inactive-text dark:text-dark-body">•</span>
-                                                                <span className={`text-sm font-bold ${lineIn ? 'text-brand-green' : 'text-brand-red'}`}>
-                                                                    {lineIn ? '+' : '-'}{item.quantity}
-                                                                </span>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{item.product.sku}</span>
+                                                                    <span className="text-brand-inactive-text dark:text-dark-body">•</span>
+                                                                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{item.product.category}</span>
+                                                                    <span className="text-brand-inactive-text dark:text-dark-body">•</span>
+                                                                    <span className={`text-sm font-bold ${lineIn ? 'text-brand-green' : 'text-brand-red'}`}>
+                                                                        {lineIn ? '+' : '-'}{item.quantity}
+                                                                    </span>
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
 
-                                                    {/* Desktop Divider */}
-                                                    <div className="hidden md:block w-px h-12 bg-brand-border dark:bg-dark-border mx-2"></div>
-                                                    {/* Mobile Divider */}
-                                                    <div className="md:hidden w-full h-px bg-brand-border dark:bg-dark-border"></div>
+                                                        {/* Desktop Divider */}
+                                                        <div className="hidden md:block w-px h-12 bg-brand-border dark:bg-dark-border mx-2"></div>
+                                                        {/* Mobile Divider */}
+                                                        <div className="md:hidden w-full h-px bg-brand-border dark:bg-dark-border"></div>
 
-                                                    <div className="flex items-center justify-between md:justify-start gap-4 md:gap-8 min-w-fit px-2 md:px-0">
-                                                        <div className="text-center md:text-left">
-                                                            <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Anterior</div>
-                                                            <div className="text-md font-bold text-brand-dark dark:text-dark-heading">{item.product.previousStock} un</div>
-                                                        </div>
+                                                        <div className="flex items-center justify-between md:justify-start gap-4 md:gap-8 min-w-fit px-2 md:px-0">
+                                                            <div className="text-center md:text-left">
+                                                                <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Anterior</div>
+                                                                <div className="text-md font-bold text-brand-dark dark:text-dark-heading">{item.product.previousStock} un</div>
+                                                            </div>
 
-                                                        <div className="flex items-center justify-center text-gray-300 dark:text-gray-600">
-                                                            <ArrowRightIcon size={18} />
-                                                        </div>
+                                                            <div className="flex items-center justify-center text-gray-300 dark:text-gray-600">
+                                                                <ArrowRightIcon size={18} />
+                                                            </div>
 
-                                                        <div className="text-center md:text-left">
-                                                            <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Pós-Mov.</div>
-                                                            <div className={`text-md font-bold ${lineIn ? 'text-brand-green' : 'text-brand-red'}`}>{item.product.currentStock} un</div>
+                                                            <div className="text-center md:text-left">
+                                                                <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Pós-Mov.</div>
+                                                                <div className={`text-md font-bold ${lineIn ? 'text-brand-green' : 'text-brand-red'}`}>{item.product.currentStock} un</div>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    );
+                                        );
                                     })}
                                 </div>
                             </div>

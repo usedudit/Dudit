@@ -396,13 +396,13 @@ export default function TransactionsPage({
                         const at = a.occurrenceDate
                             ? new Date(`${a.occurrenceDate}T12:00:00`).getTime()
                             : a.dueDateRaw
-                              ? new Date(a.dueDateRaw).getTime()
-                              : new Date(a.dueDate).getTime()
+                                ? new Date(a.dueDateRaw).getTime()
+                                : new Date(a.dueDate).getTime()
                         const bt = b.occurrenceDate
                             ? new Date(`${b.occurrenceDate}T12:00:00`).getTime()
                             : b.dueDateRaw
-                              ? new Date(b.dueDateRaw).getTime()
-                              : new Date(b.dueDate).getTime()
+                                ? new Date(b.dueDateRaw).getTime()
+                                : new Date(b.dueDate).getTime()
                         aVal = at
                         bVal = bt
                         break
