@@ -5,6 +5,7 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { checkPartnerPermission } from "@/lib/auth/authorization"
 import POSPage from "@/components/erp/pos/POSPage"
 import { getPOSInitialDataAction } from "@/app/actions/erp/pos"
+import { getActiveCashSessionAction } from "@/app/actions/erp/cash-register"
 
 export const dynamic = "force-dynamic"
 
@@ -13,9 +14,10 @@ export default async function POSPageServer() {
   if (!context) return <AccessDenied />
 
   const partnerId = context.partnerId
-  const [{ allowed }, initialDataResult] = await Promise.all([
+  const [{ allowed }, initialDataResult, activeSessionResult] = await Promise.all([
     checkPartnerPermission(partnerId, "orders", "create"),
     getPOSInitialDataAction(partnerId),
+    getActiveCashSessionAction(partnerId),
   ])
 
   if (!allowed) return <AccessDenied />
@@ -24,11 +26,19 @@ export default async function POSPageServer() {
     return <AccessDenied />
   }
 
+  if (!activeSessionResult.success) {
+    return <AccessDenied />
+  }
+
   return (
     <>
       <ERPPageHeader title="PDV" />
       <FadeIn className="p-4 md:p-6 h-full">
-        <POSPage partnerId={partnerId} initialData={initialDataResult.data} />
+        <POSPage
+          partnerId={partnerId}
+          initialData={initialDataResult.data}
+          initialActiveSession={activeSessionResult.data}
+        />
       </FadeIn>
     </>
   )

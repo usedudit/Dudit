@@ -83,7 +83,7 @@ export async function getPOSInitialDataAction(partnerId: string) {
   await requirePartnerAccess(partnerId)
   const supabase = await getSupabaseServerClient()
 
-  const [productsRes, customersRes, accountsRes, draftsRes] = await Promise.all([
+  const [productsRes, customersRes, accountsRes, draftsRes, paymentMethodsRes] = await Promise.all([
     supabase
       .from("products")
       .select("id, name, sku, price, stock_available, allow_sell_without_stock, images, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
@@ -110,12 +110,20 @@ export async function getPOSInitialDataAction(partnerId: string) {
       .eq("status", "draft")
       .order("created_at", { ascending: false })
       .limit(20),
+    supabase
+      .from("payment_methods")
+      .select("id, name, type, is_default, is_active")
+      .eq("partner_id", partnerId)
+      .eq("is_active", true)
+      .order("is_default", { ascending: false })
+      .order("name"),
   ])
 
   if (productsRes.error) return { success: false as const, error: productsRes.error.message }
   if (customersRes.error) return { success: false as const, error: customersRes.error.message }
   if (accountsRes.error) return { success: false as const, error: accountsRes.error.message }
   if (draftsRes.error) return { success: false as const, error: draftsRes.error.message }
+  if (paymentMethodsRes.error) return { success: false as const, error: paymentMethodsRes.error.message }
 
   return {
     success: true as const,
@@ -124,6 +132,7 @@ export async function getPOSInitialDataAction(partnerId: string) {
       customers: customersRes.data || [],
       financeAccounts: accountsRes.data || [],
       preSales: draftsRes.data || [],
+      paymentMethods: paymentMethodsRes.data || [],
     },
   }
 }

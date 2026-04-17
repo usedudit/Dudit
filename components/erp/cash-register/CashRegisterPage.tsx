@@ -15,14 +15,14 @@ import { useNotification } from "@/hooks/use-notification"
 
 type SessionItem = {
   id: string
-  user_id: string
+  opened_by_user_id: string
   user_name: string
   opened_at: string
   closed_at: string | null
-  opening_balance: number
-  closing_balance: number | null
+  initial_amount: number
+  closing_amount: number | null
   status: "open" | "closed"
-  total_received: number
+  expected_drawer_total?: number
 }
 
 const ITEMS_PER_PAGE = 8
@@ -54,6 +54,7 @@ export default function CashRegisterPage({
   const [movementAmount, setMovementAmount] = useState(0)
   const [movementDescription, setMovementDescription] = useState("")
   const [closeSummary, setCloseSummary] = useState<any | null>(null)
+  const [countedByPm, setCountedByPm] = useState<Record<string, string>>({})
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -82,7 +83,7 @@ export default function CashRegisterPage({
     }
     const result = await openCashSessionAction({
       partnerId,
-      openingBalance,
+      initialAmount: openingBalance,
       notes: openingNotes,
     })
     if (!result.success) {
@@ -107,17 +108,32 @@ export default function CashRegisterPage({
       notifyError(summary.error || "Não foi possível carregar o resumo de fechamento.")
       return
     }
+    const rows = summary.data.groupedByMethod || []
+    const init: Record<string, string> = {}
+    if (rows.length === 0) {
+      init.__total__ = String(Number(summary.data.expectedDrawerTotal || 0).toFixed(2))
+    } else {
+      for (const row of rows) {
+        const key = row.paymentMethodId || "__none__"
+        init[key] = String(Number(row.calculated ?? row.total ?? 0).toFixed(2))
+      }
+    }
+    setCountedByPm(init)
     setCloseSummary(summary.data)
     setCloseModal(true)
   }
 
   const handleCloseSession = async () => {
     if (!activeSession?.id) return
+    const countedByMethod = Object.entries(countedByPm).map(([key, val]) => ({
+      paymentMethodId: key === "__none__" || key === "__total__" ? null : key,
+      amount: Number(String(val).replace(",", ".")) || 0,
+    }))
     const result = await closeCashSessionAction({
       partnerId,
       cashSessionId: activeSession.id,
       notes: closingNotes,
-      countedByMethod: [],
+      countedByMethod,
     })
     if (!result.success) {
       notifyError(result.error || "Não foi possível fechar o caixa.")
@@ -127,6 +143,7 @@ export default function CashRegisterPage({
     setActiveSession(null)
     setCloseModal(false)
     setCloseSummary(null)
+    setCountedByPm({})
     setClosingNotes("")
     await refreshHistory()
   }
@@ -219,9 +236,9 @@ export default function CashRegisterPage({
             <div className="mt-2 grid grid-cols-1 md:grid-cols-5 gap-2 text-sm">
               <span>Abertura: {new Date(session.opened_at).toLocaleString("pt-BR")}</span>
               <span>Fechamento: {session.closed_at ? new Date(session.closed_at).toLocaleString("pt-BR") : "-"}</span>
-              <span>Inicial: {formatCurrency(Number(session.opening_balance || 0))}</span>
-              <span>Final: {session.closing_balance != null ? formatCurrency(Number(session.closing_balance || 0)) : "-"}</span>
-              <span>Total recebido: {formatCurrency(Number(session.total_received || 0))}</span>
+              <span>Inicial: {formatCurrency(Number(session.initial_amount || 0))}</span>
+              <span>Final: {session.closing_amount != null ? formatCurrency(Number(session.closing_amount || 0)) : "-"}</span>
+              <span>Saldo esperado (gaveta): {formatCurrency(Number(session.expected_drawer_total || 0))}</span>
             </div>
           </div>
         ))}
@@ -234,7 +251,7 @@ export default function CashRegisterPage({
 
       <DefaultModal isOpen={openModal} onClose={() => setOpenModal(false)} title="Abrir caixa">
         <div className="space-y-3">
-          <MoneyInput label="Saldo inicial" value={openingBalance} onChange={setOpeningBalance} />
+          <MoneyInput label="Troco inicial" value={openingBalance} onChange={setOpeningBalance} />
           <Input label="Observações" value={openingNotes} onChange={(e: any) => setOpeningNotes(e.target.value)} />
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setOpenModal(false)}>Cancelar</Button>
@@ -248,17 +265,36 @@ export default function CashRegisterPage({
           {closeSummary && (
             <>
               <div className="rounded-lg border border-brand-border p-3">
-                <p className="text-sm text-brand-inactive-text">Saldo esperado</p>
-                <p className="text-xl font-bold">{formatCurrency(Number(closeSummary.expectedBalance || 0))}</p>
+                <p className="text-sm text-brand-inactive-text">Saldo calculado (gaveta)</p>
+                <p className="text-xl font-bold">{formatCurrency(Number(closeSummary.expectedDrawerTotal || 0))}</p>
               </div>
               <div className="space-y-1">
                 {(closeSummary.groupedByMethod || []).map((row: any) => (
                   <div key={row.paymentMethodId || row.label} className="flex items-center justify-between text-sm">
-                    <span>{row.label}</span>
-                    <span className="font-semibold">{formatCurrency(Number(row.total || 0))}</span>
+                    <span>{row.label} (calculado)</span>
+                    <span className="font-semibold">{formatCurrency(Number(row.calculated ?? row.total ?? 0))}</span>
                   </div>
                 ))}
               </div>
+              {(closeSummary.groupedByMethod || []).length === 0 ? (
+                <MoneyInput
+                  label="Valor contado na gaveta (total)"
+                  value={Number(countedByPm.__total__ ?? closeSummary.expectedDrawerTotal ?? 0)}
+                  onChange={(v) => setCountedByPm((prev) => ({ ...prev, __total__: String(v) }))}
+                />
+              ) : (
+                (closeSummary.groupedByMethod || []).map((row: any) => {
+                  const key = row.paymentMethodId || "__none__"
+                  return (
+                    <MoneyInput
+                      key={key}
+                      label={`Contado — ${row.label}`}
+                      value={Number(countedByPm[key] ?? row.calculated ?? row.total ?? 0)}
+                      onChange={(v) => setCountedByPm((prev) => ({ ...prev, [key]: String(v) }))}
+                    />
+                  )
+                })
+              )}
             </>
           )}
           <Input label="Observações de fechamento" value={closingNotes} onChange={(e: any) => setClosingNotes(e.target.value)} />

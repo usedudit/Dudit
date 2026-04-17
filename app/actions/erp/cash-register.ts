@@ -5,8 +5,10 @@ import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/auth
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { revalidateEntityTimeline } from "@/lib/utils/revalidation"
+import { revalidatePath } from "next/cache"
 
-type CountedEntry = {
+export type CountedPaymentMethodEntry = {
   paymentMethodId?: string | null
   amount: number
 }
@@ -16,34 +18,135 @@ function money(value: number) {
   return Math.round(value * 100) / 100
 }
 
-async function getOpenSession(
+async function resolveDefaultCashFinanceAccountId(
   supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
   partnerId: string,
-  userId?: string
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("finance_accounts")
+    .select("id")
+    .eq("partner_id", partnerId)
+    .eq("is_active", true)
+    .eq("type", "cash")
+    .order("is_default", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  return data?.id ?? null
+}
+
+function isMovementActive(row: { reversed_at?: string | null }) {
+  return row.reversed_at == null
+}
+
+/** Cash drawer balance: initial + cash sales + deposits − withdrawals − refunds (active movements only). */
+export function computeDrawerBalanceCents(params: {
+  initialAmount: number
+  movements: Array<{
+    type: string
+    amount: number | string
+    reversed_at?: string | null
+    payment_method_id?: string | null
+    payment_method_type?: string | null
+  }>
+}) {
+  const initial = money(Number(params.initialAmount || 0))
+  let cashSales = 0
+  let deposits = 0
+  let withdrawals = 0
+  let refunds = 0
+
+  for (const m of params.movements || []) {
+    if (!isMovementActive(m)) continue
+    const amt = money(Number(m.amount || 0))
+    if (!(amt > 0)) continue
+    if (m.type === "deposit") deposits += amt
+    else if (m.type === "withdrawal") withdrawals += amt
+    else if (m.type === "refund") refunds += amt
+    else if (m.type === "sale") {
+      const pmType = m.payment_method_type
+      const isCash = !m.payment_method_id || pmType === "cash"
+      if (isCash) cashSales += amt
+    }
+  }
+
+  const total = money(initial + cashSales + deposits - withdrawals - refunds)
+  return {
+    initial,
+    cashSales,
+    deposits,
+    withdrawals,
+    refunds,
+    total,
+  }
+}
+
+async function loadMovementsForSession(
+  supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+  partnerId: string,
+  cashSessionId: string,
 ) {
-  let query = supabase
+  const { data: movements, error } = await supabase
+    .from("cash_movements")
+    .select("id, type, description, payment_method_id, amount, created_at, reference_id, reversed_at, reversed_by_user_id, created_by_user_id, financial_transaction_id")
+    .eq("partner_id", partnerId)
+    .eq("cash_session_id", cashSessionId)
+    .order("created_at", { ascending: false })
+  if (error) throw new Error(error.message)
+
+  const pmIds = Array.from(
+    new Set((movements || []).map((m: { payment_method_id: string | null }) => m.payment_method_id).filter(Boolean),
+  ) as string[]
+
+  const pmMap = new Map<string, { name: string; type: string }>()
+  if (pmIds.length > 0) {
+    const { data: methods } = await supabase
+      .from("payment_methods")
+      .select("id, name, type")
+      .eq("partner_id", partnerId)
+      .in("id", pmIds)
+    for (const row of methods || []) {
+      pmMap.set(row.id, { name: row.name || "—", type: row.type || "other" })
+    }
+  }
+
+  const enriched = (movements || []).map((m: any) => ({
+    ...m,
+    payment_method_name: m.payment_method_id ? pmMap.get(m.payment_method_id)?.name || "Método removido" : "Dinheiro (não informado)",
+    payment_method_type: m.payment_method_id ? pmMap.get(m.payment_method_id)?.type || null : "cash",
+  }))
+
+  return enriched
+}
+
+async function getOpenSessionForUser(
+  supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+  partnerId: string,
+  userId: string,
+) {
+  const { data } = await supabase
     .from("cash_sessions")
     .select("*")
     .eq("partner_id", partnerId)
     .eq("status", "open")
+    .eq("opened_by_user_id", userId)
     .order("opened_at", { ascending: false })
     .limit(1)
-
-  if (userId) query = query.eq("user_id", userId)
-  const { data } = await query.maybeSingle()
+    .maybeSingle()
   return data
 }
 
 export async function getActiveCashSessionAction(partnerId: string) {
+  const user = await requireUser()
   await requirePartnerAccessWithPermission(partnerId, "financial", "view")
   const supabase = await getSupabaseServerClient()
-  const session = await getOpenSession(supabase, partnerId)
+  const session = await getOpenSessionForUser(supabase, partnerId, user.id)
   return { success: true as const, data: session || null }
 }
 
 export async function openCashSessionAction(input: {
   partnerId: string
-  openingBalance: number
+  /** Troco inicial / fundo de caixa — valor de controle (não gera lançamento financeiro). */
+  initialAmount: number
   notes?: string
 }) {
   const user = await requireUser()
@@ -54,13 +157,11 @@ export async function openCashSessionAction(input: {
 
   const supabase = await getSupabaseServerClient()
 
-  const rawBalance = Number(input.openingBalance || 0)
-  if (!Number.isFinite(rawBalance)) return { success: false as const, error: "Saldo de abertura inválido." }
-  const openingBalance = money(Math.max(0, rawBalance))
+  const raw = Number(input.initialAmount ?? 0)
+  if (!Number.isFinite(raw)) return { success: false as const, error: "Valor inicial inválido." }
+  const initialAmount = money(Math.max(0, raw))
 
-  // Check for existing open session for this user within this partner
-  // (DB unique partial index is the ultimate guard, this gives a better error message)
-  const existing = await getOpenSession(supabase, input.partnerId, user.id)
+  const existing = await getOpenSessionForUser(supabase, input.partnerId, user.id)
   if (existing?.id) {
     return { success: false as const, error: "Você já possui um caixa aberto." }
   }
@@ -69,8 +170,8 @@ export async function openCashSessionAction(input: {
     .from("cash_sessions")
     .insert({
       partner_id: input.partnerId,
-      user_id: user.id,
-      opening_balance: openingBalance,
+      opened_by_user_id: user.id,
+      initial_amount: initialAmount,
       status: "open",
       notes: input.notes?.trim() || null,
     })
@@ -78,26 +179,24 @@ export async function openCashSessionAction(input: {
     .single()
 
   if (error) {
-    // Handle unique constraint violation gracefully (race condition)
     if (error.code === "23505") {
       return { success: false as const, error: "Você já possui um caixa aberto." }
     }
     return { success: false as const, error: error.message }
   }
 
-  console.info("[cash_register] session_opened", JSON.stringify({
-    sessionId: data.id, partnerId: input.partnerId, userId: user.id, openingBalance,
-  }))
-
   await logAuditEvent({
     partnerId: input.partnerId,
     actorUserId: user.id,
     entityType: "cash_session",
     entityId: data.id,
-    actionType: "opened",
-    changeLines: [`abriu o caixa com saldo inicial de R$ ${openingBalance.toFixed(2)}.`],
+    actionType: "cash_opened",
+    changeLines: [`abriu o caixa com troco inicial de R$ ${initialAmount.toFixed(2)}.`],
     source: "manual",
   })
+  await revalidateEntityTimeline("cash_session", data.id)
+  revalidatePath("/erp/cash-register")
+  revalidatePath("/erp/pos")
 
   return { success: true as const, data }
 }
@@ -105,111 +204,136 @@ export async function openCashSessionAction(input: {
 export async function createCashMovementAction(input: {
   partnerId: string
   cashSessionId?: string
-  type: "withdrawal" | "deposit" | "refund"
+  type: "withdrawal" | "deposit"
   description: string
   amount: number
-  paymentMethodId?: string | null
-  referenceId?: string | null
+  /** Conta financeira tipo caixa; se omitido, usa a primeira conta caixa ativa do parceiro. */
+  cashFinanceAccountId?: string | null
 }) {
+  const user = await requireUser()
   await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
 
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
   const supabase = await getSupabaseServerClient()
-  const session = input.cashSessionId
-    ? await supabase
-      .from("cash_sessions")
-      .select("*")
-      .eq("id", input.cashSessionId)
-      .eq("partner_id", input.partnerId)
-      .eq("status", "open")
-      .maybeSingle()
-    : { data: await getOpenSession(supabase, input.partnerId), error: null }
 
-  const openSession = session.data
-  if (!openSession?.id) {
-    return { success: false as const, error: "Não existe caixa aberto para esta operação." }
+  let sessionId = input.cashSessionId || null
+  if (!sessionId) {
+    const s = await getOpenSessionForUser(supabase, input.partnerId, user.id)
+    sessionId = s?.id || null
+  } else {
+    const { data: s } = await supabase
+      .from("cash_sessions")
+      .select("id, status, opened_by_user_id")
+      .eq("id", sessionId)
+      .eq("partner_id", input.partnerId)
+      .maybeSingle()
+    if (!s?.id || s.status !== "open") {
+      return { success: false as const, error: "Sessão inválida ou caixa fechado." }
+    }
   }
 
+  if (!sessionId) return { success: false as const, error: "Não existe caixa aberto para esta operação." }
+
   const rawAmount = Number(input.amount || 0)
-  if (!Number.isFinite(rawAmount)) return { success: false as const, error: "Valor inválido." }
-  const parsedAmount = money(rawAmount)
-  if (parsedAmount <= 0) return { success: false as const, error: "Informe um valor maior que zero." }
-  if (!input.description?.trim()) return { success: false as const, error: "Descrição é obrigatória." }
+  if (!Number.isFinite(rawAmount) || !(rawAmount > 0)) {
+    return { success: false as const, error: "Informe um valor maior que zero." }
+  }
+  if (!String(input.description || "").trim()) {
+    return { success: false as const, error: "Descrição é obrigatória." }
+  }
 
-  const signedAmount = input.type === "withdrawal"
-    ? -Math.abs(parsedAmount)
-    : input.type === "refund"
-      ? -Math.abs(parsedAmount)
-      : Math.abs(parsedAmount)
+  const cashAccountId =
+    input.cashFinanceAccountId?.trim() || (await resolveDefaultCashFinanceAccountId(supabase, input.partnerId))
+  if (!cashAccountId) {
+    return { success: false as const, error: "Cadastre uma conta financeira do tipo caixa para registrar sangrias e reforços." }
+  }
 
-  const { data, error } = await supabase
-    .from("cash_movements")
-    .insert({
-      partner_id: input.partnerId,
-      cash_session_id: openSession.id,
-      type: input.type,
-      description: input.description.trim(),
-      payment_method_id: input.paymentMethodId || null,
-      amount: signedAmount,
-      reference_id: input.referenceId || null,
-    })
-    .select("*")
-    .single()
-
-  if (error) return { success: false as const, error: error.message }
-
-  console.info("[cash_register] movement_created", JSON.stringify({
-    movementId: data.id, sessionId: openSession.id, type: input.type, amount: signedAmount,
-  }))
-
-  const typeLabel = input.type === "withdrawal" ? "sangria" : input.type === "refund" ? "reembolso" : "suprimento"
-  await logAuditEvent({
-    partnerId: input.partnerId,
-    actorUserId: null,
-    entityType: "cash_session",
-    entityId: openSession.id,
-    actionType: "movement",
-    changeLines: [`registrou ${typeLabel} de R$ ${Math.abs(signedAmount).toFixed(2)} — ${input.description.trim()}`],
-    source: "manual",
+  const { data: rpcData, error: rpcError } = await supabase.rpc("erp_create_cash_manual_movement", {
+    p_partner_id: input.partnerId,
+    p_cash_session_id: sessionId,
+    p_movement_type: input.type,
+    p_amount: money(rawAmount),
+    p_description: input.description.trim(),
+    p_cash_account_id: cashAccountId,
   })
 
-  return { success: true as const, data }
+  if (rpcError) {
+    return { success: false as const, error: rpcError.message || "Falha ao registrar movimentação." }
+  }
+
+  const movementId = (rpcData as any)?.movement_id as string | undefined
+  const typeLabel = input.type === "withdrawal" ? "Sangria" : "Reforço"
+  await logAuditEvent({
+    partnerId: input.partnerId,
+    actorUserId: user.id,
+    entityType: "cash_session",
+    entityId: sessionId,
+    actionType: input.type === "withdrawal" ? "withdrawal_created" : "deposit_created",
+    changeLines: [`registrou ${typeLabel.toLowerCase()} de R$ ${money(rawAmount).toFixed(2)} — ${input.description.trim()}`],
+    metadata: movementId ? { movement_id: movementId } : null,
+    source: "manual",
+  })
+  await revalidateEntityTimeline("cash_session", sessionId)
+  revalidatePath("/erp/cash-register")
+  revalidatePath("/erp/transactions")
+
+  const { data: movement } = await supabase
+    .from("cash_movements")
+    .select("*")
+    .eq("id", movementId || "")
+    .maybeSingle()
+
+  return { success: true as const, data: movement || rpcData }
 }
 
-export async function registerSaleCashMovementsAction(input: {
+export async function reverseCashMovementAction(input: {
   partnerId: string
-  saleId: string
-  cashSessionId: string
-  paymentBreakdown: Array<{ amount: number; paymentMethodId?: string | null; method?: string }>
+  movementId: string
 }) {
+  const user = await requireUser()
   await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+
+  const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+  if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
+
   const supabase = await getSupabaseServerClient()
 
-  const entries = (input.paymentBreakdown || [])
-    .map((entry) => ({
-      amount: money(Number(entry.amount || 0)),
-      paymentMethodId: entry.paymentMethodId || null,
-      method: entry.method || "Venda PDV",
-    }))
-    .filter((entry) => entry.amount > 0)
+  const { data: rpcData, error: rpcError } = await supabase.rpc("erp_reverse_cash_manual_movement", {
+    p_partner_id: input.partnerId,
+    p_movement_id: input.movementId,
+  })
 
-  if (entries.length === 0) return { success: true as const, data: [] }
+  if (rpcError) {
+    return { success: false as const, error: rpcError.message || "Não foi possível estornar a movimentação." }
+  }
 
-  const payload = entries.map((entry) => ({
-    partner_id: input.partnerId,
-    cash_session_id: input.cashSessionId,
-    type: "sale",
-    description: `Venda PDV ${input.saleId.slice(0, 8).toUpperCase()} - ${entry.method}`,
-    payment_method_id: entry.paymentMethodId,
-    amount: Math.abs(entry.amount),
-    reference_id: input.saleId,
-  }))
+  const { data: movement } = await supabase
+    .from("cash_movements")
+    .select("cash_session_id, description, amount, type")
+    .eq("id", input.movementId)
+    .maybeSingle()
 
-  const { data, error } = await supabase.from("cash_movements").insert(payload).select("*")
-  if (error) return { success: false as const, error: error.message }
-  return { success: true as const, data: data || [] }
+  if (movement?.cash_session_id) {
+    await logAuditEvent({
+      partnerId: input.partnerId,
+      actorUserId: user.id,
+      entityType: "cash_session",
+      entityId: movement.cash_session_id,
+      actionType: "movement_reversed",
+      changeLines: [
+        `estornou ${movement.type === "withdrawal" ? "sangria" : "reforço"} de R$ ${money(Number(movement.amount || 0)).toFixed(2)} — ${String(movement.description || "").slice(0, 120)}`,
+      ],
+      source: "manual",
+    })
+    await revalidateEntityTimeline("cash_session", movement.cash_session_id)
+  }
+
+  revalidatePath("/erp/cash-register")
+  revalidatePath("/erp/transactions")
+
+  return { success: true as const, data: rpcData }
 }
 
 export async function getCashSessionCloseSummaryAction(partnerId: string, cashSessionId: string) {
@@ -224,51 +348,36 @@ export async function getCashSessionCloseSummaryAction(partnerId: string, cashSe
     .single()
   if (sessionError || !session) return { success: false as const, error: sessionError?.message || "Caixa não encontrado." }
 
-  const { data: movements, error: movementsError } = await supabase
-    .from("cash_movements")
-    .select("id, type, amount, payment_method_id, created_at")
-    .eq("partner_id", partnerId)
-    .eq("cash_session_id", cashSessionId)
-  if (movementsError) return { success: false as const, error: movementsError.message }
+  const movements = await loadMovementsForSession(supabase, partnerId, cashSessionId)
+  const drawer = computeDrawerBalanceCents({
+    initialAmount: Number(session.initial_amount ?? session.opening_balance ?? 0),
+    movements: movements as any[],
+  })
 
-  const paymentMethodIds = Array.from(new Set((movements || []).map((m: any) => m.payment_method_id).filter(Boolean))) as string[]
-  const methodsMap = new Map<string, string>()
-  if (paymentMethodIds.length > 0) {
-    const { data: methods } = await supabase
-      .from("payment_methods")
-      .select("id, name")
-      .eq("partner_id", partnerId)
-      .in("id", paymentMethodIds)
-    for (const method of methods || []) methodsMap.set(method.id, method.name)
+  const grouped = new Map<string, { paymentMethodId: string | null; label: string; calculated: number }>()
+  for (const m of movements) {
+    if (!isMovementActive(m)) continue
+    if (m.type !== "sale") continue
+    const isCash = !m.payment_method_id || m.payment_method_type === "cash"
+    if (!isCash) continue
+    const key = m.payment_method_id || "__cash__"
+    const label = m.payment_method_name || "Dinheiro"
+    const amt = money(Number(m.amount || 0))
+    const cur = grouped.get(key)
+    if (cur) cur.calculated = money(cur.calculated + amt)
+    else grouped.set(key, { paymentMethodId: m.payment_method_id || null, label, calculated: amt })
   }
 
-  const grouped = new Map<string, { paymentMethodId: string | null; label: string; total: number }>()
-  for (const movement of movements || []) {
-    const id = movement.payment_method_id || "__none__"
-    const label = movement.payment_method_id ? (methodsMap.get(movement.payment_method_id) || "Método removido") : "Não informado"
-    const current = grouped.get(id)
-    if (current) {
-      current.total = money(current.total + Number(movement.amount || 0))
-    } else {
-      grouped.set(id, {
-        paymentMethodId: movement.payment_method_id || null,
-        label,
-        total: money(Number(movement.amount || 0)),
-      })
-    }
-  }
-
-  const groupedByMethod = Array.from(grouped.values()).sort((a, b) => b.total - a.total)
-  const movementsTotal = money((movements || []).reduce((acc: number, m: any) => acc + Number(m.amount || 0), 0))
-  const expectedBalance = money(Number(session.opening_balance || 0) + movementsTotal)
+  const groupedByMethod = Array.from(grouped.values()).sort((a, b) => b.calculated - a.calculated)
 
   return {
     success: true as const,
     data: {
       session,
+      movements,
       groupedByMethod,
-      movementsTotal,
-      expectedBalance,
+      drawer,
+      expectedDrawerTotal: drawer.total,
     },
   }
 }
@@ -276,10 +385,11 @@ export async function getCashSessionCloseSummaryAction(partnerId: string, cashSe
 export async function closeCashSessionAction(input: {
   partnerId: string
   cashSessionId: string
-  countedByMethod?: CountedEntry[]
+  countedByMethod?: CountedPaymentMethodEntry[]
   notes?: string
 }) {
-  await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+  const user = await requireUser()
+  const access = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
 
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
@@ -289,27 +399,48 @@ export async function closeCashSessionAction(input: {
   const summary = await getCashSessionCloseSummaryAction(input.partnerId, input.cashSessionId)
   if (!summary.success) return summary
 
-  if (summary.data.session.status !== "open") {
+  const session = summary.data.session as any
+  if (session.status !== "open") {
     return { success: false as const, error: "Este caixa já foi fechado." }
   }
 
-  const countedTotal = money(
-    (input.countedByMethod || []).reduce((acc, entry) => {
-      const val = Number(entry.amount || 0)
-      return acc + (Number.isFinite(val) ? Math.max(0, val) : 0)
-    }, 0)
-  )
-  const finalClosing = countedTotal > 0 ? countedTotal : summary.data.expectedBalance
+  const role = String(access.role || "").toUpperCase()
+  const isAdminRole = role === "OWNER" || role === "ADMIN"
+  const openedBy = session.opened_by_user_id || session.user_id
+  if (openedBy !== user.id && !isAdminRole) {
+    return { success: false as const, error: "Apenas o operador que abriu o caixa ou um administrador podem fechar." }
+  }
+
+  const countedRows = (input.countedByMethod || []).map((row) => ({
+    paymentMethodId: row.paymentMethodId ?? null,
+    amount: money(Math.max(0, Number(row.amount || 0))),
+  }))
+  const countedTotal = money(countedRows.reduce((a, r) => a + (Number.isFinite(r.amount) ? r.amount : 0), 0))
+
+  const calculated = summary.data.expectedDrawerTotal
+  if (!Number.isFinite(calculated)) {
+    return { success: false as const, error: "Não foi possível calcular o saldo esperado do caixa." }
+  }
+
+  const hasExplicitCounts = (input.countedByMethod || []).length > 0
+  const informedTotal = hasExplicitCounts ? countedTotal : calculated
+  const difference = money(informedTotal - calculated)
+
+  const closingPayload = {
+    closing_amount: informedTotal,
+    calculated_amount: calculated,
+    difference_amount: difference,
+    closed_at: new Date().toISOString(),
+    closed_by_user_id: user.id,
+    status: "closed",
+    notes: input.notes?.trim() || session.notes || null,
+    updated_at: new Date().toISOString(),
+    closing_method_counts: countedRows.length > 0 ? countedRows : null,
+  }
 
   const { data, error } = await supabase
     .from("cash_sessions")
-    .update({
-      closing_balance: finalClosing,
-      closed_at: new Date().toISOString(),
-      status: "closed",
-      notes: input.notes?.trim() || summary.data.session.notes || null,
-      updated_at: new Date().toISOString(),
-    })
+    .update(closingPayload)
     .eq("id", input.cashSessionId)
     .eq("partner_id", input.partnerId)
     .eq("status", "open")
@@ -318,32 +449,28 @@ export async function closeCashSessionAction(input: {
 
   if (error) return { success: false as const, error: error.message }
 
-  const difference = money(finalClosing - summary.data.expectedBalance)
-  console.info("[cash_register] session_closed", JSON.stringify({
-    sessionId: input.cashSessionId, partnerId: input.partnerId,
-    expectedBalance: summary.data.expectedBalance, countedTotal: finalClosing, difference,
-  }))
-
   await logAuditEvent({
     partnerId: input.partnerId,
-    actorUserId: null,
+    actorUserId: user.id,
     entityType: "cash_session",
     entityId: input.cashSessionId,
-    actionType: "closed",
+    actionType: "cash_closed",
     changeLines: [
-      `fechou o caixa com saldo contado de R$ ${finalClosing.toFixed(2)}.`,
-      ...(Math.abs(difference) > 0.009 ? [`diferença de R$ ${difference.toFixed(2)} em relação ao esperado.`] : []),
+      `fechou o caixa. Valor informado (contagem): R$ ${informedTotal.toFixed(2)}; calculado: R$ ${calculated.toFixed(2)}; diferença: R$ ${difference.toFixed(2)}.`,
     ],
     source: "manual",
   })
+  await revalidateEntityTimeline("cash_session", input.cashSessionId)
+  revalidatePath("/erp/cash-register")
+  revalidatePath("/erp/pos")
 
   return {
     success: true as const,
     data: {
       ...data,
-      expectedBalance: summary.data.expectedBalance,
-      countedTotal: finalClosing,
-      difference,
+      calculated_amount: calculated,
+      closing_amount: informedTotal,
+      difference_amount: difference,
       groupedByMethod: summary.data.groupedByMethod,
     },
   }
@@ -355,43 +482,72 @@ export async function getCashSessionsHistoryAction(partnerId: string) {
 
   const { data: sessions, error: sessionError } = await supabase
     .from("cash_sessions")
-    .select("id, user_id, opened_at, closed_at, opening_balance, closing_balance, status, notes, created_at")
+    .select("id, opened_by_user_id, opened_at, closed_at, initial_amount, closing_amount, calculated_amount, difference_amount, status, notes, created_at")
     .eq("partner_id", partnerId)
     .order("opened_at", { ascending: false })
     .limit(400)
   if (sessionError) return { success: false as const, error: sessionError.message }
 
-  const sessionIds = (sessions || []).map((session: any) => session.id)
+  const sessionIds = (sessions || []).map((s: { id: string }) => s.id)
   const { data: movementRows } = sessionIds.length > 0
     ? await supabase
       .from("cash_movements")
-      .select("cash_session_id, amount")
+      .select("cash_session_id, type, amount, reversed_at, payment_method_id")
       .eq("partner_id", partnerId)
       .in("cash_session_id", sessionIds)
     : { data: [] as any[] }
 
-  const userIds = Array.from(new Set((sessions || []).map((session: any) => session.user_id).filter(Boolean)))
+  const userIds = Array.from(
+    new Set(
+      (sessions || [])
+        .map((s: any) => s.opened_by_user_id)
+        .filter(Boolean),
+    ),
+  ) as string[]
+
   const { data: users } = userIds.length > 0
-    ? await supabase
-      .from("user_profiles")
-      .select("user_id, full_name")
-      .in("user_id", userIds)
+    ? await supabase.from("user_profiles").select("user_id, full_name").in("user_id", userIds)
     : { data: [] as any[] }
 
-  const userMap = new Map<string, string>((users || []).map((user: any) => [user.user_id, user.full_name || "Usuário"]))
-  const movementBySession = new Map<string, number>()
-  for (const row of movementRows || []) {
-    movementBySession.set(
-      row.cash_session_id,
-      money((movementBySession.get(row.cash_session_id) || 0) + Number(row.amount || 0))
-    )
+  const userMap = new Map<string, string>((users || []).map((u: any) => [u.user_id, u.full_name || "Usuário"]))
+
+  const pmIds = Array.from(
+    new Set((movementRows || []).map((r: any) => r.payment_method_id).filter(Boolean)),
+  ) as string[]
+  const pmType = new Map<string, string>()
+  if (pmIds.length > 0) {
+    const { data: pms } = await supabase.from("payment_methods").select("id, type").eq("partner_id", partnerId).in("id", pmIds)
+    for (const pm of pms || []) pmType.set(pm.id, pm.type || "other")
   }
 
-  const mapped = (sessions || []).map((session: any) => ({
-    ...session,
-    user_name: userMap.get(session.user_id) || "Usuário",
-    total_received: movementBySession.get(session.id) || 0,
-  }))
+  const drawerBySession = new Map<string, number>()
+  for (const row of movementRows || []) {
+    if (row.reversed_at) continue
+    const sid = row.cash_session_id
+    const amt = money(Number(row.amount || 0))
+    if (!(amt > 0)) continue
+    let delta = 0
+    if (row.type === "deposit") delta = amt
+    else if (row.type === "withdrawal" || row.type === "refund") delta = -amt
+    else if (row.type === "sale") {
+      const isCash = !row.payment_method_id || pmType.get(row.payment_method_id) === "cash"
+      if (isCash) delta = amt
+    }
+    drawerBySession.set(sid, money((drawerBySession.get(sid) || 0) + delta))
+  }
+
+  const mapped = (sessions || []).map((s: any) => {
+    const initial = money(Number(s.initial_amount ?? 0))
+    const drawerDelta = drawerBySession.get(s.id) || 0
+    return {
+      ...s,
+      initial_amount: initial,
+      closing_amount: s.closing_amount ?? null,
+      user_name: userMap.get(s.opened_by_user_id) || "Usuário",
+      drawer_movement_net: drawerDelta,
+      expected_drawer_total: money(initial + drawerDelta),
+    }
+  })
 
   return { success: true as const, data: mapped }
 }
@@ -408,28 +564,115 @@ export async function getCashSessionDetailsAction(partnerId: string, cashSession
     .single()
   if (sessionError || !session) return { success: false as const, error: sessionError?.message || "Caixa não encontrado." }
 
-  const { data: movements, error: movementError } = await supabase
-    .from("cash_movements")
-    .select("id, type, description, payment_method_id, amount, created_at, reference_id")
-    .eq("partner_id", partnerId)
-    .eq("cash_session_id", cashSessionId)
-    .order("created_at", { ascending: false })
-  if (movementError) return { success: false as const, error: movementError.message }
+  const movements = await loadMovementsForSession(supabase, partnerId, cashSessionId)
 
-  const paymentMethodIds = Array.from(new Set((movements || []).map((movement: any) => movement.payment_method_id).filter(Boolean))) as string[]
-  const { data: methods } = paymentMethodIds.length > 0
-    ? await supabase
-      .from("payment_methods")
-      .select("id, name")
-      .eq("partner_id", partnerId)
-      .in("id", paymentMethodIds)
+  const userIds = Array.from(
+    new Set(
+      [
+        session.opened_by_user_id || session.user_id,
+        session.closed_by_user_id,
+        ...(movements || []).map((m: any) => m.created_by_user_id),
+        ...(movements || []).map((m: any) => m.reversed_by_user_id),
+      ].filter(Boolean),
+    ),
+  ) as string[]
+
+  const { data: profiles } = userIds.length > 0
+    ? await supabase.from("user_profiles").select("user_id, full_name").in("user_id", userIds)
     : { data: [] as any[] }
-  const methodsMap = new Map<string, string>((methods || []).map((method: any) => [method.id, method.name || "Sem nome"]))
+  const nameById = new Map<string, string>((profiles || []).map((p: any) => [p.user_id, p.full_name || "Usuário"]))
 
-  const detailMovements = (movements || []).map((movement: any) => ({
-    ...movement,
-    payment_method_name: movement.payment_method_id ? (methodsMap.get(movement.payment_method_id) || "Método removido") : "Não informado",
+  const initial = money(Number(session.initial_amount ?? session.opening_balance ?? 0))
+  const drawer = computeDrawerBalanceCents({ initialAmount: initial, movements: movements as any[] })
+
+  const summaryByPaymentMethod: Array<{
+    paymentMethodId: string | null
+    label: string
+    calculated: number
+    counted: number | null
+    difference: number | null
+  }> = []
+
+  const countedMap = new Map<string | null, number>()
+  const rawCounts = session.closing_method_counts as CountedPaymentMethodEntry[] | null
+  if (Array.isArray(rawCounts)) {
+    for (const c of rawCounts) {
+      const k = c.paymentMethodId ?? null
+      countedMap.set(k, money(Math.max(0, Number(c.amount || 0))))
+    }
+  }
+
+  const saleGroups = new Map<string | null, { label: string; calculated: number }>()
+  for (const m of movements) {
+    if (!isMovementActive(m) || m.type !== "sale") continue
+    const isCash = !m.payment_method_id || m.payment_method_type === "cash"
+    if (!isCash) continue
+    const key = m.payment_method_id || null
+    const label = m.payment_method_name || "Dinheiro"
+    const amt = money(Number(m.amount || 0))
+    const cur = saleGroups.get(key)
+    if (cur) cur.calculated = money(cur.calculated + amt)
+    else saleGroups.set(key, { label, calculated: amt })
+  }
+  for (const [pmId, row] of saleGroups) {
+    const countedVal = session.status === "closed" ? countedMap.get(pmId ?? null) ?? null : null
+    summaryByPaymentMethod.push({
+      paymentMethodId: pmId,
+      label: row.label,
+      calculated: row.calculated,
+      counted: countedVal,
+      difference: countedVal != null ? money(countedVal - row.calculated) : null,
+    })
+  }
+  summaryByPaymentMethod.sort((a, b) => b.calculated - a.calculated)
+
+  const adjustmentMovements = (movements || []).filter(
+    (m: any) => (m.type === "withdrawal" || m.type === "deposit") && isMovementActive(m),
+  )
+
+  const enrichedMovements = (movements || []).map((m: any) => ({
+    ...m,
+    creator_name: m.created_by_user_id ? nameById.get(m.created_by_user_id) || "—" : "—",
+    reversed_by_name: m.reversed_by_user_id ? nameById.get(m.reversed_by_user_id) || "—" : null,
   }))
 
-  return { success: true as const, data: { session, movements: detailMovements } }
+  const calculatedTotal =
+    session.status === "closed" && session.calculated_amount != null
+      ? money(Number(session.calculated_amount))
+      : drawer.total
+  const informedTotal =
+    session.status === "closed" && session.closing_amount != null
+      ? money(Number(session.closing_amount))
+      : null
+  const storedDifference =
+    session.status === "closed" && session.difference_amount != null ? money(Number(session.difference_amount)) : null
+
+  return {
+    success: true as const,
+    data: {
+      session: {
+        ...session,
+        initial_amount: initial,
+        opened_by_user_id: session.opened_by_user_id || session.user_id,
+      },
+      movements: enrichedMovements,
+      operators: {
+        open_name: nameById.get(session.opened_by_user_id || session.user_id) || "—",
+        close_name: session.closed_by_user_id ? nameById.get(session.closed_by_user_id) || "—" : null,
+      },
+      drawer,
+      summaryByPaymentMethod,
+      totals: {
+        initial,
+        totalCashSales: drawer.cashSales,
+        totalWithdrawals: drawer.withdrawals,
+        totalDeposits: drawer.deposits,
+        totalRefunds: drawer.refunds,
+        calculatedDrawerTotal: calculatedTotal,
+        informedDrawerTotal: informedTotal,
+        difference: storedDifference ?? (informedTotal != null ? money(informedTotal - calculatedTotal) : null),
+      },
+      adjustmentMovementCount: adjustmentMovements.length,
+    },
+  }
 }

@@ -12,6 +12,7 @@ export type ActionType =
   | "refunded" | "installment_paid" | "settled" | "recurring_created"
   | "recurring_updated" | "recurring_cancelled" | "cash_opened"
   | "cash_closed" | "cash_movement" | "sale_created"
+  | "withdrawal_created" | "deposit_created" | "movement_reversed"
 
 export interface TimelineEntry {
   id: string

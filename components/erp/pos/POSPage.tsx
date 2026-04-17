@@ -36,6 +36,7 @@ import {
   finalizePreSaleAction,
   upsertPreSaleDraftAction,
 } from "@/app/actions/erp/pos"
+import { openCashSessionAction } from "@/app/actions/erp/cash-register"
 import { getTeamMembers } from "@/app/actions/erp/team"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import SelectSellerSheet from "@/components/erp/pos/SelectSellerSheet"
@@ -74,6 +75,7 @@ type PreSale = {
 
 type Customer = { id: string; name: string }
 type FinanceAccount = { id: string; name: string; is_default?: boolean; is_active?: boolean }
+type PaymentMethodOption = { id: string; name: string; type: string; is_default?: boolean | null }
 type CartItem = {
   id: string
   productId: string | null
@@ -92,7 +94,9 @@ interface Props {
     customers: Customer[]
     financeAccounts: FinanceAccount[]
     preSales: PreSale[]
+    paymentMethods: PaymentMethodOption[]
   }
+  initialActiveSession: any | null
 }
 
 // Extracted memoized component to avoid unnecessary re-renders
@@ -196,17 +200,20 @@ const MorePreSalesCard = ({ count, onClick }: { count: number, onClick: () => vo
   </button>
 )
 
-export default function POSPage({ partnerId, initialData }: Props) {
+export default function POSPage({ partnerId, initialData, initialActiveSession }: Props) {
   const { success: notifySuccess, error: notifyError } = useNotification()
   const isMobile = useMediaQuery("(max-width: 1024px)")
 
   const [products] = useState<Product[]>(initialData.products || [])
   const [customers] = useState<Customer[]>(initialData.customers || [])
   const [accounts] = useState<FinanceAccount[]>(initialData.financeAccounts || [])
+  const [paymentMethods] = useState<PaymentMethodOption[]>(initialData.paymentMethods || [])
   const [preSales, setPreSales] = useState<PreSale[]>(initialData.preSales || [])
   const [teamMembers, setTeamMembers] = useState<any[]>([])
 
-  const [isCashierOpen, setIsCashierOpen] = useState(false)
+  const [activeCashSession, setActiveCashSession] = useState<any | null>(initialActiveSession || null)
+
+  const isCashierOpen = !!activeCashSession?.id
   const [selectedCategory, setSelectedCategory] = useState("All Product")
   const [search, setSearch] = useState("")
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>(undefined)
@@ -214,6 +221,17 @@ export default function POSPage({ partnerId, initialData }: Props) {
   const [financeAccountId, setFinanceAccountId] = useState<string | undefined>(
     accounts.find((account) => account.is_default)?.id || accounts[0]?.id
   )
+  const defaultSalePaymentMethodId = useMemo(() => {
+    const cash = paymentMethods.find((pm) => pm.type === "cash")
+    if (cash?.id) return cash.id
+    const def = paymentMethods.find((pm) => pm.is_default)
+    return def?.id || paymentMethods[0]?.id || undefined
+  }, [paymentMethods])
+  const [salePaymentMethodId, setSalePaymentMethodId] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    if (salePaymentMethodId) return
+    if (defaultSalePaymentMethodId) setSalePaymentMethodId(defaultSalePaymentMethodId)
+  }, [defaultSalePaymentMethodId, salePaymentMethodId])
   const [discountAmount, setDiscountAmount] = useState(0)
   const [discountType, setDiscountType] = useState<'fixed' | 'percentage'>('fixed')
   const [shippingFee, setShippingFee] = useState(0)
@@ -232,6 +250,11 @@ export default function POSPage({ partnerId, initialData }: Props) {
   const [itemToRemoveId, setItemToRemoveId] = useState<string | null>(null)
   const [editingItem, setEditingItem] = useState<CartItem | null>(null)
   const [isNotesSheetOpen, setIsNotesSheetOpen] = useState(false)
+
+  const [isOpenCashModalOpen, setIsOpenCashModalOpen] = useState(false)
+  const [openingBalance, setOpeningBalance] = useState(0)
+  const [openingNotes, setOpeningNotes] = useState("")
+  const [isOpeningCash, setIsOpeningCash] = useState(false)
 
   // States for Editing Item Modal
   const [editQty, setEditQty] = useState(1)
@@ -509,13 +532,24 @@ export default function POSPage({ partnerId, initialData }: Props) {
 
     setIsFinalizing(true)
     try {
+      if (paymentMethods.length > 0 && !salePaymentMethodId) {
+        notifyError("Selecione a forma de recebimento.")
+        return
+      }
+      const pm = paymentMethods.find((p) => p.id === salePaymentMethodId)
       const result = await finalizePreSaleAction({
         partnerId,
         preSaleId: preSaleIdToFinalize as string,
         financeAccountId: financeAccountId || null,
         paidAmount: total,
-        paymentMethod: "PDV",
-        paymentBreakdown: [{ method: "PDV", amount: total }],
+        paymentMethod: pm?.name || "PDV",
+        paymentBreakdown: [
+          {
+            method: pm?.name || "PDV",
+            amount: total,
+            paymentMethodId: salePaymentMethodId || null,
+          },
+        ],
       })
       if (!result.success) {
         notifyError(result.error || "Não foi possível finalizar a venda.")
@@ -621,6 +655,26 @@ export default function POSPage({ partnerId, initialData }: Props) {
             </div>
           )}
 
+          {paymentMethods.length > 0 && (
+            <div className="pt-2">
+              <label className="block text-xs font-semibold text-brand-inactive-text dark:text-dark-body mb-1">
+                Forma de recebimento
+              </label>
+              <select
+                className="w-full rounded-xl border border-brand-border bg-white dark:bg-dark-surface px-3 py-2 text-sm font-medium text-brand-dark dark:text-dark-heading"
+                value={salePaymentMethodId || ""}
+                onChange={(e) => setSalePaymentMethodId(e.target.value || undefined)}
+              >
+                {paymentMethods.map((pm) => (
+                  <option key={pm.id} value={pm.id}>
+                    {pm.name}
+                    {pm.type === "cash" ? " (afeta caixa físico)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="border-t border-dashed border-brand-border pt-3 mt-2">
             <div className="flex justify-between items-end">
               <span className="text-lg font-bold text-brand-dark dark:text-dark-heading tracking-tight">Total a Pagar</span>
@@ -680,11 +734,73 @@ export default function POSPage({ partnerId, initialData }: Props) {
           title="Abrir Caixa"
           itemButton={{
             text: "Abrir o Caixa",
-            action: () => setIsCashierOpen(true),
+            action: () => setIsOpenCashModalOpen(true),
             variant: "filled",
             className: "h-12 px-10 rounded-full font-bold text-md"
           }}
         />
+        <DefaultModal
+          isOpen={isOpenCashModalOpen}
+          onClose={() => setIsOpenCashModalOpen(false)}
+          title="Abrir caixa"
+          footer={
+            <div className="flex items-center gap-3 w-full">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setIsOpenCashModalOpen(false)}
+                disabled={isOpeningCash}
+              >
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={async () => {
+                  if (openingBalance < 0) {
+                    notifyError("Saldo inicial inválido.")
+                    return
+                  }
+                  if (isOpeningCash) return
+                  setIsOpeningCash(true)
+                  try {
+                    const result = await openCashSessionAction({
+                      partnerId,
+                      initialAmount: openingBalance,
+                      notes: openingNotes,
+                    })
+                    if (!result.success) {
+                      notifyError(result.error || "Não foi possível abrir o caixa.")
+                      return
+                    }
+                    notifySuccess("Caixa aberto com sucesso.")
+                    setActiveCashSession(result.data)
+                    setIsOpenCashModalOpen(false)
+                    setOpeningBalance(0)
+                    setOpeningNotes("")
+                  } finally {
+                    setIsOpeningCash(false)
+                  }
+                }}
+                isLoading={isOpeningCash}
+              >
+                Confirmar abertura
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4 pt-2">
+            <MoneyInput
+              label="Saldo inicial em dinheiro"
+              value={openingBalance}
+              onChange={setOpeningBalance}
+            />
+            <Input
+              label="Observações"
+              value={openingNotes}
+              onChange={(e: any) => setOpeningNotes(e.target.value)}
+            />
+          </div>
+        </DefaultModal>
       </div>
     )
   }
