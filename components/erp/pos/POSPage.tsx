@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { TrashIcon, ChevronRightIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button, AlertModal, DefaultModal, MoneyInput, InfoCard, Input } from "@/components/reusable"
+import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useNotification } from "@/hooks/use-notification"
@@ -103,6 +103,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   const [editDiscount, setEditDiscount] = useState(0)
   const [editDiscountType, setEditDiscountType] = useState<"fixed" | "percentage">("fixed")
   const [isGlobalDiscountModalOpen, setIsGlobalDiscountModalOpen] = useState(false)
+  const [globalDiscountValue, setGlobalDiscountValue] = useState(0)
+  const [globalDiscountType, setGlobalDiscountType] = useState<"fixed" | "percentage">("fixed")
 
   const isXL = useMediaQuery("(min-width: 1280px)")
   const isLG = useMediaQuery("(min-width: 1024px)")
@@ -174,6 +176,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     })),
     [cart]
   )
+  const hasNotes = notes.trim().length > 0
 
   const getPaymentMethodId = useCallback((methodLabel?: string | null) => {
     const normalizedLabel = normalizePDVSearchTerm(methodLabel)
@@ -333,6 +336,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     setActivePreSaleId(preSale.id)
     setSelectedCustomerId(preSale.customer_id || undefined)
     setDiscountAmount(Number(preSale.discount_amount || 0))
+    setDiscountType("fixed")
     setNotes(preSale.notes || "")
     setCart(items)
   }, [])
@@ -341,6 +345,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     setActivePreSaleId(null)
     setSelectedCustomerId(undefined)
     setDiscountAmount(0)
+    setDiscountType("fixed")
     setNotes("")
     setCart([])
   }, [])
@@ -444,6 +449,12 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     setEditDiscountType("fixed")
   }, [editingItem])
 
+  useEffect(() => {
+    if (!isGlobalDiscountModalOpen) return
+    setGlobalDiscountValue(discountAmount)
+    setGlobalDiscountType(discountType)
+  }, [isGlobalDiscountModalOpen, discountAmount, discountType])
+
   const saveEditedItem = () => {
     if (!editingItem) return
 
@@ -496,8 +507,30 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     if (fee) setShippingFee(Number(fee))
   }, [])
 
+  const handleOpenNotesSheet = useCallback(() => {
+    setIsMobileSummarySheetOpen(false)
+    setIsMobileItemsSheetOpen(false)
+    setIsNotesSheetOpen(true)
+  }, [])
+
   const cartItemsList = (
-    <div className={`space-y-3 flex-1 overflow-y-auto pr-1 ${desktopScrollClass}`}>
+    <div className="flex h-full min-h-0 flex-col rounded-2xl border border-brand-border bg-white/70 p-3 dark:bg-dark-surface/80">
+      <div className={`space-y-3 flex-1 overflow-y-auto pr-1 ${desktopScrollClass}`}>
+        {cart.map((item) => (
+          <POSCartItemCard
+            key={item.id}
+            item={item}
+            onChangeQty={changeQty}
+            onRemove={(id) => setItemToRemoveId(id)}
+            onEdit={(currentItem) => setEditingItem(currentItem)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+
+  const mobileCartItemsList = (
+    <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1 hide-scrollbar">
       {cart.map((item) => (
         <POSCartItemCard
           key={item.id}
@@ -557,8 +590,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                       alt={product.name}
                       className="h-full w-full object-cover bg-brand-gray dark:bg-dark-border/50"
                     />
-                    <span className="absolute left-2 top-2 rounded-lg bg-brand-dark/80 px-2 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
-                      {Math.max(0, Number(product.stock_available || 0))} Stock
+                    <span className="absolute left-2 top-2 rounded-lg bg-brand-dark/80 px-2 py-1 text-[9px] font-bold text-white backdrop-blur-sm sm:text-[10px] lg:text-[11px]">
+                      {Math.max(0, Number(product.stock_available || 0))} em Estoque
                     </span>
                   </div>
                   <div>
@@ -594,7 +627,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 exit={{ opacity: 0 }}
                 className="mt-auto border-t border-brand-border pt-6"
               >
-                <h4 className="mb-4 text-xl font-bold tracking-tight text-brand-dark">Pedidos em pré-venda</h4>
+                <h4 className="mb-4 text-xl font-bold text-brand-dark">Pedidos em pré-venda</h4>
                 <div className={`flex items-stretch gap-4 overflow-x-auto pb-2 ${desktopScrollClass}`}>
                   {preSales.slice(0, preSaleLimit).map((preSale, index) => (
                     <div key={preSale.id} className="relative group">
@@ -636,10 +669,12 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
               onContinue={handleOpenPaymentModal}
               onSaveDraft={persistDraft}
               onAddShipping={handleShippingPrompt}
-              onOpenNotes={() => setIsNotesSheetOpen(true)}
+              onOpenNotes={handleOpenNotesSheet}
               showItemsShortcut={false}
+              showActionsMenu={cart.length > 0}
+              hasNotes={hasNotes}
+              cartItems={cartItemsList}
             />
-            <div className="mt-4">{cartItemsList}</div>
           </div>
         )}
       </div>
@@ -706,7 +741,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             onContinue={handleOpenPaymentModal}
             onSaveDraft={persistDraft}
             onAddShipping={handleShippingPrompt}
-            onOpenNotes={() => setIsNotesSheetOpen(true)}
+            onOpenNotes={handleOpenNotesSheet}
+            showActionsMenu={cart.length > 0}
           />
         </div>
       </BottomSheet>
@@ -717,17 +753,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Itens do Pedido</h3>
             <p className="mt-1 text-sm text-brand-inactive-text dark:text-dark-body">{itemCount} item(ns) no pedido</p>
           </div>
-          <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1 hide-scrollbar">
-            {cart.map((item) => (
-              <POSCartItemCard
-                key={item.id}
-                item={item}
-                onChangeQty={changeQty}
-                onRemove={(id) => setItemToRemoveId(id)}
-                onEdit={(currentItem) => setEditingItem(currentItem)}
-              />
-            ))}
-          </div>
+          {mobileCartItemsList}
           <Button
             className="h-12 w-full"
             onClick={() => {
@@ -740,32 +766,66 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         </div>
       </BottomSheet>
 
-      <BottomSheet isOpen={isPreSaleSheetOpen} onClose={() => setIsPreSaleSheetOpen(false)} title="Pedidos em Pré-venda">
-        <div className="grid grid-cols-1 gap-4 pt-4 md:grid-cols-2 lg:grid-cols-3">
-          {preSales.map((preSale, index) => (
-            <div key={preSale.id} className="relative group">
-              <POSPreSaleCard
-                preSale={preSale}
-                index={index}
-                customers={customers}
-                onClick={() => {
-                  loadPreSale(preSale)
-                  setIsPreSaleSheetOpen(false)
-                }}
-              />
-              <button
-                className="absolute right-4 top-4 text-brand-red opacity-0 transition-opacity group-hover:opacity-100"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  removeDraft(preSale.id)
-                }}
-              >
-                <TrashIcon size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
-      </BottomSheet>
+      {isMobile ? (
+        <BottomSheet isOpen={isPreSaleSheetOpen} onClose={() => setIsPreSaleSheetOpen(false)} title="Pedidos em Pré-venda">
+          <div className="grid grid-cols-1 gap-4 pt-4 md:grid-cols-2 lg:grid-cols-3">
+            {preSales.map((preSale, index) => (
+              <div key={preSale.id} className="relative group">
+                <POSPreSaleCard
+                  preSale={preSale}
+                  index={index}
+                  customers={customers}
+                  onClick={() => {
+                    loadPreSale(preSale)
+                    setIsPreSaleSheetOpen(false)
+                  }}
+                />
+                <button
+                  className="absolute right-4 top-4 text-brand-red"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeDraft(preSale.id)
+                  }}
+                >
+                  <TrashIcon size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </BottomSheet>
+      ) : (
+        <DefaultModal
+          isOpen={isPreSaleSheetOpen}
+          onClose={() => setIsPreSaleSheetOpen(false)}
+          title="Pedidos em Pré-venda"
+          maxWidth="2xl"
+        >
+          <div className="grid grid-cols-1 gap-4 pt-2 md:grid-cols-2 xl:grid-cols-3">
+            {preSales.map((preSale, index) => (
+              <div key={preSale.id} className="relative group">
+                <POSPreSaleCard
+                  preSale={preSale}
+                  index={index}
+                  customers={customers}
+                  onClick={() => {
+                    loadPreSale(preSale)
+                    setIsPreSaleSheetOpen(false)
+                  }}
+                />
+                <button
+                  className="absolute right-4 top-4 text-brand-red opacity-0 transition-opacity group-hover:opacity-100"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeDraft(preSale.id)
+                  }}
+                >
+                  <TrashIcon size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </DefaultModal>
+      )}
 
       <AnimatePresence>
         {isPaymentModalOpen && (
@@ -859,7 +919,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
           <div className="space-y-6 pt-2">
             <InfoCard color="gray" title="Produto" message={editingItem.name} />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Input
                 label="Quantidade"
                 name="editQty"
@@ -867,14 +927,35 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 value={editQty}
                 onChange={(e: any) => setEditQty(Number(e.target.value))}
               />
-              <MoneyInput
-                label="Desconto"
-                value={editDiscount}
-                onChange={(value: number) => setEditDiscount(value)}
-              />
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-brand-dark dark:text-dark-heading">Tipo de desconto</label>
+                  <select
+                    value={editDiscountType}
+                    onChange={(e) => setEditDiscountType(e.target.value as "fixed" | "percentage")}
+                    className="h-[42px] w-full rounded-lg border border-brand-border bg-brand-gray px-4 text-sm text-brand-dark focus:border-brand-dark focus:bg-white focus:outline-none dark:border-dark-border dark:bg-dark-border/30 dark:text-dark-heading dark:focus:bg-dark-surface"
+                  >
+                    <option value="fixed">Dinheiro</option>
+                    <option value="percentage">Porcentagem</option>
+                  </select>
+                </div>
+                {editDiscountType === "fixed" ? (
+                  <MoneyInput
+                    label="Desconto"
+                    value={editDiscount}
+                    onChange={(value: number) => setEditDiscount(value)}
+                  />
+                ) : (
+                  <PercentageInput
+                    label="Desconto"
+                    value={editDiscount}
+                    onChange={(value: number) => setEditDiscount(value)}
+                  />
+                )}
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <MoneyInput
                 label="Valor unitário"
                 value={editPrice}
@@ -905,11 +986,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
               Cancelar
             </Button>
             <Button className="flex-1" onClick={() => {
-              if (editDiscountType === "fixed") {
-                setDiscountAmount(editDiscount)
-              } else {
-                setDiscountAmount(total * (editDiscount / 100))
-              }
+              setDiscountType(globalDiscountType)
+              setDiscountAmount(globalDiscountValue)
               setIsGlobalDiscountModalOpen(false)
             }}>
               Aplicar
@@ -919,21 +997,45 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       >
         <div className="space-y-6 pt-2">
           <InfoCard color="green" title="Valor total de itens" message={formatCurrency(total)} />
-          <MoneyInput
-            label="Desconto do pedido"
-            value={editDiscount}
-            onChange={(value: number) => setEditDiscount(value)}
-          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-brand-dark dark:text-dark-heading">Tipo de desconto</label>
+              <select
+                value={globalDiscountType}
+                onChange={(e) => setGlobalDiscountType(e.target.value as "fixed" | "percentage")}
+                className="h-[42px] w-full rounded-lg border border-brand-border bg-brand-gray px-4 text-sm text-brand-dark focus:border-brand-dark focus:bg-white focus:outline-none dark:border-dark-border dark:bg-dark-border/30 dark:text-dark-heading dark:focus:bg-dark-surface"
+              >
+                <option value="fixed">Dinheiro</option>
+                <option value="percentage">Porcentagem</option>
+              </select>
+            </div>
+            {globalDiscountType === "fixed" ? (
+              <MoneyInput
+                label="Desconto do pedido"
+                value={globalDiscountValue}
+                onChange={(value: number) => setGlobalDiscountValue(value)}
+              />
+            ) : (
+              <PercentageInput
+                label="Desconto do pedido"
+                value={globalDiscountValue}
+                onChange={(value: number) => setGlobalDiscountValue(value)}
+              />
+            )}
+          </div>
         </div>
       </DefaultModal>
 
       {isNotesSheetOpen && (
-        <DefaultModal
-          isOpen={isNotesSheetOpen}
-          onClose={() => setIsNotesSheetOpen(false)}
-          title="Adicionar Observação"
-          footer={
-            <div className="flex w-full items-center gap-3">
+        <BottomSheet isOpen={isNotesSheetOpen} onClose={() => setIsNotesSheetOpen(false)} title="Adicionar Observação">
+          <div className="space-y-4 pt-2">
+            <textarea
+              className="h-32 w-full resize-none rounded-xl border border-brand-border bg-[#F5F6F7] p-4 text-brand-dark focus:border-brand-primary focus:outline-none dark:border-dark-border dark:bg-dark-gray dark:text-dark-text"
+              placeholder="Digite alguma observação que sairá no pedido..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+            <div className="flex items-center gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
                 Cancelar
               </Button>
@@ -941,17 +1043,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 Confirmar
               </Button>
             </div>
-          }
-        >
-          <div className="pt-2">
-            <textarea
-              className="h-32 w-full resize-none rounded-xl border border-brand-border bg-[#F5F6F7] p-4 text-brand-dark focus:border-brand-primary focus:outline-none dark:border-dark-border dark:bg-dark-gray dark:text-dark-text"
-              placeholder="Digite alguma observação que sairá no pedido..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
           </div>
-        </DefaultModal>
+        </BottomSheet>
       )}
 
       <SelectCustomerSheet
@@ -976,8 +1069,12 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       <AlertModal
         isOpen={isResetAlertOpen}
         onClose={() => setIsResetAlertOpen(false)}
-        onConfirm={() => {
-          clearCurrentOrder()
+        onConfirm={async () => {
+          if (activePreSaleId) {
+            await removeDraft(activePreSaleId)
+          } else {
+            clearCurrentOrder()
+          }
           setIsResetAlertOpen(false)
         }}
         title="Limpar pedido?"

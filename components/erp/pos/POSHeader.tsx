@@ -119,7 +119,7 @@ const POSHeader = memo(function POSHeader({
       </div>
 
       {!isMobile && (
-        <Tabs value={selectedCategory} onValueChange={onCategoryChange} className="mb-6">
+        <Tabs value={selectedCategory} onValueChange={onCategoryChange} className="mb-6 border-b border-brand-border dark:border-dark-border">
           <TabsList className="w-full border-b-0 px-0">
             {categories.map((category) => (
               <TabsTrigger key={category} value={category}>

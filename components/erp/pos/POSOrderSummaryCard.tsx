@@ -1,6 +1,6 @@
 "use client"
 
-import { memo } from "react"
+import { memo, type ReactNode } from "react"
 import { ArchiveIcon, ChevronRightIcon, EditIcon, TagIcon, ThreeDotsIcon, TrashIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { Button } from "@/components/reusable"
@@ -25,6 +25,7 @@ type SummaryProps = {
   onAddShipping: () => void
   onOpenNotes: () => void
   showItemsShortcut?: boolean
+  showActionsMenu?: boolean
 }
 
 function POSOrderActionsMenu({
@@ -32,7 +33,10 @@ function POSOrderActionsMenu({
   onOpenDiscount,
   onAddShipping,
   onOpenNotes,
-}: Pick<SummaryProps, "onSaveDraft" | "onOpenDiscount" | "onAddShipping" | "onOpenNotes">) {
+  showActionsMenu = true,
+}: Pick<SummaryProps, "onSaveDraft" | "onOpenDiscount" | "onAddShipping" | "onOpenNotes" | "showActionsMenu">) {
+  if (!showActionsMenu) return null
+
   return (
     <Dropdown
       trigger={
@@ -77,6 +81,7 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
   onAddShipping,
   onOpenNotes,
   showItemsShortcut = true,
+  showActionsMenu = true,
 }: Omit<SummaryProps, "canReset" | "onReset">) {
   return (
     <div className="rounded-2xl border border-brand-border bg-white p-4 space-y-4 dark:bg-dark-surface">
@@ -84,11 +89,11 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
         <button
           type="button"
           onClick={onOpenItems}
-          className="flex w-full items-center justify-between rounded-[24px] border border-brand-border bg-brand-gray/50 px-4 py-4 text-left"
+          className="flex w-full items-center justify-between rounded-full border border-brand-border bg-brand-gray/50 dark:bg-brand-border/50 px-1 py-1 text-left"
         >
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-50 text-brand-primary">
-              <ArchiveIcon className="h-4 w-4" />
+              <ArchiveIcon className="mr-2 h-4 w-4" />
             </div>
             <span className="font-bold text-brand-dark dark:text-dark-heading">Itens do Pedido ({itemCount})</span>
           </div>
@@ -99,11 +104,11 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
       <button
         type="button"
         onClick={onOpenDiscount}
-        className="flex w-full items-center justify-between rounded-[24px] border border-brand-border bg-brand-gray/50 px-4 py-4 text-left"
+        className="flex w-full items-center justify-between rounded-full border border-brand-border bg-brand-gray/50 dark:bg-brand-border/50 px-1 py-1 text-left"
       >
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-dark text-white">
-            <TagIcon className="h-4 w-4" />
+            <TagIcon className="mr-2 h-4 w-4" />
           </div>
           <span className="font-bold text-brand-dark dark:text-dark-heading">
             {discountVal > 0 ? `Desconto Aplicado (${formatCurrency(discountVal)})` : "Aplicar Desconto"}
@@ -152,6 +157,7 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
           onOpenDiscount={onOpenDiscount}
           onAddShipping={onAddShipping}
           onOpenNotes={onOpenNotes}
+          showActionsMenu={showActionsMenu}
         />
       </div>
     </div>
@@ -161,19 +167,33 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
 export default function POSDesktopOrderPanel({
   canReset,
   onReset,
+  onOpenNotes,
+  hasNotes = false,
+  cartItems,
   ...summaryProps
-}: SummaryProps) {
+}: SummaryProps & {
+  hasNotes?: boolean
+  cartItems?: ReactNode
+}) {
   return (
-    <div className="flex h-full flex-col rounded-xl border border-brand-border bg-brand-gray p-4 dark:bg-dark-border/50 md:p-5">
+    <div className="flex h-full min-h-0 flex-col rounded-xl border border-brand-border bg-brand-gray p-4 dark:bg-dark-border/50 md:p-5">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Resumo do Pedido</h3>
-        <Button variant="outline" className="h-9" onClick={onReset} disabled={!canReset}>
-          <TrashIcon className="h-4 w-4 text-brand-red dark:text-brand-red" /> Limpar Pedido
-        </Button>
+        <div className="flex items-center gap-2">
+          {hasNotes && (
+            <Button variant="outline" className="h-10 w-10 p-0" onClick={onOpenNotes}>
+              <ArchiveIcon className="h-4 w-4 text-brand-dark dark:text-dark-heading" />
+            </Button>
+          )}
+          <Button variant="outline" className="h-9" onClick={onReset} disabled={!canReset}>
+            <TrashIcon className="h-4 w-4 text-brand-red dark:text-brand-red" /> Limpar Pedido
+          </Button>
+        </div>
       </div>
 
-      <div className="mt-auto">
-        <POSOrderSummaryContent {...summaryProps} />
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
+        {cartItems && <div className="min-h-0 flex-1">{cartItems}</div>}
+        <POSOrderSummaryContent {...summaryProps} onOpenNotes={onOpenNotes} />
       </div>
     </div>
   )

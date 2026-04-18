@@ -22,11 +22,11 @@ const POSCartItemCard = memo(function POSCartItemCard({
 }: Props) {
   return (
     <div className="rounded-2xl border border-brand-border bg-white p-3 dark:bg-dark-surface">
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-start gap-3">
         <img
           src={getR2ImageUrl(item.image, "thumbnail")}
           alt={item.name}
-          className="h-16 w-16 rounded-xl object-cover bg-brand-gray dark:bg-dark-border/50"
+          className="h-16 w-16 shrink-0 rounded-xl object-cover bg-brand-gray dark:bg-dark-border/50"
         />
         <div className="min-w-0 flex-1">
           <p className="truncate font-bold text-brand-dark dark:text-dark-heading">{item.name}</p>
@@ -35,21 +35,21 @@ const POSCartItemCard = memo(function POSCartItemCard({
           )}
           <p className="text-sm text-brand-inactive-text dark:text-dark-body">{formatCurrency(item.price)}</p>
           <div className="mt-2 flex items-center gap-2">
-            <Button className="flex h-7 w-7 items-center justify-center" variant="outline" onClick={() => onChangeQty(item.id, -1)}>
+            <Button className="flex h-7 w-7 px-0 py-0 items-center justify-center" variant="outline" onClick={() => onChangeQty(item.id, -1)}>
               <MinusIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" />
             </Button>
             <span className="min-w-8 text-center font-bold">{String(item.qty).padStart(2, "0")}</span>
-            <Button className="flex h-7 w-7 items-center justify-center" onClick={() => onChangeQty(item.id, 1)}>
+            <Button className="flex h-7 w-7 px-0 py-0 items-center justify-center" onClick={() => onChangeQty(item.id, 1)}>
               <PlusIcon className="h-4 w-4 text-white" />
             </Button>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-2 text-right">
-          <div className="flex gap-1.5">
-            <Button className="h-8 w-8" variant="outline" onClick={() => onEdit(item)}>
+        <div className="flex shrink-0 flex-col items-end gap-2 text-right">
+          <div className="flex flex-wrap justify-end gap-1.5">
+            <Button className="h-8 w-8 px-0 py-0" variant="outline" onClick={() => onEdit(item)}>
               <EditIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" />
             </Button>
-            <Button className="h-8 w-8" variant="outline" onClick={() => onRemove(item.id)}>
+            <Button className="h-8 w-8 px-0 py-0" variant="outline" onClick={() => onRemove(item.id)}>
               <TrashIcon className="h-4 w-4 text-brand-red dark:text-brand-red" />
             </Button>
           </div>
