@@ -17,7 +17,7 @@ export const POSPreSaleCard = memo(function POSPreSaleCard({ preSale, index, cus
   return (
     <button
       onClick={onClick}
-      className="min-w-[280px] rounded-xl border border-brand-border bg-white p-4 text-left cursor-pointer dark:border-dark-border dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/50 transition-all"
+      className="min-w-[280px] bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">

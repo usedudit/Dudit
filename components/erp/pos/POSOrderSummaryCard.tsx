@@ -3,7 +3,7 @@
 import { memo, type ReactNode } from "react"
 import { ArchiveIcon, ChevronRightIcon, EditIcon, TagIcon, ThreeDotsIcon, TrashIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
-import { Button } from "@/components/reusable"
+import { Button, IconPlaceholder } from "@/components/reusable"
 import Dropdown from "@/components/reusable/Dropdown"
 import DropdownItem from "@/components/reusable/DropdownItem"
 
@@ -26,6 +26,8 @@ type SummaryProps = {
   onOpenNotes: () => void
   showItemsShortcut?: boolean
   showActionsMenu?: boolean
+  isEmpty?: boolean
+  emptyState?: ReactNode
 }
 
 function POSOrderActionsMenu({
@@ -82,7 +84,23 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
   onOpenNotes,
   showItemsShortcut = true,
   showActionsMenu = true,
+  isEmpty = false,
+  emptyState,
 }: Omit<SummaryProps, "canReset" | "onReset">) {
+  if (isEmpty) {
+    return (
+      <div className="flex flex-1 items-center justify-center rounded-2xl border border-dashed border-brand-border bg-white p-6 dark:bg-dark-surface">
+        {emptyState || (
+          <IconPlaceholder
+            title="Nenhum item no pedido"
+            subtitle="Adicione produtos para começar o atendimento."
+            className="py-8"
+          />
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="rounded-2xl border border-brand-border bg-white p-4 space-y-4 dark:bg-dark-surface">
       {showItemsShortcut && (
@@ -170,11 +188,31 @@ export default function POSDesktopOrderPanel({
   onOpenNotes,
   hasNotes = false,
   cartItems,
+  isEmpty = false,
+  emptyState,
   ...summaryProps
 }: SummaryProps & {
   hasNotes?: boolean
   cartItems?: ReactNode
+  isEmpty?: boolean
+  emptyState?: ReactNode
 }) {
+  if (isEmpty) {
+    return (
+      <div className="flex h-full min-h-0 flex-col rounded-xl border border-brand-border bg-brand-gray p-4 dark:bg-dark-border/50 md:p-5">
+        <div className="flex min-h-0 flex-1 items-center justify-center">
+          {emptyState || (
+            <IconPlaceholder
+              title="Nenhum item no pedido"
+              subtitle="Adicione produtos para começar o atendimento."
+              className="py-8"
+            />
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col rounded-xl border border-brand-border bg-brand-gray p-4 dark:bg-dark-border/50 md:p-5">
       <div className="mb-4 flex items-center justify-between">

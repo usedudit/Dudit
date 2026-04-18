@@ -75,42 +75,40 @@ const POSHeader = memo(function POSHeader({
               </button>
             </>
           ) : (
-            <div className="flex items-center gap-8">
+            <div className="flex items-center gap-3">
               <ListItem
                 onClick={onOpenCustomerSheet}
-                className="border-none p-0 gap-3"
+                className="min-w-[220px] gap-4 border-none bg-transparent p-3 hover:bg-brand-gray/40 dark:hover:bg-dark-border/30"
                 left={
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-border bg-brand-gray dark:border-dark-border dark:bg-dark-border">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-gray dark:bg-dark-border/50">
                     {selectedCustomerId ? (
-                      <span className="text-lg font-bold">
+                      <span className="text-lg font-bold text-brand-dark dark:text-dark-heading">
                         {customers.find((customer) => customer.id === selectedCustomerId)?.name.charAt(0).toUpperCase()}
                       </span>
                     ) : (
-                      <UserIcon size={20} />
+                      <UserIcon size={20} className="text-brand-dark dark:text-dark-heading" />
                     )}
                   </div>
                 }
                 title="Cliente"
                 description={selectedCustomerId ? customers.find((customer) => customer.id === selectedCustomerId)?.name : "Consumidor Final"}
-                titleClassName="text-sm font-bold text-brand-dark dark:text-dark-heading !leading-none"
-                descriptionClassName="max-w-[150px] truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body !leading-none"
+                titleClassName="mb-1 text-base font-bold text-brand-dark dark:text-dark-heading"
+                descriptionClassName="max-w-[160px] truncate text-sm text-brand-inactive-text dark:text-dark-body"
                 showChevron
               />
 
-              <div className="h-10 w-[1px] bg-brand-border dark:bg-dark-border" />
-
               <ListItem
                 onClick={onOpenSellerSheet}
-                className="border-none p-0 gap-3"
+                className="min-w-[220px] gap-4 border-none bg-transparent p-3 hover:bg-brand-gray/40 dark:hover:bg-dark-border/30"
                 left={
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-border bg-brand-gray dark:border-dark-border dark:bg-dark-border">
-                    <ClockIcon size={20} className="text-brand-inactive-text dark:text-dark-body" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-gray dark:bg-dark-border/50">
+                    <ClockIcon size={20} className="text-brand-dark dark:text-dark-heading" />
                   </div>
                 }
                 title="Vendedor"
                 description={selectedSellerId ? teamMembers.find((member) => member.id === selectedSellerId)?.fullName || "Selecionar" : "Selecionar"}
-                titleClassName="text-sm font-bold text-brand-dark dark:text-dark-heading !leading-none"
-                descriptionClassName="max-w-[150px] truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body !leading-none"
+                titleClassName="mb-1 text-base font-bold text-brand-dark dark:text-dark-heading"
+                descriptionClassName="max-w-[160px] truncate text-sm text-brand-inactive-text dark:text-dark-body"
                 showChevron
               />
             </div>

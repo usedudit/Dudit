@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { TrashIcon, ChevronRightIcon } from "@/lib/icons"
+import { TrashIcon, ChevronRightIcon, XIcon, SalesIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input } from "@/components/reusable"
+import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input, IconPlaceholder } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
+import Portal from "@/components/Portal"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useNotification } from "@/hooks/use-notification"
 import {
@@ -50,6 +51,44 @@ interface Props {
 type TeamMember = {
   id: string
   fullName?: string | null
+}
+
+function DesktopPOSSheet({
+  isOpen,
+  onClose,
+  title,
+  children,
+  widthClassName = "w-[450px]",
+}: {
+  isOpen: boolean
+  onClose: () => void
+  title: string
+  children: React.ReactNode
+  widthClassName?: string
+}) {
+  return (
+    <Portal>
+      <div
+        className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        onClick={onClose}
+      >
+        <div
+          className={`fixed right-4 top-4 bottom-4 ${widthClassName} overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+            <header className="flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+              <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</h2>
+              <Button variant="ghost" onClick={onClose} size="icon">
+                <XIcon className="h-5 w-5" />
+              </Button>
+            </header>
+            <div className="flex-1 overflow-y-auto">{children}</div>
+          </div>
+        </div>
+      </div>
+    </Portal>
+  )
 }
 
 export default function POSPage({ partnerId, initialData, initialActiveSession }: Props) {
@@ -514,7 +553,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   }, [])
 
   const cartItemsList = (
-    <div className="flex h-full min-h-0 flex-col rounded-2xl border border-brand-border bg-white/70 p-3 dark:bg-dark-surface/80">
+    <div className="flex h-full min-h-0 flex-col">
       <div className={`space-y-3 flex-1 overflow-y-auto pr-1 ${desktopScrollClass}`}>
         {cart.map((item) => (
           <POSCartItemCard
@@ -674,6 +713,19 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
               showActionsMenu={cart.length > 0}
               hasNotes={hasNotes}
               cartItems={cartItemsList}
+              isEmpty={cart.length === 0}
+              emptyState={
+                <IconPlaceholder
+                  icon={SalesIcon}
+                  title="Caixa aberto e pronto para vender"
+                  subtitle="Adicione produtos ao pedido para ver o resumo, aplicar descontos e continuar o atendimento."
+                  containerSize="h-20 w-20"
+                  iconSize="h-8 w-8"
+                  titleClass="text-2xl font-bold text-brand-dark dark:text-dark-heading"
+                  subtitleClass="mt-2 max-w-md text-sm text-brand-inactive-text dark:text-dark-body"
+                  className="px-6 py-10"
+                />
+              }
             />
           </div>
         )}
@@ -794,13 +846,13 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
           </div>
         </BottomSheet>
       ) : (
-        <DefaultModal
+        <DesktopPOSSheet
           isOpen={isPreSaleSheetOpen}
           onClose={() => setIsPreSaleSheetOpen(false)}
           title="Pedidos em Pré-venda"
-          maxWidth="2xl"
+          widthClassName="w-[560px]"
         >
-          <div className="grid grid-cols-1 gap-4 pt-2 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2">
             {preSales.map((preSale, index) => (
               <div key={preSale.id} className="relative group">
                 <POSPreSaleCard
@@ -824,7 +876,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
               </div>
             ))}
           </div>
-        </DefaultModal>
+        </DesktopPOSSheet>
       )}
 
       <AnimatePresence>
@@ -1027,24 +1079,49 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       </DefaultModal>
 
       {isNotesSheetOpen && (
-        <BottomSheet isOpen={isNotesSheetOpen} onClose={() => setIsNotesSheetOpen(false)} title="Adicionar Observação">
-          <div className="space-y-4 pt-2">
-            <textarea
-              className="h-32 w-full resize-none rounded-xl border border-brand-border bg-[#F5F6F7] p-4 text-brand-dark focus:border-brand-primary focus:outline-none dark:border-dark-border dark:bg-dark-gray dark:text-dark-text"
-              placeholder="Digite alguma observação que sairá no pedido..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-            <div className="flex items-center gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
-                Cancelar
-              </Button>
-              <Button className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
-                Confirmar
-              </Button>
+        isMobile ? (
+          <BottomSheet isOpen={isNotesSheetOpen} onClose={() => setIsNotesSheetOpen(false)} title="Adicionar Observação">
+            <div className="space-y-4 pt-2">
+              <textarea
+                className="h-32 w-full resize-none rounded-xl border border-brand-border bg-[#F5F6F7] p-4 text-brand-dark focus:border-brand-primary focus:outline-none dark:border-dark-border dark:bg-dark-gray dark:text-dark-text"
+                placeholder="Digite alguma observação que sairá no pedido..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+              <div className="flex items-center gap-3">
+                <Button variant="outline" className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
+                  Confirmar
+                </Button>
+              </div>
             </div>
-          </div>
-        </BottomSheet>
+          </BottomSheet>
+        ) : (
+          <DesktopPOSSheet
+            isOpen={isNotesSheetOpen}
+            onClose={() => setIsNotesSheetOpen(false)}
+            title="Adicionar Observação"
+          >
+            <div className="flex h-full flex-col p-6">
+              <textarea
+                className="h-40 w-full resize-none rounded-xl border border-brand-border bg-[#F5F6F7] p-4 text-brand-dark focus:border-brand-primary focus:outline-none dark:border-dark-border dark:bg-dark-gray dark:text-dark-text"
+                placeholder="Digite alguma observação que sairá no pedido..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+              <div className="mt-4 flex items-center gap-3 border-t border-brand-border pt-4 dark:border-dark-border">
+                <Button variant="outline" className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
+                  Confirmar
+                </Button>
+              </div>
+            </div>
+          </DesktopPOSSheet>
+        )
       )}
 
       <SelectCustomerSheet
