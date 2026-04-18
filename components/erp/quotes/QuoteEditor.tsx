@@ -15,7 +15,7 @@ import {
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import QuantitySelector from '@/components/reusable/QuantitySelector';
-import { Button, Input, TabsContent, FormDropdown, MoneyInput, PercentageInput, DatePicker, ThreeDotsLoader, IconPlaceholder, Pagination } from '@/components/reusable';
+import { Button, Input, TabsContent, FormDropdown, MoneyInput, PercentageInput, DatePicker, ThreeDotsLoader, IconPlaceholder, Pagination, InfoCard } from '@/components/reusable';
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { formatCurrency } from "@/lib/utils";
 import { QUOTE_DEFAULT_CUSTOMER_LABEL, type QuoteEditCaps } from "@/lib/quotes/quote-edit-rules";
@@ -134,21 +134,18 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
 
                     {caps?.bannerMessage && !props.isReadOnly && (
-                        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
-                            <p className="font-medium mb-2">{caps.bannerMessage}</p>
-                            <div className="flex flex-wrap gap-2">
-                                {caps.showReopenCta && props.onReopenQuote && (
-                                    <Button type="button" variant="outline" className="h-9 text-xs" onClick={props.onReopenQuote}>
-                                        Reabrir como rascunho
-                                    </Button>
-                                )}
-                                {caps.showDuplicateCta && props.onDuplicateQuote && (
-                                    <Button type="button" variant="outline" className="h-9 text-xs" onClick={props.onDuplicateQuote}>
-                                        Duplicar orçamento
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
+                        <><InfoCard title="Atenção" message={caps.bannerMessage} color="orange" className="mb-6" /><div className="flex flex-wrap gap-2">
+                            {caps.showReopenCta && props.onReopenQuote && (
+                                <Button type="button" variant="outline" className="h-9 text-xs" onClick={props.onReopenQuote}>
+                                    Reabrir como rascunho
+                                </Button>
+                            )}
+                            {caps.showDuplicateCta && props.onDuplicateQuote && (
+                                <Button type="button" variant="outline" className="h-9 text-xs" onClick={props.onDuplicateQuote}>
+                                    Duplicar orçamento
+                                </Button>
+                            )}
+                        </div></>
                     )}
 
                     {/* 1. PRODUCT SEARCH & TABLE */}

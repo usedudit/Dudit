@@ -1,8 +1,8 @@
 "use client"
 
 import { memo } from "react"
-import { SearchIcon, UserIcon, ClockIcon, ChevronRightIcon } from "@/lib/icons"
-import { Input, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import { SearchIcon, UserIcon, ClockIcon, ChevronRightIcon, DashboardIcon } from "@/lib/icons"
+import { Input, Tabs, TabsList, TabsTrigger, ListItem } from "@/components/reusable"
 import type { PDVCustomer } from "@/lib/types/pdv"
 
 type TeamMember = {
@@ -63,53 +63,56 @@ const POSHeader = memo(function POSHeader({
             <>
               <button
                 onClick={onOpenCategorySheet}
-                className="flex h-10 min-w-[112px] items-center justify-between rounded-full border border-brand-border bg-[#F5F6F7] px-3 text-brand-dark dark:border-dark-border dark:bg-dark-gray dark:text-dark-text"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-border bg-brand-gray text-brand-dark dark:border-dark-border dark:bg-dark-gray dark:text-dark-text"
               >
-                <span className="truncate text-sm font-bold">{mobileCategoryLabel}</span>
-                <ChevronRightIcon size={16} />
+                <DashboardIcon size={18} />
               </button>
-              <button onClick={onOpenCustomerSheet} className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-border bg-[#F5F6F7] text-brand-dark dark:border-dark-border dark:bg-dark-gray dark:text-dark-text">
+              <button onClick={onOpenCustomerSheet} className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-border bg-brand-gray text-brand-dark dark:border-dark-border dark:bg-dark-gray dark:text-dark-text">
                 <UserIcon size={18} />
               </button>
-              <button onClick={onOpenSellerSheet} className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-border bg-[#F5F6F7] text-brand-dark dark:border-dark-border dark:bg-dark-gray dark:text-dark-text">
+              <button onClick={onOpenSellerSheet} className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-border bg-brand-gray text-brand-dark dark:border-dark-border dark:bg-dark-gray dark:text-dark-text">
                 <ClockIcon size={18} />
               </button>
             </>
           ) : (
             <div className="flex items-center gap-8">
-              <button onClick={onOpenCustomerSheet} className="group flex items-center gap-3 transition-colors">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-border bg-brand-gray dark:border-dark-border dark:bg-dark-border">
-                  {selectedCustomerId ? (
-                    <span className="text-lg font-bold">
-                      {customers.find((customer) => customer.id === selectedCustomerId)?.name.charAt(0).toUpperCase()}
-                    </span>
-                  ) : (
-                    <UserIcon size={20} />
-                  )}
-                </div>
-                <div className="flex min-w-[100px] flex-col text-left">
-                  <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Cliente</span>
-                  <span className="max-w-[150px] truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                    {selectedCustomerId ? customers.find((customer) => customer.id === selectedCustomerId)?.name : "Consumidor Final"}
-                  </span>
-                </div>
-                <ChevronRightIcon size={16} className="text-brand-inactive-text transition-colors group-hover:text-brand-dark" />
-              </button>
+              <ListItem
+                onClick={onOpenCustomerSheet}
+                className="border-none p-0 gap-3"
+                left={
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-border bg-brand-gray dark:border-dark-border dark:bg-dark-border">
+                    {selectedCustomerId ? (
+                      <span className="text-lg font-bold">
+                        {customers.find((customer) => customer.id === selectedCustomerId)?.name.charAt(0).toUpperCase()}
+                      </span>
+                    ) : (
+                      <UserIcon size={20} />
+                    )}
+                  </div>
+                }
+                title="Cliente"
+                description={selectedCustomerId ? customers.find((customer) => customer.id === selectedCustomerId)?.name : "Consumidor Final"}
+                titleClassName="text-sm font-bold text-brand-dark dark:text-dark-heading !leading-none"
+                descriptionClassName="max-w-[150px] truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body !leading-none"
+                showChevron
+              />
 
               <div className="h-10 w-[1px] bg-brand-border dark:bg-dark-border" />
 
-              <button onClick={onOpenSellerSheet} className="group flex items-center gap-3 transition-colors">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-border bg-brand-gray dark:border-dark-border dark:bg-dark-border">
-                  <ClockIcon className="h-5 w-5 text-brand-inactive-text dark:text-dark-body" />
-                </div>
-                <div className="flex min-w-[100px] flex-col text-left">
-                  <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Vendedor</span>
-                  <span className="max-w-[150px] truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                    {selectedSellerId ? teamMembers.find((member) => member.id === selectedSellerId)?.fullName : "Selecionar"}
-                  </span>
-                </div>
-                <ChevronRightIcon size={16} className="text-brand-inactive-text transition-colors group-hover:text-brand-dark" />
-              </button>
+              <ListItem
+                onClick={onOpenSellerSheet}
+                className="border-none p-0 gap-3"
+                left={
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-border bg-brand-gray dark:border-dark-border dark:bg-dark-border">
+                    <ClockIcon size={20} className="text-brand-inactive-text dark:text-dark-body" />
+                  </div>
+                }
+                title="Vendedor"
+                description={selectedSellerId ? teamMembers.find((member) => member.id === selectedSellerId)?.fullName || "Selecionar" : "Selecionar"}
+                titleClassName="text-sm font-bold text-brand-dark dark:text-dark-heading !leading-none"
+                descriptionClassName="max-w-[150px] truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body !leading-none"
+                showChevron
+              />
             </div>
           )}
         </div>

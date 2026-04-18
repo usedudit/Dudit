@@ -528,7 +528,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex h-full flex-col gap-4">
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className="flex min-h-0 flex-col xl:col-span-8 xl:pl-6">
+        <div className="flex min-h-0 flex-col xl:col-span-8 xl:pr-6">
           <POSHeader
             isMobile={isMobile}
             search={search}
@@ -546,7 +546,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             onOpenSellerSheet={() => setIsSelectSellerOpen(true)}
           />
 
-          <div className={`mt-2 grid grid-cols-2 gap-3 overflow-y-auto pr-1 pb-24 md:grid-cols-3 xl:grid-cols-4 xl:pb-6 2xl:grid-cols-5 ${desktopScrollClass}`}>
+          <div className={`mt-2 grid grid-cols-2 gap-3 overflow-y-auto pr-1 pb-24 md:grid-cols-4 xl:grid-cols-5 xl:pb-6 2xl:grid-cols-6 ${desktopScrollClass}`}>
             {filteredProducts
               .slice(0, (cart.length === 0 && preSales.length > 0) ? (preSaleLimit === 4 ? 8 : preSaleLimit === 3 ? 6 : preSaleLimit === 2 ? 4 : 2) : undefined)
               .map((product) => (
@@ -645,11 +645,11 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       </div>
       {isMobile && itemCount > 0 && (
         <button
-          className="fixed bottom-4 left-4 right-4 z-40 flex h-14 items-center justify-between rounded-[22px] bg-brand-primary px-4 font-bold text-white shadow-[0_14px_32px_rgba(5,150,105,0.28)]"
+          className="fixed bottom-4 left-4 right-4 z-40 flex h-14 items-center justify-between rounded-full bg-brand-green px-4 font-bold text-white"
           onClick={() => setIsMobileSummarySheetOpen(true)}
         >
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm text-brand-primary">{itemCount}</span>
+            <span className="flex h-8 w-8 font-black items-center justify-center rounded-full bg-white text-sm text-brand-dark">{itemCount}</span>
             <span>Ver Pedido</span>
           </div>
           <span>{formatCurrency(total)}</span>

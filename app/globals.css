@@ -606,7 +606,7 @@ tbody tr {
 
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(5, 150, 105, 0.45) transparent;
+  scrollbar-color: #f9fafb;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -619,14 +619,14 @@ tbody tr {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(5, 150, 105, 0.32);
+  background: rgb(229, 231, 235);
   border-radius: 9999px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(5, 150, 105, 0.5);
+  background: rgb(229, 231, 235);
   border: 2px solid transparent;
   background-clip: padding-box;
 }

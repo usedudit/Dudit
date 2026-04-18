@@ -79,7 +79,7 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
   showItemsShortcut = true,
 }: Omit<SummaryProps, "canReset" | "onReset">) {
   return (
-    <div className="rounded-[28px] border border-brand-border bg-white p-4 space-y-4 dark:bg-dark-surface">
+    <div className="rounded-2xl border border-brand-border bg-white p-4 space-y-4 dark:bg-dark-surface">
       {showItemsShortcut && (
         <button
           type="button"
