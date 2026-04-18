@@ -104,7 +104,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   const [activeCashSession, setActiveCashSession] = useState<any | null>(initialActiveSession || null)
 
   const isCashierOpen = !!activeCashSession?.id
-  const [selectedCategory, setSelectedCategory] = useState("All Product")
+  const [selectedCategory, setSelectedCategory] = useState("Todos")
   const [search, setSearch] = useState("")
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>(undefined)
   const [selectedSellerId, setSelectedSellerId] = useState<string | undefined>(undefined)
@@ -161,7 +161,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     products.forEach((product) => {
       if (product.category) cats.add(product.category)
     })
-    return ["All Product", ...Array.from(cats)]
+    return ["Todos", ...Array.from(cats)]
   }, [products])
 
   useEffect(() => {
@@ -182,7 +182,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     let result = products
     const term = normalizePDVSearchTerm(search)
 
-    if (selectedCategory !== "All Product") {
+    if (selectedCategory !== "Todos") {
       result = result.filter((product) => product.category === selectedCategory)
     }
 
@@ -202,7 +202,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     return discountAmount
   }, [subtotal, discountAmount, discountType])
   const total = useMemo(() => Math.max(0, subtotal - discountVal + shippingFee + otherCosts), [subtotal, discountVal, shippingFee, otherCosts])
-  const mobileCategoryLabel = selectedCategory === "All Product" ? "Categorias" : selectedCategory
+  const mobileCategoryLabel = selectedCategory === "Todos" ? "Categorias" : selectedCategory
   const selectedCustomer = useMemo(
     () => (selectedCustomerId ? customers.find((customer) => customer.id === selectedCustomerId) || null : null),
     [customers, selectedCustomerId]
@@ -718,12 +718,11 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 <IconPlaceholder
                   icon={SalesIcon}
                   title="Caixa aberto e pronto para vender"
-                  subtitle="Adicione produtos ao pedido para ver o resumo, aplicar descontos e continuar o atendimento."
+                  subtitle="Adicione itens ao pedido para ver o resumo, aplicar descontos e continuar o atendimento."
                   containerSize="h-20 w-20"
                   iconSize="h-8 w-8"
                   titleClass="text-2xl font-bold text-brand-dark dark:text-dark-heading"
-                  subtitleClass="mt-2 max-w-md text-sm text-brand-inactive-text dark:text-dark-body"
-                  className="px-6 py-10"
+                  subtitleClass="mt-2 max-w-md text-lg text-brand-inactive-text dark:text-dark-body"
                 />
               }
             />

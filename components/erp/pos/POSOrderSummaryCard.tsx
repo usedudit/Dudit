@@ -1,7 +1,7 @@
 "use client"
 
 import { memo, type ReactNode } from "react"
-import { ArchiveIcon, ChevronRightIcon, EditIcon, TagIcon, ThreeDotsIcon, TrashIcon } from "@/lib/icons"
+import { ChevronRightIcon, FileIcon, TagIcon, ThreeDotsIcon, TrashIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { Button, IconPlaceholder } from "@/components/reusable"
 import Dropdown from "@/components/reusable/Dropdown"
@@ -52,16 +52,16 @@ function POSOrderActionsMenu({
       className="inline-block w-auto"
     >
       <DropdownItem onClick={onSaveDraft}>
-        <ArchiveIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Salvar Pedido
+        <FileIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Salvar Pedido
       </DropdownItem>
       <DropdownItem onClick={onOpenDiscount}>
         <TagIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Aplicar Desconto
       </DropdownItem>
       <DropdownItem onClick={onAddShipping}>
-        <ArchiveIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Adicionar Frete
+        <FileIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Adicionar Frete
       </DropdownItem>
       <DropdownItem onClick={onOpenNotes}>
-        <ArchiveIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Adicionar Observação
+        <FileIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Adicionar Observação
       </DropdownItem>
     </Dropdown>
   )
@@ -102,7 +102,7 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
   }
 
   return (
-    <div className="rounded-2xl border border-brand-border bg-white p-4 space-y-4 dark:bg-dark-surface">
+    <div className="bg-white space-y-4 dark:bg-dark-surface lg:rounded-2xl lg:border lg:border-brand-border lg:p-4">
       {showItemsShortcut && (
         <button
           type="button"
@@ -110,12 +110,12 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
           className="flex w-full items-center justify-between rounded-full border border-brand-border bg-brand-gray/50 dark:bg-brand-border/50 px-1 py-1 text-left"
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-50 text-brand-primary">
-              <ArchiveIcon className="mr-2 h-4 w-4" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-dark text-white">
+              <FileIcon className="h-4 w-4" />
             </div>
             <span className="font-bold text-brand-dark dark:text-dark-heading">Itens do Pedido ({itemCount})</span>
           </div>
-          <ChevronRightIcon className="h-4 w-4 text-brand-inactive-text" />
+          <ChevronRightIcon className="mr-2 h-5 w-5 text-brand-inactive-text" />
         </button>
       )}
 
@@ -126,13 +126,12 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
       >
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-dark text-white">
-            <TagIcon className="mr-2 h-4 w-4" />
+            <TagIcon className="h-4 w-4" />
           </div>
           <span className="font-bold text-brand-dark dark:text-dark-heading">
             {discountVal > 0 ? `Desconto Aplicado (${formatCurrency(discountVal)})` : "Aplicar Desconto"}
           </span>
         </div>
-        <EditIcon className="h-4 w-4 text-brand-inactive-text" />
       </button>
 
       <div className="space-y-3 pt-1 text-sm">
@@ -216,11 +215,11 @@ export default function POSDesktopOrderPanel({
   return (
     <div className="flex h-full min-h-0 flex-col rounded-xl border border-brand-border bg-brand-gray p-4 dark:bg-dark-border/50 md:p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Resumo do Pedido</h3>
+        <h3 className="text-xl lg:text-2xl font-bold text-brand-dark dark:text-dark-heading">Resumo do Pedido</h3>
         <div className="flex items-center gap-2">
           {hasNotes && (
-            <Button variant="outline" className="h-10 w-10 p-0" onClick={onOpenNotes}>
-              <ArchiveIcon className="h-4 w-4 text-brand-dark dark:text-dark-heading" />
+            <Button variant="outline" className="h-9 w-9 p-0" onClick={onOpenNotes}>
+              <FileIcon className="h-4 w-4 text-brand-dark dark:text-dark-heading" />
             </Button>
           )}
           <Button variant="outline" className="h-9" onClick={onReset} disabled={!canReset}>

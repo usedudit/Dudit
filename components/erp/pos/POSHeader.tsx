@@ -1,7 +1,7 @@
 "use client"
 
 import { memo } from "react"
-import { SearchIcon, UserIcon, ClockIcon, ChevronRightIcon, DashboardIcon } from "@/lib/icons"
+import { SearchIcon, UserIcon, ClockIcon, ChevronRightIcon, DashboardIcon, IdentityCardIcon } from "@/lib/icons"
 import { Input, Tabs, TabsList, TabsTrigger, ListItem } from "@/components/reusable"
 import type { PDVCustomer } from "@/lib/types/pdv"
 
@@ -71,43 +71,43 @@ const POSHeader = memo(function POSHeader({
                 <UserIcon size={18} />
               </button>
               <button onClick={onOpenSellerSheet} className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-border bg-brand-gray text-brand-dark dark:border-dark-border dark:bg-dark-gray dark:text-dark-text">
-                <ClockIcon size={18} />
+                <IdentityCardIcon size={18} />
               </button>
             </>
           ) : (
             <div className="flex items-center gap-3">
               <ListItem
                 onClick={onOpenCustomerSheet}
-                className="min-w-[220px] gap-4 border-none bg-transparent p-3 hover:bg-brand-gray/40 dark:hover:bg-dark-border/30"
+                className="min-w-[220px] gap-4 border-none"
                 left={
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-gray dark:bg-dark-border/50">
+                  <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
                     {selectedCustomerId ? (
                       <span className="text-lg font-bold text-brand-dark dark:text-dark-heading">
                         {customers.find((customer) => customer.id === selectedCustomerId)?.name.charAt(0).toUpperCase()}
                       </span>
                     ) : (
-                      <UserIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                      <UserIcon size={20} className="text-brand-inactive-text dark:text-dark-body" />
                     )}
                   </div>
                 }
                 title="Cliente"
                 description={selectedCustomerId ? customers.find((customer) => customer.id === selectedCustomerId)?.name : "Consumidor Final"}
-                titleClassName="mb-1 text-base font-bold text-brand-dark dark:text-dark-heading"
+                titleClassName="text-base font-bold text-brand-dark dark:text-dark-heading"
                 descriptionClassName="max-w-[160px] truncate text-sm text-brand-inactive-text dark:text-dark-body"
                 showChevron
               />
 
               <ListItem
                 onClick={onOpenSellerSheet}
-                className="min-w-[220px] gap-4 border-none bg-transparent p-3 hover:bg-brand-gray/40 dark:hover:bg-dark-border/30"
+                className="min-w-[220px] gap-4 border-none"
                 left={
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-gray dark:bg-dark-border/50">
-                    <ClockIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                  <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
+                    <ClockIcon size={20} className="text-brand-inactive-text dark:text-dark-body" />
                   </div>
                 }
                 title="Vendedor"
                 description={selectedSellerId ? teamMembers.find((member) => member.id === selectedSellerId)?.fullName || "Selecionar" : "Selecionar"}
-                titleClassName="mb-1 text-base font-bold text-brand-dark dark:text-dark-heading"
+                titleClassName="text-base font-bold text-brand-dark dark:text-dark-heading"
                 descriptionClassName="max-w-[160px] truncate text-sm text-brand-inactive-text dark:text-dark-body"
                 showChevron
               />

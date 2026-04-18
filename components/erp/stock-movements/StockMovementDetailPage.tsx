@@ -232,7 +232,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                                                 <div className="text-md font-bold text-brand-dark dark:text-dark-heading">{item.product.previousStock} un</div>
                                                             </div>
 
-                                                            <div className="flex items-center justify-center text-gray-300 dark:text-gray-600">
+                                                            <div className="flex items-center justify-center text-brand-inactive-text dark:text-dark-body">
                                                                 <ArrowRightIcon size={18} />
                                                             </div>
 
