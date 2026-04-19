@@ -967,7 +967,9 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         customers = customerData
     }
 
-    const ref = String(sale.id || "").replace(/-/g, "").slice(0, 8).toUpperCase()
+    const ref =
+        (sale.sale_number && String(sale.sale_number).trim()) ||
+        String(sale.id || "").replace(/-/g, "").slice(0, 8).toUpperCase()
     const situation =
         sale.status === "paid" || sale.payment_status === "paid"
             ? "paid"

@@ -632,16 +632,24 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                                                     {o.displayId}
                                                                 </h3>
                                                                 <div className="flex gap-1.5 shrink-0 items-center">
-                                                                    <Badge variant={o.statusColor} className="h-5 text-[10px] px-1.5">
-                                                                        {o.statusLabel}
-                                                                    </Badge>
-                                                                    <Badge variant={o.deliveryStatusColor} className="h-5 text-[10px] px-1.5">
-                                                                        {o.deliveryStatusLabel}
-                                                                    </Badge>
-                                                                    {o.isUnfulfilled && (
-                                                                        <Badge variant="gray" className="h-5 text-[10px] px-1.5 opacity-70">
-                                                                            Pendente
+                                                                    {o.situation === "cancelled" ? (
+                                                                        <Badge variant="red" className="h-5 text-[10px] px-1.5">
+                                                                            Cancelado
                                                                         </Badge>
+                                                                    ) : (
+                                                                        <>
+                                                                            <Badge variant={o.statusColor} className="h-5 text-[10px] px-1.5">
+                                                                                {o.statusLabel}
+                                                                            </Badge>
+                                                                            <Badge variant={o.deliveryStatusColor} className="h-5 text-[10px] px-1.5">
+                                                                                {o.deliveryStatusLabel}
+                                                                            </Badge>
+                                                                            {o.isUnfulfilled && (
+                                                                                <Badge variant="gray" className="h-5 text-[10px] px-1.5 opacity-70">
+                                                                                    Pendente
+                                                                                </Badge>
+                                                                            )}
+                                                                        </>
                                                                     )}
                                                                 </div>
                                                             </div>

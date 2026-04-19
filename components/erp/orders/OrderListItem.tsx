@@ -69,16 +69,24 @@ const OrderListItem = React.memo(
                 case "status":
                     return (
                         <div className={`flex gap-2 w-full ${getJustifyClass(columns.find(c => c.id === 'status')?.align)}`}>
-                            <Badge variant={order.statusColor}>
-                                {order.statusLabel}
-                            </Badge>
-                            <Badge variant={order.deliveryStatusColor || "gray"}>
-                                {order.deliveryStatusLabel || "Não informado"}
-                            </Badge>
-                            {order.isUnfulfilled && (
-                                <Badge variant="gray" className="opacity-70">
-                                    Pendente
+                            {order.situation === "cancelled" ? (
+                                <Badge variant="red">
+                                    Cancelado
                                 </Badge>
+                            ) : (
+                                <>
+                                    <Badge variant={order.statusColor}>
+                                        {order.statusLabel}
+                                    </Badge>
+                                    <Badge variant={order.deliveryStatusColor || "gray"}>
+                                        {order.deliveryStatusLabel || "Não informado"}
+                                    </Badge>
+                                    {order.isUnfulfilled && (
+                                        <Badge variant="gray" className="opacity-70">
+                                            Pendente
+                                        </Badge>
+                                    )}
+                                </>
                             )}
                         </div>
                     )

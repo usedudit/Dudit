@@ -146,6 +146,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     }, [totalAmount, originalPaidAmount])
 
     const primaryActionLabel = editOrderId ? "Salvar" : "Finalizar Venda"
+    const isPaidOrderLocked = Boolean(editOrderId && originalPaymentStatus === "paid")
 
     const normalizeSalesChannel = useCallback((value?: string | null) => {
         if (!value) return "Venda Direta"
@@ -162,6 +163,11 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             const res = await getOrderDetailsAction(editOrderId!, partnerId)
             if (res.success && res.data) {
                 const order = res.data
+                if (order?.situation === "cancelled") {
+                    notifyError("Edição bloqueada", "Vendas canceladas não podem ser editadas.")
+                    onBack()
+                    return
+                }
                 setSelectedCustomer(order.buyer_id ? { id: order.buyer_id, name: order.customer_name } : null)
                 setOrderDate(order.created_at.split('T')[0])
                 setSalesChannel(normalizeSalesChannel(order.order_source))
@@ -221,6 +227,11 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         }
         load()
     }, [editOrderId, partnerId, notifyError, normalizeSalesChannel])
+
+    useEffect(() => {
+        if (!isPaidOrderLocked) return
+        setActiveTab("observations")
+    }, [isPaidOrderLocked])
 
     useEffect(() => {
         async function loadAccounts() {
@@ -757,11 +768,13 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             {/* Tabs Navigation */}
                             <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                 <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                    <TabsTrigger value="general">
-                                        Dados gerais
-                                        {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
-                                    </TabsTrigger>
-                                    {deliveryMethod === 'delivery' && <TabsTrigger value="delivery">Entrega</TabsTrigger>}
+                                    {!isPaidOrderLocked && (
+                                        <TabsTrigger value="general">
+                                            Dados gerais
+                                            {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                        </TabsTrigger>
+                                    )}
+                                    {!isPaidOrderLocked && deliveryMethod === 'delivery' && <TabsTrigger value="delivery">Entrega</TabsTrigger>}
                                     <TabsTrigger value="observations">Observações</TabsTrigger>
                                 </TabsList>
                             </div>
@@ -769,7 +782,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     </div>
 
                     <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                        <TabsContent value="general" className="mt-0">
+                        {!isPaidOrderLocked && (
+                            <TabsContent value="general" className="mt-0">
                             <OrderGeneralTab
                                 items={items}
                                 searchQuery={productBucket.searchQuery}
@@ -831,9 +845,11 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                 fieldErrors={fieldErrors}
                                 setFieldErrors={setFieldErrors}
                             />
-                        </TabsContent>
+                            </TabsContent>
+                        )}
 
-                        <TabsContent value="delivery" className="mt-0">
+                        {!isPaidOrderLocked && (
+                            <TabsContent value="delivery" className="mt-0">
                             <AddressTab
                                 cep={cep}
                                 street={street}
@@ -853,7 +869,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                 setUf={setUf}
                                 setNoNumber={setNoNumber}
                             />
-                        </TabsContent>
+                            </TabsContent>
+                        )}
 
                         <TabsContent value="observations" className="mt-0">
                             <OrderObservationsTab

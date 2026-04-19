@@ -86,10 +86,9 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
     const pageTitle = `Pedido ${order.order_number}`
     const paymentStatus = getPaymentStatusMeta(order.situation)
-    const deliveryStatus = getDeliveryStatusMeta(order.delivery_status)
     const pendingSuffix = paymentStatus.label !== "Pago" ? ` (${paymentStatus.label})` : ""
     const remainingPaymentAmount = Math.max(0, Number(order.total_amount || 0) - Number(order.paid_amount || 0))
-    const hasPendingPayment = order.situation !== "paid" && remainingPaymentAmount > 0.009
+    const hasPendingPayment = order.situation !== "paid" && order.situation !== "cancelled" && remainingPaymentAmount > 0.009
     const paymentMethodLabel = `${order.payment_method || "Nao informado"}${pendingSuffix}`
     const paymentBreakdown = Array.isArray(order.payment_breakdown) && order.payment_breakdown.length > 0
         ? order.payment_breakdown.filter((entry: any) => entry?.method)
@@ -170,7 +169,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                         onShare={() => { }}
                                     />
 
-                                    {!order.is_pos_sale && (
+                                    {!order.is_pos_sale && order.situation !== "cancelled" && (
                                         <Button onClick={() => onEditOrder(order)} className="whitespace-nowrap">
                                             <EditIcon className="w-[18px] h-[18px] mr-2" />
                                             Editar Venda
@@ -214,39 +213,41 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 </div>
                                             </div>
 
-                                            <div className="bg-white dark:bg-dark-surface px-12 pt-12 pb-12">
-                                                <div className="relative px-4">
-                                                    <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
-                                                        <div
-                                                            className={`absolute left-0 h-full rounded-full transition-all duration-500 ${order.delivery_status === "delivery_failed" ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
-                                                            style={{ width: `${(timelineSteps.filter((s) => s.active).length - 1) * 33.33}%` }}
-                                                        ></div>
+                                            {order.situation !== "cancelled" && (
+                                                <div className="bg-white dark:bg-dark-surface px-12 pt-12 pb-12">
+                                                    <div className="relative px-4">
+                                                        <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
+                                                            <div
+                                                                className={`absolute left-0 h-full rounded-full transition-all duration-500 ${order.delivery_status === "delivery_failed" ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
+                                                                style={{ width: `${(timelineSteps.filter((s) => s.active).length - 1) * 33.33}%` }}
+                                                            ></div>
 
-                                                        {timelineSteps.map((step, idx) => (
-                                                            <div key={idx} className="relative flex flex-col items-center">
-                                                                <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
-                                                                    <span className={`text-xs font-medium ${step.active ? (order.delivery_status === "delivery_failed" && idx === 3 ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
-                                                                        {step.label}
-                                                                    </span>
+                                                            {timelineSteps.map((step, idx) => (
+                                                                <div key={idx} className="relative flex flex-col items-center">
+                                                                    <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
+                                                                        <span className={`text-xs font-medium ${step.active ? (order.delivery_status === "delivery_failed" && idx === 3 ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
+                                                                            {step.label}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (order.delivery_status === "delivery_failed" && idx === 3 ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
+                                                                        {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
+                                                                    </div>
+                                                                    <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
+                                                                        {step.date ? (
+                                                                            <div className="flex items-center gap-1 text-xs text-brand-inactive-text">
+                                                                                <span>{step.date}</span>
+                                                                                {step.time && <span>{step.time}</span>}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
-                                                                <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (order.delivery_status === "delivery_failed" && idx === 3 ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
-                                                                    {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
-                                                                </div>
-                                                                <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
-                                                                    {step.date ? (
-                                                                        <div className="flex items-center gap-1 text-xs text-brand-inactive-text">
-                                                                            <span>{step.date}</span>
-                                                                            {step.time && <span>{step.time}</span>}
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        ))}
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
 
                                         <div className="mt-8">
@@ -388,7 +389,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                             </Button>
                         }
                     />
-                    {!order.is_pos_sale && (
+                    {!order.is_pos_sale && order.situation !== "cancelled" && (
                         <Button onClick={() => onEditOrder(order)} className="flex-1 whitespace-nowrap">
                             <EditIcon className="w-4 h-4 mr-2" />
                             Editar Venda

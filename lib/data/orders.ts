@@ -11,6 +11,7 @@ function mapPosSaleToOrderRow(sale: any, customerNameOverride?: string | null) {
   const items = Array.isArray(sale.sale_items) ? sale.sale_items : []
   const qtySum = items.reduce((sum: number, it: any) => sum + Number(it.quantity || 0), 0)
   const customerName = customerNameOverride || "Consumidor final"
+  const orderRef = (sale.sale_number && String(sale.sale_number).trim()) || saleRefFromId(sale.id)
   const situation =
     sale.status === "paid" || sale.payment_status === "paid"
       ? "paid"
@@ -22,7 +23,7 @@ function mapPosSaleToOrderRow(sale: any, customerNameOverride?: string | null) {
     ...sale,
     id: sale.id,
     mp_payment_id: null,
-    order_number: saleRefFromId(sale.id),
+    order_number: orderRef,
     customer_name: customerName,
     buyer_id: sale.customer_id,
     total_amount: Number(sale.final_amount ?? 0),
@@ -69,7 +70,7 @@ export const getPartnerOrdersCached = cache(async (partnerId: string) => {
         supabase
           .from("sales")
           .select(`
-            id, partner_id, customer_id, final_amount, paid_amount, discount_amount, payment_status, status, created_at, pre_sale_id, notes,
+            id, partner_id, customer_id, sale_number, final_amount, paid_amount, discount_amount, payment_status, status, created_at, pre_sale_id, notes,
             sale_items(id, product_id, variant_id, product_name, variant_name, unit_price, quantity, subtotal, total_price)
           `)
           .eq("partner_id", partnerId)

@@ -270,10 +270,16 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                         <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.accountLine || "-"}</span>
                                                     }
                                                 />
-                                                <PaymentRow
-                                                    label="Data de vencimento"
-                                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.dueDateLine || "-"}</span>}
-                                                />
+                                                {detail.showDueDateRow && (
+                                                    <PaymentRow
+                                                        label="Data de vencimento"
+                                                        value={
+                                                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                {detail.dueDateLine || "-"}
+                                                            </span>
+                                                        }
+                                                    />
+                                                )}
                                                 {detail.paymentDateLine && (
                                                     <PaymentRow
                                                         label="Data de pagamento"

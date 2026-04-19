@@ -334,14 +334,24 @@ export async function getFinancialTransactionsAction(
         const t2 = performance.now()
 
         // Orders lookup (for sales transactions)
-        const ordersPromise = salesOrderNumbers.length > 0
+        const uniqueSaleRefs = [...new Set(salesOrderNumbers)]
+        const ordersPromise = uniqueSaleRefs.length > 0
             ? supabase
                 .from("orders")
                 .select("order_number, buyer_id, customer_name")
                 .eq("partner_id", partnerId)
-                .in("order_number", [...new Set(salesOrderNumbers)])
+                .in("order_number", uniqueSaleRefs)
                 .then((r: any) => r.data || [])
             : Promise.resolve([] as { order_number: string; buyer_id: string | null; customer_name: string | null }[])
+
+        const salesPromise = uniqueSaleRefs.length > 0
+            ? supabase
+                .from("sales")
+                .select("sale_number, customer_id")
+                .eq("partner_id", partnerId)
+                .in("sale_number", uniqueSaleRefs)
+                .then((r: any) => r.data || [])
+            : Promise.resolve([] as { sale_number: string; customer_id: string | null }[])
 
         // Payment methods lookup
         const pmIdsArr = [...paymentMethodIds]
@@ -365,8 +375,9 @@ export async function getFinancialTransactionsAction(
                 .then((r: any) => r.data || [])
             : Promise.resolve([] as InstallmentGroupRow[])
 
-        const [orders, pmRows, installmentGroups] = await Promise.all([
+        const [orders, posSales, pmRows, installmentGroups] = await Promise.all([
             ordersPromise,
+            salesPromise,
             paymentMethodsPromise,
             installmentGroupsPromise,
         ])
@@ -376,6 +387,12 @@ export async function getFinancialTransactionsAction(
         for (const o of orders) {
             orderByNumber.set(String(o.order_number), { buyer_id: o.buyer_id, customer_name: o.customer_name })
             if (o.buyer_id) allCustomerIds.add(o.buyer_id)
+        }
+
+        const saleByNumber = new Map<string, { customer_id: string | null }>()
+        for (const s of posSales) {
+            if (s.sale_number) saleByNumber.set(String(s.sale_number), { customer_id: s.customer_id })
+            if (s.customer_id) allCustomerIds.add(s.customer_id)
         }
 
         // Remove installment group IDs that were accidentally added to customer set
@@ -422,14 +439,27 @@ export async function getFinancialTransactionsAction(
             const diffTime = baseDateObj.getTime() - now.getTime()
             const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
-            const order = t.category === "Vendas" ? orderByNumber.get(String(t.description || "").trim()) : null
+            const descTrim = t.category === "Vendas" ? String(t.description || "").trim() : ""
+            const order = t.category === "Vendas" && descTrim ? orderByNumber.get(descTrim) : null
+            const saleRow = t.category === "Vendas" && descTrim ? saleByNumber.get(descTrim) : null
             const customerName = order?.buyer_id ? customerById.get(order.buyer_id)?.name : null
             const fromTxnCustomer = t.customer_id ? customerById.get(t.customer_id)?.name : null
-            const salesContactName =
-                customerName
-                || order?.customer_name
-                || fromTxnCustomer
-                || "Consumidor final"
+            let salesContactName: string
+            if (order) {
+                salesContactName =
+                    (customerName && String(customerName).trim())
+                    || (order.customer_name && String(order.customer_name).trim())
+                    || (fromTxnCustomer && String(fromTxnCustomer).trim())
+                    || "Consumidor final"
+            } else if (saleRow) {
+                const saleCust = saleRow.customer_id ? customerById.get(saleRow.customer_id)?.name : null
+                salesContactName =
+                    (saleCust && String(saleCust).trim())
+                    || (fromTxnCustomer && String(fromTxnCustomer).trim())
+                    || "Consumidor final"
+            } else {
+                salesContactName = (fromTxnCustomer && String(fromTxnCustomer).trim()) || "Consumidor final"
+            }
             const linkedCustomerName = t.customer_id ? customerById.get(t.customer_id)?.name : null
             const fallbackContact = t.transaction_contacts?.name || "-"
             const manualCustomerName = linkedCustomerName || "Cliente"
@@ -586,6 +616,9 @@ export async function createManualTransactionAction(input: CreateManualTransacti
         const contactId = customerId ? null : input.contactId ?? null
         const contactTypeResolved = customerId ? "customer" : input.contactType ?? null
 
+        const isVendaIncome =
+            String(input.category || "").trim() === "Vendas" && input.transactionType === "income"
+
         const payload: Record<string, unknown> = {
             partner_id: input.partnerId,
             description: description,
@@ -597,7 +630,10 @@ export async function createManualTransactionAction(input: CreateManualTransacti
             customer_id: customerId,
             contact_type: contactTypeResolved,
             amount: input.transactionType === "adjustment" ? amount : absAmount,
-            due_date: ["adjustment", "transfer", "refund"].includes(input.transactionType) ? null : (input.dueDate || transactionDate),
+            due_date:
+                ["adjustment", "transfer", "refund"].includes(input.transactionType) || isVendaIncome
+                    ? null
+                    : (input.dueDate || transactionDate),
             payment_date: input.paymentDate ?? null,
             transaction_date: transactionDate,
             status,
@@ -1654,6 +1690,8 @@ export type TransactionDetailPayload = {
     ledgerDirection: ERPTransaction["ledgerDirection"]
     contactCard: { title: string; name: string; email: string | null; phone: string | null }
     canEdit: boolean
+    /** Quando false, a UI não exibe a linha "Data de vencimento" (ex.: vendas PDV/pedido sem vencimento). */
+    showDueDateRow: boolean
 }
 
 export async function getTransactionDetailsAction(
@@ -1784,8 +1822,10 @@ export async function getTransactionDetailsAction(
 
         let items: TransactionDetailPayload["items"] = []
         let salesOrder: { buyer_id?: string | null; customer_name?: string | null } | null = null
+        let posSaleCustomerId: string | null | undefined = undefined
 
         if (row.category === "Vendas" && row.description) {
+            const desc = String(row.description).trim()
             const { data: ord } = await supabase
                 .from("orders")
                 .select(
@@ -1805,7 +1845,7 @@ export async function getTransactionDetailsAction(
         `,
                 )
                 .eq("partner_id", partnerId)
-                .eq("order_number", String(row.description).trim())
+                .eq("order_number", desc)
                 .maybeSingle()
 
             salesOrder = ord as any
@@ -1829,6 +1869,78 @@ export async function getTransactionDetailsAction(
                         image: img,
                     }
                 })
+            }
+
+            if (items.length === 0) {
+                let { data: sale } = await supabase
+                    .from("sales")
+                    .select(
+                        `
+            id,
+            customer_id,
+            sale_number,
+            sale_items (
+              id,
+              quantity,
+              unit_price,
+              subtotal,
+              product_name,
+              products ( sku, images )
+            )
+          `,
+                    )
+                    .eq("partner_id", partnerId)
+                    .eq("sale_number", desc)
+                    .maybeSingle()
+
+                if (!sale && row.reference_note && /^[0-9a-f-]{36}$/i.test(String(row.reference_note))) {
+                    const res = await supabase
+                        .from("sales")
+                        .select(
+                            `
+              id,
+              customer_id,
+              sale_number,
+              sale_items (
+                id,
+                quantity,
+                unit_price,
+                subtotal,
+                product_name,
+                products ( sku, images )
+              )
+            `,
+                        )
+                        .eq("partner_id", partnerId)
+                        .eq("id", String(row.reference_note))
+                        .maybeSingle()
+                    sale = res.data
+                }
+
+                if (sale) {
+                    posSaleCustomerId = sale.customer_id ?? null
+                    const si = (sale as any).sale_items
+                    if (Array.isArray(si) && si.length > 0) {
+                        items = si.map((item: any) => {
+                            const img =
+                                Array.isArray(item.products?.images) && item.products.images[0]
+                                    ? String(item.products.images[0])
+                                    : null
+                            const qty = Number(item.quantity || 0)
+                            const unit = Number(item.unit_price || 0)
+                            const sub = Number(item.subtotal ?? qty * unit)
+                            return {
+                                id: String(item.id),
+                                title: String(item.product_name || "Item"),
+                                sku: String(item.products?.sku || "N/A"),
+                                quantity: qty,
+                                unitPrice: unit,
+                                lineTotal: sub,
+                                image: img,
+                            }
+                        })
+                    }
+                }
             }
         }
 
@@ -1869,10 +1981,34 @@ export async function getTransactionDetailsAction(
                     email: cust?.email ?? null,
                     phone: cust?.phone ?? null,
                 }
-            } else if (ord?.customer_name) {
+            } else {
+                const nm =
+                    (ord?.customer_name && String(ord.customer_name).trim()) || "Consumidor final"
                 contactCard = {
                     title: "Cliente",
-                    name: ord.customer_name,
+                    name: nm,
+                    email: null,
+                    phone: null,
+                }
+            }
+        } else if (row.category === "Vendas" && posSaleCustomerId !== undefined) {
+            if (posSaleCustomerId) {
+                const { data: cust } = await supabase
+                    .from("customers")
+                    .select("name, email, phone")
+                    .eq("id", posSaleCustomerId)
+                    .eq("partner_id", partnerId)
+                    .maybeSingle()
+                contactCard = {
+                    title: "Cliente",
+                    name: cust?.name || "Cliente",
+                    email: cust?.email ?? null,
+                    phone: cust?.phone ?? null,
+                }
+            } else {
+                contactCard = {
+                    title: "Cliente",
+                    name: "Consumidor final",
                     email: null,
                     phone: null,
                 }
@@ -1905,6 +2041,8 @@ export async function getTransactionDetailsAction(
 
         const paymentDateSubtitle = row.payment_date ? formatDateTime(row.payment_date) : null
 
+        const showDueDateRow = String(row.category || "").trim() !== "Vendas" || !!row.due_date
+
         const payload: TransactionDetailPayload = {
             id: row.id,
             headerTitle,
@@ -1928,6 +2066,7 @@ export async function getTransactionDetailsAction(
             ledgerDirection: ledgerDirectionFromRow(row as DbTransaction),
             contactCard,
             canEdit,
+            showDueDateRow,
         }
 
         return { success: true, data: payload }
