@@ -225,7 +225,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Itens da Transação</h3>
                                             <div className="space-y-4">
                                                 {detail.items.map((item) => (
-                                                    <div key={item.id} className="flex items-start gap-4 p-3">
+                                                    <div key={item.id} className="flex items-start gap-4">
                                                         <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
                                                             <img
                                                                 src={item.image ? getR2ImageUrl(item.image, "thumbnail") : "https://img.dudit.com.br/static/Placeholder.png"}

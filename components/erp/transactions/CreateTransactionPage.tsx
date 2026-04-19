@@ -209,7 +209,7 @@ export default function CreateTransactionPage({
     const [subcategoryId, setSubcategoryId] = useState<string | undefined>(() => editRecurringTemplate?.subcategory_id ?? editTransaction?.subcategoryId ?? undefined)
     const [dueDate, setDueDate] = useState(() =>
         editRecurringTemplate?.start_date?.slice(0, 10) ||
-            (editTransaction?.dueDateRaw ? editTransaction.dueDateRaw.slice(0, 10) : format(new Date(), "yyyy-MM-dd")),
+        (editTransaction?.dueDateRaw ? editTransaction.dueDateRaw.slice(0, 10) : format(new Date(), "yyyy-MM-dd")),
     )
     const [paymentDate, setPaymentDate] = useState(() => editTransaction?.paymentDateRaw ? editTransaction.paymentDateRaw.slice(0, 10) : format(new Date(), "yyyy-MM-dd"))
     const [status, setStatus] = useState<"pending" | "paid">(() => editRecurringTemplate ? "pending" : editTransaction ? (String(editTransaction.rawStatus || "").toLowerCase() === "paid" ? "paid" : "pending") : "pending")
@@ -320,7 +320,7 @@ export default function CreateTransactionPage({
             if (dueDate !== iDueDate) return true
             if (paymentDate !== iPaymentDate) return true
             if (contactType !== iContactType) return true
-            
+
             return false
         }
 
@@ -1319,7 +1319,7 @@ export default function CreateTransactionPage({
                             options={childCategories.map((c) => ({ value: c.id, label: c.name }))}
                             value={subcategoryId}
                             onChange={(v) => setSubcategoryId(v)}
-                            placeholder="Selecione"
+                            placeholder="Selecione..."
                             disabled={isPaidTransaction}
                             actionItem={isPaidTransaction ? undefined : {
                                 label: "Criar nova subcategoria",
@@ -1333,7 +1333,7 @@ export default function CreateTransactionPage({
                             {!isSalesOrigin ? (
                                 <DatePicker label="Data de vencimento" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} disabled={lockFinancialFields} />
                             ) : (
-                                <Input label="Data de vencimento" value="Nao se aplica para vendas" readOnly disabled />
+                                <Input label="Data de vencimento" value="Não se aplica para vendas" readOnly disabled />
                             )}
                             <DatePicker
                                 label="Data do pagamento"
@@ -1348,16 +1348,16 @@ export default function CreateTransactionPage({
                         <div className="rounded-2xl border border-brand-border dark:border-dark-border p-4 space-y-4 bg-brand-gray/25 dark:bg-dark-border/15">
                             {!isRecurringTemplateEdit && (
                                 recurringModeEnabled && (
-                                <Checkbox
-                                    name="enable_recurrence"
-                                    checked={enableRecurrence}
-                                    onChange={setEnableRecurrence}
-                                    label={
-                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                            Criar recorrência
-                                        </span>
-                                    }
-                                />
+                                    <Checkbox
+                                        name="enable_recurrence"
+                                        checked={enableRecurrence}
+                                        onChange={setEnableRecurrence}
+                                        label={
+                                            <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                Criar recorrência
+                                            </span>
+                                        }
+                                    />
                                 )
                             )}
                             {isRecurringTemplateEdit && (

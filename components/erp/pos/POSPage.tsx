@@ -666,7 +666,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 exit={{ opacity: 0 }}
                 className="mt-auto border-t border-brand-border pt-6"
               >
-                <h4 className="mb-4 text-xl font-bold text-brand-dark">Pedidos em pré-venda</h4>
+                <h4 className="mb-4 text-xl font-bold text-brand-dark dark:text-dark-heading">Pedidos em pré-venda</h4>
                 <div className={`flex items-stretch gap-4 overflow-x-auto pb-2 ${desktopScrollClass}`}>
                   {preSales.slice(0, preSaleLimit).map((preSale, index) => (
                     <div key={preSale.id} className="relative group">

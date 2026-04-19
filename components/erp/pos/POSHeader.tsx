@@ -80,7 +80,7 @@ const POSHeader = memo(function POSHeader({
                 onClick={onOpenCustomerSheet}
                 className="min-w-[220px] gap-4 border-none"
                 left={
-                  <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
+                  <div className="w-[42px] h-[42px] rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors border border-brand-border dark:border-dark-border">
                     {selectedCustomerId ? (
                       <span className="text-lg font-bold text-brand-dark dark:text-dark-heading">
                         {customers.find((customer) => customer.id === selectedCustomerId)?.name.charAt(0).toUpperCase()}
@@ -92,8 +92,8 @@ const POSHeader = memo(function POSHeader({
                 }
                 title="Cliente"
                 description={selectedCustomerId ? customers.find((customer) => customer.id === selectedCustomerId)?.name : "Consumidor Final"}
-                titleClassName="text-base font-bold text-brand-dark dark:text-dark-heading"
-                descriptionClassName="max-w-[160px] truncate text-sm text-brand-inactive-text dark:text-dark-body"
+                titleClassName="text-sm font-bold text-brand-dark dark:text-dark-heading"
+                descriptionClassName="max-w-[160px] truncate text-sm text-brand-inactive-text dark:text-dark-body leading-none"
                 showChevron
               />
 
@@ -101,14 +101,14 @@ const POSHeader = memo(function POSHeader({
                 onClick={onOpenSellerSheet}
                 className="min-w-[220px] gap-4 border-none"
                 left={
-                  <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
+                  <div className="w-[42px] h-[42px] rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors border border-brand-border dark:border-dark-border">
                     <ClockIcon size={20} className="text-brand-inactive-text dark:text-dark-body" />
                   </div>
                 }
                 title="Vendedor"
                 description={selectedSellerId ? teamMembers.find((member) => member.id === selectedSellerId)?.fullName || "Selecionar" : "Selecionar"}
-                titleClassName="text-base font-bold text-brand-dark dark:text-dark-heading"
-                descriptionClassName="max-w-[160px] truncate text-sm text-brand-inactive-text dark:text-dark-body"
+                titleClassName="text-sm font-bold text-brand-dark dark:text-dark-heading"
+                descriptionClassName="max-w-[160px] truncate text-sm text-brand-inactive-text dark:text-dark-body leading-none"
                 showChevron
               />
             </div>

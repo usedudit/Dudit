@@ -24,7 +24,7 @@ export const POSPreSaleCard = memo(function POSPreSaleCard({ preSale, index, cus
           <div className="flex h-8 w-8 items-center justify-center rounded-full border border-brand-border bg-brand-gray dark:border-dark-border dark:bg-dark-border">
             <ClockIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" />
           </div>
-          <span className="text-lg font-bold text-brand-dark dark:text-dark-text">Nº {index + 1}</span>
+          <span className="text-lg font-bold text-brand-dark dark:text-dark-heading">Nº {index + 1}</span>
         </div>
         <Badge variant="gray" icon={<span className="hidden" />} className="gap-0 px-3 py-1 text-[11px] font-medium">
           {new Date(preSale.created_at).toLocaleString("pt-BR", {
@@ -52,9 +52,9 @@ export function POSMorePreSalesCard({ count, onClick }: { count: number; onClick
   return (
     <button
       onClick={onClick}
-      className="flex min-w-[110px] items-center justify-center rounded-[20px] border border-brand-border bg-white p-4"
+      className="flex min-w-[110px] items-center justify-center rounded-2xl border border-brand-border p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 cursor-pointer"
     >
-      <span className="text-2xl font-bold text-brand-primary">+{count}</span>
+      <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">+{count}</span>
     </button>
   )
 }

@@ -222,7 +222,7 @@ export default function POSDesktopOrderPanel({
               <FileIcon className="h-4 w-4 text-brand-dark dark:text-dark-heading" />
             </Button>
           )}
-          <Button variant="outline" className="h-9" onClick={onReset} disabled={!canReset}>
+          <Button variant="outline" className="h-9 text-brand-red dark:text-brand-red" onClick={onReset} disabled={!canReset}>
             <TrashIcon className="h-4 w-4 text-brand-red dark:text-brand-red" /> Limpar Pedido
           </Button>
         </div>
