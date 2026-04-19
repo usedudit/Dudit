@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, Checkbox, IconPlaceholder, Badge } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, Badge, ActionsDropdown } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
@@ -82,8 +82,8 @@ const INITIAL_FILTERS: FilterState = {
     paymentType: [],
 }
 
-const ITEMS_PER_PAGE = 8
-const SERVER_PAGE_SIZE = 50
+const ITEMS_PER_PAGE = 100
+const SERVER_PAGE_SIZE = 100
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
     { id: "transaction", label: "Descrição", align: "left", width: "300px" },
@@ -158,6 +158,14 @@ export default function TransactionsPage({
     const [settlingGroup, setSettlingGroup] = useState(false)
     const [loadedTransactions, setLoadedTransactions] = useState<ERPTransaction[]>(transactions)
     const [serverPage, setServerPage] = useState(1)
+    const observerTarget = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        setLoadedTransactions(transactions)
+        setServerPage(1)
+        setPage(1)
+    }, [transactions])
+
     const [loadingMoreTransactions, setLoadingMoreTransactions] = useState(false)
     const [settlePaymentsByInstallment, setSettlePaymentsByInstallment] = useState<
         Record<string, { paymentAmount: string; interestAmount: string; discountAmount: string; paymentMethodId: string }>
@@ -489,6 +497,30 @@ export default function TransactionsPage({
         }
     }, [loadingMoreTransactions, canLoadMoreFromServer, serverPage, partnerId, notifyError])
 
+    useEffect(() => {
+        // Fallback for non-observer browsers or specific edge cases
+        if (page === totalPages && canLoadMoreFromServer && !loadingMoreTransactions) {
+            void loadMoreTransactions()
+        }
+    }, [page, totalPages, canLoadMoreFromServer, loadingMoreTransactions, loadMoreTransactions])
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && canLoadMoreFromServer && !loadingMoreTransactions) {
+                    void loadMoreTransactions()
+                }
+            },
+            { threshold: 0.1 }
+        )
+
+        if (observerTarget.current) {
+            observer.observe(observerTarget.current)
+        }
+
+        return () => observer.disconnect()
+    }, [canLoadMoreFromServer, loadingMoreTransactions, loadMoreTransactions])
+
     const handleSelectRow = useCallback((id: string) => {
         setSelection((prev) => {
             const ids = new Set(prev.ids)
@@ -522,7 +554,7 @@ export default function TransactionsPage({
 
     const handleEditFromTransactionDetail = useCallback(
         (id: string) => {
-            const t = loadedTransactions.find((x) => x.id === id)
+            const t = loadedTransactions.find((x: ERPTransaction) => x.id === id)
             if (!t) {
                 notifyError("Erro", "Transação não está na página atual. Volte à lista e abra novamente para editar.")
                 return
@@ -638,7 +670,7 @@ export default function TransactionsPage({
                 }
                 return
             }
-            const existsInLoadedList = loadedTransactions.some((row) => row.id === transaction.id)
+            const existsInLoadedList = loadedTransactions.some((row: ERPTransaction) => row.id === transaction.id)
             if (!existsInLoadedList) {
                 notifyError("Erro", "Essa transação não está mais disponível. Atualize a página e tente novamente.")
                 debouncedRefresh()
@@ -653,7 +685,7 @@ export default function TransactionsPage({
     )
 
     const handleEditInstallment = useCallback((installmentId: string) => {
-        const tx = loadedTransactions.find((item) => item.id === installmentId)
+        const tx = loadedTransactions.find((item: ERPTransaction) => item.id === installmentId)
         if (!tx) {
             notifyError("Parcela não encontrada.")
             return
@@ -897,47 +929,59 @@ export default function TransactionsPage({
                                                     className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 flex items-start gap-3"
                                                     onClick={() => handleOpenTransactionDetail(transaction)}
                                                 >
-                                                    <div className="shrink-0 pt-0.5" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="shrink-0 pt-1" onClick={(e) => e.stopPropagation()}>
                                                         <Checkbox checked={selection.ids.has(transaction.id)} onChange={() => handleSelectRow(transaction.id)} />
                                                     </div>
-                                                    <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-                                                        <div className="flex justify-between items-start gap-3">
-                                                            <div className="min-w-0">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                                                                        {transaction.description}
-                                                                    </h3>
-                                                                    {isRecurring && (
-                                                                        <Badge variant="purple" className="whitespace-nowrap scale-90 shrink-0">
-                                                                            Recorrente
-                                                                        </Badge>
-                                                                    )}
-                                                                </div>
-                                                                <span className="flex items-center gap-1.5 text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mt-0.5">
-                                                                    <PaymentIcon className="w-3.5 h-3.5 shrink-0" />
-                                                                    <span>{transaction.paymentType} • {transaction.contactName}</span>
-                                                                </span>
-                                                            </div>
 
-                                                            <div className="flex flex-col items-end gap-1 shrink-0 text-right min-w-[100px]">
-                                                                <span className={`inline-flex items-center justify-center h-8 px-3 rounded-full text-[12px] font-semibold whitespace-nowrap border ${transaction.isOverdue ? "text-brand-red border-brand-red/15 bg-brand-red/5" : "text-brand-inactive-text dark:text-dark-body border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/60"}`}>
-                                                                    {transaction.dueDateShort}
-                                                                </span>
-                                                                <DueDateCountdown transaction={transaction} align="right" />
-                                                                <Badge variant={transaction.statusVariant} className="whitespace-nowrap">
-                                                                    {transaction.status}
-                                                                </Badge>
-                                                            </div>
+                                                    <div className="shrink-0 w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex items-center justify-center">
+                                                        <PaymentIcon className="text-brand-dark dark:text-dark-heading" />
+                                                    </div>
+
+                                                    <div className="flex-1 min-w-0 flex flex-col gap-1">
+                                                        <div className="flex justify-between items-start gap-2">
+                                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                {transaction.description}
+                                                            </h3>
+                                                            <span className={`text-[15px] font-bold whitespace-nowrap ${transaction.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}>
+                                                                {transaction.ledgerDirection === "in" ? "+ " : "- "}
+                                                                {formatCurrency(transaction.amount)}
+                                                            </span>
                                                         </div>
 
-                                                        <div className={`text-[16px] font-bold ${transaction.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}>
-                                                            {transaction.ledgerDirection === "in" ? "+ " : "- "}
-                                                            {formatCurrency(transaction.amount)}
+                                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                                                            <span className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading">
+                                                                {transaction.contactName}
+                                                            </span>
+                                                            <span className="text-brand-inactive-text">•</span>
+                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                {transaction.category}
+                                                            </span>
+                                                            <span className="text-brand-inactive-text">•</span>
+                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                {transaction.dueDate}
+                                                            </span>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-2 mt-2">
+                                                            <Badge variant={transaction.statusVariant} className="scale-90 origin-left">
+                                                                {transaction.status}
+                                                            </Badge>
+                                                            {transaction.installmentGroupId && (
+                                                                <Badge variant="orange" className="scale-90 origin-left">
+                                                                    Parcelado
+                                                                </Badge>
+                                                            )}
+                                                            {isRecurring && (
+                                                                <Badge variant="purple" className="scale-90 origin-left">
+                                                                    Recorrente
+                                                                </Badge>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
                                             )
                                         })}
+                                        <div ref={observerTarget} className="h-10" />
                                     </div>
                                 ) : viewMode === "grid" ? (
                                     <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
@@ -1026,6 +1070,7 @@ export default function TransactionsPage({
                                                     ))}
                                                 </tbody>
                                             </table>
+                                            <div ref={observerTarget} className="h-10" />
                                         </div>
                                     </div>
                                 )}
@@ -1039,13 +1084,16 @@ export default function TransactionsPage({
                         <Pagination
                             currentPage={page}
                             totalPages={totalPages}
-                            onPageChange={setPage}
+                            onPageChange={(p) => {
+                                setPage(p)
+                                if (p === totalPages && canLoadMoreFromServer) {
+                                    void loadMoreTransactions()
+                                }
+                            }}
                         />
-                        {canLoadMoreFromServer && (
-                            <div className="flex justify-center">
-                                <Button variant="outline" onClick={() => void loadMoreTransactions()} disabled={loadingMoreTransactions}>
-                                    {loadingMoreTransactions ? "Carregando..." : "Carregar mais transações"}
-                                </Button>
+                        {canLoadMoreFromServer && page === totalPages && (
+                            <div className="flex justify-center py-4 text-brand-inactive-text text-sm">
+                                {loadingMoreTransactions ? "Carregando..." : "Buscando mais itens no servidor..."}
                             </div>
                         )}
                     </div>
@@ -1106,34 +1154,47 @@ export default function TransactionsPage({
                                 ))
                             })()}
                         </div>
-                        <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                        <div className="flex flex-col w-full max-h-[60vh] overflow-y-auto px-1 pr-1 custom-scrollbar border-t border-brand-border dark:border-dark-border mt-4">
                             {(installmentDetail.installments || []).map((row: any) => (
-                                <div key={row.id} className="rounded-xl border border-brand-border dark:border-dark-border p-3">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <p className="font-semibold text-sm">{row.description}</p>
-                                        <Badge variant={row.status === "paid" ? "green" : row.status === "overdue" ? "red" : "orange"}>
-                                            {row.status === "paid" ? "Pago" : row.status === "overdue" ? "Vencido" : "Pendente"}
-                                        </Badge>
-                                    </div>
-                                    <p className="text-xs text-brand-inactive-text">
-                                        Parcela {row.installmentNumber}/{installmentDetail.group?.installments_count}
-                                    </p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2 mt-2 text-xs">
-                                        <span>Original: {formatCurrency(row.originalAmount || 0)}</span>
-                                        <span>Pago: {formatCurrency(row.paidAmount || 0)}</span>
-                                        <span>Restante: {formatCurrency(row.remainingAmount || 0)}</span>
-                                        <span>Vencimento: {row.dueDate || "-"}</span>
-                                    </div>
-                                    {row.status !== "paid" && (
-                                        <div className="mt-3 flex gap-2">
-                                            <Button size="sm" variant="outline" onClick={() => handleEditInstallment(row.id)}>
-                                                Editar parcela
-                                            </Button>
-                                            <Button size="sm" onClick={() => void handlePayInstallment(row.id)}>
-                                                Marcar como paga
-                                            </Button>
-                                        </div>
-                                    )}
+                                <div key={row.id} className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 flex items-start gap-4 hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 px-2 transition-colors rounded-lg">
+                                     <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                                          <div className="flex justify-between items-start gap-3">
+                                               <div className="min-w-0">
+                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                        {row.description}
+                                                    </h3>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-brand-slate dark:bg-dark-border text-brand-dark dark:text-dark-heading">
+                                                            Parcela {row.installmentNumber}/{installmentDetail.group?.installments_count}
+                                                        </span>
+                                                        <Badge variant={row.status === "paid" ? "green" : row.status === "overdue" ? "red" : "orange"} className="scale-90">
+                                                            {row.status === "paid" ? "Pago" : row.status === "overdue" ? "Vencido" : "Pendente"}
+                                                        </Badge>
+                                                    </div>
+                                               </div>
+                                               <div className="flex flex-col items-end gap-1 shrink-0">
+                                                    <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
+                                                        {formatCurrency(row.originalAmount || 0)}
+                                                    </span>
+                                                    <span className="text-[12px] font-medium text-brand-inactive-text">
+                                                        Vence em {row.dueDate || "-"}
+                                                    </span>
+                                               </div>
+                                          </div>
+                                          <div className="flex items-center gap-4 mt-2 py-2 px-3 rounded-lg bg-brand-gray/50 dark:bg-dark-border/20 border border-brand-border/50 dark:border-dark-border/30">
+                                               <div className="flex flex-col"><span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider">Restante</span><span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{formatCurrency(row.remainingAmount || 0)}</span></div>
+                                               <div className="flex flex-col border-l border-brand-border dark:border-dark-border pl-4"><span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider">Pago</span><span className="font-bold text-[13px] text-brand-green">{formatCurrency(row.paidAmount || 0)}</span></div>
+                                          </div>
+                                     </div>
+                                     {row.status !== "paid" && (
+                                         <div className="shrink-0 flex items-center justify-center pt-1 ml-2 action-btn">
+                                              <ActionsDropdown
+                                                   onEdit={() => handleEditInstallment(row.id)}
+                                                   onCancel={() => void handlePayInstallment(row.id)}
+                                                   cancelLabel="Marcar como paga"
+                                              />
+                                         </div>
+                                     )}
                                 </div>
                             ))}
                         </div>
@@ -1211,7 +1272,7 @@ export default function TransactionsPage({
                                 </p>
                             </div>
                         </div>
-                        <div className="max-h-[38vh] overflow-y-auto rounded-lg border border-brand-border dark:border-dark-border divide-y divide-brand-border dark:divide-dark-border">
+                        <div className="flex flex-col w-full max-h-[50vh] overflow-y-auto px-1 pr-1 custom-scrollbar border-y border-brand-border dark:border-dark-border divide-y divide-brand-border dark:divide-dark-border">
                             {(installmentDetail?.installments || [])
                                 .filter((row: any) => row.status !== "paid")
                                 .map((row: any) => {
@@ -1223,22 +1284,52 @@ export default function TransactionsPage({
                                     }
                                     const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
                                     return (
-                                        <div key={row.id} className="p-3 space-y-2">
-                                            <p className="text-sm font-semibold">{row.description} - Parcela {row.installmentNumber}</p>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-brand-inactive-text">
-                                                <span>Original: {formatCurrency(Number(row.originalAmount || 0))}</span>
-                                                <span>Restante: {formatCurrency(Number(row.remainingAmount || 0))}</span>
+                                        <div key={row.id} className="py-6 flex flex-col gap-4">
+                                            <div className="flex justify-between items-start gap-4">
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                        {row.description}
+                                                    </h3>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-brand-slate dark:bg-dark-border text-brand-dark dark:text-dark-heading uppercase tracking-wide">
+                                                            Parcela {row.installmentNumber}
+                                                        </span>
+                                                        <span className="text-[11px] font-medium text-brand-inactive-text">
+                                                            Venc: {row.dueDate || "-"}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <span className="text-[11px] text-brand-inactive-text font-bold uppercase tracking-wider">Restante</span>
+                                                    <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">{formatCurrency(Number(row.remainingAmount || 0))}</span>
+                                                </div>
                                             </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                                <input type="number" step="0.01" min="0" value={values.paymentAmount} onChange={(e) => setSettlePaymentsByInstallment((prev) => ({ ...prev, [row.id]: { ...values, paymentAmount: e.target.value } }))} className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-transparent text-sm" placeholder="Valor pagamento" />
-                                                <input type="number" step="0.01" min="0" value={values.interestAmount} onChange={(e) => setSettlePaymentsByInstallment((prev) => ({ ...prev, [row.id]: { ...values, interestAmount: e.target.value } }))} className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-transparent text-sm" placeholder="Juros" />
-                                                <input type="number" step="0.01" min="0" value={values.discountAmount} onChange={(e) => setSettlePaymentsByInstallment((prev) => ({ ...prev, [row.id]: { ...values, discountAmount: e.target.value } }))} className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-transparent text-sm" placeholder="Desconto" />
-                                                <select value={values.paymentMethodId} onChange={(e) => setSettlePaymentsByInstallment((prev) => ({ ...prev, [row.id]: { ...values, paymentMethodId: e.target.value } }))} className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-transparent text-sm">
-                                                    <option value="">Não informado</option>
-                                                    {(paymentMethods || []).map((pm: any) => (<option key={pm.id} value={pm.id}>{pm.name}</option>))}
-                                                </select>
+
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                <div className="flex flex-col gap-1.5">
+                                                    <label className="text-[10px] font-bold text-brand-inactive-text uppercase">Pagamento</label>
+                                                    <input type="number" step="0.01" min="0" value={values.paymentAmount} onChange={(e) => setSettlePaymentsByInstallment((prev) => ({ ...prev, [row.id]: { ...values, paymentAmount: e.target.value } }))} className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm font-semibold transition-all focus:border-brand-primary outline-none" />
+                                                </div>
+                                                <div className="flex flex-col gap-1.5">
+                                                    <label className="text-[10px] font-bold text-brand-inactive-text uppercase">Meio</label>
+                                                    <select value={values.paymentMethodId} onChange={(e) => setSettlePaymentsByInstallment((prev) => ({ ...prev, [row.id]: { ...values, paymentMethodId: e.target.value } }))} className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-2 bg-white dark:bg-dark-surface/50 text-sm transition-all focus:border-brand-primary outline-none">
+                                                        {(paymentMethods || []).map((pm: any) => (<option key={pm.id} value={pm.id}>{pm.name}</option>))}
+                                                    </select>
+                                                </div>
+                                                <div className="flex flex-col gap-1.5">
+                                                    <label className="text-[10px] font-bold text-brand-inactive-text uppercase">Juros</label>
+                                                    <input type="number" step="0.01" min="0" value={values.interestAmount} onChange={(e) => setSettlePaymentsByInstallment((prev) => ({ ...prev, [row.id]: { ...values, interestAmount: e.target.value } }))} className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm transition-all focus:border-brand-primary outline-none" />
+                                                </div>
+                                                <div className="flex flex-col gap-1.5">
+                                                    <label className="text-[10px] font-bold text-brand-inactive-text uppercase">Desc.</label>
+                                                    <input type="number" step="0.01" min="0" value={values.discountAmount} onChange={(e) => setSettlePaymentsByInstallment((prev) => ({ ...prev, [row.id]: { ...values, discountAmount: e.target.value } }))} className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm transition-all focus:border-brand-primary outline-none" />
+                                                </div>
                                             </div>
-                                            <p className="text-xs font-semibold">Valor final pago: {formatCurrency(finalPaid)}</p>
+                                            <div className="flex justify-end pt-1">
+                                                <p className="text-[13px] font-bold text-brand-green bg-brand-green/5 px-3 py-1 rounded-full border border-brand-green/10">
+                                                    Final: {formatCurrency(finalPaid)}
+                                                </p>
+                                            </div>
                                         </div>
                                     )
                                 })}
@@ -1267,76 +1358,59 @@ export default function TransactionsPage({
             >
                 {selectedInstallmentForPayment ? (
                     <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                            <div className="rounded-lg border border-brand-border dark:border-dark-border p-3">
-                                <p className="text-brand-inactive-text">Valor original</p>
-                                <p className="font-semibold">{formatCurrency(Number(selectedInstallmentForPayment.originalAmount || 0))}</p>
-                            </div>
-                            <div className="rounded-lg border border-brand-border dark:border-dark-border p-3">
-                                <p className="text-brand-inactive-text">Valor restante</p>
-                                <p className="font-semibold">{formatCurrency(Number(selectedInstallmentForPayment.remainingAmount || 0))}</p>
-                            </div>
-                        </div>
+                        <div className="flex flex-col w-full">
+                            <div className="py-4 flex flex-col gap-6">
+                                <div className="flex justify-between items-start gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                            {selectedInstallmentForPayment.description}
+                                        </h3>
+                                        <div className="flex items-center gap-2 mt-1.5 font-medium">
+                                            <span className="text-[12px] px-2.5 py-1 rounded-md bg-brand-slate dark:bg-dark-border text-brand-dark dark:text-dark-heading uppercase tracking-wide">
+                                                Parcela {selectedInstallmentForPayment.installmentNumber}
+                                            </span>
+                                            <span className="text-[12px] text-brand-inactive-text">
+                                                Vence em {selectedInstallmentForPayment.dueDate || "-"}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-1 px-4 py-2 bg-brand-gray dark:bg-dark-border rounded-xl">
+                                        <span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider">Valor Original</span>
+                                        <span className="font-bold text-[16px] text-brand-dark dark:text-dark-heading">{formatCurrency(Number(selectedInstallmentForPayment.originalAmount || 0))}</span>
+                                    </div>
+                                </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Valor do pagamento</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={paymentAmount}
-                                onChange={(e) => setPaymentAmount(e.target.value)}
-                                className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-transparent"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Juros</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={interestAmount}
-                                onChange={(e) => setInterestAmount(e.target.value)}
-                                className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-transparent"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Desconto</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={discountAmount}
-                                onChange={(e) => setDiscountAmount(e.target.value)}
-                                className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-transparent"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Forma de pagamento</label>
-                            <select
-                                value={paymentMethodId}
-                                onChange={(e) => setPaymentMethodId(e.target.value)}
-                                className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-transparent"
-                            >
-                                <option value="">Não informado</option>
-                                {(paymentMethods || []).map((pm: any) => (
-                                    <option key={pm.id} value={pm.id}>
-                                        {pm.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-xs font-bold text-brand-inactive-text uppercase ml-1">Valor do Pagamento</label>
+                                        <input type="number" step="0.01" min="0" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="w-full rounded-xl h-11 border border-brand-border dark:border-dark-border px-4 bg-white dark:bg-dark-surface/50 text-sm font-bold transition-all focus:border-brand-primary outline-none shadow-sm" />
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-xs font-bold text-brand-inactive-text uppercase ml-1">Meio de Pagamento</label>
+                                        <select value={paymentMethodId} onChange={(e) => setPaymentMethodId(e.target.value)} className="w-full rounded-xl h-11 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm font-medium transition-all focus:border-brand-primary outline-none shadow-sm">
+                                            {(paymentMethods || []).map((pm: any) => (<option key={pm.id} value={pm.id}>{pm.name}</option>))}
+                                        </select>
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-xs font-bold text-brand-inactive-text uppercase ml-1">Juros (+)</label>
+                                        <input type="number" step="0.01" min="0" value={interestAmount} onChange={(e) => setInterestAmount(e.target.value)} className="w-full rounded-xl h-11 border border-brand-border dark:border-dark-border px-4 bg-white dark:bg-dark-surface/50 text-sm transition-all focus:border-brand-primary outline-none shadow-sm" />
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-xs font-bold text-brand-inactive-text uppercase ml-1">Desconto (-)</label>
+                                        <input type="number" step="0.01" min="0" value={discountAmount} onChange={(e) => setDiscountAmount(e.target.value)} className="w-full rounded-xl h-11 border border-brand-border dark:border-dark-border px-4 bg-white dark:bg-dark-surface/50 text-sm transition-all focus:border-brand-primary outline-none shadow-sm" />
+                                    </div>
+                                </div>
 
-                        <div className="rounded-lg border border-brand-border dark:border-dark-border p-3 text-sm">
-                            <p className="text-brand-inactive-text">Valor final pago</p>
-                            <p className="font-semibold">
-                                {formatCurrency(
-                                    Math.max(
-                                        0,
-                                        Number(paymentAmount || 0) + Number(interestAmount || 0) - Number(discountAmount || 0),
-                                    ),
-                                )}
-                            </p>
+                                <div className="p-4 rounded-xl border border-brand-green/20 bg-brand-green/5 flex justify-between items-center mt-2">
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] text-brand-green font-bold uppercase tracking-widest">Total a Processar</span>
+                                        <span className="text-brand-inactive-text text-xs">Considerando descontos/juros</span>
+                                    </div>
+                                    <span className="font-bold text-2xl text-brand-green">
+                                        {formatCurrency(Math.max(0, Number(paymentAmount || 0) + Number(interestAmount || 0) - Number(discountAmount || 0)))}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="flex justify-end gap-2">

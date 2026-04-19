@@ -28,6 +28,7 @@ type UpsertPaymentMethodInput = {
   pixKeyType?: "cpf" | "cnpj" | "email" | "phone" | "random" | null
   pixKey?: string | null
   usePartnerPixData?: boolean
+  cardBrand?: string | null
 }
 
 async function resolvePixKeyFromPartner(
@@ -235,6 +236,7 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
     supportsInstallments,
     maxInstallments,
     discountPercent: data.discountPercent,
+    cardBrand: data.cardBrand,
     installmentFees: supportsInstallments ? (data.installmentFees || []) : [],
   })
 
@@ -244,6 +246,18 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
   }
 
   const supabase = await getSupabaseServerClient()
+
+  // Check for duplicate payment type
+  const { data: existingMethod } = await supabase
+    .from("payment_methods")
+    .select("id")
+    .eq("partner_id", data.partnerId)
+    .eq("type", canonicalType)
+    .maybeSingle()
+
+  if (existingMethod) {
+    return { error: `Já existe uma forma de pagamento cadastrada para o tipo "${canonicalType === 'pix' ? 'PIX' : canonicalType === 'cash' ? 'Dinheiro' : canonicalType === 'credit_card' ? 'Cartão de Crédito' : canonicalType === 'debit_card' ? 'Cartão de Débito' : 'Outros'}".` }
+  }
 
   const { data: method, error: methodError } = await supabase
     .from("payment_methods")
@@ -262,6 +276,7 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
       discount_percent: data.discountPercent ?? 0,
       fee_bearer: data.feeBearer || "merchant",
       supports_installments: supportsInstallments,
+      card_brand: data.cardBrand,
       pix_key_type: isPix ? (data.pixKeyType || null) : null,
       pix_key: isPix ? persistedPixKey : null,
       use_partner_pix_data: isPix ? Boolean(data.usePartnerPixData) : false,
@@ -302,6 +317,7 @@ export async function updatePaymentMethodAction(
     pixKeyType?: "cpf" | "cnpj" | "email" | "phone" | "random" | null
     pixKey?: string | null
     usePartnerPixData?: boolean
+    cardBrand?: string | null
   },
 ) {
   await requireRateLimit(RateLimitCategory.PAYMENT)
@@ -318,6 +334,21 @@ export async function updatePaymentMethodAction(
   }
 
   await requirePartnerAccessWithPermission(method.partner_id, "financial", "edit")
+
+  if (data.paymentType !== undefined) {
+    const canonicalType = toCanonicalPaymentType(data.paymentType)
+    const { data: existingMethod } = await supabase
+      .from("payment_methods")
+      .select("id")
+      .eq("partner_id", method.partner_id)
+      .eq("type", canonicalType)
+      .neq("id", methodId) // Exclude current method
+      .maybeSingle()
+
+    if (existingMethod) {
+      return { error: `Já existe uma forma de pagamento cadastrada para o tipo "${canonicalType === 'pix' ? 'PIX' : canonicalType === 'cash' ? 'Dinheiro' : canonicalType === 'credit_card' ? 'Cartão de Crédito' : canonicalType === 'debit_card' ? 'Cartão de Débito' : 'Outros'}".` }
+    }
+  }
 
   const updateData: any = {}
   if (data.name !== undefined) updateData.name = data.name
@@ -359,6 +390,9 @@ export async function updatePaymentMethodAction(
     updateData.pix_key = await encryptPixKeyIfNeeded(data.pixKeyType || null, data.pixKey)
   }
 
+  if (data.cardBrand !== undefined) {
+    updateData.card_brand = data.cardBrand
+  }
   const { error: methodError } = await supabase
     .from("payment_methods")
     .update(updateData)

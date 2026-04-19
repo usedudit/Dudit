@@ -133,7 +133,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                         <div className="flex items-center gap-1.5">
                             {method.card_brand && (
                                 <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body uppercase">
-                                    {method.card_brand.replace("_", " ")}
+                                    {method.card_brand.split(";").map((b: string) => b.trim().replace("_", " ")).join(", ")}
                                 </span>
                             )}
                             {method.card_brand && method.max_installments && <span className="text-[10px] text-brand-border dark:text-dark-border">•</span>}
@@ -223,7 +223,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                     </div>
 
                     <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body uppercase">
-                        {method.payment_type?.replace("_", " ") || ""} {method.card_brand ? `• ${method.card_brand.replace("_", " ")}` : ""}
+                        {method.payment_type?.replace("_", " ") || ""} {method.card_brand ? `• ${method.card_brand.split(";").map((b: string) => b.trim().replace("_", " ")).join(", ")}` : ""}
                     </div>
 
                     <div className="flex items-end justify-between gap-2 mt-0.5">

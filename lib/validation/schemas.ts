@@ -115,6 +115,7 @@ export const PaymentMethodSchema = z.object({
   supportsInstallments: z.boolean().optional(),
   maxInstallments: z.number().int().min(1).max(24).optional().nullable(),
   discountPercent: z.number().min(0).max(100).optional().nullable(),
+  cardBrand: z.string().max(500).optional().nullable(),
   installmentFees: z.array(z.object({
     installmentNumber: z.number().int().min(1).max(24),
     feePercent: z.number().min(0).max(100),
