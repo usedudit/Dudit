@@ -23,6 +23,8 @@ export type PDVPreSale = {
   subtotal: number
   discount_amount: number
   total_amount: number
+  shipping_fee?: number | null
+  other_costs?: number | null
   notes: string | null
   status: "draft" | "completed"
   items: any[]
@@ -61,6 +63,12 @@ export type PDVCartItem = {
   variantId: string | null
   name: string
   variantName: string | null
+  /** Preço unitário de lista (antes do desconto por linha). */
+  listUnitPrice?: number | null
+  /** Tipo de desconto aplicado só nesta linha (persistido na pré-venda). */
+  lineDiscountType?: "fixed" | "percentage" | null
+  /** Valor do desconto: R$ se fixed, ou % se percentage. */
+  lineDiscountValue?: number | null
   price: number
   qty: number
   image: string | null

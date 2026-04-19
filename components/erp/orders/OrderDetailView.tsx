@@ -170,10 +170,12 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                         onShare={() => { }}
                                     />
 
-                                    <Button onClick={() => onEditOrder(order)} className="whitespace-nowrap">
-                                        <EditIcon className="w-[18px] h-[18px] mr-2" />
-                                        Editar Venda
-                                    </Button>
+                                    {!order.is_pos_sale && (
+                                        <Button onClick={() => onEditOrder(order)} className="whitespace-nowrap">
+                                            <EditIcon className="w-[18px] h-[18px] mr-2" />
+                                            Editar Venda
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
 
@@ -386,10 +388,12 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                             </Button>
                         }
                     />
-                    <Button onClick={() => onEditOrder(order)} className="flex-1 whitespace-nowrap">
-                        <EditIcon className="w-4 h-4 mr-2" />
-                        Editar Venda
-                    </Button>
+                    {!order.is_pos_sale && (
+                        <Button onClick={() => onEditOrder(order)} className="flex-1 whitespace-nowrap">
+                            <EditIcon className="w-4 h-4 mr-2" />
+                            Editar Venda
+                        </Button>
+                    )}
                 </div>
             </Tabs>
         </FadeIn>

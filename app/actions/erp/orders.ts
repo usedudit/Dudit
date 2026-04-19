@@ -921,32 +921,96 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         `)
         .eq("id", orderId)
         .eq("partner_id", partnerId)
-        .single()
+        .maybeSingle()
 
     if (error) return { error: error.message }
-    if (!data) return { error: "Pedido nÃ£o encontrado" }
+    if (data) {
+        let customers = null
+        if (data.buyer_id) {
+            const { data: customerData } = await supabase
+                .from("customers")
+                .select("id, name, email, phone, addresses(*)")
+                .eq("id", data.buyer_id)
+                .single()
+            customers = customerData
+        }
+
+        let sellerName: string | null = null
+        if (data.created_by) {
+            const { data: sellerProfile } = await supabase
+                .from("user_profiles")
+                .select("full_name")
+                .eq("user_id", data.created_by)
+                .single()
+            sellerName = sellerProfile?.full_name || null
+        }
+
+        return { success: true, data: { ...data, customers, seller_name: sellerName } }
+    }
+
+    const { data: sale, error: saleError } = await supabase
+        .from("sales")
+        .select("*, sale_items(*)")
+        .eq("id", orderId)
+        .eq("partner_id", partnerId)
+        .maybeSingle()
+
+    if (saleError || !sale) return { error: "Pedido nÃ£o encontrado" }
 
     let customers = null
-    if (data.buyer_id) {
+    if (sale.customer_id) {
         const { data: customerData } = await supabase
             .from("customers")
             .select("id, name, email, phone, addresses(*)")
-            .eq("id", data.buyer_id)
+            .eq("id", sale.customer_id)
             .single()
         customers = customerData
     }
 
-    let sellerName: string | null = null
-    if (data.created_by) {
-        const { data: sellerProfile } = await supabase
-            .from("user_profiles")
-            .select("full_name")
-            .eq("user_id", data.created_by)
-            .single()
-        sellerName = sellerProfile?.full_name || null
+    const ref = String(sale.id || "").replace(/-/g, "").slice(0, 8).toUpperCase()
+    const situation =
+        sale.status === "paid" || sale.payment_status === "paid"
+            ? "paid"
+            : sale.payment_status === "partially_paid"
+                ? "partially_paid"
+                : "pending"
+
+    const orderLike = {
+        id: sale.id,
+        order_number: ref,
+        order_source: "Presencial",
+        situation,
+        delivery_status: "delivered",
+        total_amount: Number(sale.final_amount || 0),
+        paid_amount: Number(sale.paid_amount || 0),
+        discount_value: Number(sale.discount_amount || 0),
+        shipping_cost: 0,
+        additional_costs: 0,
+        notes: sale.notes,
+        created_at: sale.created_at,
+        order_date: sale.created_at,
+        order_items: (sale.sale_items || []).map((it: any) => ({
+            id: it.id,
+            product_name: it.product_name,
+            product_price: Number(it.unit_price || 0),
+            quantity: Number(it.quantity || 0),
+            subtotal: Number(it.subtotal ?? Number(it.quantity) * Number(it.unit_price)),
+            sku: "-",
+            image: null,
+            product_id: it.product_id,
+            variant_id: it.variant_id,
+        })),
+        buyer_id: sale.customer_id,
+        customer_name: customers?.name || "Consumidor final",
+        customers,
+        seller_name: null,
+        is_pos_sale: true,
+        payment_method: null,
+        payment_breakdown: [],
+        mp_payment_id: null,
     }
 
-    return { success: true, data: { ...data, customers, seller_name: sellerName } }
+    return { success: true, data: orderLike }
 }
 
 export async function getOrderHistoryAction(orderId: string, partnerId: string) {
@@ -954,6 +1018,15 @@ export async function getOrderHistoryAction(orderId: string, partnerId: string) 
     if (!user) return { error: "NÃ£o autenticado" }
 
     await requirePartnerAccess(partnerId)
+
+    const supabase = await getSupabaseServerClient()
+    const { data: saleRow } = await supabase
+        .from("sales")
+        .select("id")
+        .eq("id", orderId)
+        .eq("partner_id", partnerId)
+        .maybeSingle()
+    if (saleRow?.id) return { success: true, data: [] as any[] }
 
     const entries = await getOrderHistoryEntries(orderId, partnerId)
     return { success: true, data: entries }

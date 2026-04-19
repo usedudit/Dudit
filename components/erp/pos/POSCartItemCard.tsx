@@ -4,7 +4,7 @@ import { memo } from "react"
 import { MinusIcon, PlusIcon, EditIcon, TrashIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button } from "@/components/reusable"
+import { Badge, Button } from "@/components/reusable"
 import type { PDVCartItem } from "@/lib/types/pdv"
 
 type Props = {
@@ -20,6 +20,9 @@ const POSCartItemCard = memo(function POSCartItemCard({
   onRemove,
   onEdit,
 }: Props) {
+  const list = item.listUnitPrice ?? item.price
+  const hasLineDiscount = list > item.price + 0.001
+
   return (
     <div className="rounded-2xl border border-brand-border bg-white p-3 dark:bg-dark-surface">
       <div className="flex min-w-0 items-start gap-3">
@@ -35,7 +38,12 @@ const POSCartItemCard = memo(function POSCartItemCard({
           )}
           <p className="text-sm text-brand-inactive-text dark:text-dark-body">{formatCurrency(item.price)}</p>
           <div className="mt-2 flex items-center gap-2">
-            <Button className="flex h-7 w-7 px-0 py-0 items-center justify-center" variant="outline" onClick={() => onChangeQty(item.id, -1)}>
+            <Button
+              className="flex h-7 w-7 px-0 py-0 items-center justify-center"
+              variant="outline"
+              disabled={item.qty <= 1}
+              onClick={() => onChangeQty(item.id, -1)}
+            >
               <MinusIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" />
             </Button>
             <span className="min-w-8 text-center font-bold">{String(item.qty).padStart(2, "0")}</span>
@@ -54,7 +62,14 @@ const POSCartItemCard = memo(function POSCartItemCard({
             </Button>
           </div>
           <div className="mt-1">
-            <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Total</p>
+            <div className="flex items-center justify-end gap-2">
+              <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Total</p>
+              {hasLineDiscount && (
+                <Badge variant="orange" className="text-[10px] font-bold uppercase tracking-wide">
+                  Desc.
+                </Badge>
+              )}
+            </div>
             <p className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(item.price * item.qty)}</p>
           </div>
         </div>

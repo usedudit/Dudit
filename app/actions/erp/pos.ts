@@ -18,6 +18,9 @@ type DraftItemInput = {
   price: number
   totalPrice?: number
   image?: string | null
+  listUnitPrice?: number | null
+  lineDiscountType?: "fixed" | "percentage" | null
+  lineDiscountValue?: number | null
 }
 
 type DraftUpsertInput = {
@@ -28,6 +31,8 @@ type DraftUpsertInput = {
   subtotal: number
   discountAmount: number
   totalAmount: number
+  shippingFee?: number
+  otherCosts?: number
   items: DraftItemInput[]
 }
 
@@ -63,6 +68,19 @@ function normalizeDraftItems(items: DraftItemInput[]) {
       Number(item.totalPrice || (Number(item.qty || 0) * Number(item.price || 0)))
     ),
     image: item.image || null,
+    list_unit_price:
+      item.listUnitPrice != null && Number.isFinite(Number(item.listUnitPrice))
+        ? safeMoney(Number(item.listUnitPrice))
+        : null,
+    line_discount_type: item.lineDiscountType === "fixed" || item.lineDiscountType === "percentage"
+      ? item.lineDiscountType
+      : null,
+    line_discount_value:
+      item.lineDiscountValue != null && Number.isFinite(Number(item.lineDiscountValue))
+        ? item.lineDiscountType === "percentage"
+          ? Math.max(0, Math.min(100, Math.round(Number(item.lineDiscountValue) * 100) / 100))
+          : safeMoney(Number(item.lineDiscountValue))
+        : null,
   }))
 
   for (const item of normalized) {
@@ -105,7 +123,7 @@ export async function getPOSInitialDataAction(partnerId: string) {
       .order("is_default", { ascending: false }),
     supabase
       .from("pre_sales")
-      .select("id, customer_id, subtotal, discount_amount, total_amount, notes, status, items, created_at, updated_at")
+      .select("id, customer_id, subtotal, discount_amount, total_amount, shipping_fee, other_costs, notes, status, items, created_at, updated_at")
       .eq("partner_id", partnerId)
       .eq("status", "draft")
       .order("created_at", { ascending: false })
@@ -150,10 +168,12 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
   const subtotal = safeMoney(input.subtotal)
   const discountAmount = safeMoney(Math.min(input.discountAmount, subtotalFromItems))
   const totalAmount = safeMoney(input.totalAmount)
-  const expectedTotal = safeMoney(subtotalFromItems - discountAmount)
+  const shippingFee = safeMoney(input.shippingFee ?? 0)
+  const otherCosts = safeMoney(input.otherCosts ?? 0)
+  const expectedTotal = safeMoney(subtotalFromItems - discountAmount + shippingFee + otherCosts)
 
   if (normalizedItems.length === 0) return { success: false as const, error: "Não é possível salvar pré-venda sem itens." }
-  if (subtotal < 0 || discountAmount < 0 || totalAmount < 0) {
+  if (subtotal < 0 || discountAmount < 0 || totalAmount < 0 || shippingFee < 0 || otherCosts < 0) {
     return { success: false as const, error: "Valores negativos não são permitidos." }
   }
   if (Math.abs(subtotal - subtotalFromItems) > 0.01) {
@@ -163,7 +183,7 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
     return { success: false as const, error: "Total da pré-venda não confere com os itens e desconto." }
   }
 
-  const payload = {
+  const payload: Record<string, unknown> = {
     partner_id: input.partnerId,
     customer_id: input.customerId || null,
     items: normalizedItems,
@@ -174,6 +194,9 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
     status: "draft",
     updated_at: new Date().toISOString(),
   }
+
+  payload.shipping_fee = shippingFee
+  payload.other_costs = otherCosts
 
   if (input.preSaleId) {
     const { data, error } = await supabase

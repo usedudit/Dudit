@@ -144,6 +144,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   const [isGlobalDiscountModalOpen, setIsGlobalDiscountModalOpen] = useState(false)
   const [globalDiscountValue, setGlobalDiscountValue] = useState(0)
   const [globalDiscountType, setGlobalDiscountType] = useState<"fixed" | "percentage">("fixed")
+  const [isUserDraftSaveUi, setIsUserDraftSaveUi] = useState(false)
 
   const isXL = useMediaQuery("(min-width: 1280px)")
   const isLG = useMediaQuery("(min-width: 1024px)")
@@ -270,6 +271,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     setCart((prev) => {
       const found = prev.find((item) => item.productId === product.id && item.variantId === (variantId || null))
       if (!found) {
+        const listUnit = Number(product.price || 0) + Number(selectedVariant?.price_adjustment || 0)
         return [
           ...prev,
           {
@@ -278,7 +280,10 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             variantId: variantId || null,
             name: product.name,
             variantName: selectedVariant?.variant_name || null,
-            price: Number(product.price || 0) + Number(selectedVariant?.price_adjustment || 0),
+            listUnitPrice: listUnit,
+            lineDiscountType: null,
+            lineDiscountValue: null,
+            price: listUnit,
             qty: 1,
             image: (selectedVariant?.variant_options?.image as string | undefined) || product.images?.[0] || null,
           },
@@ -299,6 +304,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     setCart((prev) => prev
       .map((item) => {
         if (item.id !== itemId) return item
+        if (delta < 0 && item.qty <= 1) return item
         const nextQty = Math.max(0, item.qty + delta)
         const product = products.find((currentProduct) => currentProduct.id === item.productId)
         const variant = item.variantId ? product?.product_variants?.find((currentVariant) => currentVariant.id === item.variantId) : null
@@ -318,7 +324,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     setCart((prev) => prev.filter((item) => item.id !== itemId))
   }, [])
 
-  const persistDraft = async () => {
+  const persistDraft = async (opts?: { notifyOnSuccess?: boolean }) => {
     if (cart.length === 0) return null
     if (isSavingDraftRef.current) return null
 
@@ -331,8 +337,10 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         customerId: selectedCustomerId,
         notes,
         subtotal,
-        discountAmount,
+        discountAmount: discountVal,
         totalAmount: total,
+        shippingFee,
+        otherCosts,
         items: cart.map((item) => ({
           productId: item.productId,
           variantId: item.variantId,
@@ -342,6 +350,9 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
           price: item.price,
           totalPrice: item.price * item.qty,
           image: item.image,
+          listUnitPrice: item.listUnitPrice ?? item.price,
+          lineDiscountType: item.lineDiscountType ?? null,
+          lineDiscountValue: item.lineDiscountValue ?? null,
         })),
       })
 
@@ -353,6 +364,9 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       const saved = result.data as PreSale
       setActivePreSaleId(saved.id)
       setPreSales((prev) => [saved, ...prev.filter((preSale) => preSale.id !== saved.id)].slice(0, 20))
+      if (opts?.notifyOnSuccess) {
+        notifySuccess("Pedido salvo com sucesso.")
+      }
       return saved.id
     } finally {
       setIsSavingDraft(false)
@@ -360,44 +374,14 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     }
   }
 
-  const loadPreSale = useCallback((preSale: PreSale) => {
-    const items = (Array.isArray(preSale.items) ? preSale.items : []).map((item: any) => ({
-      id: crypto.randomUUID(),
-      productId: item.product_id ?? item.productId ?? null,
-      variantId: item.variant_id ?? item.variantId ?? null,
-      variantName: item.variant_name || item.variantName || null,
-      name: item.name,
-      price: Number((item.unit_price ?? item.price) || 0),
-      qty: Number((item.quantity ?? item.qty) || 0),
-      image: item.image || null,
-    }))
-
-    setActivePreSaleId(preSale.id)
-    setSelectedCustomerId(preSale.customer_id || undefined)
-    setDiscountAmount(Number(preSale.discount_amount || 0))
-    setDiscountType("fixed")
-    setNotes(preSale.notes || "")
-    setCart(items)
-  }, [])
-
-  const clearCurrentOrder = useCallback(() => {
-    setActivePreSaleId(null)
-    setSelectedCustomerId(undefined)
-    setDiscountAmount(0)
-    setDiscountType("fixed")
-    setNotes("")
-    setCart([])
-  }, [])
-
-  const removeDraft = async (preSaleId: string) => {
-    const result = await deletePreSaleDraftAction(partnerId, preSaleId)
-    if (!result.success) {
-      notifyError(result.error || "Não foi possível excluir a pré-venda.")
-      return
+  const saveDraftFromMenu = async () => {
+    if (cart.length === 0) return
+    setIsUserDraftSaveUi(true)
+    try {
+      await persistDraft({ notifyOnSuccess: true })
+    } finally {
+      setIsUserDraftSaveUi(false)
     }
-
-    setPreSales((prev) => prev.filter((item) => item.id !== preSaleId))
-    if (activePreSaleId === preSaleId) clearCurrentOrder()
   }
 
   const ensurePreSaleToFinalize = async () => {
@@ -414,6 +398,57 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     }
 
     return preSaleIdToFinalize
+  }
+
+  const loadPreSale = useCallback((preSale: PreSale) => {
+    const items = (Array.isArray(preSale.items) ? preSale.items : []).map((item: any) => {
+      const unit = Number((item.unit_price ?? item.price) || 0)
+      const listU = Number((item.list_unit_price ?? item.listUnitPrice) || 0) || unit
+      const ldType = item.line_discount_type ?? item.lineDiscountType
+      const ldVal = item.line_discount_value ?? item.lineDiscountValue
+      return {
+        id: crypto.randomUUID(),
+        productId: item.product_id ?? item.productId ?? null,
+        variantId: item.variant_id ?? item.variantId ?? null,
+        variantName: item.variant_name || item.variantName || null,
+        name: item.name,
+        listUnitPrice: listU,
+        lineDiscountType: ldType === "percentage" || ldType === "fixed" ? ldType : null,
+        lineDiscountValue: ldVal != null && Number.isFinite(Number(ldVal)) ? Number(ldVal) : null,
+        price: unit,
+        qty: Number((item.quantity ?? item.qty) || 0),
+        image: item.image || null,
+      }
+    })
+
+    setActivePreSaleId(preSale.id)
+    setSelectedCustomerId(preSale.customer_id || undefined)
+    setDiscountAmount(Number(preSale.discount_amount || 0))
+    setDiscountType("fixed")
+    setNotes(preSale.notes || "")
+    setShippingFee(Number(preSale.shipping_fee || 0))
+    setCart(items)
+  }, [])
+
+  const clearCurrentOrder = useCallback(() => {
+    setActivePreSaleId(null)
+    setSelectedCustomerId(undefined)
+    setDiscountAmount(0)
+    setDiscountType("fixed")
+    setNotes("")
+    setShippingFee(0)
+    setCart([])
+  }, [])
+
+  const removeDraft = async (preSaleId: string) => {
+    const result = await deletePreSaleDraftAction(partnerId, preSaleId)
+    if (!result.success) {
+      notifyError(result.error || "Não foi possível excluir a pré-venda.")
+      return
+    }
+
+    setPreSales((prev) => prev.filter((item) => item.id !== preSaleId))
+    if (activePreSaleId === preSaleId) clearCurrentOrder()
   }
 
   const handleOpenPaymentModal = useCallback(() => {
@@ -483,9 +518,19 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   useEffect(() => {
     if (!editingItem) return
     setEditQty(editingItem.qty)
-    setEditPrice(editingItem.price)
-    setEditDiscount(0)
-    setEditDiscountType("fixed")
+    const list = editingItem.listUnitPrice ?? editingItem.price
+    setEditPrice(list)
+    if (
+      editingItem.lineDiscountValue != null
+      && editingItem.lineDiscountValue > 0
+      && (editingItem.lineDiscountType === "fixed" || editingItem.lineDiscountType === "percentage")
+    ) {
+      setEditDiscountType(editingItem.lineDiscountType)
+      setEditDiscount(editingItem.lineDiscountValue)
+    } else {
+      setEditDiscount(0)
+      setEditDiscountType("fixed")
+    }
   }, [editingItem])
 
   useEffect(() => {
@@ -506,7 +551,32 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       }
     }
 
-    setCart((prev) => prev.map((item) => (item.id === editingItem.id ? { ...item, qty: editQty, price: finalUnitPrice } : item)))
+    const product = products.find((p) => p.id === editingItem.productId)
+    const variant = editingItem.variantId
+      ? product?.product_variants?.find((v) => v.id === editingItem.variantId)
+      : null
+    const available = variant ? Number(variant.stock_available || 0) : Number(product?.stock_available || 0)
+
+    if (product && !product.allow_sell_without_stock && editQty > available) {
+      notifyError(`Estoque insuficiente para o item ${editingItem.name}`)
+      return
+    }
+
+    const listUnitPrice = editPrice
+    const hasLineDisc = editDiscount > 0
+    const lineDiscountType = hasLineDisc ? editDiscountType : null
+    const lineDiscountValue = hasLineDisc ? editDiscount : null
+
+    setCart((prev) => prev.map((item) => (item.id === editingItem.id
+      ? {
+          ...item,
+          qty: editQty,
+          price: finalUnitPrice,
+          listUnitPrice,
+          lineDiscountType,
+          lineDiscountValue,
+        }
+      : item)))
     setEditingItem(null)
     notifySuccess("Item atualizado.")
   }
@@ -706,7 +776,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
               onOpenItems={() => { }}
               onOpenDiscount={() => setIsGlobalDiscountModalOpen(true)}
               onContinue={handleOpenPaymentModal}
-              onSaveDraft={persistDraft}
+              onSaveDraft={saveDraftFromMenu}
               onAddShipping={handleShippingPrompt}
               onOpenNotes={handleOpenNotesSheet}
               showItemsShortcut={false}
@@ -790,7 +860,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             }}
             onOpenDiscount={() => setIsGlobalDiscountModalOpen(true)}
             onContinue={handleOpenPaymentModal}
-            onSaveDraft={persistDraft}
+            onSaveDraft={saveDraftFromMenu}
             onAddShipping={handleShippingPrompt}
             onOpenNotes={handleOpenNotesSheet}
             showActionsMenu={cart.length > 0}
@@ -1047,7 +1117,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         }
       >
         <div className="space-y-6 pt-2">
-          <InfoCard color="green" title="Valor total de itens" message={formatCurrency(total)} />
+          <InfoCard color="green" title="Valor total de itens" message={formatCurrency(subtotal)} />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-brand-dark dark:text-dark-heading">Tipo de desconto</label>
@@ -1141,6 +1211,21 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
           setIsSelectSellerOpen(false)
         }}
       />
+
+      <DefaultModal
+        isOpen={isSavingDraft && isUserDraftSaveUi}
+        onClose={() => {}}
+        title=""
+        maxWidth="sm"
+        hideHeader
+      >
+        <div className="flex flex-col items-center justify-center gap-6 p-6">
+          <img src="https://img.dudit.com.br/static/mascots/Aguarde.png" alt="Aguarde" className="h-36 w-36 object-contain" />
+          <p className="text-center text-lg font-semibold leading-tight text-brand-dark dark:text-dark-heading">
+            Salvando pedido...
+          </p>
+        </div>
+      </DefaultModal>
 
       <AlertModal
         isOpen={isResetAlertOpen}

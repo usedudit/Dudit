@@ -424,7 +424,12 @@ export async function getFinancialTransactionsAction(
 
             const order = t.category === "Vendas" ? orderByNumber.get(String(t.description || "").trim()) : null
             const customerName = order?.buyer_id ? customerById.get(order.buyer_id)?.name : null
-            const salesContactName = customerName || order?.customer_name || "Cliente"
+            const fromTxnCustomer = t.customer_id ? customerById.get(t.customer_id)?.name : null
+            const salesContactName =
+                customerName
+                || order?.customer_name
+                || fromTxnCustomer
+                || "Consumidor final"
             const linkedCustomerName = t.customer_id ? customerById.get(t.customer_id)?.name : null
             const fallbackContact = t.transaction_contacts?.name || "-"
             const manualCustomerName = linkedCustomerName || "Cliente"

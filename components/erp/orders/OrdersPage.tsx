@@ -228,7 +228,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     created_at_time: new Date(o.order_date || o.created_at).getTime(),
                     situation: o.situation,
                     previousSituationBeforeCancel: o.previous_situation_before_cancel || null,
-                    canEdit: o.situation !== "cancelled",
+                    canEdit: !o.is_pos_sale && o.situation !== "cancelled",
                     canReopen: o.situation === "cancelled",
                     paidAmount: Number(o.paid_amount || 0)
                 }
