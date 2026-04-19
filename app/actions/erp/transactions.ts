@@ -294,11 +294,22 @@ export async function getFinancialTransactionsAction(
 
         const page = Math.max(1, options?.page ?? 1)
         const pageSize = options?.pageSize ?? 50
-        const offset = (page - 1) * pageSize
+        const safePageSize = Math.max(1, Math.min(100, pageSize))
+        const offset = (page - 1) * safePageSize
 
         // ── Step 1: Main query with pagination ──────────────────────────
         const t1 = performance.now()
-        const { data, error, count } = await supabase
+        const countRes = await supabase
+            .from("transactions")
+            .select("id", { count: "exact", head: true })
+            .eq("partner_id", partnerId)
+        if (countRes.error) throw countRes.error
+        const totalCount = countRes.count ?? 0
+        if (offset >= totalCount) {
+            return { success: true, data: [], totalCount }
+        }
+
+        const { data, error } = await supabase
             .from("transactions")
             .select(`
         id, description, category, amount, due_date, payment_date, created_at, status, notes, payment_type, transaction_type, contact_id, customer_id, contact_type,
@@ -307,11 +318,16 @@ export async function getFinancialTransactionsAction(
       `, { count: "exact" })
             .eq("partner_id", partnerId)
             .order("created_at", { ascending: false })
-            .range(offset, offset + pageSize - 1)
+            .range(offset, offset + safePageSize - 1)
 
-        if (error) throw error
+        if (error) {
+            const message = String((error as any)?.message || "").toLowerCase()
+            if (message.includes("requested range not satisfiable")) {
+                return { success: true, data: [], totalCount }
+            }
+            throw error
+        }
         const txs = (data || []) as unknown as DbTransaction[]
-        const totalCount = count ?? 0
         console.log(`[PERF] transactions.query ${Math.round(performance.now() - t1)}ms (${txs.length} rows, total ${totalCount})`)
 
         // ── Step 2: Collect all IDs for secondary lookups ───────────────
@@ -469,7 +485,7 @@ export async function getFinancialTransactionsAction(
                 displayId: `TRX-${t.id.slice(0, 8).toUpperCase()}`,
                 description: t.category === "Vendas" ? `Venda - ${t.description}` : t.description,
                 details: undefined,
-                category: t.category || "Outros",
+                category: String(t.category || "").trim() || "-",
                 contactName:
                     t.category === "Vendas"
                         ? salesContactName
@@ -619,10 +635,11 @@ export async function createManualTransactionAction(input: CreateManualTransacti
         const isVendaIncome =
             String(input.category || "").trim() === "Vendas" && input.transactionType === "income"
 
+        const normalizedCategory = String(input.category || "").trim()
         const payload: Record<string, unknown> = {
             partner_id: input.partnerId,
             description: description,
-            category: input.category || "Outros",
+            category: normalizedCategory || null,
             category_id: input.categoryId ?? null,
             subcategory_id: input.subcategoryId ?? null,
             account_id: input.accountId ?? null,
@@ -1019,6 +1036,8 @@ export async function createInstallmentGroupAction(input: {
     paymentType?: string | null
     paymentMethodId?: string | null
     notes?: string | null
+    initialStatus?: "pending" | "paid"
+    firstInstallmentPaymentDate?: string | null
 }) {
     try {
         const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
@@ -1059,14 +1078,17 @@ export async function createInstallmentGroupAction(input: {
             .single()
         if (groupErr || !group?.id) throw groupErr || new Error("Erro ao criar grupo parcelado.")
 
+        const initialStatus = input.initialStatus === "paid" ? "paid" : "pending"
+        const firstInstallmentPaymentDate = input.firstInstallmentPaymentDate || new Date().toISOString()
         const transactionsPayload = Array.from({ length: count }).map((_, index) => {
             const installmentNumber = index + 1
             const due = addInstallmentDate(startDate, input.frequency, interval, index)
             const lineAmount = installmentNumber === count ? Math.round((eachAmount + amountDiff) * 100) / 100 : eachAmount
+            const isFirstInstallmentPaid = initialStatus === "paid" && installmentNumber === 1
             return {
                 partner_id: input.partnerId,
                 description: input.description.trim(),
-                category: input.categoryLabel || "Parcelado",
+                category: String(input.categoryLabel || "").trim() || null,
                 category_id: input.categoryId || null,
                 subcategory_id: input.subcategoryId || null,
                 account_id: input.accountId || null,
@@ -1075,9 +1097,9 @@ export async function createInstallmentGroupAction(input: {
                 contact_type: input.customerId ? "customer" : (input.contactType || null),
                 amount: lineAmount,
                 due_date: due.toISOString().slice(0, 10),
-                payment_date: null,
+                payment_date: isFirstInstallmentPaid ? firstInstallmentPaymentDate : null,
                 transaction_date: due.toISOString(),
-                status: "pending",
+                status: isFirstInstallmentPaid ? "paid" : "pending",
                 notes: input.notes ?? null,
                 payment_type: input.paymentType || null,
                 payment_method_id: input.paymentMethodId || null,
@@ -1094,6 +1116,17 @@ export async function createInstallmentGroupAction(input: {
 
         const inserted = await insertTransactionsWithOptionalCreator(supabase, transactionsPayload)
         if (inserted.error) throw inserted.error
+
+        if (initialStatus === "paid" && input.accountId) {
+            const firstInstallmentAmount = Number((transactionsPayload[0] as any)?.amount || 0)
+            if (firstInstallmentAmount > 0) {
+                await applyFinanceAccountBalanceAfterInsert(supabase, input.partnerId, input.accountId, {
+                    transaction_type: input.transactionType,
+                    amount: firstInstallmentAmount,
+                    status: "paid",
+                })
+            }
+        }
 
         await revalidateTransactions(input.partnerId)
         return { success: true as const, data: { groupId: group.id, createdCount: (inserted.data || []).length } }
@@ -1575,7 +1608,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
             return { success: true, data: existing, alreadyPaid: true }
         }
 
-        let categoryName = "Sem categoria"
+        let categoryName: string | null = null
         if (rec.category_id) {
             const { data: cat } = await supabase
                 .from("financial_categories")
@@ -2183,7 +2216,7 @@ export async function getTransactionDetailsAction(
             typeBannerLabel: transactionTypeLabel(row.transaction_type),
             timeline,
             items,
-            categoryLine: row.category || "Outros",
+            categoryLine: String(row.category || "").trim() || "-",
             subcategoryLine,
             accountLine,
             dueDateLine: row.due_date ? formatDateLabel(row.due_date) : null,

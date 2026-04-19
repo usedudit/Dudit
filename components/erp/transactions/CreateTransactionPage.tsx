@@ -462,7 +462,7 @@ export default function CreateTransactionPage({
         return categories.filter((c) => c.parent_id === categoryId)
     }, [categories, categoryId])
     const selectedCategoryName = useMemo(
-        () => parentCategories.find((c) => c.id === categoryId)?.name || "Outros",
+        () => String(parentCategories.find((c) => c.id === categoryId)?.name || "").trim(),
         [parentCategories, categoryId],
     )
 
@@ -1042,6 +1042,8 @@ export default function CreateTransactionPage({
                     paymentType,
                     paymentMethodId: paymentMethodId || null,
                     notes: notes || null,
+                    initialStatus: status,
+                    firstInstallmentPaymentDate: status === "paid" ? paymentDate : null,
                 })
                 if (!installmentRes.success) return error(installmentRes.error || "Erro ao criar parcelamento")
                 success("Parcelamento criado com sucesso!")

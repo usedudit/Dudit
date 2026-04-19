@@ -15,6 +15,7 @@ import {
   finalizePreSaleAction,
   getPOSCustomerDetailsAction,
   createPOSCustomerQuickAction,
+  createPOSCustomerAddressAction,
   createPOSQuickProductAction,
   upsertPreSaleDraftAction,
 } from "@/app/actions/erp/pos"
@@ -709,6 +710,39 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     }
   }, [partnerId, notifyError, notifySuccess])
 
+  const handleCreateShippingAddress = useCallback(async (payload: {
+    customerId: string
+    address: {
+      zipCode: string
+      street: string
+      number: string
+      complement: string
+      neighborhood: string
+      city: string
+      state: string
+    }
+  }) => {
+    const result = await createPOSCustomerAddressAction({
+      partnerId,
+      customerId: payload.customerId,
+      address: payload.address,
+    })
+
+    if (!result.success) {
+      notifyError(result.error || "Não foi possível cadastrar o endereço.")
+      throw new Error(result.error || "Não foi possível cadastrar o endereço.")
+    }
+
+    const details = await getPOSCustomerDetailsAction({ partnerId, customerId: payload.customerId })
+    if (!details.success || !details.data) {
+      notifyError(details.error || "Endereço salvo, mas falhou ao recarregar cliente.")
+      throw new Error(details.error || "Endereço salvo, mas falhou ao recarregar cliente.")
+    }
+
+    setShippingCustomerDetails(details.data)
+    notifySuccess("Endereço cadastrado com sucesso.")
+  }, [partnerId, notifyError, notifySuccess])
+
   const handleOpenNotesSheet = useCallback(() => {
     setIsMobileSummarySheetOpen(false)
     setIsMobileItemsSheetOpen(false)
@@ -1362,6 +1396,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         currentShippingFee={shippingFee}
         onSelectCustomer={handleSelectShippingCustomer}
         onCreateCustomer={handleCreateQuickCustomerForShipping}
+        onCreateAddress={handleCreateShippingAddress}
         onApply={({ shippingFee: fee }) => {
           setShippingFee(Math.max(0, Number(fee || 0)))
           setIsShippingSheetOpen(false)

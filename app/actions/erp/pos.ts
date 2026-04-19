@@ -166,22 +166,15 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
   const normalizedItems = normalizedItemsResult.items
 
   const subtotalFromItems = computeSubtotal(normalizedItems)
-  const subtotal = safeMoney(input.subtotal)
-  const discountAmount = safeMoney(Math.min(input.discountAmount, subtotalFromItems))
-  const totalAmount = safeMoney(input.totalAmount)
+  const subtotal = subtotalFromItems
+  const discountAmount = safeMoney(Math.min(Math.max(0, input.discountAmount), subtotalFromItems))
   const shippingFee = safeMoney(input.shippingFee ?? 0)
   const otherCosts = safeMoney(input.otherCosts ?? 0)
-  const expectedTotal = safeMoney(subtotalFromItems - discountAmount + shippingFee + otherCosts)
+  const totalAmount = safeMoney(subtotalFromItems - discountAmount + shippingFee + otherCosts)
 
   if (normalizedItems.length === 0) return { success: false as const, error: "Não é possível salvar pré-venda sem itens." }
-  if (subtotal < 0 || discountAmount < 0 || totalAmount < 0 || shippingFee < 0 || otherCosts < 0) {
+  if (discountAmount < 0 || totalAmount < 0 || shippingFee < 0 || otherCosts < 0) {
     return { success: false as const, error: "Valores negativos não são permitidos." }
-  }
-  if (Math.abs(subtotal - subtotalFromItems) > 0.01) {
-    return { success: false as const, error: "Subtotal da pré-venda não confere com os itens." }
-  }
-  if (Math.abs(totalAmount - expectedTotal) > 0.01) {
-    return { success: false as const, error: "Total da pré-venda não confere com os itens e desconto." }
   }
 
   const payload: Record<string, unknown> = {
@@ -571,6 +564,96 @@ export async function getPOSCustomerDetailsAction(input: {
         state: address.state || "",
         country: address.country || "BR",
       } : null,
+    },
+  }
+}
+
+export async function createPOSCustomerAddressAction(input: {
+  partnerId: string
+  customerId: string
+  address: {
+    zipCode?: string
+    street?: string
+    number?: string
+    complement?: string
+    neighborhood?: string
+    city?: string
+    state?: string
+  }
+}) {
+  await requireUser()
+  await requirePartnerAccess(input.partnerId)
+
+  const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+  if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
+
+  const supabase = await getSupabaseServerClient()
+
+  const { data: customer, error: customerError } = await supabase
+    .from("customers")
+    .select("id")
+    .eq("partner_id", input.partnerId)
+    .eq("id", input.customerId)
+    .maybeSingle()
+
+  if (customerError || !customer?.id) {
+    return { success: false as const, error: customerError?.message || "Cliente não encontrado." }
+  }
+
+  const address = input.address || {}
+  const hasAddress = !!(address.street || address.city || address.zipCode)
+  if (!hasAddress) {
+    return { success: false as const, error: "Informe um endereço válido." }
+  }
+
+  const basePayload = {
+    customer_id: customer.id,
+    address_type: "primary",
+    zip_code: address.zipCode || null,
+    street: address.street || null,
+    number: address.number || null,
+    complement: address.complement || null,
+    neighborhood: address.neighborhood || null,
+    city: address.city || null,
+    state: address.state || null,
+    country: "BR",
+    is_default: true,
+  }
+
+  const { data: existingPrimary } = await supabase
+    .from("addresses")
+    .select("id")
+    .eq("customer_id", customer.id)
+    .eq("address_type", "primary")
+    .limit(1)
+    .maybeSingle()
+
+  if (existingPrimary?.id) {
+    const { error } = await supabase
+      .from("addresses")
+      .update(basePayload)
+      .eq("id", existingPrimary.id)
+      .eq("customer_id", customer.id)
+
+    if (error) return { success: false as const, error: error.message }
+  } else {
+    const { error } = await supabase.from("addresses").insert(basePayload)
+    if (error) return { success: false as const, error: error.message }
+  }
+
+  return {
+    success: true as const,
+    data: {
+      address: {
+        zipCode: address.zipCode || "",
+        street: address.street || "",
+        number: address.number || "",
+        complement: address.complement || "",
+        neighborhood: address.neighborhood || "",
+        city: address.city || "",
+        state: address.state || "",
+        country: "BR",
+      },
     },
   }
 }

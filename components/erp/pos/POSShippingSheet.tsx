@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { SearchIcon, XIcon, PlusIcon } from "@/lib/icons"
-import { Button, Input, CepInput, CustomerCard, Checkbox } from "@/components/reusable"
+import { Button, Input, CepInput, CustomerCard, Checkbox, MoneyInput } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -52,6 +52,18 @@ interface POSShippingSheetProps {
   currentShippingFee: number
   onSelectCustomer: (customerId: string) => Promise<void> | void
   onCreateCustomer: (payload: NewCustomerPayload) => Promise<void> | void
+  onCreateAddress: (payload: {
+    customerId: string
+    address: {
+      zipCode: string
+      street: string
+      number: string
+      complement: string
+      neighborhood: string
+      city: string
+      state: string
+    }
+  }) => Promise<void> | void
   onApply: (payload: { shippingFee: number }) => void
   isCreatingCustomer?: boolean
 }
@@ -65,14 +77,17 @@ export default function POSShippingSheet({
   currentShippingFee,
   onSelectCustomer,
   onCreateCustomer,
+  onCreateAddress,
   onApply,
   isCreatingCustomer = false,
 }: POSShippingSheetProps) {
   const isMobile = useMediaQuery("(max-width: 768px)")
   const [search, setSearch] = useState("")
   const [mode, setMode] = useState<"select" | "create">("select")
-  const [shippingInput, setShippingInput] = useState(String(currentShippingFee || 0))
+  const [shippingInput, setShippingInput] = useState(Number(currentShippingFee || 0))
   const [shippingFree, setShippingFree] = useState(currentShippingFee <= 0)
+  const [isAddressSheetOpen, setIsAddressSheetOpen] = useState(false)
+  const [isSavingAddress, setIsSavingAddress] = useState(false)
 
   const [newCustomerName, setNewCustomerName] = useState("")
   const [newCustomerEmail, setNewCustomerEmail] = useState("")
@@ -88,8 +103,9 @@ export default function POSShippingSheet({
 
   useEffect(() => {
     if (!isOpen) return
-    setShippingInput(String(currentShippingFee || 0))
+    setShippingInput(Number(currentShippingFee || 0))
     setShippingFree(currentShippingFee <= 0)
+    if (selectedCustomerId) setMode("select")
   }, [isOpen, currentShippingFee])
 
   useEffect(() => {
@@ -102,6 +118,11 @@ export default function POSShippingSheet({
     setCity(customerDetails.address.city || "")
     setState(customerDetails.address.state || "")
   }, [customerDetails?.id])
+
+  useEffect(() => {
+    if (!selectedCustomerId) return
+    setMode("select")
+  }, [selectedCustomerId])
 
   const filteredCustomers = useMemo(
     () => customers.filter((customer) => customer.name.toLowerCase().includes(search.toLowerCase())),
@@ -118,6 +139,11 @@ export default function POSShippingSheet({
     })
   }
 
+  const hasSelectedCustomer = !!selectedCustomerId
+  const hasSelectedCustomerAddress = !!customerDetails?.address?.street
+  const showCustomerDetailsBlock = hasSelectedCustomer && hasSelectedCustomerAddress
+  const showShippingInput = showCustomerDetailsBlock
+  const showCustomerModeSwitcher = !hasSelectedCustomer
   const shippingFeeValue = shippingFree ? 0 : Math.max(0, Number(shippingInput || 0))
 
   const content = (
@@ -130,14 +156,16 @@ export default function POSShippingSheet({
       </header>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-6">
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant={mode === "select" ? "default" : "outline"} onClick={() => setMode("select")}>
-            Selecionar cliente
-          </Button>
-          <Button variant={mode === "create" ? "default" : "outline"} onClick={() => setMode("create")}>
-            Novo cliente
-          </Button>
-        </div>
+        {showCustomerModeSwitcher && (
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant={mode === "select" ? "default" : "outline"} onClick={() => setMode("select")}>
+              Selecionar cliente
+            </Button>
+            <Button variant={mode === "create" ? "default" : "outline"} onClick={() => setMode("create")}>
+              Novo cliente
+            </Button>
+          </div>
+        )}
 
         {mode === "select" ? (
           <div className="space-y-3">
@@ -175,71 +203,47 @@ export default function POSShippingSheet({
             <Input label="Email" name="newCustomerEmail" type="email" value={newCustomerEmail} onChange={(e) => setNewCustomerEmail(e.target.value)} />
             <Input label="CPF" name="newCustomerCpf" value={newCustomerCpf} onChange={(e) => setNewCustomerCpf(e.target.value)} />
             <Input label="Telefone" name="newCustomerPhone" value={newCustomerPhone} onChange={(e) => setNewCustomerPhone(e.target.value)} />
-            <div className="grid grid-cols-2 gap-3">
-              <CepInput label="CEP" value={zipCode} onChange={setZipCode} onAddressFetched={(addr) => {
-                setStreet(addr.street || "")
-                setNeighborhood(addr.neighborhood || "")
-                setCity(addr.city || "")
-                setState(addr.state || "")
-              }} />
-              <Input label="Endereço" name="newCustomerStreet" value={street} onChange={(e) => setStreet(e.target.value)} />
-              <Input label="Número" name="newCustomerNumber" value={number} onChange={(e) => setNumber(e.target.value)} />
-              <Input label="Complemento" name="newCustomerComplement" value={complement} onChange={(e) => setComplement(e.target.value)} />
-              <Input label="Bairro" name="newCustomerNeighborhood" value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} />
-              <Input label="Cidade" name="newCustomerCity" value={city} onChange={(e) => setCity(e.target.value)} />
-              <Input label="UF" name="newCustomerState" value={state} onChange={(e) => setState(e.target.value)} />
-            </div>
             <Button className="w-full" onClick={handleCreateCustomer} isLoading={isCreatingCustomer}>
               Cadastrar cliente
             </Button>
           </div>
         )}
 
-        <div className="rounded-xl border border-brand-border p-3">
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Nome" name="shippingCustomerName" value={customerDetails?.name || ""} readOnly />
-            <Input label="Email" name="shippingCustomerEmail" value={customerDetails?.email || ""} readOnly />
-            <Input label="CPF" name="shippingCustomerCpf" value={customerDetails?.cpf || ""} readOnly />
+        {hasSelectedCustomer && !hasSelectedCustomerAddress && (
+          <div className="rounded-xl border border-brand-border p-4">
+            <p className="text-sm text-brand-inactive-text">
+              O cliente selecionado ainda não possui endereço de entrega.
+            </p>
+            <Button className="mt-3 w-full" onClick={() => setIsAddressSheetOpen(true)}>
+              Adicionar endereço
+            </Button>
           </div>
+        )}
+
+        {showCustomerDetailsBlock && (
           <CustomerCard
             customer={{ name: customerDetails?.name || "", email: customerDetails?.email || "", phone: customerDetails?.phone || "" }}
             address={customerDetails?.address || null}
-            showMap={false}
-            className="mt-3 border-0 shadow-none"
+            showMap
+            className="border-brand-border"
           />
-          {!customerDetails?.address?.street && (
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <CepInput label="CEP" value={zipCode} onChange={setZipCode} onAddressFetched={(addr) => {
-                setStreet(addr.street || "")
-                setNeighborhood(addr.neighborhood || "")
-                setCity(addr.city || "")
-                setState(addr.state || "")
-              }} />
-              <Input label="Endereço" name="shippingStreet" value={street} onChange={(e) => setStreet(e.target.value)} />
-              <Input label="Número" name="shippingNumber" value={number} onChange={(e) => setNumber(e.target.value)} />
-              <Input label="Complemento" name="shippingComplement" value={complement} onChange={(e) => setComplement(e.target.value)} />
-              <Input label="Bairro" name="shippingNeighborhood" value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} />
-              <Input label="Cidade" name="shippingCity" value={city} onChange={(e) => setCity(e.target.value)} />
-              <Input label="UF" name="shippingState" value={state} onChange={(e) => setState(e.target.value)} />
-            </div>
-          )}
-        </div>
+        )}
 
-        <Input
-          label="Envio personalizado"
-          name="customShippingFee"
-          type="number"
-          value={shippingFree ? 0 : shippingInput}
-          onChange={(e) => setShippingInput(e.target.value)}
-          prefix={<span>R$</span>}
-          suffix={(
-            <label className="flex items-center gap-1 text-xs text-brand-dark">
-              <Checkbox checked={shippingFree} onChange={() => setShippingFree((prev) => !prev)} name="shippingFree" />
-              Sem custo
-            </label>
-          )}
-          readOnly={shippingFree}
-        />
+        {showShippingInput && (
+          <MoneyInput
+            label="Envio personalizado"
+            name="customShippingFee"
+            value={shippingFree ? 0 : shippingInput}
+            onChange={(value) => setShippingInput(value)}
+            suffix={(
+              <label className="flex items-center gap-1 text-xs text-brand-dark">
+                <Checkbox checked={shippingFree} onChange={() => setShippingFree((prev) => !prev)} name="shippingFree" />
+                Sem custo
+              </label>
+            )}
+            readOnly={shippingFree}
+          />
+        )}
       </div>
 
       <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
@@ -247,8 +251,68 @@ export default function POSShippingSheet({
           <Button variant="outline" className="flex-1" onClick={onClose}>
             Cancelar
           </Button>
-          <Button className="flex-1" onClick={() => onApply({ shippingFee: shippingFeeValue })}>
-            Aplicar envio
+          <Button
+            className="flex-1"
+            onClick={mode === "create" && !hasSelectedCustomer ? handleCreateCustomer : () => onApply({ shippingFee: shippingFeeValue })}
+            isLoading={isCreatingCustomer}
+          >
+            {mode === "create" && !hasSelectedCustomer ? "Cadastrar cliente" : "Aplicar envio"}
+          </Button>
+        </div>
+      </footer>
+    </div>
+  )
+
+  const addressSheetContent = (
+    <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+      <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+        <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Cadastrar Endereço</h2>
+        <Button variant="ghost" onClick={() => setIsAddressSheetOpen(false)} size="icon">
+          <XIcon className="h-5 w-5" />
+        </Button>
+      </header>
+
+      <div className="flex-1 space-y-4 overflow-y-auto p-6">
+        <Input label="Cliente" name="addressCustomerName" value={customerDetails?.name || ""} readOnly />
+        <div className="grid grid-cols-2 gap-3">
+          <CepInput label="CEP" value={zipCode} onChange={setZipCode} onAddressFetched={(addr) => {
+            setStreet(addr.street || "")
+            setNeighborhood(addr.neighborhood || "")
+            setCity(addr.city || "")
+            setState(addr.state || "")
+          }} />
+          <Input label="Endereço" name="shippingStreet" value={street} onChange={(e) => setStreet(e.target.value)} />
+          <Input label="Número" name="shippingNumber" value={number} onChange={(e) => setNumber(e.target.value)} />
+          <Input label="Complemento" name="shippingComplement" value={complement} onChange={(e) => setComplement(e.target.value)} />
+          <Input label="Bairro" name="shippingNeighborhood" value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} />
+          <Input label="Cidade" name="shippingCity" value={city} onChange={(e) => setCity(e.target.value)} />
+          <Input label="UF" name="shippingState" value={state} onChange={(e) => setState(e.target.value)} />
+        </div>
+      </div>
+
+      <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" className="flex-1" onClick={() => setIsAddressSheetOpen(false)}>
+            Cancelar
+          </Button>
+          <Button
+            className="flex-1"
+            isLoading={isSavingAddress}
+            onClick={async () => {
+              if (!customerDetails?.id) return
+              setIsSavingAddress(true)
+              try {
+                await onCreateAddress({
+                  customerId: customerDetails.id,
+                  address: { zipCode, street, number, complement, neighborhood, city, state },
+                })
+                setIsAddressSheetOpen(false)
+              } finally {
+                setIsSavingAddress(false)
+              }
+            }}
+          >
+            Salvar endereço
           </Button>
         </div>
       </footer>
@@ -256,22 +320,44 @@ export default function POSShippingSheet({
   )
 
   if (isMobile) {
-    return <BottomSheet isOpen={isOpen} onClose={onClose}>{content}</BottomSheet>
+    return (
+      <>
+        <BottomSheet isOpen={isOpen} onClose={onClose}>{content}</BottomSheet>
+        <BottomSheet isOpen={isAddressSheetOpen} onClose={() => setIsAddressSheetOpen(false)}>
+          {addressSheetContent}
+        </BottomSheet>
+      </>
+    )
   }
 
   return (
-    <Portal>
-      <div
-        className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-        onClick={onClose}
-      >
+    <>
+      <Portal>
         <div
-          className={`fixed right-4 top-4 bottom-4 w-[520px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
-          onClick={(e) => e.stopPropagation()}
+          className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+          onClick={onClose}
         >
-          {content}
+          <div
+            className={`fixed right-4 top-4 bottom-4 w-[520px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {content}
+          </div>
         </div>
-      </div>
-    </Portal>
+      </Portal>
+      <Portal>
+        <div
+          className={`fixed inset-0 z-[60] bg-black/50 transition-opacity duration-300 ${isAddressSheetOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+          onClick={() => setIsAddressSheetOpen(false)}
+        >
+          <div
+            className={`fixed right-4 top-4 bottom-4 w-[520px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isAddressSheetOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {addressSheetContent}
+          </div>
+        </div>
+      </Portal>
+    </>
   )
 }

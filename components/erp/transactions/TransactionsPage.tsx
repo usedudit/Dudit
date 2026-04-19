@@ -82,7 +82,7 @@ const INITIAL_FILTERS: FilterState = {
     paymentType: [],
 }
 
-const ITEMS_PER_PAGE = 100
+const ITEMS_PER_PAGE = 8
 const SERVER_PAGE_SIZE = 100
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
@@ -158,12 +158,14 @@ export default function TransactionsPage({
     const [settlingGroup, setSettlingGroup] = useState(false)
     const [loadedTransactions, setLoadedTransactions] = useState<ERPTransaction[]>(transactions)
     const [serverPage, setServerPage] = useState(1)
+    const [totalAvailable, setTotalAvailable] = useState(totalCount || transactions.length)
     const observerTarget = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         setLoadedTransactions(transactions)
         setServerPage(1)
         setPage(1)
+        setTotalAvailable(totalCount || transactions.length)
     }, [transactions])
 
     const [loadingMoreTransactions, setLoadingMoreTransactions] = useState(false)
@@ -276,7 +278,7 @@ export default function TransactionsPage({
                 id: `virt-${occ.recurringId}-${occ.occurrenceDate}`,
                 displayId: "",
                 description: occ.description,
-                category: occ.categoryName || "Sem categoria",
+                category: String(occ.categoryName || "").trim() || "-",
                 contactName: occ.contactName || "-",
                 contactType: (occ.contactType || "other") as ERPTransaction["contactType"],
                 dueDate: dateLabel,
@@ -470,7 +472,21 @@ export default function TransactionsPage({
         isDatePeriodFilterActive(filters.datePeriod)
     const hasTransactions = loadedTransactions.length > 0
 
-    const canLoadMoreFromServer = loadedTransactions.length < (totalCount || 0)
+    const canLoadMoreFromServer = loadedTransactions.length < totalAvailable
+
+    const refreshTransactionsNow = useCallback(async () => {
+        const res = await getFinancialTransactionsAction(partnerId, { page: 1, pageSize: SERVER_PAGE_SIZE })
+        if (!res.success) {
+            notifyError(res.error || "Erro ao atualizar transações.")
+            return false
+        }
+        setLoadedTransactions(res.data || [])
+        setServerPage(1)
+        setPage(1)
+        setTotalAvailable(res.totalCount || (res.data || []).length)
+        router.refresh()
+        return true
+    }, [partnerId, notifyError, router])
 
     const loadMoreTransactions = useCallback(async () => {
         if (loadingMoreTransactions || !canLoadMoreFromServer) return
@@ -492,6 +508,7 @@ export default function TransactionsPage({
                 return merged
             })
             setServerPage(nextPage)
+            setTotalAvailable(res.totalCount || 0)
         } finally {
             setLoadingMoreTransactions(false)
         }
@@ -592,14 +609,14 @@ export default function TransactionsPage({
             } else {
                 notifySuccess("Ocorrência marcada como paga!")
             }
-            debouncedRefresh()
+            void refreshTransactionsNow()
         } catch {
             notifyError("Erro ao marcar como pago")
         } finally {
             setMarkingAsPaid(false)
             setConfirmRecurringPayment(null)
         }
-    }, [partnerId, markingAsPaid, debouncedRefresh, notifySuccess, notifyError, confirmRecurringPayment])
+    }, [partnerId, markingAsPaid, refreshTransactionsNow, notifySuccess, notifyError, confirmRecurringPayment])
 
     const handleSettleInstallmentGroup = useCallback((transaction: ERPTransaction) => {
         if (!transaction.isInstallmentGroup) return
@@ -641,11 +658,11 @@ export default function TransactionsPage({
             setConfirmSettleGroup(null)
             setOpenInstallmentGroupId(null)
             setInstallmentDetail(null)
-            debouncedRefresh()
+            void refreshTransactionsNow()
         } finally {
             setSettlingGroup(false)
         }
-    }, [confirmSettleGroup, settlingGroup, partnerId, notifyError, notifySuccess, debouncedRefresh, settlePaymentsByInstallment])
+    }, [confirmSettleGroup, settlingGroup, partnerId, notifyError, notifySuccess, refreshTransactionsNow, settlePaymentsByInstallment])
 
     const handleOpenTransactionDetail = useCallback(
         (transaction: ERPTransaction) => {
@@ -742,7 +759,7 @@ export default function TransactionsPage({
             notifySuccess(res.data.fullyPaid ? "Parcela quitada com sucesso." : "Pagamento parcial registrado.")
             setPaymentModalOpen(false)
             setSelectedInstallmentForPayment(null)
-            debouncedRefresh()
+            void refreshTransactionsNow()
         } finally {
             setPayingInstallment(false)
         }
@@ -756,7 +773,7 @@ export default function TransactionsPage({
         paymentMethodId,
         notifyError,
         notifySuccess,
-        debouncedRefresh,
+        refreshTransactionsNow,
     ])
 
     if (viewingTransactionId) {
@@ -806,7 +823,7 @@ export default function TransactionsPage({
                         setShowCreateTransaction(false)
                         setEditingTransaction(null)
                         setEditingRecurringTemplateId(null)
-                        debouncedRefresh()
+                        void refreshTransactionsNow()
                     }}
                 />
             </motion.div>

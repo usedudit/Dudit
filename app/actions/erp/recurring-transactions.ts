@@ -534,8 +534,8 @@ export async function generateRecurringOccurrencesAction(partnerId: string) {
         : toYmdFromTs(row.occurrence_date)
 
       const categoryName = row.category_id
-        ? (catById.get(String(row.category_id)) || "Sem categoria")
-        : "Sem categoria"
+        ? (catById.get(String(row.category_id)) || "-")
+        : "-"
 
       let contactName = "-"
       if (row.customer_id) {
