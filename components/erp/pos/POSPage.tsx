@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { TrashIcon, ChevronRightIcon, XIcon, SalesIcon } from "@/lib/icons"
+import { TrashIcon, ChevronRightIcon, XIcon, SalesIcon, MoneyIcon, TagIcon, FileIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input, IconPlaceholder } from "@/components/reusable"
@@ -13,18 +13,24 @@ import { useNotification } from "@/hooks/use-notification"
 import {
   deletePreSaleDraftAction,
   finalizePreSaleAction,
+  getPOSCustomerDetailsAction,
+  createPOSCustomerQuickAction,
+  createPOSQuickProductAction,
   upsertPreSaleDraftAction,
 } from "@/app/actions/erp/pos"
 import { openCashSessionAction } from "@/app/actions/erp/cash-register"
 import { getTeamMembers } from "@/app/actions/erp/team"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import SelectSellerSheet from "@/components/erp/pos/SelectSellerSheet"
+import SelectCouponSheet from "@/components/erp/pos/SelectCouponSheet"
 import PaymentModal from "@/components/erp/orders/PaymentModal"
 import POSCartItemCard from "@/components/erp/pos/POSCartItemCard"
 import { POSMorePreSalesCard, POSPreSaleCard } from "@/components/erp/pos/POSPreSaleCard"
 import POSCashClosedView from "@/components/erp/pos/POSCashClosedView"
 import POSHeader from "@/components/erp/pos/POSHeader"
 import POSDesktopOrderPanel, { POSOrderSummaryContent } from "@/components/erp/pos/POSOrderSummaryCard"
+import POSQuickProductSheet from "@/components/erp/pos/POSQuickProductSheet"
+import POSShippingSheet from "@/components/erp/pos/POSShippingSheet"
 import type {
   PDVCartItem as CartItem,
   PDVCustomer as Customer,
@@ -95,8 +101,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   const { success: notifySuccess, error: notifyError } = useNotification()
   const isMobile = useMediaQuery("(max-width: 1024px)")
 
-  const products = initialData.products || []
-  const customers = initialData.customers || []
+  const [products, setProducts] = useState<Product[]>(initialData.products || [])
+  const [customers, setCustomers] = useState<Customer[]>(initialData.customers || [])
   const accounts = initialData.financeAccounts || []
   const paymentMethods = initialData.paymentMethods || []
   const [preSales, setPreSales] = useState<PreSale[]>(initialData.preSales || [])
@@ -113,7 +119,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     [accounts]
   )
   const [discountAmount, setDiscountAmount] = useState(0)
-  const [discountType, setDiscountType] = useState<"fixed" | "percentage">("fixed")
+  const [discountType, setDiscountType] = useState<"fixed" | "percentage" | "coupon">("fixed")
+  const [discountCouponCode, setDiscountCouponCode] = useState("")
   const [shippingFee, setShippingFee] = useState(0)
   const [otherCosts] = useState(0)
   const [notes, setNotes] = useState("")
@@ -139,11 +146,32 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   const [isOpeningCash, setIsOpeningCash] = useState(false)
   const [editQty, setEditQty] = useState(1)
   const [editPrice, setEditPrice] = useState(0)
-  const [editDiscount, setEditDiscount] = useState(0)
-  const [editDiscountType, setEditDiscountType] = useState<"fixed" | "percentage">("fixed")
   const [isGlobalDiscountModalOpen, setIsGlobalDiscountModalOpen] = useState(false)
   const [globalDiscountValue, setGlobalDiscountValue] = useState(0)
-  const [globalDiscountType, setGlobalDiscountType] = useState<"fixed" | "percentage">("fixed")
+  const [globalDiscountType, setGlobalDiscountType] = useState<"fixed" | "percentage" | "coupon">("fixed")
+  const [globalDiscountCouponCode, setGlobalDiscountCouponCode] = useState("")
+  const [isCouponSheetOpen, setIsCouponSheetOpen] = useState(false)
+  const [isQuickProductSheetOpen, setIsQuickProductSheetOpen] = useState(false)
+  const [isShippingSheetOpen, setIsShippingSheetOpen] = useState(false)
+  const [isCreatingQuickProduct, setIsCreatingQuickProduct] = useState(false)
+  const [isCreatingQuickCustomer, setIsCreatingQuickCustomer] = useState(false)
+  const [shippingCustomerDetails, setShippingCustomerDetails] = useState<{
+    id: string
+    name: string
+    email?: string | null
+    phone?: string | null
+    cpf?: string | null
+    address?: {
+      zipCode?: string
+      street?: string
+      number?: string
+      complement?: string
+      neighborhood?: string
+      city?: string
+      state?: string
+      country?: string
+    } | null
+  } | null>(null)
   const [isUserDraftSaveUi, setIsUserDraftSaveUi] = useState(false)
 
   const isXL = useMediaQuery("(min-width: 1280px)")
@@ -200,6 +228,9 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     if (discountType === "percentage") {
       return (subtotal * discountAmount) / 100
     }
+    if (discountType === "coupon") {
+      return 0
+    }
     return discountAmount
   }, [subtotal, discountAmount, discountType])
   const total = useMemo(() => Math.max(0, subtotal - discountVal + shippingFee + otherCosts), [subtotal, discountVal, shippingFee, otherCosts])
@@ -217,6 +248,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     [cart]
   )
   const hasNotes = notes.trim().length > 0
+  const percentagePresets = [5, 10, 15, 20]
 
   const getPaymentMethodId = useCallback((methodLabel?: string | null) => {
     const normalizedLabel = normalizePDVSearchTerm(methodLabel)
@@ -300,6 +332,33 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     })
   }, [notifyError])
 
+  const handleCreateQuickProduct = useCallback(async (payload: {
+    name: string
+    price: number
+    stockQuantity: number
+  }) => {
+    setIsCreatingQuickProduct(true)
+    try {
+      const result = await createPOSQuickProductAction({
+        partnerId,
+        name: payload.name,
+        price: payload.price,
+        stockQuantity: payload.stockQuantity,
+      })
+      if (!result.success || !result.data) {
+        notifyError(result.error || "Não foi possível criar o produto.")
+        return
+      }
+      const createdProduct = result.data as Product
+      setProducts((prev) => [createdProduct, ...prev])
+      addToCart(createdProduct)
+      setIsQuickProductSheetOpen(false)
+      notifySuccess("Produto criado e adicionado ao carrinho.")
+    } finally {
+      setIsCreatingQuickProduct(false)
+    }
+  }, [partnerId, notifyError, notifySuccess, addToCart])
+
   const changeQty = useCallback((itemId: string, delta: number) => {
     setCart((prev) => prev
       .map((item) => {
@@ -378,7 +437,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     if (cart.length === 0) return
     setIsUserDraftSaveUi(true)
     try {
-      await persistDraft({ notifyOnSuccess: true })
+      const savedId = await persistDraft({ notifyOnSuccess: true })
+      if (savedId) clearCurrentOrder()
     } finally {
       setIsUserDraftSaveUi(false)
     }
@@ -403,18 +463,15 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   const loadPreSale = useCallback((preSale: PreSale) => {
     const items = (Array.isArray(preSale.items) ? preSale.items : []).map((item: any) => {
       const unit = Number((item.unit_price ?? item.price) || 0)
-      const listU = Number((item.list_unit_price ?? item.listUnitPrice) || 0) || unit
-      const ldType = item.line_discount_type ?? item.lineDiscountType
-      const ldVal = item.line_discount_value ?? item.lineDiscountValue
       return {
         id: crypto.randomUUID(),
         productId: item.product_id ?? item.productId ?? null,
         variantId: item.variant_id ?? item.variantId ?? null,
         variantName: item.variant_name || item.variantName || null,
         name: item.name,
-        listUnitPrice: listU,
-        lineDiscountType: ldType === "percentage" || ldType === "fixed" ? ldType : null,
-        lineDiscountValue: ldVal != null && Number.isFinite(Number(ldVal)) ? Number(ldVal) : null,
+        listUnitPrice: unit,
+        lineDiscountType: null,
+        lineDiscountValue: null,
         price: unit,
         qty: Number((item.quantity ?? item.qty) || 0),
         image: item.image || null,
@@ -425,6 +482,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     setSelectedCustomerId(preSale.customer_id || undefined)
     setDiscountAmount(Number(preSale.discount_amount || 0))
     setDiscountType("fixed")
+    setDiscountCouponCode("")
     setNotes(preSale.notes || "")
     setShippingFee(Number(preSale.shipping_fee || 0))
     setCart(items)
@@ -435,6 +493,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     setSelectedCustomerId(undefined)
     setDiscountAmount(0)
     setDiscountType("fixed")
+    setDiscountCouponCode("")
     setNotes("")
     setShippingFee(0)
     setCart([])
@@ -520,36 +579,17 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     setEditQty(editingItem.qty)
     const list = editingItem.listUnitPrice ?? editingItem.price
     setEditPrice(list)
-    if (
-      editingItem.lineDiscountValue != null
-      && editingItem.lineDiscountValue > 0
-      && (editingItem.lineDiscountType === "fixed" || editingItem.lineDiscountType === "percentage")
-    ) {
-      setEditDiscountType(editingItem.lineDiscountType)
-      setEditDiscount(editingItem.lineDiscountValue)
-    } else {
-      setEditDiscount(0)
-      setEditDiscountType("fixed")
-    }
   }, [editingItem])
 
   useEffect(() => {
     if (!isGlobalDiscountModalOpen) return
     setGlobalDiscountValue(discountAmount)
     setGlobalDiscountType(discountType)
-  }, [isGlobalDiscountModalOpen, discountAmount, discountType])
+    setGlobalDiscountCouponCode(discountCouponCode)
+  }, [isGlobalDiscountModalOpen, discountAmount, discountType, discountCouponCode])
 
   const saveEditedItem = () => {
     if (!editingItem) return
-
-    let finalUnitPrice = editPrice
-    if (editDiscount > 0) {
-      if (editDiscountType === "fixed") {
-        finalUnitPrice = Math.max(0, editPrice - editDiscount)
-      } else {
-        finalUnitPrice = Math.max(0, editPrice * (1 - editDiscount / 100))
-      }
-    }
 
     const product = products.find((p) => p.id === editingItem.productId)
     const variant = editingItem.variantId
@@ -562,19 +602,14 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       return
     }
 
-    const listUnitPrice = editPrice
-    const hasLineDisc = editDiscount > 0
-    const lineDiscountType = hasLineDisc ? editDiscountType : null
-    const lineDiscountValue = hasLineDisc ? editDiscount : null
-
     setCart((prev) => prev.map((item) => (item.id === editingItem.id
       ? {
           ...item,
           qty: editQty,
-          price: finalUnitPrice,
-          listUnitPrice,
-          lineDiscountType,
-          lineDiscountValue,
+          price: editPrice,
+          listUnitPrice: editPrice,
+          lineDiscountType: null,
+          lineDiscountValue: null,
         }
       : item)))
     setEditingItem(null)
@@ -611,10 +646,68 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     }
   }
 
-  const handleShippingPrompt = useCallback(() => {
-    const fee = prompt("Valor do frete:")
-    if (fee) setShippingFee(Number(fee))
-  }, [])
+  const handleOpenShippingSheet = useCallback(async () => {
+    if (selectedCustomerId) {
+      const details = await getPOSCustomerDetailsAction({ partnerId, customerId: selectedCustomerId })
+      if (details.success && details.data) {
+        setShippingCustomerDetails(details.data)
+      }
+    } else {
+      setShippingCustomerDetails(null)
+    }
+    setIsShippingSheetOpen(true)
+  }, [partnerId, selectedCustomerId])
+
+  const handleSelectShippingCustomer = useCallback(async (customerId: string) => {
+    const details = await getPOSCustomerDetailsAction({ partnerId, customerId })
+    if (!details.success || !details.data) {
+      notifyError(details.error || "Não foi possível carregar o cliente.")
+      return
+    }
+    setSelectedCustomerId(customerId)
+    setShippingCustomerDetails(details.data)
+  }, [partnerId, notifyError])
+
+  const handleCreateQuickCustomerForShipping = useCallback(async (payload: {
+    name: string
+    email: string
+    phone: string
+    cpf: string
+    address: {
+      zipCode: string
+      street: string
+      number: string
+      complement: string
+      neighborhood: string
+      city: string
+      state: string
+    }
+  }) => {
+    setIsCreatingQuickCustomer(true)
+    try {
+      const result = await createPOSCustomerQuickAction({
+        partnerId,
+        ...payload,
+      })
+      if (!result.success || !result.data) {
+        notifyError(result.error || "Não foi possível cadastrar o cliente.")
+        return
+      }
+      const createdCustomer = {
+        id: result.data.id,
+        name: result.data.name,
+        email: result.data.email,
+        phone: result.data.phone,
+        cpf: result.data.cpf,
+      } as Customer
+      setCustomers((prev) => [createdCustomer, ...prev.filter((item) => item.id !== createdCustomer.id)])
+      setSelectedCustomerId(createdCustomer.id)
+      setShippingCustomerDetails(result.data)
+      notifySuccess("Cliente cadastrado e vinculado ao pedido.")
+    } finally {
+      setIsCreatingQuickCustomer(false)
+    }
+  }, [partnerId, notifyError, notifySuccess])
 
   const handleOpenNotesSheet = useCallback(() => {
     setIsMobileSummarySheetOpen(false)
@@ -777,7 +870,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
               onOpenDiscount={() => setIsGlobalDiscountModalOpen(true)}
               onContinue={handleOpenPaymentModal}
               onSaveDraft={saveDraftFromMenu}
-              onAddShipping={handleShippingPrompt}
+              onAddShipping={handleOpenShippingSheet}
+              onOpenCreateProduct={() => setIsQuickProductSheetOpen(true)}
               onOpenNotes={handleOpenNotesSheet}
               showItemsShortcut={false}
               showActionsMenu={cart.length > 0}
@@ -861,7 +955,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             onOpenDiscount={() => setIsGlobalDiscountModalOpen(true)}
             onContinue={handleOpenPaymentModal}
             onSaveDraft={saveDraftFromMenu}
-            onAddShipping={handleShippingPrompt}
+            onAddShipping={handleOpenShippingSheet}
+            onOpenCreateProduct={() => setIsQuickProductSheetOpen(true)}
             onOpenNotes={handleOpenNotesSheet}
             showActionsMenu={cart.length > 0}
           />
@@ -1048,49 +1143,19 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 value={editQty}
                 onChange={(e: any) => setEditQty(Number(e.target.value))}
               />
-              <div className="space-y-4">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-brand-dark dark:text-dark-heading">Tipo de desconto</label>
-                  <select
-                    value={editDiscountType}
-                    onChange={(e) => setEditDiscountType(e.target.value as "fixed" | "percentage")}
-                    className="h-[42px] w-full rounded-lg border border-brand-border bg-brand-gray px-4 text-sm text-brand-dark focus:border-brand-dark focus:bg-white focus:outline-none dark:border-dark-border dark:bg-dark-border/30 dark:text-dark-heading dark:focus:bg-dark-surface"
-                  >
-                    <option value="fixed">Dinheiro</option>
-                    <option value="percentage">Porcentagem</option>
-                  </select>
-                </div>
-                {editDiscountType === "fixed" ? (
-                  <MoneyInput
-                    label="Desconto"
-                    value={editDiscount}
-                    onChange={(value: number) => setEditDiscount(value)}
-                  />
-                ) : (
-                  <PercentageInput
-                    label="Desconto"
-                    value={editDiscount}
-                    onChange={(value: number) => setEditDiscount(value)}
-                  />
-                )}
-              </div>
+              <Input
+                label="Sub total"
+                readOnly
+                value={formatCurrency(editPrice * editQty)}
+                className="flex-1 w-full"
+              />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-1">
               <MoneyInput
                 label="Valor unitário"
                 value={editPrice}
                 onChange={(value: number) => setEditPrice(value)}
-              />
-              <Input
-                label="Sub total"
-                readOnly
-                value={formatCurrency(
-                  (editDiscountType === "fixed"
-                    ? Math.max(0, editPrice - editDiscount)
-                    : Math.max(0, editPrice * (1 - editDiscount / 100))) * editQty
-                )}
-                className="flex-1 w-full"
               />
             </div>
           </div>
@@ -1108,7 +1173,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             </Button>
             <Button className="flex-1" onClick={() => {
               setDiscountType(globalDiscountType)
-              setDiscountAmount(globalDiscountValue)
+              setDiscountAmount(globalDiscountType === "coupon" ? 0 : globalDiscountValue)
+              setDiscountCouponCode(globalDiscountType === "coupon" ? globalDiscountCouponCode : "")
               setIsGlobalDiscountModalOpen(false)
             }}>
               Aplicar
@@ -1118,79 +1184,137 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       >
         <div className="space-y-6 pt-2">
           <InfoCard color="green" title="Valor total de itens" message={formatCurrency(subtotal)} />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-brand-dark dark:text-dark-heading">Tipo de desconto</label>
-              <select
-                value={globalDiscountType}
-                onChange={(e) => setGlobalDiscountType(e.target.value as "fixed" | "percentage")}
-                className="h-[42px] w-full rounded-lg border border-brand-border bg-brand-gray px-4 text-sm text-brand-dark focus:border-brand-dark focus:bg-white focus:outline-none dark:border-dark-border dark:bg-dark-border/30 dark:text-dark-heading dark:focus:bg-dark-surface"
-              >
-                <option value="fixed">Dinheiro</option>
-                <option value="percentage">Porcentagem</option>
-              </select>
-            </div>
-            {globalDiscountType === "fixed" ? (
-              <MoneyInput
-                label="Desconto do pedido"
-                value={globalDiscountValue}
-                onChange={(value: number) => setGlobalDiscountValue(value)}
-              />
-            ) : (
-              <PercentageInput
-                label="Desconto do pedido"
-                value={globalDiscountValue}
-                onChange={(value: number) => setGlobalDiscountValue(value)}
-              />
-            )}
+          <div className="grid grid-cols-3 gap-3">
+            <button
+              type="button"
+              onClick={() => setGlobalDiscountType("percentage")}
+              className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${globalDiscountType === "percentage"
+                ? "border-brand-primary bg-brand-primary/10 text-brand-primary"
+                : "border-brand-border bg-brand-gray text-brand-dark hover:border-brand-primary/50"}`}
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-current/20">
+                <TagIcon size={16} />
+              </div>
+              <span className="font-bold">Porcentagem</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setGlobalDiscountType("fixed")}
+              className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${globalDiscountType === "fixed"
+                ? "border-brand-primary bg-brand-primary/10 text-brand-primary"
+                : "border-brand-border bg-brand-gray text-brand-dark hover:border-brand-primary/50"}`}
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-current/20">
+                <MoneyIcon size={16} />
+              </div>
+              <span className="font-bold">Valor fixo</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setGlobalDiscountType("coupon")}
+              className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${globalDiscountType === "coupon"
+                ? "border-brand-primary bg-brand-primary/10 text-brand-primary"
+                : "border-brand-border bg-brand-gray text-brand-dark hover:border-brand-primary/50"}`}
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-current/20">
+                <FileIcon size={16} />
+              </div>
+              <span className="font-bold">Cupom</span>
+            </button>
           </div>
+          {globalDiscountType === "fixed" && (
+            <MoneyInput
+              label="Desconto do pedido"
+              value={globalDiscountValue}
+              onChange={(value: number) => setGlobalDiscountValue(value)}
+            />
+          )}
+          {globalDiscountType === "percentage" && (
+            <div className="space-y-3">
+              <PercentageInput
+                label="Porcentagem a ser aplicada"
+                value={globalDiscountValue}
+                onChange={(value: number) => setGlobalDiscountValue(value)}
+              />
+              <div className="flex flex-wrap gap-3">
+                {percentagePresets.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setGlobalDiscountValue(preset)}
+                    className="h-12 min-w-[72px] rounded-xl border border-transparent bg-gray-100 px-5 text-sm font-bold text-brand-dark transition-colors hover:border-brand-border hover:bg-gray-200 dark:bg-dark-border/30 dark:text-dark-heading dark:hover:bg-dark-border/50"
+                  >
+                    {preset}%
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {globalDiscountType === "coupon" && (
+            <div className="space-y-1">
+              <Input
+                label="Cupom"
+                name="globalDiscountCouponCode"
+                placeholder="Digite o cupom"
+                value={globalDiscountCouponCode}
+                onChange={(e: any) => setGlobalDiscountCouponCode(e.target.value)}
+              />
+              <Button
+                variant="link"
+                className="h-auto px-0 text-brand-primary"
+                onClick={() => setIsCouponSheetOpen(true)}
+              >
+                Ver cupons cadastrados
+              </Button>
+            </div>
+          )}
         </div>
       </DefaultModal>
 
-      {isNotesSheetOpen && (
-        isMobile ? (
-          <BottomSheet isOpen={isNotesSheetOpen} onClose={() => setIsNotesSheetOpen(false)} title="Adicionar Observação">
-            <div className="space-y-4 pt-2">
-              <textarea
-                className="h-32 w-full resize-none rounded-xl border border-brand-border bg-[#F5F6F7] p-4 text-brand-dark focus:border-brand-primary focus:outline-none dark:border-dark-border dark:bg-dark-gray dark:text-dark-text"
-                placeholder="Digite alguma observação que sairá no pedido..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-              <div className="flex items-center gap-3">
-                <Button variant="outline" className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
-                  Confirmar
-                </Button>
-              </div>
+      {isMobile && (
+        <BottomSheet isOpen={isNotesSheetOpen} onClose={() => setIsNotesSheetOpen(false)} title="Adicionar Observação">
+          <div className="space-y-4 pt-2">
+            <textarea
+              className="h-32 w-full resize-none rounded-xl border border-brand-border bg-[#F5F6F7] p-4 text-brand-dark focus:border-brand-primary focus:outline-none dark:border-dark-border dark:bg-dark-gray dark:text-dark-text"
+              placeholder="Digite alguma observação que sairá no pedido..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+            <div className="flex items-center gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
+                Cancelar
+              </Button>
+              <Button className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
+                Confirmar
+              </Button>
             </div>
-          </BottomSheet>
-        ) : (
-          <DesktopPOSSheet
-            isOpen={isNotesSheetOpen}
-            onClose={() => setIsNotesSheetOpen(false)}
-            title="Adicionar Observação"
-          >
-            <div className="flex h-full flex-col p-6">
-              <textarea
-                className="h-40 w-full resize-none rounded-xl border border-brand-border bg-[#F5F6F7] p-4 text-brand-dark focus:border-brand-primary focus:outline-none dark:border-dark-border dark:bg-dark-gray dark:text-dark-text"
-                placeholder="Digite alguma observação que sairá no pedido..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-              <div className="mt-4 flex items-center gap-3 border-t border-brand-border pt-4 dark:border-dark-border">
-                <Button variant="outline" className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
-                  Confirmar
-                </Button>
-              </div>
+          </div>
+        </BottomSheet>
+      )}
+
+      {!isMobile && (
+        <DesktopPOSSheet
+          isOpen={isNotesSheetOpen}
+          onClose={() => setIsNotesSheetOpen(false)}
+          title="Adicionar Observação"
+        >
+          <div className="flex h-full flex-col p-6">
+            <textarea
+              className="h-40 w-full resize-none rounded-xl border border-brand-border bg-[#F5F6F7] p-4 text-brand-dark focus:border-brand-primary focus:outline-none dark:border-dark-border dark:bg-dark-gray dark:text-dark-text"
+              placeholder="Digite alguma observação que sairá no pedido..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+            <div className="mt-4 flex items-center gap-3 border-t border-brand-border pt-4 dark:border-dark-border">
+              <Button variant="outline" className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
+                Cancelar
+              </Button>
+              <Button className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
+                Confirmar
+              </Button>
             </div>
-          </DesktopPOSSheet>
-        )
+          </div>
+        </DesktopPOSSheet>
       )}
 
       <SelectCustomerSheet
@@ -1210,6 +1334,39 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
           setSelectedSellerId(seller.id)
           setIsSelectSellerOpen(false)
         }}
+      />
+
+      <SelectCouponSheet
+        isOpen={isCouponSheetOpen}
+        onClose={() => setIsCouponSheetOpen(false)}
+        onSelect={(coupon) => {
+          setGlobalDiscountType("coupon")
+          setGlobalDiscountCouponCode(coupon?.code || "")
+          setIsCouponSheetOpen(false)
+        }}
+      />
+
+      <POSQuickProductSheet
+        isOpen={isQuickProductSheetOpen}
+        onClose={() => setIsQuickProductSheetOpen(false)}
+        onCreate={handleCreateQuickProduct}
+        isCreating={isCreatingQuickProduct}
+      />
+
+      <POSShippingSheet
+        isOpen={isShippingSheetOpen}
+        onClose={() => setIsShippingSheetOpen(false)}
+        customers={customers}
+        selectedCustomerId={selectedCustomerId}
+        customerDetails={shippingCustomerDetails}
+        currentShippingFee={shippingFee}
+        onSelectCustomer={handleSelectShippingCustomer}
+        onCreateCustomer={handleCreateQuickCustomerForShipping}
+        onApply={({ shippingFee: fee }) => {
+          setShippingFee(Math.max(0, Number(fee || 0)))
+          setIsShippingSheetOpen(false)
+        }}
+        isCreatingCustomer={isCreatingQuickCustomer}
       />
 
       <DefaultModal

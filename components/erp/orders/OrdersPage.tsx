@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useUserProfile } from "@/hooks/use-user-profile"
 
 // Components
-import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Badge, Input } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Badge, Input, InfoCard } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import OrderListItem from "./OrderListItem"
@@ -42,6 +42,7 @@ import {
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import AlertModal from "../../reusable/AlertModal"
 import DefaultModal from "@/components/reusable/DefaultModal"
+import { DropdownItem } from "@/components/reusable/Dropdown"
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import { deleteOrdersInBatchAction, updateOrdersStatusInBatchAction } from "@/app/actions/erp/orders"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
@@ -125,6 +126,8 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
     const [wrapperMode, setWrapperMode] = useState<'create' | 'edit' | 'view' | null>(null)
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
+    const [deliveryStatusModal, setDeliveryStatusModal] = useState<{ open: boolean; order: Order | null }>({ open: false, order: null })
+    const [deliveryStatusValue, setDeliveryStatusValue] = useState("not_sent")
 
     const queryClient = useQueryClient()
 
@@ -177,7 +180,7 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                 title: "Canal",
                 type: "checkbox-list",
                 options: Array.from(
-                    new Set(effectiveOrders?.map((o: any) => o.order_source || "Venda Direta") || []),
+                    new Set(effectiveOrders?.map((o: any) => o.order_source || "Manual") || []),
                 ) as string[],
             },
         ],
@@ -219,11 +222,11 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                     statusColor: statusInfo.color,
                     deliveryStatusLabel: deliveryInfo.label,
                     deliveryStatusColor: deliveryInfo.variant,
-                    isUnfulfilled: (o.situation === "pending" || o.situation === "in_process"),
+                    isUnfulfilled: false,
                     formattedDate: formatDate(o.order_date || o.created_at),
                     formattedTime: formatTime(o.order_date || o.created_at),
                     store_name: o.stores?.name || "-",
-                    order_source: o.order_source || "Venda Direta",
+                    order_source: o.order_source || "Manual",
                     items_count: o.order_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || o.quantity || 0,
                     created_at_time: new Date(o.order_date || o.created_at).getTime(),
                     situation: o.situation,
@@ -306,6 +309,44 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
     const handleDetailsOrder = (order: Order) => {
         setSelectedOrderId(order.originalId)
         setWrapperMode('view')
+    }
+    const openDeliveryStatusModal = (order: Order) => {
+        setDeliveryStatusModal({ open: true, order })
+        setDeliveryStatusValue(
+            order.deliveryStatusLabel === "Não enviado" ? "not_sent"
+                : order.deliveryStatusLabel === "Preparando" ? "preparing"
+                    : order.deliveryStatusLabel === "Enviado" ? "sent"
+                        : order.deliveryStatusLabel === "Entregue" ? "delivered"
+                            : order.deliveryStatusLabel === "Disponível para retirada" ? "pickup_available"
+                                : order.deliveryStatusLabel === "Entrega não realizada" ? "delivery_failed"
+                                    : "not_sent"
+        )
+    }
+    const submitDeliveryStatusChange = async () => {
+        const targetOrder = deliveryStatusModal.order
+        if (!targetOrder) return
+        setActionModal({ open: true, text: "Atualizando status de entrega..." })
+        try {
+            const result = await updateOrdersStatusInBatchAction({
+                orderIds: [targetOrder.originalId],
+                partnerId,
+                actionType: "delivery_status",
+                statusValue: deliveryStatusValue,
+            })
+            if (result.success) {
+                await queryClient.invalidateQueries({ queryKey: ['erp', 'orders', partnerId] })
+                await queryClient.refetchQueries({ queryKey: ['erp', 'orders', partnerId], type: 'active' })
+                toast({ title: "Sucesso", description: "Status de entrega atualizado." })
+                setDeliveryStatusModal({ open: false, order: null })
+            } else {
+                toast({ title: "Erro", description: result.error, variant: "destructive" })
+            }
+        } catch (error) {
+            console.error(error)
+            toast({ title: "Erro", description: "Falha ao atualizar status de entrega.", variant: "destructive" })
+        } finally {
+            setActionModal({ open: false, text: "" })
+        }
     }
     const handleSelectRow = (id: string) => {
         setSelection((p) => {
@@ -415,7 +456,8 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
             }
 
             if (result.success) {
-                queryClient.invalidateQueries({ queryKey: ['erp', 'orders', partnerId] })
+                await queryClient.invalidateQueries({ queryKey: ['erp', 'orders', partnerId] })
+                await queryClient.refetchQueries({ queryKey: ['erp', 'orders', partnerId], type: 'active' })
                 if (!singleCancelId) setSelection({ ids: new Set() })
                 toast({
                     title: "Sucesso",
@@ -425,6 +467,9 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                             ? "Pedidos reabertos"
                             : "Pedidos cancelados"
                 })
+                if ((result as any).warning) {
+                    toast({ title: "Atenção", description: (result as any).warning, variant: "destructive" })
+                }
             } else {
                 toast({ title: "Erro", description: result.error, variant: "destructive" })
             }
@@ -481,6 +526,31 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                             onEditOrder={(order: any) => {
                                 setSelectedOrderId(order.id)
                                 setWrapperMode('edit')
+                            }}
+                            onUpdateDeliveryStatus={(order: any) => {
+                                openDeliveryStatusModal({
+                                    originalId: order.id,
+                                    displayId: order.order_number || `#${String(order.id).substring(0, 8)}`,
+                                    customer_name: order.customer_name || "Cliente Balcão",
+                                    customer_id: order.buyer_id || "-",
+                                    total_amount: Number(order.total_amount || 0),
+                                    statusLabel: "",
+                                    statusColor: "gray",
+                                    deliveryStatusLabel: getDeliveryStatusMeta(order.delivery_status).label,
+                                    deliveryStatusColor: getDeliveryStatusMeta(order.delivery_status).variant,
+                                    isUnfulfilled: false,
+                                    formattedDate: "",
+                                    formattedTime: "",
+                                    store_name: "",
+                                    order_source: order.order_source || "Manual",
+                                    items_count: Number(order.order_items?.length || 0),
+                                    created_at_time: new Date(order.created_at || Date.now()).getTime(),
+                                    situation: order.situation || "pending",
+                                    previousSituationBeforeCancel: order.previous_situation_before_cancel || null,
+                                    canEdit: !order.is_pos_sale && order.situation !== "cancelled",
+                                    canReopen: order.situation === "cancelled",
+                                    paidAmount: Number(order.paid_amount || 0),
+                                })
                             }}
                             initialOrder={effectiveOrders?.find((o: any) => o.id === selectedOrderId) || undefined}
                         />
@@ -644,11 +714,6 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                                                             <Badge variant={o.deliveryStatusColor} className="h-5 text-[10px] px-1.5">
                                                                                 {o.deliveryStatusLabel}
                                                                             </Badge>
-                                                                            {o.isUnfulfilled && (
-                                                                                <Badge variant="gray" className="h-5 text-[10px] px-1.5 opacity-70">
-                                                                                    Pendente
-                                                                                </Badge>
-                                                                            )}
                                                                         </>
                                                                     )}
                                                                 </div>
@@ -686,6 +751,11 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                                         canEdit={o.canEdit}
                                                         cancelLabel={o.canReopen ? "Reabrir" : "Cancelar"}
                                                         onCancel={() => o.canReopen ? handleReopenOrder(o.originalId) : openCancelModal(o.originalId)}
+                                                        extraActions={
+                                                            <DropdownItem onClick={() => openDeliveryStatusModal(o)}>
+                                                                Alterar status de entrega
+                                                            </DropdownItem>
+                                                        }
                                                     />
                                                 ))}
                                             </div>
@@ -757,6 +827,11 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                                                     cancelLabel={o.canReopen ? "Reabrir" : "Cancelar"}
                                                                     onCancel={() => o.canReopen ? handleReopenOrder(o.originalId) : openCancelModal(o.originalId)}
                                                                     onDetails={handleDetailsOrder}
+                                                                    extraActions={
+                                                                        <DropdownItem onClick={() => openDeliveryStatusModal(o)}>
+                                                                            Alterar status de entrega
+                                                                        </DropdownItem>
+                                                                    }
                                                                 />
                                                             ))}
                                                         </tbody>
@@ -886,6 +961,42 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                 <div className="flex flex-col items-center justify-center p-6 gap-6 h-full mt-4">
                     <img src="https://img.dudit.com.br/static/mascots/Aguarde.png" alt="Aguarde" className="w-36 h-36 object-contain" />
                     <p className="text-lg font-semibold text-brand-dark dark:text-dark-heading text-center leading-tight">{actionModal.text}</p>
+                </div>
+            </DefaultModal>
+
+            <DefaultModal
+                isOpen={deliveryStatusModal.open}
+                onClose={() => setDeliveryStatusModal({ open: false, order: null })}
+                title="Alterar status de entrega"
+                footer={
+                    <div className="flex justify-end gap-3 w-full">
+                        <Button variant="outline" onClick={() => setDeliveryStatusModal({ open: false, order: null })}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={submitDeliveryStatusChange}>
+                            Salvar
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="flex flex-col gap-4 p-4">
+                    <InfoCard
+                        title="Pedido"
+                        message={deliveryStatusModal.order?.displayId || "-"}
+                        color="gray"
+                    />
+                    <select
+                        value={deliveryStatusValue}
+                        onChange={(e) => setDeliveryStatusValue(e.target.value)}
+                        className="w-full rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 py-2 text-sm"
+                    >
+                        <option value="not_sent">Não enviado</option>
+                        <option value="preparing">Preparando</option>
+                        <option value="sent">Enviado</option>
+                        <option value="delivered">Entregue</option>
+                        <option value="pickup_available">Disponível para retirada</option>
+                        <option value="delivery_failed">Entrega não realizada</option>
+                    </select>
                 </div>
             </DefaultModal>
         </motion.div>

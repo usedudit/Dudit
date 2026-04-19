@@ -104,6 +104,8 @@ DECLARE
   v_breakdown_total NUMERIC := 0;
   v_is_cash BOOLEAN;
   v_sale_number TEXT;
+  v_stock_movement_result JSON;
+  v_stock_movement_id UUID;
 BEGIN
   SELECT * INTO v_draft
     FROM public.pre_sales
@@ -309,14 +311,20 @@ BEGIN
   END LOOP;
 
   IF jsonb_array_length(v_stock_items) > 0 THEN
-    PERFORM public.create_batch_stock_movement(
+    v_stock_movement_result := public.create_batch_stock_movement(
       p_partner_id := p_partner_id,
       p_movement_type := 'out',
-      p_reason := 'Venda PDV',
-      p_notes := 'Baixa de estoque da venda ' || v_sale_id::text,
+      p_reason := 'Venda de Produtos',
+      p_notes := NULLIF(BTRIM(COALESCE(v_draft.notes, '')), ''),
       p_created_by := p_user_id,
       p_items := v_stock_items
     );
+    v_stock_movement_id := NULLIF((v_stock_movement_result->>'id'), '')::uuid;
+    IF v_stock_movement_id IS NOT NULL THEN
+      UPDATE public.stock_movements
+      SET reference_name = 'Pedido #' || v_sale_number
+      WHERE id = v_stock_movement_id;
+    END IF;
   END IF;
 
   IF v_clamped_paid > 0 THEN

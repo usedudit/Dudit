@@ -31,6 +31,7 @@ import { markRecurringOccurrenceAsPaidAction } from "@/app/actions/erp/transacti
 import { getInstallmentGroupDetailsAction } from "@/app/actions/erp/transactions"
 import { recordInstallmentPaymentAction } from "@/app/actions/erp/transactions"
 import { settleInstallmentGroupAction } from "@/app/actions/erp/transactions"
+import { getFinancialTransactionsAction } from "@/app/actions/erp/transactions"
 import { useRouter } from "next/navigation"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import { useNotification } from "@/hooks/use-notification"
@@ -82,6 +83,7 @@ const INITIAL_FILTERS: FilterState = {
 }
 
 const ITEMS_PER_PAGE = 8
+const SERVER_PAGE_SIZE = 50
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
     { id: "transaction", label: "Descrição", align: "left", width: "300px" },
@@ -154,6 +156,12 @@ export default function TransactionsPage({
     const [confirmRecurringPayment, setConfirmRecurringPayment] = useState<ERPTransaction | null>(null)
     const [confirmSettleGroup, setConfirmSettleGroup] = useState<ERPTransaction | null>(null)
     const [settlingGroup, setSettlingGroup] = useState(false)
+    const [loadedTransactions, setLoadedTransactions] = useState<ERPTransaction[]>(transactions)
+    const [serverPage, setServerPage] = useState(1)
+    const [loadingMoreTransactions, setLoadingMoreTransactions] = useState(false)
+    const [settlePaymentsByInstallment, setSettlePaymentsByInstallment] = useState<
+        Record<string, { paymentAmount: string; interestAmount: string; discountAmount: string; paymentMethodId: string }>
+    >({})
     const settleSummary = useMemo(() => {
         if (!confirmSettleGroup) return null
         const rows = installmentDetail?.installments || []
@@ -196,20 +204,20 @@ export default function TransactionsPage({
 
     const paymentTypeOptions = useMemo(() => {
         const s = new Set<string>()
-        for (const t of transactions) {
+        for (const t of loadedTransactions) {
             if (t.paymentType) s.add(t.paymentType)
         }
         for (const o of recurringOccurrences) {
             if (o.paymentDisplay) s.add(o.paymentDisplay)
         }
         return Array.from(s).sort((a, b) => a.localeCompare(b, "pt-BR"))
-    }, [transactions, recurringOccurrences])
+    }, [loadedTransactions, recurringOccurrences])
 
     const statusFilterOptions = useMemo(() => {
-        const s = new Set(transactions.map((item) => item.status))
+        const s = new Set(loadedTransactions.map((item) => item.status))
         if (recurringOccurrences.length > 0) s.add("Pendente")
         return Array.from(s)
-    }, [transactions, recurringOccurrences])
+    }, [loadedTransactions, recurringOccurrences])
 
     const filterSections: FilterSectionConfig[] = useMemo(
         () => [
@@ -238,11 +246,11 @@ export default function TransactionsPage({
                 id: "category",
                 title: "Categoria",
                 type: "checkbox-list",
-                options: Array.from(new Set(transactions.map((item) => item.category))).sort((a, b) => a.localeCompare(b, "pt-BR")),
+                options: Array.from(new Set(loadedTransactions.map((item) => item.category))).sort((a, b) => a.localeCompare(b, "pt-BR")),
             },
             { id: "paymentType", title: "Meio de Pagamento", type: "checkbox-list", options: paymentTypeOptions },
         ],
-        [paymentTypeOptions, statusFilterOptions, transactions, activeTab],
+        [paymentTypeOptions, statusFilterOptions, loadedTransactions, activeTab],
     )
 
     const filteredTransactions = useMemo(() => {
@@ -295,7 +303,7 @@ export default function TransactionsPage({
         })
 
         // Merge real transactions with virtual recurring items
-        const allItems = [...transactions, ...virtualItems]
+        const allItems = [...loadedTransactions, ...virtualItems]
 
         let result = allItems.filter((item) => {
             const matchesSearch =
@@ -333,7 +341,7 @@ export default function TransactionsPage({
 
         const groupedInstallments = new Map<string, ERPTransaction[]>()
         const fullGroupStats = new Map<string, { total: number; paid: number }>()
-        for (const tx of transactions) {
+        for (const tx of loadedTransactions) {
             if (!tx.installmentGroupId) continue
             const key = tx.installmentGroupId
             const prev = fullGroupStats.get(key) || { total: tx.installmentTotalCount || 0, paid: 0 }
@@ -436,7 +444,7 @@ export default function TransactionsPage({
         }
 
         return result
-    }, [transactions, recurringOccurrences, debouncedSearch, activeTab, filters, sortConfig])
+    }, [loadedTransactions, recurringOccurrences, debouncedSearch, activeTab, filters, sortConfig])
 
     const { paginatedTransactions, totalPages } = useMemo(() => {
         const paginated = filteredTransactions.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
@@ -452,7 +460,34 @@ export default function TransactionsPage({
         filters.recurringOnly ||
         filters.installmentOnly ||
         isDatePeriodFilterActive(filters.datePeriod)
-    const hasTransactions = transactions.length > 0
+    const hasTransactions = loadedTransactions.length > 0
+
+    const canLoadMoreFromServer = loadedTransactions.length < (totalCount || 0)
+
+    const loadMoreTransactions = useCallback(async () => {
+        if (loadingMoreTransactions || !canLoadMoreFromServer) return
+        setLoadingMoreTransactions(true)
+        try {
+            const nextPage = serverPage + 1
+            const res = await getFinancialTransactionsAction(partnerId, { page: nextPage, pageSize: SERVER_PAGE_SIZE })
+            if (!res.success) {
+                notifyError(res.error || "Erro ao carregar mais transações.")
+                return
+            }
+            const nextRows = res.data || []
+            setLoadedTransactions((prev) => {
+                const existingIds = new Set(prev.map((item) => item.id))
+                const merged = [...prev]
+                for (const row of nextRows) {
+                    if (!existingIds.has(row.id)) merged.push(row)
+                }
+                return merged
+            })
+            setServerPage(nextPage)
+        } finally {
+            setLoadingMoreTransactions(false)
+        }
+    }, [loadingMoreTransactions, canLoadMoreFromServer, serverPage, partnerId, notifyError])
 
     const handleSelectRow = useCallback((id: string) => {
         setSelection((prev) => {
@@ -487,7 +522,7 @@ export default function TransactionsPage({
 
     const handleEditFromTransactionDetail = useCallback(
         (id: string) => {
-            const t = transactions.find((x) => x.id === id)
+            const t = loadedTransactions.find((x) => x.id === id)
             if (!t) {
                 notifyError("Erro", "Transação não está na página atual. Volte à lista e abra novamente para editar.")
                 return
@@ -495,7 +530,7 @@ export default function TransactionsPage({
             setViewingTransactionId(null)
             setEditingTransaction(t)
         },
-        [transactions, notifyError],
+        [loadedTransactions, notifyError],
     )
 
     const handleMarkAsPaid = useCallback(async (transaction: ERPTransaction) => {
@@ -536,8 +571,19 @@ export default function TransactionsPage({
 
     const handleSettleInstallmentGroup = useCallback((transaction: ERPTransaction) => {
         if (!transaction.isInstallmentGroup) return
+        const rows = (installmentDetail?.installments || []).filter((row: any) => row.status !== "paid")
+        const nextState: Record<string, { paymentAmount: string; interestAmount: string; discountAmount: string; paymentMethodId: string }> = {}
+        for (const row of rows) {
+            nextState[row.id] = {
+                paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
+                interestAmount: "0",
+                discountAmount: "0",
+                paymentMethodId: paymentMethods?.[0]?.id || "",
+            }
+        }
+        setSettlePaymentsByInstallment(nextState)
         setConfirmSettleGroup(transaction)
-    }, [])
+    }, [installmentDetail, paymentMethods])
 
     const handleConfirmSettleInstallmentGroup = useCallback(async () => {
         if (!confirmSettleGroup?.installmentGroupId) return
@@ -547,6 +593,13 @@ export default function TransactionsPage({
             const res = await settleInstallmentGroupAction({
                 partnerId,
                 installmentGroupId: confirmSettleGroup.installmentGroupId,
+                installmentPayments: Object.entries(settlePaymentsByInstallment).map(([transactionId, values]) => ({
+                    transactionId,
+                    paymentAmount: Number(values.paymentAmount || 0),
+                    interestAmount: Number(values.interestAmount || 0),
+                    discountAmount: Number(values.discountAmount || 0),
+                    paymentMethodId: values.paymentMethodId || null,
+                })),
             })
             if (!res.success) {
                 notifyError(res.error || "Erro ao quitar parcelado")
@@ -560,7 +613,7 @@ export default function TransactionsPage({
         } finally {
             setSettlingGroup(false)
         }
-    }, [confirmSettleGroup, settlingGroup, partnerId, notifyError, notifySuccess, debouncedRefresh])
+    }, [confirmSettleGroup, settlingGroup, partnerId, notifyError, notifySuccess, debouncedRefresh, settlePaymentsByInstallment])
 
     const handleOpenTransactionDetail = useCallback(
         (transaction: ERPTransaction) => {
@@ -585,7 +638,7 @@ export default function TransactionsPage({
                 }
                 return
             }
-            const existsInLoadedList = transactions.some((row) => row.id === transaction.id)
+            const existsInLoadedList = loadedTransactions.some((row) => row.id === transaction.id)
             if (!existsInLoadedList) {
                 notifyError("Erro", "Essa transação não está mais disponível. Atualize a página e tente novamente.")
                 debouncedRefresh()
@@ -596,11 +649,11 @@ export default function TransactionsPage({
             setEditingTransaction(null)
             setEditingRecurringTemplateId(null)
         },
-        [transactions, notifyError, debouncedRefresh, partnerId],
+        [loadedTransactions, notifyError, debouncedRefresh, partnerId],
     )
 
     const handleEditInstallment = useCallback((installmentId: string) => {
-        const tx = transactions.find((item) => item.id === installmentId)
+        const tx = loadedTransactions.find((item) => item.id === installmentId)
         if (!tx) {
             notifyError("Parcela não encontrada.")
             return
@@ -612,7 +665,7 @@ export default function TransactionsPage({
         setOpenInstallmentGroupId(null)
         setInstallmentDetail(null)
         setEditingTransaction(tx)
-    }, [transactions, notifyError])
+    }, [loadedTransactions, notifyError])
 
     const handlePayInstallment = useCallback(async (installmentId: string) => {
         const row = (installmentDetail?.installments || []).find((item: any) => item.id === installmentId)
@@ -982,11 +1035,20 @@ export default function TransactionsPage({
                 </div>
 
                 {paginatedTransactions.length > 0 && (
-                    <Pagination
-                        currentPage={page}
-                        totalPages={totalPages}
-                        onPageChange={setPage}
-                    />
+                    <div className="space-y-3">
+                        <Pagination
+                            currentPage={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                        />
+                        {canLoadMoreFromServer && (
+                            <div className="flex justify-center">
+                                <Button variant="outline" onClick={() => void loadMoreTransactions()} disabled={loadingMoreTransactions}>
+                                    {loadingMoreTransactions ? "Carregando..." : "Carregar mais transações"}
+                                </Button>
+                            </div>
+                        )}
+                    </div>
                 )}
             </div>
 
@@ -1056,7 +1118,7 @@ export default function TransactionsPage({
                                     <p className="text-xs text-brand-inactive-text">
                                         Parcela {row.installmentNumber}/{installmentDetail.group?.installments_count}
                                     </p>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 text-xs">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2 mt-2 text-xs">
                                         <span>Original: {formatCurrency(row.originalAmount || 0)}</span>
                                         <span>Pago: {formatCurrency(row.paidAmount || 0)}</span>
                                         <span>Restante: {formatCurrency(row.remainingAmount || 0)}</span>
@@ -1140,8 +1202,46 @@ export default function TransactionsPage({
                             </div>
                             <div className="rounded-lg border border-brand-border dark:border-dark-border p-3">
                                 <p className="text-brand-inactive-text">Valor total da quitação</p>
-                                <p className="font-semibold">{formatCurrency(Number(settleSummary?.totalToSettle || 0))}</p>
+                                <p className="font-semibold">
+                                    {formatCurrency(
+                                        Object.values(settlePaymentsByInstallment).reduce((acc, row) => (
+                                            acc + Math.max(0, Number(row.paymentAmount || 0) + Number(row.interestAmount || 0) - Number(row.discountAmount || 0))
+                                        ), 0),
+                                    )}
+                                </p>
                             </div>
+                        </div>
+                        <div className="max-h-[38vh] overflow-y-auto rounded-lg border border-brand-border dark:border-dark-border divide-y divide-brand-border dark:divide-dark-border">
+                            {(installmentDetail?.installments || [])
+                                .filter((row: any) => row.status !== "paid")
+                                .map((row: any) => {
+                                    const values = settlePaymentsByInstallment[row.id] || {
+                                        paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
+                                        interestAmount: "0",
+                                        discountAmount: "0",
+                                        paymentMethodId: paymentMethods?.[0]?.id || "",
+                                    }
+                                    const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
+                                    return (
+                                        <div key={row.id} className="p-3 space-y-2">
+                                            <p className="text-sm font-semibold">{row.description} - Parcela {row.installmentNumber}</p>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-brand-inactive-text">
+                                                <span>Original: {formatCurrency(Number(row.originalAmount || 0))}</span>
+                                                <span>Restante: {formatCurrency(Number(row.remainingAmount || 0))}</span>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                <input type="number" step="0.01" min="0" value={values.paymentAmount} onChange={(e) => setSettlePaymentsByInstallment((prev) => ({ ...prev, [row.id]: { ...values, paymentAmount: e.target.value } }))} className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-transparent text-sm" placeholder="Valor pagamento" />
+                                                <input type="number" step="0.01" min="0" value={values.interestAmount} onChange={(e) => setSettlePaymentsByInstallment((prev) => ({ ...prev, [row.id]: { ...values, interestAmount: e.target.value } }))} className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-transparent text-sm" placeholder="Juros" />
+                                                <input type="number" step="0.01" min="0" value={values.discountAmount} onChange={(e) => setSettlePaymentsByInstallment((prev) => ({ ...prev, [row.id]: { ...values, discountAmount: e.target.value } }))} className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-transparent text-sm" placeholder="Desconto" />
+                                                <select value={values.paymentMethodId} onChange={(e) => setSettlePaymentsByInstallment((prev) => ({ ...prev, [row.id]: { ...values, paymentMethodId: e.target.value } }))} className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-transparent text-sm">
+                                                    <option value="">Não informado</option>
+                                                    {(paymentMethods || []).map((pm: any) => (<option key={pm.id} value={pm.id}>{pm.name}</option>))}
+                                                </select>
+                                            </div>
+                                            <p className="text-xs font-semibold">Valor final pago: {formatCurrency(finalPaid)}</p>
+                                        </div>
+                                    )
+                                })}
                         </div>
                         <div className="flex justify-end gap-2">
                             <Button variant="outline" onClick={() => setConfirmSettleGroup(null)} disabled={settlingGroup}>

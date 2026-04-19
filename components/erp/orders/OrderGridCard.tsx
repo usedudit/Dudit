@@ -15,6 +15,7 @@ interface OrderGridCardProps {
     onDetails: () => void
     canEdit?: boolean
     cancelLabel?: string
+    extraActions?: React.ReactNode
 }
 
 const OrderGridCard = React.memo(
@@ -26,7 +27,8 @@ const OrderGridCard = React.memo(
         onCancel,
         onDetails,
         canEdit = true,
-        cancelLabel = "Cancelar"
+        cancelLabel = "Cancelar",
+        extraActions
     }: OrderGridCardProps) => {
 
         return (
@@ -55,22 +57,25 @@ const OrderGridCard = React.memo(
                                     {order.displayId}
                                 </h3>
                                 <div className="flex items-center shrink-0">
-                                    <Badge
-                                        variant={order.statusColor}
-                                        className="whitespace-nowrap scale-90"
-                                    >
-                                        {order.statusLabel}
-                                    </Badge>
-                                    <Badge
-                                        variant={order.deliveryStatusColor || "gray"}
-                                        className="whitespace-nowrap scale-90"
-                                    >
-                                        {order.deliveryStatusLabel || "Não informado"}
-                                    </Badge>
-                                    {order.isUnfulfilled && (
-                                        <Badge variant="gray" className="whitespace-nowrap scale-90">
-                                            Pendente
+                                    {order.situation === "cancelled" ? (
+                                        <Badge variant="red" className="whitespace-nowrap scale-90">
+                                            Cancelado
                                         </Badge>
+                                    ) : (
+                                        <>
+                                            <Badge
+                                                variant={order.statusColor}
+                                                className="whitespace-nowrap scale-90"
+                                            >
+                                                {order.statusLabel}
+                                            </Badge>
+                                            <Badge
+                                                variant={order.deliveryStatusColor || "gray"}
+                                                className="whitespace-nowrap scale-90"
+                                            >
+                                                {order.deliveryStatusLabel || "Não informado"}
+                                            </Badge>
+                                        </>
                                     )}
                                 </div>
                             </div>
@@ -140,7 +145,9 @@ const OrderGridCard = React.memo(
                                 onEdit={canEdit ? onEdit : undefined}
                                 onCancel={onCancel}
                                 cancelLabel={cancelLabel}
-                            />
+                            >
+                                {extraActions}
+                            </ActionsDropdown>
                         </div>
                     </div>
                 </div>

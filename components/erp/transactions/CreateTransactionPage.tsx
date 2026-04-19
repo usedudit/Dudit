@@ -199,6 +199,7 @@ export default function CreateTransactionPage({
     const isPaidTransaction = !!editTransaction && String(editTransaction.rawStatus || "").toLowerCase() === "paid"
     const isSystemGatewayOrigin = !!editTransaction && ["system", "gateway"].includes(String(editTransaction.origin || "").toLowerCase())
     const lockFinancialFields = isPaidTransaction || isSystemGatewayOrigin
+    const isInstallmentTransaction = !!editTransaction?.installmentGroupId
     const isRecurringTransaction = !!editTransaction && !!editTransaction.recurringId
     const isSalesOrigin = !!editTransaction && String(editTransaction.category || "").toLowerCase() === "vendas"
 
@@ -800,25 +801,31 @@ export default function CreateTransactionPage({
                 const cp = contactPayload()
                 const patch: Record<string, unknown> = {}
 
-                // Always allow these
-                patch.description = description.trim()
-                patch.notes = notes || null
-
-                if (!isPaidTransaction) {
-                    patch.categoryId = categoryId || null
-                    patch.subcategoryId = subcategoryId || null
-                }
-
-                // Only allow financial fields if NOT locked
-                if (!lockFinancialFields) {
-                    patch.amount = amount
+                if (isInstallmentTransaction) {
+                    patch.notes = notes || null
                     patch.accountId = accountId || null
-                    patch.contactId = cp.contactId
-                    patch.customerId = cp.customerId
-                    patch.contactType = cp.contactTypeResolved
-                    patch.paymentMethodId = paymentMethodId
-                    patch.dueDate = isSalesOrigin ? null : dueDate
-                    patch.transactionDate = isSalesOrigin ? paymentDate : dueDate
+                    patch.paymentMethodId = paymentMethodId || null
+                } else {
+                    // Always allow these
+                    patch.description = description.trim()
+                    patch.notes = notes || null
+
+                    if (!isPaidTransaction) {
+                        patch.categoryId = categoryId || null
+                        patch.subcategoryId = subcategoryId || null
+                    }
+
+                    // Only allow financial fields if NOT locked
+                    if (!lockFinancialFields) {
+                        patch.amount = amount
+                        patch.accountId = accountId || null
+                        patch.contactId = cp.contactId
+                        patch.customerId = cp.customerId
+                        patch.contactType = cp.contactTypeResolved
+                        patch.paymentMethodId = paymentMethodId
+                        patch.dueDate = isSalesOrigin ? null : dueDate
+                        patch.transactionDate = isSalesOrigin ? paymentDate : dueDate
+                    }
                 }
 
                 const res = await updateManualTransactionAction(

@@ -25,9 +25,6 @@ export function useDebouncedRefresh(delayMs = 400) {
         // If there's already a pending debounced refresh, skip and reset timer
         if (timerRef.current) {
             clearTimeout(timerRef.current)
-            console.log("[REFRESH] skipped (debounced, waiting for burst to settle)")
-        } else {
-            console.log("[REFRESH] triggered (scheduling)")
         }
 
         pendingRef.current = true
@@ -35,7 +32,6 @@ export function useDebouncedRefresh(delayMs = 400) {
         timerRef.current = setTimeout(() => {
             timerRef.current = null
             pendingRef.current = false
-            console.log("[REFRESH] executed")
             router.refresh()
         }, delayMs)
     }, [router, delayMs])

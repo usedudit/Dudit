@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import {
     ChevronLeftIcon,
-    EditIcon,
     ThreeDotsIcon
 } from "@/lib/icons"
 import {
@@ -17,6 +16,7 @@ import {
     TabsList,
     TabsTrigger
 } from "@/components/reusable"
+import { DropdownItem } from "@/components/reusable/Dropdown"
 import { getOrderDetailsAction, getOrderHistoryAction } from "@/app/actions/erp/orders"
 import { OrderHistoryTab } from "./OrderHistoryTab"
 import { useNotification } from "@/hooks/use-notification"
@@ -30,10 +30,11 @@ interface OrderDetailViewProps {
     partnerId: string
     onBack: () => void
     onEditOrder: (order: any) => void
+    onUpdateDeliveryStatus: (order: any) => void
     initialOrder?: any
 }
 
-export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrder, initialOrder }: OrderDetailViewProps) {
+export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrder, onUpdateDeliveryStatus, initialOrder }: OrderDetailViewProps) {
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [order, setOrder] = useState<any>(initialOrder || null)
@@ -105,6 +106,13 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const getTimelineSteps = (status: string) => {
         const baseDate = formatDayMonth(order.created_at)
         const baseTime = formatTime(order.created_at)
+        if (order.situation === "cancelled") {
+            const cancelledAt = order.updated_at || order.created_at
+            return [
+                { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
+                { label: "Cancelado", date: formatDayMonth(cancelledAt), time: formatTime(cancelledAt), active: true },
+            ]
+        }
 
         const steps = [
             { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
@@ -165,23 +173,23 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                 <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                     <ActionsDropdown
+                                        onEdit={!order.is_pos_sale && order.situation !== "cancelled" ? () => onEditOrder(order) : undefined}
                                         onPrint={() => window.print()}
                                         onShare={() => { }}
-                                    />
-
-                                    {!order.is_pos_sale && order.situation !== "cancelled" && (
-                                        <Button onClick={() => onEditOrder(order)} className="whitespace-nowrap">
-                                            <EditIcon className="w-[18px] h-[18px] mr-2" />
-                                            Editar Venda
-                                        </Button>
-                                    )}
+                                    >
+                                        {!order.is_pos_sale && order.situation !== "cancelled" && (
+                                            <DropdownItem onClick={() => onUpdateDeliveryStatus(order)}>
+                                                Alterar status de entrega
+                                            </DropdownItem>
+                                        )}
+                                    </ActionsDropdown>
                                 </div>
                             </div>
 
                             <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                 <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                    <TabsTrigger value="summary">Resumo</TabsTrigger>
-                                    <TabsTrigger value="history">Historico</TabsTrigger>
+                                    <TabsTrigger value="summary">Dados gerais</TabsTrigger>
+                                    <TabsTrigger value="history">Histórico</TabsTrigger>
                                 </TabsList>
                             </div>
                         </div>
@@ -197,7 +205,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 <div className="flex justify-between items-center">
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-                                                            {order.order_source === "Marketplace" ? "Canal de venda:" : "Responsavel pela venda:"}
+                                                            {order.order_source === "Marketplace" ? "Canal de venda:" : "Responsável pela venda:"}
                                                         </span>
                                                         <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
                                                             {order.order_source === "Marketplace"
@@ -213,41 +221,39 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 </div>
                                             </div>
 
-                                            {order.situation !== "cancelled" && (
-                                                <div className="bg-white dark:bg-dark-surface px-12 pt-12 pb-12">
-                                                    <div className="relative px-4">
-                                                        <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
-                                                            <div
-                                                                className={`absolute left-0 h-full rounded-full transition-all duration-500 ${order.delivery_status === "delivery_failed" ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
-                                                                style={{ width: `${(timelineSteps.filter((s) => s.active).length - 1) * 33.33}%` }}
-                                                            ></div>
+                                            <div className="bg-white dark:bg-dark-surface px-12 pt-12 pb-12">
+                                                <div className="relative px-4">
+                                                    <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
+                                                        <div
+                                                            className={`absolute left-0 h-full rounded-full transition-all duration-500 ${order.delivery_status === "delivery_failed" ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
+                                                            style={{ width: `${timelineSteps.length <= 1 ? 0 : ((timelineSteps.filter((s) => s.active).length - 1) / (timelineSteps.length - 1)) * 100}%` }}
+                                                        ></div>
 
-                                                            {timelineSteps.map((step, idx) => (
-                                                                <div key={idx} className="relative flex flex-col items-center">
-                                                                    <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
-                                                                        <span className={`text-xs font-medium ${step.active ? (order.delivery_status === "delivery_failed" && idx === 3 ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
-                                                                            {step.label}
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (order.delivery_status === "delivery_failed" && idx === 3 ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
-                                                                        {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
-                                                                    </div>
-                                                                    <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
-                                                                        {step.date ? (
-                                                                            <div className="flex items-center gap-1 text-xs text-brand-inactive-text">
-                                                                                <span>{step.date}</span>
-                                                                                {step.time && <span>{step.time}</span>}
-                                                                            </div>
-                                                                        ) : (
-                                                                            <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
-                                                                        )}
-                                                                    </div>
+                                                        {timelineSteps.map((step, idx) => (
+                                                            <div key={idx} className="relative flex flex-col items-center">
+                                                                <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
+                                                                    <span className={`text-xs font-medium ${step.active ? (order.delivery_status === "delivery_failed" && idx === 3 ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
+                                                                        {step.label}
+                                                                    </span>
                                                                 </div>
-                                                            ))}
-                                                        </div>
+                                                                <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (order.delivery_status === "delivery_failed" && idx === 3 ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
+                                                                    {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
+                                                                </div>
+                                                                <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
+                                                                    {step.date ? (
+                                                                        <div className="flex items-center gap-1 text-xs text-brand-inactive-text">
+                                                                            <span>{step.date}</span>
+                                                                            {step.time && <span>{step.time}</span>}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ))}
                                                     </div>
                                                 </div>
-                                            )}
+                                            </div>
                                         </div>
 
                                         <div className="mt-8">
@@ -287,7 +293,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                             <div className="space-y-3">
                                                 <PaymentRow
-                                                    label="Metodo de Pagamento"
+                                                    label="Método de Pagamento"
                                                     value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{paymentMethodLabel}</span>}
                                                 />
 
@@ -380,6 +386,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                 <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
                     <ActionsDropdown
+                        onEdit={!order.is_pos_sale && order.situation !== "cancelled" ? () => onEditOrder(order) : undefined}
                         onPrint={() => window.print()}
                         onShare={() => { }}
                         trigger={
@@ -388,13 +395,13 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                 Opcoes
                             </Button>
                         }
-                    />
-                    {!order.is_pos_sale && order.situation !== "cancelled" && (
-                        <Button onClick={() => onEditOrder(order)} className="flex-1 whitespace-nowrap">
-                            <EditIcon className="w-4 h-4 mr-2" />
-                            Editar Venda
-                        </Button>
-                    )}
+                    >
+                        {!order.is_pos_sale && order.situation !== "cancelled" && (
+                            <DropdownItem onClick={() => onUpdateDeliveryStatus(order)}>
+                                Alterar status de entrega
+                            </DropdownItem>
+                        )}
+                    </ActionsDropdown>
                 </div>
             </Tabs>
         </FadeIn>

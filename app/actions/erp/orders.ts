@@ -603,17 +603,21 @@ async function createRefundTransactionForCancelledOrder(params: {
         return { error: "Não foi possível gerar o reembolso automático porque a venda não possui conta financeira vinculada." as const }
     }
 
-    const { data: existingRefund } = await params.supabase
+    const { data: existingRefunds, error: existingRefundsError } = await params.supabase
         .from("transactions")
-        .select("id")
+        .select("id, amount, status")
         .eq("partner_id", params.partnerId)
-        .eq("transaction_type", "refund")
         .eq("refund_kind", "revenue_refund")
         .eq("reference_note", params.orderId)
-        .limit(1)
-        .maybeSingle()
+        .in("status", ["paid", "partially_paid"])
 
-    if (existingRefund?.id) return { success: true as const }
+    if (existingRefundsError) return { error: existingRefundsError.message }
+
+    const alreadyRefundedAmount = (existingRefunds || []).reduce((sum, tx) => {
+        return sum + Math.abs(Number(tx.amount || 0))
+    }, 0)
+    const refundableAmount = Math.max(0, paidAmount - alreadyRefundedAmount)
+    if (refundableAmount <= 0.009) return { success: true as const }
 
     const paymentDate = new Date().toISOString()
     const { error } = await params.supabase
@@ -625,17 +629,17 @@ async function createRefundTransactionForCancelledOrder(params: {
             customer_id: params.customerId || null,
             contact_id: null,
             contact_type: "customer",
-            amount: paidAmount,
+            amount: refundableAmount,
             due_date: null,
             payment_date: paymentDate,
             transaction_date: paymentDate,
             status: "paid",
             notes: "Gerado automaticamente ao cancelar venda.",
             payment_type: "Reembolso",
-            original_amount: paidAmount,
+            original_amount: refundableAmount,
             interest_amount: null,
             fee_amount: 0,
-            transaction_type: "refund",
+            transaction_type: "expense",
             origin: "order_cancel",
             refund_kind: "revenue_refund",
             reference_note: params.orderId,
@@ -849,7 +853,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             orderId: order.id,
             createdBy: user.id,
             reason: "Venda de Produto",
-            notes: "Baixa de estoque ao criar pedido no ERP",
+            notes: data.notes?.trim() || undefined,
             items: stockItems,
         })
 
@@ -967,6 +971,16 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         customers = customerData
     }
 
+    let saleSellerName: string | null = null
+    if ((sale as any).finalized_by_user_id) {
+        const { data: sellerProfile } = await supabase
+            .from("user_profiles")
+            .select("full_name")
+            .eq("user_id", (sale as any).finalized_by_user_id)
+            .single()
+        saleSellerName = sellerProfile?.full_name || null
+    }
+
     const ref =
         (sale.sale_number && String(sale.sale_number).trim()) ||
         String(sale.id || "").replace(/-/g, "").slice(0, 8).toUpperCase()
@@ -1005,7 +1019,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         buyer_id: sale.customer_id,
         customer_name: customers?.name || "Consumidor final",
         customers,
-        seller_name: null,
+        seller_name: saleSellerName,
         is_pos_sale: true,
         payment_method: null,
         payment_breakdown: [],
@@ -1204,7 +1218,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
                 createdBy: user.id,
                 type: "in",
                 reason: "Edicao de pedido",
-                notes: "Devolucao de estoque ao editar pedido no ERP",
+                notes: data.notes?.trim() || undefined,
                 items: delta.incoming,
             })
 
@@ -1219,7 +1233,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
                 createdBy: user.id,
                 type: "out",
                 reason: "Edicao de pedido",
-                notes: "Baixa adicional de estoque ao editar pedido no ERP",
+                notes: data.notes?.trim() || undefined,
                 items: delta.outgoing,
             })
 
@@ -1255,7 +1269,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
                 orderId,
                 createdBy: user.id,
                 reason: "Venda de Produtos",
-                notes: "Baixa de estoque ao atualizar pedido no ERP",
+                notes: data.notes?.trim() || undefined,
                 items: stockItems,
             })
 
@@ -1324,6 +1338,10 @@ export async function updateOrdersStatusInBatchAction(payload: {
         .eq("partner_id", payload.partnerId)
 
     if (payload.actionType === "cancel" || payload.actionType === "reopen") {
+        if (!currentOrders || currentOrders.length === 0) {
+            return { error: "Nenhum pedido válido foi encontrado para processar." }
+        }
+
         const { data: profile } = await supabase
             .from("user_profiles")
             .select("full_name")
@@ -1331,6 +1349,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
             .single()
 
         const effectiveUserName = profile?.full_name || payload.userName || "Usuario"
+        const processingWarnings: string[] = []
 
         for (const order of currentOrders || []) {
             if (payload.actionType === "cancel") {
@@ -1355,7 +1374,10 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     .eq("id", order.id)
                     .eq("partner_id", payload.partnerId)
 
-                if (error) return { error: error.message }
+                if (error) {
+                    processingWarnings.push(`Pedido ${order.order_number || order.id}: falha ao cancelar (${error.message})`)
+                    continue
+                }
 
                 if (order.inventory_deducted && stockWasRestoredOnCancel) {
                     const movementResult = await createOrderStockMovement({
@@ -1369,7 +1391,9 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         items: order.order_items || [],
                     })
 
-                    if ("error" in movementResult) return { error: movementResult.error }
+                    if ("error" in movementResult) {
+                        processingWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível restaurar estoque (${movementResult.error})`)
+                    }
                 } else if (!order.inventory_deducted) {
                     const releaseResult = await releaseOrderInventory({
                         client: supabase,
@@ -1378,7 +1402,9 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         items: order.order_items || [],
                     })
 
-                    if ("error" in releaseResult) return { error: releaseResult.error }
+                    if ("error" in releaseResult) {
+                        processingWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível liberar reserva de estoque (${releaseResult.error})`)
+                    }
                 }
 
                 if (payload.generateAutomaticRefund) {
@@ -1395,7 +1421,9 @@ export async function updateOrdersStatusInBatchAction(payload: {
                             createdByUserId: user.id,
                         })
 
-                        if ("error" in refundResult) return { error: refundResult.error }
+                        if ("error" in refundResult) {
+                            processingWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível gerar reembolso (${refundResult.error})`)
+                        }
                     }
                 }
             }
@@ -1419,7 +1447,8 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     })
 
                     if (stockValidationError) {
-                        return { error: buildReopenStockErrorMessage(orderItems) }
+                        processingWarnings.push(`Pedido ${order.order_number || order.id}: não foi possível reabrir por estoque insuficiente`)
+                        continue
                     }
                 }
 
@@ -1434,7 +1463,10 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     .eq("id", order.id)
                     .eq("partner_id", payload.partnerId)
 
-                if (error) return { error: error.message }
+                if (error) {
+                    processingWarnings.push(`Pedido ${order.order_number || order.id}: falha ao reabrir (${error.message})`)
+                    continue
+                }
 
                 if (shouldReverseStock) {
                     const movementResult = await createOrderStockMovement({
@@ -1447,7 +1479,9 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         items: order.order_items || [],
                     })
 
-                    if ("error" in movementResult) return { error: movementResult.error }
+                    if ("error" in movementResult) {
+                        processingWarnings.push(`Pedido ${order.order_number || order.id}: reaberto, mas não foi possível remover itens novamente do estoque (${movementResult.error})`)
+                    }
                 } else if (!order.inventory_deducted) {
                     const reserveResult = await reserveOrderInventory({
                         client: supabase,
@@ -1456,7 +1490,9 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         items: order.order_items || [],
                     })
 
-                    if ("error" in reserveResult) return { error: reserveResult.error }
+                    if ("error" in reserveResult) {
+                        processingWarnings.push(`Pedido ${order.order_number || order.id}: reaberto, mas não foi possível reservar estoque (${reserveResult.error})`)
+                    }
                 }
             }
         }
@@ -1510,6 +1546,9 @@ export async function updateOrdersStatusInBatchAction(payload: {
             (currentOrders || []).flatMap((order: any) => order.order_items || [])
         )
         await revalidateOrders(payload.partnerId)
+        if (processingWarnings.length > 0) {
+            return { success: true, warning: processingWarnings.join(" | ") }
+        }
         return { success: true }
     }
 
@@ -1601,7 +1640,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     orderId: order.id,
                     createdBy: user.id,
                     reason: "Venda de Produtos",
-                    notes: `Baixa de estoque ao alterar status para ${payload.statusValue}`,
+                    notes: normalizeOrderNotes(order.notes) || undefined,
                     items: order.order_items || [],
                 })
 

@@ -148,13 +148,13 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                             <div className="flex items-center gap-3 shrink-0 ml-3">
                                 <Button
                                     variant="outline"
-                                    className="h-[42px] px-6"
+                                    className="h-[42px]"
                                     onClick={() => setIsUndoModalOpen(true)}
                                 >
                                     <RotateIcon className="w-4 h-4 mr-2" /> Desfazer
                                 </Button>
 
-                                <Button className="h-[42px] px-6" onClick={() => { /* PDF Logic */ }}>
+                                <Button className="h-[42px]" onClick={() => { /* PDF Logic */ }}>
                                     <DownloadIcon className="w-4 h-4 mr-2" /> PDF
                                 </Button>
                             </div>

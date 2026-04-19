@@ -24,6 +24,7 @@ interface OrderListItemProps {
     canEdit?: boolean
     cancelLabel?: string
     showCheckbox?: boolean
+    extraActions?: React.ReactNode
 }
 
 const OrderListItem = React.memo(
@@ -38,6 +39,7 @@ const OrderListItem = React.memo(
         canEdit = true,
         cancelLabel = "Cancelar",
         showCheckbox = true,
+        extraActions,
     }: OrderListItemProps) => {
 
         const renderCellContent = (colId: string) => {
@@ -81,11 +83,6 @@ const OrderListItem = React.memo(
                                     <Badge variant={order.deliveryStatusColor || "gray"}>
                                         {order.deliveryStatusLabel || "Não informado"}
                                     </Badge>
-                                    {order.isUnfulfilled && (
-                                        <Badge variant="gray" className="opacity-70">
-                                            Pendente
-                                        </Badge>
-                                    )}
                                 </>
                             )}
                         </div>
@@ -113,7 +110,7 @@ const OrderListItem = React.memo(
                 case "channel":
                     return (
                         <span className="text-[13px] font-medium truncate max-w-[120px]">
-                            {order.order_source || "Venda Direta"}
+                            {order.order_source || "Manual"}
                         </span>
                     )
 
@@ -127,7 +124,9 @@ const OrderListItem = React.memo(
                                 onEdit={canEdit ? () => onEdit(order) : undefined}
                                 onCancel={() => onCancel(order)}
                                 cancelLabel={cancelLabel}
-                            />
+                            >
+                                {extraActions}
+                            </ActionsDropdown>
                         </div>
                     )
 

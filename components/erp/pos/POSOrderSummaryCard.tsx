@@ -23,6 +23,7 @@ type SummaryProps = {
   onContinue: () => void
   onSaveDraft: () => unknown | Promise<unknown>
   onAddShipping: () => void
+  onOpenCreateProduct: () => void
   onOpenNotes: () => void
   showItemsShortcut?: boolean
   showActionsMenu?: boolean
@@ -34,9 +35,10 @@ function POSOrderActionsMenu({
   onSaveDraft,
   onOpenDiscount,
   onAddShipping,
+  onOpenCreateProduct,
   onOpenNotes,
   showActionsMenu = true,
-}: Pick<SummaryProps, "onSaveDraft" | "onOpenDiscount" | "onAddShipping" | "onOpenNotes" | "showActionsMenu">) {
+}: Pick<SummaryProps, "onSaveDraft" | "onOpenDiscount" | "onAddShipping" | "onOpenCreateProduct" | "onOpenNotes" | "showActionsMenu">) {
   if (!showActionsMenu) return null
 
   return (
@@ -60,6 +62,9 @@ function POSOrderActionsMenu({
       <DropdownItem onClick={onAddShipping}>
         <FileIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Adicionar Frete
       </DropdownItem>
+      <DropdownItem onClick={onOpenCreateProduct}>
+        <FileIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Criar Produto
+      </DropdownItem>
       <DropdownItem onClick={onOpenNotes}>
         <FileIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Adicionar Observação
       </DropdownItem>
@@ -81,6 +86,7 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
   onContinue,
   onSaveDraft,
   onAddShipping,
+  onOpenCreateProduct,
   onOpenNotes,
   showItemsShortcut = true,
   showActionsMenu = true,
@@ -173,6 +179,7 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
           onSaveDraft={onSaveDraft}
           onOpenDiscount={onOpenDiscount}
           onAddShipping={onAddShipping}
+          onOpenCreateProduct={onOpenCreateProduct}
           onOpenNotes={onOpenNotes}
           showActionsMenu={showActionsMenu}
         />

@@ -5,6 +5,7 @@ import { requirePartnerAccess, requireUser } from "@/lib/auth/authorization"
 import { revalidateOrders, revalidateTransactions, revalidateStockMovements } from "@/lib/utils/revalidation"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { getActiveCashSessionAction } from "@/app/actions/erp/cash-register"
+import { generateSKUBase } from "@/lib/utils/code-generators"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { logAuditEvent } from "@/lib/services/timeline.service"
@@ -342,4 +343,234 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
   })
 
   return { success: true as const, data: { saleId } }
+}
+
+export async function createPOSQuickProductAction(input: {
+  partnerId: string
+  name: string
+  price: number
+  stockQuantity: number
+}) {
+  await requireUser()
+  await requirePartnerAccess(input.partnerId)
+
+  const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+  if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
+
+  const name = String(input.name || "").trim()
+  const price = safeMoney(Number(input.price || 0))
+  const stockQuantity = Math.max(0, Math.floor(Number(input.stockQuantity || 0)))
+
+  if (!name) return { success: false as const, error: "Informe o nome do produto." }
+  if (price < 0) return { success: false as const, error: "Preço inválido." }
+  if (stockQuantity < 0) return { success: false as const, error: "Estoque inválido." }
+
+  const supabase = await getSupabaseServerClient()
+  const { data: store } = await supabase
+    .from("stores")
+    .select("id")
+    .eq("partner_id", input.partnerId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  if (!store?.id) {
+    return { success: false as const, error: "Nenhuma loja encontrada para cadastrar o produto." }
+  }
+
+  const skuBase = generateSKUBase(name)
+  const sku = `${skuBase}-${Date.now().toString().slice(-5)}`
+
+  const { data: product, error } = await supabase
+    .from("products")
+    .insert({
+      partner_id: input.partnerId,
+      store_id: store.id,
+      name,
+      sku,
+      price,
+      stock_quantity: stockQuantity,
+      is_active: true,
+      allow_sell_without_stock: false,
+    })
+    .select("id, name, category, sku, price, stock_available, allow_sell_without_stock, images, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
+    .single()
+
+  if (error) return { success: false as const, error: error.message }
+  return { success: true as const, data: product }
+}
+
+export async function createPOSCustomerQuickAction(input: {
+  partnerId: string
+  name: string
+  email?: string
+  phone?: string
+  cpf?: string
+  address?: {
+    zipCode?: string
+    street?: string
+    number?: string
+    complement?: string
+    neighborhood?: string
+    city?: string
+    state?: string
+  }
+}) {
+  await requireUser()
+  await requirePartnerAccess(input.partnerId)
+
+  const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+  if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
+
+  const name = String(input.name || "").trim()
+  const email = String(input.email || "").trim().toLowerCase()
+  const phone = String(input.phone || "").trim()
+  const cpfDigits = String(input.cpf || "").replace(/\D/g, "")
+
+  if (!name) return { success: false as const, error: "Informe o nome do cliente." }
+
+  const supabase = await getSupabaseServerClient()
+
+  if (email) {
+    const { data: existingEmail } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("partner_id", input.partnerId)
+      .ilike("email", email)
+      .limit(1)
+      .maybeSingle()
+    if (existingEmail?.id) {
+      return { success: false as const, error: "Já existe cliente com este email." }
+    }
+  }
+
+  let encryptedCpf: string | null = null
+  if (cpfDigits) {
+    const { encryptCPF } = await import("@/lib/crypto")
+    encryptedCpf = await encryptCPF(cpfDigits)
+    const { data: existingCpf } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("partner_id", input.partnerId)
+      .eq("cpf", encryptedCpf)
+      .limit(1)
+      .maybeSingle()
+    if (existingCpf?.id) {
+      return { success: false as const, error: "Já existe cliente com este CPF." }
+    }
+  }
+
+  const { data: customer, error } = await supabase
+    .from("customers")
+    .insert({
+      partner_id: input.partnerId,
+      name,
+      email: email || null,
+      phone: phone || null,
+      person_type: "pf",
+      cpf: encryptedCpf,
+      status: "ativo",
+    })
+    .select("id, name, email, phone")
+    .single()
+
+  if (error) return { success: false as const, error: error.message }
+
+  const address = input.address || {}
+  const hasAddress = !!(address.street || address.city || address.zipCode)
+  if (hasAddress) {
+    await supabase.from("addresses").insert({
+      customer_id: customer.id,
+      address_type: "primary",
+      zip_code: address.zipCode || null,
+      street: address.street || null,
+      number: address.number || null,
+      complement: address.complement || null,
+      neighborhood: address.neighborhood || null,
+      city: address.city || null,
+      state: address.state || null,
+      country: "BR",
+      is_default: true,
+    })
+  }
+
+  return {
+    success: true as const,
+    data: {
+      id: customer.id,
+      name: customer.name,
+      email: customer.email || null,
+      phone: customer.phone || null,
+      cpf: cpfDigits || null,
+      address: hasAddress ? {
+        zipCode: address.zipCode || "",
+        street: address.street || "",
+        number: address.number || "",
+        complement: address.complement || "",
+        neighborhood: address.neighborhood || "",
+        city: address.city || "",
+        state: address.state || "",
+      } : null,
+    },
+  }
+}
+
+export async function getPOSCustomerDetailsAction(input: {
+  partnerId: string
+  customerId: string
+}) {
+  await requireUser()
+  await requirePartnerAccess(input.partnerId)
+
+  const supabase = await getSupabaseServerClient()
+  const [{ data: customer, error: customerError }, { data: address }] = await Promise.all([
+    supabase
+      .from("customers")
+      .select("id, name, email, phone, cpf")
+      .eq("partner_id", input.partnerId)
+      .eq("id", input.customerId)
+      .single(),
+    supabase
+      .from("addresses")
+      .select("zip_code, street, number, complement, neighborhood, city, state, country")
+      .eq("customer_id", input.customerId)
+      .eq("address_type", "primary")
+      .limit(1)
+      .maybeSingle(),
+  ])
+
+  if (customerError || !customer) {
+    return { success: false as const, error: customerError?.message || "Cliente não encontrado." }
+  }
+
+  let plainCpf: string | null = null
+  if (customer.cpf) {
+    try {
+      const { decryptCPF } = await import("@/lib/crypto")
+      plainCpf = await decryptCPF(customer.cpf)
+    } catch {
+      plainCpf = null
+    }
+  }
+
+  return {
+    success: true as const,
+    data: {
+      id: customer.id,
+      name: customer.name,
+      email: customer.email || null,
+      phone: customer.phone || null,
+      cpf: plainCpf,
+      address: address ? {
+        zipCode: address.zip_code || "",
+        street: address.street || "",
+        number: address.number || "",
+        complement: address.complement || "",
+        neighborhood: address.neighborhood || "",
+        city: address.city || "",
+        state: address.state || "",
+        country: address.country || "BR",
+      } : null,
+    },
+  }
 }

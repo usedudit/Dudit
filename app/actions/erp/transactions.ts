@@ -833,6 +833,7 @@ export async function updateManualTransactionAction(
             .eq("id", transactionId)
             .eq("partner_id", partnerId)
             .single()
+        const isInstallmentTransaction = !!current.installment_group_id
         if (currentError || !current) throw new Error(currentError?.message || "Transação não encontrada.")
 
         const paid = isStatusPaid(current.status)
@@ -889,15 +890,26 @@ export async function updateManualTransactionAction(
             "description",
             "notes",
         ])
+        const ALLOWED_INSTALLMENT_KEYS = new Set<keyof CreateManualTransactionInput>([
+            "accountId",
+            "paymentMethodId",
+            "notes",
+        ])
 
-        const allowedKeys = paid ? ALLOWED_PAID_KEYS : ALLOWED_PENDING_KEYS
+        const allowedKeys = isInstallmentTransaction
+            ? ALLOWED_INSTALLMENT_KEYS
+            : (paid ? ALLOWED_PAID_KEYS : ALLOWED_PENDING_KEYS)
         for (const key of patchKeys) {
             if (!allowedKeys.has(key)) {
                 throw new Error(`Campo "${key}" não pode ser editado quando status é ${paid ? "paid" : "pending"}.`)
             }
         }
 
-        if (paid) {
+        if (isInstallmentTransaction) {
+            if (!systemGateway && patch.accountId !== undefined) payload.account_id = patch.accountId
+            if (patch.paymentMethodId !== undefined) payload.payment_method_id = patch.paymentMethodId
+            if (patch.notes !== undefined) payload.notes = patch.notes
+        } else if (paid) {
             if (patch.description !== undefined) payload.description = patch.description?.trim()
             if (patch.notes !== undefined) payload.notes = patch.notes
         } else {
@@ -1186,7 +1198,7 @@ export async function recordInstallmentPaymentAction(input: {
 
         const { data: tx, error: txErr } = await supabase
             .from("transactions")
-            .select("id, status, partner_id, installment_group_id, original_amount, amount, transaction_type, refund_kind, account_id")
+            .select("id, status, partner_id, installment_group_id, installment_number, description, category, category_id, subcategory_id, account_id, contact_id, customer_id, contact_type, payment_type, notes, due_date, original_amount, amount, transaction_type, refund_kind")
             .eq("id", input.transactionId)
             .eq("partner_id", input.partnerId)
             .single()
@@ -1250,6 +1262,52 @@ export async function recordInstallmentPaymentAction(input: {
             refund_kind: tx.refund_kind,
         })
 
+        const { data: groupData } = await supabase
+            .from("installment_groups")
+            .select("id, description, installments_count")
+            .eq("id", tx.installment_group_id)
+            .eq("partner_id", input.partnerId)
+            .maybeSingle()
+
+        const installmentCount = Number(groupData?.installments_count || 0) || null
+        const installmentNumber = Number(tx.installment_number || 0) || null
+        const paymentNoteLines = [
+            installmentNumber && installmentCount
+                ? `Pagamento da parcela ${installmentNumber}/${installmentCount} do parcelado "${groupData?.description || tx.description}".`
+                : `Pagamento de parcela do parcelado "${groupData?.description || tx.description}".`,
+            `Valor base: R$ ${paymentAmount.toFixed(2)} | Juros: R$ ${interestAmount.toFixed(2)} | Desconto: R$ ${discountAmount.toFixed(2)} | Valor final pago: R$ ${finalPaid.toFixed(2)}.`,
+        ]
+
+        await insertTransactionsWithOptionalCreator(supabase, {
+            partner_id: input.partnerId,
+            description: installmentNumber && installmentCount
+                ? `${tx.description} - Pagamento parcela ${installmentNumber}/${installmentCount}`
+                : `${tx.description} - Pagamento de parcela`,
+            category: tx.category || "Parcelado",
+            category_id: tx.category_id || null,
+            subcategory_id: tx.subcategory_id || null,
+            account_id: tx.account_id || null,
+            contact_id: tx.contact_id || null,
+            customer_id: tx.customer_id || null,
+            contact_type: tx.contact_type || null,
+            amount: finalPaid,
+            due_date: tx.due_date || null,
+            payment_date: nowIso,
+            transaction_date: nowIso,
+            status: "paid",
+            notes: paymentNoteLines.join("\n"),
+            payment_type: tx.payment_type || null,
+            payment_method_id: input.paymentMethodId || null,
+            original_amount: finalPaid,
+            interest_amount: Math.max(0, interestAmount),
+            fee_amount: 0,
+            transaction_type: tx.transaction_type,
+            origin: "manual",
+            refund_kind: tx.refund_kind || null,
+            reference_note: `installment_payment:${input.transactionId}`,
+            created_by_user_id: userId,
+        })
+
         if (fullyPaid) {
             const { error: updateErr } = await supabase
                 .from("transactions")
@@ -1298,6 +1356,13 @@ export async function recordInstallmentPaymentAction(input: {
 export async function settleInstallmentGroupAction(input: {
     partnerId: string
     installmentGroupId: string
+    installmentPayments?: Array<{
+        transactionId: string
+        paymentAmount: number
+        interestAmount?: number
+        discountAmount?: number
+        paymentMethodId?: string | null
+    }>
 }) {
     try {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -1307,9 +1372,16 @@ export async function settleInstallmentGroupAction(input: {
         const supabase = await getSupabaseServerClient()
         const nowIso = new Date().toISOString()
 
+        const { data: groupData } = await supabase
+            .from("installment_groups")
+            .select("id, description, installments_count")
+            .eq("id", input.installmentGroupId)
+            .eq("partner_id", input.partnerId)
+            .maybeSingle()
+
         const { data: txRows, error: txErr } = await supabase
             .from("transactions")
-            .select("id, status, amount, original_amount, account_id, transaction_type, refund_kind")
+            .select("id, status, installment_number, description, category, category_id, subcategory_id, account_id, contact_id, customer_id, contact_type, payment_type, notes, due_date, amount, original_amount, transaction_type, refund_kind")
             .eq("partner_id", input.partnerId)
             .eq("installment_group_id", input.installmentGroupId)
         if (txErr) throw txErr
@@ -1331,9 +1403,15 @@ export async function settleInstallmentGroupAction(input: {
             paidByTx.set(txId, (paidByTx.get(txId) || 0) + amount)
         }
 
+        const paymentInputByTxId = new Map(
+            (input.installmentPayments || []).map((entry) => [entry.transactionId, entry])
+        )
         const paymentsToInsert: Record<string, unknown>[] = []
         const txIdsToMarkPaid: string[] = []
         let affectedCount = 0
+        let settlementTotal = 0
+        const settlementLines: string[] = []
+        let baseTxForConsolidated: any = null
 
         for (const row of rows as any[]) {
             const original = Math.abs(Number(row.original_amount ?? row.amount ?? 0))
@@ -1346,22 +1424,37 @@ export async function settleInstallmentGroupAction(input: {
                 continue
             }
 
+            const custom = paymentInputByTxId.get(String(row.id))
+            const basePayment = Number(custom?.paymentAmount ?? remaining)
+            const interest = Number(custom?.interestAmount || 0)
+            const discount = Number(custom?.discountAmount || 0)
+            let finalPaid = Math.round((basePayment + interest - discount) * 100) / 100
+            if (finalPaid > remaining + 0.01) finalPaid = Math.round(remaining * 100) / 100
+            if (!(finalPaid > 0)) continue
+
             paymentsToInsert.push({
                 partner_id: input.partnerId,
                 transaction_id: row.id,
-                amount: remaining,
-                payment_method_id: null,
+                amount: finalPaid,
+                payment_method_id: custom?.paymentMethodId || null,
                 created_by_user_id: userId,
                 created_at: nowIso,
             })
 
             await applyFinanceAccountBalanceDelta(supabase, input.partnerId, row.account_id, {
                 transaction_type: row.transaction_type,
-                amount: remaining,
+                amount: finalPaid,
                 refund_kind: row.refund_kind,
             })
             txIdsToMarkPaid.push(row.id)
             affectedCount += 1
+            settlementTotal += finalPaid
+            baseTxForConsolidated = baseTxForConsolidated || row
+            const totalInstallments = Number(groupData?.installments_count || 0)
+            const installmentN = Number(row.installment_number || 0)
+            settlementLines.push(
+                `Parcela ${installmentN || "-"}${totalInstallments ? `/${totalInstallments}` : ""}: base R$ ${basePayment.toFixed(2)}, juros R$ ${interest.toFixed(2)}, desconto R$ ${discount.toFixed(2)}, pago R$ ${finalPaid.toFixed(2)}.`
+            )
         }
 
         if (paymentsToInsert.length > 0) {
@@ -1380,6 +1473,40 @@ export async function settleInstallmentGroupAction(input: {
                 .eq("partner_id", input.partnerId)
                 .in("id", txIdsToMarkPaid)
             if (updErr) throw updErr
+        }
+
+        if (settlementTotal > 0 && baseTxForConsolidated) {
+            await insertTransactionsWithOptionalCreator(supabase, {
+                partner_id: input.partnerId,
+                description: `Quitação parcelado: ${groupData?.description || baseTxForConsolidated.description || "Parcelado"}`,
+                category: baseTxForConsolidated.category || "Parcelado",
+                category_id: baseTxForConsolidated.category_id || null,
+                subcategory_id: baseTxForConsolidated.subcategory_id || null,
+                account_id: baseTxForConsolidated.account_id || null,
+                contact_id: baseTxForConsolidated.contact_id || null,
+                customer_id: baseTxForConsolidated.customer_id || null,
+                contact_type: baseTxForConsolidated.contact_type || null,
+                amount: settlementTotal,
+                due_date: null,
+                payment_date: nowIso,
+                transaction_date: nowIso,
+                status: "paid",
+                notes: [
+                    `Quitação total do parcelado "${groupData?.description || baseTxForConsolidated.description || "Parcelado"}".`,
+                    ...settlementLines,
+                    `Total pago: R$ ${settlementTotal.toFixed(2)}.`,
+                ].join("\n"),
+                payment_type: baseTxForConsolidated.payment_type || null,
+                payment_method_id: null,
+                original_amount: settlementTotal,
+                interest_amount: null,
+                fee_amount: 0,
+                transaction_type: baseTxForConsolidated.transaction_type,
+                origin: "manual",
+                refund_kind: baseTxForConsolidated.refund_kind || null,
+                reference_note: `installment_settlement:${input.installmentGroupId}`,
+                created_by_user_id: userId,
+            })
         }
 
         await Promise.allSettled(
