@@ -613,7 +613,7 @@ async function createRefundTransactionForCancelledOrder(params: {
 
     if (existingRefundsError) return { error: existingRefundsError.message }
 
-    const alreadyRefundedAmount = (existingRefunds || []).reduce((sum, tx) => {
+    const alreadyRefundedAmount = (existingRefunds || []).reduce((sum: number, tx: any) => {
         return sum + Math.abs(Number(tx.amount || 0))
     }, 0)
     const refundableAmount = Math.max(0, paidAmount - alreadyRefundedAmount)

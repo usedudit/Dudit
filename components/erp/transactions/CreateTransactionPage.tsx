@@ -1352,20 +1352,25 @@ export default function CreateTransactionPage({
                     )}
 
                     {isIncomeExpense && (!isEditMode || isRecurringTemplateEdit) && (
-                        <div className="rounded-2xl border border-brand-border dark:border-dark-border p-4 space-y-4 bg-brand-gray/25 dark:bg-dark-border/15">
-                            {!isRecurringTemplateEdit && (
-                                recurringModeEnabled && (
-                                    <Checkbox
-                                        name="enable_recurrence"
-                                        checked={enableRecurrence}
-                                        onChange={setEnableRecurrence}
-                                        label={
-                                            <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                Criar recorrência
-                                            </span>
-                                        }
-                                    />
-                                )
+                        <div className="mt-8">
+                            <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">
+                                    {enableRecurrence && "Detalhes da recorrência"}
+                                    {installmentModeEnabled && "Detalhes das parcelas"}
+                                </h3>
+                            </div>
+                            {!enableRecurrence && !isRecurringTemplateEdit && recurringModeEnabled && (
+                                <Checkbox
+                                    name="enable_recurrence"
+                                    checked={enableRecurrence}
+                                    onChange={setEnableRecurrence}
+                                    label={
+                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                            Criar recorrência
+                                        </span>
+                                    }
+                                />
                             )}
                             {isRecurringTemplateEdit && (
                                 <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Regra de recorrência</p>
