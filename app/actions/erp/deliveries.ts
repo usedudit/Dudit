@@ -338,3 +338,40 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
   if (error) return { success: false as const, error: error.message }
   return { success: true as const, data }
 }
+
+export async function updateERPDeliveryStatusAction(params: {
+  partnerId: string
+  deliveryId: string
+  status: DeliveryStatusValue
+}) {
+  await requireUser()
+  await requirePartnerAccess(params.partnerId)
+  const supabase = await getSupabaseServerClient()
+
+  const allowed = new Set<DeliveryStatusValue>([
+    "not_sent",
+    "preparing",
+    "sent",
+    "delivered",
+    "pickup_available",
+    "delivery_failed",
+    "cancelled",
+  ])
+  if (!allowed.has(params.status)) {
+    return { success: false as const, error: "Status de entrega inválido." }
+  }
+
+  const patch: Record<string, unknown> = { status: params.status }
+  if (params.status === "delivered") {
+    patch.delivered_at = new Date().toISOString()
+  }
+
+  const { error } = await supabase
+    .from("deliveries")
+    .update(patch)
+    .eq("id", params.deliveryId)
+    .eq("partner_id", params.partnerId)
+
+  if (error) return { success: false as const, error: error.message }
+  return { success: true as const }
+}

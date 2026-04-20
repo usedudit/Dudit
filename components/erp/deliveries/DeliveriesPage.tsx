@@ -8,7 +8,7 @@ import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSh
 import { ExportFileIcon, PlusIcon, ArrowUpDownIcon } from "@/lib/icons"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
-import { getERPDeliveriesPageAction, type ERPDeliveryListCursor } from "@/app/actions/erp/deliveries"
+import { getERPDeliveriesPageAction, type ERPDeliveryListCursor, updateERPDeliveryStatusAction } from "@/app/actions/erp/deliveries"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
 import DeliveryPageControls from "./DeliveryPageControls"
 import DeliveryListItem from "./DeliveryListItem"
@@ -51,6 +51,7 @@ export default function DeliveriesPage({
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [wrapper, setWrapper] = useState<"list" | "create" | "detail">("list")
   const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null)
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({})
   const observerTarget = useRef<HTMLDivElement>(null)
   const tableContainerRef = useRef<HTMLDivElement>(null)
   const [scrollState, setScrollState] = useState({ left: false, right: false })
@@ -90,18 +91,29 @@ export default function DeliveriesPage({
 
   const mapped = useMemo(() => {
     const term = search.toLowerCase().trim()
+    const nowMs = Date.now()
     let list = (items || []).map((raw: any) => {
       const order = raw.orders || {}
       const deliveryPersonName = raw.partner_users?.user_profiles?.full_name || null
+      const effectiveStatus = statusOverrides[raw.id] || raw.status || "not_sent"
       const estimatedArrivalAt = raw.started_at && raw.estimated_duration_minutes
         ? new Date(new Date(raw.started_at).getTime() + Number(raw.estimated_duration_minutes) * 60000).toISOString()
         : null
+      const isClosed = ["delivered", "cancelled", "delivery_failed"].includes(effectiveStatus)
+      const isLate = !!estimatedArrivalAt && !isClosed && nowMs > new Date(estimatedArrivalAt).getTime()
+      const remainingMs = estimatedArrivalAt ? Math.max(0, new Date(estimatedArrivalAt).getTime() - nowMs) : 0
+      const remainingMinutes = Math.ceil(remainingMs / 60000)
+      const remainingHoursPart = Math.floor(remainingMinutes / 60)
+      const remainingMinutesPart = remainingMinutes % 60
+      const remainingLabel = remainingHoursPart > 0
+        ? `Vence em ${remainingHoursPart}h ${remainingMinutesPart}m`
+        : `Vence em ${remainingMinutes} min`
       return {
         id: raw.id,
         orderId: raw.order_id,
         orderDisplayId: order.order_number || `#${String(raw.order_id || "").slice(0, 8).toUpperCase()}`,
         customerName: order.customer_name || "Cliente",
-        status: raw.status || "not_sent",
+        status: effectiveStatus,
         deliveryPersonName,
         estimatedDurationMinutes: Number(raw.estimated_duration_minutes || 0),
         startedAt: raw.started_at,
@@ -109,6 +121,9 @@ export default function DeliveriesPage({
         estimatedArrivalAt,
         deliveryFee: Number(order.shipping_cost || 0),
         createdAtMs: new Date(raw.created_at).getTime(),
+        deliveryTimingState: isLate ? "late" : "on_time",
+        deliveryTimingLabel: estimatedArrivalAt ? (isLate ? "Atrasada" : "No prazo") : "",
+        deliveryTimingDetail: estimatedArrivalAt && !isLate && !isClosed ? remainingLabel : "",
       }
     })
 
@@ -133,7 +148,21 @@ export default function DeliveriesPage({
       })
     }
     return list
-  }, [items, search, filters, sortConfig])
+  }, [items, search, filters, sortConfig, statusOverrides])
+
+  const handleQuickStatusChange = async (deliveryId: string, status: string) => {
+    const previous = statusOverrides[deliveryId]
+    setStatusOverrides((prev) => ({ ...prev, [deliveryId]: status }))
+    const res = await updateERPDeliveryStatusAction({ partnerId, deliveryId, status: status as any })
+    if (!res.success) {
+      setStatusOverrides((prev) => {
+        const next = { ...prev }
+        if (previous) next[deliveryId] = previous
+        else delete next[deliveryId]
+        return next
+      })
+    }
+  }
 
   const totalPages = Math.max(1, Math.ceil(mapped.length / ITEMS_PER_PAGE))
   const paginated = mapped.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
@@ -184,7 +213,7 @@ export default function DeliveriesPage({
               </motion.div>
             ) : viewMode === "grid" ? (
               <motion.div key="grid" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                {paginated.map((delivery) => <DeliveryGridCard key={delivery.id} delivery={delivery} onDetails={() => { setSelectedDeliveryId(delivery.id); setWrapper("detail") }} />)}
+                {paginated.map((delivery) => <DeliveryGridCard key={delivery.id} delivery={delivery} onQuickStatusChange={handleQuickStatusChange} onDetails={() => { setSelectedDeliveryId(delivery.id); setWrapper("detail") }} />)}
               </motion.div>
             ) : (
               <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full overflow-hidden rounded-xl relative">
@@ -218,7 +247,7 @@ export default function DeliveriesPage({
                     </thead>
                     <tbody>
                       {paginated.map((delivery) => (
-                        <DeliveryListItem key={delivery.id} delivery={delivery} columns={COLUMNS as any} onDetails={() => { setSelectedDeliveryId(delivery.id); setWrapper("detail") }} />
+                        <DeliveryListItem key={delivery.id} delivery={delivery} columns={COLUMNS as any} onQuickStatusChange={handleQuickStatusChange} onDetails={() => { setSelectedDeliveryId(delivery.id); setWrapper("detail") }} />
                       ))}
                     </tbody>
                   </table>

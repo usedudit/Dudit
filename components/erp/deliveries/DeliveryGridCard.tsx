@@ -3,15 +3,17 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Badge, ActionsDropdown } from "@/components/reusable"
+import { DropdownItem } from "@/components/reusable/Dropdown"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
 
 interface DeliveryGridCardProps {
   delivery: any
   onDetails: () => void
+  onQuickStatusChange?: (deliveryId: string, status: string) => void
 }
 
-const DeliveryGridCard = React.memo(({ delivery, onDetails }: DeliveryGridCardProps) => {
+const DeliveryGridCard = React.memo(({ delivery, onDetails, onQuickStatusChange }: DeliveryGridCardProps) => {
   const statusMeta = getDeliveryStatusMeta(delivery.status)
   return (
     <motion.div
@@ -43,9 +45,22 @@ const DeliveryGridCard = React.memo(({ delivery, onDetails }: DeliveryGridCardPr
         <div className="min-w-0">
           <p className="text-xs text-brand-inactive-text">Saída</p>
           <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{delivery.startedAt ? formatDate(delivery.startedAt) : "-"}</p>
+          <p className={`text-[11px] font-semibold ${delivery.deliveryTimingState === "late" ? "text-brand-red" : "text-brand-green"}`}>
+            {delivery.deliveryTimingLabel || ""}
+          </p>
+          {delivery.deliveryTimingDetail ? (
+            <p className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+              {delivery.deliveryTimingDetail}
+            </p>
+          ) : null}
         </div>
         <div onClick={(e) => e.stopPropagation()}>
-          <ActionsDropdown onEdit={onDetails} />
+          <ActionsDropdown onEdit={onDetails}>
+            <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "preparing")}>Status: Preparando</DropdownItem>
+            <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "sent")}>Status: Enviado</DropdownItem>
+            <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "delivered")}>Status: Entregue</DropdownItem>
+            <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "delivery_failed")}>Status: Entrega não realizada</DropdownItem>
+          </ActionsDropdown>
         </div>
       </div>
     </motion.div>

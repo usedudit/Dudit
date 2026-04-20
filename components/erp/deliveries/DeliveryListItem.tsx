@@ -3,6 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Badge, ActionsDropdown } from "@/components/reusable"
+import { DropdownItem } from "@/components/reusable/Dropdown"
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
 import { TruckIcon } from "@/lib/icons"
@@ -11,6 +12,7 @@ interface DeliveryListItemProps {
   delivery: any
   columns: Array<{ id: string; align?: "left" | "center" | "right" }>
   onDetails: (delivery: any) => void
+  onQuickStatusChange?: (deliveryId: string, status: string) => void
 }
 
 function getAlignClass(align?: string) {
@@ -25,7 +27,7 @@ function getJustifyClass(align?: string) {
   return "justify-start"
 }
 
-const DeliveryListItem = React.memo(({ delivery, columns, onDetails }: DeliveryListItemProps) => {
+const DeliveryListItem = React.memo(({ delivery, columns, onDetails, onQuickStatusChange }: DeliveryListItemProps) => {
   const statusMeta = getDeliveryStatusMeta(delivery.status)
 
   const renderCell = (id: string) => {
@@ -57,6 +59,14 @@ const DeliveryListItem = React.memo(({ delivery, columns, onDetails }: DeliveryL
             <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
               Prev.: {delivery.estimatedArrivalAt ? `${formatDate(delivery.estimatedArrivalAt)} ${formatTime(delivery.estimatedArrivalAt)}` : "-"}
             </span>
+            <span className={`text-[11px] font-semibold ${delivery.deliveryTimingState === "late" ? "text-brand-red" : "text-brand-green"}`}>
+              {delivery.deliveryTimingLabel || ""}
+            </span>
+            {delivery.deliveryTimingDetail ? (
+              <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+                {delivery.deliveryTimingDetail}
+              </span>
+            ) : null}
           </div>
         )
       case "delivered_at":
@@ -64,7 +74,12 @@ const DeliveryListItem = React.memo(({ delivery, columns, onDetails }: DeliveryL
       case "actions":
         return (
           <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
-            <ActionsDropdown onEdit={() => onDetails(delivery)} />
+            <ActionsDropdown onEdit={() => onDetails(delivery)}>
+              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "preparing")}>Status: Preparando</DropdownItem>
+              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "sent")}>Status: Enviado</DropdownItem>
+              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "delivered")}>Status: Entregue</DropdownItem>
+              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "delivery_failed")}>Status: Entrega não realizada</DropdownItem>
+            </ActionsDropdown>
           </div>
         )
       default:
