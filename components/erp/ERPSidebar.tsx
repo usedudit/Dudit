@@ -57,7 +57,7 @@ const navItems: NavItem[] = [
             { label: "Orçamentos", href: "/erp/quotes" },
             { label: "PDV (Frente de Caixa)", href: "/erp/pos" },
             { label: "Devoluções", href: "/" },
-            { label: "Expedição e Entregas", href: "/" },
+            { label: "Expedição e Entregas", href: "/erp/logistics" },
         ],
     },
     {

@@ -36,7 +36,7 @@ export const ListItem: React.FC<ListItemProps> = ({
             {left && <div className="shrink-0">{left}</div>}
 
             {Icon && (
-                <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
+                <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
                     <Icon className="text-brand-dark dark:text-dark-heading" />
                 </div>
             )}
