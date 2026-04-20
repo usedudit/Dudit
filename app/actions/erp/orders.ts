@@ -1703,3 +1703,78 @@ export async function updateOrdersStatusInBatchAction(payload: {
     await revalidateOrders(payload.partnerId)
     return { success: true }
 }
+
+export type ERPOrderListCursor = { createdAt: string; id: string }
+
+function buildOrdersKeysetOrFilter(cursor: ERPOrderListCursor): string {
+    const ts = cursor.createdAt
+    const id = cursor.id
+    const q = (s: string) => `"${String(s).replace(/"/g, '""')}"`
+    return `created_at.lt.${q(ts)},and(created_at.eq.${q(ts)},id.lt.${q(id)})`
+}
+
+const ERP_ORDERS_PAGE_SIZE = 100
+
+export async function getERPOrdersPageAction(
+    partnerId: string,
+    options?: { cursor?: ERPOrderListCursor | null; limit?: number },
+): Promise<
+    | { success: true; items: any[]; nextCursor: ERPOrderListCursor | null; hasMore: boolean }
+    | { success: false; error: string }
+> {
+    try {
+        const user = await requireUser()
+        if (!user) return { success: false, error: "Não autenticado" }
+        await requirePartnerAccess(partnerId)
+
+        const supabase = await getSupabaseServerClient()
+        const cursor = options?.cursor ?? null
+        const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_ORDERS_PAGE_SIZE))))
+        const fetchLimit = limit + 1
+
+        let q = supabase
+            .from("orders")
+            .select(`
+                id,
+                order_number,
+                mp_payment_id,
+                customer_name,
+                buyer_id,
+                total_amount,
+                paid_amount,
+                situation,
+                previous_situation_before_cancel,
+                delivery_status,
+                order_source,
+                order_date,
+                created_at,
+                is_pos_sale,
+                quantity,
+                stores(name),
+                order_items(quantity)
+            `)
+            .eq("partner_id", partnerId)
+
+        if (cursor) {
+            q = q.or(buildOrdersKeysetOrFilter(cursor))
+        }
+
+        const { data, error } = await q
+            .order("created_at", { ascending: false })
+            .order("id", { ascending: false })
+            .limit(fetchLimit)
+
+        if (error) throw error
+
+        const rows = data || []
+        const hasMore = rows.length > limit
+        const items = hasMore ? rows.slice(0, limit) : rows
+        const last = items[items.length - 1]
+        const nextCursor: ERPOrderListCursor | null =
+            hasMore && last?.created_at && last?.id ? { createdAt: String(last.created_at), id: String(last.id) } : null
+
+        return { success: true, items, nextCursor, hasMore }
+    } catch (e: any) {
+        return { success: false, error: e?.message || "Erro ao carregar pedidos" }
+    }
+}

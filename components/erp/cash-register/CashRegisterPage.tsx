@@ -28,13 +28,16 @@ import {
 import {
     closeCashSessionAction,
     getCashSessionCloseSummaryAction,
-    getCashSessionsHistoryAction,
+    getCashSessionsHistoryPageAction,
     openCashSessionAction,
     getCashSessionDetailsAction,
+    type ERPCashSessionListCursor,
 } from "@/app/actions/erp/cash-register"
 
 import { useNotification } from "@/hooks/use-notification"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useInfiniteList } from "@/hooks/use-infinite-list"
+import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 
 import CashRegisterPageControls from "./CashRegisterPageControls"
 import CashSessionGridCard from "./CashSessionGridCard"
@@ -90,17 +93,20 @@ function formatShortDate(value: string | null | undefined) {
 export default function CashRegisterPage({
     partnerId,
     initialHistory,
+    initialNextCursor,
+    initialHasMore,
     initialActiveSession,
 }: {
     partnerId: string
     initialHistory: SessionItem[]
+    initialNextCursor: ERPCashSessionListCursor | null
+    initialHasMore: boolean
     initialActiveSession: any | null
 }) {
     const { success: notifySuccess, error: notifyError } = useNotification()
     const isMobile = useMediaQuery("(max-width: 768px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
 
-    const [history, setHistory] = useState<SessionItem[]>(initialHistory || [])
     const [activeSession, setActiveSession] = useState<any | null>(initialActiveSession || null)
     const [search, setSearch] = useState("")
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
@@ -124,6 +130,19 @@ export default function CashRegisterPage({
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
+
+    const observerTarget = useRef<HTMLDivElement>(null)
+    const queryKey = useMemo(() => ["erp", "cash-sessions", partnerId] as const, [partnerId])
+    const { items: history, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useInfiniteList<SessionItem, ERPCashSessionListCursor>({
+        queryKey,
+        initialPage: { items: initialHistory || [], nextCursor: initialNextCursor, hasMore: initialHasMore },
+        fetchFn: async ({ cursor }) => {
+            const res = await getCashSessionsHistoryPageAction(partnerId, { cursor, limit: 100 })
+            if (!res.success) throw new Error(res.error || "Erro ao carregar histórico do caixa.")
+            return { items: res.items || [], nextCursor: res.nextCursor, hasMore: res.hasMore }
+        },
+        dedupeKey: (s) => String((s as any)?.id || ""),
+    })
 
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return
@@ -233,8 +252,7 @@ export default function CashRegisterPage({
     const paginated = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
 
     const refreshHistory = async () => {
-        const result = await getCashSessionsHistoryAction(partnerId)
-        if (result.success) setHistory(result.data as SessionItem[])
+        await refetch()
     }
 
     const handleViewDetails = async (id: string) => {
@@ -373,6 +391,21 @@ export default function CashRegisterPage({
             setIsClosingSession(false)
         }
     }
+
+    useInfiniteScrollObserver(observerTarget, {
+        enabled: true,
+        hasNextPage: !!hasNextPage,
+        isFetchingNextPage,
+        fetchNextPage: () => fetchNextPage(),
+        rootMargin: "320px",
+        threshold: 0,
+    })
+
+    useEffect(() => {
+        if (page === totalPages && hasNextPage && !isFetchingNextPage) {
+            void fetchNextPage()
+        }
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
 
     const columns: { id: string; label: string; align: "left" | "center" | "right"; width?: string }[] = [
         { id: "session", label: "Sessão", align: "left", width: "250px" },
@@ -642,11 +675,27 @@ export default function CashRegisterPage({
                             </motion.div>
                         )}
                     </AnimatePresence>
+                    {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
                 </div>
 
                 {filtered.length > 0 && (
-                    <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+                    <Pagination
+                        currentPage={page}
+                        totalPages={totalPages}
+                        onPageChange={(p) => {
+                            setPage(p)
+                            if (p === totalPages && hasNextPage && !isFetchingNextPage) {
+                                void fetchNextPage()
+                            }
+                        }}
+                    />
                 )}
+                {hasNextPage && page === totalPages && isFetchingNextPage ? (
+                    <div className="flex flex-col gap-2 py-2 px-4">
+                        <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse" />
+                        <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse opacity-70" />
+                    </div>
+                ) : null}
             </div>
 
             <FilterSheet

@@ -1,10 +1,10 @@
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import StockMovementPageContent from "@/components/erp/stock-movements/StockMovementPage"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { getStockMovementsCached } from "@/lib/data/stock-movements"
 import { redirect } from "next/navigation"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { AccessDenied } from "@/components/erp/access-denied"
+import { getERPStockMovementsPageAction } from "@/app/actions/erp/stock-movements"
 
 export default async function StockMovementsPage() {
   // Layout already guarantees auth + valid context - just read cached data
@@ -12,7 +12,8 @@ export default async function StockMovementsPage() {
   if (!context) redirect("")
 
   const partnerId = context.partnerId
-  const movements = await getStockMovementsCached(partnerId)
+  const page = await getERPStockMovementsPageAction(partnerId, { cursor: null, limit: 100 })
+  if (!page.success) return <AccessDenied />
 
   return (
     <>
@@ -20,7 +21,9 @@ export default async function StockMovementsPage() {
       <FadeIn className="p-4">
         <StockMovementPageContent
           partnerId={partnerId}
-          movements={movements || []}
+          movements={page.items || []}
+          initialNextCursor={page.nextCursor}
+          initialHasMore={page.hasMore}
         />
       </FadeIn>
     </>

@@ -2,12 +2,13 @@
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { useMediaQuery, useERPData } from "../hooks"
+import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useStore } from "@/lib/store-context"
-import { fetchERPOrdersClient } from "@/app/actions/erp/client-loaders"
 import { useQueryClient } from "@tanstack/react-query"
 import { useUserProfile } from "@/hooks/use-user-profile"
+import { useInfiniteList } from "@/hooks/use-infinite-list"
+import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 
 // Components
 import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Badge, Input, InfoCard } from "@/components/reusable"
@@ -44,7 +45,7 @@ import AlertModal from "../../reusable/AlertModal"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { DropdownItem } from "@/components/reusable/Dropdown"
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
-import { deleteOrdersInBatchAction, updateOrdersStatusInBatchAction } from "@/app/actions/erp/orders"
+import { deleteOrdersInBatchAction, updateOrdersStatusInBatchAction, getERPOrdersPageAction, type ERPOrderListCursor } from "@/app/actions/erp/orders"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
 
 // --- TYPES & INTERFACES ---
@@ -98,7 +99,17 @@ const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; 
     { id: "actions", label: "Ações", align: "center", width: "80px" },
 ]
 
-export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: any[], partnerId: string }) {
+export default function OrdersPage({
+    orders: rawOrders,
+    initialNextCursor,
+    initialHasMore,
+    partnerId
+}: {
+    orders: any[]
+    initialNextCursor: ERPOrderListCursor | null
+    initialHasMore: boolean
+    partnerId: string
+}) {
     const { toast } = useToast()
     const router = useRouter()
     const { selectedStore, isLoading: storeLoading } = useStore()
@@ -131,13 +142,20 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
 
     const queryClient = useQueryClient()
 
-    const { data: queryOrders, isLoading: isQueryLoading } = useERPData(
-        ['erp', 'orders', partnerId],
-        () => fetchERPOrdersClient(),
-        { initialData: rawOrders, isCritical: true }
-    )
+    const queryKey = useMemo(() => ['erp', 'orders', partnerId] as const, [partnerId])
+    const observerTarget = useRef<HTMLDivElement>(null)
 
-    const effectiveOrders = queryOrders ?? rawOrders
+    const { items: effectiveOrders, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading: isQueryLoading } = useInfiniteList<any, ERPOrderListCursor>({
+        queryKey,
+        initialPage: { items: rawOrders, nextCursor: initialNextCursor, hasMore: initialHasMore },
+        fetchFn: async ({ cursor }) => {
+            const res = await getERPOrdersPageAction(partnerId, { cursor, limit: 100 })
+            if (!res.success) throw new Error(res.error || "Erro ao carregar pedidos.")
+            return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
+        },
+        dedupeKey: (o) => String(o?.id || ""),
+    })
+
     const isLoading = storeLoading || isQueryLoading
 
     const itemsPerPage = 8
@@ -170,6 +188,21 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
         window.addEventListener("resize", checkScroll)
         return () => window.removeEventListener("resize", checkScroll)
     }, [checkScroll, effectiveViewMode, effectiveOrders])
+
+    useInfiniteScrollObserver(observerTarget, {
+        enabled: true,
+        hasNextPage: !!hasNextPage,
+        isFetchingNextPage,
+        fetchNextPage: () => fetchNextPage(),
+        rootMargin: "320px",
+        threshold: 0,
+    })
+
+    useEffect(() => {
+        if (page === totalPages && hasNextPage && !isFetchingNextPage) {
+            void fetchNextPage()
+        }
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
 
     const filterSections: FilterSectionConfig[] = useMemo(
         () => [
@@ -842,15 +875,27 @@ export default function OrdersPage({ orders: rawOrders, partnerId }: { orders: a
                                     </motion.div>
                                 )}
                             </AnimatePresence>
+                            {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
                         </div>
 
                         {hasOrders && paginated.length > 0 && (
                             <Pagination
                                 currentPage={page}
                                 totalPages={totalPages}
-                                onPageChange={setPage}
+                                onPageChange={(p) => {
+                                    setPage(p)
+                                    if (p === totalPages && hasNextPage && !isFetchingNextPage) {
+                                        void fetchNextPage()
+                                    }
+                                }}
                             />
                         )}
+                        {hasNextPage && page === totalPages && isFetchingNextPage ? (
+                            <div className="flex flex-col gap-2 py-2 px-4">
+                                <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse" />
+                                <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse opacity-70" />
+                            </div>
+                        ) : null}
                     </div>
                 )}
             </AnimatePresence>

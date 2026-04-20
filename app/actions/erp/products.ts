@@ -1375,3 +1375,59 @@ export const getERPProductsPageData = cache(async () => {
         variants: [] // Variants are loaded on-demand when editing a specific product
     }
 })
+
+export type ERPProductListCursor = { createdAt: string; id: string }
+
+function buildProductsKeysetOrFilter(cursor: ERPProductListCursor): string {
+    const ts = cursor.createdAt
+    const id = cursor.id
+    const q = (s: string) => `"${String(s).replace(/"/g, '""')}"`
+    // Page after (created_at DESC, id DESC)
+    return `created_at.lt.${q(ts)},and(created_at.eq.${q(ts)},id.lt.${q(id)})`
+}
+
+const ERP_PRODUCTS_PAGE_SIZE = 100
+
+export async function getERPProductsPageAction(
+    partnerId: string,
+    options?: { cursor?: ERPProductListCursor | null; limit?: number },
+): Promise<
+    | { success: true; items: any[]; nextCursor: ERPProductListCursor | null; hasMore: boolean }
+    | { success: false; error: string }
+> {
+    try {
+        await requirePartnerAccessWithPermission(partnerId, "products", "view")
+        const supabase = await getSupabaseServerClient()
+
+        const cursor = options?.cursor ?? null
+        const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_PRODUCTS_PAGE_SIZE))))
+        const fetchLimit = limit + 1
+
+        let q = supabase
+            .from("products")
+            .select("id, name, category, brand, stock_quantity, price, min_stock, is_active, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status")
+            .eq("partner_id", partnerId)
+
+        if (cursor) {
+            q = q.or(buildProductsKeysetOrFilter(cursor))
+        }
+
+        const { data, error } = await q
+            .order("created_at", { ascending: false })
+            .order("id", { ascending: false })
+            .limit(fetchLimit)
+
+        if (error) throw error
+
+        const rows = data || []
+        const hasMore = rows.length > limit
+        const items = hasMore ? rows.slice(0, limit) : rows
+        const last = items[items.length - 1]
+        const nextCursor: ERPProductListCursor | null =
+            hasMore && last?.created_at && last?.id ? { createdAt: String(last.created_at), id: String(last.id) } : null
+
+        return { success: true, items, nextCursor, hasMore }
+    } catch (e: any) {
+        return { success: false, error: e?.message || "Erro ao carregar produtos" }
+    }
+}

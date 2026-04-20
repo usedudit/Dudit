@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query"
+import { useQueryClient } from "@tanstack/react-query"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, Checkbox, IconPlaceholder, Badge, ActionsDropdown } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
@@ -42,6 +42,8 @@ import { getFinancialTransactionsAction } from "@/app/actions/erp/transactions"
 import { useRouter } from "next/navigation"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import { useNotification } from "@/hooks/use-notification"
+import { useInfiniteList } from "@/hooks/use-infinite-list"
+import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import {
     EMPTY_DATE_PERIOD,
     resolveDatePeriodBounds,
@@ -169,53 +171,24 @@ export default function TransactionsPage({
     const [settlingGroup, setSettlingGroup] = useState(false)
     const observerTarget = useRef<HTMLDivElement>(null)
 
-    const {
-        data: infiniteData,
-        fetchNextPage,
-        hasNextPage,
-        isFetchingNextPage,
-    } = useInfiniteQuery({
+    const { items: loadedTransactions, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteList<
+        ERPTransaction,
+        FinancialTransactionCursor,
+        FinancialTransactionsPageSuccess
+    >({
         queryKey: financialTransactionsQueryKey(partnerId),
-        initialPageParam: null as FinancialTransactionCursor | null,
-        queryFn: async ({ pageParam }: { pageParam: FinancialTransactionCursor | null }) => {
-            const res = await getFinancialTransactionsAction(partnerId, {
-                cursor: pageParam ?? undefined,
-            })
+        initialPage: {
+            items: initialItems,
+            nextCursor: initialNextCursor,
+            hasMore: initialHasMore,
+        },
+        fetchFn: async ({ cursor }) => {
+            const res = await getFinancialTransactionsAction(partnerId, { cursor })
             if (!res.success) throw new Error(res.error || "Erro ao carregar transações.")
-            return {
-                items: res.items,
-                nextCursor: res.nextCursor,
-                hasMore: res.hasMore,
-            }
+            return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
-        getNextPageParam: (lastPage: FinancialTransactionsPageSuccess) => {
-            if (!lastPage.hasMore) return undefined
-            return lastPage.nextCursor ?? undefined
-        },
-        initialData: {
-            pages: [
-                {
-                    items: initialItems,
-                    nextCursor: initialNextCursor,
-                    hasMore: initialHasMore,
-                },
-            ],
-            pageParams: [null],
-        },
+        dedupeKey: (t) => t.id,
     })
-
-    const loadedTransactions = useMemo(() => {
-        const pages = infiniteData?.pages ?? []
-        const flat = pages.flatMap((p: FinancialTransactionsPageSuccess) => p.items)
-        const seen = new Set<string>()
-        const out: ERPTransaction[] = []
-        for (const item of flat) {
-            if (seen.has(item.id)) continue
-            seen.add(item.id)
-            out.push(item)
-        }
-        return out
-    }, [infiniteData?.pages])
     const [settlePaymentsByInstallment, setSettlePaymentsByInstallment] = useState<
         Record<string, { paymentAmount: string; interestAmount: string; discountAmount: string; paymentMethodId: string }>
     >({})
@@ -572,27 +545,14 @@ export default function TransactionsPage({
         return true
     }, [partnerId, notifyError, queryClient, router])
 
-    const isFetchingNextRef = useRef(false)
-
-    useEffect(() => {
-        if (!hasNextPage) return
-        const el = observerTarget.current
-        if (!el) return
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                if (!entries[0]?.isIntersecting || isFetchingNextRef.current) return
-                isFetchingNextRef.current = true
-                void fetchNextPage().finally(() => {
-                    isFetchingNextRef.current = false
-                })
-            },
-            { rootMargin: "320px", threshold: 0 },
-        )
-
-        observer.observe(el)
-        return () => observer.disconnect()
-    }, [hasNextPage, fetchNextPage])
+    useInfiniteScrollObserver(observerTarget, {
+        enabled: true,
+        hasNextPage: !!hasNextPage,
+        isFetchingNextPage,
+        fetchNextPage: () => fetchNextPage(),
+        rootMargin: "320px",
+        threshold: 0,
+    })
 
     useEffect(() => {
         if (page === totalPages && hasNextPage && !isFetchingNextPage) {

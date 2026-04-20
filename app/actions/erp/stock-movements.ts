@@ -453,3 +453,72 @@ export async function undoBatchStockMovementsAction(ids: string[], customReason?
         return errorResponse("Erro interno ao desfazer movimentações em lote")
     }
 }
+
+export type ERPStockMovementListCursor = { createdAt: string; id: string }
+
+function buildStockMovementKeysetOrFilter(cursor: ERPStockMovementListCursor): string {
+    const ts = cursor.createdAt
+    const id = cursor.id
+    const q = (s: string) => `"${String(s).replace(/"/g, '""')}"`
+    return `created_at.lt.${q(ts)},and(created_at.eq.${q(ts)},id.lt.${q(id)})`
+}
+
+const ERP_STOCK_MOVEMENTS_PAGE_SIZE = 100
+
+export async function getERPStockMovementsPageAction(
+    partnerId: string,
+    options?: { cursor?: ERPStockMovementListCursor | null; limit?: number },
+): Promise<
+    | { success: true; items: any[]; nextCursor: ERPStockMovementListCursor | null; hasMore: boolean }
+    | { success: false; error: string }
+> {
+    try {
+        const user = await requireUser()
+        if (!user) return { success: false, error: "Não autenticado" }
+        await requirePartner()
+
+        const supabase = await getSupabaseServerClient()
+        const cursor = options?.cursor ?? null
+        const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_STOCK_MOVEMENTS_PAGE_SIZE))))
+        const fetchLimit = limit + 1
+
+        let q = supabase
+            .from("stock_movements")
+            .select(`
+                id,
+                created_at,
+                movement_type,
+                order_id,
+                reference_type,
+                reference_name,
+                reason,
+                notes,
+                created_by,
+                orders(order_number),
+                stock_movement_items(quantity, products(name, sku))
+            `)
+            .eq("partner_id", partnerId)
+
+        if (cursor) {
+            q = q.or(buildStockMovementKeysetOrFilter(cursor))
+        }
+
+        const { data, error } = await q
+            .order("created_at", { ascending: false })
+            .order("id", { ascending: false })
+            .limit(fetchLimit)
+
+        if (error) throw error
+
+        const rows = data || []
+        const hasMore = rows.length > limit
+        const items = hasMore ? rows.slice(0, limit) : rows
+        const last = items[items.length - 1]
+        const nextCursor: ERPStockMovementListCursor | null =
+            hasMore && last?.created_at && last?.id ? { createdAt: String(last.created_at), id: String(last.id) } : null
+
+        return { success: true, items, nextCursor, hasMore }
+    } catch (e: any) {
+        return { success: false, error: e?.message || "Erro ao carregar movimentações" }
+    }
+}

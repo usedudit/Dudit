@@ -499,3 +499,63 @@ export async function toggleCustomersStatusAction(customerIds: string[], isActiv
   revalidatePath("/erp/customers")
   return { success: true }
 }
+
+export type ERPCustomerListCursor = { createdAt: string; id: string }
+
+function buildCustomersKeysetOrFilter(cursor: ERPCustomerListCursor): string {
+  const ts = cursor.createdAt
+  const id = cursor.id
+  const q = (s: string) => `"${String(s).replace(/"/g, '""')}"`
+  // Page after (created_at DESC, id DESC)
+  return `created_at.lt.${q(ts)},and(created_at.eq.${q(ts)},id.lt.${q(id)})`
+}
+
+const ERP_CUSTOMERS_PAGE_SIZE = 100
+
+export async function getERPCustomersPageAction(
+  partnerId: string,
+  options?: { cursor?: ERPCustomerListCursor | null; storeId?: string | null; limit?: number },
+): Promise<
+  | { success: true; items: any[]; nextCursor: ERPCustomerListCursor | null; hasMore: boolean }
+  | { success: false; error: string }
+> {
+  try {
+    await requirePartnerAccessWithPermission(partnerId, "customers", "view")
+    const supabase = await getSupabaseServerClient()
+
+    const cursor = options?.cursor ?? null
+    const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_CUSTOMERS_PAGE_SIZE))))
+    const fetchLimit = limit + 1
+
+    let q = supabase
+      .from("customers")
+      .select("id, name, email, phone, status, store_credit, created_at, store_id")
+      .eq("partner_id", partnerId)
+
+    if (options?.storeId) {
+      q = q.eq("store_id", options.storeId)
+    }
+
+    if (cursor) {
+      q = q.or(buildCustomersKeysetOrFilter(cursor))
+    }
+
+    const { data, error } = await q
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(fetchLimit)
+
+    if (error) throw error
+
+    const rows = data || []
+    const hasMore = rows.length > limit
+    const items = hasMore ? rows.slice(0, limit) : rows
+    const last = items[items.length - 1]
+    const nextCursor: ERPCustomerListCursor | null =
+      hasMore && last?.created_at && last?.id ? { createdAt: String(last.created_at), id: String(last.id) } : null
+
+    return { success: true, items, nextCursor, hasMore }
+  } catch (e: any) {
+    return { success: false, error: e?.message || "Erro ao carregar clientes" }
+  }
+}

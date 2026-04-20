@@ -1,10 +1,10 @@
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import OrdersPage from "@/components/erp/orders/OrdersPage"
-import { getPartnerOrdersCached } from "@/lib/data/orders"
 import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { getERPOrdersPageAction } from "@/app/actions/erp/orders"
 
 export const dynamic = "force-dynamic"
 
@@ -16,19 +16,22 @@ export default async function OrdersPageServer() {
   const partnerId = context.partnerId
 
   // Parallelize permission check and data fetch
-  const [{ allowed }, orders] = await Promise.all([
+  const [{ allowed }, page] = await Promise.all([
     checkPartnerPermission(partnerId, "orders", "view"),
-    getPartnerOrdersCached(partnerId),
+    getERPOrdersPageAction(partnerId, { cursor: null, limit: 100 }),
   ])
 
   if (!allowed) return <AccessDenied />
+  if (!page.success) return <AccessDenied />
 
   return (
     <>
       <ERPPageHeader title="Pedidos" />
       <FadeIn className="p-4">
         <OrdersPage
-          orders={orders || []}
+          orders={page.items || []}
+          initialNextCursor={page.nextCursor}
+          initialHasMore={page.hasMore}
           partnerId={partnerId}
         />
       </FadeIn>

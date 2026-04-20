@@ -1,10 +1,10 @@
 import CustomersPage from "@/components/erp/clientes/CustomersPage"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { checkPartnerPermission } from "@/lib/auth/authorization"
-import { getPartnerCustomersCached } from "@/lib/data/customers"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { getERPCustomersPageAction } from "@/app/actions/erp/customers"
 
 export const dynamic = "force-dynamic"
 
@@ -15,18 +15,24 @@ export default async function CustomersRoute() {
   const partnerId = context.partnerId
 
   // Parallelize permission check and data fetch
-  const [{ allowed }, customers] = await Promise.all([
+  const [{ allowed }, page] = await Promise.all([
     checkPartnerPermission(partnerId, "customers", "view"),
-    getPartnerCustomersCached(partnerId),
+    getERPCustomersPageAction(partnerId, { cursor: null, limit: 100 }),
   ])
 
   if (!allowed) return <AccessDenied />
+  if (!page.success) return <AccessDenied />
 
   return (
     <>
       <ERPPageHeader title="Clientes" />
       <FadeIn className="p-4">
-        <CustomersPage partnerId={partnerId} initialCustomers={customers || []} />
+        <CustomersPage
+          partnerId={partnerId}
+          initialCustomers={page.items || []}
+          initialNextCursor={page.nextCursor}
+          initialHasMore={page.hasMore}
+        />
       </FadeIn>
     </>
   )

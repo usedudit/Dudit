@@ -1,23 +1,28 @@
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import ProductsPage from "@/components/erp/product/ProductsPage"
-import { getERPProductsPageData } from "@/app/actions/erp/products"
+import { getERPProductsPageAction } from "@/app/actions/erp/products"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AccessDenied } from "@/components/erp/access-denied"
+import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 
 export const dynamic = "force-dynamic"
 
 export default async function ProductsPageServer() {
-    // Layout already guarantees auth + valid context
-    const data = await getERPProductsPageData()
-    if (!data || !data.products) return <AccessDenied />
-    const partnerId = data.partnerId
+    const context = await getCurrentPartnerContext()
+    if (!context) return <AccessDenied />
+    const partnerId = context.partnerId
+
+    const page = await getERPProductsPageAction(partnerId, { cursor: null, limit: 100 })
+    if (!page.success) return <AccessDenied />
 
     return (
         <>
             <ERPPageHeader title="Produtos" />
             <FadeIn className="p-4">
                 <ProductsPage
-                    products={data.products}
+                    products={page.items}
+                    initialNextCursor={page.nextCursor}
+                    initialHasMore={page.hasMore}
                     partnerId={partnerId}
                     suppliers={[]}
                 />

@@ -2,11 +2,13 @@
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { useMediaQuery, useERPData } from "../hooks"
+import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useStore } from "@/lib/store-context"
-import { fetchERPCustomersClient } from "@/app/actions/erp/client-loaders"
+import { getERPCustomersPageAction, type ERPCustomerListCursor } from "@/app/actions/erp/customers"
 import { useQueryClient } from "@tanstack/react-query"
+import { useInfiniteList } from "@/hooks/use-infinite-list"
+import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 
 // Components
 import { Button, IconPlaceholder, ThreeDotsLoader, Checkbox, Badge, AlertModal } from "@/components/reusable"
@@ -73,7 +75,17 @@ const COLUMNS = [
     { id: "actions", label: "Ações", align: "center" as const, width: "80px" },
 ]
 
-export default function CustomersPage({ partnerId, initialCustomers = [] }: { partnerId: string; initialCustomers?: any[] }) {
+export default function CustomersPage({
+    partnerId,
+    initialCustomers = [],
+    initialNextCursor,
+    initialHasMore,
+}: {
+    partnerId: string
+    initialCustomers?: any[]
+    initialNextCursor: ERPCustomerListCursor | null
+    initialHasMore: boolean
+}) {
     const { toast } = useToast()
     const { selectedStore, isLoading: storeLoading } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
@@ -97,11 +109,37 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
 
     const queryClient = useQueryClient()
 
-    const { data: rawCustomers, isLoading: isQueryLoading, isError: customersError } = useERPData(
-        ['erp', 'customers', partnerId, selectedStore?.id || 'all'],
-        () => fetchERPCustomersClient(selectedStore?.id || null),
-        { initialData: initialCustomers.length > 0 ? initialCustomers : undefined }
+    const queryKey = useMemo(
+        () => ["erp", "customers", partnerId, selectedStore?.id || "all"] as const,
+        [partnerId, selectedStore?.id],
     )
+    const observerTarget = useRef<HTMLDivElement>(null)
+
+    const {
+        items: rawCustomers,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        isLoading: isQueryLoading,
+        isError: customersError,
+    } = useInfiniteList<any, ERPCustomerListCursor>({
+        queryKey,
+        initialPage: {
+            items: initialCustomers,
+            nextCursor: initialNextCursor,
+            hasMore: initialHasMore,
+        },
+        fetchFn: async ({ cursor }) => {
+            const res = await getERPCustomersPageAction(partnerId, {
+                cursor,
+                storeId: selectedStore?.id || null,
+                limit: 100,
+            })
+            if (!res.success) throw new Error(res.error || "Erro ao carregar clientes.")
+            return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
+        },
+        dedupeKey: (c) => String(c?.id || ""),
+    })
 
     const isLoading = storeLoading || (isQueryLoading && !rawCustomers)
     const itemsPerPage = 8
@@ -128,6 +166,21 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
         window.addEventListener("resize", checkScroll)
         return () => window.removeEventListener("resize", checkScroll)
     }, [checkScroll, viewMode, rawCustomers])
+
+    useInfiniteScrollObserver(observerTarget, {
+        enabled: true,
+        hasNextPage: !!hasNextPage,
+        isFetchingNextPage,
+        fetchNextPage: () => fetchNextPage(),
+        rootMargin: "320px",
+        threshold: 0,
+    })
+
+    useEffect(() => {
+        if (page === totalPages && hasNextPage && !isFetchingNextPage) {
+            void fetchNextPage()
+        }
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
 
     const filterSections: FilterSectionConfig[] = [
         { id: "status", title: "Status", type: "checkbox-list", options: ["Ativo", "Inativo", "Bloqueado"] },
@@ -554,15 +607,27 @@ export default function CustomersPage({ partnerId, initialCustomers = [] }: { pa
                             </motion.div>
                         )}
                     </AnimatePresence>
+                    {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
                 </div>
 
                 {hasCustomers && paginated.length > 0 && (
                     <Pagination
                         currentPage={page}
                         totalPages={totalPages}
-                        onPageChange={setPage}
+                        onPageChange={(p) => {
+                            setPage(p)
+                            if (p === totalPages && hasNextPage && !isFetchingNextPage) {
+                                void fetchNextPage()
+                            }
+                        }}
                     />
                 )}
+                {hasNextPage && page === totalPages && isFetchingNextPage ? (
+                    <div className="flex flex-col gap-2 py-2 px-4">
+                        <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse" />
+                        <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse opacity-70" />
+                    </div>
+                ) : null}
             </div>
 
             <FilterSheet

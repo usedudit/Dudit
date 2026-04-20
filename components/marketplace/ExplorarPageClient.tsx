@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo, useRef } from "react"
+import { useState, useMemo, useRef } from "react"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { ItemCard } from "./shared-components"
@@ -13,8 +13,9 @@ import { getPartnerUrl } from "@/lib/utils/url-generator"
 import { motion, AnimatePresence } from "framer-motion"
 import { SkeletonLoader } from "@/components/reusable/SkeletonLoader"
 import { ChevronDown, ChevronLeft } from "lucide-react"
-import { searchMarketplace } from "@/app/actions/marketplace/search"
-import { useInfiniteQuery, keepPreviousData } from "@tanstack/react-query"
+import { searchMarketplace, type MarketplaceListCursor } from "@/app/actions/marketplace/search"
+import { useInfiniteList } from "@/hooks/use-infinite-list"
+import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 
 interface ExplorarPageClientProps {
     initialResults?: any[]
@@ -38,71 +39,49 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
     const observerTarget = useRef<HTMLDivElement>(null)
     const MAX_ITEMS = 300 // Memory cap
 
-    const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-        queryKey: ['explore', query, currentType],
-        initialPageParam: null as any,
-        queryFn: async ({ pageParam }) => {
-            let limits: any = { geral: 40 }
-            if (currentType === 'produtos') limits = { produtos: 40 }
-            else if (currentType === 'servicos') limits = { servicos: 40 }
-            else if (currentType === 'vitrines') limits = { vitrines: 40 }
+    const limitConfig = useMemo(() => {
+        if (currentType === "produtos") return { produtos: 40 } as const
+        if (currentType === "servicos") return { servicos: 40 } as const
+        if (currentType === "vitrines") return { vitrines: 40 } as const
+        return { geral: 40 } as const
+    }, [currentType])
 
-            const nextBatch = await searchMarketplace(query, currentType, {
-                ...limits,
-                cursor: pageParam?.cursor,
-                lastId: pageParam?.lastId
+    const { items: rawItemsUncapped, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteList<
+        any,
+        MarketplaceListCursor
+    >({
+        queryKey: ["explore", query, currentType],
+        initialPage:
+            currentType === type
+                ? { items: initialResults, nextCursor: null, hasMore: initialResults.length >= 40 }
+                : undefined,
+        fetchFn: async ({ cursor }) => {
+            const res = await searchMarketplace(query, currentType as any, {
+                ...limitConfig,
+                cursor,
             })
-            return nextBatch || []
+            return res
         },
-        getNextPageParam: (lastPage) => {
-            if (!lastPage || lastPage.length === 0) return undefined;
-            const lastItem = lastPage[lastPage.length - 1];
-            return {
-                cursor: lastItem.created_at ? new Date(lastItem.created_at).getTime() : undefined,
-                lastId: lastItem.id
-            }
-        },
-        initialData: () => {
-            if (currentType === type) {
-                return { pages: [initialResults], pageParams: [null] }
-            }
-            return undefined
-        },
-        placeholderData: keepPreviousData,
+        dedupeKey: (item) => String(item?.itemType || "") + ":" + String(item?.id || ""),
         staleTime: 60000,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
     })
 
     const rawItems = useMemo(() => {
-        if (currentType !== type && !data) return []
-        const all = data ? data.pages.flat() : initialResults
-        // MEMORY CAP: Discard oldest items if exceeding limit
-        if (all.length > MAX_ITEMS) {
-            return all.slice(0, MAX_ITEMS)
-        }
+        const all = rawItemsUncapped || []
+        if (all.length > MAX_ITEMS) return all.slice(0, MAX_ITEMS)
         return all
-    }, [data, initialResults, currentType, type])
+    }, [rawItemsUncapped])
 
-    // HARDENED IntersectionObserver - single trigger with double-fire protection
-    const isFetchingRef = useRef(false)
-    useEffect(() => {
-        if (!hasNextPage || isFetchingNextPage) return
-        isFetchingRef.current = false
-
-        const observer = new IntersectionObserver((entries) => {
-            if (entries[0].isIntersecting && !isFetchingRef.current) {
-                isFetchingRef.current = true
-                fetchNextPage()
-            }
-        }, {
-            rootMargin: "200px"
-        })
-
-        if (observerTarget.current) observer.observe(observerTarget.current)
-
-        return () => observer.disconnect()
-    }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+    useInfiniteScrollObserver(observerTarget, {
+        enabled: true,
+        hasNextPage: !!hasNextPage,
+        isFetchingNextPage,
+        fetchNextPage: () => fetchNextPage(),
+        rootMargin: "200px",
+        threshold: 0,
+    })
 
     const normalizedInitialResults = useMemo(() => {
         return rawItems.map((item: any) => {

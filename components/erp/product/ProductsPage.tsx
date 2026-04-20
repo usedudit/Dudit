@@ -3,15 +3,17 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-import { useMediaQuery, useERPData } from "../hooks"
+import { useMediaQuery } from "../hooks"
 import { useStore } from "@/lib/store-context"
 import { generateSKUBase } from "@/lib/utils/code-generators"
 import type { Product } from "@/lib/types/product"
 import { motion, AnimatePresence } from "framer-motion"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { UNITS } from "@/lib/constants/product-constants"
-import { fetchERPProductsClient } from "@/app/actions/erp/client-loaders"
 import { useQueryClient } from "@tanstack/react-query"
+import { getERPProductsPageAction, type ERPProductListCursor } from "@/app/actions/erp/products"
+import { useInfiniteList } from "@/hooks/use-infinite-list"
+import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 
 // Actions
 import {
@@ -176,24 +178,36 @@ EmptyState.displayName = "EmptyState"
 
 export default function ProductsPage({
     products: initialProducts,
+    initialNextCursor,
+    initialHasMore,
     partnerId,
     suppliers,
-}: { products: Product[]; partnerId: string; suppliers: any[] }) {
+}: { products: Product[]; initialNextCursor: ERPProductListCursor | null; initialHasMore: boolean; partnerId: string; suppliers: any[] }) {
     const router = useRouter()
     const { toast } = useToast()
     const { selectedStore } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
 
     const queryClient = useQueryClient()
-    const productsQueryKey = ['erp', 'products', partnerId]
+    const productsQueryKey = useMemo(() => ['erp', 'products', partnerId] as const, [partnerId])
 
-    const { data: queryProducts, isLoading: isQueryLoading } = useERPData(
-        productsQueryKey,
-        () => fetchERPProductsClient(),
-        { initialData: initialProducts, isCritical: true }
-    )
-
-    const effectiveBaseProducts = queryProducts ?? initialProducts
+    const observerTarget = useRef<HTMLDivElement>(null)
+    const {
+        items: effectiveBaseProducts,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        isLoading: isQueryLoading,
+    } = useInfiniteList<any, ERPProductListCursor>({
+        queryKey: productsQueryKey,
+        initialPage: { items: initialProducts, nextCursor: initialNextCursor, hasMore: initialHasMore },
+        fetchFn: async ({ cursor }) => {
+            const res = await getERPProductsPageAction(partnerId, { cursor, limit: 100 })
+            if (!res.success) throw new Error(res.error || "Erro ao carregar produtos.")
+            return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
+        },
+        dedupeKey: (p) => String(p?.id || ""),
+    })
 
     // State
     const [data, setData] = useState<{ products: Product[], search: string, debouncedSearch: string, page: number }>({ products: effectiveBaseProducts, search: "", debouncedSearch: "", page: 1 })
@@ -207,6 +221,15 @@ export default function ProductsPage({
             prevProductsRef.current = effectiveBaseProducts
         }
     }, [effectiveBaseProducts])
+
+    useInfiniteScrollObserver(observerTarget, {
+        enabled: true,
+        hasNextPage: !!hasNextPage,
+        isFetchingNextPage,
+        fetchNextPage: () => fetchNextPage(),
+        rootMargin: "320px",
+        threshold: 0,
+    })
 
     const [selection, setSelection] = useState({ ids: new Set<string>(), product: null as Product | null, delete: null as Product | null, duplicate: null as Partial<Product> | null, loadingDetails: false })
     const [actionModal, setActionModal] = useState<{ open: boolean; text: string }>({ open: false, text: "" })
@@ -877,15 +900,27 @@ export default function ProductsPage({
                             </motion.div>
                         )}
                     </AnimatePresence>
+                    {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
                 </div>
 
                 {hasProducts && paginated.length > 0 && (
                     <Pagination
                         currentPage={data.page}
                         totalPages={totalPages}
-                        onPageChange={(p) => setData(prev => ({ ...prev, page: p }))}
+                        onPageChange={(p) => {
+                            setData(prev => ({ ...prev, page: p }))
+                            if (p === totalPages && hasNextPage && !isFetchingNextPage) {
+                                void fetchNextPage()
+                            }
+                        }}
                     />
                 )}
+                {hasNextPage && data.page === totalPages && isFetchingNextPage ? (
+                    <div className="flex flex-col gap-2 py-2 px-4">
+                        <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse" />
+                        <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse opacity-70" />
+                    </div>
+                ) : null}
 
             </div>
 

@@ -876,6 +876,117 @@ export async function getCashSessionsHistoryAction(partnerId: string) {
   return { success: true as const, data: mapped }
 }
 
+export type ERPCashSessionListCursor = { openedAt: string; id: string }
+
+function buildCashSessionsKeysetOrFilter(cursor: ERPCashSessionListCursor): string {
+  const ts = cursor.openedAt
+  const id = cursor.id
+  const q = (s: string) => `"${String(s).replace(/"/g, '""')}"`
+  // Page after (opened_at DESC, id DESC)
+  return `opened_at.lt.${q(ts)},and(opened_at.eq.${q(ts)},id.lt.${q(id)})`
+}
+
+const ERP_CASH_SESSIONS_PAGE_SIZE = 100
+
+export async function getCashSessionsHistoryPageAction(
+  partnerId: string,
+  options?: { cursor?: ERPCashSessionListCursor | null; limit?: number },
+) {
+  await requirePartnerAccess(partnerId)
+  const supabase = await getSupabaseServerClient()
+
+  const cursor = options?.cursor ?? null
+  const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_CASH_SESSIONS_PAGE_SIZE))))
+  const fetchLimit = limit + 1
+
+  let q = supabase
+    .from("cash_sessions")
+    .select("id, opened_by_user_id, closed_by_user_id, opened_at, closed_at, initial_amount, closing_amount, calculated_amount, difference_amount, status, notes, created_at")
+    .eq("partner_id", partnerId)
+
+  if (cursor) q = q.or(buildCashSessionsKeysetOrFilter(cursor))
+
+  const { data: sessions, error: sessionError } = await q
+    .order("opened_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(fetchLimit)
+
+  if (sessionError) return { success: false as const, error: sessionError.message }
+
+  const rows = sessions || []
+  const hasMore = rows.length > limit
+  const pageItems = hasMore ? rows.slice(0, limit) : rows
+
+  const sessionIds = pageItems.map((s: { id: string }) => s.id)
+  const { data: movementRows } = sessionIds.length > 0
+    ? await supabase
+      .from("cash_movements")
+      .select("cash_session_id, type, amount, reversed_at, payment_method_id")
+      .eq("partner_id", partnerId)
+      .in("cash_session_id", sessionIds)
+    : { data: [] as any[] }
+
+  const userIds = Array.from(
+    new Set(
+      (pageItems || [])
+        .flatMap((s: any) => [s.opened_by_user_id, s.closed_by_user_id])
+        .filter(Boolean),
+    ),
+  ) as string[]
+
+  const { data: users } = userIds.length > 0
+    ? await supabase.from("user_profiles").select("user_id, full_name").in("user_id", userIds)
+    : { data: [] as any[] }
+
+  const userMap = new Map<string, string>((users || []).map((u: any) => [u.user_id, u.full_name || "Usuário"]))
+
+  const pmIds = Array.from(
+    new Set((movementRows || []).map((r: any) => r.payment_method_id).filter(Boolean)),
+  ) as string[]
+  const pmType = new Map<string, string>()
+  if (pmIds.length > 0) {
+    const { data: pms } = await supabase.from("payment_methods").select("id, type").eq("partner_id", partnerId).in("id", pmIds)
+    for (const pm of pms || []) pmType.set(pm.id, pm.type || "other")
+  }
+
+  const drawerBySession = new Map<string, number>()
+  for (const row of movementRows || []) {
+    if (row.reversed_at) continue
+    const sid = row.cash_session_id
+    const amt = money(Number(row.amount || 0))
+    if (!(amt > 0)) continue
+    let delta = 0
+    if (row.type === "deposit") delta = amt
+    else if (row.type === "withdrawal" || row.type === "refund") delta = -amt
+    else if (row.type === "sale") {
+      const isCash = !row.payment_method_id || pmType.get(row.payment_method_id) === "cash"
+      if (isCash) delta = amt
+    }
+    drawerBySession.set(sid, money((drawerBySession.get(sid) || 0) + delta))
+  }
+
+  const items = (pageItems || []).map((s: any) => {
+    const initial = money(Number(s.initial_amount ?? 0))
+    const drawerDelta = drawerBySession.get(s.id) || 0
+    return {
+      ...s,
+      initial_amount: initial,
+      closing_amount: s.closing_amount ?? null,
+      user_name: userMap.get(s.opened_by_user_id) || "Usuário",
+      opened_by_name: userMap.get(s.opened_by_user_id) || "Usuário",
+      closed_by_name: s.closed_by_user_id ? userMap.get(s.closed_by_user_id) || "Usuário" : null,
+      drawer_movement_net: drawerDelta,
+      expected_drawer_total: money(initial + drawerDelta),
+    }
+  })
+
+  const last = items[items.length - 1]
+  const nextCursor: ERPCashSessionListCursor | null =
+    hasMore && last?.opened_at && last?.id ? { openedAt: String(last.opened_at), id: String(last.id) } : null
+
+  return { success: true as const, items, nextCursor, hasMore }
+}
+
 export async function getCashSessionDetailsAction(partnerId: string, cashSessionId: string) {
   await requirePartnerAccess(partnerId)
   const supabase = await getSupabaseServerClient()

@@ -23,6 +23,95 @@ import {
 import { checkLimit, increment_usage_counter, decrement_usage_counter } from "@/lib/services/subscription.service"
 import { withTelemetry } from "@/lib/utils/action-logger"
 
+export type ERPQuoteListCursor = { createdAt: string; id: string }
+
+function buildQuotesKeysetOrFilter(cursor: ERPQuoteListCursor): string {
+    const ts = cursor.createdAt
+    const id = cursor.id
+    const q = (s: string) => `"${String(s).replace(/"/g, '""')}"`
+    // Page after (created_at DESC, id DESC)
+    return `created_at.lt.${q(ts)},and(created_at.eq.${q(ts)},id.lt.${q(id)})`
+}
+
+const ERP_QUOTES_PAGE_SIZE = 100
+
+export async function getERPQuotesPageAction(
+    partnerId: string,
+    options?: { cursor?: ERPQuoteListCursor | null; limit?: number },
+): Promise<
+    | { success: true; items: any[]; nextCursor: ERPQuoteListCursor | null; hasMore: boolean }
+    | { success: false; error: string }
+> {
+    return withTelemetry("getERPQuotesPageAction", async () => {
+        try {
+            const user = await requireUser()
+            await requirePartnerAccessWithPermission(partnerId, "quotes", "view", user)
+
+            const supabase = await getSupabaseServerClient()
+            const cursor = options?.cursor ?? null
+            const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_QUOTES_PAGE_SIZE))))
+            const fetchLimit = limit + 1
+
+            let q = supabase
+                .from("quotes")
+                .select(
+                    `
+                    id,
+                    quote_number,
+                    status,
+                    issue_date,
+                    expiration_date,
+                    total,
+                    customer_id,
+                    created_at,
+                    updated_at,
+                    customers (id, name, email),
+                    items_count:quote_items(count),
+                    user_profiles:created_by_user_id(full_name)
+                `,
+                )
+                .eq("partner_id", partnerId)
+
+            if (cursor) {
+                q = q.or(buildQuotesKeysetOrFilter(cursor))
+            }
+
+            const { data, error } = await q
+                .order("created_at", { ascending: false })
+                .order("id", { ascending: false })
+                .limit(fetchLimit)
+
+            if (error) throw error
+
+            // Mark expired quotes on read (virtual status)
+            const now = new Date()
+            now.setHours(0, 0, 0, 0)
+
+            const mappedData = (data || []).map((row: any) => {
+                if (
+                    row.expiration_date &&
+                    (row.status === "draft" || row.status === "sent") &&
+                    new Date(row.expiration_date) < now
+                ) {
+                    return { ...row, status: "expired", _originalStatus: row.status }
+                }
+                return row
+            })
+
+            const rows = mappedData
+            const hasMore = rows.length > limit
+            const items = hasMore ? rows.slice(0, limit) : rows
+            const last = items[items.length - 1]
+            const nextCursor: ERPQuoteListCursor | null =
+                hasMore && last?.created_at && last?.id ? { createdAt: String(last.created_at), id: String(last.id) } : null
+
+            return { success: true, items, nextCursor, hasMore }
+        } catch (e: any) {
+            return { success: false, error: e?.message || "Erro ao carregar orçamentos" }
+        }
+    })
+}
+
 function quoteItemsEditBlockedMessage(status: string): string {
     const s = normalizeQuoteStatus(status)
     if (s === "sent") return MSG_SENT_FINANCIAL

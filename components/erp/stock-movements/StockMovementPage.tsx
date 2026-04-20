@@ -19,10 +19,12 @@ import StockMovementDetailPage from './StockMovementDetailPage';
 import StockMovementPageControls from './StockMovementPageControls';
 import StockMovementListItem from './StockMovementListItem';
 import StockMovementGridCard from './StockMovementGridCard';
-import { undoStockMovementAction, undoBatchStockMovementsAction, getStockMovementDetails } from '@/app/actions/erp/stock-movements';
+import { undoStockMovementAction, undoBatchStockMovementsAction, getStockMovementDetails, getERPStockMovementsPageAction, type ERPStockMovementListCursor } from '@/app/actions/erp/stock-movements';
 import { useNotification } from '@/hooks/use-notification';
 import { useMediaQuery } from '@/components/erp/hooks';
 import { FadeIn } from '@/components/animations/FadeIn';
+import { useInfiniteList } from '@/hooks/use-infinite-list';
+import { useInfiniteScrollObserver } from '@/hooks/use-infinite-scroll-observer';
 import {
     EMPTY_DATE_PERIOD,
     resolveDatePeriodBounds,
@@ -35,6 +37,8 @@ import {
 interface StockMovementPageProps {
     partnerId: string;
     movements: any[];
+    initialNextCursor: ERPStockMovementListCursor | null;
+    initialHasMore: boolean;
 }
 
 type TabType = 'all' | 'in' | 'out';
@@ -52,7 +56,7 @@ const MOVEMENT_TYPE_LABELS: Record<string, string> = {
     'lost': 'Perda',
 };
 
-const StockMovementPageContent = ({ partnerId, movements: initialMovements }: StockMovementPageProps) => {
+const StockMovementPageContent = ({ partnerId, movements: initialMovements, initialNextCursor, initialHasMore }: StockMovementPageProps) => {
     const { error: notifyError, success: notifySuccess } = useNotification();
     const isMobile = useMediaQuery("(max-width: 768px)");
 
@@ -88,6 +92,19 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
 
     const tableContainerRef = useRef<HTMLDivElement>(null);
     const [scrollState, setScrollState] = useState({ left: false, right: false });
+
+    const observerTarget = useRef<HTMLDivElement>(null);
+    const queryKey = useMemo(() => ['erp', 'stock-movements', partnerId] as const, [partnerId]);
+    const { items: loadedMovements, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteList<any, ERPStockMovementListCursor>({
+        queryKey,
+        initialPage: { items: initialMovements, nextCursor: initialNextCursor, hasMore: initialHasMore },
+        fetchFn: async ({ cursor }) => {
+            const res = await getERPStockMovementsPageAction(partnerId, { cursor, limit: 100 })
+            if (!res.success) throw new Error(res.error || 'Erro ao carregar movimentações.')
+            return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
+        },
+        dedupeKey: (m) => String(m?.id || ''),
+    });
 
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return;
@@ -196,7 +213,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
     };
 
     const formattedMovements = useMemo(() => {
-        return (initialMovements || []).map(mov => {
+        return (loadedMovements || []).map(mov => {
             const dateObj = new Date(mov.created_at);
             let reason = mov.reason || MOVEMENT_TYPE_LABELS[mov.movement_type] || mov.movement_type;
             const orderReference = mov.order_id && mov.orders?.order_number
@@ -234,7 +251,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                 notes: mov.notes || '',
             };
         });
-    }, [initialMovements]);
+    }, [loadedMovements]);
 
     const filteredMovements = useMemo(() => {
         const { startYmd, endYmd } = resolveDatePeriodBounds(filters.datePeriod);
@@ -297,6 +314,21 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
         (page - 1) * ITEMS_PER_PAGE,
         page * ITEMS_PER_PAGE
     );
+
+    useInfiniteScrollObserver(observerTarget, {
+        enabled: true,
+        hasNextPage: !!hasNextPage,
+        isFetchingNextPage,
+        fetchNextPage: () => fetchNextPage(),
+        rootMargin: "320px",
+        threshold: 0,
+    });
+
+    useEffect(() => {
+        if (page === totalPages && hasNextPage && !isFetchingNextPage) {
+            void fetchNextPage()
+        }
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
     const handleClearFilters = () => {
         setSearchTerm("");
@@ -551,15 +583,27 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements }: St
                             </motion.div>
                         )}
                     </AnimatePresence>
+                    {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
                 </div>
 
                 {filteredMovements.length > 0 && (
                     <Pagination
                         currentPage={page}
                         totalPages={totalPages}
-                        onPageChange={setPage}
+                        onPageChange={(p) => {
+                            setPage(p)
+                            if (p === totalPages && hasNextPage && !isFetchingNextPage) {
+                                void fetchNextPage()
+                            }
+                        }}
                     />
                 )}
+                {hasNextPage && page === totalPages && isFetchingNextPage ? (
+                    <div className="flex flex-col gap-2 py-2 px-4">
+                        <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse" />
+                        <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse opacity-70" />
+                    </div>
+                ) : null}
             </div>
 
             <FilterSheet

@@ -1,40 +1,37 @@
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import QuotesPage from "@/components/erp/quotes/QuotesPage"
-import { getPartnerQuotesCached } from "@/lib/data/quotes"
 import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { getERPQuotesPageAction } from "@/app/actions/erp/quotes"
 
 export const dynamic = "force-dynamic"
 
-export default async function QuotesPageServer({ searchParams }: { searchParams: { page?: string } }) {
+export default async function QuotesPageServer() {
     // Layout already guarantees auth + valid context
     const context = await getCurrentPartnerContext()
     if (!context) return <AccessDenied />
 
     const partnerId = context.partnerId
-    const page = Number(searchParams?.page) || 1
-    const limit = 50
-    const offset = (page - 1) * limit
 
     // Parallelize permission check and data fetch
-    const [{ allowed }, { data: quotes, total }] = await Promise.all([
+    const [{ allowed }, page] = await Promise.all([
         checkPartnerPermission(partnerId, "quotes", "view"),
-        getPartnerQuotesCached(partnerId, limit, offset),
+        getERPQuotesPageAction(partnerId, { cursor: null, limit: 100 }),
     ])
 
     if (!allowed) return <AccessDenied />
+    if (!page.success) return <AccessDenied />
 
     return (
         <>
             <ERPPageHeader title="Orçamentos" />
             <FadeIn className="p-4">
                 <QuotesPage
-                    quotes={quotes || []}
-                    totalQuotes={total}
-                    currentPage={page}
-                    limit={limit}
+                    quotes={page.items || []}
+                    initialNextCursor={page.nextCursor}
+                    initialHasMore={page.hasMore}
                     partnerId={partnerId}
                 />
             </FadeIn>

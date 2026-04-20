@@ -34,6 +34,8 @@ export const searchMarketplaceDirect = cache(async (
     return results
 })
 
+export type MarketplaceListCursor = { createdAt: string; id: string }
+
 /**
  * SERVER ACTION para uso do CLIENT (infinite scroll, busca manual).
  * Aplica rate limiting para proteção contra bots.
@@ -41,16 +43,47 @@ export const searchMarketplaceDirect = cache(async (
 export const searchMarketplace = async (
     query: string,
     type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' = 'tudo',
-    limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string } = {}
+    limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: MarketplaceListCursor | null } = {}
 ) => {
     // Rate limit APENAS para chamadas do client (POST / Server Actions)
     const { success } = await requireRateLimit(RateLimitCategory.API_GENERAL)
     if (!success) {
         console.warn("[Security] Rate limit exceeded on searchMarketplace")
-        return []
+        return { items: [], nextCursor: null, hasMore: false as const }
     }
-    const { results } = await _searchMarketplaceCore(query, type, limits)
-    return results
+
+    const cursor = limits.cursor ?? null
+    const cursorMs = cursor?.createdAt ? new Date(cursor.createdAt).getTime() : undefined
+    const lastId = cursor?.id || undefined
+
+    const { results } = await _searchMarketplaceCore(query, type, {
+        vitrines: limits.vitrines,
+        produtos: limits.produtos,
+        servicos: limits.servicos,
+        geral: limits.geral,
+        cursor: Number.isFinite(cursorMs as any) ? cursorMs : undefined,
+        lastId,
+    })
+
+    // Normalize pagination response to the app-wide standard.
+    const items = results || []
+    const last = items[items.length - 1]
+    const nextCursor: MarketplaceListCursor | null =
+        last?.created_at && last?.id ? { createdAt: String(last.created_at), id: String(last.id) } : null
+
+    // This search backend doesn’t currently expose an exact hasMore flag.
+    // We conservatively assume "hasMore" when we got a full page.
+    const limitCount =
+        type === "tudo"
+            ? (limits.geral ?? 40)
+            : type === "vitrines"
+              ? (limits.vitrines ?? 4)
+              : type === "produtos"
+                ? (limits.produtos ?? 20)
+                : (limits.servicos ?? 20)
+
+    const hasMore = items.length >= limitCount && !!nextCursor
+    return { items, nextCursor, hasMore }
 }
 
 

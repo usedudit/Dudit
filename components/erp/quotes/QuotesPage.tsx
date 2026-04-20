@@ -40,8 +40,10 @@ import {
     TelegramIcon,
     ClockIcon
 } from "@/lib/icons"
-import { useRouter } from "next/navigation"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
+import { useInfiniteList } from "@/hooks/use-infinite-list"
+import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
+import { getERPQuotesPageAction, type ERPQuoteListCursor } from "@/app/actions/erp/quotes"
 
 // --- TYPES & INTERFACES ---
 
@@ -85,20 +87,51 @@ const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; 
     { id: "actions", label: "Ações", align: "center", width: "80px" },
 ]
 
-export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, currentPage = 1, limit = 50 }: { quotes: any[], partnerId: string, totalQuotes?: number, currentPage?: number, limit?: number }) {
+export default function QuotesPage({
+    quotes: rawQuotes,
+    initialNextCursor,
+    initialHasMore,
+    partnerId,
+}: {
+    quotes: any[]
+    initialNextCursor: ERPQuoteListCursor | null
+    initialHasMore: boolean
+    partnerId: string
+}) {
     const { success, error } = useNotification()
-    const router = useRouter()
     const debouncedRefresh = useDebouncedRefresh()
     const { isLoading: storeLoading } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
 
-    // Local state for instant updates
-    const [currentQuotes, setCurrentQuotes] = useState<any[]>(rawQuotes)
+    const queryKey = useMemo(() => ["erp", "quotes", partnerId] as const, [partnerId])
+    const observerTarget = useRef<HTMLDivElement>(null)
 
+    const {
+        items: loadedQuotes,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+    } = useInfiniteList<any, ERPQuoteListCursor>({
+        queryKey,
+        initialPage: { items: rawQuotes, nextCursor: initialNextCursor, hasMore: initialHasMore },
+        fetchFn: async ({ cursor }) => {
+            const res = await getERPQuotesPageAction(partnerId, { cursor, limit: 100 })
+            if (!res.success) throw new Error(res.error || "Erro ao carregar orçamentos.")
+            return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
+        },
+        dedupeKey: (q) => String(q?.id || ""),
+    })
+
+    // Local state for instant updates (optimistic delete etc.)
+    const [currentQuotes, setCurrentQuotes] = useState<any[]>(loadedQuotes)
+    const prevQuotesRef = useRef<any[]>(loadedQuotes)
     useEffect(() => {
-        setCurrentQuotes(rawQuotes)
-    }, [rawQuotes])
+        if (prevQuotesRef.current !== loadedQuotes) {
+            setCurrentQuotes(loadedQuotes)
+            prevQuotesRef.current = loadedQuotes
+        }
+    }, [loadedQuotes])
 
     // State
     const [wrapperMode, setWrapperMode] = useState<'create' | 'edit' | 'duplicate' | 'view' | null>(null)
@@ -107,7 +140,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
     const [debouncedSearch, setDebouncedSearch] = useState("")
     const [activeTab, setActiveTab] = useState<"Todos" | "Enviados" | "Aprovados" | "Rejeitados" | "Expirados">("Todos")
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
-    const [page, setPage] = useState(currentPage)
+    const [page, setPage] = useState(1)
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
     const [modals, setModals] = useState({ filter: false, delete: false })
     const [selection, setSelection] = useState({ ids: new Set<string>() })
@@ -141,7 +174,7 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
         checkScroll()
         window.addEventListener("resize", checkScroll)
         return () => window.removeEventListener("resize", checkScroll)
-    }, [checkScroll, viewMode, rawQuotes])
+    }, [checkScroll, viewMode, currentQuotes])
 
     const filterSections: FilterSectionConfig[] = [
         { id: "status", title: "Status", type: "checkbox-list", options: ["Rascunho", "Enviado", "Aprovado", "Rejeitado", "Expirado"] },
@@ -272,15 +305,14 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
         return result;
     }, [currentQuotes, debouncedSearch, activeTab, filters, sortConfig])
 
-    const isServerPaginated = (totalQuotes !== undefined)
-    const totalPages = isServerPaginated ? Math.ceil(totalQuotes / limit) : Math.ceil(filteredQuotes.length / itemsPerPage)
-    const paginated = isServerPaginated ? filteredQuotes : filteredQuotes.slice((page - 1) * itemsPerPage, page * itemsPerPage)
+    const totalPages = Math.ceil(filteredQuotes.length / itemsPerPage) || 1
+    const paginated = filteredQuotes.slice((page - 1) * itemsPerPage, page * itemsPerPage)
 
     const hasActiveFilters =
         filters.status.length > 0 ||
         isDatePeriodFilterActive(filters.issuePeriod) ||
         debouncedSearch.length > 0
-    const hasQuotes = (rawQuotes?.length || 0) > 0
+    const hasQuotes = (currentQuotes?.length || 0) > 0
 
     // Handlers
     const handleAddQuote = useCallback(() => {
@@ -389,12 +421,26 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
     }, [])
 
     const handlePageChange = useCallback((newPage: number) => {
-        if (isServerPaginated) {
-            router.push(`?page=${newPage}`)
-        } else {
-            setPage(newPage)
+        setPage(newPage)
+        if (newPage === totalPages && hasNextPage && !isFetchingNextPage) {
+            void fetchNextPage()
         }
-    }, [isServerPaginated, router])
+    }, [totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
+
+    useInfiniteScrollObserver(observerTarget, {
+        enabled: true,
+        hasNextPage: !!hasNextPage,
+        isFetchingNextPage,
+        fetchNextPage: () => fetchNextPage(),
+        rootMargin: "320px",
+        threshold: 0,
+    })
+
+    useEffect(() => {
+        if (page === totalPages && hasNextPage && !isFetchingNextPage) {
+            void fetchNextPage()
+        }
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
 
 
     return (
@@ -682,13 +728,20 @@ export default function QuotesPage({ quotes: rawQuotes, partnerId, totalQuotes, 
                             </AnimatePresence>
                         </div>
 
-                        {(isServerPaginated ? totalPages > 0 : paginated.length > 0) && (
+                        {paginated.length > 0 && (
                             <Pagination
-                                currentPage={isServerPaginated ? currentPage : page}
+                                currentPage={page}
                                 totalPages={totalPages}
                                 onPageChange={handlePageChange}
                             />
                         )}
+                        {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
+                        {hasNextPage && page === totalPages && isFetchingNextPage ? (
+                            <div className="flex flex-col gap-2 py-2 px-4">
+                                <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse" />
+                                <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse opacity-70" />
+                            </div>
+                        ) : null}
                     </div>
                 )}
             </AnimatePresence>
