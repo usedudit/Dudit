@@ -125,21 +125,6 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
         </button>
       )}
 
-      <button
-        type="button"
-        onClick={onOpenDiscount}
-        className="flex w-full items-center justify-between rounded-full border border-brand-border bg-brand-gray/50 dark:bg-brand-border/50 px-1 py-1 text-left"
-      >
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-dark text-white">
-            <TagIcon className="h-4 w-4" />
-          </div>
-          <span className="font-bold text-brand-dark dark:text-dark-heading">
-            {discountVal > 0 ? `Desconto Aplicado (${formatCurrency(discountVal)})` : "Aplicar Desconto"}
-          </span>
-        </div>
-      </button>
-
       <div className="space-y-3 pt-1 text-sm">
         <div className="flex items-center justify-between text-brand-inactive-text dark:text-dark-body">
           <span>Sub-Total</span>

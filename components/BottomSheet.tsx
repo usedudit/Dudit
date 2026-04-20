@@ -108,7 +108,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
                                 {/* Handle - área de drag, não permite scroll aqui */}
                                 <div className="shrink-0 p-4 cursor-grab active:cursor-grabbing">
 
-                                    <div className="w-10 h-1.5 bg-gray-300 rounded-full mx-auto mb-3" />
+                                    <div className="w-10 h-1.5 bg-gray-300 dark:bg-dark-border rounded-full mx-auto mb-3" />
 
                                     {title && (
                                         <h2 className="text-lg font-bold text-center">

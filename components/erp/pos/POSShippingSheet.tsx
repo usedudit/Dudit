@@ -1,13 +1,11 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { SearchIcon, XIcon, PlusIcon } from "@/lib/icons"
-import { Button, Input, CepInput, CustomerCard, Checkbox, MoneyInput } from "@/components/reusable"
+import { useEffect, useState } from "react"
+import { XIcon } from "@/lib/icons"
+import { Button, CepInput, CustomerCard, Checkbox, MoneyInput, Input } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
-
-type ShippingCustomer = { id: string; name: string }
 
 type ShippingCustomerDetails = {
   id: string
@@ -27,31 +25,12 @@ type ShippingCustomerDetails = {
   } | null
 } | null
 
-type NewCustomerPayload = {
-  name: string
-  email: string
-  phone: string
-  cpf: string
-  address: {
-    zipCode: string
-    street: string
-    number: string
-    complement: string
-    neighborhood: string
-    city: string
-    state: string
-  }
-}
-
 interface POSShippingSheetProps {
   isOpen: boolean
   onClose: () => void
-  customers: ShippingCustomer[]
   selectedCustomerId?: string
   customerDetails: ShippingCustomerDetails
   currentShippingFee: number
-  onSelectCustomer: (customerId: string) => Promise<void> | void
-  onCreateCustomer: (payload: NewCustomerPayload) => Promise<void> | void
   onCreateAddress: (payload: {
     customerId: string
     address: {
@@ -65,34 +44,23 @@ interface POSShippingSheetProps {
     }
   }) => Promise<void> | void
   onApply: (payload: { shippingFee: number }) => void
-  isCreatingCustomer?: boolean
 }
 
 export default function POSShippingSheet({
   isOpen,
   onClose,
-  customers,
   selectedCustomerId,
   customerDetails,
   currentShippingFee,
-  onSelectCustomer,
-  onCreateCustomer,
   onCreateAddress,
   onApply,
-  isCreatingCustomer = false,
 }: POSShippingSheetProps) {
   const isMobile = useMediaQuery("(max-width: 768px)")
-  const [search, setSearch] = useState("")
-  const [mode, setMode] = useState<"select" | "create">("select")
   const [shippingInput, setShippingInput] = useState(Number(currentShippingFee || 0))
   const [shippingFree, setShippingFree] = useState(currentShippingFee <= 0)
   const [isAddressSheetOpen, setIsAddressSheetOpen] = useState(false)
   const [isSavingAddress, setIsSavingAddress] = useState(false)
 
-  const [newCustomerName, setNewCustomerName] = useState("")
-  const [newCustomerEmail, setNewCustomerEmail] = useState("")
-  const [newCustomerPhone, setNewCustomerPhone] = useState("")
-  const [newCustomerCpf, setNewCustomerCpf] = useState("")
   const [zipCode, setZipCode] = useState("")
   const [street, setStreet] = useState("")
   const [number, setNumber] = useState("")
@@ -105,7 +73,6 @@ export default function POSShippingSheet({
     if (!isOpen) return
     setShippingInput(Number(currentShippingFee || 0))
     setShippingFree(currentShippingFee <= 0)
-    if (selectedCustomerId) setMode("select")
   }, [isOpen, currentShippingFee])
 
   useEffect(() => {
@@ -119,31 +86,8 @@ export default function POSShippingSheet({
     setState(customerDetails.address.state || "")
   }, [customerDetails?.id])
 
-  useEffect(() => {
-    if (!selectedCustomerId) return
-    setMode("select")
-  }, [selectedCustomerId])
-
-  const filteredCustomers = useMemo(
-    () => customers.filter((customer) => customer.name.toLowerCase().includes(search.toLowerCase())),
-    [customers, search]
-  )
-
-  const handleCreateCustomer = async () => {
-    await onCreateCustomer({
-      name: newCustomerName.trim(),
-      email: newCustomerEmail.trim(),
-      phone: newCustomerPhone.trim(),
-      cpf: newCustomerCpf.trim(),
-      address: { zipCode, street, number, complement, neighborhood, city, state },
-    })
-  }
-
   const hasSelectedCustomer = !!selectedCustomerId
-  const hasSelectedCustomerAddress = !!customerDetails?.address?.street
-  const showCustomerDetailsBlock = hasSelectedCustomer && hasSelectedCustomerAddress
-  const showShippingInput = showCustomerDetailsBlock
-  const showCustomerModeSwitcher = !hasSelectedCustomer
+  const hasStreet = !!customerDetails?.address?.street?.trim()
   const shippingFeeValue = shippingFree ? 0 : Math.max(0, Number(shippingInput || 0))
 
   const content = (
@@ -156,80 +100,22 @@ export default function POSShippingSheet({
       </header>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-6">
-        {showCustomerModeSwitcher && (
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant={mode === "select" ? "default" : "outline"} onClick={() => setMode("select")}>
-              Selecionar cliente
-            </Button>
-            <Button variant={mode === "create" ? "default" : "outline"} onClick={() => setMode("create")}>
-              Novo cliente
-            </Button>
-          </div>
+        {!hasSelectedCustomer && (
+          <p className="text-sm text-brand-inactive-text">
+            Selecione um cliente no PDV para configurar o envio.
+          </p>
         )}
 
-        {mode === "select" ? (
-          <div className="space-y-3">
-            <Input
-              label=""
-              name="shippingCustomerSearch"
-              placeholder="Buscar cliente..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
-              variant="full-rounded"
-              className="mb-0"
-            />
-            <div className="max-h-56 space-y-2 overflow-y-auto">
-              {filteredCustomers.map((customer) => (
-                <button
-                  key={customer.id}
-                  type="button"
-                  onClick={() => onSelectCustomer(customer.id)}
-                  className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left ${
-                    selectedCustomerId === customer.id
-                      ? "border-brand-primary bg-brand-primary/10"
-                      : "border-brand-border bg-white hover:bg-brand-gray/30"
-                  }`}
-                >
-                  <span className="font-bold text-brand-dark">{customer.name}</span>
-                  <PlusIcon className="h-4 w-4 text-brand-inactive-text" />
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <Input label="Nome" name="newCustomerName" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} />
-            <Input label="Email" name="newCustomerEmail" type="email" value={newCustomerEmail} onChange={(e) => setNewCustomerEmail(e.target.value)} />
-            <Input label="CPF" name="newCustomerCpf" value={newCustomerCpf} onChange={(e) => setNewCustomerCpf(e.target.value)} />
-            <Input label="Telefone" name="newCustomerPhone" value={newCustomerPhone} onChange={(e) => setNewCustomerPhone(e.target.value)} />
-            <Button className="w-full" onClick={handleCreateCustomer} isLoading={isCreatingCustomer}>
-              Cadastrar cliente
-            </Button>
-          </div>
-        )}
-
-        {hasSelectedCustomer && !hasSelectedCustomerAddress && (
-          <div className="rounded-xl border border-brand-border p-4">
-            <p className="text-sm text-brand-inactive-text">
-              O cliente selecionado ainda não possui endereço de entrega.
-            </p>
-            <Button className="mt-3 w-full" onClick={() => setIsAddressSheetOpen(true)}>
-              Adicionar endereço
-            </Button>
-          </div>
-        )}
-
-        {showCustomerDetailsBlock && (
+        {hasSelectedCustomer && customerDetails && (
           <CustomerCard
-            customer={{ name: customerDetails?.name || "", email: customerDetails?.email || "", phone: customerDetails?.phone || "" }}
-            address={customerDetails?.address || null}
-            showMap
+            customer={{ name: customerDetails.name || "", email: customerDetails.email || "", phone: customerDetails.phone || "" }}
+            address={customerDetails.address || null}
+            showMap={hasStreet}
             className="border-brand-border"
           />
         )}
 
-        {showShippingInput && (
+        {hasSelectedCustomer && hasStreet && (
           <MoneyInput
             label="Envio personalizado"
             name="customShippingFee"
@@ -244,6 +130,12 @@ export default function POSShippingSheet({
             readOnly={shippingFree}
           />
         )}
+
+        {hasSelectedCustomer && !hasStreet && (
+          <Button className="w-full" onClick={() => setIsAddressSheetOpen(true)}>
+            Adicionar endereço
+          </Button>
+        )}
       </div>
 
       <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
@@ -253,10 +145,10 @@ export default function POSShippingSheet({
           </Button>
           <Button
             className="flex-1"
-            onClick={mode === "create" && !hasSelectedCustomer ? handleCreateCustomer : () => onApply({ shippingFee: shippingFeeValue })}
-            isLoading={isCreatingCustomer}
+            disabled={!hasSelectedCustomer || !hasStreet}
+            onClick={() => onApply({ shippingFee: shippingFeeValue })}
           >
-            {mode === "create" && !hasSelectedCustomer ? "Cadastrar cliente" : "Aplicar envio"}
+            Aplicar envio
           </Button>
         </div>
       </footer>

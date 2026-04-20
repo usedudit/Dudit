@@ -14,7 +14,6 @@ import {
   deletePreSaleDraftAction,
   finalizePreSaleAction,
   getPOSCustomerDetailsAction,
-  createPOSCustomerQuickAction,
   createPOSCustomerAddressAction,
   createPOSQuickProductAction,
   upsertPreSaleDraftAction,
@@ -58,6 +57,7 @@ interface Props {
 type TeamMember = {
   id: string
   fullName?: string | null
+  userId?: string
 }
 
 function DesktopPOSSheet({
@@ -155,7 +155,6 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   const [isQuickProductSheetOpen, setIsQuickProductSheetOpen] = useState(false)
   const [isShippingSheetOpen, setIsShippingSheetOpen] = useState(false)
   const [isCreatingQuickProduct, setIsCreatingQuickProduct] = useState(false)
-  const [isCreatingQuickCustomer, setIsCreatingQuickCustomer] = useState(false)
   const [shippingCustomerDetails, setShippingCustomerDetails] = useState<{
     id: string
     name: string
@@ -197,8 +196,20 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   useEffect(() => {
     async function loadTeam() {
       const res = await getTeamMembers()
-      if (!res.error && res.members) {
-        setTeamMembers(res.members)
+      if (res.error || !res.members?.length) return
+      setTeamMembers(
+        res.members.map((member) => ({
+          id: member.id,
+          fullName: member.fullName,
+          userId: member.userId,
+        }))
+      )
+      if (res.currentUserId) {
+        const self = res.members.find((member) => member.userId === res.currentUserId)
+        if (self) {
+          defaultSellerPartnerUserIdRef.current = self.id
+          setSelectedSellerId((prev) => prev ?? self.id)
+        }
       }
     }
     loadTeam()
@@ -206,7 +217,10 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
 
   const isFinalizingRef = useRef(false)
   const isSavingDraftRef = useRef(false)
+  const defaultSellerPartnerUserIdRef = useRef<string | undefined>(undefined)
   const desktopScrollClass = "custom-scrollbar max-lg:hide-scrollbar"
+  const [customerSelectIntent, setCustomerSelectIntent] = useState<"default" | "shipping-preflight">("default")
+  const [isRemoveCustomerAlertOpen, setIsRemoveCustomerAlertOpen] = useState(false)
 
   const filteredProducts = useMemo(() => {
     let result = products
@@ -240,6 +254,13 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     () => (selectedCustomerId ? customers.find((customer) => customer.id === selectedCustomerId) || null : null),
     [customers, selectedCustomerId]
   )
+  const pinnedCustomerForSheet = useMemo(() => {
+    if (!selectedCustomerId) return null
+    const found = customers.find((c) => c.id === selectedCustomerId)
+    return found
+      ? { id: found.id, name: found.name, email: found.email ?? null }
+      : { id: selectedCustomerId, name: "Cliente selecionado", email: null as string | null }
+  }, [customers, selectedCustomerId])
   const paymentModalCart = useMemo(
     () => cart.map((item) => ({
       ...item,
@@ -446,19 +467,12 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   }
 
   const ensurePreSaleToFinalize = async () => {
-    let preSaleIdToFinalize = activePreSaleId
-
-    if (!preSaleIdToFinalize) {
-      const createdDraftId = await persistDraft()
-      if (!createdDraftId) {
-        notifyError("Não foi possível gerar a pré-venda.")
-        return null
-      }
-      setActivePreSaleId(createdDraftId)
-      preSaleIdToFinalize = createdDraftId
+    const savedId = await persistDraft()
+    if (!savedId) {
+      notifyError("Não foi possível atualizar a pré-venda antes de finalizar.")
+      return null
     }
-
-    return preSaleIdToFinalize
+    return savedId
   }
 
   const loadPreSale = useCallback((preSale: PreSale) => {
@@ -498,6 +512,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     setNotes("")
     setShippingFee(0)
     setCart([])
+    setSelectedSellerId(defaultSellerPartnerUserIdRef.current)
   }, [])
 
   const removeDraft = async (preSaleId: string) => {
@@ -647,68 +662,24 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     }
   }
 
-  const handleOpenShippingSheet = useCallback(async () => {
-    if (selectedCustomerId) {
-      const details = await getPOSCustomerDetailsAction({ partnerId, customerId: selectedCustomerId })
-      if (details.success && details.data) {
-        setShippingCustomerDetails(details.data)
-      }
+  const openShippingSheetWithCustomer = useCallback(async (customerId: string) => {
+    const details = await getPOSCustomerDetailsAction({ partnerId, customerId })
+    if (details.success && details.data) {
+      setShippingCustomerDetails(details.data)
     } else {
       setShippingCustomerDetails(null)
     }
     setIsShippingSheetOpen(true)
-  }, [partnerId, selectedCustomerId])
+  }, [partnerId])
 
-  const handleSelectShippingCustomer = useCallback(async (customerId: string) => {
-    const details = await getPOSCustomerDetailsAction({ partnerId, customerId })
-    if (!details.success || !details.data) {
-      notifyError(details.error || "Não foi possível carregar o cliente.")
+  const handleOpenShippingSheet = useCallback(async () => {
+    if (selectedCustomerId) {
+      await openShippingSheetWithCustomer(selectedCustomerId)
       return
     }
-    setSelectedCustomerId(customerId)
-    setShippingCustomerDetails(details.data)
-  }, [partnerId, notifyError])
-
-  const handleCreateQuickCustomerForShipping = useCallback(async (payload: {
-    name: string
-    email: string
-    phone: string
-    cpf: string
-    address: {
-      zipCode: string
-      street: string
-      number: string
-      complement: string
-      neighborhood: string
-      city: string
-      state: string
-    }
-  }) => {
-    setIsCreatingQuickCustomer(true)
-    try {
-      const result = await createPOSCustomerQuickAction({
-        partnerId,
-        ...payload,
-      })
-      if (!result.success || !result.data) {
-        notifyError(result.error || "Não foi possível cadastrar o cliente.")
-        return
-      }
-      const createdCustomer = {
-        id: result.data.id,
-        name: result.data.name,
-        email: result.data.email,
-        phone: result.data.phone,
-        cpf: result.data.cpf,
-      } as Customer
-      setCustomers((prev) => [createdCustomer, ...prev.filter((item) => item.id !== createdCustomer.id)])
-      setSelectedCustomerId(createdCustomer.id)
-      setShippingCustomerDetails(result.data)
-      notifySuccess("Cliente cadastrado e vinculado ao pedido.")
-    } finally {
-      setIsCreatingQuickCustomer(false)
-    }
-  }, [partnerId, notifyError, notifySuccess])
+    setCustomerSelectIntent("shipping-preflight")
+    setIsSelectCustomerOpen(true)
+  }, [selectedCustomerId, openShippingSheetWithCustomer])
 
   const handleCreateShippingAddress = useCallback(async (payload: {
     customerId: string
@@ -809,7 +780,10 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             onOpenCategorySheet={() => setIsCategorySheetOpen(true)}
             selectedCustomerId={selectedCustomerId}
             customers={customers}
-            onOpenCustomerSheet={() => setIsSelectCustomerOpen(true)}
+            onOpenCustomerSheet={() => {
+              setCustomerSelectIntent("default")
+              setIsSelectCustomerOpen(true)
+            }}
             selectedSellerId={selectedSellerId}
             teamMembers={teamMembers}
             onOpenSellerSheet={() => setIsSelectSellerOpen(true)}
@@ -1218,7 +1192,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       >
         <div className="space-y-6 pt-2">
           <InfoCard color="green" title="Valor total de itens" message={formatCurrency(subtotal)} />
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols lg:grid-cols-3  gap-3">
             <button
               type="button"
               onClick={() => setGlobalDiscountType("percentage")}
@@ -1353,12 +1327,33 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
 
       <SelectCustomerSheet
         isOpen={isSelectCustomerOpen}
-        onClose={() => setIsSelectCustomerOpen(false)}
+        onClose={() => {
+          setIsSelectCustomerOpen(false)
+          setCustomerSelectIntent("default")
+        }}
         onSelect={(customer) => {
           setSelectedCustomerId(customer.id)
+          setCustomers((prev) => {
+            if (prev.some((c) => c.id === customer.id)) return prev
+            return [{ id: customer.id, name: customer.name, email: customer.email ?? null }, ...prev]
+          })
           setIsSelectCustomerOpen(false)
+          if (customerSelectIntent === "shipping-preflight") {
+            setCustomerSelectIntent("default")
+            void openShippingSheetWithCustomer(customer.id)
+          }
         }}
         partnerId={partnerId}
+        selectedCustomerId={selectedCustomerId}
+        pinnedCustomer={pinnedCustomerForSheet}
+        onRequestRemoveSelected={
+          selectedCustomerId
+            ? () => {
+                setIsSelectCustomerOpen(false)
+                setIsRemoveCustomerAlertOpen(true)
+              }
+            : undefined
+        }
       />
 
       <SelectSellerSheet
@@ -1390,18 +1385,14 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       <POSShippingSheet
         isOpen={isShippingSheetOpen}
         onClose={() => setIsShippingSheetOpen(false)}
-        customers={customers}
         selectedCustomerId={selectedCustomerId}
         customerDetails={shippingCustomerDetails}
         currentShippingFee={shippingFee}
-        onSelectCustomer={handleSelectShippingCustomer}
-        onCreateCustomer={handleCreateQuickCustomerForShipping}
         onCreateAddress={handleCreateShippingAddress}
         onApply={({ shippingFee: fee }) => {
           setShippingFee(Math.max(0, Number(fee || 0)))
           setIsShippingSheetOpen(false)
         }}
-        isCreatingCustomer={isCreatingQuickCustomer}
       />
 
       <DefaultModal
@@ -1433,6 +1424,21 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         title="Limpar pedido?"
         description="Todos os itens adicionados serão removidos do pedido atual."
         confirmText="Limpar"
+        cancelText="Cancelar"
+        variant="warning"
+      />
+
+      <AlertModal
+        isOpen={isRemoveCustomerAlertOpen}
+        onClose={() => setIsRemoveCustomerAlertOpen(false)}
+        onConfirm={() => {
+          setSelectedCustomerId(undefined)
+          setShippingCustomerDetails(null)
+          setIsRemoveCustomerAlertOpen(false)
+        }}
+        title="Remover cliente?"
+        description="O cliente será desvinculado deste pedido. Você pode selecionar outro a qualquer momento."
+        confirmText="Remover"
         cancelText="Cancelar"
         variant="warning"
       />
