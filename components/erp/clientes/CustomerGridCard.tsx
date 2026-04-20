@@ -4,7 +4,6 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
-import { ThreeDotsIcon } from "@/lib/icons"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 interface CustomerGridCardProps {
@@ -67,7 +66,7 @@ const CustomerGridCard = React.memo(
                         </div>
 
                         {/* Linha 2: ID */}
-                        <div className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate mt-1">
+                        <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate">
                             <span>ID {customer.id || "-"}</span>
                         </div>
                     </div>
@@ -105,7 +104,6 @@ const CustomerGridCard = React.memo(
                             onClick={(e) => e.stopPropagation()}
                         >
                             <ActionsDropdown
-                                onView={onDetails}
                                 onEdit={onEdit}
                                 onDelete={onDelete}
                             />

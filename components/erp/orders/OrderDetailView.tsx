@@ -31,10 +31,11 @@ interface OrderDetailViewProps {
     onBack: () => void
     onEditOrder: (order: any) => void
     onUpdateDeliveryStatus: (order: any) => void
+    onCancelOrReopenOrder: (order: any) => void
     initialOrder?: any
 }
 
-export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrder, onUpdateDeliveryStatus, initialOrder }: OrderDetailViewProps) {
+export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrder, onUpdateDeliveryStatus, onCancelOrReopenOrder, initialOrder }: OrderDetailViewProps) {
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [order, setOrder] = useState<any>(initialOrder || null)
@@ -102,6 +103,15 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const cleanNotes = String(order.notes || "").replace(/\n*Pedido cancelado por:[\s\S]*$/, "").trim()
     const cancelNote = (String(order.notes || "").match(/Pedido cancelado por:[\s\S]*$/)?.[0] || "").trim()
     const changeAmount = Math.max(0, Number(order.paid_amount || 0) - Number(order.total_amount || 0))
+    const canEdit = order.situation !== "cancelled"
+    const canReopen = order.situation === "cancelled"
+    const cancelLabel = canReopen ? "Reabrir" : "Cancelar"
+    const isPickupOrder = order.delivery_type === "pickup" || Number(order.shipping_cost || 0) <= 0
+    const timelineDate = (isActive: boolean) => {
+        if (!isActive) return { date: "", time: "" }
+        const when = order.updated_at || order.created_at
+        return { date: formatDayMonth(when), time: formatTime(when) }
+    }
 
     const getTimelineSteps = (status: string) => {
         const baseDate = formatDayMonth(order.created_at)
@@ -114,22 +124,28 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
             ]
         }
 
-        const steps = [
-            { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
-            { label: "Preparando", date: baseDate, time: "", active: ["preparing", "sent", "delivered", "pickup_available", "delivery_failed"].includes(status) },
-            { label: "Enviado", date: "", time: "", active: ["sent", "delivered", "delivery_failed"].includes(status) },
-            { label: "Entregue", date: "", time: "", active: ["delivered"].includes(status) }
-        ]
-
-        if (status === "pickup_available") {
-            steps[3].label = "Disponivel"
-            steps[3].active = true
-        } else if (status === "delivery_failed") {
-            steps[3].label = "Falha na entrega"
-            steps[3].active = true
+        if (isPickupOrder) {
+            const pickedUp = ["delivered", "pickup_available"].includes(status)
+            const pickedMeta = timelineDate(pickedUp)
+            return [
+                { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
+                { label: "Pedido Retirado", date: pickedMeta.date, time: pickedMeta.time, active: pickedUp },
+            ]
         }
 
-        return steps
+        const preparingActive = ["preparing", "sent", "delivered", "pickup_available", "delivery_failed"].includes(status)
+        const sentActive = ["sent", "delivered", "delivery_failed", "pickup_available"].includes(status)
+        const finalActive = ["delivered", "pickup_available", "delivery_failed"].includes(status)
+        const preparingMeta = timelineDate(preparingActive)
+        const sentMeta = timelineDate(sentActive)
+        const finalMeta = timelineDate(finalActive)
+
+        return [
+            { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
+            { label: "Preparando", date: preparingMeta.date, time: preparingMeta.time, active: preparingActive },
+            { label: status === "pickup_available" ? "Disponível para retirada" : "Enviado", date: sentMeta.date, time: sentMeta.time, active: sentActive },
+            { label: status === "delivery_failed" ? "Entrega não realizada" : "Entregue", date: finalMeta.date, time: finalMeta.time, active: finalActive }
+        ]
     }
 
     const timelineSteps = getTimelineSteps(order.delivery_status)
@@ -173,11 +189,11 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                 <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                     <ActionsDropdown
-                                        onEdit={!order.is_pos_sale && order.situation !== "cancelled" ? () => onEditOrder(order) : undefined}
-                                        onPrint={() => window.print()}
-                                        onShare={() => { }}
+                                        onEdit={canEdit ? () => onEditOrder(order) : undefined}
+                                        onCancel={() => onCancelOrReopenOrder(order)}
+                                        cancelLabel={cancelLabel}
                                     >
-                                        {!order.is_pos_sale && order.situation !== "cancelled" && (
+                                        {order.situation !== "cancelled" && (
                                             <DropdownItem onClick={() => onUpdateDeliveryStatus(order)}>
                                                 Alterar status de entrega
                                             </DropdownItem>
@@ -386,9 +402,9 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                 <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
                     <ActionsDropdown
-                        onEdit={!order.is_pos_sale && order.situation !== "cancelled" ? () => onEditOrder(order) : undefined}
-                        onPrint={() => window.print()}
-                        onShare={() => { }}
+                        onEdit={canEdit ? () => onEditOrder(order) : undefined}
+                        onCancel={() => onCancelOrReopenOrder(order)}
+                        cancelLabel={cancelLabel}
                         trigger={
                             <Button variant="outline" className="flex-1">
                                 <ThreeDotsIcon className="w-4 h-4 mr-2" />
@@ -396,7 +412,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                             </Button>
                         }
                     >
-                        {!order.is_pos_sale && order.situation !== "cancelled" && (
+                        {order.situation !== "cancelled" && (
                             <DropdownItem onClick={() => onUpdateDeliveryStatus(order)}>
                                 Alterar status de entrega
                             </DropdownItem>

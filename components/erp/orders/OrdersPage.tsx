@@ -45,7 +45,7 @@ import AlertModal from "../../reusable/AlertModal"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { DropdownItem } from "@/components/reusable/Dropdown"
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
-import { deleteOrdersInBatchAction, updateOrdersStatusInBatchAction, getERPOrdersPageAction, type ERPOrderListCursor } from "@/app/actions/erp/orders"
+import { updateOrdersStatusInBatchAction, getERPOrdersPageAction, type ERPOrderListCursor } from "@/app/actions/erp/orders"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
 
 // --- TYPES & INTERFACES ---
@@ -68,6 +68,7 @@ interface Order {
     items_count: number;
     created_at_time: number;
     situation: string;
+    delivery_status?: string;
     previousSituationBeforeCancel?: string | null;
     canEdit: boolean;
     canReopen: boolean;
@@ -263,8 +264,9 @@ export default function OrdersPage({
                     items_count: o.order_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || o.quantity || 0,
                     created_at_time: new Date(o.order_date || o.created_at).getTime(),
                     situation: o.situation,
+                    delivery_status: o.delivery_status,
                     previousSituationBeforeCancel: o.previous_situation_before_cancel || null,
-                    canEdit: !o.is_pos_sale && o.situation !== "cancelled",
+                    canEdit: o.situation !== "cancelled",
                     canReopen: o.situation === "cancelled",
                     paidAmount: Number(o.paid_amount || 0)
                 }
@@ -411,6 +413,12 @@ export default function OrdersPage({
         return cancellableOrdersSelection.every((order) => order.situation === "paid" || order.situation === "partially_paid" || order.paidAmount > 0.009)
     }, [cancellableOrdersSelection])
 
+    const selectedOrdersForBulkActions = useMemo(() => {
+        const selectedIds = selection.ids
+        if (selectedIds.size === 0) return [] as Order[]
+        return filteredOrders.filter((order) => selectedIds.has(order.originalId))
+    }, [filteredOrders, selection.ids])
+
     const handleReopenOrder = async (orderId: string) => {
         setSingleCancelId(orderId)
         await confirmBulk("reopen", [orderId])
@@ -423,17 +431,7 @@ export default function OrdersPage({
         setActionModal({ open: true, text: "Aplicando alterações..." })
 
         try {
-            if (payload.type === 'delete') {
-                const result = await deleteOrdersInBatchAction(ids, partnerId)
-                if (result.success) {
-                    queryClient.invalidateQueries({ queryKey: ['erp', 'orders', partnerId] })
-                    setSelection({ ids: new Set() })
-                    toast({ title: "Sucesso", description: `${ids.length} pedidos excluídos` })
-                    setBulkEditModal({ isOpen: false })
-                } else {
-                    toast({ title: "Erro", description: result.error, variant: "destructive" })
-                }
-            } else if (payload.type === 'order_payment' || payload.type === 'order_delivery') {
+            if (payload.type === 'order_payment' || payload.type === 'order_delivery') {
                 const actionType = payload.type === 'order_payment' ? 'payment_status' : 'delivery_status'
                 const result = await updateOrdersStatusInBatchAction({
                     orderIds: ids,
@@ -446,10 +444,15 @@ export default function OrdersPage({
                     await queryClient.refetchQueries({ queryKey: ['erp', 'orders', partnerId], type: 'active' })
                     setSelection({ ids: new Set() })
                     toast({ title: "Sucesso", description: "Status alterado com sucesso" })
+                    if ((result as any).warning) {
+                        toast({ title: "Atenção", description: (result as any).warning, variant: "destructive" })
+                    }
                     setBulkEditModal({ isOpen: false })
                 } else {
                     toast({ title: "Erro", description: result.error, variant: "destructive" })
                 }
+            } else {
+                toast({ title: "Ação inválida", description: "Essa ação em massa não é suportada para pedidos.", variant: "destructive" })
             }
         } catch (error) {
             console.error(error)
@@ -459,17 +462,15 @@ export default function OrdersPage({
         }
     }
 
-    const confirmBulk = async (action: 'delete' | 'cancel' | 'reopen', explicitIds?: string[]) => {
+    const confirmBulk = async (action: 'cancel' | 'reopen', explicitIds?: string[]) => {
         const ids = explicitIds?.length ? explicitIds : (singleCancelId ? [singleCancelId] : Array.from(selection.ids))
         if (ids.length === 0) return
 
-        setActionModal({ open: true, text: action === 'delete' ? "Excluindo pedidos..." : action === 'reopen' ? "Reabrindo pedidos..." : "Cancelando pedidos..." })
+        setActionModal({ open: true, text: action === 'reopen' ? "Reabrindo pedidos..." : "Cancelando pedidos..." })
 
         try {
             let result;
-            if (action === 'delete') {
-                result = await deleteOrdersInBatchAction(ids, partnerId)
-            } else if (action === 'reopen') {
+            if (action === 'reopen') {
                 result = await updateOrdersStatusInBatchAction({
                     orderIds: ids,
                     partnerId,
@@ -494,9 +495,7 @@ export default function OrdersPage({
                 if (!singleCancelId) setSelection({ ids: new Set() })
                 toast({
                     title: "Sucesso",
-                    description: action === 'delete'
-                        ? "Pedidos excluídos"
-                        : action === 'reopen'
+                    description: action === 'reopen'
                             ? "Pedidos reabertos"
                             : "Pedidos cancelados"
                 })
@@ -510,7 +509,7 @@ export default function OrdersPage({
             console.error(error)
             toast({ title: "Erro", description: "Ocorreu um erro.", variant: "destructive" })
         } finally {
-            setConfirmations(p => ({ ...p, bulkDelete: false, bulkCancel: false }))
+            setConfirmations(p => ({ ...p, bulkCancel: false }))
             setSingleCancelId(null)
             setCancelReason("")
             setRestoreStockOnCancel(true)
@@ -580,10 +579,17 @@ export default function OrdersPage({
                                     created_at_time: new Date(order.created_at || Date.now()).getTime(),
                                     situation: order.situation || "pending",
                                     previousSituationBeforeCancel: order.previous_situation_before_cancel || null,
-                                    canEdit: !order.is_pos_sale && order.situation !== "cancelled",
+                                    canEdit: order.situation !== "cancelled",
                                     canReopen: order.situation === "cancelled",
                                     paidAmount: Number(order.paid_amount || 0),
                                 })
+                            }}
+                            onCancelOrReopenOrder={(order: any) => {
+                                if (order.situation === "cancelled") {
+                                    void handleReopenOrder(order.id)
+                                    return
+                                }
+                                openCancelModal(order.id)
                             }}
                             initialOrder={effectiveOrders?.find((o: any) => o.id === selectedOrderId) || undefined}
                         />
@@ -784,11 +790,11 @@ export default function OrdersPage({
                                                         canEdit={o.canEdit}
                                                         cancelLabel={o.canReopen ? "Reabrir" : "Cancelar"}
                                                         onCancel={() => o.canReopen ? handleReopenOrder(o.originalId) : openCancelModal(o.originalId)}
-                                                        extraActions={
+                                                        extraActions={o.situation !== "cancelled" ? (
                                                             <DropdownItem onClick={() => openDeliveryStatusModal(o)}>
                                                                 Alterar status de entrega
                                                             </DropdownItem>
-                                                        }
+                                                        ) : null}
                                                     />
                                                 ))}
                                             </div>
@@ -860,11 +866,11 @@ export default function OrdersPage({
                                                                     cancelLabel={o.canReopen ? "Reabrir" : "Cancelar"}
                                                                     onCancel={() => o.canReopen ? handleReopenOrder(o.originalId) : openCancelModal(o.originalId)}
                                                                     onDetails={handleDetailsOrder}
-                                                                    extraActions={
+                                                                    extraActions={o.situation !== "cancelled" ? (
                                                                         <DropdownItem onClick={() => openDeliveryStatusModal(o)}>
                                                                             Alterar status de entrega
                                                                         </DropdownItem>
-                                                                    }
+                                                                    ) : null}
                                                                 />
                                                             ))}
                                                         </tbody>
@@ -942,16 +948,6 @@ export default function OrdersPage({
             </FloatingActionBar>
 
             <AlertModal
-                isOpen={false}
-                onClose={() => setConfirmations((p) => ({ ...p, bulkDelete: false }))}
-                onConfirm={() => confirmBulk("delete")}
-                title="Excluir Pedidos"
-                message={`Tem certeza que deseja excluir ${selection.ids.size} pedido(s)? Esta ação não pode ser desfeita e pode afetar as estatísticas.`}
-                confirmText="Excluir"
-                variant="danger"
-            />
-
-            <AlertModal
                 isOpen={confirmations.bulkCancel}
                 onClose={() => {
                     setConfirmations((p) => ({ ...p, bulkCancel: false }))
@@ -994,6 +990,11 @@ export default function OrdersPage({
                 onClose={() => setBulkEditModal({ isOpen: false })}
                 selectedCount={selection.ids.size}
                 targetType="order"
+                orderSelectionGuards={{
+                    totalCount: selectedOrdersForBulkActions.length,
+                    paidCount: selectedOrdersForBulkActions.filter((order) => order.situation === "paid").length,
+                    deliveredCount: selectedOrdersForBulkActions.filter((order) => order.delivery_status === "delivered").length,
+                }}
                 onApply={handleBulkEditApply}
             />
 

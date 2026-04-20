@@ -6,6 +6,7 @@ import { Button, Input, IconPlaceholder, Badge } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery, usePickerBucket } from "@/components/erp/hooks"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import {
   fetchPartnerCustomersBucket,
   type PartnerCustomerBucketItem,
@@ -15,12 +16,23 @@ export type PinnedCustomerSummary = {
   id: string
   name: string
   email?: string | null
+  avatar_url?: string | null
 }
 
 interface SelectCustomerSheetProps {
   isOpen: boolean
   onClose: () => void
   onSelect: (customer: PartnerCustomerBucketItem | PinnedCustomerSummary) => void
+  onCreateCustomer?: (payload: {
+    name: string
+    email?: string
+    phone?: string
+  }) => Promise<{
+    id: string
+    name: string
+    email?: string | null
+    phone?: string | null
+  } | null>
   partnerId: string
   selectedCustomerId?: string
   pinnedCustomer?: PinnedCustomerSummary | null
@@ -44,6 +56,7 @@ const SelectCustomerSheet = ({
   isOpen,
   onClose,
   onSelect,
+  onCreateCustomer,
   partnerId: _partnerId,
   selectedCustomerId,
   pinnedCustomer,
@@ -51,6 +64,12 @@ const SelectCustomerSheet = ({
   title = "Selecionar Cliente",
 }: SelectCustomerSheetProps) => {
   const [appendPulse, setAppendPulse] = useState(false)
+  const [isNewCustomerSheetOpen, setIsNewCustomerSheetOpen] = useState(false)
+  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false)
+  const [newCustomerName, setNewCustomerName] = useState("")
+  const [newCustomerEmail, setNewCustomerEmail] = useState("")
+  const [newCustomerPhone, setNewCustomerPhone] = useState("")
+  const [newCustomerError, setNewCustomerError] = useState<string | null>(null)
   const loadMoreLock = useRef(false)
   const listScrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -75,6 +94,7 @@ const SelectCustomerSheet = ({
           name: pinnedCustomer.name,
           email: pinnedCustomer.email ?? null,
           phone: null,
+          avatar_url: pinnedCustomer.avatar_url ?? null,
         }
       return [head, ...rest]
     },
@@ -98,6 +118,16 @@ const SelectCustomerSheet = ({
   useEffect(() => {
     if (!isOpen) return
     void pickerRef.current.loadBucket()
+  }, [isOpen])
+
+  useEffect(() => {
+    if (isOpen) return
+    setIsNewCustomerSheetOpen(false)
+    setIsCreatingCustomer(false)
+    setNewCustomerName("")
+    setNewCustomerEmail("")
+    setNewCustomerPhone("")
+    setNewCustomerError(null)
   }, [isOpen])
 
   useEffect(() => {
@@ -146,6 +176,7 @@ const SelectCustomerSheet = ({
           onChange={(e) => picker.setSearchQuery(e.target.value)}
           prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
           className="mb-0"
+          variant="full-rounded"
         />
       </div>
 
@@ -185,22 +216,27 @@ const SelectCustomerSheet = ({
                       : "cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40"
                   }`}
                 >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-brand-border bg-brand-gray text-lg font-bold text-brand-inactive-text dark:border-dark-border dark:bg-gray-800">
-                    {(customer.name || "?").charAt(0)}
-                  </div>
+                  <UserProfileImage
+                    fullName={customer.name || "Cliente"}
+                    imageUrl={customer.avatar_url}
+                    className="h-12 w-12 shrink-0 text-lg"
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <span className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
                         {customer.name}
                       </span>
                       {isSelected && (
-                        <Badge variant="green" className="shrink-0">
+                        <Badge variant="green" className="whitespace-nowrap scale-90 shrink-0">
                           Selecionado
                         </Badge>
                       )}
                     </div>
-                    <p className="mt-0.5 truncate text-[11px] font-medium uppercase tracking-wide text-brand-inactive-text dark:text-dark-body">
-                      {customer.email || "Sem email"}
+                    <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                      ID {customer.id || "-"}
+                    </p>
+                    <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                      {customer.email || "Sem e-mail"}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
@@ -251,35 +287,159 @@ const SelectCustomerSheet = ({
       </div>
 
       <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-        <Button variant="outline" className="h-12 w-full" onClick={onClose}>
-          Cancelar
+        {onCreateCustomer ? (
+          <div className="flex items-center gap-3">
+            <Button variant="outline" className="h-12 flex-1" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button
+              className="h-12 flex-1"
+              onClick={() => {
+                setNewCustomerError(null)
+                setIsNewCustomerSheetOpen(true)
+              }}
+            >
+              Novo cliente
+            </Button>
+          </div>
+        ) : (
+          <Button variant="outline" className="h-12 w-full" onClick={onClose}>
+            Cancelar
+          </Button>
+        )}
+      </footer>
+    </div>
+  )
+
+  const newCustomerSheetContent = (
+    <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+      <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+        <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Novo cliente</h2>
+        <Button variant="ghost" onClick={() => setIsNewCustomerSheetOpen(false)} size="icon">
+          <XIcon className="h-5 w-5" />
         </Button>
+      </header>
+
+      <div className="flex-1 space-y-4 overflow-y-auto p-6">
+        <Input
+          label="Nome"
+          name="newCustomerName"
+          value={newCustomerName}
+          onChange={(e) => setNewCustomerName(e.target.value)}
+          placeholder="Nome do cliente"
+        />
+        <Input
+          label="E-mail"
+          name="newCustomerEmail"
+          value={newCustomerEmail}
+          onChange={(e) => setNewCustomerEmail(e.target.value)}
+          placeholder="cliente@exemplo.com"
+        />
+        <Input
+          label="Telefone"
+          name="newCustomerPhone"
+          value={newCustomerPhone}
+          onChange={(e) => setNewCustomerPhone(e.target.value)}
+          placeholder="(00) 00000-0000"
+        />
+        {newCustomerError && (
+          <p className="text-sm font-medium text-brand-red">{newCustomerError}</p>
+        )}
+      </div>
+
+      <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" className="flex-1" onClick={() => setIsNewCustomerSheetOpen(false)}>
+            Voltar
+          </Button>
+          <Button
+            className="flex-1"
+            isLoading={isCreatingCustomer}
+            onClick={async () => {
+              if (!onCreateCustomer) return
+              const name = newCustomerName.trim()
+              if (!name) {
+                setNewCustomerError("Informe o nome do cliente.")
+                return
+              }
+
+              setIsCreatingCustomer(true)
+              setNewCustomerError(null)
+              try {
+                const created = await onCreateCustomer({
+                  name,
+                  email: newCustomerEmail.trim(),
+                  phone: newCustomerPhone.trim(),
+                })
+                if (!created) return
+
+                setNewCustomerName("")
+                setNewCustomerEmail("")
+                setNewCustomerPhone("")
+                setIsNewCustomerSheetOpen(false)
+                onSelect(created)
+              } catch (error) {
+                setNewCustomerError(error instanceof Error ? error.message : "Não foi possível criar o cliente.")
+              } finally {
+                setIsCreatingCustomer(false)
+              }
+            }}
+          >
+            Salvar cliente
+          </Button>
+        </div>
       </footer>
     </div>
   )
 
   if (isMobile) {
     return (
-      <BottomSheet isOpen={isOpen} onClose={onClose}>
-        {content}
-      </BottomSheet>
+      <>
+        <BottomSheet isOpen={isOpen} onClose={onClose}>
+          {content}
+        </BottomSheet>
+        <BottomSheet isOpen={isNewCustomerSheetOpen} onClose={() => setIsNewCustomerSheetOpen(false)}>
+          {newCustomerSheetContent}
+        </BottomSheet>
+      </>
     )
   }
 
   return (
-    <Portal>
-      <div
-        className={`fixed inset-0 z-50 bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-        onClick={onClose}
-      >
+    <>
+      <Portal>
         <div
-          className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
-          onClick={(e) => e.stopPropagation()}
+          className={`fixed inset-0 z-50 bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+          onClick={onClose}
         >
-          {content}
+          <div
+            className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${
+              isOpen
+                ? isNewCustomerSheetOpen
+                  ? "-translate-x-10 scale-[0.97] opacity-70"
+                  : "translate-x-0 opacity-100"
+                : "translate-x-[120%] opacity-100"
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {content}
+          </div>
         </div>
-      </div>
-    </Portal>
+      </Portal>
+      <Portal>
+        <div
+          className={`fixed inset-0 z-[60] bg-black/50 transition-opacity duration-300 ${isNewCustomerSheetOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+          onClick={() => setIsNewCustomerSheetOpen(false)}
+        >
+          <div
+            className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isNewCustomerSheetOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {newCustomerSheetContent}
+          </div>
+        </div>
+      </Portal>
+    </>
   )
 }
 

@@ -981,6 +981,15 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         saleSellerName = sellerProfile?.full_name || null
     }
 
+    const { data: saleDraft } = await supabase
+        .from("pre_sales")
+        .select("shipping_fee")
+        .eq("id", sale.pre_sale_id)
+        .eq("partner_id", partnerId)
+        .limit(1)
+        .maybeSingle()
+
+    const shippingCost = Number(saleDraft?.shipping_fee || 0)
     const ref =
         (sale.sale_number && String(sale.sale_number).trim()) ||
         String(sale.id || "").replace(/-/g, "").slice(0, 8).toUpperCase()
@@ -996,11 +1005,12 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         order_number: ref,
         order_source: "Presencial",
         situation,
-        delivery_status: "delivered",
+        delivery_status: (sale as any).delivery_status || (shippingCost > 0 ? "preparing" : "delivered"),
+        delivery_type: shippingCost > 0 ? "delivery" : "pickup",
         total_amount: Number(sale.final_amount || 0),
         paid_amount: Number(sale.paid_amount || 0),
         discount_value: Number(sale.discount_amount || 0),
-        shipping_cost: 0,
+        shipping_cost: shippingCost,
         additional_costs: 0,
         notes: sale.notes,
         created_at: sale.created_at,
@@ -1336,12 +1346,12 @@ export async function updateOrdersStatusInBatchAction(payload: {
         .select("id, order_number, situation, delivery_status, notes, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, finance_account_id, buyer_id, customer_name, previous_situation_before_cancel, stock_restored_on_cancel, inventory_deducted, order_items(product_id, variant_id, quantity)")
         .in("id", payload.orderIds)
         .eq("partner_id", payload.partnerId)
+    const overallWarnings: string[] = []
+    if (!currentOrders || currentOrders.length === 0) {
+        return { error: "Nenhum pedido válido foi encontrado para processar." }
+    }
 
     if (payload.actionType === "cancel" || payload.actionType === "reopen") {
-        if (!currentOrders || currentOrders.length === 0) {
-            return { error: "Nenhum pedido válido foi encontrado para processar." }
-        }
-
         const { data: profile } = await supabase
             .from("user_profiles")
             .select("full_name")
@@ -1350,6 +1360,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
         const effectiveUserName = profile?.full_name || payload.userName || "Usuario"
         const processingWarnings: string[] = []
+        let processedCount = 0
 
         for (const order of currentOrders || []) {
             if (payload.actionType === "cancel") {
@@ -1378,6 +1389,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     processingWarnings.push(`Pedido ${order.order_number || order.id}: falha ao cancelar (${error.message})`)
                     continue
                 }
+                processedCount += 1
 
                 if (order.inventory_deducted && stockWasRestoredOnCancel) {
                     const movementResult = await createOrderStockMovement({
@@ -1467,6 +1479,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     processingWarnings.push(`Pedido ${order.order_number || order.id}: falha ao reabrir (${error.message})`)
                     continue
                 }
+                processedCount += 1
 
                 if (shouldReverseStock) {
                     const movementResult = await createOrderStockMovement({
@@ -1546,6 +1559,9 @@ export async function updateOrdersStatusInBatchAction(payload: {
             (currentOrders || []).flatMap((order: any) => order.order_items || [])
         )
         await revalidateOrders(payload.partnerId)
+        if (processedCount === 0) {
+            return { error: payload.actionType === "cancel" ? "Nenhum pedido foi cancelado." : "Nenhum pedido foi reaberto." }
+        }
         if (processingWarnings.length > 0) {
             return { success: true, warning: processingWarnings.join(" | ") }
         }
@@ -1565,7 +1581,13 @@ export async function updateOrdersStatusInBatchAction(payload: {
             return { error: "Status de pagamento invalido para atualizacao em massa." }
         }
 
+        const paymentWarnings: string[] = []
+        let paymentProcessedCount = 0
         for (const order of currentOrders || []) {
+            if (order.situation === "paid") {
+                paymentWarnings.push(`Pedido ${order.order_number || order.id}: já está pago e não pode ter o pagamento alterado.`)
+                continue
+            }
             const paymentState = resolvePaymentState({
                 requestedStatus,
                 totalAmount: Number(order.total_amount || 0),
@@ -1587,6 +1609,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 .eq("partner_id", payload.partnerId)
 
             if (error) return { error: error.message }
+            paymentProcessedCount += 1
 
             if (order.situation !== "paid" && paymentState.situation === "paid") {
                 await createFinancialTransactionsForPaidOrder(supabase, {
@@ -1603,6 +1626,10 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 })
             }
         }
+        if (paymentProcessedCount === 0) {
+            return { error: "Nenhum pedido elegível para alteração de pagamento." }
+        }
+        overallWarnings.push(...paymentWarnings)
     }
 
     if (payload.actionType === "delivery_status") {
@@ -1619,7 +1646,13 @@ export async function updateOrdersStatusInBatchAction(payload: {
             return { error: "Status de envio invalido para atualizacao em massa." }
         }
 
+        const deliveryWarnings: string[] = []
+        let deliveryProcessedCount = 0
         for (const order of currentOrders || []) {
+            if (order.delivery_status === "delivered") {
+                deliveryWarnings.push(`Pedido ${order.order_number || order.id}: já está entregue e não pode ter o status de entrega alterado.`)
+                continue
+            }
             const shouldFinalizeNow = !order.inventory_deducted && shouldDeductInventory(payload.statusValue)
 
             const { error } = await supabase
@@ -1632,6 +1665,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 .eq("partner_id", payload.partnerId)
 
             if (error) return { error: error.message }
+            deliveryProcessedCount += 1
 
             if (shouldFinalizeNow) {
                 const finalizeResult = await finalizeOrderInventory({
@@ -1647,6 +1681,10 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 if ("error" in finalizeResult) return { error: finalizeResult.error }
             }
         }
+        if (deliveryProcessedCount === 0) {
+            return { error: "Nenhum pedido elegível para alteração de entrega." }
+        }
+        overallWarnings.push(...deliveryWarnings)
     }
 
     try {
@@ -1701,6 +1739,9 @@ export async function updateOrdersStatusInBatchAction(payload: {
         (currentOrders || []).flatMap((order: any) => order.order_items || [])
     )
     await revalidateOrders(payload.partnerId)
+    if (overallWarnings.length > 0) {
+        return { success: true, warning: overallWarnings.join(" | ") }
+    }
     return { success: true }
 }
 

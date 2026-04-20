@@ -1741,7 +1741,7 @@ export default function CreateTransactionPage({
 
                         <div className="px-4 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                             <TabsContent value="general" className="mt-0">
-                                <div className="grid grid-cols-12 gap-y-10 lg:gap-x-12">
+                                <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                     <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                                         <motion.div
                                             key={txKind}
@@ -1830,7 +1830,7 @@ export default function CreateTransactionPage({
                             </TabsContent>
 
                             <TabsContent value="notes" className="mt-0">
-                                <div className="grid grid-cols-12 gap-y-10 lg:gap-x-12">
+                                <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                     <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Observações</h3>
                                         <FormTextarea
@@ -1846,7 +1846,7 @@ export default function CreateTransactionPage({
                             </TabsContent>
 
                             <TabsContent value="attachments" className="mt-0">
-                                <div className="grid grid-cols-12 gap-y-10 lg:gap-x-12">
+                                <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                     <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                                         <IconPlaceholder
                                             icon={UserIcon}

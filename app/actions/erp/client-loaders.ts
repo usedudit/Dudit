@@ -107,6 +107,7 @@ export type PartnerCustomerBucketItem = {
   name: string
   email: string | null
   phone: string | null
+  avatar_url?: string | null
 }
 
 export async function fetchPartnerCustomersBucket(): Promise<PartnerCustomerBucketItem[]> {
@@ -121,7 +122,7 @@ export async function fetchPartnerCustomersBucket(): Promise<PartnerCustomerBuck
   const supabase = await getSupabaseServerClient()
   const { data, error } = await supabase
     .from("customers")
-    .select("id, name, email, phone")
+    .select("id, name, email, phone, avatar_url")
     .eq("partner_id", partnerId)
     .order("name", { ascending: true })
     .limit(500)

@@ -198,7 +198,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                                 <div className="p-6">
                                                     <div className="flex flex-col md:flex-row md:items-center gap-6">
                                                         <div className="flex items-start gap-5 flex-1">
-                                                            <div className="w-12 h-12 rounded-full border border-brand-border dark:border-dark-border overflow-hidden shrink-0 bg-brand-gray dark:bg-dark-border/20">
+                                                            <div className="w-14 h-14 rounded-full border border-brand-border dark:border-dark-border overflow-hidden shrink-0 bg-brand-gray dark:bg-dark-border/20">
                                                                 <img
                                                                     src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
                                                                     className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"
@@ -207,7 +207,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                                             </div>
 
                                                             <div className="flex-1 min-w-0">
-                                                                <h4 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate mb-1">{item.product.name}</h4>
+                                                                <h4 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate">{item.product.name}</h4>
 
                                                                 <div className="flex items-center gap-2">
                                                                     <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{item.product.sku}</span>

@@ -106,6 +106,8 @@ export default function CustomersPage({
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
     const [confirmations, setConfirmations] = useState({ bulkDelete: false, bulkInactive: false })
     const [isProcessingBulk, setIsProcessingBulk] = useState(false)
+    const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null)
+    const [isDeletingCustomer, setIsDeletingCustomer] = useState(false)
 
     const queryClient = useQueryClient()
 
@@ -288,6 +290,9 @@ export default function CustomersPage({
     const handleDetailsCustomer = (customer: Customer) => {
         setUi({ pageState: "details", selectedId: customer.originalId })
     }
+    const handleDeleteCustomer = (customer: Customer) => {
+        setCustomerToDelete(customer)
+    }
     const handleSelectRow = (id: string) => {
         setSelection((p) => {
             const s = new Set(p.ids)
@@ -300,6 +305,28 @@ export default function CustomersPage({
         setSearch("")
         setFilters(INITIAL_FILTERS)
         setActiveTab("Todos")
+    }
+
+    const confirmDeleteCustomer = async () => {
+        if (!customerToDelete) return
+        setIsDeletingCustomer(true)
+        const result = await deleteCustomersInBatchAction([customerToDelete.originalId])
+        if (result.success) {
+            queryClient.invalidateQueries({ queryKey: ['erp', 'customers', partnerId, selectedStore?.id || 'all'] })
+            toast({ title: "Excluído com sucesso" })
+            setSelection((p) => {
+                const nextIds = new Set(p.ids)
+                nextIds.delete(customerToDelete.originalId)
+                return { ...p, ids: nextIds }
+            })
+            if (ui.selectedId === customerToDelete.originalId) {
+                setUi({ pageState: "list", selectedId: null })
+            }
+            setCustomerToDelete(null)
+        } else {
+            toast({ title: "Erro", description: result.error, variant: "destructive" })
+        }
+        setIsDeletingCustomer(false)
     }
 
     const confirmBulk = async (action: "delete" | "inactive") => {
@@ -529,7 +556,7 @@ export default function CustomersPage({
                                                 onSelect={() => handleSelectRow(c.originalId)}
                                                 onDetails={() => handleDetailsCustomer(c)}
                                                 onEdit={() => handleEditCustomer(c)}
-                                                onDelete={() => { }}
+                                                onDelete={() => handleDeleteCustomer(c)}
                                             />
                                         ))}
                                     </div>
@@ -595,7 +622,7 @@ export default function CustomersPage({
                                                             selected={selection.ids.has(c.originalId)}
                                                             onSelect={handleSelectRow}
                                                             onEdit={handleEditCustomer}
-                                                            onDelete={() => { }}
+                                                            onDelete={handleDeleteCustomer}
                                                             onDetails={handleDetailsCustomer}
                                                         />
                                                     ))}
@@ -659,6 +686,19 @@ export default function CustomersPage({
                 variant="warning"
                 onConfirm={() => confirmBulk("inactive")}
                 isLoading={isProcessingBulk}
+            />
+
+            <AlertModal
+                isOpen={!!customerToDelete}
+                onClose={() => {
+                    if (!isDeletingCustomer) setCustomerToDelete(null)
+                }}
+                title="Excluir cliente?"
+                description={`Tem certeza que deseja excluir ${customerToDelete?.name || "este cliente"}? Esta ação não pode ser desfeita.`}
+                confirmText={isDeletingCustomer ? "Excluindo..." : "Excluir"}
+                variant="danger"
+                onConfirm={confirmDeleteCustomer}
+                isLoading={isDeletingCustomer}
             />
 
             <FloatingActionBar selectedCount={selection.ids.size} onClearSelection={() => setSelection((p) => ({ ...p, ids: new Set() }))}>

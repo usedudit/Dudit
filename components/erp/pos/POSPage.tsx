@@ -15,6 +15,7 @@ import {
   finalizePreSaleAction,
   getPOSCustomerDetailsAction,
   createPOSCustomerAddressAction,
+  createPOSCustomerQuickAction,
   createPOSQuickProductAction,
   upsertPreSaleDraftAction,
 } from "@/app/actions/erp/pos"
@@ -221,6 +222,43 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   const desktopScrollClass = "custom-scrollbar max-lg:hide-scrollbar"
   const [customerSelectIntent, setCustomerSelectIntent] = useState<"default" | "shipping-preflight">("default")
   const [isRemoveCustomerAlertOpen, setIsRemoveCustomerAlertOpen] = useState(false)
+  const [isLeaveWithoutSaveAlertOpen, setIsLeaveWithoutSaveAlertOpen] = useState(false)
+  const [pendingLeaveHref, setPendingLeaveHref] = useState<string | null>(null)
+  const EMPTY_ORDER_SIGNATURE = "__empty_order__"
+
+  const buildOrderSignature = useCallback((payload: {
+    selectedCustomerId?: string
+    selectedSellerId?: string
+    discountAmount: number
+    discountType: "fixed" | "percentage" | "coupon"
+    discountCouponCode: string
+    shippingFee: number
+    notes: string
+    cart: CartItem[]
+  }) => {
+    if (!payload.cart.length) return EMPTY_ORDER_SIGNATURE
+    return JSON.stringify({
+      selectedCustomerId: payload.selectedCustomerId || "",
+      selectedSellerId: payload.selectedSellerId || "",
+      discountAmount: Number(payload.discountAmount || 0),
+      discountType: payload.discountType,
+      discountCouponCode: payload.discountCouponCode || "",
+      shippingFee: Number(payload.shippingFee || 0),
+      notes: payload.notes || "",
+      cart: payload.cart.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        variantId: item.variantId,
+        name: item.name,
+        price: Number(item.price || 0),
+        qty: Number(item.qty || 0),
+        listUnitPrice: Number(item.listUnitPrice ?? item.price ?? 0),
+        lineDiscountType: item.lineDiscountType ?? null,
+        lineDiscountValue: Number(item.lineDiscountValue ?? 0),
+      })),
+    })
+  }, [])
+  const [lastSavedOrderSignature, setLastSavedOrderSignature] = useState<string>(EMPTY_ORDER_SIGNATURE)
 
   const filteredProducts = useMemo(() => {
     let result = products
@@ -270,6 +308,30 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     [cart]
   )
   const hasNotes = notes.trim().length > 0
+  const currentOrderSignature = useMemo(
+    () => buildOrderSignature({
+      selectedCustomerId,
+      selectedSellerId,
+      discountAmount,
+      discountType,
+      discountCouponCode,
+      shippingFee,
+      notes,
+      cart,
+    }),
+    [
+      buildOrderSignature,
+      selectedCustomerId,
+      selectedSellerId,
+      discountAmount,
+      discountType,
+      discountCouponCode,
+      shippingFee,
+      notes,
+      cart,
+    ]
+  )
+  const hasUnsavedOrderChanges = currentOrderSignature !== lastSavedOrderSignature
   const percentagePresets = [5, 10, 15, 20]
 
   const getPaymentMethodId = useCallback((methodLabel?: string | null) => {
@@ -381,6 +443,39 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     }
   }, [partnerId, notifyError, notifySuccess, addToCart])
 
+  const handleCreateQuickCustomer = useCallback(async (payload: {
+    name: string
+    email?: string
+    phone?: string
+  }) => {
+    const result = await createPOSCustomerQuickAction({
+      partnerId,
+      name: payload.name,
+      email: payload.email,
+      phone: payload.phone,
+    })
+
+    if (!result.success || !result.data) {
+      notifyError(result.error || "Não foi possível cadastrar o cliente.")
+      return null
+    }
+
+    const created = result.data as {
+      id: string
+      name: string
+      email?: string | null
+      phone?: string | null
+    }
+
+    setCustomers((prev) => {
+      if (prev.some((customer) => customer.id === created.id)) return prev
+      return [{ id: created.id, name: created.name, email: created.email ?? null, phone: created.phone ?? null }, ...prev]
+    })
+
+    notifySuccess("Cliente cadastrado com sucesso.")
+    return created
+  }, [partnerId, notifyError, notifySuccess])
+
   const changeQty = useCallback((itemId: string, delta: number) => {
     setCart((prev) => prev
       .map((item) => {
@@ -408,6 +503,17 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   const persistDraft = async (opts?: { notifyOnSuccess?: boolean }) => {
     if (cart.length === 0) return null
     if (isSavingDraftRef.current) return null
+
+    const signatureAtSave = buildOrderSignature({
+      selectedCustomerId,
+      selectedSellerId,
+      discountAmount,
+      discountType,
+      discountCouponCode,
+      shippingFee,
+      notes,
+      cart,
+    })
 
     isSavingDraftRef.current = true
     setIsSavingDraft(true)
@@ -444,6 +550,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
 
       const saved = result.data as PreSale
       setActivePreSaleId(saved.id)
+      setLastSavedOrderSignature(signatureAtSave)
       setPreSales((prev) => [saved, ...prev.filter((preSale) => preSale.id !== saved.id)].slice(0, 20))
       if (opts?.notifyOnSuccess) {
         notifySuccess("Pedido salvo com sucesso.")
@@ -501,7 +608,17 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     setNotes(preSale.notes || "")
     setShippingFee(Number(preSale.shipping_fee || 0))
     setCart(items)
-  }, [])
+    setLastSavedOrderSignature(buildOrderSignature({
+      selectedCustomerId: preSale.customer_id || undefined,
+      selectedSellerId,
+      discountAmount: Number(preSale.discount_amount || 0),
+      discountType: "fixed",
+      discountCouponCode: "",
+      shippingFee: Number(preSale.shipping_fee || 0),
+      notes: preSale.notes || "",
+      cart: items,
+    }))
+  }, [buildOrderSignature, selectedSellerId])
 
   const clearCurrentOrder = useCallback(() => {
     setActivePreSaleId(null)
@@ -513,7 +630,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     setShippingFee(0)
     setCart([])
     setSelectedSellerId(defaultSellerPartnerUserIdRef.current)
-  }, [])
+    setLastSavedOrderSignature(EMPTY_ORDER_SIGNATURE)
+  }, [EMPTY_ORDER_SIGNATURE])
 
   const removeDraft = async (preSaleId: string) => {
     const result = await deletePreSaleDraftAction(partnerId, preSaleId)
@@ -581,6 +699,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       notifySuccess("Venda finalizada com sucesso.")
       setPreSales((prev) => prev.filter((draft) => draft.id !== preSaleIdToFinalize))
       clearCurrentOrder()
+      setLastSavedOrderSignature(EMPTY_ORDER_SIGNATURE)
       setIsMobileSummarySheetOpen(false)
       setIsMobileItemsSheetOpen(false)
       return { success: true, orderNumber: result.data?.saleId }
@@ -589,6 +708,84 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       isFinalizingRef.current = false
     }
   }
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedOrderChanges) return
+      event.preventDefault()
+      event.returnValue = ""
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
+  }, [hasUnsavedOrderChanges])
+
+  useEffect(() => {
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (!hasUnsavedOrderChanges) return
+      const target = event.target as HTMLElement | null
+      const anchor = target?.closest("a[href]") as HTMLAnchorElement | null
+      if (!anchor) return
+      if (anchor.target === "_blank" || anchor.hasAttribute("download")) return
+
+      const hrefAttr = anchor.getAttribute("href")
+      if (!hrefAttr || hrefAttr.startsWith("#")) return
+
+      const destination = new URL(anchor.href, window.location.href)
+      const current = new URL(window.location.href)
+      if (destination.origin !== current.origin) return
+      if (destination.pathname === current.pathname && destination.search === current.search && destination.hash === current.hash) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      setPendingLeaveHref(`${destination.pathname}${destination.search}${destination.hash}`)
+      setIsLeaveWithoutSaveAlertOpen(true)
+    }
+
+    document.addEventListener("click", handleDocumentClick, true)
+    return () => document.removeEventListener("click", handleDocumentClick, true)
+  }, [hasUnsavedOrderChanges])
+
+  useEffect(() => {
+    const originalPushState = window.history.pushState
+    const originalReplaceState = window.history.replaceState
+
+    const shouldBlockHistoryNavigation = (url?: string | URL | null) => {
+      if (!hasUnsavedOrderChanges || !url) return false
+
+      const current = new URL(window.location.href)
+      const destination = new URL(String(url), current.href)
+      if (destination.origin !== current.origin) return false
+      if (destination.pathname === current.pathname) return false
+
+      setPendingLeaveHref(`${destination.pathname}${destination.search}${destination.hash}`)
+      setIsLeaveWithoutSaveAlertOpen(true)
+      return true
+    }
+
+    window.history.pushState = function pushState(
+      data: any,
+      unused: string,
+      url?: string | URL | null
+    ) {
+      if (shouldBlockHistoryNavigation(url)) return
+      return originalPushState.call(this, data, unused, url)
+    }
+
+    window.history.replaceState = function replaceState(
+      data: any,
+      unused: string,
+      url?: string | URL | null
+    ) {
+      if (shouldBlockHistoryNavigation(url)) return
+      return originalReplaceState.call(this, data, unused, url)
+    }
+
+    return () => {
+      window.history.pushState = originalPushState
+      window.history.replaceState = originalReplaceState
+    }
+  }, [hasUnsavedOrderChanges])
 
   useEffect(() => {
     if (!editingItem) return
@@ -721,8 +918,11 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   }, [])
 
   const cartItemsList = (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className={`space-y-3 flex-1 overflow-y-auto pr-1 ${desktopScrollClass}`}>
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-2xl">
+      <div
+        className={`space-y-3 flex-1 overflow-y-auto pr-1 ${desktopScrollClass}`}
+        style={{ scrollbarGutter: "stable" }}
+      >
         {cart.map((item) => (
           <POSCartItemCard
             key={item.id}
@@ -733,6 +933,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
           />
         ))}
       </div>
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-8 bg-gradient-to-b from-[#F5F6F7] to-transparent dark:from-dark-border/60" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-8 bg-gradient-to-t from-[#F5F6F7] to-transparent dark:from-dark-border/60" />
     </div>
   )
 
@@ -1344,6 +1546,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
           }
         }}
         partnerId={partnerId}
+        onCreateCustomer={handleCreateQuickCustomer}
         selectedCustomerId={selectedCustomerId}
         pinnedCustomer={pinnedCustomerForSheet}
         onRequestRemoveSelected={
@@ -1425,6 +1628,25 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         description="Todos os itens adicionados serão removidos do pedido atual."
         confirmText="Limpar"
         cancelText="Cancelar"
+        variant="danger"
+      />
+
+      <AlertModal
+        isOpen={isLeaveWithoutSaveAlertOpen}
+        onClose={() => {
+          setIsLeaveWithoutSaveAlertOpen(false)
+          setPendingLeaveHref(null)
+        }}
+        onConfirm={() => {
+          const destination = pendingLeaveHref
+          setIsLeaveWithoutSaveAlertOpen(false)
+          setPendingLeaveHref(null)
+          if (destination) window.location.assign(destination)
+        }}
+        title="Sair sem salvar?"
+        description="Você tem alterações no pedido que ainda não foram salvas."
+        confirmText="Sair sem salvar"
+        cancelText="Continuar editando"
         variant="warning"
       />
 

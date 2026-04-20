@@ -273,7 +273,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
 
                         {/* Content Body */}
                         <div className="px-4 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                            <div className="grid grid-cols-12 gap-y-10 lg:gap-x-12">
+                            <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
 
                                 {/* Form Column */}
                                 <div className={activeTab === 'Geral' ? "col-span-12 lg:col-span-8 pr-0 lg:pr-12" : "col-span-12"}>

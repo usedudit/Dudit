@@ -96,7 +96,6 @@ const CustomerListItem = React.memo(
               onClick={(e) => e.stopPropagation()}
             >
               <ActionsDropdown
-                onView={() => onDetails(customer)}
                 onEdit={() => onEdit(customer)}
                 onDelete={() => onDelete(customer)}
               />

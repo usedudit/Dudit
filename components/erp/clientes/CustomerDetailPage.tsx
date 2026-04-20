@@ -234,8 +234,6 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         <ActionsDropdown
-                                            onShare={() => { }}
-                                            onArchive={() => { }}
                                             onDelete={() => setShowDeleteModal(true)}
                                         />
                                         <Button className='whitespace-nowrap' onClick={() => onEdit?.(customer)}>
@@ -482,7 +480,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                             <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
 
                                             <div className="px-6 pt-5">
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Detalhes</h3>
+                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mt-2">Detalhes</h3>
                                             </div>
 
                                             {/* Top Part: Customer Identity */}
@@ -496,7 +494,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                     </div>
                                                     <div className="min-w-0">
                                                         <h4 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">{customer.name}</h4>
-                                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">#{customer.id}</p>
+                                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">{customer.id}</p>
                                                     </div>
                                                 </div>
 
@@ -640,8 +638,6 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                     {/* Mobile Bottom Action Bar */}
                     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
                         <ActionsDropdown
-                            onShare={() => { }}
-                            onArchive={() => { }}
                             onDelete={() => setShowDeleteModal(true)}
                             trigger={
                                 <Button variant="outline" className="flex-1 h-[48px] font-bold">

@@ -53,7 +53,7 @@ const ProductGridCard = React.memo(
             >
                 <div className="flex gap-4 mb-2">
                     {/* Imagem do Produto */}
-                    <div className="w-20 h-20 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 overflow-hidden">
+                    <div className="w-18 h-18 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 overflow-hidden">
                         <img
                             src={imageUrl}
                             alt={product.name}
@@ -92,8 +92,8 @@ const ProductGridCard = React.memo(
                         </div>
 
                         {/* Linha 2: SKU • Categoria • Marca */}
-                        <div className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate mt-1 flex items-center">
-                            <span>SKU {product.sku || "N/A"}</span>
+                        <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate mt-1 flex items-center">
+                            <span>SKU: {product.sku || "N/A"}</span>
                             {product.category && (
                                 <>
                                     <span className="mx-1.5">•</span>

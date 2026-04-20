@@ -33,6 +33,11 @@ interface BulkEditActionsModalProps {
     onClose: () => void
     selectedCount: number
     targetType: 'product' | 'variation' | 'quote' | 'order'
+    orderSelectionGuards?: {
+        paidCount: number
+        deliveredCount: number
+        totalCount: number
+    }
     onApply: (payload: BulkActionPayload) => Promise<void>
 }
 
@@ -90,6 +95,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
     onClose,
     selectedCount,
     targetType,
+    orderSelectionGuards,
     onApply
 }) => {
     const [view, setView] = useState<BulkActionType | 'menu'>('menu')
@@ -116,7 +122,24 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
         }
     }, [isOpen])
 
+    const isOrderPaymentFullyBlocked = targetType === "order"
+        && (orderSelectionGuards?.totalCount || 0) > 0
+        && (orderSelectionGuards?.paidCount || 0) >= (orderSelectionGuards?.totalCount || 0)
+    const isOrderDeliveryFullyBlocked = targetType === "order"
+        && (orderSelectionGuards?.totalCount || 0) > 0
+        && (orderSelectionGuards?.deliveredCount || 0) >= (orderSelectionGuards?.totalCount || 0)
+    const ignoredByRuleCount = view === "order_payment"
+        ? (orderSelectionGuards?.paidCount || 0)
+        : view === "order_delivery"
+            ? (orderSelectionGuards?.deliveredCount || 0)
+            : 0
+    const selectableCount = Math.max(0, (orderSelectionGuards?.totalCount || 0) - ignoredByRuleCount)
+    const isCurrentViewBlocked =
+        (view === "order_payment" && isOrderPaymentFullyBlocked)
+        || (view === "order_delivery" && isOrderDeliveryFullyBlocked)
+
     const handleApply = async () => {
+        if (isCurrentViewBlocked) return
         setIsApplying(true)
         try {
             const payload: BulkActionPayload = { type: view as BulkActionType }
@@ -198,11 +221,17 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                         )}
                         {targetType === 'order' && (
                             <>
-                                <BulkActionCard icon={MoneyIcon} label="Status de Pagamento" onClick={() => { setView('order_payment'); setOrderStatusConfig('paid') }} />
-                                <BulkActionCard icon={Package} label="Status de Envio" onClick={() => { setView('order_delivery'); setOrderStatusConfig('preparing') }} />
+                                <div className={isOrderPaymentFullyBlocked ? "opacity-50 pointer-events-none" : ""}>
+                                    <BulkActionCard icon={MoneyIcon} label="Status de Pagamento" onClick={() => { setView('order_payment'); setOrderStatusConfig('paid') }} />
+                                </div>
+                                <div className={isOrderDeliveryFullyBlocked ? "opacity-50 pointer-events-none" : ""}>
+                                    <BulkActionCard icon={Package} label="Status de Envio" onClick={() => { setView('order_delivery'); setOrderStatusConfig('preparing') }} />
+                                </div>
                             </>
                         )}
-                        <BulkActionCard icon={TrashIcon} label="Excluir" onClick={() => setView('delete')} danger />
+                        {targetType !== 'order' && (
+                            <BulkActionCard icon={TrashIcon} label="Excluir" onClick={() => setView('delete')} danger />
+                        )}
                     </div>
                 )
             case 'price':
@@ -387,24 +416,39 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                     { value: 'delivery_failed', label: 'Falha na entrega' }
                 ]
                 return (
-                    <div className="space-y-1 pt-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
-                        {orderStatuses.map((s) => (
-                            <ListItem
-                                key={s.value}
-                                title={s.label}
-                                titleClassName="font-medium"
-                                onClick={() => setOrderStatusConfig(s.value)}
-                                className="cursor-pointer py-1 pl-4"
-                                right={
-                                    <RadioButton
-                                        checked={orderStatusConfig === s.value}
-                                        onChange={() => setOrderStatusConfig(s.value)}
-                                        name="orderStatusM"
-                                        value={s.value}
-                                    />
-                                }
-                            />
-                        ))}
+                    <div className="space-y-3 pt-2">
+                        {ignoredByRuleCount > 0 && (
+                            <div className="rounded-xl border border-brand-orange/30 bg-brand-orange/10 px-4 py-3 text-sm font-medium text-brand-orange-dark dark:text-brand-orange">
+                                {ignoredByRuleCount} de {(orderSelectionGuards?.totalCount || 0)} pedido(s) serão ignorados por regra.
+                                {!isCurrentViewBlocked && selectableCount > 0 && ` ${selectableCount} pedido(s) ainda podem ser atualizados.`}
+                            </div>
+                        )}
+                        {isCurrentViewBlocked && (
+                            <div className="rounded-xl border border-brand-orange/30 bg-brand-orange/10 px-4 py-3 text-sm font-medium text-brand-orange-dark dark:text-brand-orange">
+                                {view === "order_payment"
+                                    ? "Todos os pedidos selecionados já estão pagos. Não é possível alterar o status de pagamento."
+                                    : "Todos os pedidos selecionados já estão entregues. Não é possível alterar o status de entrega."}
+                            </div>
+                        )}
+                        <div className="space-y-1 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                            {orderStatuses.map((s) => (
+                                <ListItem
+                                    key={s.value}
+                                    title={s.label}
+                                    titleClassName="font-medium"
+                                    onClick={() => !isCurrentViewBlocked && setOrderStatusConfig(s.value)}
+                                    className={`py-1 pl-4 ${isCurrentViewBlocked ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                                    right={
+                                        <RadioButton
+                                            checked={orderStatusConfig === s.value}
+                                            onChange={() => !isCurrentViewBlocked && setOrderStatusConfig(s.value)}
+                                            name="orderStatusM"
+                                            value={s.value}
+                                        />
+                                    }
+                                />
+                            ))}
+                        </div>
                     </div>
                 )
             case 'image':
@@ -462,7 +506,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                 {view !== 'menu' && (
                     <div className="flex gap-3 w-full mt-6">
                         <Button variant="outline" className="flex-1" onClick={onClose} disabled={isApplying}>Cancelar</Button>
-                        <Button variant={view === 'delete' ? 'destructive' : 'default'} className="flex-1" onClick={handleApply} disabled={isApplying}>
+                        <Button variant={view === 'delete' ? 'destructive' : 'default'} className="flex-1" onClick={handleApply} disabled={isApplying || isCurrentViewBlocked}>
                             {isApplying ? 'Aplicando...' : view === 'delete' ? 'Excluir Seleção' : `Aplicar em ${selectedCount}`}
                         </Button>
                     </div>

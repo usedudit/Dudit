@@ -230,7 +230,13 @@ export default function POSShippingSheet({
           onClick={onClose}
         >
           <div
-            className={`fixed right-4 top-4 bottom-4 w-[520px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+            className={`fixed right-4 top-4 bottom-4 w-[520px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${
+              isOpen
+                ? isAddressSheetOpen
+                  ? "-translate-x-10 scale-[0.97] opacity-70"
+                  : "translate-x-0 opacity-100"
+                : "translate-x-[120%] opacity-100"
+            }`}
             onClick={(e) => e.stopPropagation()}
           >
             {content}

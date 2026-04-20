@@ -49,12 +49,24 @@ export function getAvatarColor(name: string): string {
 export function UserProfileImage({
   fullName,
   className = "",
+  imageUrl,
 }: {
   fullName: string
   className?: string
+  imageUrl?: string | null
 }) {
   const initials = getUserInitials(fullName)
   const backgroundColor = getAvatarColor(fullName)
+  const normalizedImageUrl = typeof imageUrl === "string" ? imageUrl.trim() : ""
+  const hasImage = normalizedImageUrl.length > 0
+
+  if (hasImage) {
+    return (
+      <div className={`overflow-hidden rounded-full ${className}`} title={fullName}>
+        <img src={normalizedImageUrl} alt={fullName} className="h-full w-full object-cover" />
+      </div>
+    )
+  }
 
   return (
     <div

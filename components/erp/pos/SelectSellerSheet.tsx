@@ -100,6 +100,7 @@ const SelectSellerSheet = ({ isOpen, onClose, onSelect }: SelectSellerSheetProps
           onChange={(e) => picker.setSearchQuery(e.target.value)}
           prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
           className="mb-0"
+          variant="full-rounded"
         />
       </div>
 
@@ -129,7 +130,7 @@ const SelectSellerSheet = ({ isOpen, onClose, onSelect }: SelectSellerSheetProps
                   <div className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
                     {member.fullName || member.email || "Membro"}
                   </div>
-                  <p className="mt-0.5 truncate text-[11px] font-medium uppercase tracking-wide text-brand-inactive-text dark:text-dark-body">
+                  <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                     {member.role || "Equipe"}
                   </p>
                 </div>

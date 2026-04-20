@@ -305,6 +305,21 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     return { success: false as const, error: "Falha ao finalizar venda - nenhum ID retornado." }
   }
 
+  const { data: finalizedPreSale } = await supabase
+    .from("pre_sales")
+    .select("shipping_fee")
+    .eq("id", input.preSaleId)
+    .eq("partner_id", input.partnerId)
+    .limit(1)
+    .maybeSingle()
+
+  const hasShipping = Number(finalizedPreSale?.shipping_fee || 0) > 0
+  await supabase
+    .from("sales")
+    .update({ delivery_status: hasShipping ? "preparing" : "delivered" })
+    .eq("id", saleId)
+    .eq("partner_id", input.partnerId)
+
   // Invalidate caches (non-blocking - sale is already safely committed)
   const draftItems = await supabase
     .from("sale_items")
