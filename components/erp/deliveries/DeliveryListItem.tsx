@@ -40,7 +40,9 @@ const DeliveryListItem = React.memo(({ delivery, columns, onDetails, onQuickStat
             </div>
             <div className="flex flex-col min-w-0">
               <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">{delivery.orderDisplayId}</span>
-              <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">{delivery.customerName}</span>
+              <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                {delivery.customerName}{delivery.orderCount > 1 ? ` • +${delivery.orderCount - 1} pedido(s)` : ""}
+              </span>
             </div>
           </div>
         )

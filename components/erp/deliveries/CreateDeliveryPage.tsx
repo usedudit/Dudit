@@ -74,7 +74,7 @@ export default function CreateDeliveryPage({
     const startedAt = new Date(`${date}T${time}:00`).toISOString()
     const res = await createERPDeliveryAction({
       partnerId,
-      orderId: selectedOrder.id,
+      orderIds: [selectedOrder.id],
       deliveryPersonId: selectedDeliveryPersonId || null,
       status: status as any,
       startedAt,

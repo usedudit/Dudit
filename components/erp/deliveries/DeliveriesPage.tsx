@@ -93,7 +93,9 @@ export default function DeliveriesPage({
     const term = search.toLowerCase().trim()
     const nowMs = Date.now()
     let list = (items || []).map((raw: any) => {
-      const order = raw.orders || {}
+      const links = Array.isArray(raw.delivery_orders) ? raw.delivery_orders : []
+      const firstLink = [...links].sort((a: any, b: any) => Number(a.position || 9999) - Number(b.position || 9999))[0]
+      const order = firstLink?.orders || {}
       const deliveryPersonName = raw.partner_users?.user_profiles?.full_name || null
       const effectiveStatus = statusOverrides[raw.id] || raw.status || "not_sent"
       const estimatedArrivalAt = raw.started_at && raw.estimated_duration_minutes
@@ -110,8 +112,9 @@ export default function DeliveriesPage({
         : `Vence em ${remainingMinutes} min`
       return {
         id: raw.id,
-        orderId: raw.order_id,
-        orderDisplayId: order.order_number || `#${String(raw.order_id || "").slice(0, 8).toUpperCase()}`,
+        orderId: firstLink?.order_id || null,
+        orderCount: links.length,
+        orderDisplayId: order.order_number || (firstLink?.order_id ? `#${String(firstLink.order_id).slice(0, 8).toUpperCase()}` : "-"),
         customerName: order.customer_name || "Cliente",
         status: effectiveStatus,
         deliveryPersonName,

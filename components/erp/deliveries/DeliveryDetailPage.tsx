@@ -40,7 +40,9 @@ export default function DeliveryDetailPage({
   if (!delivery) return null
 
   const statusMeta = getDeliveryStatusMeta(delivery.status)
-  const order = delivery.orders
+  const links = Array.isArray(delivery.delivery_orders) ? delivery.delivery_orders : []
+  const firstLink = links[0]
+  const order = firstLink?.orders
   const customer = order?.customers || null
   const address = order?.delivery_address || customer?.addresses?.[0]?.street || "-"
 
@@ -73,6 +75,7 @@ export default function DeliveryDetailPage({
         <div className="col-span-12 lg:col-span-4 space-y-4">
           <InfoCard title="Cliente" message={customer?.name || order?.customer_name || "Cliente"} color="gray" />
           <InfoCard title="Entregador" message={delivery.partner_users?.user_profiles?.full_name || "Não atribuído"} color="gray" />
+          <InfoCard title="Pedidos na rota" message={String(links.length || 0)} color="gray" />
         </div>
       </div>
     </div>
