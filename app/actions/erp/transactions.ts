@@ -2,7 +2,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
-import type { ERPTransaction } from "@/lib/services/transactions.types"
+import type { ERPTransaction, FinancialTransactionCursor, FinancialTransactionsPageSuccess } from "@/lib/services/transactions.types"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -286,10 +286,28 @@ async function applyFinanceAccountBalanceDelta(
     }
 }
 
+const FINANCIAL_TX_LIST_SELECT = `
+        id, description, category, amount, original_amount, due_date, payment_date, created_at, status, notes, payment_type, transaction_type, contact_id, customer_id, contact_type,
+        transfer_group_id, refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id, payment_method_id, installment_group_id, installment_number,
+        transaction_contacts(name, type)
+      `
+
+const FINANCIAL_TX_PAGE_SIZE = 100
+
+/** PostgREST `or=(…)` filter for keyset page after (created_at DESC, id DESC). */
+function buildTransactionKeysetOrFilter(cursor: FinancialTransactionCursor): string {
+    const ts = cursor.createdAt
+    const id = cursor.id
+    const q = (s: string) => `"${String(s).replace(/"/g, '""')}"`
+    return `created_at.lt.${q(ts)},and(created_at.eq.${q(ts)},id.lt.${q(id)})`
+}
+
 export async function getFinancialTransactionsAction(
     partnerId: string,
-    options?: { page?: number; pageSize?: number }
-): Promise<{ success: true; data: ERPTransaction[]; totalCount: number } | { success: false; error: string }> {
+    options?: { cursor?: FinancialTransactionCursor | null },
+): Promise<
+    ({ success: true } & FinancialTransactionsPageSuccess) | { success: false; error: string }
+> {
     const actionStart = performance.now()
     try {
         const authStart = performance.now()
@@ -297,43 +315,33 @@ export async function getFinancialTransactionsAction(
         console.log(`[PERF] transactions.auth ${Math.round(performance.now() - authStart)}ms`)
         const supabase = await getSupabaseServerClient()
 
-        const page = Math.max(1, options?.page ?? 1)
-        const pageSize = options?.pageSize ?? 50
-        const safePageSize = Math.max(1, Math.min(100, pageSize))
-        const offset = (page - 1) * safePageSize
+        const cursor = options?.cursor ?? null
+        const fetchLimit = FINANCIAL_TX_PAGE_SIZE + 1
 
-        // ── Step 1: Main query with pagination ──────────────────────────
+        // ── Step 1: Keyset page (created_at DESC, id DESC) ──────────────
         const t1 = performance.now()
-        const countRes = await supabase
-            .from("transactions")
-            .select("id", { count: "exact", head: true })
-            .eq("partner_id", partnerId)
-        if (countRes.error) throw countRes.error
-        const totalCount = countRes.count ?? 0
-        if (offset >= totalCount) {
-            return { success: true, data: [], totalCount }
+        let listQuery = supabase.from("transactions").select(FINANCIAL_TX_LIST_SELECT).eq("partner_id", partnerId)
+
+        if (cursor) {
+            listQuery = listQuery.or(buildTransactionKeysetOrFilter(cursor))
         }
 
-        const { data, error } = await supabase
-            .from("transactions")
-            .select(`
-        id, description, category, amount, original_amount, due_date, payment_date, created_at, status, notes, payment_type, transaction_type, contact_id, customer_id, contact_type,
-        transfer_group_id, refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id, payment_method_id, installment_group_id, installment_number,
-        transaction_contacts(name, type)
-      `, { count: "exact" })
-            .eq("partner_id", partnerId)
+        const { data, error } = await listQuery
             .order("created_at", { ascending: false })
-            .range(offset, offset + safePageSize - 1)
+            .order("id", { ascending: false })
+            .limit(fetchLimit)
 
         if (error) {
-            const message = String((error as any)?.message || "").toLowerCase()
-            if (message.includes("requested range not satisfiable")) {
-                return { success: true, data: [], totalCount }
-            }
             throw error
         }
-        const txs = (data || []) as unknown as DbTransaction[]
-        console.log(`[PERF] transactions.query ${Math.round(performance.now() - t1)}ms (${txs.length} rows, total ${totalCount})`)
+        const rawRows = (data || []) as unknown as DbTransaction[]
+        const hasMore = rawRows.length > FINANCIAL_TX_PAGE_SIZE
+        const txs = hasMore ? rawRows.slice(0, FINANCIAL_TX_PAGE_SIZE) : rawRows
+        const lastRow = txs[txs.length - 1]
+        const nextCursor: FinancialTransactionCursor | null =
+            hasMore && lastRow ? { createdAt: lastRow.created_at, id: lastRow.id } : null
+
+        console.log(`[PERF] transactions.query ${Math.round(performance.now() - t1)}ms (${txs.length} rows, hasMore=${hasMore})`)
 
         // ── Step 2: Collect all IDs for secondary lookups ───────────────
         const salesOrderNumbers: string[] = []
@@ -567,8 +575,8 @@ export async function getFinancialTransactionsAction(
             }
         })
 
-        console.log(`[PERF] getFinancialTransactions took ${Math.round(performance.now() - actionStart)}ms (${txs.length} rows, page ${page})`)
-        return { success: true, data: mapped, totalCount }
+        console.log(`[PERF] getFinancialTransactions took ${Math.round(performance.now() - actionStart)}ms (${txs.length} rows)`)
+        return { success: true, items: mapped, nextCursor, hasMore }
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao carregar transações" }
     }

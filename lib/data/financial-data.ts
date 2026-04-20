@@ -1,6 +1,7 @@
 import "server-only"
 import { cache } from "react"
 import { getFinancialTransactionsAction } from "@/app/actions/erp/transactions"
+import type { FinancialTransactionCursor } from "@/lib/services/transactions.types"
 import { getFinancialCategoriesAction } from "@/app/actions/erp/financial-category-metadata"
 import { getFinanceAccountsAction } from "@/app/actions/erp/finance-accounts"
 import { generateRecurringOccurrencesAction, getRecurringTransactionsAction } from "@/app/actions/erp/recurring-transactions"
@@ -33,7 +34,7 @@ const getRequestId = cache(() => {
 
 // ── Transactions ────────────────────────────────────────────────────────────
 export const getTransactionsData = cache(
-    async (partnerId: string, options?: { page?: number; pageSize?: number }) => {
+    async (partnerId: string, options?: { cursor?: FinancialTransactionCursor | null }) => {
         const reqId = getRequestId()
         console.log(`[DEDUP] req-${reqId} | getTransactionsData EXECUTE (partnerId=${partnerId.slice(0, 8)})`)
         const t0 = performance.now()

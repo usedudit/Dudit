@@ -1,11 +1,13 @@
 "use client"
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, Checkbox, IconPlaceholder, Badge, ActionsDropdown } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
+import { SkeletonLoader } from "@/components/reusable/SkeletonLoader"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { formatCurrency } from "@/lib/utils"
@@ -25,7 +27,12 @@ import TransactionListItem from "./TransactionListItem"
 import TransactionGridCard from "./TransactionGridCard"
 import CreateTransactionPage, { type CategoryItem, type AccountItem } from "./CreateTransactionPage"
 import TransactionDetailView from "./TransactionDetailView"
-import type { ERPTransaction, TransactionTab } from "../../../lib/services/transactions.types"
+import type {
+    ERPTransaction,
+    FinancialTransactionCursor,
+    FinancialTransactionsPageSuccess,
+    TransactionTab,
+} from "../../../lib/services/transactions.types"
 import type { RecurringOccurrence } from "@/app/actions/erp/recurring-transactions"
 import { markRecurringOccurrenceAsPaidAction } from "@/app/actions/erp/transactions"
 import { getInstallmentGroupDetailsAction } from "@/app/actions/erp/transactions"
@@ -83,7 +90,8 @@ const INITIAL_FILTERS: FilterState = {
 }
 
 const ITEMS_PER_PAGE = 8
-const SERVER_PAGE_SIZE = 100
+
+const financialTransactionsQueryKey = (partnerId: string) => ["erp-financial-transactions", partnerId] as const
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
     { id: "transaction", label: "Descrição", align: "left", width: "300px" },
@@ -105,8 +113,9 @@ const getPaymentIcon = (paymentType: string) => {
 }
 
 export default function TransactionsPage({
-    transactions,
-    totalCount,
+    initialItems,
+    initialNextCursor,
+    initialHasMore,
     partnerId,
     categories = [],
     accounts = [],
@@ -114,8 +123,9 @@ export default function TransactionsPage({
     recurringTemplates = [],
     paymentMethods = [],
 }: {
-    transactions: ERPTransaction[]
-    totalCount?: number
+    initialItems: ERPTransaction[]
+    initialNextCursor: FinancialTransactionCursor | null
+    initialHasMore: boolean
     partnerId: string
     categories?: CategoryItem[]
     accounts?: AccountItem[]
@@ -124,6 +134,7 @@ export default function TransactionsPage({
     paymentMethods?: any[]
 }) {
     const router = useRouter()
+    const queryClient = useQueryClient()
     const debouncedRefresh = useDebouncedRefresh()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const isMobile = useMediaQuery("(max-width: 767px)")
@@ -156,19 +167,55 @@ export default function TransactionsPage({
     const [confirmRecurringPayment, setConfirmRecurringPayment] = useState<ERPTransaction | null>(null)
     const [confirmSettleGroup, setConfirmSettleGroup] = useState<ERPTransaction | null>(null)
     const [settlingGroup, setSettlingGroup] = useState(false)
-    const [loadedTransactions, setLoadedTransactions] = useState<ERPTransaction[]>(transactions)
-    const [serverPage, setServerPage] = useState(1)
-    const [totalAvailable, setTotalAvailable] = useState(totalCount || transactions.length)
     const observerTarget = useRef<HTMLDivElement>(null)
 
-    useEffect(() => {
-        setLoadedTransactions(transactions)
-        setServerPage(1)
-        setPage(1)
-        setTotalAvailable(totalCount || transactions.length)
-    }, [transactions])
+    const {
+        data: infiniteData,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+    } = useInfiniteQuery({
+        queryKey: financialTransactionsQueryKey(partnerId),
+        initialPageParam: null as FinancialTransactionCursor | null,
+        queryFn: async ({ pageParam }: { pageParam: FinancialTransactionCursor | null }) => {
+            const res = await getFinancialTransactionsAction(partnerId, {
+                cursor: pageParam ?? undefined,
+            })
+            if (!res.success) throw new Error(res.error || "Erro ao carregar transações.")
+            return {
+                items: res.items,
+                nextCursor: res.nextCursor,
+                hasMore: res.hasMore,
+            }
+        },
+        getNextPageParam: (lastPage: FinancialTransactionsPageSuccess) => {
+            if (!lastPage.hasMore) return undefined
+            return lastPage.nextCursor ?? undefined
+        },
+        initialData: {
+            pages: [
+                {
+                    items: initialItems,
+                    nextCursor: initialNextCursor,
+                    hasMore: initialHasMore,
+                },
+            ],
+            pageParams: [null],
+        },
+    })
 
-    const [loadingMoreTransactions, setLoadingMoreTransactions] = useState(false)
+    const loadedTransactions = useMemo(() => {
+        const pages = infiniteData?.pages ?? []
+        const flat = pages.flatMap((p: FinancialTransactionsPageSuccess) => p.items)
+        const seen = new Set<string>()
+        const out: ERPTransaction[] = []
+        for (const item of flat) {
+            if (seen.has(item.id)) continue
+            seen.add(item.id)
+            out.push(item)
+        }
+        return out
+    }, [infiniteData?.pages])
     const [settlePaymentsByInstallment, setSettlePaymentsByInstallment] = useState<
         Record<string, { paymentAmount: string; interestAmount: string; discountAmount: string; paymentMethodId: string }>
     >({})
@@ -224,7 +271,7 @@ export default function TransactionsPage({
         checkScroll()
         window.addEventListener("resize", checkScroll)
         return () => window.removeEventListener("resize", checkScroll)
-    }, [checkScroll, viewMode, transactions])
+    }, [checkScroll, viewMode, loadedTransactions.length])
 
     // ── Search debounce (300ms) ──────────────────────────────────────
     useEffect(() => {
@@ -504,71 +551,54 @@ export default function TransactionsPage({
         isDatePeriodFilterActive(filters.datePeriod)
     const hasTransactions = loadedTransactions.length > 0
 
-    const canLoadMoreFromServer = loadedTransactions.length < totalAvailable
-
     const refreshTransactionsNow = useCallback(async () => {
-        const res = await getFinancialTransactionsAction(partnerId, { page: 1, pageSize: SERVER_PAGE_SIZE })
+        const res = await getFinancialTransactionsAction(partnerId, {})
         if (!res.success) {
             notifyError(res.error || "Erro ao atualizar transações.")
             return false
         }
-        setLoadedTransactions(res.data || [])
-        setServerPage(1)
+        queryClient.setQueryData(financialTransactionsQueryKey(partnerId), {
+            pages: [
+                {
+                    items: res.items,
+                    nextCursor: res.nextCursor,
+                    hasMore: res.hasMore,
+                } satisfies FinancialTransactionsPageSuccess,
+            ],
+            pageParams: [null] as (FinancialTransactionCursor | null)[],
+        })
         setPage(1)
-        setTotalAvailable(res.totalCount || (res.data || []).length)
         router.refresh()
         return true
-    }, [partnerId, notifyError, router])
+    }, [partnerId, notifyError, queryClient, router])
 
-    const loadMoreTransactions = useCallback(async () => {
-        if (loadingMoreTransactions || !canLoadMoreFromServer) return
-        setLoadingMoreTransactions(true)
-        try {
-            const nextPage = serverPage + 1
-            const res = await getFinancialTransactionsAction(partnerId, { page: nextPage, pageSize: SERVER_PAGE_SIZE })
-            if (!res.success) {
-                notifyError(res.error || "Erro ao carregar mais transações.")
-                return
-            }
-            const nextRows = res.data || []
-            setLoadedTransactions((prev) => {
-                const existingIds = new Set(prev.map((item) => item.id))
-                const merged = [...prev]
-                for (const row of nextRows) {
-                    if (!existingIds.has(row.id)) merged.push(row)
-                }
-                return merged
-            })
-            setServerPage(nextPage)
-            setTotalAvailable(res.totalCount || 0)
-        } finally {
-            setLoadingMoreTransactions(false)
-        }
-    }, [loadingMoreTransactions, canLoadMoreFromServer, serverPage, partnerId, notifyError])
+    const isFetchingNextRef = useRef(false)
 
     useEffect(() => {
-        // Fallback for non-observer browsers or specific edge cases
-        if (page === totalPages && canLoadMoreFromServer && !loadingMoreTransactions) {
-            void loadMoreTransactions()
-        }
-    }, [page, totalPages, canLoadMoreFromServer, loadingMoreTransactions, loadMoreTransactions])
+        if (!hasNextPage) return
+        const el = observerTarget.current
+        if (!el) return
 
-    useEffect(() => {
         const observer = new IntersectionObserver(
             (entries) => {
-                if (entries[0].isIntersecting && canLoadMoreFromServer && !loadingMoreTransactions) {
-                    void loadMoreTransactions()
-                }
+                if (!entries[0]?.isIntersecting || isFetchingNextRef.current) return
+                isFetchingNextRef.current = true
+                void fetchNextPage().finally(() => {
+                    isFetchingNextRef.current = false
+                })
             },
-            { threshold: 0.1 }
+            { rootMargin: "320px", threshold: 0 },
         )
 
-        if (observerTarget.current) {
-            observer.observe(observerTarget.current)
-        }
-
+        observer.observe(el)
         return () => observer.disconnect()
-    }, [canLoadMoreFromServer, loadingMoreTransactions, loadMoreTransactions])
+    }, [hasNextPage, fetchNextPage])
+
+    useEffect(() => {
+        if (page === totalPages && hasNextPage && !isFetchingNextPage) {
+            void fetchNextPage()
+        }
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
 
     const handleSelectRow = useCallback((id: string) => {
         setSelection((prev) => {
@@ -1145,6 +1175,7 @@ export default function TransactionsPage({
                             </motion.div>
                         )}
                     </AnimatePresence>
+                    {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
                 </div>
 
                 {paginatedTransactions.length > 0 && (
@@ -1154,16 +1185,17 @@ export default function TransactionsPage({
                             totalPages={totalPages}
                             onPageChange={(p) => {
                                 setPage(p)
-                                if (p === totalPages && canLoadMoreFromServer) {
-                                    void loadMoreTransactions()
+                                if (p === totalPages && hasNextPage && !isFetchingNextPage) {
+                                    void fetchNextPage()
                                 }
                             }}
                         />
-                        {canLoadMoreFromServer && page === totalPages && (
-                            <div className="flex justify-center py-4 text-brand-inactive-text text-sm">
-                                {loadingMoreTransactions ? "Carregando..." : "Buscando mais itens no servidor..."}
+                        {hasNextPage && page === totalPages && isFetchingNextPage ? (
+                            <div className="flex flex-col gap-2 py-2 px-4">
+                                <SkeletonLoader className="h-10 w-full max-w-lg mx-auto rounded-lg" />
+                                <SkeletonLoader className="h-10 w-full max-w-lg mx-auto rounded-lg opacity-70" />
                             </div>
-                        )}
+                        ) : null}
                     </div>
                 )}
             </div>

@@ -1,5 +1,8 @@
 export type TransactionTab = "Transações" | "Previstos"
 
+/** Stable keyset cursor for paginating transactions (created_at DESC, id DESC). */
+export type FinancialTransactionCursor = { createdAt: string; id: string }
+
 export type TransactionStatusVariant = "green" | "red" | "orange" | "gray"
 
 export type LedgerDirection = "in" | "out"
@@ -64,4 +67,10 @@ export interface ERPTransaction {
   installmentPaidCount?: number
   /** Parcela pendente: saldo em aberto (considera pagamentos parciais em transaction_payments). */
   installmentRemainingAmount?: number
+}
+
+export type FinancialTransactionsPageSuccess = {
+  items: ERPTransaction[]
+  nextCursor: FinancialTransactionCursor | null
+  hasMore: boolean
 }

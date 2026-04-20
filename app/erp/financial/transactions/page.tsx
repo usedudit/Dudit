@@ -45,8 +45,9 @@ export default async function FinancialTransactionsRoute() {
       <ERPPageHeader title="Transações" />
       <FadeIn className="p-4">
         <TransactionsPage
-          transactions={txResult.data}
-          totalCount={(txResult as any).totalCount ?? txResult.data.length}
+          initialItems={txResult.items}
+          initialNextCursor={txResult.nextCursor}
+          initialHasMore={txResult.hasMore}
           partnerId={partnerId}
           categories={categories}
           accounts={accounts}
