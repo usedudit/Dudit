@@ -308,6 +308,19 @@ export default function QuotesPage({
     const totalPages = Math.ceil(filteredQuotes.length / itemsPerPage) || 1
     const paginated = filteredQuotes.slice((page - 1) * itemsPerPage, page * itemsPerPage)
 
+    const handlePageChange = useCallback((newPage: number) => {
+        setPage(newPage)
+        if (newPage === totalPages && hasNextPage && !isFetchingNextPage) {
+            void fetchNextPage()
+        }
+    }, [totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
+
+    useEffect(() => {
+        if (page === totalPages && hasNextPage && !isFetchingNextPage) {
+            void fetchNextPage()
+        }
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
+
     const hasActiveFilters =
         filters.status.length > 0 ||
         isDatePeriodFilterActive(filters.issuePeriod) ||
@@ -420,13 +433,6 @@ export default function QuotesPage({
         setActiveTab("Todos")
     }, [])
 
-    const handlePageChange = useCallback((newPage: number) => {
-        setPage(newPage)
-        if (newPage === totalPages && hasNextPage && !isFetchingNextPage) {
-            void fetchNextPage()
-        }
-    }, [totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
-
     useInfiniteScrollObserver(observerTarget, {
         enabled: true,
         hasNextPage: !!hasNextPage,
@@ -436,11 +442,6 @@ export default function QuotesPage({
         threshold: 0,
     })
 
-    useEffect(() => {
-        if (page === totalPages && hasNextPage && !isFetchingNextPage) {
-            void fetchNextPage()
-        }
-    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
 
 
     return (

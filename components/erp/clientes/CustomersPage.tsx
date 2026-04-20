@@ -178,12 +178,6 @@ export default function CustomersPage({
         threshold: 0,
     })
 
-    useEffect(() => {
-        if (page === totalPages && hasNextPage && !isFetchingNextPage) {
-            void fetchNextPage()
-        }
-    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
-
     const filterSections: FilterSectionConfig[] = [
         { id: "status", title: "Status", type: "checkbox-list", options: ["Ativo", "Inativo", "Bloqueado"] },
     ]
@@ -278,6 +272,12 @@ export default function CustomersPage({
 
     const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage)
     const paginated = filteredCustomers.slice((page - 1) * itemsPerPage, page * itemsPerPage)
+
+    useEffect(() => {
+        if (page === totalPages && hasNextPage && !isFetchingNextPage) {
+            void fetchNextPage()
+        }
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
 
     const hasActiveFilters = filters.status.length > 0 || debouncedSearch.length > 0
     const hasCustomers = (rawCustomers?.length || 0) > 0

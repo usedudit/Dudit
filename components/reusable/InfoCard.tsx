@@ -1,6 +1,6 @@
 import React from "react"
 
-type InfoCardColor = "orange" | "green" | "gray" | "blue" | "red" | "yellow"
+type InfoCardColor = "orange" | "green" | "gray" | "blue" | "red" | "yellow" | "purple"
 
 interface InfoCardProps {
   title?: string
@@ -44,6 +44,12 @@ const colorMap: Record<InfoCardColor, { bg: string; text: string; bar: string; b
     bg: "bg-blue-500/10",
     text: "text-blue-600",
     bar: "bg-blue-600",
+    border: "border-brand-border"
+  },
+  purple: {
+    bg: "bg-purple-500/10",
+    text: "text-purple-600",
+    bar: "bg-purple-600",
     border: "border-brand-border"
   },
 }

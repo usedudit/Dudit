@@ -315,6 +315,12 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
         page * ITEMS_PER_PAGE
     );
 
+    useEffect(() => {
+        if (page === totalPages && hasNextPage && !isFetchingNextPage) {
+            void fetchNextPage()
+        }
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage]);
+
     useInfiniteScrollObserver(observerTarget, {
         enabled: true,
         hasNextPage: !!hasNextPage,
@@ -324,11 +330,6 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
         threshold: 0,
     });
 
-    useEffect(() => {
-        if (page === totalPages && hasNextPage && !isFetchingNextPage) {
-            void fetchNextPage()
-        }
-    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
     const handleClearFilters = () => {
         setSearchTerm("");

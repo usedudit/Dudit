@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Button, Input, Tabs, TabsList, TabsTrigger, TabsContent, FormDropdown } from "@/components/reusable"
+import { Button, Input, Tabs, TabsList, TabsTrigger, TabsContent, FormDropdown, Badge } from "@/components/reusable"
 import { ChevronLeftIcon, SaveIcon, SearchIcon } from "@/lib/icons"
 import { usePickerBucket } from "@/components/erp/hooks"
 import { fetchDeliveryOrderBucketAction, fetchDeliveryPeopleBucketAction, createERPDeliveryAction } from "@/app/actions/erp/deliveries"
@@ -10,6 +10,18 @@ import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
 import { getDeliveryStatusMeta, getPaymentStatusMeta } from "@/lib/orders/status"
 
 type DeliveryPerson = { id: string; userId?: string; fullName: string }
+type OrderPickerItem = {
+  id: string
+  displayId: string
+  totalAmount: number
+  orderDate?: string | null
+  status: string
+  deliveryStatus: string
+  shippingFee: number
+  customer?: { id: string | null; name: string; email?: string | null; phone?: string | null } | null
+  address?: string
+  items?: any[]
+}
 
 export default function CreateDeliveryPage({
   partnerId,
@@ -32,8 +44,8 @@ export default function CreateDeliveryPage({
   const searchRef = useRef<HTMLDivElement>(null)
   const [deliveryPeople, setDeliveryPeople] = useState<DeliveryPerson[]>([])
 
-  const orderPicker = usePickerBucket(
-    () => fetchDeliveryOrderBucketAction(partnerId),
+  const orderPicker = usePickerBucket<OrderPickerItem>(
+    () => fetchDeliveryOrderBucketAction(partnerId) as Promise<OrderPickerItem[]>,
     (order, q) =>
       String(order.displayId || "").toLowerCase().includes(q) ||
       String(order.customer?.name || "").toLowerCase().includes(q),
@@ -197,7 +209,7 @@ export default function CreateDeliveryPage({
                         {(selectedOrder.items || []).length === 0 ? (
                           <div className="text-sm text-brand-inactive-text">A entrega considera o pedido completo (itens não editáveis nesta etapa).</div>
                         ) : (
-                          selectedOrder.items.map((item: any) => (
+                          selectedOrder.items?.map((item: any) => (
                             <div key={item.id} className="flex items-center gap-3 py-3 border-b border-brand-border dark:border-dark-border">
                               <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border" />
                               <div className="flex-1 min-w-0">

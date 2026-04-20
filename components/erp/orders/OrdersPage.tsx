@@ -199,11 +199,6 @@ export default function OrdersPage({
         threshold: 0,
     })
 
-    useEffect(() => {
-        if (page === totalPages && hasNextPage && !isFetchingNextPage) {
-            void fetchNextPage()
-        }
-    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
 
     const filterSections: FilterSectionConfig[] = useMemo(
         () => [
@@ -321,6 +316,12 @@ export default function OrdersPage({
 
     const totalPages = Math.ceil(filteredOrders.length / itemsPerPage)
     const paginated = filteredOrders.slice((page - 1) * itemsPerPage, page * itemsPerPage)
+
+    useEffect(() => {
+        if (page === totalPages && hasNextPage && !isFetchingNextPage) {
+            void fetchNextPage()
+        }
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
 
     const hasActiveFilters =
         filters.status.length > 0 ||

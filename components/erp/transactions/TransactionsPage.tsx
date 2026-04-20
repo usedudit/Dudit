@@ -514,6 +514,12 @@ export default function TransactionsPage({
         return { paginatedTransactions: paginated, totalPages: pages }
     }, [filteredTransactions, page])
 
+    useEffect(() => {
+        if (page === totalPages && hasNextPage && !isFetchingNextPage) {
+            void fetchNextPage()
+        }
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
+
     const hasActiveFilters =
         search.length > 0 ||
         filters.status.length > 0 ||
@@ -554,11 +560,6 @@ export default function TransactionsPage({
         threshold: 0,
     })
 
-    useEffect(() => {
-        if (page === totalPages && hasNextPage && !isFetchingNextPage) {
-            void fetchNextPage()
-        }
-    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
 
     const handleSelectRow = useCallback((id: string) => {
         setSelection((prev) => {

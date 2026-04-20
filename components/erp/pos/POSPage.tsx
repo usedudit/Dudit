@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { TrashIcon, ChevronRightIcon, XIcon, SalesIcon, MoneyIcon, TagIcon, FileIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input, IconPlaceholder } from "@/components/reusable"
+import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input, IconPlaceholder, ListItem, RadioButton } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -1394,43 +1394,52 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       >
         <div className="space-y-6 pt-2">
           <InfoCard color="green" title="Valor total de itens" message={formatCurrency(subtotal)} />
-          <div className="grid grid-cols lg:grid-cols-3  gap-3">
-            <button
-              type="button"
+          <div className="grid grid-cols-1 gap-3">
+            <ListItem
               onClick={() => setGlobalDiscountType("percentage")}
-              className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${globalDiscountType === "percentage"
-                ? "border-brand-primary bg-brand-primary/10 text-brand-primary"
-                : "border-brand-border bg-brand-gray text-brand-dark hover:border-brand-primary/50"}`}
-            >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-current/20">
-                <TagIcon size={16} />
-              </div>
-              <span className="font-bold">Porcentagem</span>
-            </button>
-            <button
-              type="button"
+              icon={TagIcon}
+              title="Porcentagem"
+              description="Aplica um desconto percentual sobre o subtotal"
+              className={`px-4 py-3 ${globalDiscountType === "percentage" ? "border-brand-primary bg-brand-primary/5" : ""}`}
+              right={
+                <RadioButton
+                  name="globalDiscountType"
+                  value="percentage"
+                  checked={globalDiscountType === "percentage"}
+                  onChange={() => setGlobalDiscountType("percentage")}
+                />
+              }
+            />
+            <ListItem
               onClick={() => setGlobalDiscountType("fixed")}
-              className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${globalDiscountType === "fixed"
-                ? "border-brand-primary bg-brand-primary/10 text-brand-primary"
-                : "border-brand-border bg-brand-gray text-brand-dark hover:border-brand-primary/50"}`}
-            >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-current/20">
-                <MoneyIcon size={16} />
-              </div>
-              <span className="font-bold">Valor fixo</span>
-            </button>
-            <button
-              type="button"
+              icon={MoneyIcon}
+              title="Valor fixo"
+              description="Aplica um valor fixo de desconto em reais"
+              className={`px-4 py-3 ${globalDiscountType === "fixed" ? "border-brand-primary bg-brand-primary/5" : ""}`}
+              right={
+                <RadioButton
+                  name="globalDiscountType"
+                  value="fixed"
+                  checked={globalDiscountType === "fixed"}
+                  onChange={() => setGlobalDiscountType("fixed")}
+                />
+              }
+            />
+            <ListItem
               onClick={() => setGlobalDiscountType("coupon")}
-              className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${globalDiscountType === "coupon"
-                ? "border-brand-primary bg-brand-primary/10 text-brand-primary"
-                : "border-brand-border bg-brand-gray text-brand-dark hover:border-brand-primary/50"}`}
-            >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-current/20">
-                <FileIcon size={16} />
-              </div>
-              <span className="font-bold">Cupom</span>
-            </button>
+              icon={FileIcon}
+              title="Cupom"
+              description="Utiliza um cupom de desconto pré-cadastrado"
+              className={`px-4 py-3 ${globalDiscountType === "coupon" ? "border-brand-primary bg-brand-primary/5" : ""}`}
+              right={
+                <RadioButton
+                  name="globalDiscountType"
+                  value="coupon"
+                  checked={globalDiscountType === "coupon"}
+                  onChange={() => setGlobalDiscountType("coupon")}
+                />
+              }
+            />
           </div>
           {globalDiscountType === "fixed" && (
             <MoneyInput
