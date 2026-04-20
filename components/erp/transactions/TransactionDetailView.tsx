@@ -147,7 +147,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                             <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                 <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                     <TabsTrigger value="summary">Resumo</TabsTrigger>
-                                    <TabsTrigger value="history">Historico</TabsTrigger>
+                                    <TabsTrigger value="history">Histórico</TabsTrigger>
                                 </TabsList>
                             </div>
                         </div>
@@ -226,27 +226,35 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                             <div className="space-y-4">
                                                 {detail.items.map((item) => (
                                                     <div key={item.id} className="flex items-start gap-4">
-                                                        <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
-                                                            <img
-                                                                src={item.image ? getR2ImageUrl(item.image, "thumbnail") : "https://img.dudit.com.br/static/Placeholder.png"}
-                                                                className="w-full h-full object-cover rounded-xl"
-                                                                alt={item.title}
-                                                                onError={(e: any) => {
-                                                                    e.target.src = "https://img.dudit.com.br/static/Placeholder.png"
-                                                                }}
-                                                            />
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex justify-between items-start mb-1">
-                                                                <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.title}</h4>
-                                                                <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">{formatCurrency(item.lineTotal)}</span>
+                                                        {!detail.transactionItemsCompact && (
+                                                            <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                                <img
+                                                                    src={item.image ? getR2ImageUrl(item.image, "thumbnail") : "https://img.dudit.com.br/static/Placeholder.png"}
+                                                                    className="w-full h-full object-cover rounded-xl"
+                                                                    alt={item.title}
+                                                                    onError={(e: any) => {
+                                                                        e.target.src = "https://img.dudit.com.br/static/Placeholder.png"
+                                                                    }}
+                                                                />
                                                             </div>
-                                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku}</div>
-                                                            <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
-                                                                <span>
-                                                                    {item.quantity} un. • {formatCurrency(item.unitPrice)} / un.
+                                                        )}
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex justify-between items-start mb-1 gap-3">
+                                                                <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.title}</h4>
+                                                                <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading shrink-0">
+                                                                    {formatCurrency(item.lineTotal)}
                                                                 </span>
                                                             </div>
+                                                            {!detail.transactionItemsCompact && (
+                                                                <>
+                                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku}</div>
+                                                                    <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                        <span>
+                                                                            {item.quantity} un. • {formatCurrency(item.unitPrice)} / un.
+                                                                        </span>
+                                                                    </div>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 ))}

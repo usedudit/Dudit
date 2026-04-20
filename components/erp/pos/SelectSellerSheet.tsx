@@ -1,149 +1,193 @@
 "use client"
 
-import { useState, useEffect } from 'react';
-import { SearchIcon, PlusIcon, XIcon, ClockIcon } from '@/lib/icons';
-import { Button, Input, IconPlaceholder } from '@/components/reusable';
-import Portal from "@/components/Portal";
-import BottomSheet from "@/components/BottomSheet";
-import { useMediaQuery } from "@/components/erp/hooks";
-import { getTeamMembers } from '@/app/actions/erp/team';
+import { useState, useEffect, useCallback, useRef } from "react"
+import { SearchIcon, PlusIcon, XIcon, ClockIcon } from "@/lib/icons"
+import { Button, Input, IconPlaceholder } from "@/components/reusable"
+import Portal from "@/components/Portal"
+import BottomSheet from "@/components/BottomSheet"
+import { useMediaQuery, usePickerBucket } from "@/components/erp/hooks"
+import {
+  fetchPartnerTeamMembersBucket,
+  type PartnerTeamMemberBucketItem,
+} from "@/app/actions/erp/client-loaders"
+
+function SellerRowSkeleton() {
+  return (
+    <div className="flex animate-pulse items-center gap-4 border-b border-brand-border p-3.5 last:border-0 dark:border-dark-border">
+      <div className="h-12 w-12 shrink-0 rounded-full bg-gray-100 dark:bg-dark-border" />
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="h-4 w-2/3 rounded bg-gray-100 dark:bg-dark-border" />
+        <div className="h-3 w-1/2 rounded bg-gray-100 dark:bg-dark-border" />
+      </div>
+    </div>
+  )
+}
 
 interface SelectSellerSheetProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onSelect: (seller: any) => void;
+  isOpen: boolean
+  onClose: () => void
+  onSelect: (seller: PartnerTeamMemberBucketItem) => void
 }
 
 const SelectSellerSheet = ({ isOpen, onClose, onSelect }: SelectSellerSheetProps) => {
-    const [search, setSearch] = useState('');
-    const [members, setMembers] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const isMobile = useMediaQuery("(max-width: 768px)");
+  const [appendPulse, setAppendPulse] = useState(false)
+  const loadMoreLock = useRef(false)
+  const listScrollRef = useRef<HTMLDivElement>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const isMobile = useMediaQuery("(max-width: 768px)")
 
-    const fetchMembers = async () => {
-        setIsLoading(true);
-        try {
-            const res = await getTeamMembers();
-            if (res.members) {
-                setMembers(res.members);
-            }
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        if (isOpen) {
-            fetchMembers();
-        }
-    }, [isOpen]);
-
-    const filteredMembers = members.filter(member =>
-        member.fullName?.toLowerCase().includes(search.toLowerCase()) ||
-        member.email?.toLowerCase().includes(search.toLowerCase())
-    );
-
-    const content = (
-        <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
-            {/* Header */}
-            <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center bg-white dark:bg-dark-surface z-10 shrink-0">
-                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar Vendedor</h2>
-                <Button variant="ghost" onClick={onClose} size="icon">
-                    <XIcon className="w-5 h-5" />
-                </Button>
-            </header>
-
-            {/* Sticky Search Bar */}
-            <div className="p-6 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface z-10 shrink-0">
-                <Input
-                    label=""
-                    name="sellerSearch"
-                    placeholder="Buscar por nome ou email..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
-                    className="mb-0"
-                    variant="full-rounded"
-                />
-            </div>
-
-            {/* List Content */}
-            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                {isLoading ? (
-                    <div className="flex flex-col gap-3">
-                        {[1, 2, 3, 4, 5].map(i => (
-                            <div key={i} className="h-16 w-full animate-pulse bg-gray-100 dark:bg-dark-border rounded-xl" />
-                        ))}
-                    </div>
-                ) : filteredMembers.length > 0 ? (
-                    <div className="flex flex-col gap-2">
-                        {filteredMembers.map(member => (
-                            <button
-                                key={member.id}
-                                onClick={() => {
-                                    onSelect(member);
-                                    onClose();
-                                }}
-                                className="flex items-center gap-4 p-3 rounded-xl hover:bg-brand-gray/30 dark:hover:bg-dark-border/30 transition-all text-left border border-transparent hover:border-brand-border dark:hover:border-dark-border group"
-                            >
-                                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-gray-800 flex items-center justify-center text-lg font-bold text-brand-inactive-text border border-brand-border dark:border-dark-border overflow-hidden">
-                                    {member.fullName?.charAt(0) || 'V'}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h4 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate group-hover:text-brand-primary transition-colors">{member.fullName}</h4>
-                                    <p className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body truncate">{member.role || 'Vendedor'}</p>
-                                </div>
-                                <div className="w-8 h-8 rounded-full flex items-center justify-center text-brand-inactive-text opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <PlusIcon size={18} />
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="py-12">
-                        <IconPlaceholder
-                            icon={ClockIcon}
-                            title="Nenhum vendedor encontrado"
-                            subtitle="Tente outro termo de busca."
-                        />
-                    </div>
-                )}
-            </div>
-
-            {/* Footer */}
-            <footer className="p-6 border-t border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface shrink-0">
-                <Button variant="outline" className="w-full h-12" onClick={onClose}>
-                    Cancelar
-                </Button>
-            </footer>
-        </div>
-    );
-
-    if (isMobile) {
-        return (
-            <BottomSheet isOpen={isOpen} onClose={onClose}>
-                {content}
-            </BottomSheet>
-        );
-    }
-
+  const matchesSearch = useCallback((member: PartnerTeamMemberBucketItem, q: string) => {
     return (
-        <Portal>
-            <div
-                className={`fixed inset-0 bg-black/50 z-50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-                onClick={onClose}
-            >
-                <div
-                    className={`fixed right-4 top-4 bottom-4 w-[450px] bg-white dark:bg-dark-surface shadow-2xl rounded-2xl transition-transform duration-300 overflow-hidden ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {content}
-                </div>
-            </div>
-        </Portal>
-    );
-};
+      (member.fullName || "").toLowerCase().includes(q) ||
+      member.email.toLowerCase().includes(q) ||
+      (member.role || "").toLowerCase().includes(q)
+    )
+  }, [])
 
-export default SelectSellerSheet;
+  const picker = usePickerBucket(fetchPartnerTeamMembersBucket, matchesSearch, { pageSize: 8 })
+
+  const pickerRef = useRef(picker)
+  pickerRef.current = picker
+
+  useEffect(() => {
+    if (!isOpen) return
+    void pickerRef.current.loadBucket()
+  }, [isOpen])
+
+  useEffect(() => {
+    const root = listScrollRef.current
+    const target = sentinelRef.current
+    if (!isOpen || !root || !target || !picker.hasMore) return
+
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting || loadMoreLock.current) return
+        loadMoreLock.current = true
+        setAppendPulse(true)
+        picker.loadMore()
+        window.setTimeout(() => setAppendPulse(false), 200)
+        window.setTimeout(() => {
+          loadMoreLock.current = false
+        }, 120)
+      },
+      { root, rootMargin: "100px", threshold: 0 }
+    )
+    obs.observe(target)
+    return () => obs.disconnect()
+  }, [isOpen, picker.hasMore, picker.loadMore, picker.displayed.length, picker.filtered.length])
+
+  const showEmpty =
+    !picker.isLoadingBucket &&
+    picker.isLoaded &&
+    picker.displayed.length === 0 &&
+    picker.filtered.length === 0
+
+  const content = (
+    <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+      <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+        <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar Vendedor</h2>
+        <Button variant="ghost" onClick={onClose} size="icon">
+          <XIcon className="h-5 w-5" />
+        </Button>
+      </header>
+
+      <div className="z-10 shrink-0 border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+        <Input
+          label=""
+          name="sellerSearch"
+          placeholder="Buscar por nome, email ou função..."
+          value={picker.searchQuery}
+          onChange={(e) => picker.setSearchQuery(e.target.value)}
+          prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+          className="mb-0"
+        />
+      </div>
+
+      <div ref={listScrollRef} className="custom-scrollbar flex-1 overflow-y-auto p-0">
+        {picker.isLoadingBucket ? (
+          <div className="flex flex-col">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <SellerRowSkeleton key={i} />
+            ))}
+          </div>
+        ) : picker.displayed.length > 0 ? (
+          <div className="flex flex-col px-2 pb-2 pt-1">
+            {picker.displayed.map((member) => (
+              <button
+                key={member.id}
+                type="button"
+                onClick={() => {
+                  onSelect(member)
+                  onClose()
+                }}
+                className="group flex w-full items-center gap-4 border-b border-brand-border p-3.5 text-left transition-colors last:border-0 hover:bg-gray-50 dark:border-dark-border dark:hover:bg-dark-border/40"
+              >
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-brand-border bg-brand-gray text-lg font-bold text-brand-inactive-text dark:border-dark-border dark:bg-gray-800">
+                  {(member.fullName || member.email || "?").charAt(0)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
+                    {member.fullName || member.email || "Membro"}
+                  </div>
+                  <p className="mt-0.5 truncate text-[11px] font-medium uppercase tracking-wide text-brand-inactive-text dark:text-dark-body">
+                    {member.role || "Equipe"}
+                  </p>
+                </div>
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center text-brand-inactive-text opacity-0 transition-opacity group-hover:opacity-100">
+                  <PlusIcon size={18} />
+                </div>
+              </button>
+            ))}
+
+            {appendPulse && picker.hasMore && (
+              <div className="flex flex-col border-t border-brand-border/50 pt-1 dark:border-dark-border/50">
+                <SellerRowSkeleton />
+                <SellerRowSkeleton />
+              </div>
+            )}
+
+            {picker.hasMore && (
+              <div ref={sentinelRef} className="h-3 w-full shrink-0" aria-hidden />
+            )}
+          </div>
+        ) : showEmpty ? (
+          <div className="px-4 py-12">
+            <IconPlaceholder icon={ClockIcon} title="Nenhum vendedor encontrado" subtitle="Tente outro termo de busca." />
+          </div>
+        ) : null}
+      </div>
+
+      <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+        <Button variant="outline" className="h-12 w-full" onClick={onClose}>
+          Cancelar
+        </Button>
+      </footer>
+    </div>
+  )
+
+  if (isMobile) {
+    return (
+      <BottomSheet isOpen={isOpen} onClose={onClose}>
+        {content}
+      </BottomSheet>
+    )
+  }
+
+  return (
+    <Portal>
+      <div
+        className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        onClick={onClose}
+      >
+        <div
+          className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {content}
+        </div>
+      </div>
+    </Portal>
+  )
+}
+
+export default SelectSellerSheet

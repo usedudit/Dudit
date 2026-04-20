@@ -188,6 +188,26 @@ export default function TransactionsPage({
         }
     }, [confirmSettleGroup, installmentDetail])
 
+    /** Soma o que falta quitar (valores editados ou restante de cada parcela pendente). */
+    const settleModalTotalToPay = useMemo(() => {
+        if (!confirmSettleGroup) return 0
+        const pending = (installmentDetail?.installments || []).filter((r: any) => r.status !== "paid")
+        if (pending.length === 0) return Math.round((settleSummary?.totalToSettle ?? 0) * 100) / 100
+        let acc = 0
+        for (const row of pending) {
+            const values = settlePaymentsByInstallment[row.id] || {
+                paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
+                interestAmount: "0",
+                discountAmount: "0",
+            }
+            acc += Math.max(
+                0,
+                Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0),
+            )
+        }
+        return Math.round(acc * 100) / 100
+    }, [confirmSettleGroup, installmentDetail, settlePaymentsByInstallment, settleSummary?.totalToSettle])
+
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
 
@@ -362,6 +382,10 @@ export default function TransactionsPage({
         const passthrough: ERPTransaction[] = []
         for (const item of result) {
             if (!item.isRecurringOccurrence && item.installmentGroupId) {
+                if (String(item.rawStatus || "").toLowerCase() === "paid") {
+                    passthrough.push(item)
+                    continue
+                }
                 const key = item.installmentGroupId
                 const list = groupedInstallments.get(key) || []
                 list.push(item)
@@ -372,22 +396,30 @@ export default function TransactionsPage({
         }
         const collapsedGroups: ERPTransaction[] = []
         for (const [groupId, items] of groupedInstallments) {
-            const base = items[0]
+            if (items.length === 0) continue
+            const sortedPending = [...items].sort((a, b) => (a.installmentNumber ?? 0) - (b.installmentNumber ?? 0))
+            const nextPending = sortedPending[0]
             const fullStats = fullGroupStats.get(groupId)
-            const totalCount = fullStats?.total || base.installmentTotalCount || items.length
-            const paidCount = fullStats?.paid ?? items.filter((x) => String(x.rawStatus || "").toLowerCase() === "paid").length
+            const totalCount = fullStats?.total || nextPending.installmentTotalCount || sortedPending.length
+            const paidCount = fullStats?.paid ?? 0
             const pendingCount = Math.max(0, totalCount - paidCount)
+            if (pendingCount <= 0) continue
+
+            const amountRemainingOnCurrent =
+                nextPending.installmentRemainingAmount ?? nextPending.amount
+
             collapsedGroups.push({
-                ...base,
+                ...nextPending,
                 id: `group-${groupId}`,
-                description: `${base.installmentGroupDescription || base.description} - ${totalCount}x`,
+                description: `${nextPending.installmentGroupDescription || nextPending.description} - ${totalCount}x`,
                 installmentGroupId: groupId,
                 installmentTotalCount: totalCount,
                 installmentPaidCount: paidCount,
                 installmentPendingCount: pendingCount,
                 isInstallmentGroup: true,
-                status: pendingCount > 0 ? `${pendingCount}/${totalCount} pendentes` : "Quitado",
-                statusVariant: pendingCount > 0 ? "orange" : "green",
+                amount: amountRemainingOnCurrent,
+                status: `${pendingCount}/${totalCount} pendentes`,
+                statusVariant: "orange",
             })
         }
         result = [...passthrough, ...collapsedGroups]
@@ -618,21 +650,40 @@ export default function TransactionsPage({
         }
     }, [partnerId, markingAsPaid, refreshTransactionsNow, notifySuccess, notifyError, confirmRecurringPayment])
 
-    const handleSettleInstallmentGroup = useCallback((transaction: ERPTransaction) => {
-        if (!transaction.isInstallmentGroup) return
-        const rows = (installmentDetail?.installments || []).filter((row: any) => row.status !== "paid")
-        const nextState: Record<string, { paymentAmount: string; interestAmount: string; discountAmount: string; paymentMethodId: string }> = {}
-        for (const row of rows) {
-            nextState[row.id] = {
-                paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
-                interestAmount: "0",
-                discountAmount: "0",
-                paymentMethodId: paymentMethods?.[0]?.id || "",
+    const handleSettleInstallmentGroup = useCallback(
+        async (transaction: ERPTransaction) => {
+            if (!transaction.isInstallmentGroup || !transaction.installmentGroupId) return
+
+            let detail = installmentDetail as { group?: { id?: string }; installments?: any[] } | null
+            const gid = transaction.installmentGroupId
+            if (!detail?.group?.id || detail.group.id !== gid) {
+                const res = await getInstallmentGroupDetailsAction({ partnerId, installmentGroupId: gid })
+                if (!res.success) {
+                    notifyError(res.error || "Erro ao carregar parcelas para quitação.")
+                    return
+                }
+                detail = res.data as { group?: { id?: string }; installments?: any[] }
+                setInstallmentDetail(res.data)
             }
-        }
-        setSettlePaymentsByInstallment(nextState)
-        setConfirmSettleGroup(transaction)
-    }, [installmentDetail, paymentMethods])
+
+            const rows = (detail?.installments || []).filter((row: any) => row.status !== "paid")
+            const nextState: Record<
+                string,
+                { paymentAmount: string; interestAmount: string; discountAmount: string; paymentMethodId: string }
+            > = {}
+            for (const row of rows) {
+                nextState[row.id] = {
+                    paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
+                    interestAmount: "0",
+                    discountAmount: "0",
+                    paymentMethodId: paymentMethods?.[0]?.id || "",
+                }
+            }
+            setSettlePaymentsByInstallment(nextState)
+            setConfirmSettleGroup(transaction)
+        },
+        [installmentDetail, paymentMethods, partnerId, notifyError],
+    )
 
     const handleConfirmSettleInstallmentGroup = useCallback(async () => {
         if (!confirmSettleGroup?.installmentGroupId) return
@@ -998,7 +1049,7 @@ export default function TransactionsPage({
                                                 </div>
                                             )
                                         })}
-                                        <div ref={observerTarget} className="h-10" />
+                                       {/* <div ref={observerTarget} className="h-10" /> */}
                                     </div>
                                 ) : viewMode === "grid" ? (
                                     <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
@@ -1087,7 +1138,7 @@ export default function TransactionsPage({
                                                     ))}
                                                 </tbody>
                                             </table>
-                                            <div ref={observerTarget} className="h-10" />
+                                             {/* <div ref={observerTarget} className="h-10" /> */}
                                         </div>
                                     </div>
                                 )}
@@ -1280,13 +1331,7 @@ export default function TransactionsPage({
                             </div>
                             <div className="rounded-lg border border-brand-border dark:border-dark-border p-3">
                                 <p className="text-brand-inactive-text">Valor total da quitação</p>
-                                <p className="font-semibold">
-                                    {formatCurrency(
-                                        Object.values(settlePaymentsByInstallment).reduce((acc, row) => (
-                                            acc + Math.max(0, Number(row.paymentAmount || 0) + Number(row.interestAmount || 0) - Number(row.discountAmount || 0))
-                                        ), 0),
-                                    )}
-                                </p>
+                                <p className="font-semibold">{formatCurrency(settleModalTotalToPay)}</p>
                             </div>
                         </div>
                         <div className="flex flex-col w-full max-h-[50vh] overflow-y-auto px-1 pr-1 custom-scrollbar border-y border-brand-border dark:border-dark-border divide-y divide-brand-border dark:divide-dark-border">

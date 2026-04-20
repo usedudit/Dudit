@@ -20,7 +20,12 @@ export function formatCurrency(value: number | string): string {
 export function formatDate(date: Date | string | number): string {
   if (!date) return ""
   const d = new Date(date)
-  return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo" }).format(d)
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "America/Sao_Paulo",
+  }).format(d)
 }
 
 /**
@@ -103,6 +108,51 @@ export function diffCalendarDaysInSaoPaulo(dueYmd: string): number {
   return Math.round((dueMs - todayMs) / 86400000)
 }
 
+/** Hoje (calendário) em YYYY-MM-DD no fuso America/Sao_Paulo. */
+export function getTodayYmdSaoPaulo(): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date())
+  const y = parts.find((p) => p.type === "year")?.value
+  const m = parts.find((p) => p.type === "month")?.value
+  const d = parts.find((p) => p.type === "day")?.value
+  return `${y}-${m}-${d}`
+}
+
+/**
+ * Exibe data vinda do Postgres sem erro de “um dia antes”:
+ * valores `DATE` (YYYY-MM-DD) são o dia civil desejado; não usar `new Date("YYYY-MM-DD")` (UTC meia-noite).
+ */
+export function formatBrazilDateFromDbInput(
+  value: string | null | undefined,
+  variant: "dayMonthYear" | "dayMonth"
+): string {
+  if (value == null || value === "") return "-"
+  const s = String(value).trim()
+  const ymd = s.slice(0, 10)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
+    const [y, m, d] = ymd.split("-").map(Number)
+    const anchor = new Date(Date.UTC(y, m - 1, d, 12, 0, 0))
+    return anchor.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+      ...(variant === "dayMonthYear" ? { year: "numeric" as const } : {}),
+      timeZone: "America/Sao_Paulo",
+    })
+  }
+  const dt = new Date(s)
+  if (Number.isNaN(dt.getTime())) return s
+  return dt.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    ...(variant === "dayMonthYear" ? { year: "numeric" as const } : {}),
+    timeZone: "America/Sao_Paulo",
+  })
+}
+
 /**
  * Formats a date as DD/MM.
  */
@@ -112,6 +162,7 @@ export function formatDayMonth(date: Date | string | number): string {
   return new Intl.DateTimeFormat("pt-BR", {
     day: "2-digit",
     month: "2-digit",
+    timeZone: "America/Sao_Paulo",
   }).format(d)
 }
 /**

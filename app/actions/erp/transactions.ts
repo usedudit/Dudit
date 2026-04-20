@@ -6,7 +6,13 @@ import type { ERPTransaction } from "@/lib/services/transactions.types"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
-import { formatTime, formatDateTime, formatDayMonth } from "@/lib/utils/formatters"
+import {
+    formatTime,
+    formatDateTime,
+    formatDayMonth,
+    formatBrazilDateFromDbInput,
+    diffCalendarDaysInSaoPaulo,
+} from "@/lib/utils/formatters"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { getTransactionHistoryEntries } from "@/lib/services/transaction-history.service"
@@ -18,7 +24,8 @@ type DbTransaction = {
     id: string
     description: string
     categoryLabel?: string
-    category: string
+    category?: string | null
+    original_amount?: number | string | null
     amount: number
     due_date: string | null
     payment_date: string | null
@@ -70,13 +77,11 @@ function ledgerDirectionFromRow(t: DbTransaction): ERPTransaction["ledgerDirecti
 }
 
 function formatDateLabel(value: string) {
-    const d = new Date(value)
-    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: "America/Sao_Paulo" })
+    return formatBrazilDateFromDbInput(value, "dayMonthYear")
 }
 
 function formatDateShort(value: string) {
-    const d = new Date(value)
-    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: "America/Sao_Paulo" })
+    return formatBrazilDateFromDbInput(value, "dayMonth")
 }
 
 function toStatusVariant(status: string, isOverdue: boolean): ERPTransaction["statusVariant"] {
@@ -312,7 +317,7 @@ export async function getFinancialTransactionsAction(
         const { data, error } = await supabase
             .from("transactions")
             .select(`
-        id, description, category, amount, due_date, payment_date, created_at, status, notes, payment_type, transaction_type, contact_id, customer_id, contact_type,
+        id, description, category, amount, original_amount, due_date, payment_date, created_at, status, notes, payment_type, transaction_type, contact_id, customer_id, contact_type,
         transfer_group_id, refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id, payment_method_id, installment_group_id, installment_number,
         transaction_contacts(name, type)
       `, { count: "exact" })
@@ -398,6 +403,25 @@ export async function getFinancialTransactionsAction(
             installmentGroupsPromise,
         ])
 
+        const pendingInstallmentTxIds = txs
+            .filter((t) => t.installment_group_id && isStatusPending(t.status))
+            .map((t) => t.id)
+        const installmentPaidSumByTxId = new Map<string, number>()
+        if (pendingInstallmentTxIds.length > 0) {
+            const { data: payRows, error: payErr } = await supabase
+                .from("transaction_payments")
+                .select("transaction_id, amount")
+                .eq("partner_id", partnerId)
+                .in("transaction_id", pendingInstallmentTxIds)
+            if (payErr) throw payErr
+            for (const p of payRows || []) {
+                const tid = String((p as { transaction_id?: string }).transaction_id || "")
+                const amt = Number((p as { amount?: number | string }).amount || 0)
+                if (!tid) continue
+                installmentPaidSumByTxId.set(tid, (installmentPaidSumByTxId.get(tid) || 0) + amt)
+            }
+        }
+
         // Build order lookup and collect buyer IDs into the customer set
         const orderByNumber = new Map<string, { buyer_id: string | null; customer_name: string | null }>()
         for (const o of orders) {
@@ -445,15 +469,20 @@ export async function getFinancialTransactionsAction(
 
         // ── Step 4: Map to ERPTransaction ───────────────────────────────
         const now = new Date()
-        const todayYmd = now.toISOString().slice(0, 10)
         const mapped: ERPTransaction[] = txs.map((t) => {
-            const baseDate = t.due_date || t.payment_date || t.created_at
-            const baseDateObj = new Date(baseDate)
             const dueYmd = t.due_date ? String(t.due_date).slice(0, 10) : null
-            const isOverdue = isStatusPending(t.status) && !!dueYmd && dueYmd < todayYmd
-            
-            const diffTime = baseDateObj.getTime() - now.getTime()
-            const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+            const daysDiffVsToday = dueYmd && /^\d{4}-\d{2}-\d{2}$/.test(dueYmd) ? diffCalendarDaysInSaoPaulo(dueYmd) : 0
+            const isOverdue = isStatusPending(t.status) && !!dueYmd && daysDiffVsToday < 0
+            const daysUntilDue = dueYmd && isStatusPending(t.status) ? daysDiffVsToday : 0
+            const dueDateLabel = dueYmd ? formatBrazilDateFromDbInput(dueYmd, "dayMonthYear") : "-"
+            const dueDateShortLabel = dueYmd ? formatBrazilDateFromDbInput(dueYmd, "dayMonth") : "-"
+
+            const originalParcel = Math.abs(Number(t.original_amount ?? t.amount ?? 0))
+            let installmentRemainingAmount: number | undefined
+            if (t.installment_group_id && isStatusPending(t.status)) {
+                const paidToward = installmentPaidSumByTxId.get(t.id) || 0
+                installmentRemainingAmount = Math.max(0, Math.round((originalParcel - paidToward) * 100) / 100)
+            }
 
             const descTrim = t.category === "Vendas" ? String(t.description || "").trim() : ""
             const order = t.category === "Vendas" && descTrim ? orderByNumber.get(descTrim) : null
@@ -493,8 +522,8 @@ export async function getFinancialTransactionsAction(
                           ? manualCustomerName
                           : fallbackContact,
                 contactType: t.category === "Vendas" ? "customer" : (t.contact_type || t.transaction_contacts?.type || (t.customer_id ? "customer" : "other")),
-                dueDate: formatDateLabel(baseDate),
-                dueDateShort: formatDateShort(baseDate),
+                dueDate: dueDateLabel,
+                dueDateShort: dueDateShortLabel,
                 dueDateTime: "",
                 dateNote: isOverdue ? "Atrasado" : "-",
                 createdAtDate: formatDateLabel(t.created_at || now.toISOString()),
@@ -534,6 +563,7 @@ export async function getFinancialTransactionsAction(
                 installmentTotalCount: t.installment_group_id
                     ? Number(installmentGroupById.get(t.installment_group_id)?.installments_count || 0) || null
                     : null,
+                ...(installmentRemainingAmount !== undefined ? { installmentRemainingAmount } : {}),
             }
         })
 
@@ -549,7 +579,7 @@ export type CreateManualTransactionInput = {
     transactionType: "income" | "expense" | "transfer" | "adjustment" | "refund"
     amount: number
     description: string
-    category: string
+    category?: string | null
     categoryId?: string | null
     subcategoryId?: string | null
     accountId?: string | null
@@ -1188,9 +1218,12 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
                         installment_number: number | null
                     }) => {
                     const paid = String(row.status || "").toLowerCase() === "paid"
-                    const now = new Date()
-                    const due = row.due_date ? new Date(`${row.due_date}T12:00:00`) : null
-                    const overdue = !paid && !!due && due.getTime() < now.getTime()
+                    const dueYmdRow = row.due_date ? String(row.due_date).slice(0, 10) : ""
+                    const overdue =
+                        !paid &&
+                        !!dueYmdRow &&
+                        /^\d{4}-\d{2}-\d{2}$/.test(dueYmdRow) &&
+                        diffCalendarDaysInSaoPaulo(dueYmdRow) < 0
                     const original = Math.abs(Number(row.original_amount ?? row.amount ?? 0))
                     const paymentTotal = paymentByTxId.get(row.id) || 0
                     const paidAmount = Math.min(original, Math.max(0, paymentTotal))
@@ -1202,7 +1235,9 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
                         originalAmount: original,
                         paidAmount,
                         remainingAmount,
-                        dueDate: row.due_date,
+                        dueDate: row.due_date
+                            ? formatBrazilDateFromDbInput(String(row.due_date).slice(0, 10), "dayMonthYear")
+                            : "-",
                         paymentDate: row.payment_date,
                         status: paid || remainingAmount <= 0 ? "paid" : overdue ? "overdue" : "pending",
                     }
@@ -1304,18 +1339,11 @@ export async function recordInstallmentPaymentAction(input: {
 
         const installmentCount = Number(groupData?.installments_count || 0) || null
         const installmentNumber = Number(tx.installment_number || 0) || null
-        const paymentNoteLines = [
-            installmentNumber && installmentCount
-                ? `Pagamento da parcela ${installmentNumber}/${installmentCount} do parcelado "${groupData?.description || tx.description}".`
-                : `Pagamento de parcela do parcelado "${groupData?.description || tx.description}".`,
-            `Valor base: R$ ${paymentAmount.toFixed(2)} | Juros: R$ ${interestAmount.toFixed(2)} | Desconto: R$ ${discountAmount.toFixed(2)} | Valor final pago: R$ ${finalPaid.toFixed(2)}.`,
-        ]
-
         await insertTransactionsWithOptionalCreator(supabase, {
             partner_id: input.partnerId,
             description: installmentNumber && installmentCount
-                ? `${tx.description} - Pagamento parcela ${installmentNumber}/${installmentCount}`
-                : `${tx.description} - Pagamento de parcela`,
+                ? `Pagamento parcela ${installmentNumber}/${installmentCount} - ${tx.description}`
+                : `Pagamento de parcela - ${tx.description}`,
             category: tx.category || "Parcelado",
             category_id: tx.category_id || null,
             subcategory_id: tx.subcategory_id || null,
@@ -1324,11 +1352,11 @@ export async function recordInstallmentPaymentAction(input: {
             customer_id: tx.customer_id || null,
             contact_type: tx.contact_type || null,
             amount: finalPaid,
-            due_date: tx.due_date || null,
+            due_date: null,
             payment_date: nowIso,
             transaction_date: nowIso,
             status: "paid",
-            notes: paymentNoteLines.join("\n"),
+            notes: null,
             payment_type: tx.payment_type || null,
             payment_method_id: input.paymentMethodId || null,
             original_amount: finalPaid,
@@ -1443,7 +1471,6 @@ export async function settleInstallmentGroupAction(input: {
         const txIdsToMarkPaid: string[] = []
         let affectedCount = 0
         let settlementTotal = 0
-        const settlementLines: string[] = []
         let baseTxForConsolidated: any = null
 
         for (const row of rows as any[]) {
@@ -1483,11 +1510,6 @@ export async function settleInstallmentGroupAction(input: {
             affectedCount += 1
             settlementTotal += finalPaid
             baseTxForConsolidated = baseTxForConsolidated || row
-            const totalInstallments = Number(groupData?.installments_count || 0)
-            const installmentN = Number(row.installment_number || 0)
-            settlementLines.push(
-                `Parcela ${installmentN || "-"}${totalInstallments ? `/${totalInstallments}` : ""}: base R$ ${basePayment.toFixed(2)}, juros R$ ${interest.toFixed(2)}, desconto R$ ${discount.toFixed(2)}, pago R$ ${finalPaid.toFixed(2)}.`
-            )
         }
 
         if (paymentsToInsert.length > 0) {
@@ -1524,11 +1546,7 @@ export async function settleInstallmentGroupAction(input: {
                 payment_date: nowIso,
                 transaction_date: nowIso,
                 status: "paid",
-                notes: [
-                    `Quitação total do parcelado "${groupData?.description || baseTxForConsolidated.description || "Parcelado"}".`,
-                    ...settlementLines,
-                    `Total pago: R$ ${settlementTotal.toFixed(2)}.`,
-                ].join("\n"),
+                notes: null,
                 payment_type: baseTxForConsolidated.payment_type || null,
                 payment_method_id: null,
                 original_amount: settlementTotal,
@@ -1840,6 +1858,8 @@ export type TransactionDetailPayload = {
         lineTotal: number
         image: string | null
     }>
+    /** Itens só com descrição + valor (pagamentos de parcela / quitação parcelada). */
+    transactionItemsCompact?: boolean
     categoryLine: string
     subcategoryLine: string | null
     accountLine: string | null
@@ -1901,10 +1921,12 @@ export async function getTransactionDetailsAction(
         }
 
         const row = t as any
-        const now = new Date()
-        const todayYmd = now.toISOString().slice(0, 10)
         const dueYmd = row.due_date ? String(row.due_date).slice(0, 10) : null
-        const isOverdue = isStatusPending(row.status) && !!dueYmd && dueYmd < todayYmd
+        const isOverdue =
+            isStatusPending(row.status) &&
+            !!dueYmd &&
+            /^\d{4}-\d{2}-\d{2}$/.test(dueYmd) &&
+            diffCalendarDaysInSaoPaulo(dueYmd) < 0
 
         const statusLabel = toDisplayStatus(row.status, row.transaction_type, row.refund_kind, isOverdue)
         const statusVariant = toStatusVariant(row.status, isOverdue)
@@ -2119,6 +2141,24 @@ export async function getTransactionDetailsAction(
             ]
         }
 
+        const refNote = String(row.reference_note || "")
+        const transactionItemsCompact =
+            refNote.startsWith("installment_payment:") || refNote.startsWith("installment_settlement:")
+        if (transactionItemsCompact) {
+            const amt = Math.abs(Number(row.amount || 0))
+            items = [
+                {
+                    id: row.id,
+                    title: String(row.description || "").trim() || "Transação",
+                    sku: "",
+                    quantity: 1,
+                    unitPrice: amt,
+                    lineTotal: amt,
+                    image: null,
+                },
+            ]
+        }
+
         let contactCard: TransactionDetailPayload["contactCard"] = {
             title: "Contato",
             name: "-",
@@ -2201,7 +2241,8 @@ export async function getTransactionDetailsAction(
 
         const paymentDateSubtitle = row.payment_date ? formatDateTime(row.payment_date) : null
 
-        const showDueDateRow = String(row.category || "").trim() !== "Vendas" || !!row.due_date
+        const showDueDateRow =
+            (String(row.category || "").trim() !== "Vendas" || !!row.due_date) && !transactionItemsCompact
 
         const payload: TransactionDetailPayload = {
             id: row.id,
@@ -2216,12 +2257,13 @@ export async function getTransactionDetailsAction(
             typeBannerLabel: transactionTypeLabel(row.transaction_type),
             timeline,
             items,
+            transactionItemsCompact,
             categoryLine: String(row.category || "").trim() || "-",
             subcategoryLine,
             accountLine,
             dueDateLine: row.due_date ? formatDateLabel(row.due_date) : null,
             paymentDateLine: row.payment_date ? formatDateTime(row.payment_date) : null,
-            notesLine: row.notes ? String(row.notes) : null,
+            notesLine: transactionItemsCompact ? null : row.notes ? String(row.notes) : null,
             amount: Math.abs(Number(row.amount || 0)),
             ledgerDirection: ledgerDirectionFromRow(row as DbTransaction),
             contactCard,

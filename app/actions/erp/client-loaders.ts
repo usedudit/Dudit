@@ -19,6 +19,7 @@ export async function fetchERPOrdersClient() {
 
 import { getERPProductsPageData } from "@/app/actions/erp/products"
 import { fetchCustomersWithStorePriority } from "@/lib/store-queries"
+import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 
 export async function fetchERPProductsClient() {
   const data = await getERPProductsPageData()
@@ -97,5 +98,57 @@ export async function fetchPartnerProductsBucket() {
         ? variant.variant_options.image || null
         : null,
     })),
+  }))
+}
+
+/** Lista única em cache para busca instantânea em pickers (client-side), p.ex. PDV / orçamentos. */
+export type PartnerCustomerBucketItem = {
+  id: string
+  name: string
+  email: string | null
+  phone: string | null
+}
+
+export async function fetchPartnerCustomersBucket(): Promise<PartnerCustomerBucketItem[]> {
+  const user = await getCurrentUser()
+  if (!user) throw new Error("Unauthorized")
+  const context = await getCurrentPartnerContext()
+  if (!context) throw new Error("No context")
+  const partnerId = context.partnerId
+  const { allowed } = await checkPartnerPermission(partnerId, "customers", "view")
+  if (!allowed) throw new Error("Forbidden")
+
+  const supabase = await getSupabaseServerClient()
+  const { data, error } = await supabase
+    .from("customers")
+    .select("id, name, email, phone")
+    .eq("partner_id", partnerId)
+    .order("name", { ascending: true })
+    .limit(500)
+
+  if (error) {
+    console.error("[fetchPartnerCustomersBucket]", error)
+    return []
+  }
+
+  return (data || []) as PartnerCustomerBucketItem[]
+}
+
+export type PartnerTeamMemberBucketItem = {
+  id: string
+  fullName: string | null
+  email: string
+  role: string
+}
+
+export async function fetchPartnerTeamMembersBucket(): Promise<PartnerTeamMemberBucketItem[]> {
+  const { getTeamMembers } = await import("@/app/actions/erp/team")
+  const res = await getTeamMembers()
+  if (res.error || !res.members?.length) return []
+  return res.members.map((m) => ({
+    id: m.id,
+    fullName: m.fullName,
+    email: m.email,
+    role: m.role,
   }))
 }

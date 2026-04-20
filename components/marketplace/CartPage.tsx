@@ -379,7 +379,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
                                       <Link
                                         href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
-                                        prefetch={true}
+                                        prefetch={false}
                                         className="w-[68px] h-[68px] rounded-[8px] overflow-hidden border border-brand-border shrink-0 cursor-pointer block"
                                       >
                                         <img src={getItemImage(item)} alt={item.products.name} className="w-full h-full object-cover" />
@@ -389,7 +389,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                         <div className="flex items-start justify-between gap-2">
                                           <Link
                                             href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
-                                            prefetch={true}
+                                            prefetch={false}
                                             className="text-[14px] font-medium text-brand-dark line-clamp-2 cursor-pointer hover:text-brand-green leading-snug"
                                           >
                                             {item.products.name}
@@ -434,7 +434,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                       <div className="flex-1 flex md:justify-between md:items-center gap-4">
                                         <Link
                                           href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
-                                          prefetch={true}
+                                          prefetch={false}
                                           className="w-[68px] h-[68px] rounded-[8px] overflow-hidden border border-brand-border shrink-0 cursor-pointer block"
                                         >
                                           <img src={getItemImage(item)} alt={item.products.name} className="w-full h-full object-cover" />
@@ -443,7 +443,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                         <div className="flex-1">
                                           <Link
                                             href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
-                                            prefetch={true}
+                                            prefetch={false}
                                             className="text-[16px] font-medium text-brand-dark mb-1 line-clamp-2 cursor-pointer hover:text-brand-green block"
                                           >
                                             {item.products.name}
@@ -499,7 +499,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                               <div className="hidden md:block mt-4 pt-4 border-t border-brand-border">
                                 <Link
                                   href={getPartnerUrl(data.partner)}
-                                  prefetch={true}
+                                  prefetch={false}
                                   className="flex items-center gap-2 text-brand-green hover:underline font-medium text-[14px]"
                                 >
                                   <ChevronLeftIcon size={16} />Escolher mais itens
@@ -568,7 +568,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
               {/* Mobile: "Voltar para as compras" abaixo de tudo */}
               <Link
                 href="/"
-                prefetch={true}
+                prefetch={false}
                 className="flex items-center gap-2 text-brand-green hover:underline font-medium text-[14px] mt-2 md:hidden"
               >
                 <ChevronLeftIcon size={18} />Voltar para as compras

@@ -155,3 +155,82 @@ export function useProductBucket(loadFn: () => Promise<ProductBucketItem[]>) {
     loadBucket,
   }
 }
+
+// ─── PICKER BUCKET (cache once + filtro local + paginação por fatias) ───────
+
+export type PickerBucketOptions<T extends { id: string }> = {
+  pageSize?: number
+  /** Reordena / injeta itens após o filtro de busca (ex.: cliente selecionado primeiro). */
+  postFilter?: (items: T[]) => T[]
+  /** Quando muda, volta a mostrar só a primeira página. */
+  resetPagingKey?: string
+}
+
+/**
+ * Carrega a lista uma vez, filtra no cliente (rápido) e pagina de N em N para scroll infinito.
+ */
+export function usePickerBucket<T extends { id: string }>(
+  loadFn: () => Promise<T[]>,
+  matchesSearch: (item: T, searchLower: string) => boolean,
+  options?: PickerBucketOptions<T>
+) {
+  const pageSize = options?.pageSize ?? 8
+  const postFilter = options?.postFilter
+  const resetPagingKey = options?.resetPagingKey
+
+  const [bucket, setBucket] = useState<T[]>([])
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [visibleCount, setVisibleCount] = useState(pageSize)
+
+  const loadBucket = useCallback(async () => {
+    if (isLoaded || isLoading) return
+    setIsLoading(true)
+    try {
+      const data = await loadFn()
+      setBucket(data)
+      setIsLoaded(true)
+    } catch (err) {
+      console.error("[usePickerBucket] Error loading bucket:", err)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [loadFn, isLoaded, isLoading])
+
+  const baseFiltered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return bucket
+    return bucket.filter((item) => matchesSearch(item, q))
+  }, [bucket, searchQuery, matchesSearch])
+
+  const filtered = useMemo(() => {
+    if (!postFilter) return baseFiltered
+    return postFilter(baseFiltered)
+  }, [baseFiltered, postFilter])
+
+  useEffect(() => {
+    setVisibleCount(pageSize)
+  }, [searchQuery, pageSize, resetPagingKey])
+
+  const displayed = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount])
+
+  const hasMore = filtered.length > visibleCount
+
+  const loadMore = useCallback(() => {
+    setVisibleCount((c) => c + pageSize)
+  }, [pageSize])
+
+  return {
+    loadBucket,
+    searchQuery,
+    setSearchQuery,
+    filtered,
+    displayed,
+    hasMore,
+    loadMore,
+    isLoadingBucket: isLoading && !isLoaded,
+    isLoaded,
+    totalInBucket: bucket.length,
+  }
+}

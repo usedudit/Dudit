@@ -62,4 +62,6 @@ export interface ERPTransaction {
   isInstallmentGroup?: boolean
   installmentPendingCount?: number
   installmentPaidCount?: number
+  /** Parcela pendente: saldo em aberto (considera pagamentos parciais em transaction_payments). */
+  installmentRemainingAmount?: number
 }
