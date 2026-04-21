@@ -49,6 +49,15 @@ export async function revalidateOrders(partnerId: string) {
   revalidatePath("/", "layout")
 }
 
+export async function revalidateCoupons(partnerId: string) {
+  if (partnerId) {
+    safeRevalidateTag(TAGS.coupons(partnerId))
+    safeRevalidateTag(partnerId)
+  }
+  safeRevalidateTag("coupons")
+  revalidatePath("/erp/coupons")
+}
+
 /**
  * Revalida histórico de um pedido específico
  */

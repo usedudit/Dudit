@@ -31,6 +31,8 @@ interface OrderGeneralTabProps {
     discountAmount: number
     discountValue: number
     discountType: 'fixed' | 'percentage'
+    couponCode?: string
+    couponDiscountAmount?: number
     shippingFee: string
     otherCosts: string
     totalAmount: number
@@ -66,6 +68,8 @@ interface OrderGeneralTabProps {
     setOtherCosts: (val: string) => void
     setDiscountValue: (val: number) => void
     setDiscountType: (val: 'fixed' | 'percentage') => void
+    setCouponCode?: (val: string) => void
+    onApplyCoupon?: () => void
     setSelectedCustomer: (val: any) => void
     setIsCustomerSheetOpen: (val: boolean) => void
     setOrderDate: (val: string) => void
@@ -88,6 +92,7 @@ interface OrderGeneralTabProps {
 export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     items, searchQuery, isProductSearchOpen, isSearching, searchResults,
     subtotal, discountAmount, discountValue, discountType, shippingFee, otherCosts, totalAmount,
+    couponCode = "", couponDiscountAmount = 0,
     selectedCustomer, orderDate, salesChannel, deliveryMethod, paymentStatus, deliveryStatus, financeAccountId, accountOptions, isSaving,
     remainingPaymentAmount = 0,
     manualItemNameErrors = new Set<number>(),
@@ -95,6 +100,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     setSearchQuery, setIsProductSearchOpen, handleSearchProduct, onSearchFocus, addProductToOrder,
     updateItemField, updateItemPrice, updateItemQty, resolveItemQuantityMax, toggleItemEdit, removeItem, addBlankItem,
     setShippingFee, setOtherCosts, setDiscountValue, setDiscountType, setSelectedCustomer, setIsCustomerSheetOpen,
+    setCouponCode, onApplyCoupon,
     setOrderDate, setSalesChannel, setDeliveryMethod, setFinanceAccountId, setDeliveryStatus, onCreateAccount, handleSaveOrder,
     salesChannelOptions, deliveryMethodOptions, deliveryStatusOptions,
     fieldErrors, setFieldErrors
@@ -530,9 +536,18 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Adicionar Promoção</span>
                                 </div>
                             </div>
-                            <Button className="h-9 px-6">
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    label=""
+                                    placeholder="Código"
+                                    value={couponCode}
+                                    onChange={(e: any) => setCouponCode?.(e.target.value)}
+                                    className="mb-0 w-32"
+                                />
+                                <Button className="h-9 px-6" onClick={onApplyCoupon}>
                                 Adicionar
-                            </Button>
+                                </Button>
+                            </div>
                         </div>
 
                         <div className="flex flex-col gap-3 mt-4">
@@ -548,6 +563,15 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     <span className="text-brand-inactive-text font-medium">Desconto</span>
                                     <span className="font-bold text-brand-red">
                                         -{formatCurrency(discountAmount)}
+                                    </span>
+                                </div>
+                            )}
+
+                            {couponDiscountAmount > 0 && (
+                                <div className="flex justify-between items-center text-[15px]">
+                                    <span className="text-brand-inactive-text font-medium">Cupom aplicado</span>
+                                    <span className="font-bold text-brand-green">
+                                        -{formatCurrency(couponDiscountAmount)}
                                     </span>
                                 </div>
                             )}

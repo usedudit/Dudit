@@ -19,6 +19,7 @@ import {
     reserveOrderInventory,
     shouldDeductInventory,
 } from "@/lib/stock/reservations"
+import { validateCoupon } from "@/lib/services/coupons"
 
 type ERPItemPayload = {
     productId: string | null
@@ -44,6 +45,9 @@ type ERPOrderPayload = {
     subtotal: number
     discountValue: number
     discountType: 'fixed' | 'percentage'
+    couponCode?: string
+    couponId?: string | null
+    couponDiscountAmount?: number
     shippingCost: number
     additionalCosts: number
     totalAmount: number
@@ -779,6 +783,38 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         return { error: "A venda não pode ser salva com valor total zerado." }
     }
 
+    let couponIdToSave: string | null = data.couponId || null
+    let couponDiscountAmount = Math.max(0, Number(data.couponDiscountAmount || 0))
+    if (data.couponCode?.trim()) {
+        const couponValidation = await validateCoupon({
+            partnerId: data.partnerId,
+            code: data.couponCode,
+            customerId: data.customerId || null,
+            subtotal: Number(data.subtotal || 0),
+            shippingCost: Number(data.shippingCost || 0),
+            items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
+        })
+        if (!couponValidation.valid) return { error: couponValidation.errorMessage || "Cupom inválido." }
+        couponIdToSave = couponValidation.couponId || null
+        couponDiscountAmount = Number(couponValidation.discountAmount || 0)
+    }
+
+    let couponIdToSave: string | null = data.couponId || null
+    let couponDiscountAmount = Math.max(0, Number(data.couponDiscountAmount || 0))
+    if (data.couponCode?.trim()) {
+        const couponValidation = await validateCoupon({
+            partnerId,
+            code: data.couponCode,
+            customerId: data.customerId || null,
+            subtotal: Number(data.subtotal || 0),
+            shippingCost: Number(data.shippingCost || 0),
+            items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
+        })
+        if (!couponValidation.valid) return { error: couponValidation.errorMessage || "Cupom inválido." }
+        couponIdToSave = couponValidation.couponId || null
+        couponDiscountAmount = Number(couponValidation.discountAmount || 0)
+    }
+
     let deliveryAddressStr = ""
     if (data.deliveryMethod === "delivery" && data.address) {
         const { street, number, neighborhood, city, state, zipCode, complement } = data.address
@@ -800,6 +836,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             paid_amount: paymentState.paidAmount,
             discount_value: data.discountValue,
             discount_type: data.discountType,
+            coupon_id: couponIdToSave,
+            discount_amount: couponDiscountAmount,
             shipping_cost: data.shippingCost,
             additional_costs: data.additionalCosts,
             notes: data.notes || null,
@@ -892,6 +930,14 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     })
 
     increment_usage_counter(partnerId, "orders_month_count").catch(console.error)
+
+    if (couponIdToSave) {
+        await supabase.from("coupon_usages").insert({
+            coupon_id: couponIdToSave,
+            customer_id: data.customerId || null,
+            order_id: order.id,
+        })
+    }
 
     if (paymentState.situation === "paid") {
         await createFinancialTransactionsForPaidOrder(supabase, {
@@ -1173,6 +1219,8 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             paid_amount: paymentState.paidAmount,
             discount_value: data.discountValue,
             discount_type: data.discountType,
+            coupon_id: couponIdToSave,
+            discount_amount: couponDiscountAmount,
             shipping_cost: data.shippingCost,
             additional_costs: data.additionalCosts,
             notes: data.notes || null,

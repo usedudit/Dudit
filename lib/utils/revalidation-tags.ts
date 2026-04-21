@@ -7,6 +7,7 @@ export const TAGS = {
   products: (partnerId?: string) => partnerId ? `partner-${partnerId}-products` : 'products',
   product: (productId: string) => `product-${productId}`,
   orders: (partnerId?: string) => partnerId ? `partner-${partnerId}-orders` : 'orders',
+  coupons: (partnerId?: string) => partnerId ? `partner-${partnerId}-coupons` : "coupons",
   orderHistory: (orderId: string) => `order-${orderId}-history`,
   transactionHistory: (transactionId: string) => `transaction-${transactionId}-history`,
   customers: (partnerId?: string) => partnerId ? `partner-${partnerId}-customers` : 'customers',

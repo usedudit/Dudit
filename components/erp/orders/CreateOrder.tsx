@@ -7,6 +7,7 @@ import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
 import { useToast } from "@/components/ui/use-toast"
 import { useNotification } from "@/hooks/use-notification"
 import { createERPOrderAction, getOrderDetailsAction, updateERPOrderAction } from "@/app/actions/erp/orders"
+import { validateCouponAction } from "@/app/actions/erp/coupons"
 import SelectCustomerSheet from "../clientes/SelectCustomerSheet"
 import SelectVariantSheet from "../quotes/SelectVariantSheet"
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
@@ -95,6 +96,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [otherCosts, setOtherCosts] = useState("0")
     const [discountValue, setDiscountValue] = useState(0)
     const [discountType, setDiscountType] = useState<'fixed' | 'percentage'>('fixed')
+    const [couponCode, setCouponCode] = useState("")
+    const [couponId, setCouponId] = useState<string | null>(null)
+    const [couponDiscountAmount, setCouponDiscountAmount] = useState(0)
 
     // Address / Delivery
     const [cep, setCep] = useState("")
@@ -138,8 +142,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     }, [subtotal, discountValue, discountType])
 
     const totalAmount = useMemo(() => {
-        return subtotal - discountAmount + parseFloat(shippingFee || "0") + parseFloat(otherCosts || "0")
-    }, [subtotal, discountAmount, shippingFee, otherCosts])
+        return subtotal - discountAmount - couponDiscountAmount + parseFloat(shippingFee || "0") + parseFloat(otherCosts || "0")
+    }, [subtotal, discountAmount, couponDiscountAmount, shippingFee, otherCosts])
 
     const remainingAmount = useMemo(() => {
         return Math.max(0, totalAmount - originalPaidAmount)
@@ -190,6 +194,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setOtherCosts((order.additional_costs || 0).toString())
                 setDiscountValue(order.discount_value || 0)
                 setDiscountType(order.discount_type || "fixed")
+                setCouponId(order.coupon_id || null)
+                setCouponDiscountAmount(Number(order.discount_amount || 0))
                 setInventoryAlreadyDeducted(Boolean(order.inventory_deducted))
 
                 if (order.order_items) {
@@ -472,6 +478,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         setShippingFee("0")
         setOtherCosts("0")
         setDiscountValue(0)
+        setCouponCode("")
+        setCouponId(null)
+        setCouponDiscountAmount(0)
         setPaymentStatus("unpaid")
         setDeliveryStatus("not_sent")
         setFinanceAccountId("")
@@ -606,6 +615,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         subtotal,
         discountValue: discountAmount,
         discountType: 'fixed' as const,
+        couponCode: couponCode || undefined,
+        couponId,
+        couponDiscountAmount,
         shippingCost: parseFloat(shippingFee || "0"),
         additionalCosts: parseFloat(otherCosts || "0"),
         totalAmount,
@@ -613,6 +625,31 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         csrf_token: csrfToken || undefined
     }
 }
+
+    const handleApplyCoupon = async () => {
+        const code = couponCode.trim()
+        if (!code) {
+            notifyError("Informe um código de cupom.")
+            return
+        }
+        const result = await validateCouponAction({
+            partnerId,
+            code,
+            customerId: selectedCustomer?.id || null,
+            subtotal,
+            shippingCost: parseFloat(shippingFee || "0"),
+            items: items.map((item) => ({ productId: item.productId || null })),
+        })
+        if (!result.valid) {
+            setCouponId(null)
+            setCouponDiscountAmount(0)
+            notifyError(result.errorMessage || "Cupom inválido.")
+            return
+        }
+        setCouponId(result.couponId || null)
+        setCouponDiscountAmount(Number(result.discountAmount || 0))
+        notifySuccess("Cupom aplicado com sucesso.")
+    }
 
     const submitOrder = async (paymentOverrides?: { paymentStatus?: 'paid' | 'partially_paid' | 'unpaid'; paidAmount?: number; paymentMethod?: string; paymentBreakdown?: PaymentBreakdownEntry[] }) => {
         setIsSaving(true)
@@ -817,6 +854,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                 setOtherCosts={setOtherCosts}
                                 setDiscountValue={setDiscountValue}
                                 setDiscountType={setDiscountType}
+                                couponCode={couponCode}
+                                setCouponCode={setCouponCode}
+                                couponDiscountAmount={couponDiscountAmount}
+                                onApplyCoupon={handleApplyCoupon}
                                 setSelectedCustomer={setSelectedCustomer}
                                 setIsCustomerSheetOpen={setIsCustomerSheetOpen}
                                 setOrderDate={setOrderDate}
