@@ -189,7 +189,9 @@ function ErpPlanGatedNavItem({
                     e.preventDefault()
                     window.dispatchEvent(new CustomEvent('erp-sidebar-reset'))
                 }
-                onNavigate?.()
+                setTimeout(() => {
+                    onNavigate?.()
+                }, 0)
             }} 
             className={itemClass}>
             {labelRow}
@@ -433,11 +435,13 @@ export function ERPSidebar() {
                                                         e.preventDefault();
                                                         window.dispatchEvent(new CustomEvent('erp-sidebar-reset'));
                                                     }
-                                                    setIsMobileOpen(false)
-                                                    setHoveredItem(null)
-                                                    if (hasSubmenu && !isCollapsed) {
-                                                        toggleSubmenu(item.label)
-                                                    }
+                                                    setTimeout(() => {
+                                                        setIsMobileOpen(false)
+                                                        setHoveredItem(null)
+                                                        if (hasSubmenu && !isCollapsed) {
+                                                            toggleSubmenu(item.label)
+                                                        }
+                                                    }, 0)
                                                 }}
                                                 className={cn(
                                                     "flex items-center rounded-lg transition-colors duration-200 group relative min-h-[44px] w-full justify-start",

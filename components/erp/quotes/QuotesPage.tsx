@@ -142,6 +142,15 @@ export default function QuotesPage({
         return () => window.removeEventListener('erp-sidebar-reset', handleReset)
     }, [])
 
+    useEffect(() => {
+        const handleReset = () => {
+            setWrapperMode(null)
+            setActiveQuote(null)
+        }
+        window.addEventListener('erp-sidebar-reset', handleReset)
+        return () => window.removeEventListener('erp-sidebar-reset', handleReset)
+    }, [])
+
     // State
     const [wrapperMode, setWrapperMode] = useState<'create' | 'edit' | 'duplicate' | 'view' | null>(null)
     const [activeQuote, setActiveQuote] = useState<any>(null)
