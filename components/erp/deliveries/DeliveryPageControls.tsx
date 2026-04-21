@@ -9,6 +9,7 @@ interface DeliveryPageControlsProps {
   onAdd: () => void
   viewMode: "list" | "grid"
   onViewModeChange: (mode: "list" | "grid") => void
+  addDisabled?: boolean
 }
 
 export default function DeliveryPageControls({
@@ -18,6 +19,7 @@ export default function DeliveryPageControls({
   onAdd,
   viewMode,
   onViewModeChange,
+  addDisabled = false,
 }: DeliveryPageControlsProps) {
   return (
     <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
@@ -34,7 +36,7 @@ export default function DeliveryPageControls({
           />
         </div>
         <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] p-0"><FilterIcon className="w-4 h-4" /></Button>
-        <Button onClick={onAdd} className="w-[42px] h-[42px] p-0 rounded-full"><PlusIcon className="w-5 h-5" /></Button>
+        <Button onClick={onAdd} disabled={addDisabled} className="w-[42px] h-[42px] p-0 rounded-full"><PlusIcon className="w-5 h-5" /></Button>
       </div>
 
       <div className="hidden md:flex items-center w-full gap-4">

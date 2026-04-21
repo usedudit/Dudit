@@ -25,6 +25,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import { usePermissions } from "@/lib/permission-context"
 import { useSidebar } from "@/lib/sidebar-context"
 import { Drawer } from "vaul"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
+import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/plan-upgrade-context"
 
 interface SubMenuItem {
     label: string
@@ -126,11 +128,62 @@ const navItems: NavItem[] = [
     },
 ]
 
+function ErpPlanGatedNavItem({
+    href,
+    label,
+    planSlug,
+    itemClass,
+    labelClass,
+    onNavigate,
+}: {
+    href: string
+    label: string
+    planSlug: string
+    itemClass: string
+    labelClass?: string
+    onNavigate?: () => void
+}) {
+    const { openPlanUpgrade } = usePlanUpgrade()
+    const required =
+        href === "/erp/logistics" && !hasMinimumPlan(planSlug, "vendedor")
+            ? ("vendedor" as const)
+            : null
+    const star = required ? planStarIconForTarget(required) : null
+
+    const labelRow = (
+        <span className="flex items-center gap-2 min-w-0 flex-1">
+            <span className={cn("truncate", labelClass)}>{label}</span>
+            {star ? <img src={star} alt="" className="w-4 h-4 shrink-0 object-contain" /> : null}
+        </span>
+    )
+
+    if (required) {
+        return (
+            <button
+                type="button"
+                className={itemClass}
+                onClick={() => {
+                    openPlanUpgrade(required)
+                    onNavigate?.()
+                }}
+            >
+                {labelRow}
+            </button>
+        )
+    }
+
+    return (
+        <Link href={href} prefetch={false} onClick={() => onNavigate?.()} className={itemClass}>
+            {labelRow}
+        </Link>
+    )
+}
+
 export function ERPSidebar() {
     const pathname = usePathname()
     const { isExpanded, toggleSidebar, isMobileOpen, setIsMobileOpen } = useSidebar()
     const isCollapsed = !isExpanded
-    const { canAccessPath: canAccess, businessInfo: contextBusinessInfo } = usePermissions()
+    const { canAccessPath: canAccess, businessInfo: contextBusinessInfo, planSlug } = usePermissions()
 
     const businessInfo = useMemo(() => {
         let info = contextBusinessInfo
@@ -425,17 +478,16 @@ export function ERPSidebar() {
                                                                         )}
                                                                     </div>
 
-                                                                    <Link
+                                                                    <ErpPlanGatedNavItem
                                                                         href={subItem.href}
-                                                                        prefetch={false}
-                                                                        onClick={() => setIsMobileOpen(false)}
-                                                                        className={cn(
+                                                                        label={subItem.label}
+                                                                        planSlug={planSlug}
+                                                                        itemClass={cn(
                                                                             "flex items-center px-3 py-2 rounded-lg text-sm transition-colors duration-200 relative z-10",
                                                                             isActive ? activeClasses : inactiveClasses
                                                                         )}
-                                                                    >
-                                                                        {subItem.label}
-                                                                    </Link>
+                                                                        onNavigate={() => setIsMobileOpen(false)}
+                                                                    />
                                                                 </li>
                                                             )
                                                         })}
@@ -466,16 +518,14 @@ export function ERPSidebar() {
                                                             item.submenu!.map((subItem) => {
                                                                 const isActive = isActivePath(subItem.href)
                                                                 return (
-                                                                    <Link
+                                                                    <ErpPlanGatedNavItem
                                                                         key={subItem.href}
                                                                         href={subItem.href}
-                                                                        prefetch={false}
-                                                                        className="w-full text-left px-4 py-2.5 text-sm text-brand-inactive-text hover:text-white hover:bg-white/5 transition-colors flex items-center justify-between group/sub"
-                                                                    >
-                                                                        <span className={isActive ? "text-brand-green font-medium" : ""}>
-                                                                            {subItem.label}
-                                                                        </span>
-                                                                    </Link>
+                                                                        label={subItem.label}
+                                                                        planSlug={planSlug}
+                                                                        itemClass="w-full text-left px-4 py-2.5 text-sm text-brand-inactive-text hover:text-white hover:bg-white/5 transition-colors flex items-center justify-between group/sub"
+                                                                        labelClass={isActive ? "text-brand-green font-medium" : undefined}
+                                                                    />
                                                                 )
                                                             })
                                                         ) : (
@@ -533,18 +583,17 @@ export function ERPSidebar() {
                                             {hasSubmenu && isMenuExpanded && (
                                                 <div className="flex flex-col gap-1 pl-11 pr-3 pb-2">
                                                     {item.submenu!.map((sub) => (
-                                                        <Link
+                                                        <ErpPlanGatedNavItem
                                                             key={sub.href}
                                                             href={sub.href}
-                                                            prefetch={false}
-                                                            onClick={() => setIsMobileOpen(false)}
-                                                            className={cn(
+                                                            label={sub.label}
+                                                            planSlug={planSlug}
+                                                            itemClass={cn(
                                                                 "py-2 px-3 rounded-lg text-sm transition-colors",
                                                                 isActivePath(sub.href) ? activeClasses : inactiveClasses
                                                             )}
-                                                        >
-                                                            {sub.label}
-                                                        </Link>
+                                                            onNavigate={() => setIsMobileOpen(false)}
+                                                        />
                                                     ))}
                                                 </div>
                                             )}

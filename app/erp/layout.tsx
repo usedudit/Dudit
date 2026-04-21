@@ -17,6 +17,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 import { ThemeProvider } from "@/components/theme-provider"
+import { PlanUpgradeProvider } from "@/components/erp/subscription/plan-upgrade-context"
 import { StoreProvider } from "@/lib/store-context"
 import { PermissionProvider } from "@/lib/permission-context"
 import { ProductMetadataProvider } from "@/lib/product-metadata-context"
@@ -25,6 +26,7 @@ import {
   getAllUserPartnerAccess,
   getActivePartnerId,
 } from "@/lib/auth/partner-context"
+import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { ROUTE_PERMISSION_PRESETS, legacyToRoutePermissions } from "@/lib/permissions/route-permissions"
 import type { PartnerRole, PartnerRoutePermissions } from "@/lib/permissions/types"
 
@@ -91,21 +93,31 @@ export default async function ERPLayout({
   const sidebarCookie = cookieStore.get("dudit_sidebar_state")
   const initialExpanded = sidebarCookie ? sidebarCookie.value === "expanded" : true
 
+  const partnerPlan = await getPartnerPlan(context.partnerId)
+
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <ProductMetadataProvider>
-        <PermissionProvider role={role} routePermissions={routePermissions} partnerId={context.partnerId} businessInfo={context.businessInfo}>
-          <StoreProvider partnerId={context.partnerId}>
-            <SidebarProvider initialExpanded={initialExpanded}>
-              <div className="flex h-screen bg-brand-page-bg dark:bg-brand-page-bg text-brand-dark dark:text-white transition-colors duration-200">
-                <ERPSidebar />
-                <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-                  <ERPHeader userProfile={userProfile} />
-                  {children}
+        <PermissionProvider
+          role={role}
+          routePermissions={routePermissions}
+          partnerId={context.partnerId}
+          businessInfo={context.businessInfo}
+          planSlug={partnerPlan.slug}
+        >
+          <PlanUpgradeProvider>
+            <StoreProvider partnerId={context.partnerId}>
+              <SidebarProvider initialExpanded={initialExpanded}>
+                <div className="flex h-screen bg-brand-page-bg dark:bg-brand-page-bg text-brand-dark dark:text-white transition-colors duration-200">
+                  <ERPSidebar />
+                  <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+                    <ERPHeader userProfile={userProfile} />
+                    {children}
+                  </div>
                 </div>
-              </div>
-            </SidebarProvider>
-          </StoreProvider>
+              </SidebarProvider>
+            </StoreProvider>
+          </PlanUpgradeProvider>
         </PermissionProvider>
       </ProductMetadataProvider>
     </ThemeProvider>

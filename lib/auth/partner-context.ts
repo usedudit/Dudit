@@ -105,6 +105,7 @@ export async function getPendingInviteToken(): Promise<string | null> {
 // ─── Partner Context Resolution ─────────────────────────────────────────────
 
 import { PERMISSION_PRESETS } from "@/lib/permissions/partner-roles"
+import { mergePartnerPermissions } from "@/lib/permissions/merge-partner-permissions"
 
 // ─── Extracted Cache Factory for stability and strict keying ────────────────
 //
@@ -156,7 +157,7 @@ const getCachedUserAccess = (userId: string) => unstable_cache(
                         partnerId: record.partner_id,
                         userId: record.user_id,
                         role: record.role as PartnerRole,
-                        permissions: record.permissions as PartnerPermissions,
+                        permissions: mergePartnerPermissions(record.role as PartnerRole, record.permissions),
                         storeName: record.partners.store_name || "Loja sem nome",
                         ownerName: ownerId, // temporary
                         businessInfo: typeof record.partners.business_info === "string" ? JSON.parse(record.partners.business_info) : (record.partners.business_info || { sells: ["products"], channels: ["online"] }),

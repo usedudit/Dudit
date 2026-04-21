@@ -15,6 +15,8 @@ import { detectMonophasicByNcm } from "@/lib/fiscal-utils"
 import { mapProductToFormData } from "@/lib/utils/product-mappers"
 import { useNotification } from "@/hooks/use-notification"
 import { usePermissions } from "@/lib/permission-context"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
+import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/plan-upgrade-context"
 import { fetchJSONWithCSRF, fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { Spinner } from "@/components/reusable/Spinner"
@@ -94,7 +96,9 @@ const AddProductPage: FC<AddProductPageProps> = ({
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { selectedStore } = useStore()
     const { setHeaderOverride } = useSidebar()
-    const { businessInfo: contextBusinessInfo } = usePermissions()
+    const { businessInfo: contextBusinessInfo, planSlug } = usePermissions()
+    const { openPlanUpgrade } = usePlanUpgrade()
+    const variantsPlanBlocked = !hasMinimumPlan(planSlug, "vendedor")
 
     const businessInfo = useMemo(() => {
         let info = contextBusinessInfo
@@ -618,7 +622,17 @@ const AddProductPage: FC<AddProductPageProps> = ({
     return (
         <FadeIn>
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
+                <Tabs
+                    value={activeTab}
+                    onValueChange={(v) => {
+                        if (v === "variations" && variantsPlanBlocked) {
+                            openPlanUpgrade("vendedor")
+                            return
+                        }
+                        setActiveTab(v)
+                    }}
+                    className="flex flex-col h-full w-full"
+                >
                     <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
                         {/* Sticky Header - Desktop Only title and tabs */}
@@ -692,7 +706,14 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             Dados gerais
                                             {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
                                         </TabsTrigger>
-                                        <TabsTrigger value="variations" disabled={isLoadingDetails}>Variações</TabsTrigger>
+                                        <TabsTrigger value="variations" disabled={isLoadingDetails}>
+                                            <span className="inline-flex items-center gap-2">
+                                                Variações
+                                                {variantsPlanBlocked ? (
+                                                    <img src={planStarIconForTarget("vendedor")!} alt="" className="w-4 h-4 object-contain" />
+                                                ) : null}
+                                            </span>
+                                        </TabsTrigger>
                                         <TabsTrigger value="suppliers" disabled={isLoadingDetails}>Fornecedores</TabsTrigger>
                                         {productData.show_in_marketplace && <TabsTrigger value="marketplace" disabled={isLoadingDetails}>Marketplace</TabsTrigger>}
                                     </TabsList>

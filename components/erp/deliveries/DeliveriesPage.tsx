@@ -15,6 +15,7 @@ import DeliveryListItem from "./DeliveryListItem"
 import DeliveryGridCard from "./DeliveryGridCard"
 import CreateDeliveryPage from "./CreateDeliveryPage"
 import DeliveryDetailPage from "./DeliveryDetailPage"
+import { usePlanUpgrade } from "@/components/erp/subscription/plan-upgrade-context"
 
 type SortKey = "order_id" | "delivery_fee" | "status" | "delivery_person" | "estimated_time" | "dates" | "delivered_at"
 type SortDirection = "asc" | "desc"
@@ -37,12 +38,15 @@ export default function DeliveriesPage({
   deliveries: initialDeliveries,
   initialNextCursor,
   initialHasMore,
+  planGate,
 }: {
   partnerId: string
   deliveries: any[]
   initialNextCursor: ERPDeliveryListCursor | null
   initialHasMore: boolean
+  planGate?: { requiredPlanSlug: "vendedor"; message: string }
 }) {
+  const { openPlanUpgrade } = usePlanUpgrade()
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
   const [viewMode, setViewMode] = useState<"list" | "grid">("list")
@@ -189,7 +193,9 @@ export default function DeliveriesPage({
           </div>
           <div className="flex items-center gap-3">
             <Button variant="outline"><ExportFileIcon className="w-[18px] h-[18px]" /> Exportar</Button>
-            <Button onClick={() => setWrapper("create")}><PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} /> Nova Entrega</Button>
+            <Button onClick={() => setWrapper("create")} disabled={!!planGate}>
+              <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} /> Nova Entrega
+            </Button>
           </div>
         </div>
 
@@ -200,6 +206,7 @@ export default function DeliveriesPage({
           onAdd={() => setWrapper("create")}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
+          addDisabled={!!planGate}
         />
 
         <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
@@ -210,9 +217,14 @@ export default function DeliveriesPage({
                   placeholderType="image"
                   imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
                   imageAlt="Sem entregas"
-                  title="Nenhuma entrega encontrada"
-                  subtitle="Crie uma entrega a partir de um pedido para começar."
+                  title={planGate ? "Plano necessário" : "Nenhuma entrega encontrada"}
+                  subtitle={planGate ? planGate.message : "Crie uma entrega a partir de um pedido para começar."}
                 />
+                {planGate ? (
+                  <Button className="mt-6 rounded-full" onClick={() => openPlanUpgrade("vendedor")}>
+                    Ver plano Vendedor
+                  </Button>
+                ) : null}
               </motion.div>
             ) : viewMode === "grid" ? (
               <motion.div key="grid" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">

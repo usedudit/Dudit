@@ -330,14 +330,33 @@ export async function getERPDeliveriesPageAction(
   partnerId: string,
   options?: { cursor?: ERPDeliveryListCursor | null; limit?: number }
 ): Promise<
-  | { success: true; items: any[]; nextCursor: ERPDeliveryListCursor | null; hasMore: boolean }
+  | {
+      success: true
+      items: any[]
+      nextCursor: ERPDeliveryListCursor | null
+      hasMore: boolean
+      planGate?: { requiredPlanSlug: "vendedor"; message: string }
+    }
   | { success: false; error: string }
 > {
   try {
     await requireUser()
     await requirePartnerAccess(partnerId)
     const planCheck = await enforceDeliveryPlanAccess(partnerId, 1)
-    if (!planCheck.allowed) return { success: false, error: planCheck.error }
+    if (!planCheck.allowed) {
+      const slug = String(planCheck.planSlug || "").toLowerCase()
+      // Plano Free: página deve carregar com CTA de upgrade (evita AccessDenied enganoso).
+      if (slug === "free") {
+        return {
+          success: true,
+          items: [],
+          nextCursor: null,
+          hasMore: false,
+          planGate: { requiredPlanSlug: "vendedor", message: planCheck.error },
+        }
+      }
+      return { success: false, error: planCheck.error }
+    }
     const supabase = await getSupabaseServerClient()
 
     const cursor = options?.cursor ?? null

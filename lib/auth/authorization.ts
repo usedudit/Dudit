@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import type { User } from "@supabase/supabase-js"
-import type { PartnerPermissions, ResourcePermissions } from "@/lib/permissions/types"
+import type { PartnerPermissions, PartnerRole, ResourcePermissions } from "@/lib/permissions/types"
 
 // ─── Auth Errors ────────────────────────────────────────────────────────────
 
@@ -102,6 +102,7 @@ export async function requirePartner(resolvedUser?: User | any): Promise<{ id: s
 }
 
 import { getAllUserPartnerAccess } from "@/lib/auth/partner-context"
+import { mergePartnerPermissions } from "@/lib/permissions/merge-partner-permissions"
 
 /**
  * Check if a user has access to a partner via partner_users OR as the legacy owner.
@@ -158,8 +159,10 @@ const checkPartnerAccess = async (
   }
 
   // Explicitly validate returned truthy data
-  if (invitedAccessRes.data && invitedAccessRes.data.role && invitedAccessRes.data.permissions) {
-    return { role: invitedAccessRes.data.role, permissions: invitedAccessRes.data.permissions };
+  if (invitedAccessRes.data && invitedAccessRes.data.role) {
+    const role = String(invitedAccessRes.data.role) as PartnerRole
+    const permissions = mergePartnerPermissions(role, invitedAccessRes.data.permissions)
+    return { role: invitedAccessRes.data.role, permissions }
   }
 
   if (ownedPartnerRes.data && ownedPartnerRes.data.user_id === userId) {

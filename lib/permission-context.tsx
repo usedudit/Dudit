@@ -17,6 +17,8 @@ interface PermissionContextValue {
     routePermissions: PartnerRoutePermissions | null
     partnerId: string
     businessInfo: any // Added for feature flags
+    /** Current subscription plan slug (`plans.slug`), e.g. `free`, `vendedor`. */
+    planSlug: string
 
     // Convenience helpers
     canAccess: (routeKey: RouteKey) => boolean
@@ -38,14 +40,16 @@ interface PermissionProviderProps {
     routePermissions: PartnerRoutePermissions | null
     partnerId: string
     businessInfo: any
+    planSlug?: string
 }
 
-export function PermissionProvider({ children, role, routePermissions, partnerId, businessInfo }: PermissionProviderProps) {
+export function PermissionProvider({ children, role, routePermissions, partnerId, businessInfo, planSlug = "free" }: PermissionProviderProps) {
     const value = useMemo<PermissionContextValue>(() => ({
         role,
         routePermissions,
         partnerId,
         businessInfo,
+        planSlug,
         canAccess: (routeKey: RouteKey) => canAccessRoute(routePermissions, routeKey),
         canCreate: (routeKey: RouteKey) => canPerformAction(routePermissions, routeKey, "create"),
         canEdit: (routeKey: RouteKey) => canPerformAction(routePermissions, routeKey, "edit"),
@@ -53,7 +57,7 @@ export function PermissionProvider({ children, role, routePermissions, partnerId
         hasSpecific: (routeKey: RouteKey, permKey: string) => hasSpecificPermission(routePermissions, routeKey, permKey),
         canAccessPath: (pathname: string) => canAccessPath(routePermissions, pathname),
         getDeniedMessage: (routeKey: RouteKey, action: string) => permissionDeniedMessage(routeKey, action),
-    }), [role, routePermissions, partnerId, businessInfo])
+    }), [role, routePermissions, partnerId, businessInfo, planSlug])
 
     return (
         <PermissionContext.Provider value={value}>
@@ -75,6 +79,7 @@ export function usePermissions(): PermissionContextValue {
             routePermissions: null,
             partnerId: "",
             businessInfo: { sells: ["products"], channels: ["online"] },
+            planSlug: "free",
             canAccess: () => false,
             canCreate: () => false,
             canEdit: () => false,

@@ -21,6 +21,8 @@ export default async function LogisticsPage() {
   if (!allowed) return <AccessDenied />
   if (!page.success) return <AccessDenied />
 
+  const planGate = page.planGate
+
   return (
     <>
       <ERPPageHeader title="Entregas" />
@@ -30,6 +32,7 @@ export default async function LogisticsPage() {
           deliveries={page.items || []}
           initialNextCursor={page.nextCursor}
           initialHasMore={page.hasMore}
+          planGate={planGate}
         />
       </FadeIn>
     </>
