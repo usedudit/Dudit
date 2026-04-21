@@ -30,6 +30,49 @@ type Coordinate = { lat: number; lon: number }
 const DEFAULT_PAGE_SIZE = 100
 const ACTIVE_DELIVERY_STATUSES = ["pending", "not_sent", "preparing", "sent", "pickup_available"] as const
 
+async function getPartnerUserNameByIdMap(
+  supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+  partnerId: string,
+  partnerUserIds: string[],
+) {
+  const uniqueIds = Array.from(new Set((partnerUserIds || []).filter(Boolean)))
+  if (uniqueIds.length === 0) return new Map<string, string>()
+
+  const { data: partnerUsers } = await supabase
+    .from("partner_users")
+    .select("id, user_id")
+    .eq("partner_id", partnerId)
+    .in("id", uniqueIds)
+
+  const userIdByPartnerUserId = new Map<string, string>()
+  const userIds = new Set<string>()
+  for (const row of partnerUsers || []) {
+    if (!row?.id || !row?.user_id) continue
+    userIdByPartnerUserId.set(String(row.id), String(row.user_id))
+    userIds.add(String(row.user_id))
+  }
+
+  const nameByUserId = new Map<string, string>()
+  if (userIds.size > 0) {
+    const { data: profiles } = await supabase
+      .from("user_profiles")
+      .select("user_id, full_name")
+      .in("user_id", Array.from(userIds))
+
+    for (const profile of profiles || []) {
+      if (!profile?.user_id) continue
+      nameByUserId.set(String(profile.user_id), String(profile.full_name || "Entregador"))
+    }
+  }
+
+  const nameByPartnerUserId = new Map<string, string>()
+  for (const [partnerUserId, userId] of userIdByPartnerUserId.entries()) {
+    nameByPartnerUserId.set(partnerUserId, nameByUserId.get(userId) || "Entregador")
+  }
+
+  return nameByPartnerUserId
+}
+
 function resolveDeliveryLimitByPlanSlug(slug: string) {
   const normalized = String(slug || "").toLowerCase()
   if (normalized === "free") return { blocked: true, maxOrders: 0 as const }
@@ -195,7 +238,7 @@ export async function fetchDeliveryPeopleBucketAction(partnerId: string) {
 
   const { data, error } = await supabase
     .from("partner_users")
-    .select("id, role, user_id, user_profiles:user_id(full_name)")
+    .select("id, role, user_id")
     .eq("partner_id", partnerId)
     .eq("role", "DELIVERY")
     .order("created_at", { ascending: true })
@@ -205,10 +248,22 @@ export async function fetchDeliveryPeopleBucketAction(partnerId: string) {
     return []
   }
 
+  const userIds = Array.from(new Set((data || []).map((member: any) => member.user_id).filter(Boolean)))
+  const nameByUserId = new Map<string, string>()
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from("user_profiles")
+      .select("user_id, full_name")
+      .in("user_id", userIds)
+    for (const profile of profiles || []) {
+      nameByUserId.set(String(profile.user_id), String(profile.full_name || "Entregador"))
+    }
+  }
+
   return (data || []).map((member: any) => ({
     id: member.id,
     userId: member.user_id,
-    fullName: member.user_profiles?.full_name || "Entregador",
+    fullName: nameByUserId.get(String(member.user_id)) || "Entregador",
   }))
 }
 
@@ -377,8 +432,7 @@ export async function getERPDeliveriesPageAction(
           status,
           delivered_at,
           orders(id, order_number, customer_name, total_amount, shipping_cost, delivery_address, buyer_id)
-        ),
-        partner_users:delivery_person_id(id, user_profiles:user_id(full_name))
+        )
       `)
       .eq("partner_id", partnerId)
 
@@ -391,8 +445,15 @@ export async function getERPDeliveriesPageAction(
 
     if (error) throw error
     const rows = data || []
+    const deliveryPersonIds = rows.map((row: any) => String(row.delivery_person_id || "")).filter(Boolean)
+    const deliveryPersonNameById = await getPartnerUserNameByIdMap(supabase, partnerId, deliveryPersonIds)
     const hasMore = rows.length > limit
-    const items = hasMore ? rows.slice(0, limit) : rows
+    const items = (hasMore ? rows.slice(0, limit) : rows).map((row: any) => ({
+      ...row,
+      partner_users: row.delivery_person_id
+        ? { id: row.delivery_person_id, user_profiles: { full_name: deliveryPersonNameById.get(String(row.delivery_person_id)) || "Entregador" } }
+        : null,
+    }))
     const last = items[items.length - 1]
     const nextCursor = hasMore && last?.created_at && last?.id
       ? { createdAt: String(last.created_at), id: String(last.id) }
@@ -430,15 +491,27 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
           delivery_address,
           buyer_id
         )
-      ),
-      partner_users:delivery_person_id(id, user_profiles:user_id(full_name))
+      )
     `)
     .eq("id", deliveryId)
     .eq("partner_id", partnerId)
     .single()
 
   if (error) return { success: false as const, error: error.message }
-  return { success: true as const, data }
+
+  const deliveryPersonNameById = await getPartnerUserNameByIdMap(
+    supabase,
+    partnerId,
+    data?.delivery_person_id ? [String(data.delivery_person_id)] : [],
+  )
+
+  const hydrated = {
+    ...data,
+    partner_users: data?.delivery_person_id
+      ? { id: data.delivery_person_id, user_profiles: { full_name: deliveryPersonNameById.get(String(data.delivery_person_id)) || "Entregador" } }
+      : null,
+  }
+  return { success: true as const, data: hydrated }
 }
 
 export async function updateERPDeliveryStatusAction(params: {

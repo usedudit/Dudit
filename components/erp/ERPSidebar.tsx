@@ -265,13 +265,13 @@ export function ERPSidebar() {
     useEffect(() => {
         if (isCollapsed) return
 
-        const activeItem = navItems.find((item) =>
+        const activeItem = filteredNavItems.find((item) =>
             item.submenu?.some((sub) => isActivePath(sub.href)),
         )
         if (activeItem && openSubmenu !== activeItem.label) {
             setOpenSubmenu(activeItem.label)
         }
-    }, [pathname, isCollapsed, isActivePath])
+    }, [pathname, isCollapsed, isActivePath, filteredNavItems, openSubmenu])
 
     useEffect(() => {
         if (isCollapsed) {
@@ -437,7 +437,9 @@ export function ERPSidebar() {
                                             <button
                                                 type="button"
                                                 onClick={() => {
-                                                    if (!isCollapsed && hasSubmenu) {
+                                                    if (isCollapsed && hasSubmenu) {
+                                                        setHoveredItem((prev) => (prev === item.label ? null : item.label))
+                                                    } else if (!isCollapsed && hasSubmenu) {
                                                         toggleSubmenu(item.label)
                                                     }
                                                 }}

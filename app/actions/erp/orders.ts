@@ -1791,7 +1791,6 @@ export async function getERPOrdersPageAction(
                 delivery_status,
                 order_source,
                 created_at,
-                is_pos_sale,
                 quantity,
                 stores(name),
                 order_items(quantity)
