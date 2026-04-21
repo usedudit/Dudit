@@ -35,6 +35,11 @@ function buildQuotesKeysetOrFilter(cursor: ERPQuoteListCursor): string {
 
 const ERP_QUOTES_PAGE_SIZE = 100
 
+function isMissingQuotesCreatedByUserIdColumnError(error: unknown): boolean {
+    const message = String((error as any)?.message || "").toLowerCase()
+    return message.includes("created_by_user_id") && message.includes("quotes")
+}
+
 export async function getERPQuotesPageAction(
     partnerId: string,
     options?: { cursor?: ERPQuoteListCursor | null; limit?: number },
@@ -52,10 +57,7 @@ export async function getERPQuotesPageAction(
             const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_QUOTES_PAGE_SIZE))))
             const fetchLimit = limit + 1
 
-            let q = supabase
-                .from("quotes")
-                .select(
-                    `
+            const selectWithCreator = `
                     id,
                     quote_number,
                     status,
@@ -68,22 +70,41 @@ export async function getERPQuotesPageAction(
                     updated_at,
                     customers (id, name, email),
                     items_count:quote_items(count)
-                `,
-                )
-                .eq("partner_id", partnerId)
-
-            if (cursor) {
-                q = q.or(buildQuotesKeysetOrFilter(cursor))
+                `
+            const selectWithoutCreator = `
+                    id,
+                    quote_number,
+                    status,
+                    issue_date,
+                    expiration_date,
+                    total,
+                    customer_id,
+                    created_at,
+                    updated_at,
+                    customers (id, name, email),
+                    items_count:quote_items(count)
+                `
+            const runQuotesPageQuery = async (selectClause: string) => {
+                let query = supabase.from("quotes").select(selectClause).eq("partner_id", partnerId)
+                if (cursor) {
+                    query = query.or(buildQuotesKeysetOrFilter(cursor))
+                }
+                return query
+                    .order("created_at", { ascending: false })
+                    .order("id", { ascending: false })
+                    .limit(fetchLimit)
             }
 
-            const { data, error } = await q
-                .order("created_at", { ascending: false })
-                .order("id", { ascending: false })
-                .limit(fetchLimit)
+            let queryResult = await runQuotesPageQuery(selectWithCreator)
+            if (queryResult.error && isMissingQuotesCreatedByUserIdColumnError(queryResult.error)) {
+                queryResult = await runQuotesPageQuery(selectWithoutCreator)
+            }
+            if (queryResult.error) throw queryResult.error
 
-            if (error) throw error
-
-            const rowsWithCreator = data || []
+            const rowsWithCreator = (queryResult.data || []).map((row: any) => ({
+                ...row,
+                created_by_user_id: row?.created_by_user_id || null,
+            }))
             const creatorIds = Array.from(
                 new Set(rowsWithCreator.map((row: any) => row.created_by_user_id).filter(Boolean))
             ) as string[]

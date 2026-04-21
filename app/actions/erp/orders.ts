@@ -77,6 +77,11 @@ type PaymentBreakdownEntry = {
     amount: number
 }
 
+function isMissingOrdersIsPosSaleColumnError(error: unknown): boolean {
+    const message = String((error as any)?.message || "").toLowerCase()
+    return message.includes("is_pos_sale") && message.includes("orders")
+}
+
 function buildOrderSource(salesChannel: string | undefined, deliveryMethod: 'delivery' | 'pickup') {
     const value = salesChannel?.trim()
     if (value) return value
@@ -1773,9 +1778,7 @@ export async function getERPOrdersPageAction(
         const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_ORDERS_PAGE_SIZE))))
         const fetchLimit = limit + 1
 
-        let q = supabase
-            .from("orders")
-            .select(`
+        const baseSelect = `
                 id,
                 order_number,
                 mp_payment_id,
@@ -1792,17 +1795,37 @@ export async function getERPOrdersPageAction(
                 quantity,
                 stores(name),
                 order_items(quantity)
-            `)
-            .eq("partner_id", partnerId)
+            `
 
-        if (cursor) {
-            q = q.or(buildOrdersKeysetOrFilter(cursor))
+        const selectWithPosSale = `
+                ${baseSelect},
+                is_pos_sale
+            `
+
+        const selectWithoutPosSale = baseSelect
+
+        const buildQuery = (selectClause: string) => {
+            let query = supabase
+                .from("orders")
+                .select(selectClause)
+                .eq("partner_id", partnerId)
+
+            if (cursor) {
+                query = query.or(buildOrdersKeysetOrFilter(cursor))
+            }
+
+            return query
+                .order("created_at", { ascending: false })
+                .order("id", { ascending: false })
+                .limit(fetchLimit)
         }
 
-        const { data, error } = await q
-            .order("created_at", { ascending: false })
-            .order("id", { ascending: false })
-            .limit(fetchLimit)
+        let queryResult = await buildQuery(selectWithPosSale)
+        if (queryResult.error && isMissingOrdersIsPosSaleColumnError(queryResult.error)) {
+            queryResult = await buildQuery(selectWithoutPosSale)
+        }
+
+        const { data, error } = queryResult
 
         if (error) throw error
 
@@ -1810,6 +1833,7 @@ export async function getERPOrdersPageAction(
         const hasMore = rows.length > limit
         const items = (hasMore ? rows.slice(0, limit) : rows).map((row: any) => ({
             ...row,
+            is_pos_sale: Boolean(row?.is_pos_sale),
             // Backward-compatible field used by UI, with fallback when column doesn't exist in DB.
             order_date: row?.order_date || row?.created_at || null,
         }))

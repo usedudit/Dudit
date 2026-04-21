@@ -128,6 +128,12 @@ const navItems: NavItem[] = [
     },
 ]
 
+const PLAN_GATED_MINIMUM: Record<string, "vendedor"> = {
+    "/erp/logistics": "vendedor",
+    "/erp/products/cadastros": "vendedor",
+    "/erp/financial/cadastros-financeiro": "vendedor",
+}
+
 function ErpPlanGatedNavItem({
     href,
     label,
@@ -144,10 +150,8 @@ function ErpPlanGatedNavItem({
     onNavigate?: () => void
 }) {
     const { openPlanUpgrade } = usePlanUpgrade()
-    const required =
-        href === "/erp/logistics" && !hasMinimumPlan(planSlug, "vendedor")
-            ? ("vendedor" as const)
-            : null
+    const minimumPlan = PLAN_GATED_MINIMUM[href]
+    const required = minimumPlan && !hasMinimumPlan(planSlug, minimumPlan) ? minimumPlan : null
     const star = required ? planStarIconForTarget(required) : null
 
     const labelRow = (
@@ -244,7 +248,7 @@ export function ERPSidebar() {
 
                 // Submenu item - filter sub-items and hide if none remain
                 if (newItem.submenu) {
-                    const filteredSub = newItem.submenu.filter(sub => canAccess(sub.href))
+                    const filteredSub = newItem.submenu.filter((sub) => canAccess(sub.href) || Boolean(PLAN_GATED_MINIMUM[sub.href]))
                     if (filteredSub.length === 0) return null
                     return { ...newItem, submenu: filteredSub }
                 }
