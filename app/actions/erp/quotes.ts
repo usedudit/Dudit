@@ -63,11 +63,11 @@ export async function getERPQuotesPageAction(
                     expiration_date,
                     total,
                     customer_id,
+                    created_by_user_id,
                     created_at,
                     updated_at,
                     customers (id, name, email),
-                    items_count:quote_items(count),
-                    user_profiles:created_by_user_id(full_name)
+                    items_count:quote_items(count)
                 `,
                 )
                 .eq("partner_id", partnerId)
@@ -83,19 +83,41 @@ export async function getERPQuotesPageAction(
 
             if (error) throw error
 
+            const rowsWithCreator = data || []
+            const creatorIds = Array.from(
+                new Set(rowsWithCreator.map((row: any) => row.created_by_user_id).filter(Boolean))
+            ) as string[]
+            const creatorNameById = new Map<string, string>()
+            if (creatorIds.length > 0) {
+                const { data: profileRows } = await supabase
+                    .from("user_profiles")
+                    .select("user_id, full_name")
+                    .in("user_id", creatorIds)
+
+                for (const p of profileRows || []) {
+                    creatorNameById.set(String((p as any).user_id), String((p as any).full_name || "Sistema"))
+                }
+            }
+
             // Mark expired quotes on read (virtual status)
             const now = new Date()
             now.setHours(0, 0, 0, 0)
 
-            const mappedData = (data || []).map((row: any) => {
+            const mappedData = rowsWithCreator.map((row: any) => {
+                const mappedRow = {
+                    ...row,
+                    user_profiles: row.created_by_user_id
+                        ? { full_name: creatorNameById.get(String(row.created_by_user_id)) || "Sistema" }
+                        : null,
+                }
                 if (
                     row.expiration_date &&
                     (row.status === "draft" || row.status === "sent") &&
                     new Date(row.expiration_date) < now
                 ) {
-                    return { ...row, status: "expired", _originalStatus: row.status }
+                    return { ...mappedRow, status: "expired", _originalStatus: row.status }
                 }
-                return row
+                return mappedRow
             })
 
             const rows = mappedData

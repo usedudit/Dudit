@@ -154,10 +154,8 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
       delivery_address,
       situation,
       delivery_status,
-      order_date,
       created_at,
-      order_items(id, product_name, quantity, sku),
-      customers:buyer_id(id,name,email,phone,addresses(*))
+      order_items(id, product_name, quantity, sku)
     `)
     .eq("partner_id", partnerId)
     .order("created_at", { ascending: false })
@@ -171,7 +169,7 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
   return (data || [])
     .filter((order: any) => !activeOrderIds.has(order.id))
     .map((order: any) => {
-    const customer = order.customers || null
+    const customer = null
     return {
       id: order.id,
       displayId: order.order_number || `#${String(order.id).slice(0, 8).toUpperCase()}`,
@@ -180,7 +178,7 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
       deliveryStatus: order.delivery_status || "not_sent",
       totalAmount: Number(order.total_amount || 0),
       shippingFee: Number(order.shipping_cost || 0),
-      orderDate: order.order_date || order.created_at || null,
+      orderDate: order.created_at || null,
       customer: {
         id: customer?.id || order.buyer_id || null,
         name: customer?.name || order.customer_name || "Cliente balcão",
@@ -230,7 +228,7 @@ export async function createERPDeliveryAction(payload: CreateDeliveryPayload) {
 
   const { data: selectedOrders, error: orderError } = await supabase
     .from("orders")
-    .select("id, partner_id, shipping_cost, total_amount, delivery_address, buyer_id, customers:buyer_id(addresses(*))")
+    .select("id, partner_id, shipping_cost, total_amount, delivery_address, buyer_id")
     .in("id", orderIds)
     .eq("partner_id", payload.partnerId)
     .order("created_at", { ascending: false })
@@ -381,7 +379,7 @@ export async function getERPDeliveriesPageAction(
           position,
           status,
           delivered_at,
-          orders(id, order_number, customer_name, total_amount, shipping_cost, delivery_address, buyer_id, customers:buyer_id(id,name,email,phone,addresses(*)))
+          orders(id, order_number, customer_name, total_amount, shipping_cost, delivery_address, buyer_id)
         ),
         partner_users:delivery_person_id(id, user_profiles:user_id(full_name))
       `)
@@ -433,8 +431,7 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
           total_amount,
           shipping_cost,
           delivery_address,
-          buyer_id,
-          customers:buyer_id(id,name,email,phone,addresses(*))
+          buyer_id
         )
       ),
       partner_users:delivery_person_id(id, user_profiles:user_id(full_name))

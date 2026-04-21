@@ -1787,7 +1787,6 @@ export async function getERPOrdersPageAction(
                 previous_situation_before_cancel,
                 delivery_status,
                 order_source,
-                order_date,
                 created_at,
                 is_pos_sale,
                 quantity,
@@ -1809,7 +1808,11 @@ export async function getERPOrdersPageAction(
 
         const rows = data || []
         const hasMore = rows.length > limit
-        const items = hasMore ? rows.slice(0, limit) : rows
+        const items = (hasMore ? rows.slice(0, limit) : rows).map((row: any) => ({
+            ...row,
+            // Backward-compatible field used by UI, with fallback when column doesn't exist in DB.
+            order_date: row?.order_date || row?.created_at || null,
+        }))
         const last = items[items.length - 1]
         const nextCursor: ERPOrderListCursor | null =
             hasMore && last?.created_at && last?.id ? { createdAt: String(last.created_at), id: String(last.id) } : null

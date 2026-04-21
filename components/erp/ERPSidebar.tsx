@@ -399,50 +399,79 @@ export function ERPSidebar() {
                                     onMouseLeave={handleMouseLeave}
                                 >
                                     <div className="w-full">
-                                        <button
-                                            onClick={(e) => {
-                                                if (!isCollapsed && hasSubmenu) {
-                                                    toggleSubmenu(item.label)
-                                                }
-                                            }}
-                                            className={cn(
-                                                "flex items-center rounded-lg transition-colors duration-200 group relative min-h-[44px] w-full justify-start",
-                                                isActiveGroup ? activeClasses : inactiveClasses
-                                            )}
-                                        >
-                                            {item.href && !hasSubmenu ? (
-                                                <Link href={item.href} prefetch={false} className="absolute inset-0 z-10" onClick={() => setIsMobileOpen(false)} />
-                                            ) : null}
-
-                                            <div className="w-[44px] h-[44px] flex items-center justify-center shrink-0">
-                                                <Icon
-                                                    className={cn(
-                                                        "w-[20px] h-[20px] transition-colors",
-                                                        isActiveGroup ? "text-brand-green" : "text-current"
-                                                    )}
-                                                />
-                                            </div>
-
-                                            <span
+                                        {item.href && !hasSubmenu ? (
+                                            <Link
+                                                href={item.href}
+                                                prefetch={false}
+                                                onClick={() => setIsMobileOpen(false)}
                                                 className={cn(
-                                                    "text-[14px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out origin-left flex-1 text-left",
-                                                    isCollapsed
-                                                        ? "max-w-0 md:opacity-0 translate-x-[-10px] md:block hidden"
-                                                        : "max-w-[150px] opacity-100 translate-x-0",
+                                                    "flex items-center rounded-lg transition-colors duration-200 group relative min-h-[44px] w-full justify-start",
+                                                    isActiveGroup ? activeClasses : inactiveClasses
                                                 )}
                                             >
-                                                {item.label}
-                                            </span>
+                                                <div className="w-[44px] h-[44px] flex items-center justify-center shrink-0">
+                                                    <Icon
+                                                        className={cn(
+                                                            "w-[20px] h-[20px] transition-colors",
+                                                            isActiveGroup ? "text-brand-green" : "text-current"
+                                                        )}
+                                                    />
+                                                </div>
 
-                                            {hasSubmenu && !isCollapsed && (
-                                                <ChevronDownIcon
+                                                <span
                                                     className={cn(
-                                                        "w-4 h-4 mr-2 transition-transform duration-200 opacity-60",
-                                                        isMenuExpanded ? "rotate-180" : "rotate-0",
+                                                        "text-[14px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out origin-left flex-1 text-left",
+                                                        isCollapsed
+                                                            ? "max-w-0 md:opacity-0 translate-x-[-10px] md:block hidden"
+                                                            : "max-w-[150px] opacity-100 translate-x-0",
                                                     )}
-                                                />
-                                            )}
-                                        </button>
+                                                >
+                                                    {item.label}
+                                                </span>
+                                            </Link>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (!isCollapsed && hasSubmenu) {
+                                                        toggleSubmenu(item.label)
+                                                    }
+                                                }}
+                                                className={cn(
+                                                    "flex items-center rounded-lg transition-colors duration-200 group relative min-h-[44px] w-full justify-start",
+                                                    isActiveGroup ? activeClasses : inactiveClasses
+                                                )}
+                                            >
+                                                <div className="w-[44px] h-[44px] flex items-center justify-center shrink-0">
+                                                    <Icon
+                                                        className={cn(
+                                                            "w-[20px] h-[20px] transition-colors",
+                                                            isActiveGroup ? "text-brand-green" : "text-current"
+                                                        )}
+                                                    />
+                                                </div>
+
+                                                <span
+                                                    className={cn(
+                                                        "text-[14px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out origin-left flex-1 text-left",
+                                                        isCollapsed
+                                                            ? "max-w-0 md:opacity-0 translate-x-[-10px] md:block hidden"
+                                                            : "max-w-[150px] opacity-100 translate-x-0",
+                                                    )}
+                                                >
+                                                    {item.label}
+                                                </span>
+
+                                                {hasSubmenu && !isCollapsed && (
+                                                    <ChevronDownIcon
+                                                        className={cn(
+                                                            "w-4 h-4 mr-2 transition-transform duration-200 opacity-60",
+                                                            isMenuExpanded ? "rotate-180" : "rotate-0",
+                                                        )}
+                                                    />
+                                                )}
+                                            </button>
+                                        )}
 
                                         {/* SUBMENU - MODO EXPANDIDO */}
                                         {hasSubmenu && !isCollapsed && (
@@ -563,22 +592,35 @@ export function ERPSidebar() {
 
                                     return (
                                         <div key={item.label} className="flex flex-col">
-                                            <button
-                                                onClick={() => hasSubmenu ? toggleSubmenu(item.label) : null}
-                                                className={cn(
-                                                    "flex items-center gap-3 p-3 rounded-xl transition-colors relative",
-                                                    isActive ? activeClasses : inactiveClasses
-                                                )}
-                                            >
-                                                {item.href && !hasSubmenu && (
-                                                    <Link href={item.href} prefetch={false} className="absolute inset-0" onClick={() => setIsMobileOpen(false)} />
-                                                )}
-                                                <Icon size={20} className={isActive ? "text-brand-green" : ""} />
-                                                <span className="text-[15px] font-medium flex-1 text-left">{item.label}</span>
-                                                {hasSubmenu && (
-                                                    <ChevronDownIcon className={cn("w-4 h-4 opacity-50 transition-transform", isMenuExpanded ? "rotate-180" : "")} />
-                                                )}
-                                            </button>
+                                            {item.href && !hasSubmenu ? (
+                                                <Link
+                                                    href={item.href}
+                                                    prefetch={false}
+                                                    className={cn(
+                                                        "flex items-center gap-3 p-3 rounded-xl transition-colors relative",
+                                                        isActive ? activeClasses : inactiveClasses
+                                                    )}
+                                                    onClick={() => setIsMobileOpen(false)}
+                                                >
+                                                    <Icon size={20} className={isActive ? "text-brand-green" : ""} />
+                                                    <span className="text-[15px] font-medium flex-1 text-left">{item.label}</span>
+                                                </Link>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => hasSubmenu ? toggleSubmenu(item.label) : null}
+                                                    className={cn(
+                                                        "flex items-center gap-3 p-3 rounded-xl transition-colors relative",
+                                                        isActive ? activeClasses : inactiveClasses
+                                                    )}
+                                                >
+                                                    <Icon size={20} className={isActive ? "text-brand-green" : ""} />
+                                                    <span className="text-[15px] font-medium flex-1 text-left">{item.label}</span>
+                                                    {hasSubmenu && (
+                                                        <ChevronDownIcon className={cn("w-4 h-4 opacity-50 transition-transform", isMenuExpanded ? "rotate-180" : "")} />
+                                                    )}
+                                                </button>
+                                            )}
 
                                             {hasSubmenu && isMenuExpanded && (
                                                 <div className="flex flex-col gap-1 pl-11 pr-3 pb-2">
