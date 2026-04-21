@@ -160,6 +160,13 @@ export default function QuotesPage({
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const [page, setPage] = useState(1)
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
+
+    useEffect(() => {
+        console.log(">>> MOUNTED QuotesPage client component")
+        return () => console.log("<<< UNMOUNTED QuotesPage client component")
+    }, [])
+    
+    console.log("--- RENDER QuotesPage client component")
     const [modals, setModals] = useState({ filter: false, delete: false })
     const [selection, setSelection] = useState({ ids: new Set<string>() })
     const [isDeleting, setIsDeleting] = useState(false)

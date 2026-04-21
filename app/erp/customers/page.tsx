@@ -6,15 +6,10 @@ import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getERPCustomersPageAction } from "@/app/actions/erp/customers"
 
-export const dynamic = "force-dynamic"
-
 export default async function CustomersRoute() {
-  // Layout already guarantees auth + valid context
   const context = await getCurrentPartnerContext()
   if (!context) return <AccessDenied />
   const partnerId = context.partnerId
-
-  // Parallelize permission check and data fetch
   const [{ allowed }, page] = await Promise.all([
     checkPartnerPermission(partnerId, "customers", "view"),
     getERPCustomersPageAction(partnerId, { cursor: null, limit: 100 }),

@@ -67,6 +67,15 @@ export interface SubscriptionWithPlan extends Subscription {
   plan: Plan
 }
 
+// ─── Constants ──────────────────────────────────────────────────────────────
+
+/**
+ * Grace period for past_due subscriptions.
+ * Users keep access for this many days after a payment failure.
+ * After this period, they're downgraded to the free plan.
+ */
+const PAST_DUE_GRACE_PERIOD_DAYS = 3
+
 // ─── In-memory Cache ────────────────────────────────────────────────────────
 
 interface CacheEntry<T> {
@@ -74,7 +83,13 @@ interface CacheEntry<T> {
   expiresAt: number
 }
 
-const PARTNER_PLAN_TTL_MS = 30_000     // 30 seconds
+/**
+ * Plan cache TTL — kept short (10 seconds) to limit stale access windows.
+ * Webhooks force-invalidate the cache immediately on status changes,
+ * so this TTL only matters for the gap between a webhook updating the DB
+ * and the next plan resolution call.
+ */
+const PARTNER_PLAN_TTL_MS = 10_000     // 10 seconds
 const ALL_PLANS_TTL_MS = 60_000         // 60 seconds
 
 const partnerPlanCache = new Map<string, CacheEntry<Plan>>()
@@ -165,7 +180,11 @@ export async function getPlanById(planId: string): Promise<Plan | null> {
 }
 
 /**
- * Get the active subscription for a partner, or null.
+ * Get the non-cancelled subscription for a partner, or null.
+ * Includes pending and past_due — used for UI display, race condition guards,
+ * and preventing duplicate checkout creation.
+ *
+ * ⚠️ DO NOT use this for access control. Use getPartnerPlan() instead.
  */
 export async function getPartnerSubscription(partnerId: string): Promise<SubscriptionWithPlan | null> {
   const admin = getAdminClient()
@@ -192,20 +211,93 @@ export async function getPartnerSubscription(partnerId: string): Promise<Subscri
 }
 
 /**
- * Get the current plan for a partner.
- * Defaults to Free plan if no active subscription exists.
- * Cached for 30 seconds per partner.
+ * Get the EFFECTIVE plan for a partner — used for access control.
+ *
+ * SECURITY: This function determines what features and limits a partner has.
+ * It ONLY grants access for:
+ *   - "active" subscriptions
+ *   - "trialing" subscriptions
+ *   - "past_due" subscriptions within the grace period (3 days from period end)
+ *
+ * It NEVER grants access for:
+ *   - "pending" subscriptions (checkout created but not paid)
+ *   - "past_due" beyond the grace period
+ *   - "cancelled" or "paused" subscriptions
+ *
+ * CONSISTENCY: Uses a SINGLE atomic query to fetch all candidate subscriptions,
+ * then applies deterministic selection in application code. This eliminates
+ * race conditions where a webhook could change status between queries.
+ *
+ * CACHE: 10-second TTL. Webhooks force-invalidate on every status change,
+ * so stale access windows are bounded to max ~10 seconds in worst case.
  */
 export async function getPartnerPlan(partnerId: string): Promise<Plan> {
   const cached = getCached(partnerPlanCache.get(partnerId))
   if (cached) return cached
 
-  const subscription = await getPartnerSubscription(partnerId)
+  const admin = getAdminClient()
 
-  let plan: Plan
-  if (subscription?.plan) {
-    plan = subscription.plan
-  } else {
+  // SINGLE atomic query: fetch ALL potentially qualifying subscriptions at once.
+  // This eliminates the race condition where a webhook could change status
+  // between two sequential queries.
+  const { data: candidates, error } = await admin
+    .from("subscriptions")
+    .select("*, plan:plans!plan_id(*)")
+    .eq("partner_id", partnerId)
+    .in("status", ["active", "trialing", "past_due"])
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("[SUBSCRIPTION] Error fetching subscriptions for plan resolution:", error.message)
+  }
+
+  let plan: Plan | null = null
+
+  if (candidates && candidates.length > 0) {
+    // Deterministic selection priority:
+    // 1. active or trialing (highest priority — confirmed payment)
+    // 2. past_due within grace period (temporary access)
+    // 3. nothing qualifies → free plan
+
+    const activeSub = candidates.find(
+      (s: any) => s.status === "active" || s.status === "trialing",
+    )
+
+    if (activeSub?.plan) {
+      plan = activeSub.plan as Plan
+    } else {
+      // Check past_due subscriptions against grace period.
+      // Grace period is measured from past_due_at — a dedicated column set
+      // EXCLUSIVELY by the webhook when payment failure is confirmed.
+      // This is 100% deterministic: no other code path can modify it.
+      // Fallback to created_at if past_due_at is null (legacy rows before migration).
+      const graceCutoff = new Date(
+        Date.now() - PAST_DUE_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000,
+      )
+
+      const pastDueSub = candidates.find((s: any) => {
+        if (s.status !== "past_due") return false
+
+        // past_due_at: exact moment payment failure was confirmed via webhook.
+        // Grace = N days from that moment.
+        const graceAnchor = s.past_due_at
+          ? new Date(s.past_due_at)
+          : new Date(s.created_at)
+
+        return graceAnchor >= graceCutoff
+      })
+
+      if (pastDueSub?.plan) {
+        console.warn(
+          `[SUBSCRIPTION] Partner ${partnerId} has past_due subscription ${pastDueSub.id} within grace period (${PAST_DUE_GRACE_PERIOD_DAYS} days from past_due_at). Access maintained.`,
+        )
+        plan = pastDueSub.plan as Plan
+      }
+    }
+  }
+
+  // Fallback to free plan if no qualifying subscription found
+  if (!plan) {
     plan = await getFreePlan()
   }
 

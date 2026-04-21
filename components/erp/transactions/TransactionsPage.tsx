@@ -171,6 +171,13 @@ export default function TransactionsPage({
     const [settlingGroup, setSettlingGroup] = useState(false)
     const observerTarget = useRef<HTMLDivElement>(null)
 
+    useEffect(() => {
+        console.log(">>> MOUNTED TransactionsPage client component")
+        return () => console.log("<<< UNMOUNTED TransactionsPage client component")
+    }, [])
+
+    console.log("--- RENDER TransactionsPage client component")
+
     const { items: loadedTransactions, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteList<
         ERPTransaction,
         FinancialTransactionCursor,

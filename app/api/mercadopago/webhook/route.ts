@@ -4,21 +4,29 @@ import { createHmac, timingSafeEqual } from "crypto"
 import { SecureLogger } from "@/lib/secure-logger"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 
-const isDev = true // Forcing logs to debug webhook issues
-const MAX_WEBHOOK_AGE_MS = 5 * 60 * 1000
+// ─── Constants ──────────────────────────────────────────────────────────────
+
+const MAX_WEBHOOK_AGE_MS = 5 * 60 * 1000  // 5 minutes
 const AMOUNT_TOLERANCE = 0.01
 const MAX_RETRIES = 3
 const RETRY_DELAYS = [3000, 5000, 8000]
 
-function validateWebhookSignature(signature: string, requestId: string, resourceId: string): boolean {
+// ─── Signature Verification (MANDATORY) ─────────────────────────────────────
+
+/**
+ * Validates the webhook signature from Mercado Pago.
+ * SECURITY: This is mandatory — never bypass this check.
+ */
+function validateWebhookSignature(
+  signature: string,
+  requestId: string,
+  resourceId: string,
+): boolean {
   try {
     const webhookSecret = process.env.MP_WEBHOOK_SECRET
 
     if (!webhookSecret) {
-      if (isDev) {
-        console.error("[WEBHOOK] ⚠️ MP_WEBHOOK_SECRET não configurado. Ignorando validação em DEV.")
-        return true
-      }
+      SecureLogger.error("[WEBHOOK] MP_WEBHOOK_SECRET not configured — rejecting request")
       return false
     }
 
@@ -36,115 +44,116 @@ function validateWebhookSignature(signature: string, requestId: string, resource
     }
 
     if (!timestamp || !receivedSignature) {
-      if (isDev) console.warn("[WEBHOOK] Assinatura inválida: faltam timestamp ou v1")
+      console.warn("[WEBHOOK] Invalid signature format: missing timestamp or v1")
       return false
     }
 
-    const timestampMs = parseInt(timestamp, 10) * 1000 // Convert to milliseconds
+    // Reject expired webhooks (replay attack protection)
+    const timestampMs = parseInt(timestamp, 10) * 1000
     const now = Date.now()
     if (now - timestampMs > MAX_WEBHOOK_AGE_MS) {
-      if (isDev) console.warn(`[WEBHOOK] Webhook expirado (age: ${now - timestampMs}ms, max: ${MAX_WEBHOOK_AGE_MS}ms)`)
+      console.warn(`[WEBHOOK] Webhook expired (age: ${now - timestampMs}ms, max: ${MAX_WEBHOOK_AGE_MS}ms)`)
       return false
     }
 
-    // Template padrão do Mercado Pago: id:..., request-id:..., ts:...
+    // Mercado Pago signature template: id:...;request-id:...;ts:...
     const requestSignature = `id:${resourceId};request-id:${requestId};ts:${timestamp}`
     const computedHmac = createHmac("sha256", webhookSecret)
       .update(requestSignature)
       .digest("hex")
 
-    if (isDev) console.log("[WEBHOOK] Validação de assinatura:", {
-      esperado: computedHmac.substring(0, 16) + "...",
-      recebido: receivedSignature.substring(0, 16) + "...",
-      match: computedHmac === receivedSignature,
-    })
-
     if (computedHmac.length !== receivedSignature.length) return false
     return timingSafeEqual(Buffer.from(computedHmac), Buffer.from(receivedSignature))
   } catch (error: any) {
-    if (isDev) console.error("[WEBHOOK] Erro ao validar assinatura:", error.message)
+    SecureLogger.error("[WEBHOOK] Signature validation error", { error: error.message })
     return false
   }
 }
 
+// ─── POST Handler ───────────────────────────────────────────────────────────
+
 export async function POST(request: NextRequest) {
-  if (isDev) console.log("[WEBHOOK] ========== WEBHOOK RECEBIDO ==========")
-  if (isDev) console.log("[WEBHOOK] Timestamp:", new Date().toISOString())
-  if (isDev) console.log("[WEBHOOK] Headers:", {
-    signature: request.headers.get("x-signature")?.substring(0, 20) + "...",
-    requestId: request.headers.get("x-request-id"),
-  })
+  console.log("[WEBHOOK] ========== PAYMENT WEBHOOK RECEIVED ==========")
+  console.log("[WEBHOOK] Timestamp:", new Date().toISOString())
 
   try {
+    // ── Step 1: Validate required headers (FAIL CLOSED) ──
     const signature = request.headers.get("x-signature")
     const requestId = request.headers.get("x-request-id")
 
-    if (isDev) console.log("[WEBHOOK] Validando headers...")
     if (!signature || !requestId) {
-      if (isDev) {
-        console.error("[WEBHOOK] ⚠️ Headers inválidos: signature ou request-id faltando. Ignorando em DEV para debugar.")
-      } else {
-        return NextResponse.json({ error: "Invalid request" }, { status: 401 })
-      }
-    }
-
-    const body = await request.json()
-    if (isDev) console.log("[WEBHOOK] Body recebido:", JSON.stringify({
-      type: body.type,
-      action: body.action,
-      paymentId: body.data?.id,
-      externalReference: body.data?.external_reference,
-    }))
-
-    if (!body?.data?.id) {
-      if (isDev) console.error("[WEBHOOK] ❌ Payment ID faltando no body")
+      console.error("[WEBHOOK] Rejected: missing x-signature or x-request-id headers")
       return NextResponse.json({ error: "Invalid request" }, { status: 401 })
     }
 
-    if (isDev) console.log("[WEBHOOK] Validando assinatura...")
-    const signatureToValidate = signature || ""
-    const reqIdToValidate = requestId || ""
-    const isValid = signatureToValidate ? validateWebhookSignature(signatureToValidate, reqIdToValidate, body.data.id.toString()) : isDev
-    if (!isValid) {
-      if (isDev) {
-        console.error("[WEBHOOK] ⚠️ Assinatura inválida. Ignorando em DEV para debugar.")
-      } else {
-        return NextResponse.json({ error: "Invalid request" }, { status: 401 })
-      }
+    // ── Step 2: Parse body ──
+    const body = await request.json()
+
+    console.log("[WEBHOOK] Event:", JSON.stringify({
+      type: body.type,
+      action: body.action,
+      paymentId: body.data?.id,
+    }))
+
+    if (!body?.data?.id) {
+      console.error("[WEBHOOK] Rejected: missing payment ID in body")
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 })
     }
 
-    if (isDev) console.log("[WEBHOOK] ✅ Assinatura válida")
-    if (isDev) console.log("[WEBHOOK] Retornando ACK imediato ao Mercado Pago...")
+    // ── Step 3: Validate signature (MANDATORY — no bypass) ──
+    const isValid = validateWebhookSignature(
+      signature,
+      requestId,
+      body.data.id.toString(),
+    )
+
+    if (!isValid) {
+      SecureLogger.error("[WEBHOOK] Rejected: invalid signature", {
+        requestId,
+        paymentId: body.data.id,
+      })
+      return NextResponse.json({ error: "Invalid request" }, { status: 401 })
+    }
+
+    console.log("[WEBHOOK] Signature validated successfully")
+
+    // ── Step 4: ACK immediately, process async ──
     const response = NextResponse.json({ received: true }, { status: 200 })
 
-    // Processar assincronamente
-    processWebhookWithRetry(body, requestId || "").catch((error) => {
-      if (isDev) console.error("[WEBHOOK] ❌ Erro processando webhook:", error.message)
-      SecureLogger.error("Webhook processing failed:", { error: error.message })
+    processWebhookWithRetry(body, requestId).catch((error) => {
+      SecureLogger.error("[WEBHOOK] Async processing failed", { error: error.message })
     })
 
     return response
   } catch (error: any) {
-    if (isDev) console.error("[WEBHOOK] ❌ Erro no handler POST:", error.message)
+    SecureLogger.error("[WEBHOOK] Handler error", { error: error.message })
+    // Return 200 to prevent MP from retrying on our parsing errors
     return NextResponse.json({ received: true }, { status: 200 })
   }
 }
 
-async function processWebhookWithRetry(body: any, requestId: string, attempt: number = 0) {
+// ─── Async Processing with Retry ────────────────────────────────────────────
+
+async function processWebhookWithRetry(
+  body: any,
+  requestId: string,
+  attempt: number = 0,
+) {
   const { type, data } = body
   const paymentId = data?.id
 
-  if (isDev) console.log(`[WEBHOOK] Processando pagamento ${paymentId} (tentativa ${attempt + 1}/${MAX_RETRIES})`)
+  console.log(`[WEBHOOK] Processing payment ${paymentId} (attempt ${attempt + 1}/${MAX_RETRIES})`)
 
   try {
+    // Only handle payment events
     if (type !== "payment" || !paymentId) {
-      if (isDev) console.log("[WEBHOOK] Tipo de webhook não é pagamento, ignorando")
+      console.log("[WEBHOOK] Not a payment event, skipping")
       return
     }
 
     const supabase = createAdminClient()
 
-    if (isDev) console.log("[WEBHOOK] Verificando se pedido já foi processado...")
+    // ── Idempotency check: has this payment already been processed? ──
     const { data: existingOrderData, error: checkError } = await supabase
       .from("orders")
       .select("id, situation, total_amount, partner_id")
@@ -153,139 +162,121 @@ async function processWebhookWithRetry(body: any, requestId: string, attempt: nu
       .single()
 
     if (checkError && checkError.code !== "PGRST116") {
-      if (isDev) console.log("[WEBHOOK] Erro ao buscar pedido (pode não existir ainda):", checkError.message)
+      console.log("[WEBHOOK] Error looking up order (may not exist yet):", checkError.message)
     }
 
-    // Se já foi processado como pago, ignorar
+    // Idempotency: already processed as paid → skip
     if (existingOrderData?.situation === "paid") {
-      if (isDev) console.log(`[WEBHOOK] ⚠️ Pedido ${existingOrderData.id} já foi marcado como pago, ignorando`)
+      console.log(`[WEBHOOK] Order ${existingOrderData.id} already marked as paid, skipping (idempotent)`)
       return
     }
 
+    // Wait before processing to avoid race conditions with sync-payment-status
     const delay = RETRY_DELAYS[Math.min(attempt, RETRY_DELAYS.length - 1)]
-    if (isDev) console.log(`[WEBHOOK] Aguardando ${delay}ms para evitar race conditions...`)
     await new Promise((resolve) => setTimeout(resolve, delay))
 
-    // Buscar dados do pagamento na API do Mercado Pago
-    if (isDev) console.log("[WEBHOOK] Buscando informações do pagamento no Mercado Pago...")
+    // ── Fetch payment details from Mercado Pago API (TRUST NOTHING FROM WEBHOOK BODY) ──
     let partnerId = existingOrderData?.partner_id || null
     let paymentInfo = null
 
     if (!partnerId) {
-      if (isDev) console.log("[WEBHOOK] Partner ID não encontrado no pedido, procurando entre partners...")
+      console.log("[WEBHOOK] Partner ID not found in order, searching partners...")
       const { data: partners } = await supabase
         .from("partners")
         .select("id")
         .not("mp_access_token_encrypted", "is", null)
 
-      if (isDev) console.log(`[WEBHOOK] Encontrados ${partners?.length || 0} partners com token MP`)
-
       for (const partner of partners || []) {
         try {
-          if (isDev) console.log(`[WEBHOOK] Tentando buscar pagamento com token do partner ${partner.id}...`)
           const partnerToken = await getValidMercadoPagoAccessToken(partner.id)
           const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-            headers: {
-              Authorization: `Bearer ${partnerToken}`,
-            },
+            headers: { Authorization: `Bearer ${partnerToken}` },
           })
 
           if (mpResponse.ok) {
             paymentInfo = await mpResponse.json()
             partnerId = partner.id
-            if (isDev) console.log(`[WEBHOOK] ✅ Dados do pagamento obtidos do partner ${partnerId}`)
-            if (isDev) console.log("[WEBHOOK] Status do pagamento:", paymentInfo.status)
+            console.log(`[WEBHOOK] Payment data fetched via partner ${partnerId}, MP status: ${paymentInfo.status}`)
             break
-          } else {
-            if (isDev) console.log(`[WEBHOOK] ⚠️ Resposta ${mpResponse.status} do partner ${partner.id}`)
           }
         } catch (err: any) {
-          if (isDev) console.log(`[WEBHOOK] ⚠️ Erro tentando partner ${partner.id}:`, err.message)
+          console.warn(`[WEBHOOK] Failed to fetch via partner ${partner.id}:`, err.message)
           continue
         }
       }
     } else {
-      if (isDev) console.log(`[WEBHOOK] Partner ID conhecido: ${partnerId}, buscando dados...`)
-
       try {
         const partnerToken = await getValidMercadoPagoAccessToken(partnerId)
         const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-          headers: {
-            Authorization: `Bearer ${partnerToken}`,
-          },
+          headers: { Authorization: `Bearer ${partnerToken}` },
         })
 
         if (mpResponse.ok) {
           paymentInfo = await mpResponse.json()
-          if (isDev) console.log(`[WEBHOOK] ✅ Dados do pagamento obtidos`)
-          if (isDev) console.log("[WEBHOOK] Status do pagamento:", paymentInfo.status)
+          console.log(`[WEBHOOK] Payment data fetched, MP status: ${paymentInfo.status}`)
         } else {
-          if (isDev) console.error(`[WEBHOOK] ❌ Erro ${mpResponse.status} ao buscar pagamento`)
+          console.error(`[WEBHOOK] MP API returned ${mpResponse.status} for payment ${paymentId}`)
         }
       } catch (err: any) {
-        if (isDev) console.error("[WEBHOOK] ❌ Erro ao buscar dados do pagamento:", err.message)
+        console.error("[WEBHOOK] Error fetching payment from MP:", err.message)
       }
     }
 
     if (!paymentInfo || !partnerId) {
-      if (isDev) console.error("[WEBHOOK] ❌ Não consegui obter dados do pagamento ou partner ID")
+      console.error("[WEBHOOK] Could not fetch payment data or resolve partner")
       if (attempt < MAX_RETRIES - 1) {
-        if (isDev) console.log(`[WEBHOOK] Tentando novamente em 2s...`)
         await new Promise((resolve) => setTimeout(resolve, 2000))
         return processWebhookWithRetry(body, requestId, attempt + 1)
       }
-      if (isDev) console.error("[WEBHOOK] ❌ Falhou após todas as tentativas de retry")
+      SecureLogger.error("[WEBHOOK] Failed after all retries to fetch payment data", {
+        paymentId: paymentId.toString(),
+      })
       return
     }
 
-    // Buscar pedido
-    if (!existingOrderData) {
-      if (isDev) console.log("[WEBHOOK] Buscando pedido no banco...")
+    // ── Find order in DB ──
+    let orderData = existingOrderData
+    if (!orderData) {
       const { data: order, error: orderError } = await supabase
         .from("orders")
-        .select("id, situation, total_amount")
+        .select("id, situation, total_amount, partner_id")
         .eq("mp_payment_id", paymentId.toString())
         .limit(1)
         .single()
 
       if (orderError || !order) {
-        if (isDev) console.error("[WEBHOOK] ❌ Pedido não encontrado no banco:", orderError?.message)
+        console.error("[WEBHOOK] Order not found in database:", orderError?.message)
         if (attempt < MAX_RETRIES - 1) {
-          if (isDev) console.log(`[WEBHOOK] Tentando novamente em 2s...`)
           await new Promise((resolve) => setTimeout(resolve, 2000))
           return processWebhookWithRetry(body, requestId, attempt + 1)
         }
         return
       }
+      orderData = order
     }
 
-    const existingOrder = existingOrderData || existingOrderData
-    const orderId = existingOrder!.id
+    const orderId = orderData.id
+    console.log(`[WEBHOOK] Order found: ${orderId}, current situation: ${orderData.situation}`)
 
-    if (isDev) console.log(`[WEBHOOK] Pedido encontrado: ${orderId}`)
-    if (isDev) console.log("[WEBHOOK] Status atual do pedido:", existingOrder!.situation)
-
-    // Validar valor do pagamento
+    // ── Validate payment amount (fraud detection) ──
     if (paymentInfo.status === "approved" && paymentInfo.transaction_amount != null) {
       const paidAmount = Number(paymentInfo.transaction_amount)
-      const orderAmount = Number(existingOrder!.total_amount)
-
-      if (isDev) console.log("[WEBHOOK] Validando valor:", { paidAmount, orderAmount })
+      const orderAmount = Number(orderData.total_amount)
 
       if (Math.abs(paidAmount - orderAmount) > AMOUNT_TOLERANCE) {
-        if (isDev) console.error("[WEBHOOK] ❌ Valor do pagamento NÃO corresponde ao do pedido - POSSÍVEL FRAUDE")
-        SecureLogger.error("Webhook: Payment amount mismatch", {
+        SecureLogger.error("[WEBHOOK] FRAUD ALERT: Payment amount mismatch", {
           paidAmount,
           orderAmount,
           paymentId: paymentId.toString(),
           orderId,
+          partnerId,
         })
         return
       }
-      if (isDev) console.log("[WEBHOOK] ✅ Valor do pagamento validado")
+      console.log("[WEBHOOK] Payment amount validated:", { paidAmount, orderAmount })
     }
 
-    // Determinar novo status
+    // ── Determine new order status from MP payment status ──
     let orderStatus = "pending"
     if (paymentInfo.status === "approved") {
       orderStatus = "paid"
@@ -295,19 +286,20 @@ async function processWebhookWithRetry(body: any, requestId: string, attempt: nu
       orderStatus = "cancelled"
     }
 
-    if (isDev) console.log(`[WEBHOOK] Novo status: ${paymentInfo.status} -> pedido: ${orderStatus}`)
+    console.log(`[WEBHOOK] Status mapping: MP "${paymentInfo.status}" → order "${orderStatus}"`)
 
-    // Guard: nunca regredir
+    // ── Status regression guard ──
     const finalStatuses = ["paid", "shipped", "delivered"]
-    if (finalStatuses.includes(existingOrder!.situation) && !finalStatuses.includes(orderStatus)) {
+    if (finalStatuses.includes(orderData.situation) && !finalStatuses.includes(orderStatus)) {
       if (orderStatus !== "cancelled") {
-        if (isDev) console.log(`[WEBHOOK] ⚠️ Pedido já em status final ${existingOrder!.situation}, não regressando`)
+        console.log(`[WEBHOOK] Skipping: order already in final status "${orderData.situation}"`)
         return
       }
     }
 
-    const previousSituation = existingOrder!.situation
+    const previousSituation = orderData.situation
 
+    // ── Update order ──
     const updateData: any = {
       situation: orderStatus,
       payment_method: paymentInfo.payment_method?.type || "desconhecido",
@@ -320,8 +312,7 @@ async function processWebhookWithRetry(body: any, requestId: string, attempt: nu
       updateData.mp_date_approved = paymentInfo.date_approved
     }
 
-    if (isDev) console.log(`[WEBHOOK] Atualizando pedido ${orderId} de ${previousSituation} para ${orderStatus}...`)
-    if (isDev) console.log("[WEBHOOK] Dados para atualizar:", updateData)
+    console.log(`[WEBHOOK] Updating order ${orderId}: "${previousSituation}" → "${orderStatus}"`)
 
     const { error: updateError } = await supabase
       .from("orders")
@@ -329,19 +320,21 @@ async function processWebhookWithRetry(body: any, requestId: string, attempt: nu
       .eq("id", orderId)
 
     if (updateError) {
-      if (isDev) console.error("[WEBHOOK] ❌ Erro ao atualizar pedido:", updateError.message)
+      console.error("[WEBHOOK] Error updating order:", updateError.message)
       if (attempt < MAX_RETRIES - 1) {
-        if (isDev) console.log(`[WEBHOOK] Tentando novamente em 2s...`)
         await new Promise((resolve) => setTimeout(resolve, 2000))
         return processWebhookWithRetry(body, requestId, attempt + 1)
       }
-      SecureLogger.error("Error updating order in webhook", { error: updateError.message })
+      SecureLogger.error("[WEBHOOK] Failed to update order after retries", {
+        error: updateError.message,
+        orderId,
+      })
       return
     }
 
-    if (isDev) console.log(`[WEBHOOK] ✅ Pedido ${orderId} atualizado para ${orderStatus}`)
+    console.log(`[WEBHOOK] Order ${orderId} updated to "${orderStatus}"`)
 
-    // Criar transaction de receita quando pedido for pago
+    // ── Create revenue transaction when paid ──
     if (orderStatus === "paid") {
       try {
         const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
@@ -368,20 +361,15 @@ async function processWebhookWithRetry(body: any, requestId: string, attempt: nu
           await supabase.rpc('increment_partner_sales', { partner_uuid: fullOrder.partner_id })
         }
       } catch (txErr: any) {
-        if (isDev) console.error("[WEBHOOK] Erro ao criar transaction ou incrementar vendas:", txErr.message)
+        console.error("[WEBHOOK] Error creating transaction:", txErr.message)
       }
     }
 
-    // NOTA: Decrement de estoque será feito pelo sync-payment-status para evitar duplicação
-    // quando o webhook e sync forem chamados em sequência
+    // NOTE: Stock decrement is handled by sync-payment-status to avoid duplication
 
-    // --- REVALIDAÇÃO DE CACHE ---
-    // Mesmo que o decremento seja via trigger ou sync, precisamos limpar o cache
-    // para que o front mostre o estoque atualizado imediatamente.
+    // ── Cache revalidation ──
     if (orderStatus === "paid") {
       try {
-        if (isDev) console.log("[WEBHOOK] Revalidando cache de produtos...")
-        // Import dinâmico para evitar problemas de ciclo ou init
         const { revalidateProducts, revalidateMarketplace } = await import("@/lib/utils/revalidation")
 
         const { data: orderItems } = await supabase
@@ -392,30 +380,26 @@ async function processWebhookWithRetry(body: any, requestId: string, attempt: nu
         if (orderItems && orderItems.length > 0) {
           const uniqueProductIds = [...new Set(orderItems.map((i: any) => i.product_id))]
           for (const pid of uniqueProductIds) {
-            if (isDev) console.log(`[WEBHOOK] Revalidando produto ${pid}...`)
-            await revalidateProducts(existingOrder!.partner_id, String(pid))
+            await revalidateProducts(orderData.partner_id, String(pid))
           }
         }
         await revalidateMarketplace()
       } catch (cacheError: any) {
-        if (isDev) console.error("[WEBHOOK] ⚠️ Erro ao revalidar cache:", cacheError.message)
+        console.error("[WEBHOOK] Cache revalidation error:", cacheError.message)
       }
     }
 
-    if (isDev) console.log(`[WEBHOOK] ✅✅✅ WEBHOOK PROCESSADO COM SUCESSO ✅✅✅`)
-    if (isDev) console.log(`[WEBHOOK] Pedido ${orderId} atualizado para ${orderStatus}`)
-    if (isDev) console.log("[WEBHOOK] ========== FIM DO WEBHOOK ==========\n")
+    console.log(`[WEBHOOK] ✅ PAYMENT WEBHOOK PROCESSED SUCCESSFULLY — Order ${orderId} → "${orderStatus}"`)
+    console.log("[WEBHOOK] ==========================================================\n")
   } catch (error: any) {
-    if (isDev) console.error(`[WEBHOOK] ❌ Erro geral no processamento:`, error.message)
-    if (isDev) console.error("[WEBHOOK] Stack:", error.stack)
+    console.error("[WEBHOOK] Processing error:", error.message)
 
     if (attempt < MAX_RETRIES - 1) {
-      if (isDev) console.log(`[WEBHOOK] Tentando novamente em 3s (tentativa ${attempt + 2}/${MAX_RETRIES})...`)
+      console.log(`[WEBHOOK] Retrying in 3s (attempt ${attempt + 2}/${MAX_RETRIES})...`)
       await new Promise((resolve) => setTimeout(resolve, 3000))
       return processWebhookWithRetry(body, requestId, attempt + 1)
     }
 
-    if (isDev) console.error("[WEBHOOK] ❌ Falhou após todas as tentativas")
-    SecureLogger.error("Webhook processing failed after all retries", { error: error.message })
+    SecureLogger.error("[WEBHOOK] Failed after all retries", { error: error.message })
   }
 }

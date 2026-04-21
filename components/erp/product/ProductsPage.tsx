@@ -212,6 +212,13 @@ export default function ProductsPage({
     // State
     const [data, setData] = useState<{ products: Product[], search: string, debouncedSearch: string, page: number }>({ products: effectiveBaseProducts, search: "", debouncedSearch: "", page: 1 })
 
+    useEffect(() => {
+        console.log(">>> MOUNTED ProductsPage client component")
+        return () => console.log("<<< UNMOUNTED ProductsPage client component")
+    }, [])
+    
+    console.log("--- RENDER ProductsPage client component")
+
     // Update state when server/query data changes (e.g. after background refresh)
     const prevProductsRef = useRef(effectiveBaseProducts)
     useEffect(() => {

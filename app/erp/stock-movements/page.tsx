@@ -3,7 +3,6 @@ import StockMovementPageContent from "@/components/erp/stock-movements/StockMove
 import { FadeIn } from "@/components/animations/FadeIn"
 import { redirect } from "next/navigation"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { AccessDenied } from "@/components/erp/access-denied"
 import { getERPStockMovementsPageAction } from "@/app/actions/erp/stock-movements"
 
 export default async function StockMovementsPage() {

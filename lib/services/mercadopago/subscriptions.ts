@@ -254,7 +254,9 @@ export async function createMpSubscription(
       return { success: false, error: insertError.message }
     }
 
-    invalidatePartnerPlanCache(partnerId)
+    // NOTE: Do NOT invalidate plan cache here. The subscription is "pending"
+    // and must NOT affect plan resolution until activated via webhook.
+    // invalidatePartnerPlanCache(partnerId) — REMOVED for security
 
     await logBillingEvent(admin, partnerId, "subscription_created", plan.price, {
       plan_slug: plan.slug,
