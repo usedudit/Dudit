@@ -21,7 +21,9 @@ export default async function CustomersRoute() {
   ])
 
   if (!allowed) return <AccessDenied />
-  if (!page.success) return <AccessDenied />
+  if (!page.success) {
+    throw new Error(page.error || "Erro ao carregar clientes.")
+  }
 
   return (
     <>

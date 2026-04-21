@@ -19,7 +19,9 @@ export default async function LogisticsPage() {
   ])
 
   if (!allowed) return <AccessDenied />
-  if (!page.success) return <AccessDenied />
+  if (!page.success) {
+    throw new Error(page.error || "Erro ao carregar entregas.")
+  }
 
   const planGate = page.planGate
 

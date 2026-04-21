@@ -32,7 +32,9 @@ export default async function FinancialTransactionsRoute() {
     getPaymentMethodsData(partnerId),
   ])
 
-  if (!txResult.success) return <AccessDenied />
+  if (!txResult.success) {
+    throw new Error(txResult.error || "Erro ao carregar transações.")
+  }
 
   const categories = categoriesResult.success && categoriesResult.data ? categoriesResult.data.categories : []
   const accounts = accountsResult.success && accountsResult.data ? accountsResult.data.accounts : []

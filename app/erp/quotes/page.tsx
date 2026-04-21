@@ -22,7 +22,9 @@ export default async function QuotesPageServer() {
     ])
 
     if (!allowed) return <AccessDenied />
-    if (!page.success) return <AccessDenied />
+    if (!page.success) {
+        throw new Error(page.error || "Erro ao carregar orçamentos.")
+    }
 
     return (
         <>

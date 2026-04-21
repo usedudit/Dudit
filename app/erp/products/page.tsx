@@ -13,7 +13,9 @@ export default async function ProductsPageServer() {
     const partnerId = context.partnerId
 
     const page = await getERPProductsPageAction(partnerId, { cursor: null, limit: 100 })
-    if (!page.success) return <AccessDenied />
+    if (!page.success) {
+        throw new Error(page.error || "Erro ao carregar produtos.")
+    }
 
     return (
         <>

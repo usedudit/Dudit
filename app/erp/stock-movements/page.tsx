@@ -13,7 +13,9 @@ export default async function StockMovementsPage() {
 
   const partnerId = context.partnerId
   const page = await getERPStockMovementsPageAction(partnerId, { cursor: null, limit: 100 })
-  if (!page.success) return <AccessDenied />
+  if (!page.success) {
+    throw new Error(page.error || "Erro ao carregar movimentações de estoque.")
+  }
 
   return (
     <>
