@@ -323,7 +323,7 @@ export function ERPSidebar() {
             <div
                 ref={sidebarRef}
                 className={cn(
-                    "flex flex-col fixed z-40 left-0 top-0 h-screen border-r hidden md:flex",
+                    "flex flex-col fixed z-[120] left-0 top-0 h-screen border-r hidden md:flex",
                     "bg-dark-background border-dark-border",
                     "transition-[width] duration-300 ease-in-out",
                     "md:static md:translate-x-0",

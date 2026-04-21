@@ -1791,7 +1791,6 @@ export async function getERPOrdersPageAction(
                 delivery_status,
                 order_source,
                 created_at,
-                quantity,
                 stores(name),
                 order_items(quantity)
             `
@@ -1833,6 +1832,9 @@ export async function getERPOrdersPageAction(
         const items = (hasMore ? rows.slice(0, limit) : rows).map((row: any) => ({
             ...row,
             is_pos_sale: Boolean(row?.is_pos_sale),
+            quantity: Number(row?.quantity || 0) || (Array.isArray(row?.order_items)
+                ? row.order_items.reduce((sum: number, item: any) => sum + Number(item?.quantity || 0), 0)
+                : 0),
             // Backward-compatible field used by UI, with fallback when column doesn't exist in DB.
             order_date: row?.order_date || row?.created_at || null,
         }))
