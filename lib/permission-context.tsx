@@ -44,6 +44,9 @@ interface PermissionProviderProps {
 }
 
 export function PermissionProvider({ children, role, routePermissions, partnerId, businessInfo, planSlug = "free" }: PermissionProviderProps) {
+    const routePermissionsKey = JSON.stringify(routePermissions)
+    const businessInfoKey = JSON.stringify(businessInfo)
+
     const value = useMemo<PermissionContextValue>(() => ({
         role,
         routePermissions,
@@ -57,7 +60,7 @@ export function PermissionProvider({ children, role, routePermissions, partnerId
         hasSpecific: (routeKey: RouteKey, permKey: string) => hasSpecificPermission(routePermissions, routeKey, permKey),
         canAccessPath: (pathname: string) => canAccessPath(routePermissions, pathname),
         getDeniedMessage: (routeKey: RouteKey, action: string) => permissionDeniedMessage(routeKey, action),
-    }), [role, routePermissions, partnerId, businessInfo, planSlug])
+    }), [role, routePermissionsKey, partnerId, businessInfoKey, planSlug])
 
     return (
         <PermissionContext.Provider value={value}>

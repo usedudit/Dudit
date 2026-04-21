@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useCallback, useEffect } from "react"
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from "react"
 
 const SIDEBAR_STATE_KEY = "dudit_sidebar_state"
 
@@ -42,17 +42,17 @@ export function SidebarProvider({
     })
   }, [])
 
+  const contextValue = useMemo(() => ({
+    isExpanded,
+    isMobileOpen,
+    toggleSidebar,
+    setIsMobileOpen,
+    headerOverride,
+    setHeaderOverride,
+  }), [isExpanded, isMobileOpen, toggleSidebar, headerOverride])
+
   return (
-    <SidebarContext.Provider
-      value={{
-        isExpanded,
-        isMobileOpen,
-        toggleSidebar,
-        setIsMobileOpen,
-        headerOverride,
-        setHeaderOverride,
-      }}
-    >
+    <SidebarContext.Provider value={contextValue}>
       {children}
     </SidebarContext.Provider>
   )

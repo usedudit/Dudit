@@ -231,14 +231,7 @@ export default function ProductsPage({
 
     useEffect(() => {
         const handleReset = () => {
-            setUi(p => ({ ...p, pageState: "list", formMode: null }))
-        }
-        window.addEventListener('erp-sidebar-reset', handleReset)
-        return () => window.removeEventListener('erp-sidebar-reset', handleReset)
-    }, [])
-
-    useEffect(() => {
-        const handleReset = () => {
+            console.log("--- Resetting ProductsPage via erp-sidebar-reset event")
             setUi(p => ({ ...p, pageState: "list", formMode: null }))
         }
         window.addEventListener('erp-sidebar-reset', handleReset)

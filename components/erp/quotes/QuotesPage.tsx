@@ -135,15 +135,7 @@ export default function QuotesPage({
 
     useEffect(() => {
         const handleReset = () => {
-            setWrapperMode(null)
-            setActiveQuote(null)
-        }
-        window.addEventListener('erp-sidebar-reset', handleReset)
-        return () => window.removeEventListener('erp-sidebar-reset', handleReset)
-    }, [])
-
-    useEffect(() => {
-        const handleReset = () => {
+            console.log("--- Resetting QuotesPage via erp-sidebar-reset event")
             setWrapperMode(null)
             setActiveQuote(null)
         }

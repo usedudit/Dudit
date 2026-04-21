@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
+import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 
 interface Store {
@@ -108,8 +108,16 @@ export function StoreProvider({ children, partnerId: propPartnerId }: { children
     await fetchStores()
   }
 
+  const contextValue = useMemo(() => ({
+    selectedStore,
+    stores,
+    isLoading,
+    selectStore,
+    refreshStores
+  }), [selectedStore, stores, isLoading, selectStore])
+
   return (
-    <StoreContext.Provider value={{ selectedStore, stores, isLoading, selectStore, refreshStores }}>
+    <StoreContext.Provider value={contextValue}>
       {children}
     </StoreContext.Provider>
   )

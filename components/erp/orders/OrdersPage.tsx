@@ -189,15 +189,6 @@ export default function OrdersPage({
     }, [])
 
     useEffect(() => {
-        const handleReset = () => {
-            setWrapperMode(null)
-            setSelectedOrderId(null)
-        }
-        window.addEventListener('erp-sidebar-reset', handleReset)
-        return () => window.removeEventListener('erp-sidebar-reset', handleReset)
-    }, [])
-
-    useEffect(() => {
         const t = setTimeout(() => setDebouncedSearch(search), 500)
         return () => clearTimeout(t)
     }, [search])
