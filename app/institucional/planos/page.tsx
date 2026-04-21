@@ -44,25 +44,22 @@ const PricingHero = () => {
 const PricingCards = () => {
    const plans = [
       {
-         name: "Grátis",
+         name: "Começar",
          price: "0",
-         objective: "ativação + marketplace + hábito",
+         objective: "Pra testar e começar a aparecer",
          features: [
             "Vitrine digital pública",
             "Produtos e serviços",
-            "Estoque básico",
             "Agendamentos",
             "Orçamentos",
-            "Pedidos simples",
-            "PDV básico",
+            "Pedidos via whatsapp",
+            "PDV",
             "Clientes",
-            "QR Code",
-            "WhatsApp integrado"
          ],
          limits: [
             "Até 15 itens",
             "Até 2 imagens por item",
-            "Até 20 pedidos e agendamentos/mês",
+            "Até 25 pedidos e agendamentos/mês",
             "Até 5 orçamentos/mês",
             "1 usuário"
          ],
@@ -70,9 +67,9 @@ const PricingCards = () => {
          popular: false
       },
       {
-         name: "Vendedor",
+         name: "Vender",
          price: "19,90",
-         objective: "primeiro dinheiro da Dudit",
+         objective: "Pra vender de verdade",
          popular: true,
          features: [
             "Tudo do Grátis +",
@@ -96,17 +93,15 @@ const PricingCards = () => {
          variant: "default" as const
       },
       {
-         name: "Comerciante",
+         name: "Escalar",
          price: "49,90",
-         objective: "operação estruturada",
+         objective: "Pra organizar e escalar",
          features: [
             "Tudo do Vendedor +",
-            "Frete nacional (Superfrete)",
-            "Expedição e entregas completas",
-            "Financeiro completo (fluxo + DRE Simples)",
+            "Gestão de entregas",
+            "Financeiro completo",
             "Relatórios avançados",
             "Ordem de serviço",
-            "Devoluções e trocas",
             "Kits de produtos",
             "Campanhas promocionais"
          ],
@@ -150,7 +145,7 @@ const PricingCards = () => {
                         <h3 className={`text-xl font-bold mb-1 ${plan.popular ? 'text-white' : 'text-brand-dark'}`}>
                            {plan.name}
                         </h3>
-                        <p className={`text-[10px] font-bold uppercase tracking-widest mb-6 ${plan.popular ? 'text-brand-green' : 'text-brand-green'}`}>
+                        <p className={`text-[10px] font-bold mb-6 ${plan.popular ? 'text-brand-green' : 'text-brand-green'}`}>
                            {plan.objective}
                         </p>
                         <div className="flex items-baseline gap-1">
@@ -213,14 +208,18 @@ const PricingCards = () => {
 const ComparisonTable = () => {
    const categories = [
       {
-         title: "Vendas & Pedidos",
+         title: "Vendas & Atendimento",
          items: [
             { name: "Pedidos pelo sistema", g: "check", v: "check", c: "check" },
-            { name: "Pagamento online (Mercado Pago)", g: "x", v: "check", c: "check" },
             { name: "PDV (frente de caixa)", g: "Básico", v: "Completo", c: "Completo" },
-            { name: "Checkout no marketplace", g: "x", v: "check", c: "check" },
-            { name: "Cupons de desconto", g: "x", v: "check", c: "check" },
-            { name: "Pedidos/mês", g: "20", v: "150", c: "Ilimitado" },
+            { name: "Checkout na vitrine", g: "x", v: "check", c: "check" },
+            { name: "Pedidos/mês", g: "25", v: "150", c: "Ilimitado" },
+         ]
+      },
+      {
+         title: "Pagamentos",
+         items: [
+            { name: "Pagamento online (Mercado Pago)", g: "x", v: "check", c: "check" },
          ]
       },
       {
@@ -231,25 +230,39 @@ const ComparisonTable = () => {
             { name: "Variantes de produtos", g: "x", v: "check", c: "check" },
             { name: "Importação XML", g: "x", v: "check", c: "check" },
             { name: "Kits de produtos", g: "x", v: "x", c: "check" },
-            { name: "Itens (produtos + serviços)", g: "15", v: "100", c: "500" },
-            { name: "Imagens por item", g: "3", v: "6", c: "9" },
+            { name: "Itens (produtos + serviços)", g: "15", v: "100", c: "Ilimitado" },
+            { name: "Imagens por item", g: "2", v: "5", c: "8" },
          ]
       },
       {
-         title: "Serviços & Agendamentos",
+         title: "Serviços & Operações",
          items: [
             { name: "Cadastro de serviços", g: "check", v: "check", c: "check" },
             { name: "Agendamentos online", g: "check", v: "check", c: "check" },
             { name: "Ordem de serviço", g: "x", v: "x", c: "check" },
-            { name: "Agendamentos/mês", g: "20", v: "150", c: "Ilimitado" },
+            { name: "Agendamentos/mês", g: "25", v: "150", c: "Ilimitado" },
          ]
       },
       {
          title: "Entrega & Logística",
          items: [
             { name: "Frete local", g: "Manual", v: "Configurável", c: "Completo" },
-            { name: "Frete nacional", g: "x", v: "x", c: "check" },
             { name: "Expedição e entregas", g: "x", v: "x", c: "check" },
+         ]
+      },
+      {
+         title: "Clientes & Comunicação",
+         items: [
+            { name: "Clientes", g: "check", v: "check", c: "check" },
+            { name: "WhatsApp integrado", g: "check", v: "check", c: "check" },
+            { name: "Vitrine pública", g: "check", v: "check", c: "check" },
+         ]
+      },
+      {
+         title: "Marketing & Promoções",
+         items: [
+            { name: "Cupons de desconto", g: "x", v: "check", c: "check" },
+            { name: "Campanhas promocionais", g: "x", v: "x", c: "check" },
          ]
       },
       {
@@ -263,33 +276,17 @@ const ComparisonTable = () => {
          ]
       },
       {
-         title: "Relatórios",
+         title: "Relatórios & Análises",
          items: [
             { name: "Relatórios básicos", g: "x", v: "check", c: "check" },
             { name: "Relatórios avançados", g: "x", v: "x", c: "check" },
          ]
       },
       {
-         title: "Equipe",
+         title: "Equipe & Acessos",
          items: [
             { name: "Usuários", g: "1", v: "3", c: "5" },
             { name: "Permissões de acesso", g: "x", v: "check", c: "check" },
-         ]
-      },
-      {
-         title: "Marketplace & Vitrine",
-         items: [
-            { name: "Vitrine pública", g: "check", v: "check", c: "check" },
-            { name: "QR Code da loja", g: "check", v: "check", c: "check" },
-            { name: "WhatsApp integrado", g: "check", v: "check", c: "check" },
-            { name: "Clientes", g: "check", v: "check", c: "check" },
-         ]
-      },
-      {
-         title: "Marketing",
-         items: [
-            { name: "Cupons", g: "x", v: "check", c: "check" },
-            { name: "Campanhas promocionais", g: "x", v: "x", c: "check" },
          ]
       },
       {
@@ -297,12 +294,6 @@ const ComparisonTable = () => {
          items: [
             { name: "Criação de orçamentos", g: "check", v: "check", c: "check" },
             { name: "Orçamentos/mês", g: "5", v: "30", c: "Ilimitado" },
-         ]
-      },
-      {
-         title: "Operação",
-         items: [
-            { name: "Devoluções e trocas", g: "x", v: "x", c: "check" },
          ]
       }
    ];

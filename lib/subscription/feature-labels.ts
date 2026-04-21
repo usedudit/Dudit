@@ -9,10 +9,10 @@ export const FEATURE_LABELS: Record<string, string> = {
   appointments: "Agendamentos",
   quotes: "Orçamentos",
   technical_specs: "Ficha técnica com campos livres",
-  pdv_basic: "PDV básico",
+  pdv_basic: "PDV (Ponto de Venda)",
   whatsapp_orders: "Pedidos via WhatsApp",
   whatsapp_bookings: "Agendamentos via WhatsApp",
-  qr_code_profile: "QR Code do perfil",
+  qr_code_profile: "QR Code da Vitrine",
   mercado_pago_checkout: "Pagamento online (Mercado Pago)",
   system_orders: "Pedidos pelo sistema",
   system_bookings: "Agendamentos pelo sistema",
@@ -26,7 +26,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   basic_financial: "Financeiro básico",
   basic_reports: "Relatórios básicos",
   national_shipping: "Frete nacional (Superfrete)",
-  full_shipping_management: "Expedição completa",
+  full_shipping_management: "Gestão de entregas",
   advanced_financial: "Financeiro avançado",
   cash_flow: "Fluxo de caixa",
   dre_report: "DRE simplificado",
@@ -44,7 +44,7 @@ export const FEATURE_LABELS: Record<string, string> = {
 
 export const TIER_SLUGS_ORDERED = ["free", "vendedor", "crescer", "profissional"] as const
 
-export function buildFeaturesDisplay(features: string[], tierSlug: string, allPlans: { slug: string; features_json?: string[] }[]): string[] {
+export function buildFeaturesDisplay(features: string[], tierSlug: string, allPlans: { slug: string; name: string; features_json?: string[] }[]): string[] {
   const tierIndex = TIER_SLUGS_ORDERED.indexOf(tierSlug as (typeof TIER_SLUGS_ORDERED)[number])
 
   if (tierIndex <= 0) {
