@@ -168,9 +168,7 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
 
   return (data || [])
     .filter((order: any) => !activeOrderIds.has(order.id))
-    .map((order: any) => {
-    const customer = null
-    return {
+    .map((order: any) => ({
       id: order.id,
       displayId: order.order_number || `#${String(order.id).slice(0, 8).toUpperCase()}`,
       orderNumber: order.order_number || null,
@@ -180,15 +178,14 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
       shippingFee: Number(order.shipping_cost || 0),
       orderDate: order.created_at || null,
       customer: {
-        id: customer?.id || order.buyer_id || null,
-        name: customer?.name || order.customer_name || "Cliente balcão",
-        email: customer?.email || null,
-        phone: customer?.phone || null,
+        id: order.buyer_id || null,
+        name: order.customer_name || "Cliente balcão",
+        email: null,
+        phone: null,
       },
       address: formatAddress(order) || "",
       items: order.order_items || [],
-    }
-    })
+    }))
 }
 
 export async function fetchDeliveryPeopleBucketAction(partnerId: string) {
