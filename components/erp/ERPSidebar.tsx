@@ -181,7 +181,17 @@ function ErpPlanGatedNavItem({
     }
 
     return (
-        <Link href={href} prefetch={false} onClick={() => onNavigate?.()} className={itemClass}>
+        <Link 
+            href={href} 
+            prefetch={false} 
+            onClick={(e) => {
+                if (typeof window !== "undefined" && window.location.pathname === href) {
+                    e.preventDefault()
+                    window.dispatchEvent(new CustomEvent('erp-sidebar-reset'))
+                }
+                onNavigate?.()
+            }} 
+            className={itemClass}>
             {labelRow}
         </Link>
     )
@@ -418,7 +428,11 @@ export function ERPSidebar() {
                                             <Link
                                                 href={item.href}
                                                 prefetch={false}
-                                                onClick={() => {
+                                                onClick={(e) => {
+                                                    if (typeof window !== "undefined" && window.location.pathname === item.href) {
+                                                        e.preventDefault();
+                                                        window.dispatchEvent(new CustomEvent('erp-sidebar-reset'));
+                                                    }
                                                     setIsMobileOpen(false)
                                                     setHoveredItem(null)
                                                     if (hasSubmenu && !isCollapsed) {

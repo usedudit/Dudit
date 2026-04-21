@@ -222,6 +222,14 @@ export default function ProductsPage({
         }
     }, [effectiveBaseProducts])
 
+    useEffect(() => {
+        const handleReset = () => {
+            setUi(p => ({ ...p, pageState: "list", formMode: null }))
+        }
+        window.addEventListener('erp-sidebar-reset', handleReset)
+        return () => window.removeEventListener('erp-sidebar-reset', handleReset)
+    }, [])
+
     useInfiniteScrollObserver(observerTarget, {
         enabled: true,
         hasNextPage: !!hasNextPage,

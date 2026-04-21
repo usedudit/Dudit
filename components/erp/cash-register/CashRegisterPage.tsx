@@ -163,6 +163,15 @@ export default function CashRegisterPage({
         setPage(1)
     }, [search, filters])
 
+    useEffect(() => {
+        const handleReset = () => {
+            setSelectedSessionId(null)
+            setDetailedSession(null)
+        }
+        window.addEventListener('erp-sidebar-reset', handleReset)
+        return () => window.removeEventListener('erp-sidebar-reset', handleReset)
+    }, [])
+
     const operatorOptions = useMemo(() => {
         const names = new Set<string>()
         for (const session of history || []) {
