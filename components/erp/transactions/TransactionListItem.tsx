@@ -3,7 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { ActionsDropdown, Badge, Checkbox } from "@/components/reusable"
-import { CreditCardIcon, FileIcon, MoneyIcon } from "@/lib/icons"
+import { CreditCardIcon, FileIcon, InstallmentIcon, MoneyIcon, RepeatIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { DueDateCountdown } from "@/lib/utils/transaction-due-countdown"
 import type { ERPTransaction } from "../../../lib/services/transactions.types"
@@ -46,17 +46,17 @@ const TransactionListItem = React.memo(
                                     {transaction.description}
                                 </span>
                                 {transaction.installmentGroupId && (
-                                    <Badge variant="orange" className="whitespace-nowrap scale-90 shrink-0">
+                                    <Badge variant="orange" icon={<InstallmentIcon size={12} />} className="whitespace-nowrap scale-90 shrink-0">
                                         Parcelado
                                     </Badge>
                                 )}
                                 {!transaction.isInstallmentGroup && transaction.installmentNumber && transaction.installmentTotalCount && (
-                                    <Badge variant="gray" className="whitespace-nowrap scale-90 shrink-0">
+                                    <Badge variant="gray" icon={null} className="whitespace-nowrap scale-90 shrink-0">
                                         {transaction.installmentNumber}/{transaction.installmentTotalCount}
                                     </Badge>
                                 )}
                                 {(transaction.recurringId || transaction.isRecurringOccurrence) && (
-                                    <Badge variant="purple" className="whitespace-nowrap scale-90 shrink-0">
+                                    <Badge variant="purple" icon={<RepeatIcon size={12} />} className="whitespace-nowrap scale-90 shrink-0">
                                         Recorrente
                                     </Badge>
                                 )}

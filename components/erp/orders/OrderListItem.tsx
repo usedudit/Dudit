@@ -77,10 +77,10 @@ const OrderListItem = React.memo(
                                 </Badge>
                             ) : (
                                 <>
-                                    <Badge variant={order.statusColor}>
+                                    <Badge variant={order.statusColor} icon={order.statusIcon}>
                                         {order.statusLabel}
                                     </Badge>
-                                    <Badge variant={order.deliveryStatusColor || "gray"}>
+                                    <Badge variant={order.deliveryStatusColor || "gray"} icon={order.deliveryStatusIcon}>
                                         {order.deliveryStatusLabel || "Não informado"}
                                     </Badge>
                                 </>

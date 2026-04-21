@@ -65,12 +65,14 @@ const OrderGridCard = React.memo(
                                         <>
                                             <Badge
                                                 variant={order.statusColor}
+                                                icon={order.statusIcon}
                                                 className="whitespace-nowrap scale-90"
                                             >
                                                 {order.statusLabel}
                                             </Badge>
                                             <Badge
                                                 variant={order.deliveryStatusColor || "gray"}
+                                                icon={order.deliveryStatusIcon}
                                                 className="whitespace-nowrap scale-90"
                                             >
                                                 {order.deliveryStatusLabel || "Não informado"}

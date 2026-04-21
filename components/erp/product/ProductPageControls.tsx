@@ -9,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs" // Impo
 import {
     SearchIcon,
     FilterIcon,
-    DashboardIcon,
+    GridIcon,
     ListIcon,
     PlusIcon,
     ExportFileIcon,
@@ -19,6 +19,10 @@ import {
     NormalProductsIcon,
     LowProductsIcon,
     OutProductsIcon,
+    MoneyIcon,
+    InfoIcon,
+    TagIcon,
+    BoxIcon,
 } from "@/lib/icons"
 
 // Tipos necessários
@@ -83,7 +87,7 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
     }, [checkFilterScroll, filters])
 
     // Helpers de Renderização
-    const renderGroupedBadge = (label: string, items: string[], key: keyof FilterState) => {
+    const renderGroupedBadge = (label: string, items: string[], key: keyof FilterState, icon?: any) => {
         if (items.length === 0) return null
         const displayValue = items.length <= 3 ? items.join(", ") : `${items.slice(0, 3).join(", ")}...`
         const fullValue = items.join(", ")
@@ -92,6 +96,7 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
             <FilterChip
                 key={key}
                 label={label}
+                icon={icon}
                 value={displayValue}
                 tooltip={`${label}: ${fullValue}`}
                 // @ts-ignore
@@ -107,6 +112,7 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
             <FilterChip
                 key="price"
                 label="Preço"
+                icon={<MoneyIcon size={12} />}
                 value={`${min ? `R$${min}` : "R$0"} - ${max ? `R$${max}` : "∞"}`}
                 onRemove={() => setFilters((p) => ({ ...p, priceRange: { min: "", max: "" } }))}
             />
@@ -116,10 +122,11 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
     // Componente interno para a lista de badges
     const BadgeList = () => (
         <AnimatePresence>
-            {renderGroupedBadge("Status", filters.status, "status")}
-            {renderGroupedBadge("Estoque", filters.stocks, "stocks")}
-            {renderGroupedBadge("Cat", filters.categories, "categories")}
-            {renderGroupedBadge("Marca", filters.brands, "brands")}
+            {renderGroupedBadge("Status", filters.status, "status", <InfoIcon size={12} />)}
+            {renderGroupedBadge("Estoque", filters.stocks, "stocks", <AllProductsIcon size={12} />)}
+            {renderGroupedBadge("Categoria", filters.categories, "categories", <GridIcon size={12} />)}
+            {renderGroupedBadge("Marca", filters.brands, "brands", <TagIcon size={12} />)}
+            {renderGroupedBadge("Unidade", filters.units, "units", <BoxIcon size={12} />)}
             {renderPriceBadge()}
         </AnimatePresence>
     )
@@ -271,7 +278,7 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
                             onClick={() => onViewModeChange("grid")}
                             className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
                         >
-                            <DashboardIcon className="w-[18px] h-[18px]" />
+                            <GridIcon className="w-[18px] h-[18px]" />
                         </button>
                     </div>
                 </div>

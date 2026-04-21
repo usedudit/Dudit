@@ -7,13 +7,15 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import {
     SearchIcon,
     FilterIcon,
-    DashboardIcon,
+    GridIcon,
     ListIcon,
     PlusIcon,
     CheckCircleIcon,
     ClockIcon,
     CancelCircleIcon,
-    ExportFileIcon
+    ExportFileIcon,
+    CalendarIcon,
+    InfoIcon
 } from "@/lib/icons"
 import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import {
@@ -80,7 +82,7 @@ const QuotePageControls: React.FC<QuotePageControlsProps> = ({
                 <FilterChip
                     label="Status"
                     value={filters.status.join(", ")}
-                    // @ts-ignore
+                    icon={<InfoIcon size={12} />}
                     onRemove={() => setFilters((prev) => ({ ...prev, status: [] }))}
                 />
             )}
@@ -88,7 +90,7 @@ const QuotePageControls: React.FC<QuotePageControlsProps> = ({
                 <FilterChip
                     label="Emissão"
                     value={summarizeDatePeriodFilter(filters.issuePeriod) || ""}
-                    // @ts-ignore
+                    icon={<CalendarIcon size={12} />}
                     onRemove={() =>
                         setFilters((prev) => ({ ...prev, issuePeriod: { ...EMPTY_DATE_PERIOD } }))
                     }
@@ -240,7 +242,7 @@ const QuotePageControls: React.FC<QuotePageControlsProps> = ({
                             onClick={() => onViewModeChange("grid")}
                             className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
                         >
-                            <DashboardIcon className="w-[18px] h-[18px]" />
+                            <GridIcon className="w-[18px] h-[18px]" />
                         </button>
                     </div>
                 </div>

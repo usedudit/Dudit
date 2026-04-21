@@ -27,7 +27,14 @@ import {
     ArrowUpDownIcon,
     EditIcon,
     TrashIcon,
-    BlockedIcon
+    BlockedIcon,
+    DeliverySentIcon,
+    CancelCircleIcon,
+    ClockIcon,
+    CheckCircleIcon,
+    DeliveryPickupIcon,
+    DeliveryFailedIcon,
+    PartiallyPaidIcon
 } from "@/lib/icons"
 import { useRouter } from "next/navigation"
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
@@ -73,6 +80,8 @@ interface Order {
     canEdit: boolean;
     canReopen: boolean;
     paidAmount: number;
+    statusIcon?: React.ReactNode;
+    deliveryStatusIcon?: React.ReactNode;
 }
 
 interface FilterState {
@@ -225,20 +234,31 @@ export default function OrdersPage({
 
         const result = effectiveOrders
             .map((o: any): Order => {
-                const statusMap: Record<string, { label: string; color: string }> = {
-                    paid: { label: "Pago", color: "green" },
-                    shipped: { label: "Enviado", color: "blue" },
-                    delivered: { label: "Entregue", color: "green" },
-                    cancelled: { label: "Cancelado", color: "red" },
-                    in_process: { label: "Em análise", color: "yellow" },
-                    pending: { label: "Pendente", color: "gray" },
+                const statusMap: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+                    paid: { label: "Pago", icon: <CheckCircleIcon size={12} />, color: "green" },
+                    shipped: { label: "Enviado", icon: <DeliverySentIcon size={12} />, color: "blue" },
+                    delivered: { label: "Entregue", icon: <CheckCircleIcon size={12} />, color: "green" },
+                    cancelled: { label: "Cancelado", icon: <CancelCircleIcon size={12} />, color: "red" },
+                    in_process: { label: "Em análise", icon: <ClockIcon size={12} />, color: "yellow" },
+                    pending: { label: "Pendente", icon: <ClockIcon size={12} />, color: "gray" },
                 }
-                const statusInfo = statusMap[o.situation] || { label: o.situation, color: "gray" }
-                const deliveryInfo = getDeliveryStatusMeta(o.delivery_status)
+                const statusInfo = statusMap[o.situation] || { label: o.situation, icon: <ClockIcon size={12} />, color: "gray" }
+                const deliveryInfo = getDeliveryStatusMeta(o.delivery_status) as any
+
+                const deliveryIconMap: Record<string, React.ReactNode> = {
+                    not_sent: <BlockedIcon size={12} />,
+                    preparing: <ClockIcon size={12} />,
+                    sent: <DeliverySentIcon size={12} />,
+                    delivered: <CheckCircleIcon size={12} />,
+                    pickup_available: <DeliveryPickupIcon size={12} />,
+                    delivery_failed: <DeliveryFailedIcon size={12} />,
+                    cancelled: <CancelCircleIcon size={12} />,
+                }
 
                 if (o.situation === "partially_paid") {
                     statusInfo.label = "Parcialmente Pago"
                     statusInfo.color = "orange"
+                    statusInfo.icon = <PartiallyPaidIcon size={12} />
                 }
 
                 return {
@@ -249,8 +269,10 @@ export default function OrdersPage({
                     total_amount: Number(o.total_amount),
                     statusLabel: statusInfo.label,
                     statusColor: statusInfo.color,
+                    statusIcon: statusInfo.icon,
                     deliveryStatusLabel: deliveryInfo.label,
                     deliveryStatusColor: deliveryInfo.variant,
+                    deliveryStatusIcon: deliveryIconMap[o.delivery_status || "not_sent"] || <BlockedIcon size={12} />,
                     isUnfulfilled: false,
                     formattedDate: formatDate(o.order_date || o.created_at),
                     formattedTime: formatTime(o.order_date || o.created_at),
@@ -348,13 +370,14 @@ export default function OrdersPage({
     }
     const openDeliveryStatusModal = (order: Order) => {
         setDeliveryStatusModal({ open: true, order })
+        const statusLabel = order.deliveryStatusLabel
         setDeliveryStatusValue(
-            order.deliveryStatusLabel === "Não enviado" ? "not_sent"
-                : order.deliveryStatusLabel === "Preparando" ? "preparing"
-                    : order.deliveryStatusLabel === "Enviado" ? "sent"
-                        : order.deliveryStatusLabel === "Entregue" ? "delivered"
-                            : order.deliveryStatusLabel === "Disponível para retirada" ? "pickup_available"
-                                : order.deliveryStatusLabel === "Entrega não realizada" ? "delivery_failed"
+            statusLabel === "Não enviado" ? "not_sent"
+                : statusLabel === "Preparando" ? "preparing"
+                    : statusLabel === "Enviado" ? "sent"
+                        : statusLabel === "Entregue" ? "delivered"
+                            : statusLabel === "Disponível para retirada" || statusLabel === "Pronto retirada" ? "pickup_available"
+                                : statusLabel === "Entrega não realizada" || statusLabel === "Falha na entrega" ? "delivery_failed"
                                     : "not_sent"
         )
     }
@@ -497,8 +520,8 @@ export default function OrdersPage({
                 toast({
                     title: "Sucesso",
                     description: action === 'reopen'
-                            ? "Pedidos reabertos"
-                            : "Pedidos cancelados"
+                        ? "Pedidos reabertos"
+                        : "Pedidos cancelados"
                 })
                 if ((result as any).warning) {
                     toast({ title: "Atenção", description: (result as any).warning, variant: "destructive" })
@@ -748,10 +771,10 @@ export default function OrdersPage({
                                                                         </Badge>
                                                                     ) : (
                                                                         <>
-                                                                            <Badge variant={o.statusColor} className="h-5 text-[10px] px-1.5">
+                                                                            <Badge variant={o.statusColor} icon={o.statusIcon as any} className="h-5 text-[10px] px-1.5">
                                                                                 {o.statusLabel}
                                                                             </Badge>
-                                                                            <Badge variant={o.deliveryStatusColor} className="h-5 text-[10px] px-1.5">
+                                                                            <Badge variant={o.deliveryStatusColor} icon={o.deliveryStatusIcon as any} className="h-5 text-[10px] px-1.5">
                                                                                 {o.deliveryStatusLabel}
                                                                             </Badge>
                                                                         </>

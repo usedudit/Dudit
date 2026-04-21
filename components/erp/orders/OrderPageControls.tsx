@@ -7,7 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import {
     SearchIcon,
     FilterIcon,
-    DashboardIcon,
+    GridIcon,
     ListIcon,
     PlusIcon,
     ShoppingCartIcon,
@@ -232,7 +232,7 @@ const OrderPageControls: React.FC<OrderPageControlsProps> = ({
                             onClick={() => onViewModeChange("grid")}
                             className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
                         >
-                            <DashboardIcon className="w-[18px] h-[18px]" />
+                            <GridIcon className="w-[18px] h-[18px]" />
                         </button>
                     </div>
                 </div>

@@ -3,7 +3,7 @@
 import React from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/reusable"
-import { ChevronLeftIcon, ChevronRightIcon } from "@/lib/icons"
+import { ArrowLeftDoubleIcon, ArrowRightDoubleIcon, ChevronLeftIcon, ChevronRightIcon } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 
 interface PaginationProps {
@@ -81,9 +81,9 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
               <Button
                 variant="ghost"
                 onClick={() => onPageChange(1)}
-                className="w-9 h-9 p-0"
+                className="w-9 h-9 text-brand-inactive-text hover:bg-brand-gray dark:hover:bg-dark-border hover:text-brand-dark dark:hover:text-dark-heading transition-colors disabled:opacity-50 p-0"
               >
-                {"<<"}
+                <ArrowLeftDoubleIcon className="w-5 h-5" />
               </Button>
             )}
 
@@ -162,9 +162,9 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
               <Button
                 variant="ghost"
                 onClick={() => onPageChange(model.totalPages)}
-                className="w-9 h-9 p-0"
+                className="w-9 h-9 text-brand-inactive-text hover:bg-brand-gray dark:hover:bg-dark-border hover:text-brand-dark dark:hover:text-dark-heading transition-colors disabled:opacity-50 p-0"
               >
-                {">>"}
+                <ArrowRightDoubleIcon className="w-5 h-5" />
               </Button>
             )}
           </motion.div>

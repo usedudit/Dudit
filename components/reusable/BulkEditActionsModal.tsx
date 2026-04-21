@@ -2,11 +2,18 @@
 
 import React, { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, Input, Checkbox, IconPlaceholder, RadioButton, MoneyInput, PercentageInput, ListItem } from "@/components/reusable"
+import { Button, Input, Checkbox, IconPlaceholder, RadioButton, MoneyInput, PercentageInput, ListItem, InfoCard } from "@/components/reusable"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import {
     MoneyIcon, Package, EyeIcon, TrashIcon, RemoveImageIcon, AlertTriangleIcon,
-    UploadIcon, CheckIcon, EditIcon, ChevronLeftIcon
+    UploadIcon, CheckIcon, EditIcon, ChevronLeftIcon,
+    ClockIcon,
+    PartiallyPaidIcon,
+    CheckCircleIcon,
+    DeliverySentIcon,
+    DeliveryPickupIcon,
+    BlockedIcon,
+    DeliveryFailedIcon
 } from "@/lib/icons"
 
 import DefaultModal from "./DefaultModal"
@@ -412,23 +419,28 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                     { value: 'preparing', label: 'Preparando' },
                     { value: 'sent', label: 'Enviado' },
                     { value: 'delivered', label: 'Entregue' },
-                    { value: 'pickup_available', label: 'Pronto para retirada' },
+                    { value: 'pickup_available', label: 'Disponível para retirada' },
                     { value: 'delivery_failed', label: 'Falha na entrega' }
                 ]
                 return (
                     <div className="space-y-3 pt-2">
                         {ignoredByRuleCount > 0 && (
-                            <div className="rounded-xl border border-brand-orange/30 bg-brand-orange/10 px-4 py-3 text-sm font-medium text-brand-orange-dark dark:text-brand-orange">
-                                {ignoredByRuleCount} de {(orderSelectionGuards?.totalCount || 0)} pedido(s) serão ignorados por regra.
-                                {!isCurrentViewBlocked && selectableCount > 0 && ` ${selectableCount} pedido(s) ainda podem ser atualizados.`}
-                            </div>
+                            <InfoCard
+                                title="Atenção"
+                                message={`${ignoredByRuleCount} de ${(orderSelectionGuards?.totalCount || 0)} pedido(s) serão ignorados por regra.`}
+                                color="orange"
+                                className="px-4"
+                            />
                         )}
                         {isCurrentViewBlocked && (
-                            <div className="rounded-xl border border-brand-orange/30 bg-brand-orange/10 px-4 py-3 text-sm font-medium text-brand-orange-dark dark:text-brand-orange">
-                                {view === "order_payment"
+                            <InfoCard
+                                title="Atenção"
+                                message={view === "order_payment"
                                     ? "Todos os pedidos selecionados já estão pagos. Não é possível alterar o status de pagamento."
                                     : "Todos os pedidos selecionados já estão entregues. Não é possível alterar o status de entrega."}
-                            </div>
+                                color="orange"
+                                className="px-4"
+                            />
                         )}
                         <div className="space-y-1 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
                             {orderStatuses.map((s) => (

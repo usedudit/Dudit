@@ -268,6 +268,7 @@ export default function ProductsPage({
         filters.stocks.length > 0 ||
         filters.categories.length > 0 ||
         filters.brands.length > 0 ||
+        filters.units.length > 0 ||
         filters.status.length > 0 ||
         !!filters.priceRange.min ||
         !!filters.priceRange.max

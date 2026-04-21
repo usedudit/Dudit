@@ -16,7 +16,7 @@ import {
     MegaphoneIcon,
     MoneyIcon,
     Users,
-    DashboardIcon,
+    GridIcon,
     ChartIcon,
     WrenchIcon
 } from "@/lib/icons"
@@ -47,13 +47,14 @@ const navItems: NavItem[] = [
         href: "/erp/home",
     },
     {
-        icon: DashboardIcon,
+        icon: GridIcon,
         label: "Dashboard",
         href: "/erp/dashboard", // gráficos, métricas, relatórios rápidos
     },
     {
         icon: ShoppingCartIcon,
         label: "Vendas",
+        href: "/erp/orders",
         submenu: [
             { label: "Pedidos e Vendas", href: "/erp/orders" },
             { label: "Orçamentos", href: "/erp/quotes" },
@@ -65,6 +66,7 @@ const navItems: NavItem[] = [
     {
         icon: Package,
         label: "Produtos",
+        href: "/erp/products",
         submenu: [
             { label: "Catálogo de Produtos", href: "/erp/products" },
             { label: "Movimentação de Estoque", href: "/erp/stock-movements" },
@@ -76,6 +78,7 @@ const navItems: NavItem[] = [
     {
         icon: WrenchIcon,
         label: "Serviços",
+        href: "/erp/services",
         submenu: [
             { label: "Agendamentos", href: "/" },
             { label: "Ordens de Serviço", href: "/" },
@@ -91,6 +94,7 @@ const navItems: NavItem[] = [
     {
         icon: MoneyIcon,
         label: "Financeiro",
+        href: "/erp/financial/transactions",
         submenu: [
             { label: "Transações", href: "/erp/financial/transactions" },
             { label: "Caixa (PDV)", href: "/erp/cash-register" },
@@ -262,16 +266,23 @@ export function ERPSidebar() {
         setIsMounted(true)
     }, [])
 
+    // Auto-expand active submenu based on current path
+    const lastAutoExpandedRef = useRef<string | null>(null)
+
     useEffect(() => {
         if (isCollapsed) return
 
-        const activeItem = filteredNavItems.find((item) =>
-            item.submenu?.some((sub) => isActivePath(sub.href)),
+        const activeCategory = filteredNavItems.find((item) =>
+            item.submenu?.some((sub) => isActivePath(sub.href))
         )
-        if (activeItem && openSubmenu !== activeItem.label) {
-            setOpenSubmenu(activeItem.label)
+
+        // Only auto-expand if the active category has changed to a NEW one
+        // and we haven't already expanded it for this specific session/navigation
+        if (activeCategory && activeCategory.label !== lastAutoExpandedRef.current) {
+            setOpenSubmenu(activeCategory.label)
+            lastAutoExpandedRef.current = activeCategory.label
         }
-    }, [pathname, isCollapsed, isActivePath, filteredNavItems, openSubmenu])
+    }, [pathname, isCollapsed, isActivePath, filteredNavItems])
 
     useEffect(() => {
         if (isCollapsed) {
@@ -326,7 +337,7 @@ export function ERPSidebar() {
                     "flex flex-col fixed z-[120] left-0 top-0 h-screen border-r hidden md:flex",
                     "bg-dark-background border-dark-border",
                     "transition-[width] duration-300 ease-in-out",
-                    "md:static md:translate-x-0",
+                    "md:relative md:translate-x-0 md:z-[100]", // Ensure z-index works on desktop by changing from static to relative
                     isCollapsed ? "md:w-[68px]" : "md:w-64",
                     isMobileOpen ? "translate-x-0 w-64" : "-translate-x-full w-64",
                 )}
@@ -403,11 +414,17 @@ export function ERPSidebar() {
                                     onMouseLeave={handleMouseLeave}
                                 >
                                     <div className="w-full">
-                                        {item.href && !hasSubmenu ? (
+                                        {item.href ? (
                                             <Link
                                                 href={item.href}
                                                 prefetch={false}
-                                                onClick={() => setIsMobileOpen(false)}
+                                                onClick={() => {
+                                                    setIsMobileOpen(false)
+                                                    setHoveredItem(null)
+                                                    if (hasSubmenu && !isCollapsed) {
+                                                        toggleSubmenu(item.label)
+                                                    }
+                                                }}
                                                 className={cn(
                                                     "flex items-center rounded-lg transition-colors duration-200 group relative min-h-[44px] w-full justify-start",
                                                     isActiveGroup ? activeClasses : inactiveClasses
@@ -432,6 +449,15 @@ export function ERPSidebar() {
                                                 >
                                                     {item.label}
                                                 </span>
+
+                                                {hasSubmenu && !isCollapsed && (
+                                                    <ChevronDownIcon
+                                                        className={cn(
+                                                            "w-4 h-4 mr-2 transition-transform duration-200 opacity-60",
+                                                            isMenuExpanded ? "rotate-180" : "rotate-0",
+                                                        )}
+                                                    />
+                                                )}
                                             </Link>
                                         ) : (
                                             <button
@@ -560,6 +586,10 @@ export function ERPSidebar() {
                                                                         planSlug={planSlug}
                                                                         itemClass="w-full text-left px-4 py-2.5 text-sm text-brand-inactive-text hover:text-white hover:bg-white/5 transition-colors flex items-center justify-between group/sub"
                                                                         labelClass={isActive ? "text-brand-green font-medium" : undefined}
+                                                                        onNavigate={() => {
+                                                                            setIsMobileOpen(false)
+                                                                            setHoveredItem(null)
+                                                                        }}
                                                                     />
                                                                 )
                                                             })
@@ -606,10 +636,16 @@ export function ERPSidebar() {
                                                         "flex items-center gap-3 p-3 rounded-xl transition-colors relative",
                                                         isActive ? activeClasses : inactiveClasses
                                                     )}
-                                                    onClick={() => setIsMobileOpen(false)}
+                                                    onClick={() => {
+                                                        setIsMobileOpen(false)
+                                                        if (hasSubmenu) toggleSubmenu(item.label)
+                                                    }}
                                                 >
                                                     <Icon size={20} className={isActive ? "text-brand-green" : ""} />
                                                     <span className="text-[15px] font-medium flex-1 text-left">{item.label}</span>
+                                                    {hasSubmenu && (
+                                                        <ChevronDownIcon className={cn("w-4 h-4 opacity-50 transition-transform", isMenuExpanded ? "rotate-180" : "")} />
+                                                    )}
                                                 </Link>
                                             ) : (
                                                 <button

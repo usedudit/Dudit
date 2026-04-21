@@ -9,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import {
     SearchIcon,
     FilterIcon,
-    DashboardIcon,
+    GridIcon,
     ListIcon,
     PlusIcon,
     FileIcon,
@@ -17,6 +17,8 @@ import {
     ArrowUpDownIcon,
     ArrowUpIcon,
     ArrowDownIcon,
+    CalendarIcon,
+    InfoIcon,
 } from "@/lib/icons"
 import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import {
@@ -83,7 +85,7 @@ const StockMovementPageControls: React.FC<StockMovementPageControlsProps> = ({
                 <FilterChip
                     label="Tipos"
                     value={filters.movement_type.join(", ")}
-                    // @ts-ignore
+                    icon={<InfoIcon size={12} />}
                     onRemove={() => setFilters((prev) => ({ ...prev, movement_type: [] }))}
                 />
             )}
@@ -91,7 +93,7 @@ const StockMovementPageControls: React.FC<StockMovementPageControlsProps> = ({
                 <FilterChip
                     label="Período"
                     value={summarizeDatePeriodFilter(filters.datePeriod) || ""}
-                    // @ts-ignore
+                    icon={<CalendarIcon size={12} />}
                     onRemove={() =>
                         setFilters((prev) => ({ ...prev, datePeriod: { ...EMPTY_DATE_PERIOD } }))
                     }
@@ -212,7 +214,7 @@ const StockMovementPageControls: React.FC<StockMovementPageControlsProps> = ({
                             onClick={() => onViewModeChange("grid")}
                             className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
                         >
-                            <DashboardIcon className="w-[18px] h-[18px]" />
+                            <GridIcon className="w-[18px] h-[18px]" />
                         </button>
                     </div>
                 </div>

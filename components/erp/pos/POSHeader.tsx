@@ -1,7 +1,7 @@
 "use client"
 
 import { memo } from "react"
-import { SearchIcon, UserIcon, ClockIcon, ChevronRightIcon, DashboardIcon, IdentityCardIcon } from "@/lib/icons"
+import { SearchIcon, UserIcon, ClockIcon, ChevronRightIcon, GridIcon, IdentityCardIcon } from "@/lib/icons"
 import { Input, Tabs, TabsList, TabsTrigger, ListItem } from "@/components/reusable"
 import type { PDVCustomer } from "@/lib/types/pdv"
 
@@ -65,7 +65,7 @@ const POSHeader = memo(function POSHeader({
                 onClick={onOpenCategorySheet}
                 className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-border bg-brand-gray text-brand-dark dark:border-dark-border dark:bg-dark-gray dark:text-dark-text"
               >
-                <DashboardIcon size={18} />
+                <GridIcon size={18} />
               </button>
               <button onClick={onOpenCustomerSheet} className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-border bg-brand-gray text-brand-dark dark:border-dark-border dark:bg-dark-gray dark:text-dark-text">
                 <UserIcon size={18} />

@@ -4,6 +4,7 @@ import {
     Home03Icon,
     Wrench01Icon,
     Money04Icon,
+    MoneyNotFound04Icon,
     ShoppingBasket03Icon,
     Megaphone03Icon,
     Store01Icon,
@@ -21,6 +22,7 @@ import {
     PackageReceiveIcon as PackageReceiveIcon01,
     PackageRemoveIcon,
     DashboardSquare01Icon,
+    RepeatIcon as RepeatIcon01,
     Chart03Icon,
     ViewIcon,
     Mail01Icon,
@@ -45,6 +47,8 @@ import {
     ArrowRight01Icon,
     ArrowRight02Icon,
     ArrowLeft02Icon,
+    ArrowLeftDoubleIcon as ArrowLeftDoubleIcon01,
+    ArrowRightDoubleIcon as ArrowRightDoubleIcon01,
     FloppyDiskIcon,
     ImageUploadIcon,
     ImageDelete02Icon,
@@ -62,6 +66,7 @@ import {
     ArrowUpDownIcon as ArrowUpDown,
     MoreVerticalCircle01Icon,
     Copy01Icon,
+    RouteBlockIcon as RouteBlockIcon01,
     PencilEdit02Icon,
     Share01Icon,
     InformationCircleIcon,
@@ -96,7 +101,10 @@ import {
     CheckmarkCircle01Icon,
     ShoppingBag01Icon,
     PlusMinus01Icon,
-    ArrowTurnBackwardIcon as ArrowTurnBackwardIcon01
+    ArrowTurnBackwardIcon as ArrowTurnBackwardIcon01,
+    DeliverySent01Icon,
+    DeliveryTracking01Icon,
+    SplitIcon
 } from "@hugeicons/core-free-icons"
 
 interface IconProps {
@@ -126,7 +134,7 @@ export const Menu = CreateIcon(Menu01Icon)
 export const MenuSquareIcon = CreateIcon(MenuSquare01)
 export const MenuIcon = CreateIcon(Menu01Icon)
 export const HomeIcon = CreateIcon(Home03Icon)
-export const DashboardIcon = CreateIcon(DashboardSquare01Icon)
+export const GridIcon = CreateIcon(DashboardSquare01Icon)
 
 export const ChevronDownIcon = CreateIcon(ArrowDown01Icon)
 export const ChevronUpIcon = CreateIcon(ArrowUp01Icon)
@@ -138,6 +146,8 @@ export const ArrowUpIcon = CreateIcon(ArrowUp01Icon)
 export const ArrowLeftIcon = CreateIcon(ArrowLeft02Icon)
 export const ArrowRightIcon = CreateIcon(ArrowRight02Icon)
 export const ArrowUpDownIcon = CreateIcon(ArrowUpDown)
+export const ArrowLeftDoubleIcon = CreateIcon(ArrowLeftDoubleIcon01)
+export const ArrowRightDoubleIcon = CreateIcon(ArrowRightDoubleIcon01)
 
 export const UnfoldMoreIcon = CreateIcon(UnfoldMore01Icon)
 export const ChevronsUpDown = CreateIcon(MenuSquare01)
@@ -247,6 +257,9 @@ export const PackageReceiveIcon = CreateIcon(PackageReceiveIcon01)
 
 export const CreditCardIcon = CreateIcon(CreditCard)
 export const TruckIcon = CreateIcon(ShippingTruck01Icon)
+export const DeliverySentIcon = CreateIcon(DeliverySent01Icon)
+export const DeliveryPickupIcon = CreateIcon(DeliveryTracking01Icon)
+export const DeliveryFailedIcon = CreateIcon(RouteBlockIcon01)
 
 
 // ============================
@@ -308,6 +321,7 @@ export const CalendarIcon = CreateIcon(Calendar03Icon)
 
 export const ServiceIcon = CreateIcon(Wrench01Icon)
 export const MoneyIcon = CreateIcon(Money04Icon)
+export const PartiallyPaidIcon = CreateIcon(MoneyNotFound04Icon)
 export const SalesIcon = CreateIcon(ShoppingBasket03Icon)
 
 export const MegaphoneIcon = CreateIcon(Megaphone03Icon)
@@ -325,3 +339,6 @@ export const InstagramIcon = CreateIcon(InstagramIcon01)
 export const TwitterIcon = CreateIcon(NewTwitterIcon)
 
 export const CadastrosIcon = CreateIcon(ResourcesAddIcon)
+
+export const InstallmentIcon = CreateIcon(SplitIcon)
+export const RepeatIcon = CreateIcon(RepeatIcon01)

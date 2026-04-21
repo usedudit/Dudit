@@ -8,12 +8,15 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import {
     SearchIcon,
     FilterIcon,
-    DashboardIcon,
+    GridIcon,
     ListIcon,
     PlusIcon,
     ArrowUpDownIcon,
     ArrowUpIcon,
     ArrowDownIcon,
+    CalendarIcon,
+    UserIcon,
+    InfoIcon,
 } from "@/lib/icons"
 import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import {
@@ -82,6 +85,7 @@ const CashRegisterPageControls: React.FC<CashRegisterPageControlsProps> = ({
                 <FilterChip
                     label="Status"
                     value={filters.status.map((value) => (value === "open" ? "Aberto" : "Fechado")).join(", ")}
+                    icon={<InfoIcon size={12} />}
                     onRemove={() => setFilters((prev) => ({ ...prev, status: [] }))}
                 />
             )}
@@ -89,6 +93,7 @@ const CashRegisterPageControls: React.FC<CashRegisterPageControlsProps> = ({
                 <FilterChip
                     label="Abriu"
                     value={filters.openedBy.join(", ")}
+                    icon={<UserIcon size={12} />}
                     onRemove={() => setFilters((prev) => ({ ...prev, openedBy: [] }))}
                 />
             )}
@@ -96,6 +101,7 @@ const CashRegisterPageControls: React.FC<CashRegisterPageControlsProps> = ({
                 <FilterChip
                     label="Fechou"
                     value={filters.closedBy.join(", ")}
+                    icon={<UserIcon size={12} />}
                     onRemove={() => setFilters((prev) => ({ ...prev, closedBy: [] }))}
                 />
             )}
@@ -103,6 +109,7 @@ const CashRegisterPageControls: React.FC<CashRegisterPageControlsProps> = ({
                 <FilterChip
                     label="Abertura"
                     value={summarizeDatePeriodFilter(filters.dateOpenedPeriod) || ""}
+                    icon={<CalendarIcon size={12} />}
                     onRemove={() =>
                         setFilters((prev) => ({ ...prev, dateOpenedPeriod: { ...EMPTY_DATE_PERIOD } }))
                     }
@@ -112,6 +119,7 @@ const CashRegisterPageControls: React.FC<CashRegisterPageControlsProps> = ({
                 <FilterChip
                     label="Fechamento"
                     value={summarizeDatePeriodFilter(filters.dateClosedPeriod) || ""}
+                    icon={<CalendarIcon size={12} />}
                     onRemove={() =>
                         setFilters((prev) => ({ ...prev, dateClosedPeriod: { ...EMPTY_DATE_PERIOD } }))
                     }
@@ -220,7 +228,7 @@ const CashRegisterPageControls: React.FC<CashRegisterPageControlsProps> = ({
                             onClick={() => onViewModeChange("grid")}
                             className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
                         >
-                            <DashboardIcon className="w-[18px] h-[18px]" />
+                            <GridIcon className="w-[18px] h-[18px]" />
                         </button>
                     </div>
                 </div>

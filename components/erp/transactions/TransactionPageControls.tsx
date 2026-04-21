@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import {
     SearchIcon,
     FilterIcon,
-    DashboardIcon,
+    GridIcon,
     ListIcon,
     PlusIcon,
     ArrowUpDownIcon,
@@ -16,6 +16,10 @@ import {
     ArrowUpIcon,
     ClockIcon,
     MoneyIcon,
+    RepeatIcon,
+    InstallmentIcon,
+    CalendarIcon,
+    InfoIcon,
 } from "@/lib/icons"
 import type { TransactionTab } from "../../../lib/services/transactions.types"
 import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
@@ -85,6 +89,7 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
                 <FilterChip
                     label="Status"
                     value={filters.status.join(", ")}
+                    icon={<InfoIcon size={12} />}
                     onRemove={() => setFilters((prev) => ({ ...prev, status: [] }))}
                 />
             )}
@@ -92,6 +97,7 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
                 <FilterChip
                     label="Categoria"
                     value={filters.category.join(", ")}
+                    icon={<GridIcon size={12} />}
                     onRemove={() => setFilters((prev) => ({ ...prev, category: [] }))}
                 />
             )}
@@ -99,6 +105,7 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
                 <FilterChip
                     label="Pagamento"
                     value={filters.paymentType.join(", ")}
+                    icon={<MoneyIcon size={12} />}
                     onRemove={() => setFilters((prev) => ({ ...prev, paymentType: [] }))}
                 />
             )}
@@ -106,13 +113,23 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
                 <FilterChip
                     label="Recorrente"
                     value="Apenas recorrentes"
+                    icon={<RepeatIcon size={12} />}
                     onRemove={() => setFilters((prev) => ({ ...prev, recurringOnly: false }))}
+                />
+            )}
+            {filters.installmentOnly && (
+                <FilterChip
+                    label="Parcelado"
+                    value="Apenas parceladas"
+                    icon={<InstallmentIcon size={12} />}
+                    onRemove={() => setFilters((prev) => ({ ...prev, installmentOnly: false }))}
                 />
             )}
             {isDatePeriodFilterActive(filters.datePeriod) && (
                 <FilterChip
                     label="Período"
                     value={summarizeDatePeriodFilter(filters.datePeriod) || ""}
+                    icon={<CalendarIcon size={12} />}
                     onRemove={() =>
                         setFilters((prev) => ({ ...prev, datePeriod: { ...EMPTY_DATE_PERIOD } }))
                     }
@@ -210,7 +227,7 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
                             onClick={() => onViewModeChange("grid")}
                             className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
                         >
-                            <DashboardIcon className="w-[18px] h-[18px]" />
+                            <GridIcon className="w-[18px] h-[18px]" />
                         </button>
                     </div>
                 </div>

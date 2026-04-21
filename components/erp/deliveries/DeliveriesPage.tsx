@@ -215,7 +215,7 @@ export default function DeliveriesPage({
               <motion.div key="empty" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full">
                 <IconPlaceholder
                   placeholderType="image"
-                  imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
+                  imageSrc="https://img.dudit.com.br/static/mascots/Entregas.png"
                   imageAlt="Sem entregas"
                   title={planGate ? "Plano necessário" : "Nenhuma entrega encontrada"}
                   subtitle={planGate ? planGate.message : "Crie uma entrega a partir de um pedido para começar."}
