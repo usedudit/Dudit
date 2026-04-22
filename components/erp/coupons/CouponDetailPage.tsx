@@ -1,9 +1,9 @@
 "use client"
 
-import React, { useMemo, useState } from "react"
+import React, { useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Badge, Button, Tabs, TabsContent, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
-import { ChevronLeftIcon, EditIcon, SparklesIcon, TagIcon, TrashIcon } from "@/lib/icons"
+import { ActionsDropdown, Badge, Button, Tabs, TabsContent, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
+import { ChevronLeftIcon, EditIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
   CouponRelations,
@@ -18,30 +18,25 @@ import {
   getCouponValiditySummary,
 } from "@/lib/types/coupon"
 
-function SectionList({
-  title,
-  items,
-  emptyText,
+const SidebarCard = ({
+  children,
+  hasTopStrip = true,
 }: {
-  title: string
-  items: string[]
-  emptyText: string
-}) {
+  children: React.ReactNode
+  hasTopStrip?: boolean
+}) => (
+  <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
+    {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />}
+    {children}
+  </div>
+)
+
+function KeyValueRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-brand-border dark:border-dark-border p-5">
-      <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">{title}</h3>
-      {items.length === 0 ? (
-        <p className="text-sm text-brand-inactive-text dark:text-dark-body">{emptyText}</p>
-      ) : (
-        <div className="flex flex-wrap gap-2">
-          {items.map((item) => (
-            <Badge key={item} variant="gray" icon={null}>
-              {item}
-            </Badge>
-          ))}
-        </div>
-      )}
-    </section>
+    <div className="flex justify-between items-start text-[14px] gap-4">
+      <span className="text-brand-inactive-text dark:text-dark-body font-medium">{label}</span>
+      <div className="text-right text-brand-dark dark:text-dark-heading font-bold text-sm">{value}</div>
+    </div>
   )
 }
 
@@ -62,266 +57,202 @@ export default function CouponDetailPage({
   onToggleStatus: (coupon: CouponRow) => void
   isLoadingRelations: boolean
 }) {
-  const [activeTab, setActiveTab] = useState("overview")
-
-  const statCards = useMemo(
-    () => [
-      { label: "Desconto", value: getCouponPrimaryMeta(coupon) },
-      { label: "Uso", value: getCouponUsageSummary(coupon) },
-      { label: "Escopo", value: getCouponApplyScopeLabel(coupon.apply_scope) },
-      { label: "Clientes", value: getCouponCustomerScopeLabel(coupon.customer_scope) },
-    ],
-    [coupon],
-  )
+  const [activeTab, setActiveTab] = useState("summary")
 
   return (
     <FadeIn>
-      <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
+      <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
-          <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
+          <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
+              <div className="absolute -left-12 top-7 h-full hidden xl:flex justify-center">
+                <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                  <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                </Button>
+              </div>
+
               <div className="hidden md:flex items-start justify-between">
-                <div className="flex items-start gap-3">
-                  <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0">
-                    <ChevronLeftIcon className="w-5 h-5" />
-                  </Button>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <h1 className="font-bold text-xl md:text-3xl text-brand-dark dark:text-dark-heading truncate">{coupon.code}</h1>
-                      <Badge variant={getCouponStatusVariant(coupon)}>{getCouponStatusLabel(coupon)}</Badge>
-                      {coupon.is_automatic && (
-                        <Badge variant="blue" icon={<SparklesIcon />}>
-                          Automatico
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">{getCouponPrimaryMeta(coupon)}</p>
+                <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                  <h1 className="font-bold text-xl md:text-3xl text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3">
+                    <span className="truncate">{coupon.code}</span>
+                    <Badge variant={getCouponStatusVariant(coupon)}>{getCouponStatusLabel(coupon)}</Badge>
+                  </h1>
+
+                  <div className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                    {getCouponPrimaryMeta(coupon)}
                   </div>
                 </div>
-                <div className="hidden md:flex items-center gap-3 shrink-0">
-                  <Button variant="outline" onClick={() => onToggleStatus(coupon)}>
-                    {coupon.is_active ? "Desativar" : "Ativar"}
-                  </Button>
-                  <Button variant="outline" onClick={() => onEdit(coupon)}>
-                    <EditIcon className="w-4 h-4 mr-2" />
-                    Editar
-                  </Button>
-                  <Button variant="ghost" onClick={() => onDelete(coupon)} className="w-10 h-10 p-0">
-                    <TrashIcon className="w-4 h-4 text-brand-red-dark" />
+
+                <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                  <ActionsDropdown
+                    onEdit={() => onEdit(coupon)}
+                    onCancel={() => onToggleStatus(coupon)}
+                    cancelLabel={coupon.is_active ? "Desativar" : "Ativar"}
+                    onDelete={() => onDelete(coupon)}
+                  />
+                  <Button onClick={() => onEdit(coupon)} className="whitespace-nowrap">
+                    <EditIcon className="w-[18px] h-[18px] mr-2" />
+                    Editar cupom
                   </Button>
                 </div>
               </div>
 
               <div className="w-full md:mt-4">
                 <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                  <TabsTrigger value="overview">Visao geral</TabsTrigger>
+                  <TabsTrigger value="summary">Resumo</TabsTrigger>
                   <TabsTrigger value="scope">Escopo</TabsTrigger>
-                  <TabsTrigger value="rules">Regras</TabsTrigger>
                 </TabsList>
               </div>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 max-w-[1300px] mx-auto w-full pb-28 md:pb-8">
-            <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-              <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                  {statCards.map((card) => (
-                    <div key={card.label} className="rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-4">
-                      <p className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mb-2">{card.label}</p>
-                      <p className="font-bold text-brand-dark dark:text-dark-heading leading-tight">{card.value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <AnimatePresence mode="wait">
-                  <TabsContent value="overview" className="mt-0">
-                    <motion.div key="overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
-                      <section className="rounded-2xl border border-brand-border dark:border-dark-border p-5">
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Resumo operacional</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                          <div className="rounded-xl bg-brand-gray/40 dark:bg-dark-border/20 p-4">
-                            <p className="text-brand-inactive-text dark:text-dark-body mb-1">Validade</p>
-                            <p className="font-bold text-brand-dark dark:text-dark-heading">{getCouponValiditySummary(coupon)}</p>
-                          </div>
-                          <div className="rounded-xl bg-brand-gray/40 dark:bg-dark-border/20 p-4">
-                            <p className="text-brand-inactive-text dark:text-dark-body mb-1">Aplicacao</p>
-                            <p className="font-bold text-brand-dark dark:text-dark-heading">{getCouponApplyScopeLabel(coupon.apply_scope)}</p>
-                          </div>
-                          <div className="rounded-xl bg-brand-gray/40 dark:bg-dark-border/20 p-4">
-                            <p className="text-brand-inactive-text dark:text-dark-body mb-1">Clientes</p>
-                            <p className="font-bold text-brand-dark dark:text-dark-heading">{getCouponCustomerScopeLabel(coupon.customer_scope)}</p>
-                          </div>
-                          <div className="rounded-xl bg-brand-gray/40 dark:bg-dark-border/20 p-4">
-                            <p className="text-brand-inactive-text dark:text-dark-body mb-1">Usos realizados</p>
-                            <p className="font-bold text-brand-dark dark:text-dark-heading">{getCouponUsageCount(coupon)}</p>
-                          </div>
+          <div className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8">
+            <div className="max-w-[1300px] mx-auto p-4 md:p-6 pt-6">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsContent value="summary" className="mt-0">
+                  <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
+                    <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
+                      <section>
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Detalhes do cupom</h3>
+                        <div className="space-y-3">
+                          <KeyValueRow label="Tipo de desconto" value={getCouponPrimaryMeta(coupon)} />
+                          <KeyValueRow label="Aplicar a" value={getCouponApplyScopeLabel(coupon.apply_scope)} />
+                          <KeyValueRow label="Escopo de clientes" value={getCouponCustomerScopeLabel(coupon.customer_scope)} />
+                          <KeyValueRow label="Validade" value={getCouponValiditySummary(coupon)} />
+                          <KeyValueRow label="Uso" value={getCouponUsageSummary(coupon)} />
                         </div>
                       </section>
 
-                      <section className="rounded-2xl border border-brand-border dark:border-dark-border p-5">
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Regras aplicadas</h3>
+                      <div className="border-t border-brand-border dark:border-dark-border my-8 w-full" />
+
+                      <section>
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Regras configuradas</h3>
+                        <div className="space-y-3">
+                          <KeyValueRow label="Valor minimo do carrinho" value={`R$ ${Number(coupon.min_cart_value || 0).toFixed(2)}`} />
+                          <KeyValueRow label="Combinacao" value={coupon.allow_combination ? "Permitida" : "Bloqueada"} />
+                          <KeyValueRow label="Desconto maximo" value={coupon.max_discount_value != null ? `R$ ${Number(coupon.max_discount_value).toFixed(2)}` : "Nao definido"} />
+                          <KeyValueRow label="Limite total" value={coupon.usage_limit != null ? coupon.usage_limit : "Ilimitado"} />
+                          <KeyValueRow label="Por cliente" value={coupon.usage_per_customer != null ? coupon.usage_per_customer : coupon.first_purchase_only ? "Primeira compra" : "Livre"} />
+                        </div>
+                      </section>
+                    </div>
+
+                    <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
+                      <SidebarCard>
+                        <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-4">Status do cupom</h3>
                         <div className="space-y-3 text-sm">
                           <div className="flex items-center justify-between gap-3">
-                            <span className="text-brand-inactive-text dark:text-dark-body">Valor minimo do carrinho</span>
-                            <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {Number(coupon.min_cart_value || 0).toFixed(2)}</span>
+                            <span className="text-brand-inactive-text dark:text-dark-body">Status</span>
+                            <Badge variant={getCouponStatusVariant(coupon)}>{getCouponStatusLabel(coupon)}</Badge>
                           </div>
                           <div className="flex items-center justify-between gap-3">
-                            <span className="text-brand-inactive-text dark:text-dark-body">Combinacao</span>
-                            <span className="font-bold text-brand-dark dark:text-dark-heading">{coupon.allow_combination ? "Permitida" : "Bloqueada"}</span>
+                            <span className="text-brand-inactive-text dark:text-dark-body">Automatico</span>
+                            <span className="font-bold text-brand-dark dark:text-dark-heading">{coupon.is_automatic ? "Sim" : "Nao"}</span>
                           </div>
                           <div className="flex items-center justify-between gap-3">
-                            <span className="text-brand-inactive-text dark:text-dark-body">Primeira compra</span>
-                            <span className="font-bold text-brand-dark dark:text-dark-heading">{coupon.first_purchase_only ? "Sim" : "Nao"}</span>
-                          </div>
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-brand-inactive-text dark:text-dark-body">Teto do desconto</span>
-                            <span className="font-bold text-brand-dark dark:text-dark-heading">
-                              {coupon.max_discount_value != null ? `R$ ${Number(coupon.max_discount_value).toFixed(2)}` : "Sem teto"}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-brand-inactive-text dark:text-dark-body">Limite por cliente</span>
-                            <span className="font-bold text-brand-dark dark:text-dark-heading">
-                              {coupon.usage_per_customer != null ? coupon.usage_per_customer : "Nao definido"}
-                            </span>
+                            <span className="text-brand-inactive-text dark:text-dark-body">Usos realizados</span>
+                            <span className="font-bold text-brand-dark dark:text-dark-heading">{getCouponUsageCount(coupon)}</span>
                           </div>
                         </div>
-                      </section>
-                    </motion.div>
-                  </TabsContent>
+                      </SidebarCard>
 
-                  <TabsContent value="scope" className="mt-0">
-                    <motion.div key="scope" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
+                      <SidebarCard>
+                        <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-4">Aplicacao</h3>
+                        <div className="space-y-3 text-sm">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-brand-inactive-text dark:text-dark-body">Produtos</span>
+                            <span className="font-bold text-brand-dark dark:text-dark-heading">{relations.products.length}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-brand-inactive-text dark:text-dark-body">Servicos</span>
+                            <span className="font-bold text-brand-dark dark:text-dark-heading">{relations.services.length}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-brand-inactive-text dark:text-dark-body">Categorias</span>
+                            <span className="font-bold text-brand-dark dark:text-dark-heading">{relations.categories.length}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-brand-inactive-text dark:text-dark-body">Clientes</span>
+                            <span className="font-bold text-brand-dark dark:text-dark-heading">{relations.customers.length}</span>
+                          </div>
+                        </div>
+                      </SidebarCard>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="scope" className="mt-0">
+                  <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
+                    <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
                       {isLoadingRelations ? (
-                        <div className="rounded-2xl border border-brand-border dark:border-dark-border p-8 flex items-center justify-center">
+                        <div className="flex items-center justify-center py-16">
                           <ThreeDotsLoader />
                         </div>
                       ) : (
-                        <>
-                          <SectionList
-                            title="Categorias vinculadas"
-                            items={relations.categories}
-                            emptyText="Este cupom nao esta restrito por categorias."
-                          />
-                          <SectionList
-                            title="Produtos vinculados"
-                            items={relations.products.map((item) => item.name)}
-                            emptyText="Nenhum produto especifico vinculado."
-                          />
-                          <SectionList
-                            title="Servicos vinculados"
-                            items={relations.services.map((item) => item.name)}
-                            emptyText="Nenhum servico especifico vinculado."
-                          />
-                          <SectionList
-                            title="Clientes vinculados"
-                            items={relations.customers.map((item) => item.name)}
-                            emptyText="O cupom vale para toda a base de clientes."
-                          />
-                        </>
+                        <div className="space-y-8">
+                          <section>
+                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Categorias vinculadas</h3>
+                            <p className="text-sm text-brand-dark dark:text-dark-heading">{relations.categories.length > 0 ? relations.categories.join(", ") : "Nenhuma categoria especifica vinculada."}</p>
+                          </section>
+
+                          <div className="border-t border-brand-border dark:border-dark-border w-full" />
+
+                          <section>
+                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Produtos vinculados</h3>
+                            <p className="text-sm text-brand-dark dark:text-dark-heading">{relations.products.length > 0 ? relations.products.map((item) => item.name).join(", ") : "Nenhum produto especifico vinculado."}</p>
+                          </section>
+
+                          <div className="border-t border-brand-border dark:border-dark-border w-full" />
+
+                          <section>
+                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Servicos vinculados</h3>
+                            <p className="text-sm text-brand-dark dark:text-dark-heading">{relations.services.length > 0 ? relations.services.map((item) => item.name).join(", ") : "Nenhum servico especifico vinculado."}</p>
+                          </section>
+
+                          <div className="border-t border-brand-border dark:border-dark-border w-full" />
+
+                          <section>
+                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Clientes vinculados</h3>
+                            <p className="text-sm text-brand-dark dark:text-dark-heading">{relations.customers.length > 0 ? relations.customers.map((item) => item.name).join(", ") : "O cupom vale para toda a base de clientes."}</p>
+                          </section>
+                        </div>
                       )}
-                    </motion.div>
-                  </TabsContent>
+                    </div>
 
-                  <TabsContent value="rules" className="mt-0">
-                    <motion.div key="rules" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
-                      <section className="rounded-2xl border border-brand-border dark:border-dark-border p-5">
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Disponibilidade</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                          <div className="rounded-xl bg-brand-gray/40 dark:bg-dark-border/20 p-4">
-                            <p className="text-brand-inactive-text dark:text-dark-body mb-1">Inicio</p>
-                            <p className="font-bold text-brand-dark dark:text-dark-heading">{coupon.starts_at || "Sem inicio"}</p>
+                    <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
+                      <SidebarCard>
+                        <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-4">Resumo do escopo</h3>
+                        <div className="space-y-3 text-sm">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-brand-inactive-text dark:text-dark-body">Aplicacao</span>
+                            <span className="font-bold text-brand-dark dark:text-dark-heading">{getCouponApplyScopeLabel(coupon.apply_scope)}</span>
                           </div>
-                          <div className="rounded-xl bg-brand-gray/40 dark:bg-dark-border/20 p-4">
-                            <p className="text-brand-inactive-text dark:text-dark-body mb-1">Fim</p>
-                            <p className="font-bold text-brand-dark dark:text-dark-heading">{coupon.ends_at || "Sem fim"}</p>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-brand-inactive-text dark:text-dark-body">Clientes</span>
+                            <span className="font-bold text-brand-dark dark:text-dark-heading">{getCouponCustomerScopeLabel(coupon.customer_scope)}</span>
                           </div>
                         </div>
-                      </section>
-
-                      <section className="rounded-2xl border border-brand-border dark:border-dark-border p-5">
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Consumo</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                          <div className="rounded-xl bg-brand-gray/40 dark:bg-dark-border/20 p-4">
-                            <p className="text-brand-inactive-text dark:text-dark-body mb-1">Uso total</p>
-                            <p className="font-bold text-brand-dark dark:text-dark-heading">
-                              {coupon.usage_limit != null ? coupon.usage_limit : "Ilimitado"}
-                            </p>
-                          </div>
-                          <div className="rounded-xl bg-brand-gray/40 dark:bg-dark-border/20 p-4">
-                            <p className="text-brand-inactive-text dark:text-dark-body mb-1">Por cliente</p>
-                            <p className="font-bold text-brand-dark dark:text-dark-heading">
-                              {coupon.usage_per_customer != null ? coupon.usage_per_customer : "Livre"}
-                            </p>
-                          </div>
-                          <div className="rounded-xl bg-brand-gray/40 dark:bg-dark-border/20 p-4">
-                            <p className="text-brand-inactive-text dark:text-dark-body mb-1">Ja usado</p>
-                            <p className="font-bold text-brand-dark dark:text-dark-heading">{getCouponUsageCount(coupon)}</p>
-                          </div>
-                        </div>
-                      </section>
-                    </motion.div>
-                  </TabsContent>
-                </AnimatePresence>
-              </div>
-
-              <aside className="col-span-12 lg:col-span-4">
-                <div className="lg:sticky lg:top-24 space-y-5">
-                  <div className="rounded-3xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-5">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-11 h-11 rounded-full bg-brand-gray dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border">
-                        <TagIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Cupom</p>
-                        <h3 className="font-bold text-brand-dark dark:text-dark-heading">{coupon.code}</h3>
-                      </div>
-                    </div>
-                    <div className="space-y-3 text-sm">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-brand-inactive-text dark:text-dark-body">Status</span>
-                        <span className="font-bold text-brand-dark dark:text-dark-heading">{getCouponStatusLabel(coupon)}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-brand-inactive-text dark:text-dark-body">Automatico</span>
-                        <span className="font-bold text-brand-dark dark:text-dark-heading">{coupon.is_automatic ? "Sim" : "Nao"}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-brand-inactive-text dark:text-dark-body">Catalogo vinculado</span>
-                        <span className="font-bold text-brand-dark dark:text-dark-heading">
-                          {relations.products.length + relations.services.length + relations.categories.length || "Completo"}
-                        </span>
-                      </div>
+                      </SidebarCard>
                     </div>
                   </div>
-
-                  <div className="rounded-3xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-5">
-                    <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-4">Acoes rapidas</h3>
-                    <div className="space-y-3">
-                      <Button onClick={() => onEdit(coupon)} className="w-full">
-                        <EditIcon className="w-4 h-4 mr-2" />
-                        Editar cupom
-                      </Button>
-                      <Button variant="outline" onClick={() => onToggleStatus(coupon)} className="w-full">
-                        {coupon.is_active ? "Desativar cupom" : "Ativar cupom"}
-                      </Button>
-                      <Button variant="ghost" onClick={() => onDelete(coupon)} className="w-full text-brand-red-dark">
-                        <TrashIcon className="w-4 h-4 mr-2" />
-                        Excluir cupom
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </aside>
+                </TabsContent>
+              </Tabs>
             </div>
           </div>
         </Tabs>
 
-        <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-brand-border dark:border-dark-border bg-white dark:bg-dark-background p-4 flex gap-3">
-          <Button variant="outline" onClick={() => onToggleStatus(coupon)} className="flex-1">
-            {coupon.is_active ? "Desativar" : "Ativar"}
-          </Button>
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
+          <ActionsDropdown
+            onEdit={() => onEdit(coupon)}
+            onCancel={() => onToggleStatus(coupon)}
+            cancelLabel={coupon.is_active ? "Desativar" : "Ativar"}
+            onDelete={() => onDelete(coupon)}
+            trigger={
+              <Button variant="outline" className="flex-1">
+                Opcoes
+              </Button>
+            }
+          />
           <Button onClick={() => onEdit(coupon)} className="flex-1">
             Editar
           </Button>

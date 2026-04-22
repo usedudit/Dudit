@@ -27,15 +27,15 @@ type FilterState = {
 interface CouponPageControlsProps {
     activeTab: "Todos" | "Ativos" | "Inativos" | "Automaticos"
     setActiveTab: (tab: "Todos" | "Ativos" | "Inativos" | "Automaticos") => void
-    search: string
-    onSearchChange: (value: string) => void
-    onOpenFilter: () => void
-    onAddCoupon: () => void
-    filters: FilterState
-    setFilters: React.Dispatch<React.SetStateAction<FilterState>>
-    viewMode: "list" | "grid"
-    onViewModeChange: (mode: "list" | "grid") => void
-    hasActiveFilters: boolean
+  search: string
+  onSearchChange: (value: string) => void
+  onOpenFilter: () => void
+  filters: FilterState
+  setFilters: React.Dispatch<React.SetStateAction<FilterState>>
+  viewMode: "list" | "grid"
+  onViewModeChange: (mode: "list" | "grid") => void
+  hasActiveFilters: boolean
+  onAddCoupon: () => void
 }
 
 const CouponPageControls: React.FC<CouponPageControlsProps> = ({
@@ -44,12 +44,12 @@ const CouponPageControls: React.FC<CouponPageControlsProps> = ({
     search,
     onSearchChange,
     onOpenFilter,
-    onAddCoupon,
-    filters,
-    setFilters,
-    viewMode,
-    onViewModeChange,
-    hasActiveFilters,
+  filters,
+  setFilters,
+  viewMode,
+  onViewModeChange,
+  hasActiveFilters,
+  onAddCoupon,
 }) => {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
@@ -195,36 +195,30 @@ const CouponPageControls: React.FC<CouponPageControlsProps> = ({
                         />
                     </div>
 
-                    <div className="flex items-center gap-3 shrink-0">
-                        <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px]">
-                            <button
-                                onClick={() => onViewModeChange("list")}
-                                className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
-                            >
-                                <ListIcon className="w-[18px] h-[18px]" />
-                            </button>
-                            <button
-                                onClick={() => onViewModeChange("grid")}
-                                className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
-                            >
-                                <GridIcon className="w-[18px] h-[18px]" />
-                            </button>
-                        </div>
-                        <Button onClick={onAddCoupon}>
-                            <PlusIcon className="w-4 h-4 mr-2" />
-                            Novo cupom
-                        </Button>
-                    </div>
-                </div>
-            </div>
+          <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
+            <button
+              onClick={() => onViewModeChange("list")}
+              className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
+            >
+              <ListIcon className="w-[18px] h-[18px]" />
+            </button>
+            <button
+              onClick={() => onViewModeChange("grid")}
+              className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
+            >
+              <GridIcon className="w-[18px] h-[18px]" />
+            </button>
+          </div>
+        </div>
+      </div>
 
             <div className="md:hidden w-full overflow-x-auto hide-scrollbar mb-4 flex-none px-4">
                 <div className="flex items-center gap-2">
-                    <BadgeList />
-                </div>
-            </div>
-        </>
-    )
+          <BadgeList />
+        </div>
+      </div>
+    </>
+  )
 }
 
 export default CouponPageControls

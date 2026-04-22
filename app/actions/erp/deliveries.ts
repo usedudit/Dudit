@@ -381,12 +381,12 @@ export async function getERPDeliveriesPageAction(
   options?: { cursor?: ERPDeliveryListCursor | null; limit?: number }
 ): Promise<
   | {
-      success: true
-      items: any[]
-      nextCursor: ERPDeliveryListCursor | null
-      hasMore: boolean
-      planGate?: { requiredPlanSlug: "vendedor"; message: string }
-    }
+    success: true
+    items: any[]
+    nextCursor: ERPDeliveryListCursor | null
+    hasMore: boolean
+    planGate?: { requiredPlanSlug: "vendedor"; message: string }
+  }
   | { success: false; error: string }
 > {
   try {

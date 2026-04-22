@@ -2,8 +2,8 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge, Button } from "@/components/reusable"
-import { EditIcon, SparklesIcon, TagIcon, TrashIcon } from "@/lib/icons"
+import { ActionsDropdown, Badge, Checkbox } from "@/components/reusable"
+import { SparklesIcon, TagIcon } from "@/lib/icons"
 import {
   CouponRow,
   getCouponApplyScopeLabel,
@@ -23,6 +23,8 @@ interface ColumnDef {
 interface CouponListItemProps {
   coupon: CouponRow
   columns: ColumnDef[]
+  selected: boolean
+  onSelect: (id: string) => void
   onDetails: (coupon: CouponRow) => void
   onEdit: (coupon: CouponRow) => void
   onToggleStatus: (coupon: CouponRow) => void
@@ -30,7 +32,7 @@ interface CouponListItemProps {
 }
 
 const CouponListItem = React.memo(
-  ({ coupon, columns, onDetails, onEdit, onToggleStatus, onDelete }: CouponListItemProps) => {
+  ({ coupon, columns, selected, onSelect, onDetails, onEdit, onToggleStatus, onDelete }: CouponListItemProps) => {
     const getJustifyClass = (align?: string) => {
       if (align === "center") return "justify-center"
       if (align === "right") return "justify-end"
@@ -85,7 +87,7 @@ const CouponListItem = React.memo(
             <div className={`flex ${getJustifyClass(columns.find((column) => column.id === "status")?.align)}`}>
               <div className="flex flex-wrap justify-end gap-2">
                 {coupon.is_automatic && (
-                  <Badge variant="blue" icon={<SparklesIcon />} className="whitespace-nowrap">
+                  <Badge variant="purple" icon={<SparklesIcon />} className="whitespace-nowrap">
                     Automatico
                   </Badge>
                 )}
@@ -97,37 +99,14 @@ const CouponListItem = React.memo(
           )
         case "actions":
           return (
-            <div className="flex items-center justify-end gap-1">
-              <Button
-                variant="ghost"
-                className="w-9 h-9 p-0"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onEdit(coupon)
-                }}
-              >
-                <EditIcon className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                className="px-3"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onToggleStatus(coupon)
-                }}
-              >
-                {coupon.is_active ? "Desativar" : "Ativar"}
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-9 h-9 p-0"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onDelete(coupon)
-                }}
-              >
-                <TrashIcon className="w-4 h-4 text-brand-red-dark" />
-              </Button>
+            <div className="flex justify-center action-btn" onClick={(event) => event.stopPropagation()}>
+              <ActionsDropdown
+                onView={() => onDetails(coupon)}
+                onEdit={() => onEdit(coupon)}
+                onCancel={() => onToggleStatus(coupon)}
+                cancelLabel={coupon.is_active ? "Desativar" : "Ativar"}
+                onDelete={() => onDelete(coupon)}
+              />
             </div>
           )
         default:
@@ -139,9 +118,15 @@ const CouponListItem = React.memo(
       <motion.tr
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="group hover:bg-brand-gray dark:hover:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
+        className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
         onClick={() => onDetails(coupon)}
       >
+        <td
+          className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <Checkbox checked={selected} onChange={() => onSelect(coupon.id)} />
+        </td>
         {columns.map((column) => (
           <td
             key={column.id}

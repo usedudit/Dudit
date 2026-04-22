@@ -220,16 +220,25 @@ export default function DeliveriesPage({
               <motion.div key="empty" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full">
                 <IconPlaceholder
                   placeholderType="image"
-                  imageSrc="https://img.dudit.com.br/static/mascots/Entregas.png"
-                  imageAlt="Sem entregas"
+                  imageSrc={
+                    planGate
+                      ? "https://img.dudit.com.br/static/mascots/Plano.png"
+                      : "https://img.dudit.com.br/static/mascots/Entregas.png"
+                  }
+                  imageAlt={planGate ? "Plano necessário" : "Sem entregas"}
                   title={planGate ? "Plano necessário" : "Nenhuma entrega encontrada"}
-                  subtitle={planGate ? planGate.message : "Crie uma entrega a partir de um pedido para começar."}
+                  subtitle={
+                    planGate
+                      ? planGate.message
+                      : "Crie uma entrega a partir de um pedido para começar."
+                  }
+                  itemButton={
+                    planGate ? {
+                      text: "Ver Plano Vender",
+                      action: () => openPlanUpgrade("vendedor"),
+                    } : undefined
+                  }
                 />
-                {planGate ? (
-                  <Button className="mt-6 rounded-full" onClick={() => openPlanUpgrade("vendedor")}>
-                    Ver plano Vendedor
-                  </Button>
-                ) : null}
               </motion.div>
             ) : viewMode === "grid" ? (
               <motion.div key="grid" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">

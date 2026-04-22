@@ -4,9 +4,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
-import { Badge, Button, ThreeDotsLoader } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
 import AlertModal from "@/components/reusable/AlertModal"
-import { ArrowUpDownIcon, SparklesIcon, TagIcon } from "@/lib/icons"
+import { ArrowUpDownIcon } from "@/lib/icons"
 import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import {
@@ -34,7 +34,6 @@ import {
   EMPTY_SCOPE_DATA,
   getCouponApplyScopeLabel,
   getCouponPrimaryMeta,
-  getCouponStatusVariant,
   getCouponUsageCount,
   mapCouponToForm,
 } from "@/lib/types/coupon"
@@ -104,6 +103,7 @@ export default function CouponsPage({
   const [isSaving, setIsSaving] = useState(false)
   const [couponToDelete, setCouponToDelete] = useState<CouponRow | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [selection, setSelection] = useState({ ids: new Set<string>() })
 
   const tableContainerRef = useRef<HTMLDivElement>(null)
   const [scrollState, setScrollState] = useState({ left: false, right: false })
@@ -327,6 +327,14 @@ export default function CouponsPage({
     setCouponToDelete(coupon)
   }, [])
 
+  const handleSelectRow = useCallback((id: string) => {
+    setSelection((prev) => {
+      const next = new Set(prev.ids)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return { ids: next }
+    })
+  }, [])
+
   const confirmDelete = useCallback(async () => {
     if (!couponToDelete) return
     setIsDeleting(true)
@@ -340,6 +348,11 @@ export default function CouponsPage({
       if (selectedCouponId === couponToDelete.id) {
         handleBackToList()
       }
+      setSelection((prev) => {
+        const next = new Set(prev.ids)
+        next.delete(couponToDelete.id)
+        return { ids: next }
+      })
       setCouponToDelete(null)
       await refreshCoupons()
     } finally {
@@ -580,75 +593,74 @@ export default function CouponsPage({
         transition={{ duration: 0.2 }}
         className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
       >
-        <CouponPageControls
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          search={search}
-          onSearchChange={setSearch}
-          onOpenFilter={() => setModals((prev) => ({ ...prev, filter: true }))}
-          onAddCoupon={openCreate}
-          filters={filters}
-          setFilters={setFilters}
-          viewMode={effectiveViewMode}
-          onViewModeChange={setViewModeState}
-          hasActiveFilters={hasActiveFilters}
-        />
+        <style>{`
+          .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+          .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+          .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
+          .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
+          .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+          .hide-scrollbar::-webkit-scrollbar { display: none; }
+          .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        `}</style>
 
-        <div className="px-4 md:px-8 pb-6">
-          <div className="rounded-3xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface overflow-hidden">
-            <div className="px-5 md:px-6 py-5 border-b border-brand-border dark:border-dark-border">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                    <TagIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading">Cupons</h1>
-                    <p className="text-sm md:text-[15px] font-medium text-brand-inactive-text dark:text-dark-body">
-                      Estrutura completa de cadastro, consulta e regras promocionais do ERP.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="gray" icon={null}>
-                    {filteredCoupons.length} exibido(s)
-                  </Badge>
-                  <Badge variant="green" icon={null}>
-                    {coupons.filter((coupon) => coupon.is_active).length} ativo(s)
-                  </Badge>
-                  <Badge variant="blue" icon={<SparklesIcon />}>
-                    {coupons.filter((coupon) => coupon.is_automatic).length} automatico(s)
-                  </Badge>
-                  <Badge variant={getCouponStatusVariant({ is_active: true })} icon={null}>
-                    {totalCoupons} total
-                  </Badge>
-                </div>
+        <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+          <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+            <div className="flex flex-col gap-2 pt-1">
+              <div className="flex items-center gap-3">
+                <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                  Cupons
+                </h1>
               </div>
+              <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                Gerencie cupons, regras promocionais e escopos de aplicacao.
+              </p>
             </div>
 
-            <div className="flex-1 min-h-[420px]">
-              {isLoadingPage ? (
-                <div className="h-[420px] flex items-center justify-center">
-                  <ThreeDotsLoader />
-                </div>
-              ) : filteredCoupons.length === 0 ? (
-                <div className="h-[420px] flex flex-col items-center justify-center text-center px-6">
-                  <div className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border mb-4">
-                    <TagIcon className="w-7 h-7 text-brand-dark dark:text-dark-heading" />
-                  </div>
-                  <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-2">Nenhum cupom encontrado</h2>
-                  <p className="text-sm text-brand-inactive-text dark:text-dark-body max-w-md mb-6">
-                    Ajuste a busca, remova filtros ou cadastre um novo cupom para popular esta area.
-                  </p>
-                  <Button onClick={openCreate}>Criar cupom</Button>
-                </div>
-              ) : effectiveViewMode === "grid" ? (
-                <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="flex items-center gap-3">
+              <Button onClick={openCreate}>Novo cupom</Button>
+            </div>
+          </div>
+
+          <CouponPageControls
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            search={search}
+            onSearchChange={setSearch}
+            onOpenFilter={() => setModals((prev) => ({ ...prev, filter: true }))}
+            filters={filters}
+            setFilters={setFilters}
+            viewMode={effectiveViewMode}
+            onViewModeChange={setViewModeState}
+            hasActiveFilters={hasActiveFilters}
+            onAddCoupon={openCreate}
+          />
+
+          <div className="flex-1 min-h-[420px]">
+            {isLoadingPage ? (
+              <div className="h-[420px] flex items-center justify-center">
+                <ThreeDotsLoader />
+              </div>
+            ) : filteredCoupons.length === 0 ? (
+              <div className="h-[520px] flex items-center justify-center px-4 md:px-8">
+                <IconPlaceholder
+                  placeholderType="image"
+                  imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                  imageAlt="Nenhum cupom encontrado"
+                  title="Nenhum cupom encontrado"
+                  subtitle="Tente ajustar seus filtros ou cadastre um novo cupom."
+                  itemButton={{ text: "Criar cupom", action: openCreate }}
+                />
+              </div>
+            ) : effectiveViewMode === "grid" ? (
+              <div className="px-4 md:px-8 pb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   <AnimatePresence>
                     {paginatedCoupons.map((coupon) => (
                       <CouponGridCard
                         key={coupon.id}
                         coupon={coupon}
+                        selected={selection.ids.has(coupon.id)}
+                        onSelect={() => handleSelectRow(coupon.id)}
                         onDetails={openDetails}
                         onEdit={openEdit}
                         onToggleStatus={handleToggleStatus}
@@ -657,25 +669,43 @@ export default function CouponsPage({
                     ))}
                   </AnimatePresence>
                 </div>
-              ) : (
+              </div>
+            ) : (
+              <div className="px-4 md:px-8 pb-6">
                 <div className="relative">
                   <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
                   <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
 
                   <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                    <table className="w-full text-left border-separate border-spacing-0 min-w-[1320px]">
+                    <table className="w-full text-left border-separate border-spacing-0 min-w-[1380px]">
                       <thead>
                         <tr className="bg-brand-gray dark:bg-dark-border/50">
+                          <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-l-lg pl-6 w-12">
+                            <Checkbox
+                              checked={paginatedCoupons.length > 0 && paginatedCoupons.every((coupon) => selection.ids.has(coupon.id))}
+                              onChange={() => {
+                                const allSelected = paginatedCoupons.every((coupon) => selection.ids.has(coupon.id))
+                                setSelection((prev) => {
+                                  const next = new Set(prev.ids)
+                                  if (allSelected) {
+                                    paginatedCoupons.forEach((coupon) => next.delete(coupon.id))
+                                  } else {
+                                    paginatedCoupons.forEach((coupon) => next.add(coupon.id))
+                                  }
+                                  return { ids: next }
+                                })
+                              }}
+                            />
+                          </th>
                           {COLUMNS.map((column, index) => {
                             const isSortable = column.id !== "actions"
                             const isSorted = sortConfig?.key === column.id
-                            const isFirst = index === 0
                             const isLast = index === COLUMNS.length - 1
 
                             return (
                               <th
                                 key={column.id}
-                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${column.align === "right" ? "text-right" : column.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isFirst ? "rounded-l-lg pl-6" : ""} ${isLast ? "rounded-r-lg pr-6" : ""}`}
+                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${column.align === "right" ? "text-right" : column.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isLast ? "rounded-r-lg pr-6" : ""}`}
                                 style={{ width: column.width }}
                                 onClick={() => {
                                   if (!isSortable) return
@@ -707,6 +737,8 @@ export default function CouponsPage({
                             key={coupon.id}
                             coupon={coupon}
                             columns={COLUMNS}
+                            selected={selection.ids.has(coupon.id)}
+                            onSelect={handleSelectRow}
                             onDetails={openDetails}
                             onEdit={openEdit}
                             onToggleStatus={handleToggleStatus}
@@ -717,12 +749,12 @@ export default function CouponsPage({
                     </table>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
-        </div>
 
-        <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+          <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+        </div>
       </motion.div>
 
       <FilterSheet
