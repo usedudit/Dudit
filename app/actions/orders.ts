@@ -11,6 +11,8 @@ import { checkLimit, increment_usage_counter } from "@/lib/services/subscription
 import { revalidateOrders } from "@/lib/utils/revalidation"
 import { releaseOrderInventory, reserveOrderInventory } from "@/lib/stock/reservations"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
+import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
+import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 
 // Single revalidation to minimize cache calls
 const revalidateOrdersCache = async () => await revalidateOrders("")
@@ -26,6 +28,7 @@ export async function createOrderAction(data: {
   notes: string
   partnerId: string
   csrf_token?: string
+  couponCode?: string | null
 }) {
   await requireRateLimit(RateLimitCategory.ORDER_CREATE)
 
@@ -121,12 +124,59 @@ export async function createOrderAction(data: {
     return { error: "Tipo de item inválido" }
   }
 
-  // Verify client total matches server calculation (tolerance for floating point)
   const expectedTotal = serverPrice * data.quantity
-  if (Math.abs(expectedTotal - data.totalAmount) > 0.01) {
-    console.warn(`[SECURITY] Price manipulation attempt: user=${buyerId}, expected=${expectedTotal}, claimed=${data.totalAmount}`)
-    return { error: "O valor do pedido não corresponde ao preço atual do item" }
+
+  // ========================================================================
+  // COUPON VALIDATION & PRICING ENGINE
+  // ========================================================================
+  let couponIdToSave: string | null = null
+  let couponDiscountAmount = 0
+  let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
+
+  // Try manual coupon code first, then auto-detect
+  if (data.couponCode?.trim()) {
+    const couponResult = await validateCoupon({
+      partnerId: data.partnerId,
+      code: data.couponCode,
+      customerId: buyerId,
+      subtotal: expectedTotal,
+      items: data.itemType === "product" ? [{ productId: data.itemId }] : [{ serviceId: data.itemId }],
+    })
+    if (couponResult.valid) {
+      couponIdToSave = couponResult.couponId || null
+      couponDiscountAmount = couponResult.discountAmount
+      couponPricingData = couponResult.pricingCoupon || null
+    }
+    // If invalid, proceed without coupon (don't block the order)
+  } else {
+    // Auto-detect best automatic coupon
+    const autoResult = await findBestAutomaticCoupon({
+      partnerId: data.partnerId,
+      customerId: buyerId,
+      subtotal: expectedTotal,
+      items: data.itemType === "product" ? [{ productId: data.itemId }] : [{ serviceId: data.itemId }],
+    })
+    if (autoResult.valid) {
+      couponIdToSave = autoResult.couponId || null
+      couponDiscountAmount = autoResult.discountAmount
+      couponPricingData = autoResult.pricingCoupon || null
+    }
   }
+
+  // Run through pricing engine for consistent calculation
+  const pricingResult = calculateOrderPricing({
+    items: [{
+      productId: data.itemType === "product" ? data.itemId : null,
+      serviceId: data.itemType === "service" ? data.itemId : null,
+      unitPrice: serverPrice,
+      quantity: data.quantity,
+    }],
+    shippingCost: 0,
+    coupon: couponPricingData,
+  })
+
+  const finalTotal = pricingResult.finalTotal
+  couponDiscountAmount = pricingResult.couponDiscountAmount
 
   const { data: buyerProfile } = await supabase.from("user_profiles").select("full_name").eq("user_id", buyerId).single()
 
@@ -134,13 +184,15 @@ export async function createOrderAction(data: {
     buyer_id: buyerId,
     customer_name: buyerProfile?.full_name || null,
     partner_id: data.partnerId,
-    total_amount: expectedTotal, // SECURITY: Use server-calculated total, not client value
+    total_amount: finalTotal,
     delivery_type: data.deliveryType,
     delivery_address: data.deliveryAddress,
     payment_method: data.paymentMethod,
     payment_provider: data.paymentMethod,
     situation: "pending",
     notes: data.notes || null,
+    coupon_id: couponIdToSave,
+    discount_amount: couponDiscountAmount,
   }
 
   const { data: order, error } = await supabase.from("orders").insert(orderData).select().single()
@@ -157,10 +209,22 @@ export async function createOrderAction(data: {
     order_id: order.id,
     product_id: data.itemId,
     product_name: itemName,
-    product_price: serverPrice, // SECURITY: Use server price
+    product_price: serverPrice,
     quantity: data.quantity,
     subtotal: expectedTotal,
   })
+
+  // Record coupon usage
+  if (couponIdToSave) {
+    await supabase.from("coupon_usages").upsert(
+      {
+        coupon_id: couponIdToSave,
+        customer_id: buyerId,
+        order_id: order.id,
+      },
+      { onConflict: "coupon_id,order_id", ignoreDuplicates: true }
+    )
+  }
 
   if (data.itemType === "product") {
     const reserveResult = await reserveOrderInventory({
@@ -184,7 +248,14 @@ export async function createOrderAction(data: {
 
   revalidateOrdersCache()
 
-  return { success: true, orderNumber: order.order_number, orderId: order.id }
+  return {
+    success: true,
+    orderNumber: order.order_number,
+    orderId: order.id,
+    couponApplied: couponIdToSave ? true : false,
+    couponDiscount: couponDiscountAmount,
+    finalTotal,
+  }
 }
 
 export async function updateOrderAction(

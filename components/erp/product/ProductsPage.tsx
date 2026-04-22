@@ -7,6 +7,7 @@ import { useMediaQuery } from "../hooks"
 import { useStore } from "@/lib/store-context"
 import { generateSKUBase } from "@/lib/utils/code-generators"
 import type { Product } from "@/lib/types/product"
+import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { UNITS } from "@/lib/constants/product-constants"
@@ -146,11 +147,7 @@ const EmptyState = React.memo(({ type, onAddFirst, onClearFilters }: EmptyStateP
     }
 
     return (
-        <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
+        <FadeIn
             className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
         >
             <IconPlaceholder
@@ -168,7 +165,7 @@ const EmptyState = React.memo(({ type, onAddFirst, onClearFilters }: EmptyStateP
                     variant: "outline"
                 } : undefined}
             />
-        </motion.div>
+        </FadeIn>
     )
 })
 EmptyState.displayName = "EmptyState"
@@ -206,7 +203,7 @@ export default function ProductsPage({
             if (!res.success) throw new Error(res.error || "Erro ao carregar produtos.")
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
-        dedupeKey: (p) => String(p?.id || ""),
+        dedupeKey: useCallback((p: any) => String(p?.id || ""), []),
     })
 
     // State
@@ -216,7 +213,7 @@ export default function ProductsPage({
         console.log(">>> MOUNTED ProductsPage client component")
         return () => console.log("<<< UNMOUNTED ProductsPage client component")
     }, [])
-    
+
     console.log("--- RENDER ProductsPage client component")
 
     // Update state when server/query data changes (e.g. after background refresh)
@@ -294,9 +291,11 @@ export default function ProductsPage({
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return
         const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
-        setScrollState({
-            left: scrollLeft > 0,
-            right: scrollLeft < scrollWidth - clientWidth - 2,
+        setScrollState((prev) => {
+            const nextLeft = scrollLeft > 0
+            const nextRight = scrollLeft < scrollWidth - clientWidth - 2
+            if (prev.left === nextLeft && prev.right === nextRight) return prev
+            return { left: nextLeft, right: nextRight }
         })
     }, [])
 
@@ -309,7 +308,7 @@ export default function ProductsPage({
     }, [checkScroll, effectiveViewMode, data.products])
 
     useEffect(() => {
-        const t = setTimeout(() => setData((p) => ({ ...p, debouncedSearch: p.search })), 500)
+        const t = setTimeout(() => setData((p) => ({ ...p, debouncedSearch: p.search })), 300)
         return () => clearTimeout(t)
     }, [data.search])
 
@@ -476,7 +475,7 @@ export default function ProductsPage({
                 }
 
                 toast({ title: "Sucesso" })
-                
+
                 // For NEW products, we might want to add them immediately
                 // For UPDATED products, we rely on invalidateQueries to fetch theJoined records (names, etc)
                 queryClient.invalidateQueries({ queryKey: productsQueryKey })
@@ -679,267 +678,222 @@ export default function ProductsPage({
         data.products.filter((p) => selection.ids.has(p.id)),
         [data.products, selection.ids])
 
-    if (ui.pageState === "form") {
-        return (
-            <AddProductPage
-                mode={ui.formMode as any}
-                setMode={(m) => setUi((p) => ({ ...p, formMode: m }))}
-                product={(ui.formMode === "edit" || ui.formMode === "details" ? selection.product : selection.duplicate) as any}
-                onBack={() => setUi((p) => ({ ...p, pageState: "list" }))}
-                onClose={() => setUi((p) => ({ ...p, pageState: "list" }))}
-                onSave={handleSaveProduct}
-                isSaving={ui.isSaving}
-                suppliers={suppliers}
-                unidadesMedida={UNIDADES_MEDIDA}
-                partnerId={partnerId}
-                storeId={selectedStore?.id || ""}
-                isLoadingDetails={selection.loadingDetails}
-            />
-        )
-    }
-
     return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.2 }}
-            className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
-        >
-            <style>{`
-        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
-        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
-        .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
-
-            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-                <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
-                    <div className="flex flex-col gap-2 pt-1">
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                                Produtos
-                            </h1>
-                        </div>
-                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                            Gerencie seus produtos, estoque e preços.
-                        </p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <Dropdown
-                            trigger={
-                                <Button variant="outline">
-                                    <Settings2Icon className="w-[18px] h-[18px]" /> Ações
-                                </Button>
-                            }
-                            align="right"
-                            showChevron={false}
-                            fullWidth={false}
-                        >
-                            <DropdownItem onClick={() => setModals((p) => ({ ...p, import: true }))}>
-                                <UploadIcon size={16} /> Importar XML
-                            </DropdownItem>
-                            <DropdownItem onClick={() => setModals((p) => ({ ...p, export: true }))}>
-                                <ExportFileIcon size={16} /> Exportar
-                            </DropdownItem>
-                        </Dropdown>
-
-                        <Button
-                            onClick={handleAddFirstProduct}
-                            className="w-full"
-                        >
-                            <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
-                            Novo Produto
-                        </Button>
-                    </div>
-                </div>
-
-                {hasProducts && (
-                    <ProductPageControls
-                        activeTab={activeTab}
-                        setActiveTab={setActiveTab}
-                        search={data.search}
-                        onSearchChange={(val) => setData((p) => ({ ...p, search: val }))}
-                        onOpenFilter={() => setModals((p) => ({ ...p, filter: true }))}
-                        onOpenImport={() => setModals((p) => ({ ...p, import: true }))}
-                        onOpenExport={() => setModals((p) => ({ ...p, export: true }))}
-                        onAddProduct={handleAddFirstProduct}
-                        filters={filters}
-                        setFilters={setFilters}
-                        viewMode={viewMode}
-                        onViewModeChange={(mode) => {
-                            setViewModeState(mode)
-                        }}
-                        hasActiveFilters={hasActiveFilters}
+        <>
+            <AnimatePresence mode="wait">
+                {ui.pageState === "form" ? (
+                    <AddProductPage
+                        key="form"
+                        mode={ui.formMode as any}
+                        setMode={(m) => setUi((p) => ({ ...p, formMode: m }))}
+                        product={(ui.formMode === "edit" || ui.formMode === "details" ? selection.product : selection.duplicate) as any}
+                        onBack={() => setUi((p) => ({ ...p, pageState: "list" }))}
+                        onClose={() => setUi((p) => ({ ...p, pageState: "list" }))}
+                        onSave={handleSaveProduct}
+                        isSaving={ui.isSaving}
+                        suppliers={suppliers}
+                        unidadesMedida={UNIDADES_MEDIDA}
+                        partnerId={partnerId}
+                        storeId={selectedStore?.id || ""}
+                        isLoadingDetails={selection.loadingDetails}
                     />
-                )}
+                ) : (
+                    <FadeIn
+                        key="list"
+                        className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
+                    >
+                        <style>{`
+                        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
+                        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+                        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
+                        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
+                        .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                        .hide-scrollbar::-webkit-scrollbar { display: none; }
+                        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+                    `}</style>
 
-                <div ref={containerRef} className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-0 px-4 md:px-8">
-
-                    <AnimatePresence mode="wait">
-                        {!hasProducts ? (
-                            <motion.div key="empty-no-data" className="w-full h-full">
-                                <EmptyState
-                                    type="no-data"
-                                    onAddFirst={handleAddFirstProduct}
-                                    onClearFilters={handleClearFilters}
-                                />
-                            </motion.div>
-                        ) : paginated.length === 0 ? (
-                            <motion.div key="empty-results" className="w-full h-full">
-                                <EmptyState
-                                    type={isFiltered ? "no-results" : "empty-tab"}
-                                    onAddFirst={handleAddFirstProduct}
-                                    onClearFilters={handleClearFilters}
-                                />
-                            </motion.div>
-                        ) : (
-                            <motion.div
-                                key={activeTab + effectiveViewMode}
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.2 }}
-                                className="w-full"
-                            >
-                                {isMobile ? (
-                                    <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
-                                        {paginated.map((product) => (
-                                            <ProductMobileItem
-                                                key={product.id}
-                                                product={product}
-                                                onClick={handleDetailsProduct}
-                                                isSelected={selection.ids.has(product.id)}
-                                                onSelect={handleSelectRow}
-                                            />
-                                        ))}
+                        <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                            <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                                <div className="flex flex-col gap-2 pt-1">
+                                    <div className="flex items-center gap-3">
+                                        <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                                            Produtos
+                                        </h1>
                                     </div>
-                                ) : (
-                                    effectiveViewMode === "grid" ? (
-                                        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                            {paginated.map((p) => (
-                                                <ProductGridCard
-                                                    key={p.id}
-                                                    product={p}
-                                                    selected={selection.ids.has(p.id)}
-                                                    onSelect={() => handleSelectRow(p.id)}
-                                                    onDetails={() => handleDetailsProduct(p)}
-                                                    onEdit={() => handleEditProduct(p)}
-                                                    onDelete={() => handleDeleteProduct(p)}
-                                                    onDuplicate={() => handleDuplicateProduct(p)}
-                                                />
-                                            ))}
-                                        </div>
+                                    <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                                        Gerencie seus produtos, estoque e preços.
+                                    </p>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                    <Dropdown
+                                        trigger={
+                                            <Button variant="outline">
+                                                <Settings2Icon className="w-[18px] h-[18px]" /> Ações
+                                            </Button>
+                                        }
+                                        align="right"
+                                        showChevron={false}
+                                        fullWidth={false}
+                                    >
+                                        <DropdownItem onClick={() => setModals((p) => ({ ...p, import: true }))}>
+                                            <UploadIcon size={16} /> Importar XML
+                                        </DropdownItem>
+                                        <DropdownItem onClick={() => setModals((p) => ({ ...p, export: true }))}>
+                                            <ExportFileIcon size={16} /> Exportar
+                                        </DropdownItem>
+                                    </Dropdown>
+
+                                    <Button
+                                        onClick={handleAddFirstProduct}
+                                        className="w-full"
+                                    >
+                                        <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
+                                        Novo Produto
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {hasProducts && (
+                                <ProductPageControls
+                                    activeTab={activeTab}
+                                    setActiveTab={setActiveTab}
+                                    search={data.search}
+                                    onSearchChange={(val) => setData((p) => ({ ...p, search: val }))}
+                                    onOpenFilter={() => setModals((p) => ({ ...p, filter: true }))}
+                                    onOpenImport={() => setModals((p) => ({ ...p, import: true }))}
+                                    onOpenExport={() => setModals((p) => ({ ...p, export: true }))}
+                                    onAddProduct={handleAddFirstProduct}
+                                    filters={filters}
+                                    setFilters={setFilters}
+                                    viewMode={viewMode}
+                                    onViewModeChange={(mode) => {
+                                        setViewModeState(mode)
+                                    }}
+                                    hasActiveFilters={hasActiveFilters}
+                                />
+                            )}
+
+                            <div ref={containerRef} className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-0 px-4 md:px-8">
+                                <AnimatePresence mode="wait">
+                                    {!hasProducts ? (
+                                        <FadeIn key="empty-no-data" className="w-full h-full">
+                                            <EmptyState
+                                                type="no-data"
+                                                onAddFirst={handleAddFirstProduct}
+                                                onClearFilters={handleClearFilters}
+                                            />
+                                        </FadeIn>
+                                    ) : paginated.length === 0 ? (
+                                        <FadeIn key="empty-results" className="w-full h-full">
+                                            <EmptyState
+                                                type={isFiltered ? "no-results" : "empty-tab"}
+                                                onAddFirst={handleAddFirstProduct}
+                                                onClearFilters={handleClearFilters}
+                                            />
+                                        </FadeIn>
                                     ) : (
-                                        <div className="w-full overflow-hidden rounded-xl relative">
-                                            <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                                            <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
-
-                                            <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                                                <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
-                                                    <thead>
-                                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                            <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
-                                                                <div className="flex items-center">
-                                                                    <Checkbox
-                                                                        checked={selection.ids.size === paginated.length && paginated.length > 0}
-                                                                        onChange={(checked) =>
-                                                                            setSelection((p) => ({
-                                                                                ...p,
-                                                                                ids: checked ? new Set(paginated.map((x) => x.id)) : new Set(),
-                                                                            }))
-                                                                        }
-                                                                        className="bg-white dark:bg-dark-background"
-                                                                    />
-                                                                </div>
-                                                            </th>
-                                                            {FIXED_COLUMNS.map((col, idx) => {
-                                                                const isSortable = col.id !== "actions";
-                                                                const isSorted = ui.sort?.key === col.id;
-                                                                const isLast = idx === FIXED_COLUMNS.length - 1;
-
-                                                                return (
-                                                                    <th
-                                                                        key={col.id}
-                                                                        className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isLast ? "rounded-r-lg" : ""}`}
-                                                                        style={{ width: col.width, minWidth: col.minWidth }}
-                                                                        onClick={() => {
-                                                                            if (!isSortable) return;
-                                                                            setUi((p) => ({
-                                                                                ...p,
-                                                                                sort: p.sort?.key === col.id && p.sort.direction === "asc"
-                                                                                    ? { key: col.id, direction: "desc" }
-                                                                                    : { key: col.id, direction: "asc" },
-                                                                            }));
-                                                                        }}
-                                                                    >
-                                                                        <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
-                                                                            <span>{col.label}</span>
-                                                                            {isSortable && (
-                                                                                <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
-                                                                                    <ArrowUpDownIcon
-                                                                                        size={14}
-                                                                                        className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
-                                                                                            } ${isSorted && ui.sort?.direction === 'desc' ? 'rotate-180' : ''}`}
-                                                                                    />
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    </th>
-                                                                );
-                                                            })}
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
+                                        <AnimatePresence mode="wait">
+                                            <FadeIn key={effectiveViewMode} className="w-full">
+                                                {effectiveViewMode === "grid" ? (
+                                                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 md:gap-6 pb-6">
                                                         {paginated.map((product) => (
-                                                            <ProductListItem
+                                                            <ProductGridCard
                                                                 key={product.id}
                                                                 product={product}
-                                                                columns={FIXED_COLUMNS}
-                                                                suppliers={suppliers}
                                                                 selected={selection.ids.has(product.id)}
-                                                                onSelect={handleSelectRow}
-                                                                onEdit={handleEditProduct}
-                                                                onDuplicate={handleDuplicateProduct}
-                                                                onDelete={handleDeleteProduct}
-                                                                onDetails={handleDetailsProduct}
+                                                                onSelect={() => handleSelectRow(product.id)}
+                                                                onEdit={() => handleEditProduct(product)}
+                                                                onDetails={() => handleDetailsProduct(product)}
+                                                                onDelete={() => handleDeleteProduct(product)}
+                                                                onDuplicate={() => handleDuplicateProduct(product)}
                                                             />
                                                         ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    )
-                                )}
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                    {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
-                </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-full overflow-hidden rounded-xl relative">
+                                                        <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                                        <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
 
-                {hasProducts && paginated.length > 0 && (
-                    <Pagination
-                        currentPage={data.page}
-                        totalPages={totalPages}
-                        onPageChange={(p) => {
-                            setData(prev => ({ ...prev, page: p }))
-                            if (p === totalPages && hasNextPage && !isFetchingNextPage) {
-                                void fetchNextPage()
-                            }
-                        }}
-                    />
+                                                        <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                                                <thead>
+                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                        <th className="py-3 pl-6 pr-3 w-[48px] bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
+                                                                            <Checkbox
+                                                                                checked={selection.ids.size === paginated.length && paginated.length > 0}
+                                                                                onCheckedChange={(checked) => {
+                                                                                    if (checked) setSelection(p => ({ ...p, ids: new Set([...p.ids, ...paginated.map(x => x.id)]) }))
+                                                                                    else setSelection(p => {
+                                                                                        const s = new Set(p.ids)
+                                                                                        paginated.forEach(x => s.delete(x.id))
+                                                                                        return { ...p, ids: s }
+                                                                                    })
+                                                                                }}
+                                                                            />
+                                                                        </th>
+                                                                        {FIXED_COLUMNS.map((col) => {
+                                                                            const isSorted = ui.sort?.key === col.id
+                                                                            return (
+                                                                                <th
+                                                                                    key={col.id}
+                                                                                    className={`py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${col.id === "actions" ? "rounded-r-lg" : ""}`}
+                                                                                    style={{ width: col.width, minWidth: col.minWidth }}
+                                                                                    onClick={() => {
+                                                                                        if (col.id === "actions") return
+                                                                                        setUi((prev) => ({
+                                                                                            ...prev,
+                                                                                            sort: {
+                                                                                                key: col.id,
+                                                                                                direction: prev.sort?.key === col.id && prev.sort.direction === "asc" ? "desc" : "asc",
+                                                                                            },
+                                                                                        }))
+                                                                                    }}
+                                                                                >
+                                                                                    <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                                        <span>{col.label}</span>
+                                                                                        {col.id !== "actions" && (
+                                                                                            <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                                                                <ArrowUpDownIcon
+                                                                                                    size={14}
+                                                                                                    className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && ui.sort?.direction === "desc" ? "rotate-180" : ""}`}
+                                                                                                />
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </th>
+                                                                            )
+                                                                        })}
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {paginated.map((product) => (
+                                                                        <ProductListItem
+                                                                            key={product.id}
+                                                                            product={product}
+                                                                            columns={FIXED_COLUMNS}
+                                                                            selected={selection.ids.has(product.id)}
+                                                                            onSelect={handleSelectRow}
+                                                                            onEdit={handleEditProduct}
+                                                                            onDetails={handleDetailsProduct}
+                                                                            onDelete={handleDeleteProduct}
+                                                                            onDuplicate={handleDuplicateProduct}
+                                                                            suppliers={[]} />
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </FadeIn>
+                                        </AnimatePresence>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        </div>
+                    </FadeIn>
                 )}
-                {hasNextPage && data.page === totalPages && isFetchingNextPage ? (
-                    <div className="flex flex-col gap-2 py-2 px-4">
-                        <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse" />
-                        <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse opacity-70" />
-                    </div>
-                ) : null}
-
-            </div>
+            </AnimatePresence>
 
             <FloatingActionBar
                 selectedCount={selection.ids.size}
@@ -1050,6 +1004,6 @@ export default function ProductsPage({
                     <p className="text-lg font-semibold text-brand-dark dark:text-dark-heading text-center leading-tight">{actionModal.text}</p>
                 </div>
             </DefaultModal>
-        </motion.div>
+        </>
     )
 }

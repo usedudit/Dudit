@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { Tabs, TabsList, TabsTrigger, Button, Badge, Tooltip, Input, Combobox, ActionsDropdown } from "@/components/reusable"
 import { ChevronLeftIcon, ThreeDotsIcon, EditIcon, SaveIcon } from "@/lib/icons"
 import type { Product } from "@/lib/types/product"
@@ -622,17 +623,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
     return (
         <FadeIn>
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
-                <Tabs
-                    value={activeTab}
-                    onValueChange={(v) => {
-                        if (v === "variations" && variantsPlanBlocked) {
-                            openPlanUpgrade("vendedor")
-                            return
-                        }
-                        setActiveTab(v)
-                    }}
-                    className="flex flex-col h-full w-full"
-                >
+                <Tabs value={activeTab} onValueChange={(v) => { if (v === "variations" && variantsPlanBlocked) { openPlanUpgrade("vendedor"); return } setActiveTab(v) }}
+                    className="flex flex-col h-full w-full">
                     <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
                         {/* Sticky Header - Desktop Only title and tabs */}
@@ -723,61 +715,61 @@ const AddProductPage: FC<AddProductPageProps> = ({
 
                         {/* Tab Content */}
                         <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                            <div className={activeTab === "general" ? "block" : "hidden"}>
-                                <FadeIn key="general" className="block">
-                                    <ProductGeneralTab
-                                        productData={productData} handleInputChange={handleInputChange}
-                                        categories={categoryOptions} subCategories={subCategoryOptions} brands={brandOptions} locations={locationOptions}
-                                        unidadesMedida={unidadesMedida} isEditing={isEditing && !isSavingProduct}
-                                        images={productData.images || []} onImageUpload={handleImageUpload}
-                                        onRemoveImage={handleRemoveImage} onSetPrimaryImage={handleSetPrimaryImage}
-                                        fieldErrors={fieldErrors} onFieldChange={handleFieldChange}
-                                        uploadingImages={uploadingImages} mode={internalMode === "duplicate" ? "add" : internalMode}
-                                        blockedImages={blockedImages} isSaving={isSavingProduct}
-                                        sellsOnline={sellsOnline}
-                                        generateRandomCode={() => { }}
-                                        openAddItemModal={handleOpenMetadataModal}
-                                    />
-                                </FadeIn>
-                            </div>
-                            <div className={activeTab === "variations" ? "block" : "hidden"}>
-                                {isLoadingDetails ? (
-                                    <div className="flex flex-col items-center justify-center pt-24 pb-32">
-                                        <Spinner size={36} className="text-brand-primary" />
-                                        <p className="mt-4 text-[15px] text-brand-dark dark:text-dark-heading font-medium">Carregando variações...</p>
-                                    </div>
-                                ) : (
+                            <AnimatePresence mode="wait">
+                                {activeTab === "general" && (
+                                    <FadeIn key="general" className="block">
+                                        <ProductGeneralTab
+                                            productData={productData} handleInputChange={handleInputChange}
+                                            categories={categoryOptions} subCategories={subCategoryOptions} brands={brandOptions} locations={locationOptions}
+                                            unidadesMedida={unidadesMedida} isEditing={isEditing && !isSavingProduct}
+                                            images={productData.images || []} onImageUpload={handleImageUpload}
+                                            onRemoveImage={handleRemoveImage} onSetPrimaryImage={handleSetPrimaryImage}
+                                            fieldErrors={fieldErrors} onFieldChange={handleFieldChange}
+                                            uploadingImages={uploadingImages} mode={internalMode === "duplicate" ? "add" : internalMode}
+                                            blockedImages={blockedImages} isSaving={isSavingProduct}
+                                            sellsOnline={sellsOnline}
+                                            generateRandomCode={() => { }}
+                                            openAddItemModal={handleOpenMetadataModal}
+                                        />
+                                    </FadeIn>
+                                )}
+                                {activeTab === "variations" && (
                                     <FadeIn key="variations" className="block">
-                                        <ProductVariationsTab isEditing={isEditing} productData={productData} onSavePendingVariants={handleSavePendingVariants} />
+                                        {isLoadingDetails ? (
+                                            <div className="flex flex-col items-center justify-center pt-24 pb-32">
+                                                <Spinner size={36} className="text-brand-primary" />
+                                                <p className="mt-4 text-[15px] text-brand-dark dark:text-dark-heading font-medium">Carregando variações...</p>
+                                            </div>
+                                        ) : (
+                                            <ProductVariationsTab isEditing={isEditing} productData={productData} onSavePendingVariants={handleSavePendingVariants} />
+                                        )}
                                     </FadeIn>
                                 )}
-                            </div>
-                            <div className={activeTab === "suppliers" ? "block" : "hidden"}>
-                                {isLoadingDetails ? (
-                                    <div className="flex flex-col items-center justify-center pt-24 pb-32">
-                                        <Spinner size={36} className="text-brand-primary" />
-                                        <p className="mt-4 text-[15px] text-brand-dark dark:text-dark-heading font-medium">Carregando fornecedores...</p>
-                                    </div>
-                                ) : (
+                                {activeTab === "suppliers" && (
                                     <FadeIn key="suppliers" className="block">
-                                        <ProductSuppliersTab isEditing={isEditing} productData={productData} />
+                                        {isLoadingDetails ? (
+                                            <div className="flex flex-col items-center justify-center pt-24 pb-32">
+                                                <Spinner size={36} className="text-brand-primary" />
+                                                <p className="mt-4 text-[15px] text-brand-dark dark:text-dark-heading font-medium">Carregando fornecedores...</p>
+                                            </div>
+                                        ) : (
+                                            <ProductSuppliersTab isEditing={isEditing} productData={productData} />
+                                        )}
                                     </FadeIn>
                                 )}
-                            </div>
-                            {productData.show_in_marketplace && (
-                                <div className={activeTab === "marketplace" ? "block" : "hidden"}>
-                                    {isLoadingDetails ? (
-                                        <div className="flex flex-col items-center justify-center pt-24 pb-32">
-                                            <Spinner size={36} className="text-brand-primary" />
-                                            <p className="mt-4 text-[15px] text-brand-dark dark:text-dark-heading font-medium">Carregando marketplace...</p>
-                                        </div>
-                                    ) : (
-                                        <FadeIn key="marketplace" className="block">
+                                {activeTab === "marketplace" && productData.show_in_marketplace && (
+                                    <FadeIn key="marketplace" className="block">
+                                        {isLoadingDetails ? (
+                                            <div className="flex flex-col items-center justify-center pt-24 pb-32">
+                                                <Spinner size={36} className="text-brand-primary" />
+                                                <p className="mt-4 text-[15px] text-brand-dark dark:text-dark-heading font-medium">Carregando marketplace...</p>
+                                            </div>
+                                        ) : (
                                             <ProductMarketplaceTab productData={productData} handleInputChange={handleInputChange} isEditing={isEditing} />
-                                        </FadeIn>
-                                    )}
-                                </div>
-                            )}
+                                        )}
+                                    </FadeIn>
+                                )}
+                            </AnimatePresence>
                         </div>
                     </div>
 
@@ -900,7 +892,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                         {metadataModal.type === "subcategory" && (
                             <div className="space-y-1.5">
                                 <Combobox
-                                label="Categoria Pai"
+                                    label="Categoria Pai"
                                     options={categoryOptions}
                                     value={metadataModal.parentId || ""}
                                     onChange={(v: string) => setMetadataModal(prev => ({ ...prev, parentId: v }))}

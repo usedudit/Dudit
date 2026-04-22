@@ -9,6 +9,7 @@ import {
 } from '@/lib/icons';
 import { Button, ThreeDotsLoader, AlertModal, Input, InfoCard } from '@/components/reusable';
 import { Badge } from '@/components/reusable/Badge';
+import { FadeIn } from '@/components/animations/FadeIn';
 import { useNotification } from '@/hooks/use-notification';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import { undoStockMovementAction } from '@/app/actions/erp/stock-movements';
@@ -108,7 +109,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
             : [];
 
     return (
-        <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
+        <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
             <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth custom-scrollbar">
 
                 {/* Sticky Header */}
@@ -324,7 +325,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                 variant="warning"
                 isLoading={isUndoing}
             />
-        </div>
+        </FadeIn>
     );
 };
 

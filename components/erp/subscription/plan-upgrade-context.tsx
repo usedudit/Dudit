@@ -14,7 +14,7 @@ import {
   createSubscriptionAction,
   upgradeSubscriptionAction,
 } from "@/app/actions/subscriptions"
-import { buildFeaturesDisplay } from "@/lib/subscription/feature-labels"
+import { buildFeaturesDisplay, getHardcodedPlan } from "@/lib/subscription/feature-labels"
 import { PLAN_UPGRADE_ICONS, PLAN_UPGRADE_MASCOTS, type PlanTierSlug } from "@/lib/subscription/plan-tier"
 import { Input as FormInput } from "@/components/reusable/Input"
 import { Loader2 } from "lucide-react"
@@ -108,10 +108,9 @@ function PlanUpgradeModalInner({
   }, [plans, target])
 
   const featureLines = useMemo(() => {
-    if (!targetPlan) return []
-    const feats = (targetPlan.features_json || []) as string[]
-    return buildFeaturesDisplay(feats, targetPlan.slug, plans)
-  }, [targetPlan, plans])
+    if (!target) return []
+    return getHardcodedPlan(target).features
+  }, [target])
 
   const handleSubscribe = async () => {
     if (!targetPlan) return
@@ -160,10 +159,10 @@ function PlanUpgradeModalInner({
   const leftPanel = (
     <div className="flex flex-col h-full bg-white dark:bg-dark-surface p-8 md:p-10 overflow-y-auto">
       <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">
-        {targetPlan ? `Plano ${targetPlan.name}` : "Upgrade de plano"}
+        {target ? `Plano ${getHardcodedPlan(target).name}` : "Upgrade de plano"}
       </h2>
       <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-6">
-        Para usar este recurso, ative o plano <strong className="text-brand-dark dark:text-dark-heading">{targetPlan?.name || target}</strong>.
+        Para usar este recurso, ative o plano <strong className="text-brand-dark dark:text-dark-heading">{target ? getHardcodedPlan(target).name : target}</strong>.
         {targetPlan?.price != null && (
           <>
             {" "}

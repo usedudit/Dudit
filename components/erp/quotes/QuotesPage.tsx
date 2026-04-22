@@ -44,6 +44,7 @@ import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { getERPQuotesPageAction, type ERPQuoteListCursor } from "@/app/actions/erp/quotes"
+import { FadeIn } from "@/components/animations/FadeIn"
 
 // --- TYPES & INTERFACES ---
 
@@ -120,7 +121,7 @@ export default function QuotesPage({
             if (!res.success) throw new Error(res.error || "Erro ao carregar orçamentos.")
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
-        dedupeKey: (q) => String(q?.id || ""),
+        dedupeKey: useCallback((q: any) => String(q?.id || ""), []),
     })
 
     // Local state for instant updates (optimistic delete etc.)
@@ -157,7 +158,7 @@ export default function QuotesPage({
         console.log(">>> MOUNTED QuotesPage client component")
         return () => console.log("<<< UNMOUNTED QuotesPage client component")
     }, [])
-    
+
     console.log("--- RENDER QuotesPage client component")
     const [modals, setModals] = useState({ filter: false, delete: false })
     const [selection, setSelection] = useState({ ids: new Set<string>() })
@@ -174,16 +175,18 @@ export default function QuotesPage({
     const [scrollState, setScrollState] = useState({ left: false, right: false })
 
     useEffect(() => {
-        const t = setTimeout(() => setDebouncedSearch(search), 500)
+        const t = setTimeout(() => setDebouncedSearch(search), 300)
         return () => clearTimeout(t)
     }, [search])
 
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return
         const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
-        setScrollState({
-            left: scrollLeft > 0,
-            right: scrollLeft < scrollWidth - clientWidth - 2,
+        setScrollState((prev) => {
+            const nextLeft = scrollLeft > 0
+            const nextRight = scrollLeft < scrollWidth - clientWidth - 2
+            if (prev.left === nextLeft && prev.right === nextRight) return prev
+            return { left: nextLeft, right: nextRight }
         })
     }, [])
 
@@ -459,66 +462,48 @@ export default function QuotesPage({
         threshold: 0,
     })
 
-
-
     return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.2 }}
-            className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
-        >
-            <style>{`
-        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
-        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
-        .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
-
+        <>
             <AnimatePresence mode="wait">
-                {wrapperMode === 'view' && activeQuote ? (
-                    <motion.div
-                        key="view-quote"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="w-full h-full"
-                    >
-                        <QuoteDetail
-                            partnerId={partnerId}
-                            quoteId={activeQuote.id}
-                            onBack={() => {
-                                setWrapperMode(null)
-                                setActiveQuote(null)
-                            }}
-                            onEditQuote={handleEditQuote}
-                            initialQuote={activeQuote}
-                        />
-                    </motion.div>
-                ) : wrapperMode !== null ? (
-                    <motion.div
-                        key="create-quote"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="w-full h-full"
-                    >
-                        <CreateQuote
-                            partnerId={partnerId}
-                            existingQuote={activeQuote}
-                            mode={wrapperMode}
-                            onBack={() => {
-                                setWrapperMode(null)
-                                setActiveQuote(null)
-                            }}
-                        />
-                    </motion.div>
-                ) : (
+            {wrapperMode === 'view' && activeQuote ? (
+                <FadeIn key="view-quote" className="w-full h-full">
+                    <QuoteDetail
+                        partnerId={partnerId}
+                        quoteId={activeQuote.id}
+                        onBack={() => {
+                            setWrapperMode(null)
+                            setActiveQuote(null)
+                        }}
+                        onEditQuote={handleEditQuote}
+                        initialQuote={activeQuote}
+                    />
+                </FadeIn>
+            ) : wrapperMode !== null ? (
+                <FadeIn key="create-quote" className="w-full h-full">
+                    <CreateQuote
+                        partnerId={partnerId}
+                        existingQuote={activeQuote}
+                        mode={wrapperMode}
+                        onBack={() => {
+                            setWrapperMode(null)
+                            setActiveQuote(null)
+                        }}
+                    />
+                </FadeIn>
+            ) : (
+                <FadeIn
+                    key="list"
+                    className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
+                >
+                    <style>{`
+                        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
+                        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+                        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
+                        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
+                        .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                        .hide-scrollbar::-webkit-scrollbar { display: none; }
+                        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+                    `}</style>
 
                     <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
                         {/* Desktop Header */}
@@ -566,16 +551,12 @@ export default function QuotesPage({
                         <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
                             <AnimatePresence mode="wait">
                                 {isLoading ? (
-                                    <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                                    <FadeIn key="loading">
                                         <QuoteSkeleton count={5} viewMode={viewMode} />
-                                    </motion.div>
+                                    </FadeIn>
                                 ) : !hasQuotes ? (
-                                    <motion.div
+                                    <FadeIn
                                         key="empty-no-data"
-                                        initial={{ opacity: 0, scale: 0.95 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        exit={{ opacity: 0, scale: 0.95 }}
-                                        transition={{ duration: 0.4, ease: "easeOut" }}
                                         className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
                                     >
                                         <IconPlaceholder
@@ -585,14 +566,10 @@ export default function QuotesPage({
                                             title="Você ainda não tem orçamentos"
                                             subtitle="Seus orçamentos aparecerão aqui assim que você criá-los."
                                         />
-                                    </motion.div>
+                                    </FadeIn>
                                 ) : paginated.length === 0 ? (
-                                    <motion.div
+                                    <FadeIn
                                         key="empty-results"
-                                        initial={{ opacity: 0, scale: 0.95 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        exit={{ opacity: 0, scale: 0.95 }}
-                                        transition={{ duration: 0.4, ease: "easeOut" }}
                                         className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
                                     >
                                         <IconPlaceholder
@@ -607,16 +584,13 @@ export default function QuotesPage({
                                                 variant: "outline"
                                             }}
                                         />
-                                    </motion.div>
+                                    </FadeIn>
                                 ) : (
-                                    <motion.div
-                                        key={activeTab + viewMode}
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.2 }}
-                                        className="w-full"
-                                    >
+                                    <AnimatePresence mode="wait">
+                                        <FadeIn
+                                            key={activeTab + viewMode}
+                                            className="w-full"
+                                        >
                                         {isTablet ? (
                                             <div className="flex flex-col w-full">
                                                 {paginated.map((q: Quote, idx) => (
@@ -741,7 +715,8 @@ export default function QuotesPage({
                                                 </div>
                                             </div>
                                         )}
-                                    </motion.div>
+                                        </FadeIn>
+                                    </AnimatePresence>
                                 )}
                             </AnimatePresence>
                         </div>
@@ -761,8 +736,9 @@ export default function QuotesPage({
                             </div>
                         ) : null}
                     </div>
-                )}
-            </AnimatePresence>
+                </FadeIn>
+            )}
+        </AnimatePresence>
             <FilterSheet
                 isOpen={modals.filter}
                 onClose={() => setModals(prev => ({ ...prev, filter: false }))}
@@ -823,6 +799,6 @@ export default function QuotesPage({
                     Excluir
                 </Button>
             </FloatingActionBar>
-        </motion.div>
+        </>
     )
 }

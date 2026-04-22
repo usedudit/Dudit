@@ -33,7 +33,8 @@ import {
     CheckCircleIcon,
     BlockedIcon,
     SearchIcon,
-    FilterIcon
+    FilterIcon,
+    MoneyIcon
 } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 
@@ -662,13 +663,13 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
     const renderRangeBadge = (key: "priceRange" | "stockRange", label: string, prefix: string = "") => {
         const { min, max } = filters[key]
         if (!min && !max) return null
-        return <FilterChip key={key} label={label} value={`${min ? `${prefix}${min}` : "0"} - ${max ? `${prefix}${max}` : "∞"}`} onRemove={() => setFilters((p: any) => ({ ...p, [key]: { min: "", max: "" } }))} />
+        return <FilterChip key={key} label={label} icon={<MoneyIcon size={12} />} value={`${min ? `${prefix}${min}` : "0"} - ${max ? `${prefix}${max}` : "∞"}`} onRemove={() => setFilters((p: any) => ({ ...p, [key]: { min: "", max: "" } }))} />
     }
 
     const renderListBadge = (key: string, label: string) => {
         const items = filters[key] as string[]
         if (!items || items.length === 0) return null
-        return <FilterChip key={key} label={label} value={items.length <= 3 ? items.join(", ") : `${items.slice(0, 3).join(", ")}...`} tooltip={`${label}: ${items.join(", ")}`} onRemove={() => setFilters((p: any) => ({ ...p, [key]: [] }))} />
+        return <FilterChip key={key} label={label} icon={<CheckCircleIcon size={12} />} value={items.length <= 3 ? items.join(", ") : `${items.slice(0, 3).join(", ")}...`} tooltip={`${label}: ${items.join(", ")}`} onRemove={() => setFilters((p: any) => ({ ...p, [key]: [] }))} />
     }
 
     // --- Render ---

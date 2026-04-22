@@ -15,6 +15,9 @@ import {
     ClockIcon,
     CancelCircleIcon,
     TruckIcon,
+    CalendarIcon,
+    InfoIcon,
+    StoreIcon,
 } from "@/lib/icons"
 import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import {
@@ -82,7 +85,7 @@ const OrderPageControls: React.FC<OrderPageControlsProps> = ({
                 <FilterChip
                     label="Status"
                     value={filters.status.join(", ")}
-                    // @ts-ignore
+                    icon={<InfoIcon size={12} />}
                     onRemove={() => setFilters((prev) => ({ ...prev, status: [] }))}
                 />
             )}
@@ -90,7 +93,7 @@ const OrderPageControls: React.FC<OrderPageControlsProps> = ({
                 <FilterChip
                     label="Canal"
                     value={filters.channel.join(", ")}
-                    // @ts-ignore
+                    icon={<StoreIcon size={12} />}
                     onRemove={() => setFilters((prev) => ({ ...prev, channel: [] }))}
                 />
             )}
@@ -98,7 +101,7 @@ const OrderPageControls: React.FC<OrderPageControlsProps> = ({
                 <FilterChip
                     label="Período"
                     value={summarizeDatePeriodFilter(filters.datePeriod) || ""}
-                    // @ts-ignore
+                    icon={<CalendarIcon size={12} />}
                     onRemove={() =>
                         setFilters((prev) => ({ ...prev, datePeriod: { ...EMPTY_DATE_PERIOD } }))
                     }

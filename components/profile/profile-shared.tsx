@@ -122,16 +122,16 @@ export const ProfileCard = ({
 }) => (
     <div
         onClick={onClick}
-        className="group flex items-center gap-4 p-5 rounded-2xl border bg-white dark:bg-dark-surface border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all cursor-pointer h-full"
+        className="group flex items-center rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all cursor-pointer"
     >
-        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-gray-800 group-hover:bg-gray-200 dark:group-hover:bg-gray-700 flex items-center justify-center shrink-0 transition-colors">
-            <Icon size={20} className="text-brand-dark dark:text-dark-heading" />
+        <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
+            <Icon className="text-brand-dark dark:text-dark-heading" />
         </div>
         <div className="flex-1">
-            <h3 className="text-base font-bold mb-1 text-brand-dark dark:text-dark-heading">{title}</h3>
-            <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-tight">{description}</p>
+            <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading truncate">{title}</h3>
+            <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate">{description}</p>
         </div>
-        <ChevronRightIcon size={18} className="text-brand-inactive-text group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors" />
+        <ChevronRightIcon className="text-brand-inactive-text group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors" />
     </div>
 )
 

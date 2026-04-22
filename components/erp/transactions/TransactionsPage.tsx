@@ -12,7 +12,6 @@ import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { formatCurrency } from "@/lib/utils"
 import { diffCalendarDaysInSaoPaulo } from "@/lib/utils/formatters"
-import { DueDateCountdown } from "@/lib/utils/transaction-due-countdown"
 import {
     PlusIcon,
     ExportFileIcon,
@@ -52,6 +51,7 @@ import {
     isDatePeriodFilterActive,
     type DatePeriodFilterValue,
 } from "@/lib/utils/filter-date-period"
+import { FadeIn } from "@/components/animations/FadeIn"
 
 function ymdFromRaw(raw: string | null | undefined): string | null {
     if (!raw) return null
@@ -194,7 +194,7 @@ export default function TransactionsPage({
             if (!res.success) throw new Error(res.error || "Erro ao carregar transações.")
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
-        dedupeKey: (t) => t.id,
+        dedupeKey: useCallback((t: any) => t.id, []),
     })
     const [settlePaymentsByInstallment, setSettlePaymentsByInstallment] = useState<
         Record<string, { paymentAmount: string; interestAmount: string; discountAmount: string; paymentMethodId: string }>
@@ -241,9 +241,11 @@ export default function TransactionsPage({
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return
         const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
-        setScrollState({
-            left: scrollLeft > 0,
-            right: scrollLeft < scrollWidth - clientWidth - 2,
+        setScrollState((prev) => {
+            const nextLeft = scrollLeft > 0
+            const nextRight = scrollLeft < scrollWidth - clientWidth - 2
+            if (prev.left === nextLeft && prev.right === nextRight) return prev
+            return { left: nextLeft, right: nextRight }
         })
     }, [])
 
@@ -880,10 +882,7 @@ export default function TransactionsPage({
     }
 
     return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.2 }}
+        <FadeIn
             className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
         >
             <style>{`
@@ -936,12 +935,8 @@ export default function TransactionsPage({
                 <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
                     <AnimatePresence mode="wait">
                         {!hasTransactions ? (
-                            <motion.div
+                            <FadeIn
                                 key="empty-no-data"
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                transition={{ duration: 0.4, ease: "easeOut" }}
                                 className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
                             >
                                 <IconPlaceholder
@@ -951,14 +946,10 @@ export default function TransactionsPage({
                                     title="Você ainda não tem transações"
                                     subtitle="As movimentações financeiras vão aparecer aqui assim que forem cadastradas."
                                 />
-                            </motion.div>
+                            </FadeIn>
                         ) : paginatedTransactions.length === 0 ? (
-                            <motion.div
+                            <FadeIn
                                 key="empty-results"
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                transition={{ duration: 0.4, ease: "easeOut" }}
                                 className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
                             >
                                 <IconPlaceholder
@@ -973,178 +964,174 @@ export default function TransactionsPage({
                                         variant: "outline",
                                     }}
                                 />
-                            </motion.div>
+                            </FadeIn>
                         ) : (
-                            <motion.div
+                            <FadeIn
                                 key={activeTab + (isTablet ? "mobile" : viewMode)}
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.2 }}
                                 className="w-full"
                             >
-                                {isTablet ? (
-                                    <div className="flex flex-col w-full">
-                                        {paginatedTransactions.map((transaction) => {
-                                            const PaymentIcon = getPaymentIcon(transaction.paymentType)
-                                            const isRecurring = !!transaction.recurringId || !!transaction.isRecurringOccurrence
+                                    {isTablet ? (
+                                        <div className="flex flex-col w-full">
+                                            {paginatedTransactions.map((transaction) => {
+                                                const PaymentIcon = getPaymentIcon(transaction.paymentType)
+                                                const isRecurring = !!transaction.recurringId || !!transaction.isRecurringOccurrence
 
-                                            return (
-                                                <div
-                                                    key={transaction.id}
-                                                    className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 flex items-start gap-3"
-                                                    onClick={() => handleOpenTransactionDetail(transaction)}
-                                                >
-                                                    <div className="shrink-0 pt-1" onClick={(e) => e.stopPropagation()}>
-                                                        <Checkbox checked={selection.ids.has(transaction.id)} onChange={() => handleSelectRow(transaction.id)} />
-                                                    </div>
-
-                                                    <div className="shrink-0 w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex items-center justify-center">
-                                                        <PaymentIcon className="text-brand-dark dark:text-dark-heading" />
-                                                    </div>
-
-                                                    <div className="flex-1 min-w-0 flex flex-col gap-1">
-                                                        <div className="flex justify-between items-start gap-2">
-                                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                                                                {transaction.description}
-                                                            </h3>
-                                                            <span className={`text-[15px] font-bold whitespace-nowrap ${transaction.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}>
-                                                                {transaction.ledgerDirection === "in" ? "+ " : "- "}
-                                                                {formatCurrency(transaction.amount)}
-                                                            </span>
+                                                return (
+                                                    <div
+                                                        key={transaction.id}
+                                                        className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 flex items-start gap-3"
+                                                        onClick={() => handleOpenTransactionDetail(transaction)}
+                                                    >
+                                                        <div className="shrink-0 pt-1" onClick={(e) => e.stopPropagation()}>
+                                                            <Checkbox checked={selection.ids.has(transaction.id)} onChange={() => handleSelectRow(transaction.id)} />
                                                         </div>
 
-                                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-                                                            <span className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading">
-                                                                {transaction.contactName}
-                                                            </span>
-                                                            <span className="text-brand-inactive-text">•</span>
-                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                {transaction.category}
-                                                            </span>
-                                                            <span className="text-brand-inactive-text">•</span>
-                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                {transaction.dueDate}
-                                                            </span>
+                                                        <div className="shrink-0 w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex items-center justify-center">
+                                                            <PaymentIcon className="text-brand-dark dark:text-dark-heading" />
                                                         </div>
 
-                                                        <div className="flex items-center gap-2 mt-2">
-                                                            <Badge variant={transaction.statusVariant} className="scale-90 origin-left">
-                                                                {transaction.status}
-                                                            </Badge>
-                                                            {transaction.installmentGroupId && (
-                                                                <Badge variant="orange" className="scale-90 origin-left">
-                                                                    Parcelado
-                                                                </Badge>
-                                                            )}
-                                                            {isRecurring && (
-                                                                <Badge variant="purple" className="scale-90 origin-left">
-                                                                    Recorrente
-                                                                </Badge>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
-                                       {/* <div ref={observerTarget} className="h-10" /> */}
-                                    </div>
-                                ) : viewMode === "grid" ? (
-                                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                        {paginatedTransactions.map((transaction) => (
-                                            <TransactionGridCard
-                                                key={transaction.id}
-                                                transaction={transaction}
-                                                selected={selection.ids.has(transaction.id)}
-                                                onSelect={handleSelectRow}
-                                                onOpenDetail={handleOpenTransactionDetail}
-                                                onEdit={handleEditTransaction}
-                                                onMarkAsPaid={handleMarkAsPaid}
-                                                onSettleInstallmentGroup={handleSettleInstallmentGroup}
-                                            />
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="w-full overflow-hidden rounded-xl relative">
-                                        <div className={`absolute top-0 left-0 h-full w-12 bg-linear-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                                        <div className={`absolute top-0 right-0 h-full w-12 bg-linear-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
-
-                                        <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1460px]">
-                                                <thead>
-                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                        <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
-                                                            <div className="flex items-center">
-                                                                <Checkbox
-                                                                    checked={selection.ids.size === paginatedTransactions.length && paginatedTransactions.length > 0}
-                                                                    onChange={(checked) => {
-                                                                        setSelection({ ids: checked ? new Set(paginatedTransactions.map((item) => item.id)) : new Set() })
-                                                                    }}
-                                                                    className="bg-white dark:bg-dark-background"
-                                                                />
+                                                        <div className="flex-1 min-w-0 flex flex-col gap-1">
+                                                            <div className="flex justify-between items-start gap-2">
+                                                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                    {transaction.description}
+                                                                </h3>
+                                                                <span className={`text-[15px] font-bold whitespace-nowrap ${transaction.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}>
+                                                                    {transaction.ledgerDirection === "in" ? "+ " : "- "}
+                                                                    {formatCurrency(transaction.amount)}
+                                                                </span>
                                                             </div>
-                                                        </th>
-                                                        {COLUMNS.map((col, idx) => {
-                                                            const isSortable = col.id !== "actions"
-                                                            const isSorted = sortConfig?.key === col.id
-                                                            const isLast = idx === COLUMNS.length - 1
 
-                                                            return (
-                                                                <th
-                                                                    key={col.id}
-                                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isLast ? "rounded-r-lg" : ""}`}
-                                                                    style={{ width: col.width }}
-                                                                    onClick={() => {
-                                                                        if (!isSortable) return
-                                                                        setSortConfig((prev) => ({
-                                                                            key: col.id as SortKey,
-                                                                            direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc",
-                                                                        }))
-                                                                    }}
-                                                                >
-                                                                    <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
-                                                                        <span className={isSortable ? (col.align === "center" ? "" : "") : ""}>
-                                                                            {col.label}
-                                                                        </span>
-                                                                        {isSortable && (
-                                                                            <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
-                                                                                <ArrowUpDownIcon
-                                                                                    size={14}
-                                                                                    className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
-                                                                                />
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </th>
-                                                            )
-                                                        })}
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {paginatedTransactions.map((transaction) => (
-                                                        <TransactionListItem
-                                                            key={transaction.id}
-                                                            transaction={transaction}
-                                                            columns={COLUMNS}
-                                                            selected={selection.ids.has(transaction.id)}
-                                                            onSelect={handleSelectRow}
-                                                            onOpenDetail={handleOpenTransactionDetail}
-                                                            onEdit={handleEditTransaction}
-                                                            onMarkAsPaid={handleMarkAsPaid}
-                                                            onSettleInstallmentGroup={handleSettleInstallmentGroup}
-                                                        />
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                             {/* <div ref={observerTarget} className="h-10" /> */}
+                                                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                                                                <span className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading">
+                                                                    {transaction.contactName}
+                                                                </span>
+                                                                <span className="text-brand-inactive-text">•</span>
+                                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                    {transaction.category}
+                                                                </span>
+                                                                <span className="text-brand-inactive-text">•</span>
+                                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                    {transaction.dueDate}
+                                                                </span>
+                                                            </div>
+
+                                                            <div className="flex items-center gap-2 mt-2">
+                                                                <Badge variant={transaction.statusVariant} className="scale-90 origin-left">
+                                                                    {transaction.status}
+                                                                </Badge>
+                                                                {transaction.installmentGroupId && (
+                                                                    <Badge variant="orange" className="scale-90 origin-left">
+                                                                        Parcelado
+                                                                    </Badge>
+                                                                )}
+                                                                {isRecurring && (
+                                                                    <Badge variant="purple" className="scale-90 origin-left">
+                                                                        Recorrente
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                            {/* <div ref={observerTarget} className="h-10" /> */}
                                         </div>
-                                    </div>
-                                )}
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                    {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
-                </div>
+                                    ) : viewMode === "grid" ? (
+                                        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                            {paginatedTransactions.map((transaction) => (
+                                                <TransactionGridCard
+                                                    key={transaction.id}
+                                                    transaction={transaction}
+                                                    selected={selection.ids.has(transaction.id)}
+                                                    onSelect={handleSelectRow}
+                                                    onOpenDetail={handleOpenTransactionDetail}
+                                                    onEdit={handleEditTransaction}
+                                                    onMarkAsPaid={handleMarkAsPaid}
+                                                    onSettleInstallmentGroup={handleSettleInstallmentGroup}
+                                                />
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="w-full overflow-hidden rounded-xl relative">
+                                            <div className={`absolute top-0 left-0 h-full w-12 bg-linear-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                            <div className={`absolute top-0 right-0 h-full w-12 bg-linear-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                                            <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                <table className="w-full text-left border-separate border-spacing-0 min-w-[1460px]">
+                                                    <thead>
+                                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                            <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
+                                                                <div className="flex items-center">
+                                                                    <Checkbox
+                                                                        checked={selection.ids.size === paginatedTransactions.length && paginatedTransactions.length > 0}
+                                                                        onChange={(checked) => {
+                                                                            setSelection({ ids: checked ? new Set(paginatedTransactions.map((item) => item.id)) : new Set() })
+                                                                        }}
+                                                                        className="bg-white dark:bg-dark-background"
+                                                                    />
+                                                                </div>
+                                                            </th>
+                                                            {COLUMNS.map((col, idx) => {
+                                                                const isSortable = col.id !== "actions"
+                                                                const isSorted = sortConfig?.key === col.id
+                                                                const isLast = idx === COLUMNS.length - 1
+
+                                                                return (
+                                                                    <th
+                                                                        key={col.id}
+                                                                        className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isLast ? "rounded-r-lg" : ""}`}
+                                                                        style={{ width: col.width }}
+                                                                        onClick={() => {
+                                                                            if (!isSortable) return
+                                                                            setSortConfig((prev) => ({
+                                                                                key: col.id as SortKey,
+                                                                                direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc",
+                                                                            }))
+                                                                        }}
+                                                                    >
+                                                                        <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                            <span className={isSortable ? (col.align === "center" ? "" : "") : ""}>
+                                                                                {col.label}
+                                                                            </span>
+                                                                            {isSortable && (
+                                                                                <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                                                    <ArrowUpDownIcon
+                                                                                        size={14}
+                                                                                        className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                                                                    />
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </th>
+                                                                )
+                                                            })}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {paginatedTransactions.map((transaction) => (
+                                                            <TransactionListItem
+                                                                key={transaction.id}
+                                                                transaction={transaction}
+                                                                columns={COLUMNS}
+                                                                selected={selection.ids.has(transaction.id)}
+                                                                onSelect={handleSelectRow}
+                                                                onOpenDetail={handleOpenTransactionDetail}
+                                                                onEdit={handleEditTransaction}
+                                                                onMarkAsPaid={handleMarkAsPaid}
+                                                                onSettleInstallmentGroup={handleSettleInstallmentGroup}
+                                                            />
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                                {/* <div ref={observerTarget} className="h-10" /> */}
+                                            </div>
+                                        </div>
+                                    )}
+                                </FadeIn>
+                            )}
+                        </AnimatePresence>
+                        {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
+                    </div>
 
                 {paginatedTransactions.length > 0 && (
                     <div className="space-y-3">
@@ -1164,9 +1151,9 @@ export default function TransactionsPage({
                                 <SkeletonLoader className="h-10 w-full max-w-lg mx-auto rounded-lg opacity-70" />
                             </div>
                         ) : null}
-                    </div>
-                )}
-            </div>
+                        </div>
+                    )}
+                </div>
 
             <FilterSheet
                 isOpen={modals.filter}
@@ -1225,44 +1212,44 @@ export default function TransactionsPage({
                         <div className="flex flex-col w-full max-h-[60vh] overflow-y-auto px-1 pr-1 custom-scrollbar border-t border-brand-border dark:border-dark-border mt-4">
                             {(installmentDetail.installments || []).map((row: any) => (
                                 <div key={row.id} className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 flex items-start gap-4 hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 px-2 transition-colors rounded-lg">
-                                     <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-                                          <div className="flex justify-between items-start gap-3">
-                                               <div className="min-w-0">
-                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                                                        {row.description}
-                                                    </h3>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-brand-slate dark:bg-dark-border text-brand-dark dark:text-dark-heading">
-                                                            Parcela {row.installmentNumber}/{installmentDetail.group?.installments_count}
-                                                        </span>
-                                                        <Badge variant={row.status === "paid" ? "green" : row.status === "overdue" ? "red" : "orange"} className="scale-90">
-                                                            {row.status === "paid" ? "Pago" : row.status === "overdue" ? "Vencido" : "Pendente"}
-                                                        </Badge>
-                                                    </div>
-                                               </div>
-                                               <div className="flex flex-col items-end gap-1 shrink-0">
-                                                    <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
-                                                        {formatCurrency(row.originalAmount || 0)}
+                                    <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                                        <div className="flex justify-between items-start gap-3">
+                                            <div className="min-w-0">
+                                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                    {row.description}
+                                                </h3>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-brand-slate dark:bg-dark-border text-brand-dark dark:text-dark-heading">
+                                                        Parcela {row.installmentNumber}/{installmentDetail.group?.installments_count}
                                                     </span>
-                                                    <span className="text-[12px] font-medium text-brand-inactive-text">
-                                                        Vence em {row.dueDate || "-"}
-                                                    </span>
-                                               </div>
-                                          </div>
-                                          <div className="flex items-center gap-4 mt-2 py-2 px-3 rounded-lg bg-brand-gray/50 dark:bg-dark-border/20 border border-brand-border/50 dark:border-dark-border/30">
-                                               <div className="flex flex-col"><span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider">Restante</span><span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{formatCurrency(row.remainingAmount || 0)}</span></div>
-                                               <div className="flex flex-col border-l border-brand-border dark:border-dark-border pl-4"><span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider">Pago</span><span className="font-bold text-[13px] text-brand-green">{formatCurrency(row.paidAmount || 0)}</span></div>
-                                          </div>
-                                     </div>
-                                     {row.status !== "paid" && (
-                                         <div className="shrink-0 flex items-center justify-center pt-1 ml-2 action-btn">
-                                              <ActionsDropdown
-                                                   onEdit={() => handleEditInstallment(row.id)}
-                                                   onCancel={() => void handlePayInstallment(row.id)}
-                                                   cancelLabel="Marcar como paga"
-                                              />
-                                         </div>
-                                     )}
+                                                    <Badge variant={row.status === "paid" ? "green" : row.status === "overdue" ? "red" : "orange"} className="scale-90">
+                                                        {row.status === "paid" ? "Pago" : row.status === "overdue" ? "Vencido" : "Pendente"}
+                                                    </Badge>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-end gap-1 shrink-0">
+                                                <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
+                                                    {formatCurrency(row.originalAmount || 0)}
+                                                </span>
+                                                <span className="text-[12px] font-medium text-brand-inactive-text">
+                                                    Vence em {row.dueDate || "-"}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-4 mt-2 py-2 px-3 rounded-lg bg-brand-gray/50 dark:bg-dark-border/20 border border-brand-border/50 dark:border-dark-border/30">
+                                            <div className="flex flex-col"><span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider">Restante</span><span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{formatCurrency(row.remainingAmount || 0)}</span></div>
+                                            <div className="flex flex-col border-l border-brand-border dark:border-dark-border pl-4"><span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider">Pago</span><span className="font-bold text-[13px] text-brand-green">{formatCurrency(row.paidAmount || 0)}</span></div>
+                                        </div>
+                                    </div>
+                                    {row.status !== "paid" && (
+                                        <div className="shrink-0 flex items-center justify-center pt-1 ml-2 action-btn">
+                                            <ActionsDropdown
+                                                onEdit={() => handleEditInstallment(row.id)}
+                                                onCancel={() => void handlePayInstallment(row.id)}
+                                                cancelLabel="Marcar como paga"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -1493,6 +1480,6 @@ export default function TransactionsPage({
                     </div>
                 ) : null}
             </DefaultModal>
-        </motion.div>
+        </FadeIn>
     )
 }

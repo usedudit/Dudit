@@ -19,7 +19,8 @@ import {
     reserveOrderInventory,
     shouldDeductInventory,
 } from "@/lib/stock/reservations"
-import { validateCoupon } from "@/lib/services/coupons"
+import { validateCoupon, validateCouponById } from "@/lib/services/coupons"
+import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 
 type ERPItemPayload = {
     productId: string | null
@@ -853,22 +854,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
 
     let couponIdToSave: string | null = data.couponId || null
     let couponDiscountAmount = Math.max(0, Number(data.couponDiscountAmount || 0))
-    if (data.couponCode?.trim()) {
-        const couponValidation = await validateCoupon({
-            partnerId: data.partnerId,
-            code: data.couponCode,
-            customerId: data.customerId || null,
-            subtotal: Number(data.subtotal || 0),
-            shippingCost: Number(data.shippingCost || 0),
-            items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
-        })
-        if (!couponValidation.valid) return { error: couponValidation.errorMessage || "Cupom inválido." }
-        couponIdToSave = couponValidation.couponId || null
-        couponDiscountAmount = Number(couponValidation.discountAmount || 0)
-    }
-
-    let couponIdToSave: string | null = data.couponId || null
-    let couponDiscountAmount = Math.max(0, Number(data.couponDiscountAmount || 0))
+    let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
     if (data.couponCode?.trim()) {
         const couponValidation = await validateCoupon({
             partnerId,
@@ -881,7 +867,43 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         if (!couponValidation.valid) return { error: couponValidation.errorMessage || "Cupom inválido." }
         couponIdToSave = couponValidation.couponId || null
         couponDiscountAmount = Number(couponValidation.discountAmount || 0)
+        couponPricingData = couponValidation.pricingCoupon || null
+    } else if (couponIdToSave) {
+        // Re-validate existing coupon by ID
+        const couponValidation = await validateCouponById(couponIdToSave, {
+            partnerId,
+            customerId: data.customerId || null,
+            subtotal: Number(data.subtotal || 0),
+            shippingCost: Number(data.shippingCost || 0),
+            items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
+        })
+        if (couponValidation.valid) {
+            couponDiscountAmount = Number(couponValidation.discountAmount || 0)
+            couponPricingData = couponValidation.pricingCoupon || null
+        } else {
+            // Coupon no longer valid — clear it silently
+            couponIdToSave = null
+            couponDiscountAmount = 0
+        }
     }
+
+    // ── Server-side pricing recalculation ────────────────────────────────
+    const pricingResult = calculateOrderPricing({
+        items: sanitizedItems.map((item) => ({
+            productId: item.productId || null,
+            unitPrice: item.unitPrice,
+            quantity: item.quantity,
+        })),
+        shippingCost: Number(data.shippingCost || 0),
+        additionalCosts: Number(data.additionalCosts || 0),
+        manualDiscount: data.discountValue > 0 ? { type: data.discountType || "fixed", value: data.discountValue } : null,
+        coupon: couponPricingData,
+    })
+
+    // Override client-sent values with server-computed ones
+    couponDiscountAmount = pricingResult.couponDiscountAmount
+    const serverTotalAmount = pricingResult.finalTotal
+    const serverShippingCost = pricingResult.shipping
 
     let deliveryAddressStr = ""
     if (data.deliveryMethod === "delivery" && data.address) {
@@ -900,13 +922,13 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             delivery_type: data.deliveryMethod,
             situation: paymentState.situation,
             delivery_status: data.deliveryStatus,
-            total_amount: data.totalAmount,
+            total_amount: serverTotalAmount,
             paid_amount: paymentState.paidAmount,
             discount_value: data.discountValue,
             discount_type: data.discountType,
             coupon_id: couponIdToSave,
             discount_amount: couponDiscountAmount,
-            shipping_cost: data.shippingCost,
+            shipping_cost: serverShippingCost,
             additional_costs: data.additionalCosts,
             notes: data.notes || null,
             payment_method: paymentMethodSummary,
@@ -1000,11 +1022,14 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     increment_usage_counter(partnerId, "orders_month_count").catch(console.error)
 
     if (couponIdToSave) {
-        await supabase.from("coupon_usages").insert({
-            coupon_id: couponIdToSave,
-            customer_id: data.customerId || null,
-            order_id: order.id,
-        })
+        await supabase.from("coupon_usages").upsert(
+            {
+                coupon_id: couponIdToSave,
+                customer_id: data.customerId || null,
+                order_id: order.id,
+            },
+            { onConflict: "coupon_id,order_id", ignoreDuplicates: true }
+        )
     }
 
     if (paymentState.situation === "paid") {
@@ -1274,6 +1299,62 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         return { success: true, noChanges: true }
     }
 
+    // ── Coupon validation for updates ─────────────────────────────────────
+    let couponIdToSave: string | null = data.couponId || null
+    let couponDiscountAmount = Math.max(0, Number(data.couponDiscountAmount || 0))
+    let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
+
+    if (data.couponCode?.trim()) {
+        const couponValidation = await validateCoupon({
+            partnerId: data.partnerId,
+            code: data.couponCode,
+            customerId: data.customerId || null,
+            subtotal: Number(data.subtotal || 0),
+            shippingCost: Number(data.shippingCost || 0),
+            items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
+        })
+        if (couponValidation.valid) {
+            couponIdToSave = couponValidation.couponId || null
+            couponDiscountAmount = Number(couponValidation.discountAmount || 0)
+            couponPricingData = couponValidation.pricingCoupon || null
+        } else {
+            couponIdToSave = null
+            couponDiscountAmount = 0
+        }
+    } else if (couponIdToSave) {
+        const couponValidation = await validateCouponById(couponIdToSave, {
+            partnerId: data.partnerId,
+            customerId: data.customerId || null,
+            subtotal: Number(data.subtotal || 0),
+            shippingCost: Number(data.shippingCost || 0),
+            items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
+        })
+        if (couponValidation.valid) {
+            couponDiscountAmount = Number(couponValidation.discountAmount || 0)
+            couponPricingData = couponValidation.pricingCoupon || null
+        } else {
+            couponIdToSave = null
+            couponDiscountAmount = 0
+        }
+    }
+
+    // ── Server-side pricing recalculation ────────────────────────────────
+    const updatePricingResult = calculateOrderPricing({
+        items: sanitizedItems.map((item) => ({
+            productId: item.productId || null,
+            unitPrice: item.unitPrice,
+            quantity: item.quantity,
+        })),
+        shippingCost: Number(data.shippingCost || 0),
+        additionalCosts: Number(data.additionalCosts || 0),
+        manualDiscount: data.discountValue > 0 ? { type: data.discountType || "fixed", value: data.discountValue } : null,
+        coupon: couponPricingData,
+    })
+
+    couponDiscountAmount = updatePricingResult.couponDiscountAmount
+    const updateServerTotal = updatePricingResult.finalTotal
+    const updateServerShipping = updatePricingResult.shipping
+
     const { error: orderError } = await supabase
         .from("orders")
         .update({
@@ -1283,13 +1364,13 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             delivery_type: data.deliveryMethod,
             situation: paymentState.situation,
             delivery_status: data.deliveryStatus,
-            total_amount: data.totalAmount,
+            total_amount: updateServerTotal,
             paid_amount: paymentState.paidAmount,
             discount_value: data.discountValue,
             discount_type: data.discountType,
             coupon_id: couponIdToSave,
             discount_amount: couponDiscountAmount,
-            shipping_cost: data.shippingCost,
+            shipping_cost: updateServerShipping,
             additional_costs: data.additionalCosts,
             notes: data.notes || null,
             payment_method: paymentMethodSummary,

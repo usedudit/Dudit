@@ -54,6 +54,7 @@ import { DropdownItem } from "@/components/reusable/Dropdown"
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import { updateOrdersStatusInBatchAction, getERPOrdersPageAction, type ERPOrderListCursor } from "@/app/actions/erp/orders"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
+import { FadeIn } from "@/components/animations/FadeIn"
 
 // --- TYPES & INTERFACES ---
 
@@ -163,7 +164,7 @@ export default function OrdersPage({
             if (!res.success) throw new Error(res.error || "Erro ao carregar pedidos.")
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
-        dedupeKey: (o) => String(o?.id || ""),
+        dedupeKey: useCallback((o: any) => String(o?.id || ""), []),
     })
 
     const isLoading = storeLoading || isQueryLoading
@@ -189,16 +190,18 @@ export default function OrdersPage({
     }, [])
 
     useEffect(() => {
-        const t = setTimeout(() => setDebouncedSearch(search), 500)
+        const t = setTimeout(() => setDebouncedSearch(search), 300)
         return () => clearTimeout(t)
     }, [search])
 
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return
         const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
-        setScrollState({
-            left: scrollLeft > 0,
-            right: scrollLeft < scrollWidth - clientWidth - 2,
+        setScrollState((prev) => {
+            const nextLeft = scrollLeft > 0
+            const nextRight = scrollLeft < scrollWidth - clientWidth - 2
+            if (prev.left === nextLeft && prev.right === nextRight) return prev
+            return { left: nextLeft, right: nextRight }
         })
     }, [])
 
@@ -558,105 +561,82 @@ export default function OrdersPage({
     }
 
     return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.2 }}
-            className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
-        >
-            <style>{`
-        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
-        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
-        .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
-
+        <>
             <AnimatePresence mode="wait">
-                {wrapperMode === 'view' && selectedOrderId ? (
-                    <motion.div
-                        key="view-order"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="w-full h-full bg-white dark:bg-dark-background"
-                    >
-                        <OrderDetailView
-                            orderId={selectedOrderId}
-                            partnerId={partnerId}
-                            onBack={invalidateAndRefresh}
-                            onEditOrder={(order: any) => {
-                                setSelectedOrderId(order.id)
-                                setWrapperMode('edit')
-                            }}
-                            onUpdateDeliveryStatus={(order: any) => {
-                                openDeliveryStatusModal({
-                                    originalId: order.id,
-                                    displayId: order.order_number || `#${String(order.id).substring(0, 8)}`,
-                                    customer_name: order.customer_name || "Cliente Balcão",
-                                    customer_id: order.buyer_id || "-",
-                                    total_amount: Number(order.total_amount || 0),
-                                    statusLabel: "",
-                                    statusColor: "gray",
-                                    deliveryStatusLabel: getDeliveryStatusMeta(order.delivery_status).label,
-                                    deliveryStatusColor: getDeliveryStatusMeta(order.delivery_status).variant,
-                                    isUnfulfilled: false,
-                                    formattedDate: "",
-                                    formattedTime: "",
-                                    store_name: "",
-                                    order_source: order.order_source || "Manual",
-                                    items_count: Number(order.order_items?.length || 0),
-                                    created_at_time: new Date(order.created_at || Date.now()).getTime(),
-                                    situation: order.situation || "pending",
-                                    previousSituationBeforeCancel: order.previous_situation_before_cancel || null,
-                                    canEdit: order.situation !== "cancelled",
-                                    canReopen: order.situation === "cancelled",
-                                    paidAmount: Number(order.paid_amount || 0),
-                                })
-                            }}
-                            onCancelOrReopenOrder={(order: any) => {
-                                if (order.situation === "cancelled") {
-                                    void handleReopenOrder(order.id)
-                                    return
-                                }
-                                openCancelModal(order.id)
-                            }}
-                            initialOrder={effectiveOrders?.find((o: any) => o.id === selectedOrderId) || undefined}
-                        />
-                    </motion.div>
-                ) : wrapperMode === 'edit' && selectedOrderId ? (
-                    <motion.div
-                        key="edit-order"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="w-full h-full bg-white dark:bg-dark-background"
-                    >
-                        <CreateOrder
-                            partnerId={partnerId}
-                            editOrderId={selectedOrderId}
-                            onBack={invalidateAndRefresh}
-                        />
-                    </motion.div>
-                ) : wrapperMode === 'create' ? (
-                    <motion.div
-                        key="create-order"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="w-full h-full bg-white dark:bg-dark-background"
-                    >
-                        <CreateOrder
-                            partnerId={partnerId}
-                            onBack={invalidateAndRefresh}
-                        />
-                    </motion.div>
-                ) : (
+            {wrapperMode === 'view' && selectedOrderId ? (
+                <FadeIn key="view-order" className="w-full h-full bg-white dark:bg-dark-background">
+                    <OrderDetailView
+                        orderId={selectedOrderId}
+                        partnerId={partnerId}
+                        onBack={invalidateAndRefresh}
+                        onEditOrder={(order: any) => {
+                            setSelectedOrderId(order.id)
+                            setWrapperMode('edit')
+                        }}
+                        onUpdateDeliveryStatus={(order: any) => {
+                            openDeliveryStatusModal({
+                                originalId: order.id,
+                                displayId: order.order_number || `#${String(order.id).substring(0, 8)}`,
+                                customer_name: order.customer_name || "Cliente Balcão",
+                                customer_id: order.buyer_id || "-",
+                                total_amount: Number(order.total_amount || 0),
+                                statusLabel: "",
+                                statusColor: "gray",
+                                deliveryStatusLabel: getDeliveryStatusMeta(order.delivery_status).label,
+                                deliveryStatusColor: getDeliveryStatusMeta(order.delivery_status).variant,
+                                isUnfulfilled: false,
+                                formattedDate: "",
+                                formattedTime: "",
+                                store_name: "",
+                                order_source: order.order_source || "Manual",
+                                items_count: Number(order.order_items?.length || 0),
+                                created_at_time: new Date(order.created_at || Date.now()).getTime(),
+                                situation: order.situation || "pending",
+                                previousSituationBeforeCancel: order.previous_situation_before_cancel || null,
+                                canEdit: order.situation !== "cancelled",
+                                canReopen: order.situation === "cancelled",
+                                paidAmount: Number(order.paid_amount || 0),
+                            })
+                        }}
+                        onCancelOrReopenOrder={(order: any) => {
+                            if (order.situation === "cancelled") {
+                                void handleReopenOrder(order.id)
+                                return
+                            }
+                            openCancelModal(order.id)
+                        }}
+                        initialOrder={effectiveOrders?.find((o: any) => o.id === selectedOrderId) || undefined}
+                    />
+                </FadeIn>
+            ) : wrapperMode === 'edit' && selectedOrderId ? (
+                <FadeIn key="edit-order" className="w-full h-full bg-white dark:bg-dark-background">
+                    <CreateOrder
+                        partnerId={partnerId}
+                        editOrderId={selectedOrderId}
+                        onBack={invalidateAndRefresh}
+                    />
+                </FadeIn>
+            ) : wrapperMode === 'create' ? (
+                <FadeIn key="create-order" className="w-full h-full bg-white dark:bg-dark-background">
+                    <CreateOrder
+                        partnerId={partnerId}
+                        onBack={invalidateAndRefresh}
+                    />
+                </FadeIn>
+            ) : (
+                <FadeIn
+                    key="list"
+                    className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
+                >
+                    <style>{`
+                        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
+                        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+                        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
+                        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
+                        .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                        .hide-scrollbar::-webkit-scrollbar { display: none; }
+                        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+                    `}</style>
                     <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
                         {/* Desktop Header */}
                         <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
@@ -703,22 +683,12 @@ export default function OrdersPage({
                         <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
                             <AnimatePresence mode="wait">
                                 {isLoading ? (
-                                    <motion.div
-                                        key="loading"
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        className="flex-1 flex items-center justify-center p-8"
-                                    >
+                                    <FadeIn key="loading" className="flex-1 flex items-center justify-center p-8">
                                         <ThreeDotsLoader />
-                                    </motion.div>
+                                    </FadeIn>
                                 ) : !hasOrders ? (
-                                    <motion.div
+                                    <FadeIn
                                         key="empty-no-data"
-                                        initial={{ opacity: 0, scale: 0.95 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        exit={{ opacity: 0, scale: 0.95 }}
-                                        transition={{ duration: 0.4, ease: "easeOut" }}
                                         className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
                                     >
                                         <IconPlaceholder
@@ -728,14 +698,10 @@ export default function OrdersPage({
                                             title="Você ainda não tem pedidos"
                                             subtitle="Seus pedidos aparecerão aqui assim que seus clientes começarem a comprar."
                                         />
-                                    </motion.div>
+                                    </FadeIn>
                                 ) : paginated.length === 0 ? (
-                                    <motion.div
+                                    <FadeIn
                                         key="empty-results"
-                                        initial={{ opacity: 0, scale: 0.95 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        exit={{ opacity: 0, scale: 0.95 }}
-                                        transition={{ duration: 0.4, ease: "easeOut" }}
                                         className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
                                     >
                                         <IconPlaceholder
@@ -750,16 +716,13 @@ export default function OrdersPage({
                                                 variant: "outline"
                                             }}
                                         />
-                                    </motion.div>
+                                    </FadeIn>
                                 ) : (
-                                    <motion.div
-                                        key={activeTab + (isMobile ? "mobile" : effectiveViewMode)}
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.2 }}
-                                        className="w-full"
-                                    >
+                                    <AnimatePresence mode="wait">
+                                        <FadeIn
+                                            key={activeTab + (isMobile ? "mobile" : effectiveViewMode)}
+                                            className="w-full"
+                                        >
                                         {isMobile ? (
                                             <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
                                                 {paginated.map((o: Order) => (
@@ -911,7 +874,8 @@ export default function OrdersPage({
                                                 </div>
                                             </div>
                                         )}
-                                    </motion.div>
+                                        </FadeIn>
+                                    </AnimatePresence>
                                 )}
                             </AnimatePresence>
                             {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
@@ -936,8 +900,9 @@ export default function OrdersPage({
                             </div>
                         ) : null}
                     </div>
-                )}
-            </AnimatePresence>
+                </FadeIn>
+            )}
+        </AnimatePresence>
 
             <FilterSheet
                 isOpen={modals.filter}
@@ -1078,6 +1043,6 @@ export default function OrdersPage({
                     </select>
                 </div>
             </DefaultModal>
-        </motion.div>
+        </>
     )
 }

@@ -4,6 +4,7 @@ import React, { useState, useMemo, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useNotification } from "@/hooks/use-notification"
 import { PlusIcon } from "@/lib/icons"
+import { FadeIn } from "@/components/animations/FadeIn"
 import { Button, IconPlaceholder, Combobox, Input, Checkbox } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
@@ -37,6 +38,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
     const [metadata, setMetadata] = useState(initialMetadata)
     const [activeTab, setActiveTab] = useState<"categories" | "subcategories" | "brands" | "locations">("categories")
     const [search, setSearch] = useState("")
+    const [debouncedSearch, setDebouncedSearch] = useState("")
     const [page, setPage] = useState(1)
     const ITEMS_PER_PAGE = 8
 
@@ -62,6 +64,13 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
 
     const [nameError, setNameError] = useState(false)
 
+    React.useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(search)
+        }, 300)
+        return () => clearTimeout(timer)
+    }, [search])
+
     // Refresh Data
     const refreshData = useCallback(async () => {
         const result = await getProductMetadataAction(partnerId)
@@ -79,9 +88,9 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
         else if (activeTab === "locations") items = metadata.locations
 
         return items.filter(item =>
-            item.name.toLowerCase().includes(search.toLowerCase())
+            item.name.toLowerCase().includes(debouncedSearch.toLowerCase())
         )
-    }, [activeTab, metadata, search])
+    }, [activeTab, metadata, debouncedSearch])
 
     // Pagination
     const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE)
@@ -191,10 +200,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
     }
 
     return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.2 }}
+        <FadeIn
             className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
         >
             <style>{`
@@ -242,12 +248,8 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                 <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-0 px-4 md:px-8">
                     <AnimatePresence mode="wait">
                         {filteredItems.length === 0 ? (
-                            <motion.div
+                            <FadeIn
                                 key="empty"
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                transition={{ duration: 0.4, ease: "easeOut" }}
                                 className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
                             >
                                 <IconPlaceholder
@@ -256,13 +258,10 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                                     subtitle="Ajuste os filtros ou adicione um novo cadastro."
                                     imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
                                 />
-                            </motion.div>
+                            </FadeIn>
                         ) : (
-                            <motion.div
+                            <FadeIn
                                 key="grid"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
                                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8"
                             >
                                 {paginatedItems.map((item) => (
@@ -275,7 +274,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                                         onDelete={() => handleDeleteClick(item)}
                                     />
                                 ))}
-                            </motion.div>
+                            </FadeIn>
                         )}
                     </AnimatePresence>
                 </div>
@@ -362,6 +361,6 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                 isDestructive
                 isLoading={deleteModal.isDeleting}
             />
-        </motion.div>
+        </FadeIn>
     )
 }

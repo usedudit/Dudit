@@ -147,8 +147,42 @@ export async function createMpSubscription(
 
   // ── Race condition guard ──
   const existing = await getPartnerSubscription(partnerId)
-  if (existing && ["active", "trialing", "past_due", "pending"].includes(existing.status)) {
-    return { success: false, error: "Já existe uma assinatura ativa para este parceiro" }
+  if (existing) {
+    if (["active", "trialing", "past_due"].includes(existing.status)) {
+      return { success: false, error: "Já existe uma assinatura ativa para este parceiro" }
+    }
+
+    // If there's a stale "pending" subscription (checkout never completed),
+    // cancel it so the user can start a fresh checkout.
+    if (existing.status === "pending") {
+      SecureLogger.info("Cancelling stale pending subscription to allow new checkout", {
+        partnerId,
+        oldSubscriptionId: existing.id,
+        oldMpId: existing.mercado_pago_subscription_id,
+      })
+
+      const { error: cancelError } = await admin
+        .from("subscriptions")
+        .update({
+          status: "cancelled",
+          cancelled_at: new Date().toISOString(),
+          ended_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id)
+
+      if (cancelError) {
+        SecureLogger.error("Failed to cancel stale pending subscription", {
+          error: cancelError.message,
+          subscriptionId: existing.id,
+        })
+        return { success: false, error: "Erro ao limpar assinatura pendente. Tente novamente." }
+      }
+
+      await logBillingEvent(admin, partnerId, "stale_pending_replaced", null, {
+        cancelled_subscription_id: existing.id,
+        reason: "User initiated new checkout",
+      })
+    }
   }
 
   // ── Get plan ──

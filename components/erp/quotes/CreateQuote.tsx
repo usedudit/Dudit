@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Tabs, TabsList, TabsTrigger, Badge, Button, AlertModal } from '@/components/reusable';
+import { Tabs, TabsList, TabsTrigger, TabsContent, Badge, Button, AlertModal } from '@/components/reusable';
 import { FadeIn } from '@/components/animations/FadeIn';
+import { AnimatePresence } from 'framer-motion';
 import { ChevronLeftIcon, EditIcon, SaveIcon } from '@/lib/icons';
 import QuoteEditor from './QuoteEditor';
 import QuotePreview from './QuotePreview';
@@ -566,22 +567,12 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const handleSave = async () => {
         if (quoteItems.length === 0) {
             setFieldErrors(new Set(["productSearch"]));
-            notifyError("Carrinho vazio", "Adicione pelo menos um item ao orçamento.");
+            notifyError("Orçamento vazio", "Adicione pelo menos um item ao orçamento.");
             return;
         }
         const invalidManualIndexes = new Set<number>();
         const invalidManualPriceIndexes = new Set<number>();
-        /*
-            notifyError("Item manual invÃ¡lido", "Preencha o nome dos itens manuais antes de salvar o orÃ§amento.");
-            return;
-        }
-            if (item.isManual && !String(item.name || "").trim()) {
-                invalidManualIndexes.add(index);
-            setFieldErrors(new Set(["manualItemPrices"]));
-            notifyError("Item manual invÃ¡lido", "Preencha o preÃ§o dos itens manuais antes de salvar o orÃ§amento.");
-            return;
-        }
-        */
+
         quoteItems.forEach((item, index) => {
             if (item.isManual && !String(item.name || "").trim()) {
                 invalidManualIndexes.add(index);
@@ -606,22 +597,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
             setShowValidationModal(true);
             return;
         }
-        /*
-        if (quoteItems.some((item) => Number(item.qty || 0) <= 0)) {
-            notifyError("Quantidade invÃ¡lida", "Todos os itens precisam ter quantidade mÃ­nima de 1.");
-            return;
-        }
-        if (total <= 0) {
-            notifyError("Total invÃ¡lido", "O orÃ§amento nÃ£o pode ser salvo com valor total zerado.");
-            return;
-        }
-        const stockValidationMessage = validateQuoteStock(quoteItems);
-        if (stockValidationMessage) {
-            notifyError("Estoque insuficiente", stockValidationMessage);
-            return;
-        }
-        setFieldErrors(new Set());
-        */
+
         if (quoteItems.some((item) => Number(item.qty || 0) <= 0)) {
             setActiveTab("Dados Gerais");
             setValidationMessage("Todos os itens precisam ter quantidade mínima de 1.");
@@ -995,26 +971,30 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
                             {/* RIGHT SIDE / BELOW - PREVIEW */}
                             <div className={`w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 overflow-auto no-scrollbar ${activeTab === 'Visualização' ? 'flex flex-col flex-1 h-full lg:min-h-0' : 'hidden lg:flex flex-col'}`}>
-                                <QuotePreview
-                                    invoiceNumber={quoteCode || (mode === 'create' ? 'ORC-0000' : 'N/A')}
-                                    quoteDate={quoteDate}
-                                    expiryDate={expiryDate}
-                                    selectedCustomer={selectedCustomer}
-                                    quoteItems={quoteItems}
-                                    subtotal={subtotal}
-                                    shippingNum={shippingNum}
-                                    otherCosts={parseFloat(otherCosts) || 0}
-                                    discountValue={discountValue}
-                                    total={total}
-                                    note={internalNote}
-                                    primaryColor={primaryColor}
-                                    secondaryColor={secondaryColor}
-                                    quoteTitle={quoteTitle}
-                                    quoteSubtitle={quoteSubtitle}
-                                    partnerName={partnerName}
-                                    partnerAddress={partnerAddress}
-                                    partnerAvatar={partnerAvatar}
-                                />
+                                <TabsContent value="Visualização" className="m-0 p-0 h-full flex flex-col focus-visible:outline-none" forceMount>
+                                    <FadeIn key={activeTab === 'Visualização' ? 'preview' : 'preview-desktop'} className="flex flex-col flex-1 h-full">
+                                        <QuotePreview
+                                            invoiceNumber={quoteCode || (mode === 'create' ? 'ORC-0000' : 'N/A')}
+                                            quoteDate={quoteDate}
+                                            expiryDate={expiryDate}
+                                            selectedCustomer={selectedCustomer}
+                                            quoteItems={quoteItems}
+                                            subtotal={subtotal}
+                                            shippingNum={shippingNum}
+                                            otherCosts={parseFloat(otherCosts) || 0}
+                                            discountValue={discountValue}
+                                            total={total}
+                                            note={internalNote}
+                                            primaryColor={primaryColor}
+                                            secondaryColor={secondaryColor}
+                                            quoteTitle={quoteTitle}
+                                            quoteSubtitle={quoteSubtitle}
+                                            partnerName={partnerName}
+                                            partnerAddress={partnerAddress}
+                                            partnerAvatar={partnerAvatar}
+                                        />
+                                    </FadeIn>
+                                </TabsContent>
                             </div>
                         </div>
                     </div>

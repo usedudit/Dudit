@@ -1,261 +1,491 @@
 "use client"
 
 import { useMemo, useRef, useState } from "react"
-import { AnimatePresence, motion } from "framer-motion"
-import { Button, Input, Tabs, TabsList, TabsTrigger, TabsContent, FormDropdown, Badge } from "@/components/reusable"
-import { ChevronLeftIcon, SaveIcon, SearchIcon } from "@/lib/icons"
+import { AnimatePresence } from "framer-motion"
+import { toast } from "sonner"
+
+import { FadeIn } from "@/components/animations/FadeIn"
 import { usePickerBucket } from "@/components/erp/hooks"
-import { fetchDeliveryOrderBucketAction, fetchDeliveryPeopleBucketAction, createERPDeliveryAction } from "@/app/actions/erp/deliveries"
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
+import {
+    Badge,
+    Button,
+    CustomerCard,
+    DatePicker,
+    FormDropdown,
+    Input,
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+    TimePicker,
+} from "@/components/reusable"
+import {
+    createERPDeliveryAction,
+    fetchDeliveryOrderBucketAction,
+    fetchDeliveryPeopleBucketAction,
+} from "@/app/actions/erp/deliveries"
+import {
+    CalendarIcon,
+    ChevronLeftIcon,
+    SaveIcon,
+    SearchIcon,
+} from "@/lib/icons"
 import { getDeliveryStatusMeta, getPaymentStatusMeta } from "@/lib/orders/status"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { formatCurrency, formatDate } from "@/lib/utils"
 
 type DeliveryPerson = { id: string; userId?: string; fullName: string }
+
 type OrderPickerItem = {
-  id: string
-  displayId: string
-  totalAmount: number
-  orderDate?: string | null
-  status: string
-  deliveryStatus: string
-  shippingFee: number
-  customer?: { id: string | null; name: string; email?: string | null; phone?: string | null } | null
-  address?: string
-  items?: any[]
+    id: string
+    displayId: string
+    totalAmount: number
+    orderDate?: string | null
+    status: string
+    deliveryStatus: string
+    shippingFee: number
+    customer?: { id: string | null; name: string; email?: string | null; phone?: string | null } | null
+    address?: string
+    items?: Array<{
+        id: string
+        product_name?: string | null
+        quantity?: number | null
+        products?: {
+            sku?: string | null
+            images?: string[] | string | null
+        } | null
+    }>
+}
+
+function toLocalDateInput(value: Date | string | undefined) {
+    if (!value) return ""
+
+    const date = value instanceof Date ? value : new Date(value)
+    if (Number.isNaN(date.getTime())) return ""
+
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, "0")
+    const day = String(date.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
+}
+
+function buildCustomerAddress(address?: string) {
+    if (!address) return null
+    return {
+        street: address,
+    }
 }
 
 export default function CreateDeliveryPage({
-  partnerId,
-  onBack,
-  onSuccess,
+    partnerId,
+    onBack,
+    onSuccess,
 }: {
-  partnerId: string
-  onBack: () => void
-  onSuccess: () => void
+    partnerId: string
+    onBack: () => void
+    onSuccess: () => void
 }) {
-  const [activeTab, setActiveTab] = useState("Geral")
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
-  const [selectedDeliveryPersonId, setSelectedDeliveryPersonId] = useState<string>("")
-  const [status, setStatus] = useState("preparing")
-  const [date, setDate] = useState("")
-  const [time, setTime] = useState("")
-  const [notes, setNotes] = useState("")
-  const [isSaving, setIsSaving] = useState(false)
-  const [isOrderSearchOpen, setIsOrderSearchOpen] = useState(false)
-  const searchRef = useRef<HTMLDivElement>(null)
-  const [deliveryPeople, setDeliveryPeople] = useState<DeliveryPerson[]>([])
+    const [activeTab, setActiveTab] = useState("Geral")
+    const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
+    const [selectedDeliveryPersonId, setSelectedDeliveryPersonId] = useState<string>("")
+    const [status, setStatus] = useState("preparing")
+    const [date, setDate] = useState("")
+    const [time, setTime] = useState("")
+    const [notes, setNotes] = useState("")
+    const [isSaving, setIsSaving] = useState(false)
+    const [isOrderSearchOpen, setIsOrderSearchOpen] = useState(false)
+    const searchRef = useRef<HTMLDivElement>(null)
+    const [deliveryPeople, setDeliveryPeople] = useState<DeliveryPerson[]>([])
 
-  const orderPicker = usePickerBucket<OrderPickerItem>(
-    () => fetchDeliveryOrderBucketAction(partnerId) as Promise<OrderPickerItem[]>,
-    (order, q) =>
-      String(order.displayId || "").toLowerCase().includes(q) ||
-      String(order.customer?.name || "").toLowerCase().includes(q),
-    { pageSize: 8 }
-  )
+    const orderPicker = usePickerBucket<OrderPickerItem>(
+        () => fetchDeliveryOrderBucketAction(partnerId) as Promise<OrderPickerItem[]>,
+        (order, q) =>
+            String(order.displayId || "").toLowerCase().includes(q) ||
+            String(order.customer?.name || "").toLowerCase().includes(q),
+        { pageSize: 8 }
+    )
 
-  const selectedOrder = useMemo(
-    () => orderPicker.filtered.find((o) => o.id === selectedOrderId) || null,
-    [orderPicker.filtered, selectedOrderId]
-  )
+    const selectedOrder = useMemo(
+        () => orderPicker.filtered.find((order) => order.id === selectedOrderId) || null,
+        [orderPicker.filtered, selectedOrderId]
+    )
 
-  const loadDeliveryPeople = async () => {
-    if (deliveryPeople.length > 0) return
-    const list = await fetchDeliveryPeopleBucketAction(partnerId)
-    setDeliveryPeople(list as DeliveryPerson[])
-  }
+    const selectedStatusMeta = getDeliveryStatusMeta(status)
+    const paymentMeta = getPaymentStatusMeta(selectedOrder?.status)
+    const deliveryMeta = getDeliveryStatusMeta(selectedOrder?.deliveryStatus)
 
-  const selectedStatusMeta = getDeliveryStatusMeta(status)
-  const paymentMeta = getPaymentStatusMeta(selectedOrder?.status)
+    const selectedOrderImage = useMemo(() => {
+        const firstItemImage = selectedOrder?.items?.find((item) => item?.products?.images)?.products?.images
+        return getR2ImageUrl(firstItemImage || null, "thumb")
+    }, [selectedOrder?.items])
 
-  const handleSave = async () => {
-    if (!selectedOrder) return
-    if (!date || !time) return
+    const customerAddress = useMemo(
+        () => buildCustomerAddress(selectedOrder?.address),
+        [selectedOrder?.address]
+    )
 
-    setIsSaving(true)
-    const startedAt = new Date(`${date}T${time}:00`).toISOString()
-    const res = await createERPDeliveryAction({
-      partnerId,
-      orderIds: [selectedOrder.id],
-      deliveryPersonId: selectedDeliveryPersonId || null,
-      status: status as any,
-      startedAt,
-      notes,
-    })
-    setIsSaving(false)
-    if (res.success) onSuccess()
-  }
+    const loadDeliveryPeople = async () => {
+        if (deliveryPeople.length > 0) return
+        const list = await fetchDeliveryPeopleBucketAction(partnerId)
+        setDeliveryPeople(list as DeliveryPerson[])
+    }
 
-  return (
-    <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
-        <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
-          <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
-            <div className="hidden md:flex items-start justify-between">
-              <div className="flex items-start gap-3">
-                <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0"><ChevronLeftIcon className="w-5 h-5" /></Button>
-                <div>
-                  <h1 className="font-bold text-xl md:text-3xl text-brand-dark dark:text-dark-heading">Nova Entrega</h1>
-                  <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">Entrega vinculada ao pedido completo.</p>
-                </div>
-              </div>
-              <div className="hidden md:flex items-center gap-3">
-                <Button variant="outline" onClick={onBack} disabled={isSaving}>Cancelar</Button>
-                <Button onClick={handleSave} disabled={isSaving || !selectedOrder || !date || !time}>
-                  <SaveIcon className="w-4 h-4 mr-2" /> {isSaving ? "Salvando..." : "Salvar"}
-                </Button>
-              </div>
-            </div>
-            <div className="w-full md:mt-4">
-              <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                <TabsTrigger value="Geral" className="px-0 pb-3">Dados gerais</TabsTrigger>
-                <TabsTrigger value="Observações" className="px-0 pb-3">Observações</TabsTrigger>
-              </TabsList>
-            </div>
-          </div>
-        </div>
+    const handleSave = async () => {
+        if (!selectedOrder || !date || !time) return
 
-        <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 max-w-[1300px] mx-auto w-full pb-24 md:pb-8">
-          <TabsContent value="Geral" className="mt-0">
-            <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-              <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-8">
-                <section>
-                  <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Detalhes do Pedido</h3>
-                  <div ref={searchRef} className="relative">
-                    <Input
-                      placeholder="Pesquisar ID do pedido..."
-                      value={orderPicker.searchQuery}
-                      onChange={(e) => { orderPicker.setSearchQuery(e.target.value); setIsOrderSearchOpen(true) }}
-                      onFocus={() => { setIsOrderSearchOpen(true); void orderPicker.loadBucket() }}
-                      prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                      label=""
-                    />
-                    {isOrderSearchOpen && orderPicker.searchQuery.trim() && (
-                      <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="absolute z-50 top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl overflow-hidden max-h-72 overflow-y-auto shadow-xl">
-                        {orderPicker.displayed.map((order) => (
-                          <button
-                            key={order.id}
-                            type="button"
-                            className="w-full text-left p-3.5 border-b border-brand-border dark:border-dark-border last:border-0 hover:bg-gray-50 dark:hover:bg-dark-border"
-                            onClick={() => {
-                              setSelectedOrderId(order.id)
-                              orderPicker.setSearchQuery(order.displayId)
-                              setIsOrderSearchOpen(false)
-                            }}
-                          >
-                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{order.displayId}</div>
-                            <div className="text-xs text-brand-inactive-text">{order.customer?.name || "Cliente"} • {formatCurrency(order.totalAmount || 0)}</div>
-                          </button>
-                        ))}
-                      </motion.div>
-                    )}
-                  </div>
-                </section>
+        setIsSaving(true)
+        try {
+            const startedAt = new Date(`${date}T${time}:00`).toISOString()
+            const response = await createERPDeliveryAction({
+                partnerId,
+                orderIds: [selectedOrder.id],
+                deliveryPersonId: selectedDeliveryPersonId || null,
+                status: status as any,
+                startedAt,
+                notes,
+            })
+            if (response.success) {
+                toast.success("Entrega criada com sucesso!")
+                onSuccess()
+            } else {
+                toast.error(response.error || "Erro ao criar entrega.")
+            }
+        } catch (err: any) {
+            toast.error(err?.message || "Erro inesperado ao criar entrega.")
+        } finally {
+            setIsSaving(false)
+        }
+    }
 
-                {selectedOrder && (
-                  <>
-                    <div className="h-px bg-brand-border dark:bg-dark-border w-full" />
-                    <section className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Input label="Pedido" value={selectedOrder.displayId} onChange={() => { }} disabled />
-                        <Input label="Total do Pedido" value={formatCurrency(selectedOrder.totalAmount || 0)} onChange={() => { }} disabled />
-                        <Input label="Data do Pedido" value={selectedOrder.orderDate ? formatDate(selectedOrder.orderDate) : "-"} onChange={() => { }} disabled />
-                        <Input label="Status de Pagamento" value={paymentMeta.label} onChange={() => { }} disabled />
-                        <Input label="Status da Entrega (pedido)" value={getDeliveryStatusMeta(selectedOrder.deliveryStatus).label} onChange={() => { }} disabled />
-                        <Input label="Valor de Envio" value={formatCurrency(selectedOrder.shippingFee || 0)} onChange={() => { }} disabled />
-                      </div>
-                      <div className="rounded-2xl border border-brand-border dark:border-dark-border p-4">
-                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{selectedOrder.customer?.name || "Cliente"}</p>
-                        <p className="text-sm text-brand-inactive-text">{selectedOrder.address || "Sem endereço"}</p>
-                      </div>
-                    </section>
-
-                    <div className="h-px bg-brand-border dark:bg-dark-border w-full" />
-                    <section>
-                      <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Informações da Entrega</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormDropdown
-                          label="Carrier / Entregador"
-                          value={selectedDeliveryPersonId || "none"}
-                          setValue={(v) => setSelectedDeliveryPersonId(v === "none" ? "" : v)}
-                          options={[{ value: "none", label: "Sem entregador (não atribuído)" }, ...deliveryPeople.map((p) => ({ value: p.id, label: p.fullName }))]}
-                          onFocus={() => { void loadDeliveryPeople() }}
-                        />
-                        <FormDropdown
-                          label="Status"
-                          value={status}
-                          setValue={setStatus}
-                          options={[
-                            { value: "not_sent", label: "Não enviado" },
-                            { value: "preparing", label: "Preparando" },
-                            { value: "sent", label: "Enviado" },
-                            { value: "delivered", label: "Entregue" },
-                            { value: "pickup_available", label: "Disponível para retirada" },
-                            { value: "delivery_failed", label: "Entrega não realizada" },
-                            { value: "cancelled", label: "Cancelado" },
-                          ]}
-                        />
-                        <Input label="Data de saída" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-                        <Input label="Horário de saída" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-                      </div>
-                      <div className="mt-4 rounded-lg border border-brand-border dark:border-dark-border p-3">
-                        <span className="text-sm font-medium text-brand-inactive-text">Status selecionado: </span>
-                        <Badge variant={selectedStatusMeta.variant}>{selectedStatusMeta.label}</Badge>
-                      </div>
-                    </section>
-
-                    <div className="h-px bg-brand-border dark:bg-dark-border w-full" />
-                    <section>
-                      <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Itens para enviar</h3>
-                      <div className="space-y-3">
-                        {(selectedOrder.items || []).length === 0 ? (
-                          <div className="text-sm text-brand-inactive-text">A entrega considera o pedido completo (itens não editáveis nesta etapa).</div>
-                        ) : (
-                          selectedOrder.items?.map((item: any) => (
-                            <div key={item.id} className="flex items-center gap-3 py-3 border-b border-brand-border dark:border-dark-border">
-                              <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border" />
-                              <div className="flex-1 min-w-0">
-                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{item.product_name || "Item"}</p>
-                                <p className="text-xs text-brand-inactive-text">{item.sku || "SKU não informado"}</p>
-                              </div>
-                              <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">x{item.quantity || 0}</span>
+    return (
+        <FadeIn className="relative flex h-[calc(100vh-65px)] flex-col overflow-hidden bg-white dark:bg-dark-background">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex h-full w-full flex-col">
+                <div className="sticky top-0 z-30 w-full border-b border-brand-border bg-white dark:border-dark-border dark:bg-dark-surface">
+                    <div className="relative mx-auto max-w-[1300px] px-4 md:px-6 md:pt-4">
+                        <div className="hidden items-start justify-between md:flex">
+                            <div className="flex items-start gap-3">
+                                <Button variant="filled" onClick={onBack} className="h-10 w-10 p-0">
+                                    <ChevronLeftIcon className="h-5 w-5" />
+                                </Button>
+                                <div>
+                                    <h1 className="text-xl font-bold text-brand-dark dark:text-dark-heading md:text-3xl">
+                                        Nova Entrega
+                                    </h1>
+                                    <p className="text-[15px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                        Vincule a entrega a um pedido e acompanhe os dados principais antes de salvar.
+                                    </p>
+                                </div>
                             </div>
-                          ))
-                        )}
-                      </div>
-                    </section>
-                  </>
-                )}
-              </div>
-              <div className="hidden lg:block col-span-12 lg:col-span-4 border-l border-brand-border dark:border-dark-border pl-12">
-                <div className="rounded-2xl border border-brand-border dark:border-dark-border p-5">
-                  <h4 className="font-bold text-brand-dark dark:text-dark-heading mb-2">Resumo</h4>
-                  <p className="text-sm text-brand-inactive-text">Pedido: {selectedOrder?.displayId || "-"}</p>
-                  <p className="text-sm text-brand-inactive-text">Cliente: {selectedOrder?.customer?.name || "-"}</p>
-                  <p className="text-sm text-brand-inactive-text">Saída: {date && time ? formatDateTime(new Date(`${date}T${time}:00`)) : "-"}</p>
+
+                            <div className="hidden items-center gap-3 md:flex">
+                                <Button variant="outline" onClick={onBack} disabled={isSaving}>
+                                    Cancelar
+                                </Button>
+                                <Button onClick={handleSave} disabled={isSaving || !selectedOrder || !date || !time}>
+                                    <SaveIcon className="mr-2 h-4 w-4" />
+                                    {isSaving ? "Salvando..." : "Salvar"}
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="w-full md:mt-4">
+                            <TabsList className="w-full justify-start gap-6 border-b-0 bg-transparent p-0">
+                                <TabsTrigger value="Geral" className="px-0 pb-3">
+                                    Dados gerais
+                                </TabsTrigger>
+                                <TabsTrigger value="Observacoes" className="px-0 pb-3">
+                                    Observacoes
+                                </TabsTrigger>
+                            </TabsList>
+                        </div>
+                    </div>
                 </div>
-              </div>
-            </div>
-          </TabsContent>
 
-          <TabsContent value="Observações" className="mt-0">
-            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Observações</h3>
-            <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border p-5 h-[350px]">
-              <textarea
-                className="w-full h-full bg-transparent border-none text-[15px] text-brand-dark dark:text-dark-heading focus:outline-none resize-none placeholder:text-brand-inactive-text"
-                placeholder="Observações internas da entrega..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </div>
-          </TabsContent>
-        </div>
-      </Tabs>
+                <div className="mx-auto flex-1 w-full max-w-[1300px] overflow-y-auto px-4 py-6 pb-24 md:px-6 md:pb-8">
+                    <AnimatePresence mode="wait">
+                        <FadeIn key={activeTab}>
+                            <TabsContent value="Geral" className="mt-0">
+                                <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                                    <div className="col-span-12 space-y-8 lg:col-span-8 lg:pr-12">
+                                        <section className="space-y-4">
+                                            <div ref={searchRef} className="relative">
+                                                <Input
+                                                    placeholder="Pesquise pelo ID do pedido..."
+                                                    value={orderPicker.searchQuery}
+                                                    onChange={(event) => {
+                                                        orderPicker.setSearchQuery(event.target.value)
+                                                        setIsOrderSearchOpen(true)
+                                                    }}
+                                                    onFocus={() => {
+                                                        setIsOrderSearchOpen(true)
+                                                        void orderPicker.loadBucket()
+                                                    }}
+                                                    prefix={<SearchIcon size={18} className="shrink-0 text-brand-inactive-text" />}
+                                                    label=""
+                                                    variant="full-rounded"
+                                                />
 
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
-        <Button variant="outline" onClick={onBack} disabled={isSaving} className="flex-1 h-[48px]">Cancelar</Button>
-        <Button onClick={handleSave} disabled={isSaving || !selectedOrder || !date || !time} className="flex-1 h-[48px]">
-          <SaveIcon className="w-4 h-4 mr-2" /> {isSaving ? "Salvando..." : "Salvar"}
-        </Button>
-      </div>
-    </div>
-  )
+                                                {isOrderSearchOpen && orderPicker.searchQuery.trim() && (
+                                                    <FadeIn className="absolute left-0 right-0 top-full z-50 mt-2 max-h-72 overflow-y-auto overflow-hidden rounded-2xl border border-brand-border bg-white shadow-xl dark:border-dark-border dark:bg-dark-surface">
+                                                        {orderPicker.displayed.map((order) => (
+                                                            <button
+                                                                key={order.id}
+                                                                type="button"
+                                                                className="w-full border-b border-brand-border p-3.5 text-left transition-colors last:border-0 hover:bg-gray-50 dark:border-dark-border dark:hover:bg-dark-border"
+                                                                onClick={() => {
+                                                                    setSelectedOrderId(order.id)
+                                                                    orderPicker.setSearchQuery(order.displayId)
+                                                                    setIsOrderSearchOpen(false)
+                                                                }}
+                                                            >
+                                                                <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                    {order.displayId}
+                                                                </div>
+                                                                <div className="text-xs text-brand-inactive-text">
+                                                                    {order.customer?.name || "Cliente"} • {formatCurrency(order.totalAmount || 0)}
+                                                                </div>
+                                                            </button>
+                                                        ))}
+                                                    </FadeIn>
+                                                )}
+                                            </div>
+
+                                            {selectedOrder && (
+                                                <div className="overflow-hidden rounded-[26px] border border-brand-border bg-white shadow-[0_18px_50px_-36px_rgba(12,59,46,0.45)] dark:border-dark-border dark:bg-dark-surface">
+                                                    <div className="grid gap-5 p-4 md:grid-cols-[132px_minmax(0,1fr)] md:p-5">
+                                                        <div className="overflow-hidden rounded-2xl bg-brand-gray dark:bg-dark-border/40">
+                                                            <img
+                                                                src={selectedOrderImage}
+                                                                alt={selectedOrder.displayId}
+                                                                className="h-full min-h-[132px] w-full object-cover"
+                                                            />
+                                                        </div>
+
+                                                        <div className="min-w-0">
+                                                            <div className="mb-4 flex flex-wrap items-center gap-2">
+                                                                <span className="rounded-full bg-brand-gray px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-brand-inactive-text dark:bg-dark-border/40">
+                                                                    Pedido
+                                                                </span>
+                                                                <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
+                                                                    {selectedOrder.displayId}
+                                                                </h3>
+                                                            </div>
+
+                                                            <div className="grid gap-3 md:grid-cols-4">
+                                                                <div className="rounded-2xl border border-brand-border bg-brand-gray/35 p-4 dark:border-dark-border dark:bg-dark-border/20">
+                                                                    <div className="mb-2 flex items-center gap-2 text-brand-inactive-text">
+                                                                        <CalendarIcon className="h-4 w-4" />
+                                                                        <span className="text-xs font-bold uppercase tracking-[0.14em]">
+                                                                            Data
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className="text-lg font-bold text-brand-dark dark:text-dark-heading">
+                                                                        {selectedOrder.orderDate ? formatDate(selectedOrder.orderDate) : "-"}
+                                                                    </p>
+                                                                </div>
+
+                                                                <div className="rounded-2xl border border-brand-border bg-brand-gray/35 p-4 dark:border-dark-border dark:bg-dark-border/20">
+                                                                    <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text">
+                                                                        Pagamento
+                                                                    </p>
+                                                                    <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
+                                                                </div>
+
+                                                                <div className="rounded-2xl border border-brand-border bg-brand-gray/35 p-4 dark:border-dark-border dark:bg-dark-border/20">
+                                                                    <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text">
+                                                                        Entrega
+                                                                    </p>
+                                                                    <Badge variant={deliveryMeta.variant}>{deliveryMeta.label}</Badge>
+                                                                </div>
+
+                                                                <div className="rounded-2xl border border-brand-border bg-brand-gray/35 p-4 dark:border-dark-border dark:bg-dark-border/20">
+                                                                    <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text">
+                                                                        Total
+                                                                    </p>
+                                                                    <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                                                        {formatCurrency(selectedOrder.totalAmount || 0)}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </section>
+
+                                        {selectedOrder && (
+                                            <>
+                                                <div className="h-px w-full bg-brand-border dark:bg-dark-border" />
+
+                                                <section>
+                                                    <h3 className="mb-4 text-lg font-bold text-brand-dark dark:text-dark-heading">
+                                                        Informacoes da Entrega
+                                                    </h3>
+                                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                                        <FormDropdown
+                                                            label="Carrier / Entregador"
+                                                            value={selectedDeliveryPersonId || "none"}
+                                                            setValue={(value) => setSelectedDeliveryPersonId(value === "none" ? "" : value)}
+                                                            options={[
+                                                                { value: "none", label: "Sem entregador (nao atribuido)" },
+                                                                ...deliveryPeople.map((person) => ({
+                                                                    value: person.id,
+                                                                    label: person.fullName,
+                                                                })),
+                                                            ]}
+                                                            onFocus={() => {
+                                                                void loadDeliveryPeople()
+                                                            }}
+                                                        />
+
+                                                        <FormDropdown
+                                                            label="Status"
+                                                            value={status}
+                                                            setValue={setStatus}
+                                                            options={[
+                                                                { value: "not_sent", label: "Nao enviado" },
+                                                                { value: "preparing", label: "Preparando" },
+                                                                { value: "sent", label: "Enviado" },
+                                                                { value: "delivered", label: "Entregue" },
+                                                                { value: "pickup_available", label: "Disponivel para retirada" },
+                                                                { value: "delivery_failed", label: "Entrega nao realizada" },
+                                                                { value: "cancelled", label: "Cancelado" },
+                                                            ]}
+                                                        />
+
+                                                        <DatePicker
+                                                            label="Data de saida"
+                                                            value={date}
+                                                            onChange={(nextDate) => setDate(toLocalDateInput(nextDate))}
+                                                            placeholder="Selecione a data"
+                                                        />
+
+                                                        <TimePicker
+                                                            label="Horario de saida"
+                                                            value={time}
+                                                            onChange={setTime}
+                                                            placeholder="Selecione o horario"
+                                                        />
+                                                    </div>
+
+                                                    <div className="mt-4 rounded-2xl border border-brand-border p-4 dark:border-dark-border">
+                                                        <span className="mr-2 text-sm font-medium text-brand-inactive-text">
+                                                            Status selecionado:
+                                                        </span>
+                                                        <Badge variant={selectedStatusMeta.variant}>{selectedStatusMeta.label}</Badge>
+                                                    </div>
+                                                </section>
+
+                                                <div className="h-px w-full bg-brand-border dark:bg-dark-border" />
+
+                                                <section>
+                                                    <h3 className="mb-4 text-lg font-bold text-brand-dark dark:text-dark-heading">
+                                                        Itens do Pedido
+                                                    </h3>
+                                                    <div className="overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border">
+                                                        {(selectedOrder.items || []).length === 0 ? (
+                                                            <div className="p-5 text-sm text-brand-inactive-text">
+                                                                A entrega considera o pedido completo. Nenhum item detalhado foi retornado para este pedido.
+                                                            </div>
+                                                        ) : (
+                                                            selectedOrder.items?.map((item) => {
+                                                                const itemImage = getR2ImageUrl(item.products?.images || null, "thumb")
+
+                                                                return (
+                                                                    <div
+                                                                        key={item.id}
+                                                                        className="flex items-center gap-4 border-b border-brand-border p-4 last:border-0 dark:border-dark-border"
+                                                                    >
+                                                                        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-brand-gray dark:bg-dark-border/40">
+                                                                            <img
+                                                                                src={itemImage}
+                                                                                alt={item.product_name || "Item"}
+                                                                                className="h-full w-full object-cover"
+                                                                            />
+                                                                        </div>
+
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <p className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                                {item.product_name || "Item"}
+                                                                            </p>
+                                                                            <p className="text-xs text-brand-inactive-text">
+                                                                                {item.products?.sku || "SKU nao informado"}
+                                                                            </p>
+                                                                        </div>
+
+                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                            x{item.quantity || 0}
+                                                                        </span>
+                                                                    </div>
+                                                                )
+                                                            })
+                                                        )}
+                                                    </div>
+                                                </section>
+
+                                                <section className="lg:hidden">
+                                                    <CustomerCard
+                                                        customer={{
+                                                            name: selectedOrder.customer?.name || "Cliente",
+                                                            email: selectedOrder.customer?.email || "",
+                                                            phone: selectedOrder.customer?.phone || "",
+                                                        }}
+                                                        address={customerAddress}
+                                                        showMap={false}
+                                                    />
+                                                </section>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    <div className="col-span-12 hidden border-l border-brand-border pl-12 dark:border-dark-border lg:block lg:col-span-4">
+                                        {selectedOrder ? (
+                                            <CustomerCard
+                                                customer={{
+                                                    name: selectedOrder.customer?.name || "Cliente",
+                                                    email: selectedOrder.customer?.email || "",
+                                                    phone: selectedOrder.customer?.phone || "",
+                                                }}
+                                                address={customerAddress}
+                                                showMap={false}
+                                                className="sticky top-6"
+                                            />
+                                        ) : (
+                                            <div className="rounded-2xl border border-dashed border-brand-border p-5 text-sm text-brand-inactive-text dark:border-dark-border">
+                                                Selecione um pedido para ver os dados do cliente aqui.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="Observacoes" className="mt-0">
+                                <h3 className="mb-4 text-lg font-bold text-brand-dark dark:text-dark-heading">
+                                    Observacoes
+                                </h3>
+                                <div className="h-[350px] rounded-2xl border border-brand-border bg-brand-gray p-5 dark:border-dark-border dark:bg-dark-border/30">
+                                    <textarea
+                                        className="h-full w-full resize-none border-none bg-transparent text-[15px] text-brand-dark placeholder:text-brand-inactive-text focus:outline-none dark:text-dark-heading"
+                                        placeholder="Observacoes internas da entrega..."
+                                        value={notes}
+                                        onChange={(event) => setNotes(event.target.value)}
+                                    />
+                                </div>
+                            </TabsContent>
+                        </FadeIn>
+                    </AnimatePresence>
+                </div>
+            </Tabs>
+
+            <div className="fixed bottom-0 left-0 right-0 z-40 flex gap-3 border-t border-gray-200 bg-white px-4 py-3 dark:border-dark-border dark:bg-dark-surface md:hidden">
+                <Button variant="outline" onClick={onBack} disabled={isSaving} className="h-[48px] flex-1">
+                    Cancelar
+                </Button>
+                <Button onClick={handleSave} disabled={isSaving || !selectedOrder || !date || !time} className="h-[48px] flex-1">
+                    <SaveIcon className="mr-2 h-4 w-4" />
+                    {isSaving ? "Salvando..." : "Salvar"}
+                </Button>
+            </div>
+        </FadeIn>
+    )
 }

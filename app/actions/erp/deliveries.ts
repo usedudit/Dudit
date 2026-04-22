@@ -198,7 +198,7 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
       situation,
       delivery_status,
       created_at,
-      order_items(id, product_name, quantity, sku)
+      order_items(id, product_name, product_price, quantity, subtotal, product_id, products(sku, images))
     `)
     .eq("partner_id", partnerId)
     .order("created_at", { ascending: false })
@@ -302,48 +302,50 @@ export async function createERPDeliveryAction(payload: CreateDeliveryPayload) {
 
   const firstOrder = selectedOrders[0]
   const deliveryAddress = formatAddress(firstOrder)
-  if (!deliveryAddress) {
-    return { success: false as const, error: "Pedido sem endereço de entrega válido para roteirização." }
-  }
 
-  const { data: defaultStore } = await supabase
-    .from("stores")
-    .select("id, city, state, zip_code, street, number")
-    .eq("partner_id", payload.partnerId)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle()
+  // Geocoding & route estimation are best-effort — never block delivery creation
+  let distanceKm: number | null = null
+  let estimatedDurationMinutes: number | null = null
 
-  const originAddress = [
-    [defaultStore?.street, defaultStore?.number].filter(Boolean).join(", "),
-    [defaultStore?.city, defaultStore?.state].filter(Boolean).join(", "),
-    defaultStore?.zip_code || "",
-  ]
-    .filter(Boolean)
-    .join(" ")
+  if (deliveryAddress) {
+    try {
+      const { data: defaultStore } = await supabase
+        .from("stores")
+        .select("id, city, state, zip_code, street, number")
+        .eq("partner_id", payload.partnerId)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle()
 
-  const [originCoords, destinationCoords] = await Promise.all([
-    geocodeAddress(originAddress),
-    geocodeAddress(deliveryAddress),
-  ])
+      const originAddress = [
+        [defaultStore?.street, defaultStore?.number].filter(Boolean).join(", "),
+        [defaultStore?.city, defaultStore?.state].filter(Boolean).join(", "),
+        defaultStore?.zip_code || "",
+      ]
+        .filter(Boolean)
+        .join(" ")
 
-  if (!originCoords || !destinationCoords) {
-    return { success: false as const, error: "Não foi possível geocodificar os endereços para calcular a rota." }
-  }
+      const [originCoords, destinationCoords] = await Promise.all([
+        geocodeAddress(originAddress),
+        geocodeAddress(deliveryAddress),
+      ])
 
-  let estimate
-  try {
-    estimate = await resolveRouteEstimate(originCoords, destinationCoords)
-  } catch (error: any) {
-    return { success: false as const, error: error?.message || "Falha ao calcular distância e duração." }
+      if (originCoords && destinationCoords) {
+        const estimate = await resolveRouteEstimate(originCoords, destinationCoords)
+        distanceKm = Number(estimate.distanceKm.toFixed(2))
+        estimatedDurationMinutes = estimate.durationMinutes
+      }
+    } catch (err) {
+      console.warn("[createERPDeliveryAction] geocoding/route failed, proceeding without estimates:", err)
+    }
   }
 
   const insertPayload: Record<string, unknown> = {
     partner_id: payload.partnerId,
     delivery_person_id: payload.deliveryPersonId || null,
     status: payload.status,
-    distance_km: Number(estimate.distanceKm.toFixed(2)),
-    estimated_duration_minutes: estimate.durationMinutes,
+    distance_km: distanceKm,
+    estimated_duration_minutes: estimatedDurationMinutes,
     started_at: payload.startedAt,
     delivered_at: payload.status === "delivered" ? payload.startedAt : null,
     created_at: new Date().toISOString(),
@@ -381,12 +383,12 @@ export async function getERPDeliveriesPageAction(
   options?: { cursor?: ERPDeliveryListCursor | null; limit?: number }
 ): Promise<
   | {
-      success: true
-      items: any[]
-      nextCursor: ERPDeliveryListCursor | null
-      hasMore: boolean
-      planGate?: { requiredPlanSlug: "vendedor"; message: string }
-    }
+    success: true
+    items: any[]
+    nextCursor: ERPDeliveryListCursor | null
+    hasMore: boolean
+    planGate?: { requiredPlanSlug: "vendedor"; message: string }
+  }
   | { success: false; error: string }
 > {
   try {

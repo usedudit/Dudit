@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, IconPlaceholder } from "@/components/reusable"
+import { FadeIn } from "@/components/animations/FadeIn"
 import Pagination from "@/components/reusable/Pagination"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { ExportFileIcon, PlusIcon, ArrowUpDownIcon } from "@/lib/icons"
@@ -56,6 +57,7 @@ export default function DeliveriesPage({
   const [wrapper, setWrapper] = useState<"list" | "create" | "detail">("list")
   const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null)
   const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({})
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const observerTarget = useRef<HTMLDivElement>(null)
   const tableContainerRef = useRef<HTMLDivElement>(null)
   const [scrollState, setScrollState] = useState({ left: false, right: false })
@@ -69,7 +71,7 @@ export default function DeliveriesPage({
       if (!res.success) throw new Error(res.error || "Erro ao carregar entregas.")
       return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
     },
-    dedupeKey: (d) => String(d?.id || ""),
+    dedupeKey: useCallback((d: any) => String(d?.id || ""), []),
   })
 
   useInfiniteScrollObserver(observerTarget, {
@@ -84,8 +86,18 @@ export default function DeliveriesPage({
   const checkScroll = () => {
     if (!tableContainerRef.current) return
     const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
-    setScrollState({ left: scrollLeft > 0, right: scrollLeft < scrollWidth - clientWidth - 2 })
+    setScrollState((prev) => {
+      const nextLeft = scrollLeft > 0
+      const nextRight = scrollLeft < scrollWidth - clientWidth - 2
+      if (prev.left === nextLeft && prev.right === nextRight) return prev
+      return { left: nextLeft, right: nextRight }
+    })
   }
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
 
   useEffect(() => {
     checkScroll()
@@ -94,7 +106,7 @@ export default function DeliveriesPage({
   }, [viewMode, items])
 
   const mapped = useMemo(() => {
-    const term = search.toLowerCase().trim()
+    const term = debouncedSearch.toLowerCase().trim()
     const nowMs = Date.now()
     let list = (items || []).map((raw: any) => {
       const links = Array.isArray(raw.delivery_orders) ? raw.delivery_orders : []
@@ -176,123 +188,137 @@ export default function DeliveriesPage({
 
   const filterSections: FilterSectionConfig[] = [{ id: "status", title: "Status", type: "checkbox-list", options: ["Não enviado", "Preparando", "Enviado", "Entregue", "Disponível para retirada", "Entrega não realizada", "Cancelado"] }]
 
-  if (wrapper === "create") {
-    return <CreateDeliveryPage partnerId={partnerId} onBack={() => setWrapper("list")} onSuccess={() => setWrapper("list")} />
-  }
-  if (wrapper === "detail" && selectedDeliveryId) {
-    return <DeliveryDetailPage deliveryId={selectedDeliveryId} partnerId={partnerId} onBack={() => setWrapper("list")} />
-  }
-
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
-      <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-        <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
-          <div className="flex flex-col gap-2 pt-1">
-            <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">Entregas</h1>
-            <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">Gerencie as entregas vinculadas aos pedidos.</p>
+    <AnimatePresence mode="wait">
+      {wrapper === "create" ? (
+        <FadeIn key="create" className="w-full h-full">
+          <CreateDeliveryPage partnerId={partnerId} onBack={() => setWrapper("list")} onSuccess={() => setWrapper("list")} />
+        </FadeIn>
+      ) : wrapper === "detail" && selectedDeliveryId ? (
+        <FadeIn key="detail" className="w-full h-full">
+          <DeliveryDetailPage deliveryId={selectedDeliveryId} partnerId={partnerId} onBack={() => setWrapper("list")} />
+        </FadeIn>
+      ) : (
+        <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+          <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+            <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+              <div className="flex flex-col gap-2 pt-1">
+                <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">Entregas</h1>
+                <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">Gerencie as entregas vinculadas aos pedidos.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button variant="outline"><ExportFileIcon className="w-[18px] h-[18px]" /> Exportar</Button>
+                <Button onClick={() => setWrapper("create")} disabled={!!planGate}>
+                  <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} /> Nova Entrega
+                </Button>
+              </div>
+            </div>
+
+            <DeliveryPageControls
+              search={search}
+              onSearchChange={setSearch}
+              onOpenFilter={() => setIsFilterOpen(true)}
+              onAdd={() => setWrapper("create")}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              addDisabled={!!planGate}
+            />
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
+              <AnimatePresence mode="wait">
+                {paginated.length === 0 ? (
+                  <FadeIn key="empty" className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full">
+                    <IconPlaceholder
+                      placeholderType="image"
+                      imageSrc={
+                        planGate
+                          ? "https://img.dudit.com.br/static/mascots/Plano.png"
+                          : "https://img.dudit.com.br/static/mascots/Entregas.png"
+                      }
+                      imageAlt={planGate ? "Plano necessário" : "Sem entregas"}
+                      title={planGate ? "Plano necessário" : "Nenhuma entrega encontrada"}
+                      subtitle={
+                        planGate
+                          ? planGate.message
+                          : "Crie uma entrega a partir de um pedido para começar."
+                      }
+                      itemButton={
+                        planGate ? {
+                          text: "Ver Plano Vender",
+                          action: () => openPlanUpgrade("vendedor"),
+                        } : undefined
+                      }
+                    />
+                  </FadeIn>
+                ) : viewMode === "grid" ? (
+                  <FadeIn key="grid" className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                    {paginated.map((delivery) => <DeliveryGridCard key={delivery.id} delivery={delivery} onQuickStatusChange={handleQuickStatusChange} onDetails={() => { setSelectedDeliveryId(delivery.id); setWrapper("detail") }} />)}
+                  </FadeIn>
+                ) : (
+                  <FadeIn key="list-table" className="w-full overflow-hidden rounded-xl relative">
+                    <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                    <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+                    <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                      <table className="w-full text-left border-separate border-spacing-0 min-w-[1400px]">
+                        <thead>
+                          <tr className="bg-brand-gray dark:bg-dark-border/50">
+                            {COLUMNS.map((col, idx) => {
+                              const sortable = col.id !== "actions"
+                              const sorted = sortConfig?.key === col.id
+                              return (
+                                <th
+                                  key={col.id}
+                                  style={{ width: col.width }}
+                                  className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === 0 ? "rounded-l-lg" : ""} ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""} ${sortable ? "cursor-pointer group" : ""}`}
+                                  onClick={() => {
+                                    if (!sortable) return
+                                    setSortConfig((prev) => ({ key: col.id as SortKey, direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc" }))
+                                  }}
+                                >
+                                  <div className="flex items-center gap-1.5">
+                                    <span>{col.label}</span>
+                                    {sortable ? <ArrowUpDownIcon size={14} className={`transition-all duration-200 ${sorted ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-40 group-hover:opacity-100"}`} /> : null}
+                                  </div>
+                                </th>
+                              )
+                            })}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paginated.map((delivery) => (
+                            <DeliveryListItem key={delivery.id} delivery={delivery} columns={COLUMNS as any} onQuickStatusChange={handleQuickStatusChange} onDetails={() => { setSelectedDeliveryId(delivery.id); setWrapper("detail") }} />
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </FadeIn>
+                )}
+              </AnimatePresence>
+              {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
+            </div>
+
+            {mapped.length > 0 ? (
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                onPageChange={(p) => {
+                  setPage(p)
+                  if (p === totalPages && hasNextPage && !isFetchingNextPage) void fetchNextPage()
+                }}
+              />
+            ) : null}
+
+            <FilterSheet
+              isOpen={isFilterOpen}
+              onClose={() => setIsFilterOpen(false)}
+              sections={filterSections}
+              filters={filters}
+              setFilters={setFilters as any}
+              onClear={() => setFilters({ status: [] })}
+            />
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="outline"><ExportFileIcon className="w-[18px] h-[18px]" /> Exportar</Button>
-            <Button onClick={() => setWrapper("create")} disabled={!!planGate}>
-              <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} /> Nova Entrega
-            </Button>
-          </div>
-        </div>
-
-        <DeliveryPageControls
-          search={search}
-          onSearchChange={setSearch}
-          onOpenFilter={() => setIsFilterOpen(true)}
-          onAdd={() => setWrapper("create")}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          addDisabled={!!planGate}
-        />
-
-        <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
-          <AnimatePresence mode="wait">
-            {paginated.length === 0 ? (
-              <motion.div key="empty" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full">
-                <IconPlaceholder
-                  placeholderType="image"
-                  imageSrc="https://img.dudit.com.br/static/mascots/Entregas.png"
-                  imageAlt="Sem entregas"
-                  title={planGate ? "Plano necessário" : "Nenhuma entrega encontrada"}
-                  subtitle={planGate ? planGate.message : "Crie uma entrega a partir de um pedido para começar."}
-                />
-                {planGate ? (
-                  <Button className="mt-6 rounded-full" onClick={() => openPlanUpgrade("vendedor")}>
-                    Ver plano Vendedor
-                  </Button>
-                ) : null}
-              </motion.div>
-            ) : viewMode === "grid" ? (
-              <motion.div key="grid" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                {paginated.map((delivery) => <DeliveryGridCard key={delivery.id} delivery={delivery} onQuickStatusChange={handleQuickStatusChange} onDetails={() => { setSelectedDeliveryId(delivery.id); setWrapper("detail") }} />)}
-              </motion.div>
-            ) : (
-              <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full overflow-hidden rounded-xl relative">
-                <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
-                <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                  <table className="w-full text-left border-separate border-spacing-0 min-w-[1400px]">
-                    <thead>
-                      <tr className="bg-brand-gray dark:bg-dark-border/50">
-                        {COLUMNS.map((col, idx) => {
-                          const sortable = col.id !== "actions"
-                          const sorted = sortConfig?.key === col.id
-                          return (
-                            <th
-                              key={col.id}
-                              style={{ width: col.width }}
-                              className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === 0 ? "rounded-l-lg" : ""} ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""} ${sortable ? "cursor-pointer group" : ""}`}
-                              onClick={() => {
-                                if (!sortable) return
-                                setSortConfig((prev) => ({ key: col.id as SortKey, direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc" }))
-                              }}
-                            >
-                              <div className="flex items-center gap-1.5">
-                                <span>{col.label}</span>
-                                {sortable ? <ArrowUpDownIcon size={14} className={`transition-all duration-200 ${sorted ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-40 group-hover:opacity-100"}`} /> : null}
-                              </div>
-                            </th>
-                          )
-                        })}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paginated.map((delivery) => (
-                        <DeliveryListItem key={delivery.id} delivery={delivery} columns={COLUMNS as any} onQuickStatusChange={handleQuickStatusChange} onDetails={() => { setSelectedDeliveryId(delivery.id); setWrapper("detail") }} />
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-          {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
-        </div>
-
-        {mapped.length > 0 ? (
-          <Pagination
-            currentPage={page}
-            totalPages={totalPages}
-            onPageChange={(p) => {
-              setPage(p)
-              if (p === totalPages && hasNextPage && !isFetchingNextPage) void fetchNextPage()
-            }}
-          />
-        ) : null}
-      </div>
-
-      <FilterSheet
-        isOpen={isFilterOpen}
-        onClose={() => setIsFilterOpen(false)}
-        sections={filterSections}
-        filters={filters}
-        setFilters={setFilters as any}
-        onClear={() => setFilters({ status: [] })}
-      />
-    </motion.div>
+        </FadeIn>
+      )}
+    </AnimatePresence>
   )
 }

@@ -17,6 +17,7 @@ import { useSupabase } from "@/providers/supabase-provider"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import Link from "next/link"
 import { formatCurrency } from "@/lib/utils"
+import { validateMarketplaceCouponAction } from "@/app/actions/erp/coupons"
 
 interface ProductItem {
     id: string
@@ -58,6 +59,7 @@ interface CheckoutWrapperProps {
         installments: number
         useMercadoPago?: boolean
         paymentFormData?: any
+        couponCode?: string | null
     }) => Promise<void>
 }
 
@@ -198,6 +200,9 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
     })
 
     const [couponCode, setCouponCode] = useState("")
+    const [couponDiscount, setCouponDiscount] = useState(0)
+    const [couponValidating, setCouponValidating] = useState(false)
+    const [couponError, setCouponError] = useState<string | null>(null)
 
     const [formData, setFormData] = useState({
         deliveryType: "pickup" as "delivery" | "pickup",
@@ -372,9 +377,9 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
 
         try {
             if (paymentOption === "mercadopago") {
-                await onSubmit({ ...formData, quantities, useMercadoPago: true })
+                await onSubmit({ ...formData, quantities, useMercadoPago: true, couponCode: couponCode || null })
             } else {
-                await onSubmit({ ...formData, quantities, useMercadoPago: false })
+                await onSubmit({ ...formData, quantities, useMercadoPago: false, couponCode: couponCode || null })
             }
         } catch (err: any) {
             const msg = err.message || "Erro ao processar pedido"
@@ -741,7 +746,41 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                     </div>
 
                                     <div className="mb-4">
-                                        <CouponInput onApply={(code) => setCouponCode(code)} />
+                                        <CouponInput onApply={async (code) => {
+                                            if (!code) {
+                                                setCouponCode("")
+                                                setCouponDiscount(0)
+                                                setCouponError(null)
+                                                return
+                                            }
+                                            if (!partnerId) return
+                                            setCouponValidating(true)
+                                            setCouponError(null)
+                                            try {
+                                                const result = await validateMarketplaceCouponAction({
+                                                    partnerId,
+                                                    code,
+                                                    subtotal: totalAmount,
+                                                })
+                                                if (result.valid) {
+                                                    setCouponCode(code)
+                                                    setCouponDiscount(result.discountAmount)
+                                                    setCouponError(null)
+                                                } else {
+                                                    setCouponCode("")
+                                                    setCouponDiscount(0)
+                                                    setCouponError(result.errorMessage || "Cupom inválido.")
+                                                }
+                                            } finally {
+                                                setCouponValidating(false)
+                                            }
+                                        }} />
+                                        {couponError && (
+                                            <p className="text-xs text-red-500 mt-1">{couponError}</p>
+                                        )}
+                                        {couponDiscount > 0 && (
+                                            <p className="text-xs text-brand-green mt-1 font-medium">Desconto de {formatCurrency(couponDiscount)} aplicado!</p>
+                                        )}
                                     </div>
 
                                     <div className="space-y-3 mb-4">
@@ -749,6 +788,12 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                             <span>Total dos itens</span>
                                             <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
                                         </div>
+                                        {couponDiscount > 0 && (
+                                            <div className="flex justify-between text-sm font-medium text-brand-green">
+                                                <span>Desconto do cupom</span>
+                                                <span>-{formatCurrency(couponDiscount)}</span>
+                                            </div>
+                                        )}
                                         <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
                                             <span>Entrega</span>
                                             <span className={isPickup ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
@@ -761,7 +806,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
 
                                     <div className="flex justify-between items-end mb-4">
                                         <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">Total</span>
-                                        <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
+                                        <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">{formatCurrency(Math.max(0, totalAmount - couponDiscount))}</span>
                                     </div>
 
                                     <Button
