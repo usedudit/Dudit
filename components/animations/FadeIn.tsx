@@ -11,9 +11,10 @@ interface FadeInProps {
   children: ReactNode
   className?: string
   delay?: number
+  onClick?: () => void
 }
 
-export const FadeIn: React.FC<FadeInProps> = ({ children, className = "", delay = 0 }) => {
+export const FadeIn: React.FC<FadeInProps> = ({ children, className = "", delay = 0, onClick }) => {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -21,6 +22,7 @@ export const FadeIn: React.FC<FadeInProps> = ({ children, className = "", delay 
       exit={{ opacity: 0 }}
       transition={{ ...pageTransition, delay }}
       className={className}
+      onClick={onClick}
     >
       {children}
     </motion.div>

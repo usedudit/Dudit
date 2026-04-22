@@ -567,12 +567,12 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const handleSave = async () => {
         if (quoteItems.length === 0) {
             setFieldErrors(new Set(["productSearch"]));
-            notifyError("Carrinho vazio", "Adicione pelo menos um item ao orçamento.");
+            notifyError("Orçamento vazio", "Adicione pelo menos um item ao orçamento.");
             return;
         }
         const invalidManualIndexes = new Set<number>();
         const invalidManualPriceIndexes = new Set<number>();
-        
+
         quoteItems.forEach((item, index) => {
             if (item.isManual && !String(item.name || "").trim()) {
                 invalidManualIndexes.add(index);
@@ -597,7 +597,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
             setShowValidationModal(true);
             return;
         }
-        
+
         if (quoteItems.some((item) => Number(item.qty || 0) <= 0)) {
             setActiveTab("Dados Gerais");
             setValidationMessage("Todos os itens precisam ter quantidade mínima de 1.");

@@ -1,7 +1,6 @@
 "use client"
 
 import React from "react"
-import { motion } from "framer-motion"
 import { ActionsDropdown, Badge, Checkbox } from "@/components/reusable"
 import { SparklesIcon, TagIcon } from "@/lib/icons"
 import {
@@ -13,6 +12,7 @@ import {
   getCouponUsageSummary,
   getCouponValiditySummary,
 } from "@/lib/types/coupon"
+import { FadeIn } from "@/components/animations/FadeIn"
 
 interface CouponGridCardProps {
   coupon: CouponRow
@@ -27,11 +27,7 @@ interface CouponGridCardProps {
 const CouponGridCard = React.memo(
   ({ coupon, selected, onSelect, onDetails, onEdit, onToggleStatus, onDelete }: CouponGridCardProps) => {
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
+      <FadeIn
         onClick={() => onDetails(coupon)}
         className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 cursor-pointer group flex flex-col h-full relative overflow-hidden"
       >
@@ -115,7 +111,7 @@ const CouponGridCard = React.memo(
             </div>
           </div>
         </div>
-      </motion.div>
+      </FadeIn>
     )
   },
 )

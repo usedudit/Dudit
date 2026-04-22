@@ -108,9 +108,9 @@ export default function CouponDetailPage({
 
           <div className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8">
             <div className="max-w-[1300px] mx-auto p-4 md:p-6 pt-6">
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsContent value="summary" className="mt-0">
-                  <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
+              <AnimatePresence mode="wait">
+                <TabsContent value="summary" className="mt-0" key="summary">
+                  <FadeIn className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
                     <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
                       <section>
                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Detalhes do cupom</h3>
@@ -178,11 +178,11 @@ export default function CouponDetailPage({
                         </div>
                       </SidebarCard>
                     </div>
-                  </div>
+                  </FadeIn>
                 </TabsContent>
 
-                <TabsContent value="scope" className="mt-0">
-                  <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
+                <TabsContent value="scope" className="mt-0" key="scope">
+                  <FadeIn className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
                     <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
                       {isLoadingRelations ? (
                         <div className="flex items-center justify-center py-16">
@@ -234,9 +234,9 @@ export default function CouponDetailPage({
                         </div>
                       </SidebarCard>
                     </div>
-                  </div>
+                  </FadeIn>
                 </TabsContent>
-              </Tabs>
+              </AnimatePresence>
             </div>
           </div>
         </Tabs>

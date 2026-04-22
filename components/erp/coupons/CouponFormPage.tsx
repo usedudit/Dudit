@@ -193,7 +193,7 @@ export default function CouponFormPage({
                 <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
                   <AnimatePresence mode="wait">
                     <TabsContent value="general" className="mt-0">
-                      <motion.div key="general" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-8">
+                      <FadeIn key="general" className="space-y-8">
                         <section>
                           <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Identificacao</h3>
                           <div className="grid grid-cols-12 gap-5">
@@ -300,11 +300,11 @@ export default function CouponFormPage({
                             </label>
                           </div>
                         </section>
-                      </motion.div>
+                      </FadeIn>
                     </TabsContent>
 
                     <TabsContent value="scope" className="mt-0">
-                      <motion.div key="scope" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-8">
+                      <FadeIn key="scope" className="space-y-8">
                         <section>
                           <div className="flex items-center justify-between mb-6">
                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Itens vinculados</h3>
@@ -377,11 +377,11 @@ export default function CouponFormPage({
                             </section>
                           </>
                         )}
-                      </motion.div>
+                      </FadeIn>
                     </TabsContent>
 
                     <TabsContent value="rules" className="mt-0">
-                      <motion.div key="rules" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-8">
+                      <FadeIn key="rules" className="space-y-8">
                         <section>
                           <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Limites de uso</h3>
                           <div className="space-y-5">
@@ -479,7 +479,7 @@ export default function CouponFormPage({
                             )}
                           </div>
                         </section>
-                      </motion.div>
+                      </FadeIn>
                     </TabsContent>
                   </AnimatePresence>
                 </div>
