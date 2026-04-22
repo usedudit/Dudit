@@ -206,7 +206,7 @@ export default function ProductsPage({
             if (!res.success) throw new Error(res.error || "Erro ao carregar produtos.")
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
-        dedupeKey: (p) => String(p?.id || ""),
+        dedupeKey: useCallback((p: any) => String(p?.id || ""), []),
     })
 
     // State
@@ -216,7 +216,7 @@ export default function ProductsPage({
         console.log(">>> MOUNTED ProductsPage client component")
         return () => console.log("<<< UNMOUNTED ProductsPage client component")
     }, [])
-    
+
     console.log("--- RENDER ProductsPage client component")
 
     // Update state when server/query data changes (e.g. after background refresh)
@@ -294,9 +294,11 @@ export default function ProductsPage({
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return
         const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
-        setScrollState({
-            left: scrollLeft > 0,
-            right: scrollLeft < scrollWidth - clientWidth - 2,
+        setScrollState((prev) => {
+            const nextLeft = scrollLeft > 0
+            const nextRight = scrollLeft < scrollWidth - clientWidth - 2
+            if (prev.left === nextLeft && prev.right === nextRight) return prev
+            return { left: nextLeft, right: nextRight }
         })
     }, [])
 
@@ -476,7 +478,7 @@ export default function ProductsPage({
                 }
 
                 toast({ title: "Sucesso" })
-                
+
                 // For NEW products, we might want to add them immediately
                 // For UPDATED products, we rely on invalidateQueries to fetch theJoined records (names, etc)
                 queryClient.invalidateQueries({ queryKey: productsQueryKey })
