@@ -113,8 +113,8 @@ export default function CustomersPage({
     const queryClient = useQueryClient()
 
     const queryKey = useMemo(
-        () => ["erp", "customers", partnerId, selectedStore?.id || "all"] as const,
-        [partnerId, selectedStore?.id],
+        () => ["erp", "customers", partnerId] as const,
+        [partnerId],
     )
     const observerTarget = useRef<HTMLDivElement>(null)
 
@@ -136,7 +136,6 @@ export default function CustomersPage({
         fetchFn: async ({ cursor }) => {
             const res = await getERPCustomersPageAction(partnerId, {
                 cursor,
-                storeId: selectedStore?.id || null,
                 limit: 100,
             })
             if (!res.success) throw new Error(res.error || "Erro ao carregar clientes.")
@@ -321,7 +320,7 @@ export default function CustomersPage({
         setIsDeletingCustomer(true)
         const result = await deleteCustomersInBatchAction([customerToDelete.originalId])
         if (result.success) {
-            queryClient.invalidateQueries({ queryKey: ['erp', 'customers', partnerId, selectedStore?.id || 'all'] })
+            queryClient.invalidateQueries({ queryKey: ['erp', 'customers', partnerId] })
             toast({ title: "Excluído com sucesso" })
             setSelection((p) => {
                 const nextIds = new Set(p.ids)
@@ -346,7 +345,7 @@ export default function CustomersPage({
         if (action === "delete") {
             const result = await deleteCustomersInBatchAction(ids)
             if (result.success) {
-                queryClient.invalidateQueries({ queryKey: ['erp', 'customers', partnerId, selectedStore?.id || 'all'] })
+                queryClient.invalidateQueries({ queryKey: ['erp', 'customers', partnerId] })
                 toast({ title: "Excluído com sucesso" })
             } else {
                 toast({ title: "Erro", description: result.error, variant: "destructive" })
@@ -356,7 +355,7 @@ export default function CustomersPage({
             const allInactive = (rawCustomers || []).filter((c: any) => selection.ids.has(c.id)).every((c: any) => c.is_active === false)
             const result = await toggleCustomersStatusAction(ids, allInactive)
             if (result.success) {
-                queryClient.invalidateQueries({ queryKey: ['erp', 'customers', partnerId, selectedStore?.id || 'all'] })
+                queryClient.invalidateQueries({ queryKey: ['erp', 'customers', partnerId] })
                 toast({ title: "Status atualizado" })
             } else {
                 toast({ title: "Erro", description: result.error, variant: "destructive" })
@@ -378,7 +377,7 @@ export default function CustomersPage({
                     onBack={() => setUi({ pageState: "list", selectedId: null })}
                     onSuccess={(msg) => {
                         toast({ title: "Sucesso", description: msg })
-                        queryClient.invalidateQueries({ queryKey: ['erp', 'customers', partnerId, selectedStore?.id || 'all'] })
+                        queryClient.invalidateQueries({ queryKey: ['erp', 'customers', partnerId] })
                         setUi({ pageState: "list", selectedId: null })
                     }}
                     onError={(msg) => toast({ title: "Erro", description: msg, variant: "destructive" })}
