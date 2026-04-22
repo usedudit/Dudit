@@ -15,7 +15,7 @@ import {
 import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import { Separator } from "@/components/reusable/Separator"
-import { ArrowUpDownIcon } from "@/lib/icons"
+import { ArrowUpDownIcon, CreditCardIcon, MoneyIcon, QRCodeIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import {
     EMPTY_DATE_PERIOD,
@@ -58,6 +58,7 @@ type SessionItem = {
     closing_amount: number | null
     status: "open" | "closed"
     expected_drawer_total?: number
+    total_received_amount?: number
 }
 
 type FilterState = {
@@ -89,6 +90,18 @@ function formatShortDate(value: string | null | undefined) {
         month: "short",
         year: "numeric",
     })
+}
+
+function resolvePaymentMethodVisual(row: any) {
+    const type = String(row?.paymentMethodType || "").toLowerCase()
+    const label = String(row?.label || "").toLowerCase()
+    if (type === "cash" || label.includes("dinheiro")) {
+        return { Icon: MoneyIcon, bg: "bg-emerald-50 dark:bg-emerald-500/15", fg: "text-emerald-600 dark:text-emerald-300" }
+    }
+    if (type === "pix" || label.includes("pix")) {
+        return { Icon: QRCodeIcon, bg: "bg-cyan-50 dark:bg-cyan-500/15", fg: "text-cyan-600 dark:text-cyan-300" }
+    }
+    return { Icon: CreditCardIcon, bg: "bg-violet-50 dark:bg-violet-500/15", fg: "text-violet-600 dark:text-violet-300" }
 }
 
 export default function CashRegisterPage({
@@ -196,7 +209,6 @@ export default function CashRegisterPage({
         () => [
             { id: "dateOpenedPeriod", title: "Período de abertura", type: "date-period" },
             { id: "dateClosedPeriod", title: "Período de fechamento", type: "date-period" },
-            { id: "status", title: "Status", type: "checkbox-list", options: ["Aberto", "Fechado"] },
             { id: "openedBy", title: "Quem abriu", type: "checkbox-list", options: operatorOptions },
             { id: "closedBy", title: "Quem fechou", type: "checkbox-list", options: operatorOptions },
         ],
@@ -204,7 +216,6 @@ export default function CashRegisterPage({
     )
 
     const hasActiveFilters =
-        filters.status.length > 0 ||
         filters.openedBy.length > 0 ||
         filters.closedBy.length > 0 ||
         isDatePeriodFilterActive(filters.dateOpenedPeriod) ||
@@ -370,13 +381,9 @@ export default function CashRegisterPage({
             }
             const rows = summary.data.groupedByMethod || []
             const init: Record<string, string> = {}
-            if (rows.length === 0) {
-                init.__total__ = String(Number(summary.data.expectedDrawerTotal || 0).toFixed(2))
-            } else {
-                for (const row of rows) {
-                    const key = row.paymentMethodId || "__none__"
-                    init[key] = String(Number(row.calculated ?? 0).toFixed(2))
-                }
+            for (const row of rows) {
+                const key = row.paymentMethodId || "__none__"
+                init[key] = String(Number(row.calculated ?? 0).toFixed(2))
             }
             setCountedByPm(init)
             setCloseSummary(summary.data)
@@ -432,9 +439,37 @@ export default function CashRegisterPage({
         { id: "open_date", label: "Abertura", align: "left", width: "300px" },
         { id: "close_date", label: "Fechamento", align: "left", width: "300px" },
         { id: "initial_amount", label: "Saldo Inicial", align: "left", width: "250px" },
+        { id: "received_total", label: "Recebido na sessão", align: "left", width: "250px" },
         { id: "expected_total", label: "Saldo Final", align: "left", width: "250px" },
         { id: "status", label: "Status", align: "center", width: "120px" }
     ]
+
+    const groupedRows = closeSummary?.groupedByMethod || []
+    const closePreview = useMemo(() => {
+        if (!closeSummary) return null
+        const opening = Number(closeSummary.drawer?.initial || 0)
+        const deposits = Number(closeSummary.drawer?.deposits || 0)
+        const withdrawals = Number(closeSummary.drawer?.withdrawals || 0)
+        const refunds = Number(closeSummary.drawer?.refunds || 0)
+        const expectedDrawerTotal = Number(closeSummary.expectedDrawerTotal || 0)
+        const expectedCashSales = Number(closeSummary.drawer?.cashSales || 0)
+        const informedCashSales = groupedRows.reduce((acc: number, row: any) => {
+            const key = row.paymentMethodId || "__none__"
+            const raw = Number(String(countedByPm[key] ?? row.calculated ?? 0).replace(",", "."))
+            const value = Number.isFinite(raw) ? raw : 0
+            const type = String(row.paymentMethodType || "").toLowerCase()
+            const isCash = type === "cash" || (!row.paymentMethodId && type !== "pix")
+            return isCash ? acc + value : acc
+        }, 0)
+        const informedDrawerTotal = opening + informedCashSales + deposits - withdrawals - refunds
+        return {
+            opening,
+            expectedCashSales,
+            expectedDrawerTotal,
+            informedDrawerTotal,
+            difference: informedDrawerTotal - expectedDrawerTotal,
+        }
+    }, [closeSummary, groupedRows, countedByPm])
 
     return (
         <AnimatePresence mode="wait">
@@ -600,6 +635,14 @@ export default function CashRegisterPage({
                                                                 </div>
                                                                 <div>
                                                                     <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                        Recebido na sessão
+                                                                    </p>
+                                                                    <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                                        {formatCurrency(Number(session.total_received_amount || 0))}
+                                                                    </p>
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
                                                                         Data da sessão
                                                                     </p>
                                                                     <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
@@ -652,10 +695,10 @@ export default function CashRegisterPage({
                                                                         >
                                                                             <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
                                                                                 <span>{col.label}</span>
-                                                                                <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                                                <div className="ml-1.5 w-4 shrink-0 flex items-center justify-center">
                                                                                     <ArrowUpDownIcon
                                                                                         size={14}
-                                                                                        className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                                                                        className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-0 group-hover:opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
                                                                                     />
                                                                                 </div>
                                                                             </div>
@@ -743,42 +786,83 @@ export default function CashRegisterPage({
                                 </>
                             ) : closeSummary ? (
                                 <>
-                                    <div className="rounded-xl border border-brand-border dark:border-dark-border p-4">
-                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">Saldo calculado (gaveta)</p>
-                                        <p className="mt-2 text-2xl font-bold text-brand-dark dark:text-dark-heading">
-                                            {formatCurrency(Number(closeSummary.expectedDrawerTotal || 0))}
-                                        </p>
-                                    </div>
+                                    {closePreview ? (
+                                        <div className="rounded-xl border border-brand-border dark:border-dark-border p-4 space-y-3">
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                                <div className="rounded-xl bg-brand-gray dark:bg-dark-border/30 px-3 py-2">
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Saldo de abertura</p>
+                                                    <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                        {formatCurrency(closePreview.opening)}
+                                                    </p>
+                                                </div>
+                                                <div className="rounded-xl bg-brand-gray dark:bg-dark-border/30 px-3 py-2">
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Vendas em dinheiro</p>
+                                                    <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                        {formatCurrency(closePreview.expectedCashSales)}
+                                                    </p>
+                                                </div>
+                                                <div className="rounded-xl bg-brand-gray dark:bg-dark-border/30 px-3 py-2">
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Saldo esperado na gaveta</p>
+                                                    <p className="mt-1 text-sm font-semibold text-brand-primary">
+                                                        {formatCurrency(closePreview.expectedDrawerTotal)}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="rounded-xl bg-brand-gray dark:bg-dark-border/30 px-3 py-2">
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">Saldo informado com a contagem</p>
+                                                <div className="mt-1 flex items-center justify-between gap-3">
+                                                    <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                        {formatCurrency(closePreview.informedDrawerTotal)}
+                                                    </p>
+                                                    <p className={`text-sm font-bold ${closePreview.difference === 0 ? "text-emerald-600 dark:text-emerald-300" : "text-amber-600 dark:text-amber-300"}`}>
+                                                        Diferença: {formatCurrency(closePreview.difference)}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : null}
 
                                     <div className="rounded-xl border border-brand-border dark:border-dark-border p-4 space-y-2">
                                         <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                             Resumo calculado
                                         </p>
-                                        {(closeSummary.groupedByMethod || []).length > 0 ? (
-                                            (closeSummary.groupedByMethod || []).map((row: any) => (
-                                                <div key={row.paymentMethodId || row.label} className="flex items-center justify-between gap-3 text-sm">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body">{row.label}</span>
-                                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">
-                                                        {formatCurrency(Number(row.calculated ?? row.total ?? 0))}
-                                                    </span>
-                                                </div>
-                                            ))
+                                        {groupedRows.length > 0 ? (
+                                            groupedRows.map((row: any) => {
+                                                const visual = resolvePaymentMethodVisual(row)
+                                                return (
+                                                    <div key={row.paymentMethodId || row.label} className="w-full rounded-2xl bg-brand-gray/80 dark:bg-dark-border/20 p-3 flex items-center justify-between gap-3">
+                                                        <div className="flex items-center gap-3 min-w-0">
+                                                            <div className={`w-9 h-9 rounded-full ${visual.bg} flex items-center justify-center`}>
+                                                                <visual.Icon className={`w-5 h-5 ${visual.fg}`} />
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">{row.label}</p>
+                                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">Calculado no período</p>
+                                                            </div>
+                                                        </div>
+                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading shrink-0">
+                                                            {formatCurrency(Number(row.calculated ?? row.total ?? 0))}
+                                                        </span>
+                                                    </div>
+                                                )
+                                            })
                                         ) : (
                                             <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                                Nenhum agrupamento por meio de pagamento disponível. Informe apenas o total contado.
+                                                Nenhuma venda no período desta sessão.
                                             </p>
                                         )}
                                     </div>
 
-                                    {(closeSummary.groupedByMethod || []).length === 0 ? (
-                                        <MoneyInput
-                                            label="Valor contado na gaveta (total)"
-                                            value={Number(countedByPm.__total__ ?? closeSummary.expectedDrawerTotal ?? 0)}
-                                            onChange={(v) => setCountedByPm((prev) => ({ ...prev, __total__: String(v) }))}
-                                        />
+                                    {groupedRows.length === 0 ? (
+                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                            Sem formas de pagamento para conferência nesta sessão.
+                                        </p>
                                     ) : (
                                         <div className="space-y-3">
-                                            {(closeSummary.groupedByMethod || []).map((row: any) => {
+                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                Contagem informada por forma de pagamento
+                                            </p>
+                                            {groupedRows.map((row: any) => {
                                                 const key = row.paymentMethodId || "__none__"
                                                 return (
                                                     <MoneyInput

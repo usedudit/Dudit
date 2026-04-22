@@ -16,7 +16,6 @@ import {
     ArrowDownIcon,
     CalendarIcon,
     UserIcon,
-    InfoIcon,
 } from "@/lib/icons"
 import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import {
@@ -81,14 +80,6 @@ const CashRegisterPageControls: React.FC<CashRegisterPageControlsProps> = ({
 
     const BadgeList = () => (
         <AnimatePresence>
-            {filters.status.length > 0 && (
-                <FilterChip
-                    label="Status"
-                    value={filters.status.map((value) => (value === "open" ? "Aberto" : "Fechado")).join(", ")}
-                    icon={<InfoIcon size={12} />}
-                    onRemove={() => setFilters((prev) => ({ ...prev, status: [] }))}
-                />
-            )}
             {filters.openedBy.length > 0 && (
                 <FilterChip
                     label="Abriu"

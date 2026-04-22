@@ -72,6 +72,13 @@ const CashSessionListItem = React.memo(
                         </span>
                     )
 
+                case "received_total":
+                    return (
+                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                            {formatCurrency(Number(session.total_received_amount || 0))}
+                        </span>
+                    )
+
                 case "expected_total":
                     return (
                         <span className="text-[13px] font-bold text-brand-primary">

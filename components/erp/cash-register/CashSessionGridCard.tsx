@@ -77,15 +77,21 @@ const CashSessionGridCard = React.memo(
                 {/* Footer */}
                 <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
                     {/* Totais */}
-                    <div className="flex justify-between items-center gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                         <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Inicial</span>
                             <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
                                 {formatCurrency(Number(session.initial_amount || 0))}
                             </span>
                         </div>
+                        <div className="flex flex-col gap-0.5 items-center text-center">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Recebido</span>
+                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
+                                {formatCurrency(Number(session.total_received_amount || 0))}
+                            </span>
+                        </div>
                         <div className="flex flex-col gap-0.5 items-end text-right">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Graveta</span>
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Final</span>
                             <span className="text-[13px] font-bold text-brand-primary dark:text-brand-primary truncate">
                                 {formatCurrency(Number(session.expected_drawer_total || 0))}
                             </span>

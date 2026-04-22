@@ -22,7 +22,7 @@ export default async function CashRegisterPageServer() {
   return (
     <>
       <ERPPageHeader title="Caixa (PDV)" />
-      <FadeIn className="p-4 md:p-6 h-full">
+      <FadeIn className="p-4">
         <CashRegisterPage
           partnerId={partnerId}
           initialHistory={historyResult.items || []}

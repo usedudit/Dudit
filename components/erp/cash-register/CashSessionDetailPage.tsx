@@ -270,8 +270,8 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                                 </div>
 
                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                    <InfoCard title={isOpen ? "Caixa em operaÃ§Ã£o" : "Caixa encerrado"} message={isOpen ? `SessÃ£o aberta em ${formatLongDateTime(session.opened_at)} por ${details.operators.open_name}.` : `SessÃ£o encerrada em ${session.closed_at ? formatLongDateTime(session.closed_at) : "-"} por ${details.operators.close_name || "NÃ£o informado"}.`} color={isOpen ? "green" : "orange"} />
-                                    {!isOpen && details.totals.difference != null && <InfoCard title="ConferÃªncia do fechamento" message={`Valor informado: ${details.totals.informedDrawerTotal != null ? formatCurrency(details.totals.informedDrawerTotal) : "-"}
+                                    <InfoCard title={isOpen ? "Caixa em operação" : "Caixa encerrado"} message={isOpen ? `Sessão aberta em ${formatLongDateTime(session.opened_at)} por ${details.operators.open_name}.` : `Sessão encerrada em ${session.closed_at ? formatLongDateTime(session.closed_at) : "-"} por ${details.operators.close_name || "Não informado"}.`} color={isOpen ? "green" : "orange"} />
+                                    {!isOpen && details.totals.difference != null && <InfoCard title="Conferência do fechamento" message={`Valor informado: ${details.totals.informedDrawerTotal != null ? formatCurrency(details.totals.informedDrawerTotal) : "-"}
 DiferenÃ§a final: ${formatCurrency(details.totals.difference)}`} color={details.totals.difference === 0 ? "green" : "orange"} />}
                                     <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
                                         <div className="p-5 border-b border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/30"><h3 className="font-bold text-brand-dark dark:text-dark-heading">Dados da sessão</h3></div>

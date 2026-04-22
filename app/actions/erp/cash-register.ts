@@ -676,18 +676,17 @@ export async function getCashSessionCloseSummaryAction(partnerId: string, cashSe
     movements: movements as any[],
   })
 
-  const grouped = new Map<string, { paymentMethodId: string | null; label: string; calculated: number }>()
+  const grouped = new Map<string, { paymentMethodId: string | null; label: string; paymentMethodType: string | null; calculated: number }>()
   for (const m of movements) {
     if (!isMovementActive(m)) continue
     if (m.type !== "sale") continue
-    const isCash = !m.payment_method_id || m.payment_method_type === "cash"
-    if (!isCash) continue
     const key = m.payment_method_id || "__cash__"
     const label = m.payment_method_name || "Dinheiro"
+    const paymentMethodType = m.payment_method_type || (!m.payment_method_id ? "cash" : "other")
     const amt = money(Number(m.amount || 0))
     const cur = grouped.get(key)
     if (cur) cur.calculated = money(cur.calculated + amt)
-    else grouped.set(key, { paymentMethodId: m.payment_method_id || null, label, calculated: amt })
+    else grouped.set(key, { paymentMethodId: m.payment_method_id || null, label, paymentMethodType, calculated: amt })
   }
 
   const groupedByMethod = Array.from(grouped.values()).sort((a, b) => b.calculated - a.calculated)
@@ -737,15 +736,36 @@ export async function closeCashSessionAction(input: {
     paymentMethodId: row.paymentMethodId ?? null,
     amount: money(Math.max(0, Number(row.amount || 0))),
   }))
-  const countedTotal = money(countedRows.reduce((a, r) => a + (Number.isFinite(r.amount) ? r.amount : 0), 0))
 
   const calculated = summary.data.expectedDrawerTotal
   if (!Number.isFinite(calculated)) {
     return { success: false as const, error: "Não foi possível calcular o saldo esperado do caixa." }
   }
 
+  const methodTypeById = new Map<string, string>()
+  for (const row of summary.data.groupedByMethod || []) {
+    const key = row.paymentMethodId || "__cash__"
+    methodTypeById.set(key, row.paymentMethodType || (row.paymentMethodId ? "other" : "cash"))
+  }
+
+  const countedCashSales = money(
+    countedRows.reduce((acc, row) => {
+      const key = row.paymentMethodId || "__cash__"
+      const pmType = methodTypeById.get(key) || (row.paymentMethodId ? "other" : "cash")
+      return pmType === "cash" ? acc + row.amount : acc
+    }, 0),
+  )
+
   const hasExplicitCounts = (input.countedByMethod || []).length > 0
-  const informedTotal = hasExplicitCounts ? countedTotal : calculated
+  const informedTotal = hasExplicitCounts
+    ? money(
+      Number(summary.data.drawer?.initial || 0) +
+      countedCashSales +
+      Number(summary.data.drawer?.deposits || 0) -
+      Number(summary.data.drawer?.withdrawals || 0) -
+      Number(summary.data.drawer?.refunds || 0),
+    )
+    : calculated
   const difference = money(informedTotal - calculated)
 
   const closingPayload = {
@@ -843,11 +863,15 @@ export async function getCashSessionsHistoryAction(partnerId: string) {
   }
 
   const drawerBySession = new Map<string, number>()
+  const totalReceivedBySession = new Map<string, number>()
   for (const row of movementRows || []) {
     if (row.reversed_at) continue
     const sid = row.cash_session_id
     const amt = money(Number(row.amount || 0))
     if (!(amt > 0)) continue
+    if (row.type === "sale") {
+      totalReceivedBySession.set(sid, money((totalReceivedBySession.get(sid) || 0) + amt))
+    }
     let delta = 0
     if (row.type === "deposit") delta = amt
     else if (row.type === "withdrawal" || row.type === "refund") delta = -amt
@@ -870,6 +894,7 @@ export async function getCashSessionsHistoryAction(partnerId: string) {
       closed_by_name: s.closed_by_user_id ? userMap.get(s.closed_by_user_id) || "Usuário" : null,
       drawer_movement_net: drawerDelta,
       expected_drawer_total: money(initial + drawerDelta),
+      total_received_amount: totalReceivedBySession.get(s.id) || 0,
     }
   })
 
@@ -950,11 +975,15 @@ export async function getCashSessionsHistoryPageAction(
   }
 
   const drawerBySession = new Map<string, number>()
+  const totalReceivedBySession = new Map<string, number>()
   for (const row of movementRows || []) {
     if (row.reversed_at) continue
     const sid = row.cash_session_id
     const amt = money(Number(row.amount || 0))
     if (!(amt > 0)) continue
+    if (row.type === "sale") {
+      totalReceivedBySession.set(sid, money((totalReceivedBySession.get(sid) || 0) + amt))
+    }
     let delta = 0
     if (row.type === "deposit") delta = amt
     else if (row.type === "withdrawal" || row.type === "refund") delta = -amt
@@ -977,6 +1006,7 @@ export async function getCashSessionsHistoryPageAction(
       closed_by_name: s.closed_by_user_id ? userMap.get(s.closed_by_user_id) || "Usuário" : null,
       drawer_movement_net: drawerDelta,
       expected_drawer_total: money(initial + drawerDelta),
+      total_received_amount: totalReceivedBySession.get(s.id) || 0,
     }
   })
 
@@ -1040,8 +1070,6 @@ export async function getCashSessionDetailsAction(partnerId: string, cashSession
   const saleGroups = new Map<string | null, { label: string; calculated: number }>()
   for (const m of movements) {
     if (!isMovementActive(m) || m.type !== "sale") continue
-    const isCash = !m.payment_method_id || m.payment_method_type === "cash"
-    if (!isCash) continue
     const key = m.payment_method_id || null
     const label = m.payment_method_name || "Dinheiro"
     const amt = money(Number(m.amount || 0))
