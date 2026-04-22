@@ -361,7 +361,7 @@ export async function deletePreSaleDraftAction(partnerId: string, preSaleId: str
 }
 
 /**
- * Finalize a POS pre-sale using an atomic PostgreSQL RPC.
+ * Finalize a POS pre-sale using an atomic PostgreSQL RPC
  *
  * The RPC `finalize_pos_sale` runs inside a single DB transaction with
  * SELECT ... FOR UPDATE on product/variant rows, ensuring:

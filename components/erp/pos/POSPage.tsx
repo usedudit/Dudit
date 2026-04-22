@@ -1695,7 +1695,6 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             variant="danger"
           />
 
-<<<<<<< HEAD
       <AlertModal
         isOpen={isLeaveWithoutSaveAlertOpen}
         onClose={() => {
@@ -1717,7 +1716,6 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         cancelText="Continuar editando"
         variant="warning"
       />
-=======
           <AlertModal
             isOpen={isLeaveWithoutSaveAlertOpen}
             onClose={() => {
@@ -1736,7 +1734,6 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             cancelText="Continuar editando"
             variant="warning"
           />
->>>>>>> aaf279c1a47d8d4b937d94244bde52323bb74f14
 
           <AlertModal
             isOpen={isRemoveCustomerAlertOpen}

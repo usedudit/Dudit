@@ -13,12 +13,7 @@ import { getOrderHistoryEntries } from "@/lib/services/order-history.service"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { revalidateStockMovements } from "@/lib/utils/revalidation"
-import {
-    finalizeOrderInventory,
-    releaseOrderInventory,
-    reserveOrderInventory,
-    shouldDeductInventory,
-} from "@/lib/stock/reservations"
+import { finalizeOrderInventory, releaseOrderInventory, reserveOrderInventory, shouldDeductInventory } from "@/lib/stock/reservations"
 import { validateCoupon, validateCouponById } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 
@@ -2027,7 +2022,7 @@ export async function getERPOrdersPageAction(
             quantity: Number(row?.quantity || 0) || (Array.isArray(row?.order_items)
                 ? row.order_items.reduce((sum: number, item: any) => sum + Number(item?.quantity || 0), 0)
                 : 0),
-            // Backward-compatible field used by UI, with fallback when column doesn't exist in DB.
+            // Backward-compatible field used by UI, with fallback when column doesn't exist in DB
             order_date: row?.order_date || row?.created_at || null,
         }))
         const last = items[items.length - 1]
