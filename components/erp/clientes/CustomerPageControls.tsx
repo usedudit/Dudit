@@ -17,6 +17,7 @@ import {
     BlockedIcon,
     Settings2Icon,
     ExportFileIcon,
+    InfoIcon,
 } from "@/lib/icons"
 
 interface FilterState {
@@ -76,7 +77,7 @@ const CustomerPageControls: React.FC<CustomerPageControlsProps> = ({
                 <FilterChip
                     label="Status"
                     value={filters.status.join(", ")}
-                    // @ts-ignore
+                    icon={<InfoIcon size={12} />}
                     onRemove={() => setFilters((prev) => ({ ...prev, status: [] }))}
                 />
             )}

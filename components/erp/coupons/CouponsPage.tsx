@@ -1,57 +1,73 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { motion } from "framer-motion"
-import {
-  Badge,
-  Button,
-  Checkbox,
-  Input,
-  MoneyInput,
-  Pagination,
-  ThreeDotsLoader,
-} from "@/components/reusable"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { AnimatePresence, motion } from "framer-motion"
+import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
+import Pagination from "@/components/reusable/Pagination"
+import { Badge, Button, ThreeDotsLoader } from "@/components/reusable"
+import AlertModal from "@/components/reusable/AlertModal"
+import { ArrowUpDownIcon, SparklesIcon, TagIcon } from "@/lib/icons"
+import { useMediaQuery } from "../hooks"
+import { useToast } from "@/hooks/use-toast"
 import {
   createCouponAction,
   deleteCouponAction,
+  getCouponCustomersAction,
+  getCouponLinkedItemsAction,
+  getCouponScopeDataAction,
   listCouponsAction,
   toggleCouponStatusAction,
   updateCouponAction,
-  getCouponScopeDataAction,
-  getCouponLinkedItemsAction,
 } from "@/app/actions/erp/coupons"
-import { useToast } from "@/hooks/use-toast"
-import { formatCurrency, formatDate } from "@/lib/utils"
-import { useMediaQuery } from "../hooks"
-import { SearchIcon, XIcon, CheckCircleIcon } from "@/lib/icons"
+import CouponPageControls from "./CouponPageControls"
+import CouponGridCard from "./CouponGridCard"
+import CouponListItem from "./CouponListItem"
+import CouponFormPage from "./CouponFormPage"
+import CouponDetailPage from "./CouponDetailPage"
+import {
+  CouponFormState,
+  CouponRelations,
+  CouponRow,
+  CouponScopeData,
+  DEFAULT_COUPON_FORM,
+  EMPTY_COUPON_RELATIONS,
+  EMPTY_SCOPE_DATA,
+  getCouponApplyScopeLabel,
+  getCouponPrimaryMeta,
+  getCouponStatusVariant,
+  getCouponUsageCount,
+  mapCouponToForm,
+} from "@/lib/types/coupon"
 
-type CouponRow = any
+type FilterState = {
+  discountType: string[]
+  applyScope: string[]
+  customerScope: string[]
+  automaticOnly: boolean
+}
+
+type SortKey = "coupon" | "scope" | "usage" | "validity" | "status"
+type SortDirection = "asc" | "desc"
+type ActiveTab = "Todos" | "Ativos" | "Inativos" | "Automaticos"
+type WrapperMode = "list" | "create" | "edit" | "view"
 
 const ITEMS_PER_PAGE = 8
 
-type ScopeItem = { id: string; name: string; category?: string; price?: number }
-
-const DEFAULT_FORM = {
-  code: "",
-  discountType: "percentage",
-  discountValue: 0,
-  applyScope: "all",
-  allowCombination: true,
-  minCartValue: 0,
-  maxDiscountEnabled: false,
-  maxDiscountValue: 0,
-  usageLimitEnabled: false,
-  usageLimit: 0,
-  usagePerCustomerEnabled: false,
-  usagePerCustomer: 0,
-  firstPurchaseOnly: false,
-  unlimitedDate: true,
-  startsAt: "",
-  endsAt: "",
-  isActive: true,
-  customerScope: "all",
-  isAutomatic: false,
+const INITIAL_FILTERS: FilterState = {
+  discountType: [],
+  applyScope: [],
+  customerScope: [],
+  automaticOnly: false,
 }
+
+const COLUMNS: { id: SortKey | "actions"; label: string; align: "left" | "center" | "right"; width: string }[] = [
+  { id: "coupon", label: "Cupom", align: "left", width: "280px" },
+  { id: "scope", label: "Escopo", align: "left", width: "220px" },
+  { id: "usage", label: "Uso", align: "left", width: "180px" },
+  { id: "validity", label: "Validade", align: "left", width: "220px" },
+  { id: "status", label: "Status", align: "right", width: "240px" },
+  { id: "actions", label: "Acoes", align: "right", width: "220px" },
+]
 
 export default function CouponsPage({
   partnerId,
@@ -64,439 +80,671 @@ export default function CouponsPage({
 }) {
   const { toast } = useToast()
   const isMobile = useMediaQuery("(max-width: 767px)")
+
   const [coupons, setCoupons] = useState<CouponRow[]>(initialCoupons || [])
-  const [total] = useState(initialTotal || 0)
-  const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState("")
-  const [typeFilter, setTypeFilter] = useState("all")
-  const [activeFilter, setActiveFilter] = useState("all")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const [activeTab, setActiveTab] = useState<ActiveTab>("Todos")
+  const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
   const [page, setPage] = useState(1)
-  const [openForm, setOpenForm] = useState(false)
-  const [editingCouponId, setEditingCouponId] = useState<string | null>(null)
-  const [form, setForm] = useState<any>(DEFAULT_FORM)
+  const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
+  const [modals, setModals] = useState({ filter: false })
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({
+    key: "validity",
+    direction: "desc",
+  })
+  const [wrapperMode, setWrapperMode] = useState<WrapperMode>("list")
+  const [selectedCouponId, setSelectedCouponId] = useState<string | null>(null)
+  const [form, setForm] = useState<CouponFormState>(DEFAULT_COUPON_FORM)
+  const [scopeData, setScopeData] = useState<CouponScopeData>(EMPTY_SCOPE_DATA)
+  const [relations, setRelations] = useState<CouponRelations>(EMPTY_COUPON_RELATIONS)
+  const [isLoadingPage, setIsLoadingPage] = useState(false)
+  const [isLoadingScope, setIsLoadingScope] = useState(false)
+  const [isLoadingRelations, setIsLoadingRelations] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [couponToDelete, setCouponToDelete] = useState<CouponRow | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
-  // Scope picker state
-  const [scopeProducts, setScopeProducts] = useState<ScopeItem[]>([])
-  const [scopeServices, setScopeServices] = useState<ScopeItem[]>([])
-  const [scopeCategories, setScopeCategories] = useState<string[]>([])
-  const [scopeCustomers, setScopeCustomers] = useState<Array<{ id: string; name: string; email?: string; phone?: string }>>([])
-  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([])
-  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
-  const [selectedCategoryNames, setSelectedCategoryNames] = useState<string[]>([])
-  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([])
-  const [scopePickerOpen, setScopePickerOpen] = useState(false)
-  const [scopeSearch, setScopeSearch] = useState("")
-  const [customerSearch, setCustomerSearch] = useState("")
-  const [scopeLoading, setScopeLoading] = useState(false)
+  const tableContainerRef = useRef<HTMLDivElement>(null)
+  const [scrollState, setScrollState] = useState({ left: false, right: false })
+  const totalCoupons = initialTotal ?? initialCoupons.length
 
-  const loadScopeData = useCallback(async () => {
-    setScopeLoading(true)
-    try {
-      const res = await getCouponScopeDataAction(partnerId)
-      if (res.success) {
-        setScopeProducts(res.products || [])
-        setScopeServices(res.services || [])
-        setScopeCategories(res.categories as string[] || [])
-        setScopeCustomers(res.customers || [])
+  const effectiveViewMode = isMobile ? "grid" : viewMode
+  const selectedCoupon = useMemo(
+    () => coupons.find((coupon) => coupon.id === selectedCouponId) || null,
+    [coupons, selectedCouponId],
+  )
+
+  const filterSections: FilterSectionConfig[] = useMemo(
+    () => [
+      { id: "discountType", title: "Tipo de desconto", type: "checkbox-list", options: ["Percentual", "Valor fixo", "Frete gratis"] },
+      { id: "applyScope", title: "Escopo do catalogo", type: "checkbox-list", options: ["Todos os itens", "Categorias especificas", "Produtos especificos", "Servicos especificos"] },
+      { id: "customerScope", title: "Clientes", type: "checkbox-list", options: ["Todos os clientes", "Clientes especificos"] },
+      { id: "automaticOnly", title: "Automacao", type: "switch", switchLabel: "Mostrar apenas cupons automaticos" },
+    ],
+    [],
+  )
+
+  const resetRelations = useCallback(() => {
+    setRelations(EMPTY_COUPON_RELATIONS)
+  }, [])
+
+  const checkScroll = useCallback(() => {
+    if (!tableContainerRef.current) return
+    const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
+    setScrollState((prev) => {
+      const next = {
+        left: scrollLeft > 0,
+        right: scrollLeft < scrollWidth - clientWidth - 2,
       }
+      if (prev.left === next.left && prev.right === next.right) return prev
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedSearch(search), 350)
+    return () => clearTimeout(timeout)
+  }, [search])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, filters, activeTab])
+
+  useEffect(() => {
+    checkScroll()
+    window.addEventListener("resize", checkScroll)
+    return () => window.removeEventListener("resize", checkScroll)
+  }, [checkScroll, effectiveViewMode, coupons])
+
+  useEffect(() => {
+    const handleReset = () => {
+      setWrapperMode("list")
+      setSelectedCouponId(null)
+      resetRelations()
+    }
+    window.addEventListener("erp-sidebar-reset", handleReset)
+    return () => window.removeEventListener("erp-sidebar-reset", handleReset)
+  }, [resetRelations])
+
+  const ensureScopeData = useCallback(async () => {
+    if (
+      scopeData.products.length > 0 ||
+      scopeData.services.length > 0 ||
+      scopeData.categories.length > 0 ||
+      scopeData.customers.length > 0
+    ) {
+      return scopeData
+    }
+
+    setIsLoadingScope(true)
+    try {
+      const result = await getCouponScopeDataAction(partnerId)
+      if (!result.success) {
+        throw new Error("Nao foi possivel carregar os dados de escopo.")
+      }
+
+      const nextScopeData: CouponScopeData = {
+        products: result.products || [],
+        services: result.services || [],
+        categories: (result.categories || []) as string[],
+        customers: result.customers || [],
+      }
+      setScopeData(nextScopeData)
+      return nextScopeData
     } finally {
-      setScopeLoading(false)
+      setIsLoadingScope(false)
     }
-  }, [partnerId])
+  }, [partnerId, scopeData])
 
-  const filtered = useMemo(() => {
-    return coupons.filter((coupon) => {
-      const term = search.trim().toLowerCase()
-      const searchOk = !term || String(coupon.code || "").toLowerCase().includes(term)
-      const typeOk = typeFilter === "all" || coupon.discount_type === typeFilter
-      const activeOk = activeFilter === "all" || (activeFilter === "active" ? coupon.is_active : !coupon.is_active)
-      return searchOk && typeOk && activeOk
+  const loadRelations = useCallback(
+    async (couponId: string) => {
+      setIsLoadingRelations(true)
+      try {
+        const availableScope = await ensureScopeData()
+        const [linkedItemsResult, customersResult] = await Promise.all([
+          getCouponLinkedItemsAction(partnerId, couponId),
+          getCouponCustomersAction(partnerId, couponId),
+        ])
+
+        if (!linkedItemsResult.success || !customersResult.success) {
+          throw new Error("Nao foi possivel carregar os vinculos do cupom.")
+        }
+
+        const categoryIds = (linkedItemsResult.categoryIds || []) as string[]
+        const productIds = (linkedItemsResult.productIds || []) as string[]
+        const serviceIds = (linkedItemsResult.serviceIds || []) as string[]
+        const customerIds = (customersResult.data || []) as string[]
+
+        const nextRelations: CouponRelations = {
+          categoryIds,
+          productIds,
+          serviceIds,
+          customerIds,
+          categories: availableScope.categories.filter((item) => categoryIds.includes(item)),
+          products: availableScope.products.filter((item) => productIds.includes(item.id)),
+          services: availableScope.services.filter((item) => serviceIds.includes(item.id)),
+          customers: availableScope.customers.filter((item) => customerIds.includes(item.id)),
+        }
+
+        setRelations(nextRelations)
+        return nextRelations
+      } finally {
+        setIsLoadingRelations(false)
+      }
+    },
+    [ensureScopeData, partnerId],
+  )
+
+  const refreshCoupons = useCallback(async () => {
+    setIsLoadingPage(true)
+    try {
+      const result = await listCouponsAction(partnerId, { page: 1, limit: 100 })
+      if (!result.success) {
+        toast({ title: "Erro", description: result.error, variant: "destructive" })
+        return
+      }
+      setCoupons(result.data || [])
+    } finally {
+      setIsLoadingPage(false)
+    }
+  }, [partnerId, toast])
+
+  const openCreate = useCallback(async () => {
+    resetRelations()
+    setForm(DEFAULT_COUPON_FORM)
+    setSelectedCouponId(null)
+    setWrapperMode("create")
+    try {
+      await ensureScopeData()
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: error instanceof Error ? error.message : "Falha ao carregar dados do cupom.",
+        variant: "destructive",
+      })
+    }
+  }, [ensureScopeData, resetRelations, toast])
+
+  const openEdit = useCallback(
+    async (coupon: CouponRow) => {
+      setSelectedCouponId(coupon.id)
+      setForm(mapCouponToForm(coupon))
+      setWrapperMode("edit")
+      try {
+        await loadRelations(coupon.id)
+      } catch (error) {
+        toast({
+          title: "Erro",
+          description: error instanceof Error ? error.message : "Falha ao carregar dados do cupom.",
+          variant: "destructive",
+        })
+      }
+    },
+    [loadRelations, toast],
+  )
+
+  const openDetails = useCallback(
+    async (coupon: CouponRow) => {
+      setSelectedCouponId(coupon.id)
+      setWrapperMode("view")
+      try {
+        await loadRelations(coupon.id)
+      } catch (error) {
+        toast({
+          title: "Erro",
+          description: error instanceof Error ? error.message : "Falha ao carregar detalhes do cupom.",
+          variant: "destructive",
+        })
+      }
+    },
+    [loadRelations, toast],
+  )
+
+  const handleBackToList = useCallback(() => {
+    setWrapperMode("list")
+    setSelectedCouponId(null)
+    resetRelations()
+  }, [resetRelations])
+
+  const handleToggleStatus = useCallback(
+    async (coupon: CouponRow) => {
+      const result = await toggleCouponStatusAction(partnerId, coupon.id, !coupon.is_active)
+      if (!result.success) {
+        toast({ title: "Erro", description: result.error, variant: "destructive" })
+        return
+      }
+      toast({
+        title: "Status atualizado",
+        description: coupon.is_active ? "Cupom desativado com sucesso." : "Cupom ativado com sucesso.",
+      })
+      await refreshCoupons()
+    },
+    [partnerId, refreshCoupons, toast],
+  )
+
+  const handleDelete = useCallback((coupon: CouponRow) => {
+    setCouponToDelete(coupon)
+  }, [])
+
+  const confirmDelete = useCallback(async () => {
+    if (!couponToDelete) return
+    setIsDeleting(true)
+    try {
+      const result = await deleteCouponAction(partnerId, couponToDelete.id)
+      if (!result.success) {
+        toast({ title: "Erro", description: result.error, variant: "destructive" })
+        return
+      }
+      toast({ title: "Cupom excluido", description: `${couponToDelete.code} foi removido.` })
+      if (selectedCouponId === couponToDelete.id) {
+        handleBackToList()
+      }
+      setCouponToDelete(null)
+      await refreshCoupons()
+    } finally {
+      setIsDeleting(false)
+    }
+  }, [couponToDelete, handleBackToList, partnerId, refreshCoupons, selectedCouponId, toast])
+
+  const setSelectedProductIds = useCallback((value: React.SetStateAction<string[]>) => {
+    setRelations((prev) => {
+      const productIds = typeof value === "function" ? value(prev.productIds) : value
+      return { ...prev, productIds, products: scopeData.products.filter((item) => productIds.includes(item.id)) }
     })
-  }, [coupons, search, typeFilter, activeFilter])
+  }, [scopeData.products])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE))
-  const paginated = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
-
-  const refresh = async () => {
-    setLoading(true)
-    const res = await listCouponsAction(partnerId, { page: 1, limit: 100 })
-    if (res.success) setCoupons(res.data)
-    setLoading(false)
-  }
-
-  const openCreate = () => {
-    setEditingCouponId(null)
-    setForm(DEFAULT_FORM)
-    setSelectedProductIds([])
-    setSelectedServiceIds([])
-    setSelectedCategoryNames([])
-    setSelectedCustomerIds([])
-    loadScopeData()
-    setOpenForm(true)
-  }
-
-  const openEdit = async (coupon: any) => {
-    setEditingCouponId(coupon.id)
-    setForm({
-      code: coupon.code || "",
-      discountType: coupon.discount_type || "percentage",
-      discountValue: Number(coupon.discount_value || 0),
-      applyScope: coupon.apply_scope || "all",
-      allowCombination: Boolean(coupon.allow_combination),
-      minCartValue: Number(coupon.min_cart_value || 0),
-      maxDiscountEnabled: coupon.max_discount_value !== null,
-      maxDiscountValue: Number(coupon.max_discount_value || 0),
-      usageLimitEnabled: coupon.usage_limit !== null,
-      usageLimit: Number(coupon.usage_limit || 0),
-      usagePerCustomerEnabled: coupon.usage_per_customer !== null,
-      usagePerCustomer: Number(coupon.usage_per_customer || 0),
-      firstPurchaseOnly: Boolean(coupon.first_purchase_only),
-      unlimitedDate: !coupon.starts_at && !coupon.ends_at,
-      startsAt: coupon.starts_at ? String(coupon.starts_at).slice(0, 16) : "",
-      endsAt: coupon.ends_at ? String(coupon.ends_at).slice(0, 16) : "",
-      isActive: Boolean(coupon.is_active),
-      customerScope: coupon.customer_scope || "all",
-      isAutomatic: Boolean(coupon.is_automatic),
+  const setSelectedServiceIds = useCallback((value: React.SetStateAction<string[]>) => {
+    setRelations((prev) => {
+      const serviceIds = typeof value === "function" ? value(prev.serviceIds) : value
+      return { ...prev, serviceIds, services: scopeData.services.filter((item) => serviceIds.includes(item.id)) }
     })
-    loadScopeData()
-    // Load linked items for this coupon
-    const linked = await getCouponLinkedItemsAction(partnerId, coupon.id)
-    if (linked.success) {
-      setSelectedProductIds(linked.productIds || [])
-      setSelectedCategoryNames(linked.categoryIds || [])
-      setSelectedServiceIds(linked.serviceIds || [])
-    }
-    // Load linked customers
-    const { getCouponCustomersAction } = await import("@/app/actions/erp/coupons")
-    const custRes = await getCouponCustomersAction(partnerId, coupon.id)
-    if (custRes.success) {
-      setSelectedCustomerIds(custRes.data || [])
-    }
-    setOpenForm(true)
-  }
+  }, [scopeData.services])
 
-  const saveCoupon = async () => {
+  const setSelectedCategoryIds = useCallback((value: React.SetStateAction<string[]>) => {
+    setRelations((prev) => {
+      const categoryIds = typeof value === "function" ? value(prev.categoryIds) : value
+      return { ...prev, categoryIds, categories: scopeData.categories.filter((item) => categoryIds.includes(item)) }
+    })
+  }, [scopeData.categories])
+
+  const setSelectedCustomerIds = useCallback((value: React.SetStateAction<string[]>) => {
+    setRelations((prev) => {
+      const customerIds = typeof value === "function" ? value(prev.customerIds) : value
+      return { ...prev, customerIds, customers: scopeData.customers.filter((item) => customerIds.includes(item.id)) }
+    })
+  }, [scopeData.customers])
+
+  const saveCoupon = useCallback(async () => {
     const payload = {
       partnerId,
       code: form.code.trim().toUpperCase(),
       discountType: form.discountType,
       discountValue: form.discountType === "free_shipping" ? null : Number(form.discountValue || 0),
       applyScope: form.applyScope,
-      allowCombination: !!form.allowCombination,
+      allowCombination: Boolean(form.allowCombination),
       minCartValue: Number(form.minCartValue || 0),
       maxDiscountValue: form.maxDiscountEnabled ? Number(form.maxDiscountValue || 0) : null,
       usageLimit: form.usageLimitEnabled ? Number(form.usageLimit || 0) : null,
       usagePerCustomer: form.usagePerCustomerEnabled ? Number(form.usagePerCustomer || 0) : null,
-      firstPurchaseOnly: !!form.firstPurchaseOnly,
+      firstPurchaseOnly: Boolean(form.firstPurchaseOnly),
       startsAt: form.unlimitedDate || !form.startsAt ? null : new Date(form.startsAt).toISOString(),
       endsAt: form.unlimitedDate || !form.endsAt ? null : new Date(form.endsAt).toISOString(),
-      isActive: !!form.isActive,
-      customerScope: form.customerScope || "all",
-      isAutomatic: !!form.isAutomatic,
-      productIds: selectedProductIds,
-      categoryIds: selectedCategoryNames,
-      serviceIds: selectedServiceIds,
-      customerIds: selectedCustomerIds,
+      isActive: Boolean(form.isActive),
+      customerScope: form.customerScope,
+      isAutomatic: Boolean(form.isAutomatic),
+      productIds: relations.productIds,
+      categoryIds: relations.categoryIds,
+      serviceIds: relations.serviceIds,
+      customerIds: relations.customerIds,
     }
 
     if (!payload.code) {
-      toast({ title: "Validação", description: "Informe o código do cupom.", variant: "destructive" })
+      toast({ title: "Validacao", description: "Informe o codigo do cupom.", variant: "destructive" })
       return
     }
+
     if (payload.discountType === "percentage" && Number(payload.discountValue || 0) > 100) {
-      toast({ title: "Validação", description: "Percentual máximo é 100%.", variant: "destructive" })
+      toast({ title: "Validacao", description: "O percentual maximo permitido e 100%.", variant: "destructive" })
       return
     }
+
     if (payload.discountType === "fixed" && Number(payload.discountValue || 0) <= 0) {
-      toast({ title: "Validação", description: "Desconto fixo deve ser maior que zero.", variant: "destructive" })
+      toast({ title: "Validacao", description: "Informe um valor fixo maior que zero.", variant: "destructive" })
       return
     }
 
-    const res = editingCouponId
-      ? await updateCouponAction(editingCouponId, payload)
-      : await createCouponAction(payload)
-    if (!res.success) {
-      toast({ title: "Erro", description: res.error, variant: "destructive" })
+    if (payload.customerScope === "specific" && payload.customerIds.length === 0) {
+      toast({ title: "Validacao", description: "Selecione ao menos um cliente para esse publico.", variant: "destructive" })
       return
     }
 
-    toast({ title: "Sucesso", description: editingCouponId ? "Cupom atualizado." : "Cupom criado." })
-    setOpenForm(false)
-    setEditingCouponId(null)
-    await refresh()
+    if (payload.applyScope === "categories" && payload.categoryIds.length === 0) {
+      toast({ title: "Validacao", description: "Selecione ao menos uma categoria.", variant: "destructive" })
+      return
+    }
+
+    if (payload.applyScope === "products" && payload.productIds.length === 0) {
+      toast({ title: "Validacao", description: "Selecione ao menos um produto.", variant: "destructive" })
+      return
+    }
+
+    if (payload.applyScope === "services" && payload.serviceIds.length === 0) {
+      toast({ title: "Validacao", description: "Selecione ao menos um servico.", variant: "destructive" })
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const result = selectedCouponId
+        ? await updateCouponAction(selectedCouponId, payload)
+        : await createCouponAction(payload)
+
+      if (!result.success) {
+        toast({ title: "Erro", description: result.error, variant: "destructive" })
+        return
+      }
+
+      toast({
+        title: "Sucesso",
+        description: selectedCouponId ? "Cupom atualizado com sucesso." : "Cupom criado com sucesso.",
+      })
+
+      await refreshCoupons()
+      setWrapperMode("list")
+      setSelectedCouponId(null)
+      setForm(DEFAULT_COUPON_FORM)
+      resetRelations()
+    } finally {
+      setIsSaving(false)
+    }
+  }, [form, partnerId, refreshCoupons, relations, resetRelations, selectedCouponId, toast])
+
+  const filteredCoupons = useMemo(() => {
+    const term = debouncedSearch.trim().toLowerCase()
+
+    const mapped = coupons.filter((coupon) => {
+      const searchMatch =
+        !term ||
+        coupon.code.toLowerCase().includes(term) ||
+        getCouponPrimaryMeta(coupon).toLowerCase().includes(term)
+
+      const tabMatch =
+        activeTab === "Todos" ||
+        (activeTab === "Ativos" && coupon.is_active) ||
+        (activeTab === "Inativos" && !coupon.is_active) ||
+        (activeTab === "Automaticos" && coupon.is_automatic)
+
+      const typeLabel = coupon.discount_type === "percentage"
+        ? "Percentual"
+        : coupon.discount_type === "fixed"
+          ? "Valor fixo"
+          : "Frete gratis"
+
+      const scopeLabel = getCouponApplyScopeLabel(coupon.apply_scope)
+      const customerLabel = coupon.customer_scope === "specific" ? "Clientes especificos" : "Todos os clientes"
+
+      const typeMatch = filters.discountType.length === 0 || filters.discountType.includes(typeLabel)
+      const scopeMatch = filters.applyScope.length === 0 || filters.applyScope.includes(scopeLabel)
+      const customerScopeMatch = filters.customerScope.length === 0 || filters.customerScope.includes(customerLabel)
+      const automaticMatch = !filters.automaticOnly || coupon.is_automatic
+
+      return searchMatch && tabMatch && typeMatch && scopeMatch && customerScopeMatch && automaticMatch
+    })
+
+    if (!sortConfig) return mapped
+
+    return [...mapped].sort((left, right) => {
+      let a: string | number = ""
+      let b: string | number = ""
+
+      switch (sortConfig.key) {
+        case "coupon":
+          a = left.code
+          b = right.code
+          break
+        case "scope":
+          a = getCouponApplyScopeLabel(left.apply_scope)
+          b = getCouponApplyScopeLabel(right.apply_scope)
+          break
+        case "usage":
+          a = getCouponUsageCount(left)
+          b = getCouponUsageCount(right)
+          break
+        case "validity":
+          a = left.ends_at ? new Date(left.ends_at).getTime() : Number.MAX_SAFE_INTEGER
+          b = right.ends_at ? new Date(right.ends_at).getTime() : Number.MAX_SAFE_INTEGER
+          break
+        case "status":
+          a = left.is_active ? 1 : 0
+          b = right.is_active ? 1 : 0
+          break
+      }
+
+      if (a === b) return 0
+      const comparison = a < b ? -1 : 1
+      return sortConfig.direction === "asc" ? comparison : -comparison
+    })
+  }, [activeTab, coupons, debouncedSearch, filters, sortConfig])
+
+  const totalPages = Math.max(1, Math.ceil(filteredCoupons.length / ITEMS_PER_PAGE))
+  const paginatedCoupons = filteredCoupons.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+
+  const hasActiveFilters =
+    filters.discountType.length > 0 ||
+    filters.applyScope.length > 0 ||
+    filters.customerScope.length > 0 ||
+    filters.automaticOnly ||
+    debouncedSearch.length > 0
+
+  if (wrapperMode === "create" || wrapperMode === "edit") {
+    return (
+      <CouponFormPage
+        mode={wrapperMode}
+        coupon={selectedCoupon}
+        form={form}
+        setForm={setForm}
+        scopeData={scopeData}
+        relations={relations}
+        setSelectedProductIds={setSelectedProductIds}
+        setSelectedServiceIds={setSelectedServiceIds}
+        setSelectedCategoryIds={setSelectedCategoryIds}
+        setSelectedCustomerIds={setSelectedCustomerIds}
+        onBack={handleBackToList}
+        onSave={saveCoupon}
+        isSaving={isSaving}
+        isLoadingScope={isLoadingScope || isLoadingRelations}
+      />
+    )
+  }
+
+  if (wrapperMode === "view" && selectedCoupon) {
+    return (
+      <CouponDetailPage
+        coupon={selectedCoupon}
+        relations={relations}
+        onBack={handleBackToList}
+        onEdit={openEdit}
+        onDelete={handleDelete}
+        onToggleStatus={handleToggleStatus}
+        isLoadingRelations={isLoadingRelations}
+      />
+    )
   }
 
   return (
-    <motion.div className="flex flex-col h-full bg-white dark:bg-dark-background p-4 md:p-8" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading leading-none">Cupons</h1>
-          <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium mt-2">Gerencie descontos e promoções</p>
-        </div>
-        <Button onClick={openCreate}>Novo cupom</Button>
-      </div>
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.2 }}
+        className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
+      >
+        <CouponPageControls
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          search={search}
+          onSearchChange={setSearch}
+          onOpenFilter={() => setModals((prev) => ({ ...prev, filter: true }))}
+          onAddCoupon={openCreate}
+          filters={filters}
+          setFilters={setFilters}
+          viewMode={effectiveViewMode}
+          onViewModeChange={setViewModeState}
+          hasActiveFilters={hasActiveFilters}
+        />
 
-      <div className="flex flex-col md:flex-row gap-3 mb-4">
-        <Input label="" placeholder="Buscar por código" value={search} onChange={(e: any) => setSearch(e.target.value)} />
-        <select className="h-11 rounded-xl border border-brand-border px-3" value={activeFilter} onChange={(e) => setActiveFilter(e.target.value)}>
-          <option value="all">Todos</option>
-          <option value="active">Ativos</option>
-          <option value="inactive">Inativos</option>
-        </select>
-        <select className="h-11 rounded-xl border border-brand-border px-3" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-          <option value="all">Todos os tipos</option>
-          <option value="percentage">Percentual</option>
-          <option value="fixed">Fixo</option>
-          <option value="free_shipping">Frete grátis</option>
-        </select>
-      </div>
-
-      <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="h-40 flex items-center justify-center"><ThreeDotsLoader /></div>
-        ) : (
-          <div className={isMobile ? "flex flex-col gap-3" : "grid grid-cols-2 xl:grid-cols-3 gap-4"}>
-            {paginated.map((coupon) => {
-              const usageLimit = coupon.usage_limit === null ? "Ilimitado" : `${Number(coupon.coupon_usages?.[0]?.count || 0)} / ${coupon.usage_limit}`
-              const typeLabel = coupon.discount_type === "percentage" ? "Percentual" : coupon.discount_type === "fixed" ? "Fixo" : "Frete grátis"
-              const valueLabel = coupon.discount_type === "percentage"
-                ? `${Number(coupon.discount_value || 0)}%`
-                : coupon.discount_type === "fixed"
-                  ? formatCurrency(Number(coupon.discount_value || 0))
-                  : "R$ 0,00 frete"
-
-              return (
-                <div key={coupon.id} className="rounded-2xl border border-brand-border p-4 bg-white dark:bg-dark-surface">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="font-bold text-brand-dark dark:text-dark-heading">{coupon.code}</div>
-                      <div className="text-sm text-brand-inactive-text">{typeLabel} - {valueLabel}</div>
-                    </div>
-                    <Badge variant={coupon.is_active ? "green" : "gray"}>{coupon.is_active ? "Ativo" : "Inativo"}</Badge>
-                  </div>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {coupon.is_automatic && <Badge variant="blue">Automático</Badge>}
-                    {coupon.customer_scope === "specific" && <Badge variant="orange">Clientes específicos</Badge>}
-                  </div>
-                  <div className="text-sm mt-3 text-brand-inactive-text">
-                    Uso: {usageLimit}
-                  </div>
-                  <div className="text-sm text-brand-inactive-text">
-                    Validade: {coupon.starts_at ? formatDate(coupon.starts_at) : "Sem início"} - {coupon.ends_at ? formatDate(coupon.ends_at) : "Sem fim"}
-                  </div>
-                  <div className="flex gap-2 mt-4">
-                    <Button variant="outline" className="h-9" onClick={() => openEdit(coupon)}>Editar</Button>
-                    <Button variant="outline" className="h-9" onClick={async () => { await toggleCouponStatusAction(partnerId, coupon.id, !coupon.is_active); await refresh() }}>
-                      {coupon.is_active ? "Desativar" : "Ativar"}
-                    </Button>
-                    <Button variant="outline" className="h-9" onClick={async () => { await deleteCouponAction(partnerId, coupon.id); await refresh() }}>Excluir</Button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
-      <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
-
-      {openForm && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-end md:items-center justify-center p-0 md:p-6">
-          <div className="w-full md:max-w-3xl max-h-[95vh] overflow-y-auto bg-white dark:bg-dark-surface rounded-t-2xl md:rounded-2xl p-4 md:p-6">
-            <h2 className="font-bold text-xl mb-4">{editingCouponId ? "Editar cupom" : "Novo cupom"}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input label="Código do cupom" value={form.code} onChange={(e: any) => setForm((p: any) => ({ ...p, code: e.target.value }))} />
-              <div>
-                <label className="text-sm font-medium">Tipo de desconto</label>
-                <select className="h-11 mt-1 w-full rounded-xl border border-brand-border px-3 dark:bg-dark-surface dark:border-dark-border" value={form.discountType} onChange={(e) => setForm((p: any) => ({ ...p, discountType: e.target.value }))}>
-                  <option value="percentage">Percentual (%)</option>
-                  <option value="fixed">Valor fixo (R$)</option>
-                  <option value="free_shipping">Frete grátis</option>
-                </select>
-              </div>
-              {form.discountType !== "free_shipping" && (
-                form.discountType === "percentage"
-                  ? <Input label="Desconto (%)" type="number" value={form.discountValue} onChange={(e: any) => setForm((p: any) => ({ ...p, discountValue: Number(e.target.value) }))} />
-                  : <MoneyInput label="Valor do desconto" value={Number(form.discountValue || 0)} onChange={(v: number) => setForm((p: any) => ({ ...p, discountValue: v }))} />
-              )}
-              <MoneyInput label="Valor mínimo do carrinho" value={Number(form.minCartValue || 0)} onChange={(v: number) => setForm((p: any) => ({ ...p, minCartValue: v }))} />
-            </div>
-
-            {/* ── APLICAR A (scope) ── */}
-            <div className="mt-6 border-t border-brand-border pt-4">
-              <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Aplicar a</label>
-              <select className="h-11 mt-1 w-full rounded-xl border border-brand-border px-3 dark:bg-dark-surface dark:border-dark-border" value={form.applyScope} onChange={(e) => setForm((p: any) => ({ ...p, applyScope: e.target.value }))}>
-                <option value="all">Todos os produtos e serviços</option>
-                <option value="categories">Categorias específicas</option>
-                <option value="products">Produtos específicos</option>
-                <option value="services">Serviços específicos</option>
-              </select>
-
-              {form.applyScope === "categories" && (
-                <div className="mt-3">
-                  <p className="text-xs text-brand-inactive-text mb-2">{selectedCategoryNames.length} categoria(s) selecionada(s)</p>
-                  <div className="border border-brand-border rounded-xl max-h-[200px] overflow-y-auto">
-                    {scopeLoading ? <div className="p-4 flex justify-center"><ThreeDotsLoader /></div> : scopeCategories.length === 0 ? (
-                      <p className="p-4 text-sm text-brand-inactive-text text-center">Nenhuma categoria encontrada</p>
-                    ) : scopeCategories.map((cat) => (
-                      <label key={cat} className="flex items-center gap-3 px-4 py-2.5 hover:bg-brand-gray/30 cursor-pointer border-b border-brand-border last:border-0">
-                        <Checkbox checked={selectedCategoryNames.includes(cat)} onChange={() => setSelectedCategoryNames((prev) => prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat])} />
-                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{cat}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {form.applyScope === "products" && (
-                <div className="mt-3">
-                  <p className="text-xs text-brand-inactive-text mb-2">{selectedProductIds.length} produto(s) selecionado(s)</p>
-                  <Input label="" placeholder="Buscar produto..." value={scopeSearch} onChange={(e: any) => setScopeSearch(e.target.value)} className="mb-2" />
-                  <div className="border border-brand-border rounded-xl max-h-[200px] overflow-y-auto">
-                    {scopeLoading ? <div className="p-4 flex justify-center"><ThreeDotsLoader /></div> : scopeProducts.filter((p) => !scopeSearch || p.name.toLowerCase().includes(scopeSearch.toLowerCase())).map((product) => (
-                      <label key={product.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-brand-gray/30 cursor-pointer border-b border-brand-border last:border-0">
-                        <Checkbox checked={selectedProductIds.includes(product.id)} onChange={() => setSelectedProductIds((prev) => prev.includes(product.id) ? prev.filter((id) => id !== product.id) : [...prev, product.id])} />
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate block">{product.name}</span>
-                          {product.category && <span className="text-xs text-brand-inactive-text">{product.category}</span>}
-                        </div>
-                        <span className="text-xs font-bold text-brand-dark shrink-0">{formatCurrency(Number(product.price || 0))}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {form.applyScope === "services" && (
-                <div className="mt-3">
-                  <p className="text-xs text-brand-inactive-text mb-2">{selectedServiceIds.length} serviço(s) selecionado(s)</p>
-                  <Input label="" placeholder="Buscar serviço..." value={scopeSearch} onChange={(e: any) => setScopeSearch(e.target.value)} className="mb-2" />
-                  <div className="border border-brand-border rounded-xl max-h-[200px] overflow-y-auto">
-                    {scopeLoading ? <div className="p-4 flex justify-center"><ThreeDotsLoader /></div> : scopeServices.filter((s) => !scopeSearch || s.name.toLowerCase().includes(scopeSearch.toLowerCase())).map((service) => (
-                      <label key={service.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-brand-gray/30 cursor-pointer border-b border-brand-border last:border-0">
-                        <Checkbox checked={selectedServiceIds.includes(service.id)} onChange={() => setSelectedServiceIds((prev) => prev.includes(service.id) ? prev.filter((id) => id !== service.id) : [...prev, service.id])} />
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate block">{service.name}</span>
-                        </div>
-                        <span className="text-xs font-bold text-brand-dark shrink-0">{formatCurrency(Number(service.price || 0))}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* ── LIMITES DE USO ── */}
-            <div className="mt-6 border-t border-brand-border pt-4">
-              <label className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3 block">Limites de uso</label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Per coupon */}
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <Checkbox checked={form.usageLimitEnabled} onChange={(val) => setForm((p: any) => ({ ...p, usageLimitEnabled: Boolean(val) }))} />
-                    <span className="text-sm font-medium">Limitar uso total do cupom</span>
-                  </div>
-                  {form.usageLimitEnabled && (
-                    <Input label="Limite de usos" type="number" value={form.usageLimit} onChange={(e: any) => setForm((p: any) => ({ ...p, usageLimit: Number(e.target.value) }))} />
-                  )}
-                  {!form.usageLimitEnabled && <p className="text-xs text-brand-inactive-text ml-8">Ilimitado</p>}
-                </div>
-
-                {/* Per customer */}
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <Checkbox checked={form.usagePerCustomerEnabled} onChange={(val) => setForm((p: any) => ({ ...p, usagePerCustomerEnabled: Boolean(val), firstPurchaseOnly: false }))} />
-                    <span className="text-sm font-medium">Limitar por cliente</span>
-                  </div>
-                  {form.usagePerCustomerEnabled && (
-                    <Input label="Usos por cliente" type="number" value={form.usagePerCustomer} onChange={(e: any) => setForm((p: any) => ({ ...p, usagePerCustomer: Number(e.target.value) }))} />
-                  )}
-                  {!form.usagePerCustomerEnabled && (
-                    <div className="flex items-center gap-3 ml-8">
-                      <Checkbox checked={form.firstPurchaseOnly} onChange={(val) => setForm((p: any) => ({ ...p, firstPurchaseOnly: Boolean(val) }))} />
-                      <span className="text-xs text-brand-inactive-text">Apenas primeira compra</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* ── VALIDADE ── */}
-            <div className="mt-6 border-t border-brand-border pt-4">
-              <label className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3 block">Validade</label>
-              <div className="flex items-center gap-3 mb-3">
-                <Checkbox checked={form.unlimitedDate} onChange={(val) => setForm((p: any) => ({ ...p, unlimitedDate: Boolean(val) }))} />
-                <span className="text-sm font-medium">Sem limite de data</span>
-              </div>
-              {!form.unlimitedDate && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">Início</label>
-                    <input type="datetime-local" className="h-11 mt-1 w-full rounded-xl border border-brand-border px-3 text-sm dark:bg-dark-surface dark:border-dark-border" value={form.startsAt} onChange={(e) => setForm((p: any) => ({ ...p, startsAt: e.target.value }))} />
+        <div className="px-4 md:px-8 pb-6">
+          <div className="rounded-3xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface overflow-hidden">
+            <div className="px-5 md:px-6 py-5 border-b border-brand-border dark:border-dark-border">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                    <TagIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
                   </div>
                   <div>
-                    <label className="text-sm font-medium">Fim</label>
-                    <input type="datetime-local" className="h-11 mt-1 w-full rounded-xl border border-brand-border px-3 text-sm dark:bg-dark-surface dark:border-dark-border" value={form.endsAt} onChange={(e) => setForm((p: any) => ({ ...p, endsAt: e.target.value }))} />
+                    <h1 className="text-2xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading">Cupons</h1>
+                    <p className="text-sm md:text-[15px] font-medium text-brand-inactive-text dark:text-dark-body">
+                      Estrutura completa de cadastro, consulta e regras promocionais do ERP.
+                    </p>
                   </div>
                 </div>
-              )}
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="gray" icon={null}>
+                    {filteredCoupons.length} exibido(s)
+                  </Badge>
+                  <Badge variant="green" icon={null}>
+                    {coupons.filter((coupon) => coupon.is_active).length} ativo(s)
+                  </Badge>
+                  <Badge variant="blue" icon={<SparklesIcon />}>
+                    {coupons.filter((coupon) => coupon.is_automatic).length} automatico(s)
+                  </Badge>
+                  <Badge variant={getCouponStatusVariant({ is_active: true })} icon={null}>
+                    {totalCoupons} total
+                  </Badge>
+                </div>
+              </div>
             </div>
 
-            {/* ── OPÇÕES EXTRAS ── */}
-            <div className="mt-6 border-t border-brand-border pt-4">
-              <label className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3 block">Opções</label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center gap-3">
-                  <Checkbox checked={form.maxDiscountEnabled} onChange={(val) => setForm((p: any) => ({ ...p, maxDiscountEnabled: Boolean(val) }))} />
-                  <span className="text-sm font-medium">Desconto máximo</span>
+            <div className="flex-1 min-h-[420px]">
+              {isLoadingPage ? (
+                <div className="h-[420px] flex items-center justify-center">
+                  <ThreeDotsLoader />
                 </div>
-                {form.maxDiscountEnabled && (
-                  <MoneyInput label="Valor máximo" value={Number(form.maxDiscountValue || 0)} onChange={(v: number) => setForm((p: any) => ({ ...p, maxDiscountValue: v }))} />
-                )}
-                <div className="flex items-center gap-3">
-                  <Checkbox checked={form.allowCombination} onChange={(val) => setForm((p: any) => ({ ...p, allowCombination: Boolean(val) }))} />
-                  <span className="text-sm font-medium">Permitir combinação</span>
+              ) : filteredCoupons.length === 0 ? (
+                <div className="h-[420px] flex flex-col items-center justify-center text-center px-6">
+                  <div className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border flex items-center justify-center border border-brand-border dark:border-dark-border mb-4">
+                    <TagIcon className="w-7 h-7 text-brand-dark dark:text-dark-heading" />
+                  </div>
+                  <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-2">Nenhum cupom encontrado</h2>
+                  <p className="text-sm text-brand-inactive-text dark:text-dark-body max-w-md mb-6">
+                    Ajuste a busca, remova filtros ou cadastre um novo cupom para popular esta area.
+                  </p>
+                  <Button onClick={openCreate}>Criar cupom</Button>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Checkbox checked={form.isAutomatic} onChange={(val) => setForm((p: any) => ({ ...p, isAutomatic: Boolean(val) }))} />
-                  <span className="text-sm font-medium">Cupom automático</span>
+              ) : effectiveViewMode === "grid" ? (
+                <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  <AnimatePresence>
+                    {paginatedCoupons.map((coupon) => (
+                      <CouponGridCard
+                        key={coupon.id}
+                        coupon={coupon}
+                        onDetails={openDetails}
+                        onEdit={openEdit}
+                        onToggleStatus={handleToggleStatus}
+                        onDelete={handleDelete}
+                      />
+                    ))}
+                  </AnimatePresence>
                 </div>
-                <div>
-                  <label className="text-sm font-medium">Escopo de clientes</label>
-                  <select className="h-11 mt-1 w-full rounded-xl border border-brand-border px-3 dark:bg-dark-surface dark:border-dark-border" value={form.customerScope} onChange={(e) => setForm((p: any) => ({ ...p, customerScope: e.target.value }))}>
-                    <option value="all">Todos os clientes</option>
-                    <option value="specific">Clientes específicos</option>
-                  </select>
-                  {form.customerScope === "specific" && (
-                    <div className="mt-3">
-                      <p className="text-xs text-brand-inactive-text mb-2">{selectedCustomerIds.length} cliente(s) selecionado(s)</p>
-                      <Input label="" placeholder="Buscar cliente..." value={customerSearch} onChange={(e: any) => setCustomerSearch(e.target.value)} className="mb-2" />
-                      <div className="border border-brand-border rounded-xl max-h-[200px] overflow-y-auto">
-                        {scopeLoading ? <div className="p-4 flex justify-center"><ThreeDotsLoader /></div> : scopeCustomers.filter((c) => !customerSearch || c.name?.toLowerCase().includes(customerSearch.toLowerCase()) || c.email?.toLowerCase().includes(customerSearch.toLowerCase())).length === 0 ? (
-                          <p className="p-4 text-sm text-brand-inactive-text text-center">Nenhum cliente encontrado</p>
-                        ) : scopeCustomers.filter((c) => !customerSearch || c.name?.toLowerCase().includes(customerSearch.toLowerCase()) || c.email?.toLowerCase().includes(customerSearch.toLowerCase())).map((customer) => (
-                          <label key={customer.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-brand-gray/30 cursor-pointer border-b border-brand-border last:border-0">
-                            <Checkbox checked={selectedCustomerIds.includes(customer.id)} onChange={() => setSelectedCustomerIds((prev) => prev.includes(customer.id) ? prev.filter((id) => id !== customer.id) : [...prev, customer.id])} />
-                            <div className="flex-1 min-w-0">
-                              <span className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate block">{customer.name}</span>
-                              {customer.email && <span className="text-xs text-brand-inactive-text">{customer.email}</span>}
-                            </div>
-                          </label>
+              ) : (
+                <div className="relative">
+                  <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                  <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                  <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                    <table className="w-full text-left border-separate border-spacing-0 min-w-[1320px]">
+                      <thead>
+                        <tr className="bg-brand-gray dark:bg-dark-border/50">
+                          {COLUMNS.map((column, index) => {
+                            const isSortable = column.id !== "actions"
+                            const isSorted = sortConfig?.key === column.id
+                            const isFirst = index === 0
+                            const isLast = index === COLUMNS.length - 1
+
+                            return (
+                              <th
+                                key={column.id}
+                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${column.align === "right" ? "text-right" : column.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isFirst ? "rounded-l-lg pl-6" : ""} ${isLast ? "rounded-r-lg pr-6" : ""}`}
+                                style={{ width: column.width }}
+                                onClick={() => {
+                                  if (!isSortable) return
+                                  setSortConfig((prev) => ({
+                                    key: column.id as SortKey,
+                                    direction: prev?.key === column.id && prev.direction === "asc" ? "desc" : "asc",
+                                  }))
+                                }}
+                              >
+                                <div className={`flex items-center gap-1.5 ${column.align === "right" ? "justify-end" : column.align === "center" ? "justify-center" : ""}`}>
+                                  {column.label}
+                                  {isSortable && (
+                                    <div className="w-4 h-4 flex items-center justify-center shrink-0">
+                                      <ArrowUpDownIcon
+                                        size={14}
+                                        className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-0 group-hover:opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </th>
+                            )
+                          })}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedCoupons.map((coupon) => (
+                          <CouponListItem
+                            key={coupon.id}
+                            coupon={coupon}
+                            columns={COLUMNS}
+                            onDetails={openDetails}
+                            onEdit={openEdit}
+                            onToggleStatus={handleToggleStatus}
+                            onDelete={handleDelete}
+                          />
                         ))}
-                      </div>
-                    </div>
-                  )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 mt-6">
-              <Button variant="outline" onClick={() => setOpenForm(false)}>Cancelar</Button>
-              <Button onClick={saveCoupon}>Salvar</Button>
+              )}
             </div>
           </div>
         </div>
-      )}
-    </motion.div>
+
+        <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+      </motion.div>
+
+      <FilterSheet
+        isOpen={modals.filter}
+        onClose={() => setModals((prev) => ({ ...prev, filter: false }))}
+        sections={filterSections}
+        filters={filters}
+        setFilters={setFilters}
+        onClear={() => setFilters(INITIAL_FILTERS)}
+      />
+
+      <AlertModal
+        title="Excluir cupom"
+        description={couponToDelete ? `Tem certeza que deseja excluir o cupom ${couponToDelete.code}? Esta acao nao pode ser desfeita.` : ""}
+        isOpen={!!couponToDelete}
+        onClose={() => setCouponToDelete(null)}
+        onConfirm={confirmDelete}
+        confirmText="Excluir"
+        cancelText="Cancelar"
+        isDestructive
+        isLoading={isDeleting}
+      />
+    </>
   )
 }

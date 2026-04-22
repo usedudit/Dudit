@@ -31,7 +31,7 @@ export type CouponValidationResult = {
 // ---------------------------------------------------------------------------
 
 async function validateCouponRow(
-  supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+  supabase: any,
   coupon: any,
   input: {
     partnerId: string
@@ -188,9 +188,12 @@ async function validateCouponRow(
 // Public: Validate a coupon by code
 // ---------------------------------------------------------------------------
 
-export async function validateCoupon(input: CouponValidationInput): Promise<CouponValidationResult> {
-  const supabase = await getSupabaseServerClient()
-  const code = String(input.code || "").trim()
+export async function validateCoupon(
+  input: CouponValidationInput,
+  supabaseOverride?: any
+): Promise<CouponValidationResult> {
+  const supabase = supabaseOverride || await getSupabaseServerClient()
+  const code = String(input.code || "").trim().toUpperCase().replace(/\s+/g, "")
   if (!code) return { valid: false, discountAmount: 0, errorMessage: "Código do cupom inválido." }
 
   const { data: coupon, error } = await supabase

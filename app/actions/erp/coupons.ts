@@ -243,7 +243,10 @@ export async function validateMarketplaceCouponAction(input: {
 }) {
   // Only require authenticated user — marketplace buyers are NOT partner members
   await requireUser()
-  return validateCoupon(input)
+  // Use admin client to bypass RLS (coupons table only allows partner_users to read)
+  const { getAdminClient } = await import("@/lib/supabase/admin")
+  const admin = getAdminClient()
+  return validateCoupon(input, admin)
 }
 
 // ---------------------------------------------------------------------------
