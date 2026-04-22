@@ -9,6 +9,8 @@ import { generateSKUBase } from "@/lib/utils/code-generators"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
+import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 
 type DraftItemInput = {
   productId?: string | null
@@ -35,6 +37,9 @@ type DraftUpsertInput = {
   shippingFee?: number
   otherCosts?: number
   items: DraftItemInput[]
+  couponId?: string | null
+  couponCode?: string | null
+  couponDiscountAmount?: number
 }
 
 type FinalizePaymentEntry = {
@@ -191,6 +196,9 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
 
   payload.shipping_fee = shippingFee
   payload.other_costs = otherCosts
+  payload.coupon_id = input.couponId || null
+  payload.coupon_code = input.couponCode || null
+  payload.coupon_discount_amount = safeMoney(input.couponDiscountAmount ?? 0)
 
   if (input.preSaleId) {
     const { data, error } = await supabase
@@ -307,7 +315,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
 
   const { data: finalizedPreSale } = await supabase
     .from("pre_sales")
-    .select("shipping_fee")
+    .select("shipping_fee, coupon_id, coupon_code, coupon_discount_amount, customer_id")
     .eq("id", input.preSaleId)
     .eq("partner_id", input.partnerId)
     .limit(1)
@@ -349,6 +357,18 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     changeLines: [`finalizou venda PDV no valor de R$ ${paidAmount.toFixed(2)}.`],
     source: "manual",
   })
+
+  // ── Record coupon usage if coupon was applied ─────────────────────────
+  if (finalizedPreSale?.coupon_id) {
+    await supabase.from("coupon_usages").upsert(
+      {
+        coupon_id: finalizedPreSale.coupon_id,
+        customer_id: finalizedPreSale.customer_id || null,
+        order_id: saleId,
+      },
+      { onConflict: "coupon_id,order_id", ignoreDuplicates: true }
+    )
+  }
 
   return { success: true as const, data: { saleId } }
 }
@@ -669,6 +689,123 @@ export async function createPOSCustomerAddressAction(input: {
         state: address.state || "",
         country: "BR",
       },
+    },
+  }
+}
+
+// ============================================================================
+// POS COUPON ACTIONS
+// ============================================================================
+
+export async function applyCouponToPreSaleAction(input: {
+  partnerId: string
+  preSaleId: string
+  couponCode: string
+  customerId?: string | null
+  subtotal: number
+  shippingCost?: number
+  items?: Array<{ productId?: string | null; serviceId?: string | null }>
+}) {
+  await requireUser()
+  await requirePartnerAccess(input.partnerId)
+
+  const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+  if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
+
+  const result = await validateCoupon({
+    partnerId: input.partnerId,
+    code: input.couponCode,
+    customerId: input.customerId,
+    subtotal: input.subtotal,
+    shippingCost: input.shippingCost,
+    items: input.items,
+  })
+
+  if (!result.valid) {
+    return { success: false as const, error: result.errorMessage || "Cupom inválido." }
+  }
+
+  const supabase = await getSupabaseServerClient()
+  const { error } = await supabase
+    .from("pre_sales")
+    .update({
+      coupon_id: result.couponId || null,
+      coupon_code: result.couponCode || input.couponCode.trim().toUpperCase(),
+      coupon_discount_amount: safeMoney(result.discountAmount),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.preSaleId)
+    .eq("partner_id", input.partnerId)
+    .eq("status", "draft")
+
+  if (error) return { success: false as const, error: error.message }
+
+  return {
+    success: true as const,
+    data: {
+      couponId: result.couponId || null,
+      couponCode: result.couponCode || input.couponCode.trim().toUpperCase(),
+      discountAmount: result.discountAmount,
+      pricingCoupon: result.pricingCoupon || null,
+      freeShipping: result.freeShipping || false,
+    },
+  }
+}
+
+export async function removeCouponFromPreSaleAction(input: {
+  partnerId: string
+  preSaleId: string
+}) {
+  await requireUser()
+  await requirePartnerAccess(input.partnerId)
+
+  const supabase = await getSupabaseServerClient()
+  const { error } = await supabase
+    .from("pre_sales")
+    .update({
+      coupon_id: null,
+      coupon_code: null,
+      coupon_discount_amount: 0,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.preSaleId)
+    .eq("partner_id", input.partnerId)
+    .eq("status", "draft")
+
+  if (error) return { success: false as const, error: error.message }
+  return { success: true as const }
+}
+
+export async function findAutomaticCouponForPOSAction(input: {
+  partnerId: string
+  customerId?: string | null
+  subtotal: number
+  shippingCost?: number
+  items?: Array<{ productId?: string | null; serviceId?: string | null }>
+}) {
+  await requireUser()
+  await requirePartnerAccess(input.partnerId)
+
+  const result = await findBestAutomaticCoupon({
+    partnerId: input.partnerId,
+    customerId: input.customerId,
+    subtotal: input.subtotal,
+    shippingCost: input.shippingCost,
+    items: input.items,
+  })
+
+  if (!result.valid) {
+    return { success: false as const }
+  }
+
+  return {
+    success: true as const,
+    data: {
+      couponId: result.couponId || null,
+      couponCode: result.couponCode || null,
+      discountAmount: result.discountAmount,
+      pricingCoupon: result.pricingCoupon || null,
+      freeShipping: result.freeShipping || false,
     },
   }
 }

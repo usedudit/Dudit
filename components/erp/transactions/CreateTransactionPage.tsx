@@ -1658,9 +1658,11 @@ export default function CreateTransactionPage({
                             />
                         )}
                         {isSalesOrigin && (
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-2">
-                                O contato não pode ser alterado em transações geradas por venda.
-                            </p>
+                            <InfoCard
+                                message="O contato não pode ser alterado em transações geradas por venda."
+                                color="gray"
+                                className="mt-2"
+                            />
                         )}
                     </div>
                 </SidebarCard>

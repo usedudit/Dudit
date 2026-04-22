@@ -44,6 +44,8 @@ const DEFAULT_FORM = {
   startsAt: "",
   endsAt: "",
   isActive: true,
+  customerScope: "all",
+  isAutomatic: false,
 }
 
 export default function CouponsPage({
@@ -114,6 +116,8 @@ export default function CouponsPage({
       startsAt: coupon.starts_at ? String(coupon.starts_at).slice(0, 16) : "",
       endsAt: coupon.ends_at ? String(coupon.ends_at).slice(0, 16) : "",
       isActive: Boolean(coupon.is_active),
+      customerScope: coupon.customer_scope || "all",
+      isAutomatic: Boolean(coupon.is_automatic),
     })
     setOpenForm(true)
   }
@@ -134,9 +138,12 @@ export default function CouponsPage({
       startsAt: form.unlimitedDate || !form.startsAt ? null : new Date(form.startsAt).toISOString(),
       endsAt: form.unlimitedDate || !form.endsAt ? null : new Date(form.endsAt).toISOString(),
       isActive: !!form.isActive,
+      customerScope: form.customerScope || "all",
+      isAutomatic: !!form.isAutomatic,
       productIds: [],
       categoryIds: [],
       serviceIds: [],
+      customerIds: [],
     }
 
     if (!payload.code) {
@@ -214,6 +221,10 @@ export default function CouponsPage({
                     </div>
                     <Badge variant={coupon.is_active ? "green" : "gray"}>{coupon.is_active ? "Ativo" : "Inativo"}</Badge>
                   </div>
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {coupon.is_automatic && <Badge variant="blue">Automático</Badge>}
+                    {coupon.customer_scope === "specific" && <Badge variant="orange">Clientes específicos</Badge>}
+                  </div>
                   <div className="text-sm mt-3 text-brand-inactive-text">
                     Uso: {usageLimit}
                   </div>
@@ -270,6 +281,17 @@ export default function CouponsPage({
               <div className="flex items-center gap-3 mt-7">
                 <Checkbox checked={form.firstPurchaseOnly} onChange={(val) => setForm((p: any) => ({ ...p, firstPurchaseOnly: Boolean(val) }))} />
                 <span className="text-sm">Primeira compra apenas</span>
+              </div>
+              <div className="flex items-center gap-3 mt-7">
+                <Checkbox checked={form.isAutomatic} onChange={(val) => setForm((p: any) => ({ ...p, isAutomatic: Boolean(val) }))} />
+                <span className="text-sm">Cupom automático</span>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Escopo de clientes</label>
+                <select className="h-11 mt-1 w-full rounded-xl border border-brand-border px-3" value={form.customerScope} onChange={(e) => setForm((p: any) => ({ ...p, customerScope: e.target.value }))}>
+                  <option value="all">Todos os clientes</option>
+                  <option value="specific">Clientes específicos</option>
+                </select>
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-6">

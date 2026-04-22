@@ -18,6 +18,8 @@ import {
   createPOSCustomerQuickAction,
   createPOSQuickProductAction,
   upsertPreSaleDraftAction,
+  applyCouponToPreSaleAction,
+  removeCouponFromPreSaleAction,
 } from "@/app/actions/erp/pos"
 import { openCashSessionAction } from "@/app/actions/erp/cash-register"
 import { getTeamMembers } from "@/app/actions/erp/team"
@@ -174,6 +176,9 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     } | null
   } | null>(null)
   const [isUserDraftSaveUi, setIsUserDraftSaveUi] = useState(false)
+  const [appliedCouponId, setAppliedCouponId] = useState<string | null>(null)
+  const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null)
+  const [appliedCouponDiscount, setAppliedCouponDiscount] = useState(0)
 
   const isXL = useMediaQuery("(min-width: 1280px)")
   const isLG = useMediaQuery("(min-width: 1024px)")
@@ -1580,10 +1585,49 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       <SelectCouponSheet
         isOpen={isCouponSheetOpen}
         onClose={() => setIsCouponSheetOpen(false)}
-        onSelect={(coupon) => {
+        partnerId={partnerId}
+        appliedCouponId={appliedCouponId}
+        onApplyCoupon={async (coupon) => {
+          if (!activePreSaleId) {
+            // Apply locally if no draft yet
+            setAppliedCouponCode(coupon.code)
+            setGlobalDiscountType("coupon")
+            setGlobalDiscountCouponCode(coupon.code)
+            setIsCouponSheetOpen(false)
+            return
+          }
+          const result = await applyCouponToPreSaleAction({
+            partnerId,
+            preSaleId: activePreSaleId,
+            couponCode: coupon.code,
+            customerId: selectedCustomerId || null,
+            subtotal,
+            shippingCost: shippingFee,
+            items: cart.map((item) => ({ productId: item.productId || null })),
+          })
+          if (!result.success) {
+            notifyError(result.error || "Cupom inválido.")
+            return
+          }
+          setAppliedCouponId(result.data?.couponId || null)
+          setAppliedCouponCode(result.data?.couponCode || coupon.code)
+          setAppliedCouponDiscount(result.data?.discountAmount || 0)
           setGlobalDiscountType("coupon")
-          setGlobalDiscountCouponCode(coupon?.code || "")
+          setGlobalDiscountCouponCode(result.data?.couponCode || coupon.code)
+          notifySuccess(`Cupom ${result.data?.couponCode || coupon.code} aplicado!`)
           setIsCouponSheetOpen(false)
+        }}
+        onRemoveCoupon={async () => {
+          if (activePreSaleId) {
+            await removeCouponFromPreSaleAction({ partnerId, preSaleId: activePreSaleId })
+          }
+          setAppliedCouponId(null)
+          setAppliedCouponCode(null)
+          setAppliedCouponDiscount(0)
+          setGlobalDiscountType("fixed")
+          setGlobalDiscountCouponCode("")
+          setDiscountAmount(0)
+          notifySuccess("Cupom removido.")
         }}
       />
 

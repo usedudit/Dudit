@@ -4,7 +4,7 @@ import { z } from "zod"
 import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { revalidateCoupons } from "@/lib/utils/revalidation"
-import { validateCoupon } from "@/lib/services/coupons"
+import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
 
 const CouponSchema = z.object({
   partnerId: z.string().uuid(),
@@ -21,9 +21,12 @@ const CouponSchema = z.object({
   startsAt: z.string().nullable(),
   endsAt: z.string().nullable(),
   isActive: z.boolean().default(true),
+  customerScope: z.enum(["all", "specific"]).default("all"),
+  isAutomatic: z.boolean().default(false),
   productIds: z.array(z.string().uuid()).optional().default([]),
   categoryIds: z.array(z.string().uuid()).optional().default([]),
   serviceIds: z.array(z.string().uuid()).optional().default([]),
+  customerIds: z.array(z.string().uuid()).optional().default([]),
 })
 
 export async function listCouponsAction(partnerId: string, params?: { search?: string; isActive?: string; type?: string; page?: number; limit?: number }) {
@@ -78,6 +81,8 @@ export async function createCouponAction(input: z.infer<typeof CouponSchema>) {
       starts_at: data.startsAt,
       ends_at: data.endsAt,
       is_active: data.isActive,
+      customer_scope: data.customerScope,
+      is_automatic: data.isAutomatic,
     })
     .select("id")
     .single()
@@ -93,6 +98,9 @@ export async function createCouponAction(input: z.infer<typeof CouponSchema>) {
   }
   if (data.serviceIds.length > 0) {
     await supabase.from("coupon_services").insert(data.serviceIds.map((id) => ({ coupon_id: couponId, service_id: id })))
+  }
+  if (data.customerScope === "specific" && data.customerIds.length > 0) {
+    await supabase.from("coupon_customers").insert(data.customerIds.map((id) => ({ coupon_id: couponId, customer_id: id })))
   }
 
   await revalidateCoupons(data.partnerId)
@@ -131,6 +139,8 @@ export async function updateCouponAction(couponId: string, input: z.infer<typeof
       starts_at: data.startsAt,
       ends_at: data.endsAt,
       is_active: data.isActive,
+      customer_scope: data.customerScope,
+      is_automatic: data.isAutomatic,
     })
     .eq("id", couponId)
     .eq("partner_id", data.partnerId)
@@ -140,6 +150,7 @@ export async function updateCouponAction(couponId: string, input: z.infer<typeof
     supabase.from("coupon_products").delete().eq("coupon_id", couponId),
     supabase.from("coupon_categories").delete().eq("coupon_id", couponId),
     supabase.from("coupon_services").delete().eq("coupon_id", couponId),
+    supabase.from("coupon_customers").delete().eq("coupon_id", couponId),
   ])
   if (data.productIds.length > 0) {
     await supabase.from("coupon_products").insert(data.productIds.map((id) => ({ coupon_id: couponId, product_id: id })))
@@ -149,6 +160,9 @@ export async function updateCouponAction(couponId: string, input: z.infer<typeof
   }
   if (data.serviceIds.length > 0) {
     await supabase.from("coupon_services").insert(data.serviceIds.map((id) => ({ coupon_id: couponId, service_id: id })))
+  }
+  if (data.customerScope === "specific" && data.customerIds.length > 0) {
+    await supabase.from("coupon_customers").insert(data.customerIds.map((id) => ({ coupon_id: couponId, customer_id: id })))
   }
 
   await revalidateCoupons(data.partnerId)
@@ -190,4 +204,28 @@ export async function validateCouponAction(input: {
   await requireUser()
   await requirePartnerAccessWithPermission(input.partnerId, "orders", "view")
   return validateCoupon(input)
+}
+
+export async function findAutomaticCouponAction(input: {
+  partnerId: string
+  customerId?: string | null
+  subtotal: number
+  shippingCost?: number
+  items?: Array<{ productId?: string | null; serviceId?: string | null }>
+}) {
+  await requireUser()
+  await requirePartnerAccessWithPermission(input.partnerId, "orders", "view")
+  return findBestAutomaticCoupon(input)
+}
+
+export async function getCouponCustomersAction(partnerId: string, couponId: string) {
+  await requireUser()
+  await requirePartnerAccessWithPermission(partnerId, "orders", "view")
+  const supabase = await getSupabaseServerClient()
+  const { data, error } = await supabase
+    .from("coupon_customers")
+    .select("customer_id")
+    .eq("coupon_id", couponId)
+  if (error) return { success: false, error: error.message }
+  return { success: true, data: (data || []).map((r: any) => r.customer_id) }
 }

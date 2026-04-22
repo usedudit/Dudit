@@ -22,7 +22,7 @@ export default async function CouponsPageServer() {
     <CouponsPage
       partnerId={partnerId}
       initialCoupons={couponsRes.data}
-      initialTotal={couponsRes.total}
+      initialTotal={couponsRes.total ?? 0}
     />
   )
 }
