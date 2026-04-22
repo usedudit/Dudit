@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getAdminClient } from "@/lib/supabase/admin"
 
 /**
  * Supabase Auth PKCE Callback Route.
@@ -19,6 +20,40 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
+      const { data: authUserData } = await supabase.auth.getUser()
+      const authUser = authUserData?.user
+
+      if (authUser?.id) {
+        const metadata = (authUser.user_metadata ?? {}) as Record<string, unknown>
+        const fullName =
+          (typeof metadata.full_name === "string" && metadata.full_name.trim()) ||
+          (typeof metadata.name === "string" && metadata.name.trim()) ||
+          authUser.email?.split("@")[0] ||
+          ""
+
+        // Safety net: ensure user_profiles exists even when DB trigger doesn't run.
+        const admin = getAdminClient()
+        const { error: profileError } = await admin
+          .from("user_profiles")
+          .upsert(
+            {
+              user_id: authUser.id,
+              full_name: fullName,
+              pending_partner_registration: false,
+            },
+            { onConflict: "user_id" }
+          )
+
+        if (profileError) {
+          console.error("[AUTH CALLBACK] Failed to ensure user_profiles:", {
+            userId: authUser.id,
+            code: profileError.code,
+            message: profileError.message,
+            details: profileError.details,
+          })
+        }
+      }
+
       // Força o redirecionamento para o domínio real
       return NextResponse.redirect(`${baseUrl}${next}`)
     }
