@@ -35,7 +35,7 @@ import {
 } from "@/app/actions/subscriptions"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate } from "@/lib/utils"
-import { buildFeaturesDisplay } from "@/lib/subscription/feature-labels"
+import { buildFeaturesDisplay, getHardcodedPlan } from "@/lib/subscription/feature-labels"
 
 function formatLimitValue(val: number | string): string {
   if (val === "unlimited" || val === -1) return "Ilimitado"
@@ -470,7 +470,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                   </div>
                   <div>
                     <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                      Plano {subData.plan.name}
+                      Plano {getHardcodedPlan(subData.plan.slug).name}
                     </p>
                     <p className="text-xs text-brand-inactive-text">
                       {subData.subscription?.status === "active" && "Ativo"}
@@ -515,10 +515,10 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                   return (
                     <PlanCard
                       key={plan.id}
-                      name={plan.name}
+                      name={getHardcodedPlan(plan.slug).name}
                       price={plan.price}
-                      features={buildFeaturesDisplay(plan.features_json || [], plan.slug, plans)}
-                      limits={buildLimitsDisplay(plan.limits_json || {})}
+                      features={getHardcodedPlan(plan.slug).features}
+                      limits={getHardcodedPlan(plan.slug).limits}
                       popular={isPopular}
                       isCurrent={isCurrent}
                       isDowngrade={isDowngrade}

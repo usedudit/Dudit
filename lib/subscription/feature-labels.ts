@@ -58,3 +58,89 @@ export function buildFeaturesDisplay(features: string[], tierSlug: string, allPl
   const prevName = prevTier?.name || "anterior"
   return [`Tudo do ${prevName} +`, ...newFeatures.map((f) => FEATURE_LABELS[f] || f)]
 }
+
+export const HARDCODED_PLANS: Record<string, { name: string; features: string[]; limits: string[] }> = {
+  free: {
+    name: "Começar",
+    features: [
+      "Vitrine digital pública",
+      "Produtos e serviços",
+      "Agendamentos",
+      "Orçamentos",
+      "Pedidos via WhatsApp",
+      "PDV",
+      "Clientes",
+    ],
+    limits: [
+      "Até 15 itens",
+      "Até 2 imagens por item",
+      "Até 25 pedidos e agendamentos/mês",
+      "Até 5 orçamentos/mês",
+      "1 usuário",
+    ],
+  },
+  vendedor: {
+    name: "Vender",
+    features: [
+      "Tudo do Grátis +",
+      "Pagamento online (Mercado Pago)",
+      "Pedidos pelo sistema",
+      "Variantes de produtos",
+      "Cupons",
+      "Frete local configurável",
+      "Fornecedores",
+      "Importação XML",
+      "Financeiro básico",
+      "Relatórios básicos",
+    ],
+    limits: [
+      "Até 100 itens",
+      "Até 5 imagens por item",
+      "Até 150 pedidos e agendamentos/mês",
+      "Até 30 orçamentos/mês",
+      "Até 3 usuários",
+    ],
+  },
+  crescer: {
+    name: "Escalar",
+    features: [
+      "Tudo do Vendedor +",
+      "Gestão de entregas",
+      "Financeiro completo",
+      "Relatórios avançados",
+      "Ordem de serviço",
+      "Kits de produtos",
+      "Campanhas promocionais",
+    ],
+    limits: [
+      "Itens ilimitados",
+      "Até 8 imagens por item",
+      "Pedidos ilimitados",
+      "Agendamentos ilimitados",
+      "Orçamentos ilimitados",
+      "Até 10 usuários",
+    ],
+  },
+  profissional: {
+    name: "Profissional",
+    features: [
+      "Tudo do Escalar +",
+      "Multilojas",
+      "Integração com NF-e",
+      "Assinaturas recorrentes",
+      "Marketplace destaque",
+      "Prioridade na busca",
+      "Relatórios completos",
+    ],
+    limits: [
+      "Itens ilimitados",
+      "Imagens ilimitadas",
+      "Pedidos ilimitados",
+      "Usuários ilimitados",
+    ],
+  },
+}
+
+export function getHardcodedPlan(slug: string) {
+  return HARDCODED_PLANS[slug] || HARDCODED_PLANS.free
+}

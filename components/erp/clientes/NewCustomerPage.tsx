@@ -363,7 +363,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                 <div className={`col-span-12 ${activeTab !== 'notes' ? 'lg:col-span-8 lg:pr-12' : ''}`}>
                                     <AnimatePresence mode="wait">
                                         <TabsContent value="general" className="mt-0">
-                                            <motion.div key="general" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-10">
+                                            <FadeIn key="general" className="space-y-10">
                                                 {/* Identificação */}
                                                 <section>
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Identificação</h3>
@@ -476,11 +476,11 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                         <FormInput label="Site" placeholder="www.site.com.br" value={website} onChange={(e) => setWebsite(e.target.value)} />
                                                     </div>
                                                 </section>
-                                            </motion.div>
+                                            </FadeIn>
                                         </TabsContent>
 
                                         <TabsContent value="address" className="mt-0">
-                                            <motion.div key="address" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-10">
+                                            <FadeIn key="address" className="space-y-10">
                                                 <section>
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Endereço principal</h3>
                                                     <div className="space-y-4">
@@ -574,11 +574,11 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                         </motion.div>
                                                     )}
                                                 </section>
-                                            </motion.div>
+                                            </FadeIn>
                                         </TabsContent>
 
                                         <TabsContent value="notes" className="mt-0">
-                                            <motion.div key="notes" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                                            <FadeIn key="notes">
                                                 <section>
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Observações</h3>
                                                     <div className="bg-gray-50 dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-5 h-[400px]">
@@ -590,7 +590,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                         />
                                                     </div>
                                                 </section>
-                                            </motion.div>
+                                            </FadeIn>
                                         </TabsContent>
                                     </AnimatePresence>
                                 </div>

@@ -19,6 +19,7 @@ import { Button, Input, TabsContent, FormDropdown, MoneyInput, PercentageInput, 
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { formatCurrency } from "@/lib/utils";
 import { QUOTE_DEFAULT_CUSTOMER_LABEL, type QuoteEditCaps } from "@/lib/quotes/quote-edit-rules";
+import { FadeIn } from '@/components/animations/FadeIn';
 
 interface QuoteEditorProps {
     searchQuery: string;
@@ -131,7 +132,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
     return (
         <div className="pt-4">
             <TabsContent value="Dados Gerais" className="mt-0 focus-visible:outline-none">
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
+                <FadeIn key="Dados Gerais">
 
                     {caps?.bannerMessage && !props.isReadOnly && (
                         <><InfoCard title="Atenção" message={caps.bannerMessage} color="orange" className="mb-6" /><div className="flex flex-wrap gap-2">
@@ -720,11 +721,11 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                             />
                         </div>
                     </div>
-                </motion.div>
+                </FadeIn>
             </TabsContent>
 
             <TabsContent value="Layout" className="mt-0 focus-visible:outline-none">
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+                <FadeIn key="Layout">
                     <div className="mb-8">
                         <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading mb-6 flex items-center gap-2">
                             <SparklesIcon size={20} className="text-brand-dark dark:text-dark-heading" /> Personalizar Aparência
@@ -783,11 +784,11 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                             />
                         </div>
                     </div>
-                </motion.div>
+                </FadeIn>
             </TabsContent>
 
             <TabsContent value="Observações" className="mt-0 focus-visible:outline-none">
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+                <FadeIn key="Observações">
                     <div className="bg-white dark:bg-dark-surface p-0 space-y-8">
                         <div>
                             <label className="block text-lg font-bold text-brand-dark dark:text-dark-heading mb-2">Observações da Proposta</label>
@@ -816,7 +817,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                             </div>
                         </div>
                     </div>
-                </motion.div>
+                </FadeIn>
             </TabsContent>
         </div>
     );

@@ -813,104 +813,110 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
                     <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                         <TabsContent value="general" className="mt-0">
-                            <div className={isPaidOrderLocked ? "pointer-events-none opacity-60" : ""}>
-                                <OrderGeneralTab
-                                items={items}
-                                searchQuery={productBucket.searchQuery}
-                                isProductSearchOpen={isProductSearchOpen}
-                                isSearching={productBucket.isLoading}
-                                searchResults={productBucket.filteredResults}
-                                subtotal={subtotal}
-                                discountAmount={discountAmount}
-                                discountValue={discountValue}
-                                discountType={discountType}
-                                shippingFee={shippingFee}
-                                otherCosts={otherCosts}
-                                totalAmount={totalAmount}
-                                selectedCustomer={selectedCustomer}
-                                orderDate={orderDate}
-                                salesChannel={salesChannel}
-                                deliveryMethod={deliveryMethod}
-                                paymentStatus={paymentStatus}
-                                deliveryStatus={deliveryStatus}
-                                financeAccountId={financeAccountId}
-                                accountOptions={accountOptions}
-                                remainingPaymentAmount={editOrderId ? remainingAmount : 0}
-                                manualItemNameErrors={manualItemNameErrors}
-                                manualItemPriceErrors={manualItemPriceErrors}
-                                isSaving={isSaving}
-                                setSearchQuery={productBucket.setSearchQuery}
-                                setIsProductSearchOpen={setIsProductSearchOpen}
-                                onSearchFocus={productBucket.loadBucket}
-                                addProductToOrder={addProductToOrder}
-                                updateItemField={updateItemField}
-                                updateItemPrice={updateItemPrice}
-                                updateItemQty={updateItemQty}
-                                resolveItemQuantityMax={getItemMaxQuantity}
-                                toggleItemEdit={toggleItemEdit}
-                                removeItem={removeItem}
-                                addBlankItem={addBlankItem}
-                                setShippingFee={setShippingFee}
-                                setOtherCosts={setOtherCosts}
-                                setDiscountValue={setDiscountValue}
-                                setDiscountType={setDiscountType}
-                                couponCode={couponCode}
-                                setCouponCode={setCouponCode}
-                                couponDiscountAmount={couponDiscountAmount}
-                                onApplyCoupon={handleApplyCoupon}
-                                setSelectedCustomer={setSelectedCustomer}
-                                setIsCustomerSheetOpen={setIsCustomerSheetOpen}
-                                setOrderDate={setOrderDate}
-                                setSalesChannel={setSalesChannel}
-                                setDeliveryMethod={setDeliveryMethod}
-                                setDeliveryStatus={setDeliveryStatus}
-                                setFinanceAccountId={setFinanceAccountId}
-                                onCreateAccount={() => {
-                                    setNewAccountName("")
-                                    setNewAccountType("cash")
-                                    setNewAccountInitialBalance(0)
-                                    setNewAccountIsDefault(!financeAccounts.some((acc) => acc.integration_source !== "mercadopago"))
-                                    setIsAccountModalOpen(true)
-                                }}
-                                handleSaveOrder={handleOpenPaymentModal}
-                                salesChannelOptions={salesChannelOptions}
-                                deliveryMethodOptions={deliveryMethodOptions}
-                                deliveryStatusOptions={deliveryStatusOptions}
-                                fieldErrors={fieldErrors}
-                                setFieldErrors={setFieldErrors}
-                            />
-                            </div>
+                            <FadeIn key="general">
+                                <div className={isPaidOrderLocked ? "pointer-events-none opacity-60" : ""}>
+                                    <OrderGeneralTab
+                                        items={items}
+                                        searchQuery={productBucket.searchQuery}
+                                        isProductSearchOpen={isProductSearchOpen}
+                                        isSearching={productBucket.isLoading}
+                                        searchResults={productBucket.filteredResults}
+                                        subtotal={subtotal}
+                                        discountAmount={discountAmount}
+                                        discountValue={discountValue}
+                                        discountType={discountType}
+                                        shippingFee={shippingFee}
+                                        otherCosts={otherCosts}
+                                        totalAmount={totalAmount}
+                                        selectedCustomer={selectedCustomer}
+                                        orderDate={orderDate}
+                                        salesChannel={salesChannel}
+                                        deliveryMethod={deliveryMethod}
+                                        paymentStatus={paymentStatus}
+                                        deliveryStatus={deliveryStatus}
+                                        financeAccountId={financeAccountId}
+                                        accountOptions={accountOptions}
+                                        remainingPaymentAmount={editOrderId ? remainingAmount : 0}
+                                        manualItemNameErrors={manualItemNameErrors}
+                                        manualItemPriceErrors={manualItemPriceErrors}
+                                        isSaving={isSaving}
+                                        setSearchQuery={productBucket.setSearchQuery}
+                                        setIsProductSearchOpen={setIsProductSearchOpen}
+                                        onSearchFocus={productBucket.loadBucket}
+                                        addProductToOrder={addProductToOrder}
+                                        updateItemField={updateItemField}
+                                        updateItemPrice={updateItemPrice}
+                                        updateItemQty={updateItemQty}
+                                        resolveItemQuantityMax={getItemMaxQuantity}
+                                        toggleItemEdit={toggleItemEdit}
+                                        removeItem={removeItem}
+                                        addBlankItem={addBlankItem}
+                                        setShippingFee={setShippingFee}
+                                        setOtherCosts={setOtherCosts}
+                                        setDiscountValue={setDiscountValue}
+                                        setDiscountType={setDiscountType}
+                                        couponCode={couponCode}
+                                        setCouponCode={setCouponCode}
+                                        couponDiscountAmount={couponDiscountAmount}
+                                        onApplyCoupon={handleApplyCoupon}
+                                        setSelectedCustomer={setSelectedCustomer}
+                                        setIsCustomerSheetOpen={setIsCustomerSheetOpen}
+                                        setOrderDate={setOrderDate}
+                                        setSalesChannel={setSalesChannel}
+                                        setDeliveryMethod={setDeliveryMethod}
+                                        setDeliveryStatus={setDeliveryStatus}
+                                        setFinanceAccountId={setFinanceAccountId}
+                                        onCreateAccount={() => {
+                                            setNewAccountName("")
+                                            setNewAccountType("cash")
+                                            setNewAccountInitialBalance(0)
+                                            setNewAccountIsDefault(!financeAccounts.some((acc) => acc.integration_source !== "mercadopago"))
+                                            setIsAccountModalOpen(true)
+                                        }}
+                                        handleSaveOrder={handleOpenPaymentModal}
+                                        salesChannelOptions={salesChannelOptions}
+                                        deliveryMethodOptions={deliveryMethodOptions}
+                                        deliveryStatusOptions={deliveryStatusOptions}
+                                        fieldErrors={fieldErrors}
+                                        setFieldErrors={setFieldErrors}
+                                    />
+                                </div>
+                            </FadeIn>
                         </TabsContent>
 
                         <TabsContent value="delivery" className="mt-0">
-                            <div className={isPaidOrderLocked ? "pointer-events-none opacity-60" : ""}>
-                                <AddressTab
-                                cep={cep}
-                                street={street}
-                                number={number}
-                                complement={complement}
-                                neighborhood={neighborhood}
-                                city={city}
-                                uf={uf}
-                                noNumber={noNumber}
-                                selectedCustomer={selectedCustomer}
-                                setCep={setCep}
-                                setStreet={setStreet}
-                                setNumber={setNumber}
-                                setComplement={setComplement}
-                                setNeighborhood={setNeighborhood}
-                                setCity={setCity}
-                                setUf={setUf}
-                                setNoNumber={setNoNumber}
-                            />
-                            </div>
+                            <FadeIn key="delivery">
+                                <div className={isPaidOrderLocked ? "pointer-events-none opacity-60" : ""}>
+                                    <AddressTab
+                                        cep={cep}
+                                        street={street}
+                                        number={number}
+                                        complement={complement}
+                                        neighborhood={neighborhood}
+                                        city={city}
+                                        uf={uf}
+                                        noNumber={noNumber}
+                                        selectedCustomer={selectedCustomer}
+                                        setCep={setCep}
+                                        setStreet={setStreet}
+                                        setNumber={setNumber}
+                                        setComplement={setComplement}
+                                        setNeighborhood={setNeighborhood}
+                                        setCity={setCity}
+                                        setUf={setUf}
+                                        setNoNumber={setNoNumber}
+                                    />
+                                </div>
+                            </FadeIn>
                         </TabsContent>
 
                         <TabsContent value="observations" className="mt-0">
-                            <OrderObservationsTab
-                                notes={notes}
-                                setNotes={setNotes}
-                            />
+                            <FadeIn key="observations">
+                                <OrderObservationsTab
+                                    notes={notes}
+                                    setNotes={setNotes}
+                                />
+                            </FadeIn>
                         </TabsContent>
                     </div>
                 </div>

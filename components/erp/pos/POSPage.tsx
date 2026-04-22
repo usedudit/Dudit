@@ -44,6 +44,7 @@ import type {
   PDVProduct as Product,
 } from "@/lib/types/pdv"
 import { normalizePDVPaymentMethodLabel, normalizePDVSearchTerm } from "@/lib/utils/pdv"
+import { FadeIn } from "@/components/animations/FadeIn"
 
 interface Props {
   partnerId: string
@@ -116,6 +117,12 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   const isCashierOpen = !!activeCashSession?.id
   const [selectedCategory, setSelectedCategory] = useState("Todos")
   const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>(undefined)
   const [selectedSellerId, setSelectedSellerId] = useState<string | undefined>(undefined)
   const financeAccountId = useMemo(
@@ -267,7 +274,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
 
   const filteredProducts = useMemo(() => {
     let result = products
-    const term = normalizePDVSearchTerm(search)
+    const term = normalizePDVSearchTerm(debouncedSearch)
 
     if (selectedCategory !== "Todos") {
       result = result.filter((product) => product.category === selectedCategory)
@@ -278,7 +285,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     }
 
     return result
-  }, [products, search, selectedCategory])
+  }, [products, debouncedSearch, selectedCategory])
 
   const itemCount = useMemo(() => cart.reduce((acc, item) => acc + item.qty, 0), [cart])
   const subtotal = useMemo(() => cart.reduce((acc, item) => acc + (item.price * item.qty), 0), [cart])
@@ -822,13 +829,13 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
 
     setCart((prev) => prev.map((item) => (item.id === editingItem.id
       ? {
-          ...item,
-          qty: editQty,
-          price: editPrice,
-          listUnitPrice: editPrice,
-          lineDiscountType: null,
-          lineDiscountValue: null,
-        }
+        ...item,
+        qty: editQty,
+        price: editPrice,
+        listUnitPrice: editPrice,
+        lineDiscountType: null,
+        lineDiscountValue: null,
+      }
       : item)))
     setEditingItem(null)
     notifySuccess("Item atualizado.")
@@ -957,766 +964,770 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     </div>
   )
 
-  if (!isCashierOpen) {
-    return (
-      <POSCashClosedView
-        isOpenCashModalOpen={isOpenCashModalOpen}
-        setIsOpenCashModalOpen={setIsOpenCashModalOpen}
-        isOpeningCash={isOpeningCash}
-        openingBalance={openingBalance}
-        setOpeningBalance={setOpeningBalance}
-        openingNotes={openingNotes}
-        setOpeningNotes={setOpeningNotes}
-        onOpenCash={handleOpenCash}
-      />
-    )
-  }
-
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex h-full flex-col gap-4">
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className="flex min-h-0 flex-col xl:col-span-8 xl:pr-6">
-          <POSHeader
-            isMobile={isMobile}
-            search={search}
-            onSearchChange={setSearch}
-            categories={categories}
-            selectedCategory={selectedCategory}
-            onCategoryChange={setSelectedCategory}
-            mobileCategoryLabel={mobileCategoryLabel}
-            onOpenCategorySheet={() => setIsCategorySheetOpen(true)}
-            selectedCustomerId={selectedCustomerId}
-            customers={customers}
-            onOpenCustomerSheet={() => {
-              setCustomerSelectIntent("default")
-              setIsSelectCustomerOpen(true)
-            }}
-            selectedSellerId={selectedSellerId}
-            teamMembers={teamMembers}
-            onOpenSellerSheet={() => setIsSelectSellerOpen(true)}
+    <AnimatePresence mode="wait">
+      {!isCashierOpen ? (
+        <FadeIn key="closed">
+          <POSCashClosedView
+            isOpenCashModalOpen={isOpenCashModalOpen}
+            setIsOpenCashModalOpen={setIsOpenCashModalOpen}
+            isOpeningCash={isOpeningCash}
+            openingBalance={openingBalance}
+            setOpeningBalance={setOpeningBalance}
+            openingNotes={openingNotes}
+            setOpeningNotes={setOpeningNotes}
+            onOpenCash={handleOpenCash}
           />
-
-          <div className={`mt-2 grid grid-cols-2 gap-3 overflow-y-auto pr-1 pb-24 md:grid-cols-4 xl:grid-cols-5 xl:pb-6 2xl:grid-cols-6 ${desktopScrollClass}`}>
-            {filteredProducts
-              .slice(0, (cart.length === 0 && preSales.length > 0) ? (preSaleLimit === 4 ? 8 : preSaleLimit === 3 ? 6 : preSaleLimit === 2 ? 4 : 2) : undefined)
-              .map((product) => (
-                <div key={product.id} className="rounded-xl border border-brand-border bg-white p-3 text-left transition-all dark:bg-dark-surface">
-                  <div className="relative mb-2 aspect-square overflow-hidden rounded-2xl">
-                    <img
-                      src={getR2ImageUrl(product.images?.[0] || null, "thumbnail")}
-                      alt={product.name}
-                      className="h-full w-full object-cover bg-brand-gray dark:bg-dark-border/50"
-                    />
-                    <span className="absolute left-2 top-2 rounded-lg bg-brand-dark/80 px-2 py-1 text-[9px] font-bold text-white backdrop-blur-sm sm:text-[10px] lg:text-[11px]">
-                      {Math.max(0, Number(product.stock_available || 0))} em Estoque
-                    </span>
-                  </div>
-                  <div>
-                    <p className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</p>
-                    {product.product_variants && product.product_variants.length > 0 && (
-                      <p className="text-sm text-brand-inactive-text">{product.product_variants.length} variação(ões)</p>
-                    )}
-                    <p className="mt-0.5 font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(product.price || 0))}</p>
-
-                    <Button
-                      variant="outline"
-                      className="mt-3 h-9 w-full rounded-full border-brand-border text-xs font-bold text-brand-dark hover:bg-brand-gray"
-                      onClick={() => {
-                        if (product.product_variants && product.product_variants.length > 0) {
-                          setVariantPickerProduct(product)
-                          return
-                        }
-                        addToCart(product)
-                      }}
-                    >
-                      Adicionar
-                    </Button>
-                  </div>
-                </div>
-              ))}
-          </div>
-
-          <AnimatePresence>
-            {cart.length === 0 && preSales.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="mt-auto border-t border-brand-border pt-6"
-              >
-                <h4 className="mb-4 text-xl font-bold text-brand-dark dark:text-dark-heading">Pedidos em pré-venda</h4>
-                <div className={`flex items-stretch gap-4 overflow-x-auto pb-2 ${desktopScrollClass}`}>
-                  {preSales.slice(0, preSaleLimit).map((preSale, index) => (
-                    <div key={preSale.id} className="relative group">
-                      <POSPreSaleCard
-                        preSale={preSale}
-                        index={index}
-                        customers={customers}
-                        onClick={() => loadPreSale(preSale)}
-                      />
-                    </div>
-                  ))}
-                  {preSales.length > preSaleLimit && (
-                    <POSMorePreSalesCard
-                      count={preSales.length - preSaleLimit}
-                      onClick={() => setIsPreSaleSheetOpen(true)}
-                    />
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {!isMobile && (
-          <div className="min-h-0 xl:col-span-4">
-            <POSDesktopOrderPanel
-              itemCount={itemCount}
-              subtotal={subtotal}
-              discountVal={discountVal}
-              shippingFee={shippingFee}
-              otherCosts={otherCosts}
-              total={total}
-              isFinalizing={isFinalizing}
-              canContinue={!isFinalizing && cart.length > 0}
-              canReset={cart.length > 0}
-              onReset={() => setIsResetAlertOpen(true)}
-              onOpenItems={() => { }}
-              onOpenDiscount={() => setIsGlobalDiscountModalOpen(true)}
-              onContinue={handleOpenPaymentModal}
-              onSaveDraft={saveDraftFromMenu}
-              onAddShipping={handleOpenShippingSheet}
-              onOpenCreateProduct={() => setIsQuickProductSheetOpen(true)}
-              onOpenNotes={handleOpenNotesSheet}
-              showItemsShortcut={false}
-              showActionsMenu={cart.length > 0}
-              hasNotes={hasNotes}
-              cartItems={cartItemsList}
-              isEmpty={cart.length === 0}
-              emptyState={
-                <IconPlaceholder
-                  icon={SalesIcon}
-                  title="Caixa aberto e pronto para vender"
-                  subtitle="Adicione itens ao pedido para ver o resumo, aplicar descontos e continuar o atendimento."
-                  containerSize="h-20 w-20"
-                  iconSize="h-8 w-8"
-                  titleClass="text-2xl font-bold text-brand-dark dark:text-dark-heading"
-                  subtitleClass="mt-2 max-w-md text-lg text-brand-inactive-text dark:text-dark-body"
-                />
-              }
-            />
-          </div>
-        )}
-      </div>
-      {isMobile && itemCount > 0 && (
-        <button
-          className="fixed bottom-4 left-4 right-4 z-40 flex h-14 items-center justify-between rounded-full bg-brand-green px-4 font-bold text-white"
-          onClick={() => setIsMobileSummarySheetOpen(true)}
-        >
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 font-black items-center justify-center rounded-full bg-white text-sm text-brand-dark">{itemCount}</span>
-            <span>Ver Pedido</span>
-          </div>
-          <span>{formatCurrency(total)}</span>
-        </button>
-      )}
-
-      <BottomSheet isOpen={isCategorySheetOpen} onClose={() => setIsCategorySheetOpen(false)}>
-        <div className="space-y-3 px-1 pb-2">
-          <div>
-            <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Selecionar categoria</h3>
-            <p className="mt-1 text-sm text-brand-inactive-text dark:text-dark-body">Escolha uma categoria para filtrar os produtos do PDV.</p>
-          </div>
-          <div className="space-y-2">
-            {categories.map((category) => (
-              <button
-                key={category}
-                type="button"
-                onClick={() => {
-                  setSelectedCategory(category)
-                  setIsCategorySheetOpen(false)
-                }}
-                className={`flex w-full items-center justify-between rounded-2xl border px-4 py-4 text-left ${selectedCategory === category
-                  ? "border-brand-primary bg-green-50 text-brand-primary"
-                  : "border-brand-border bg-white text-brand-dark dark:bg-dark-surface dark:text-dark-heading"
-                  }`}
-              >
-                <span className="font-bold">{category}</span>
-                <ChevronRightIcon className="h-4 w-4" />
-              </button>
-            ))}
-          </div>
-        </div>
-      </BottomSheet>
-
-      <BottomSheet isOpen={isMobileSummarySheetOpen} onClose={() => setIsMobileSummarySheetOpen(false)}>
-        <div className="space-y-5 px-1 pb-2">
-          <div>
-            <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Resumo do Pedido</h3>
-          </div>
-          <POSOrderSummaryContent
-            itemCount={itemCount}
-            subtotal={subtotal}
-            discountVal={discountVal}
-            shippingFee={shippingFee}
-            otherCosts={otherCosts}
-            total={total}
-            isFinalizing={isFinalizing}
-            canContinue={!isFinalizing && cart.length > 0}
-            onOpenItems={() => {
-              setIsMobileSummarySheetOpen(false)
-              setIsMobileItemsSheetOpen(true)
-            }}
-            onOpenDiscount={() => setIsGlobalDiscountModalOpen(true)}
-            onContinue={handleOpenPaymentModal}
-            onSaveDraft={saveDraftFromMenu}
-            onAddShipping={handleOpenShippingSheet}
-            onOpenCreateProduct={() => setIsQuickProductSheetOpen(true)}
-            onOpenNotes={handleOpenNotesSheet}
-            showActionsMenu={cart.length > 0}
-          />
-        </div>
-      </BottomSheet>
-
-      <BottomSheet isOpen={isMobileItemsSheetOpen} onClose={() => setIsMobileItemsSheetOpen(false)}>
-        <div className="space-y-5 px-1 pb-2">
-          <div>
-            <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Itens do Pedido</h3>
-            <p className="mt-1 text-sm text-brand-inactive-text dark:text-dark-body">{itemCount} item(ns) no pedido</p>
-          </div>
-          {mobileCartItemsList}
-          <Button
-            className="h-12 w-full"
-            onClick={() => {
-              setIsMobileItemsSheetOpen(false)
-              setIsMobileSummarySheetOpen(true)
-            }}
-          >
-            Voltar
-          </Button>
-        </div>
-      </BottomSheet>
-
-      {isMobile ? (
-        <BottomSheet isOpen={isPreSaleSheetOpen} onClose={() => setIsPreSaleSheetOpen(false)} title="Pedidos em Pré-venda">
-          <div className="grid grid-cols-1 gap-4 pt-4 md:grid-cols-2 lg:grid-cols-3">
-            {preSales.map((preSale, index) => (
-              <div key={preSale.id} className="relative group">
-                <POSPreSaleCard
-                  preSale={preSale}
-                  index={index}
-                  customers={customers}
-                  onClick={() => {
-                    loadPreSale(preSale)
-                    setIsPreSaleSheetOpen(false)
-                  }}
-                />
-                <button
-                  className="absolute right-4 top-4 text-brand-red"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    removeDraft(preSale.id)
-                  }}
-                >
-                  <TrashIcon size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </BottomSheet>
+        </FadeIn>
       ) : (
-        <DesktopPOSSheet
-          isOpen={isPreSaleSheetOpen}
-          onClose={() => setIsPreSaleSheetOpen(false)}
-          title="Pedidos em Pré-venda"
-          widthClassName="w-[560px]"
-        >
-          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2">
-            {preSales.map((preSale, index) => (
-              <div key={preSale.id} className="relative group">
-                <POSPreSaleCard
-                  preSale={preSale}
-                  index={index}
-                  customers={customers}
-                  onClick={() => {
-                    loadPreSale(preSale)
-                    setIsPreSaleSheetOpen(false)
-                  }}
-                />
-                <button
-                  className="absolute right-4 top-4 text-brand-red opacity-0 transition-opacity group-hover:opacity-100"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    removeDraft(preSale.id)
-                  }}
-                >
-                  <TrashIcon size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </DesktopPOSSheet>
-      )}
+        <FadeIn key="open" className="flex h-full flex-col gap-4">
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-12">
+            <div className="flex min-h-0 flex-col xl:col-span-8 xl:pr-6">
+              <POSHeader
+                isMobile={isMobile}
+                search={search}
+                onSearchChange={setSearch}
+                categories={categories}
+                selectedCategory={selectedCategory}
+                onCategoryChange={setSelectedCategory}
+                mobileCategoryLabel={mobileCategoryLabel}
+                onOpenCategorySheet={() => setIsCategorySheetOpen(true)}
+                selectedCustomerId={selectedCustomerId}
+                customers={customers}
+                onOpenCustomerSheet={() => {
+                  setCustomerSelectIntent("default")
+                  setIsSelectCustomerOpen(true)
+                }}
+                selectedSellerId={selectedSellerId}
+                teamMembers={teamMembers}
+                onOpenSellerSheet={() => setIsSelectSellerOpen(true)}
+              />
 
-      <AnimatePresence>
-        {isPaymentModalOpen && (
-          <PaymentModal
-            isOpen={isPaymentModalOpen}
-            onClose={() => setIsPaymentModalOpen(false)}
-            cart={paymentModalCart}
-            customer={selectedCustomer}
-            partnerId={partnerId}
-            shippingFee={shippingFee}
-            otherCosts={otherCosts}
-            discountAmount={discountVal}
-            onConfirm={handleConfirmPayment}
-          />
-        )}
-      </AnimatePresence>
+              <AnimatePresence mode="wait">
+                <FadeIn key={`${selectedCategory}-${debouncedSearch}`} className={`mt-2 grid grid-cols-2 gap-3 overflow-y-auto pr-1 pb-24 md:grid-cols-4 xl:grid-cols-5 xl:pb-6 2xl:grid-cols-6 ${desktopScrollClass}`}>
+                  {filteredProducts
+                    .slice(0, (cart.length === 0 && preSales.length > 0) ? (preSaleLimit === 4 ? 8 : preSaleLimit === 3 ? 6 : preSaleLimit === 2 ? 4 : 2) : undefined)
+                    .map((product) => (
+                      <div key={product.id} className="rounded-xl border border-brand-border bg-white p-3 text-left transition-all dark:bg-dark-surface">
+                        <div className="relative mb-2 aspect-square overflow-hidden rounded-2xl">
+                          <img
+                            src={getR2ImageUrl(product.images?.[0] || null, "thumbnail")}
+                            alt={product.name}
+                            className="h-full w-full object-cover bg-brand-gray dark:bg-dark-border/50"
+                          />
+                          <span className="absolute left-2 top-2 rounded-lg bg-brand-dark/80 px-2 py-1 text-[9px] font-bold text-white backdrop-blur-sm sm:text-[10px] lg:text-[11px]">
+                            {Math.max(0, Number(product.stock_available || 0))} em Estoque
+                          </span>
+                        </div>
+                        <div>
+                          <p className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</p>
+                          {product.product_variants && product.product_variants.length > 0 && (
+                            <p className="text-sm text-brand-inactive-text">{product.product_variants.length} variação(ões)</p>
+                          )}
+                          <p className="mt-0.5 font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(product.price || 0))}</p>
 
-      {variantPickerProduct && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-[32px] bg-white p-6 shadow-2xl">
-            <h4 className="mb-4 text-xl font-bold tracking-tight text-brand-dark">Selecionar Variação</h4>
-            <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-1 hide-scrollbar">
-              {variantPickerProduct.product_variants?.map((variant) => {
-                const variantStock = Number(variant.stock_available || 0)
-                const variantPrice = Number(variantPickerProduct.price || 0) + Number(variant.price_adjustment || 0)
-                return (
-                  <button
-                    key={variant.id}
-                    disabled={!variantPickerProduct.allow_sell_without_stock && variantStock <= 0}
-                    className="group flex w-full items-center justify-between rounded-2xl border border-brand-border bg-brand-gray p-4 text-left transition-all hover:border-brand-primary active:scale-95 disabled:opacity-50"
-                    onClick={() => {
-                      if (!variantPickerProduct.allow_sell_without_stock && variantStock <= 0) {
-                        notifyError(`Estoque insuficiente para o item ${variantPickerProduct.name} - ${variant.variant_name}`)
-                        return
-                      }
-                      addToCart(variantPickerProduct, variant.id)
-                      setVariantPickerProduct(null)
-                    }}
+                          <Button
+                            variant="outline"
+                            className="mt-3 h-9 w-full rounded-full border-brand-border text-xs font-bold text-brand-dark hover:bg-brand-gray"
+                            onClick={() => {
+                              if (product.product_variants && product.product_variants.length > 0) {
+                                setVariantPickerProduct(product)
+                                return
+                              }
+                              addToCart(product)
+                            }}
+                          >
+                            Adicionar
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                </FadeIn>
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {cart.length === 0 && preSales.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="mt-auto border-t border-brand-border pt-6"
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-bold text-brand-dark">{variant.variant_name}</p>
-                      <p className="mt-0.5 text-xs font-medium text-brand-inactive-text">Disponível: {variantStock}</p>
+                    <h4 className="mb-4 text-xl font-bold text-brand-dark dark:text-dark-heading">Pedidos em pré-venda</h4>
+                    <div className={`flex items-stretch gap-4 overflow-x-auto pb-2 ${desktopScrollClass}`}>
+                      {preSales.slice(0, preSaleLimit).map((preSale, index) => (
+                        <div key={preSale.id} className="relative group">
+                          <POSPreSaleCard
+                            preSale={preSale}
+                            index={index}
+                            customers={customers}
+                            onClick={() => loadPreSale(preSale)}
+                          />
+                        </div>
+                      ))}
+                      {preSales.length > preSaleLimit && (
+                        <POSMorePreSalesCard
+                          count={preSales.length - preSaleLimit}
+                          onClick={() => setIsPreSaleSheetOpen(true)}
+                        />
+                      )}
                     </div>
-                    <span className="rounded-xl border border-brand-border bg-white px-3 py-1.5 font-bold text-brand-dark group-hover:border-brand-primary">
-                      {formatCurrency(variantPrice)}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-            <Button variant="outline" className="mt-6 h-12 w-full rounded-full font-bold" onClick={() => setVariantPickerProduct(null)}>
-              Fechar
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {itemToRemoveId && (
-        <AlertModal
-          isOpen={!!itemToRemoveId}
-          onClose={() => setItemToRemoveId(null)}
-          onConfirm={() => {
-            removeItem(itemToRemoveId)
-            setItemToRemoveId(null)
-            notifySuccess("Item removido.")
-          }}
-          title="Remover Item?"
-          description="Você tem certeza que deseja remover este item do carrinho?"
-          confirmText="Remover"
-          cancelText="Cancelar"
-          variant="danger"
-        />
-      )}
-
-      <DefaultModal
-        isOpen={!!editingItem}
-        onClose={() => setEditingItem(null)}
-        title="Editar dados do produto"
-        footer={
-          <div className="flex w-full items-center gap-3">
-            <Button variant="outline" className="flex-1" onClick={() => setEditingItem(null)}>
-              Cancelar
-            </Button>
-            <Button className="flex-1" onClick={saveEditedItem}>
-              Salvar
-            </Button>
-          </div>
-        }
-      >
-        {editingItem && (
-          <div className="space-y-6 pt-2">
-            <InfoCard color="gray" title="Produto" message={editingItem.name} />
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input
-                label="Quantidade"
-                name="editQty"
-                type="number"
-                value={editQty}
-                onChange={(e: any) => setEditQty(Number(e.target.value))}
-              />
-              <Input
-                label="Sub total"
-                readOnly
-                value={formatCurrency(editPrice * editQty)}
-                className="flex-1 w-full"
-              />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-1">
-              <MoneyInput
-                label="Valor unitário"
-                value={editPrice}
-                onChange={(value: number) => setEditPrice(value)}
-              />
-            </div>
-          </div>
-        )}
-      </DefaultModal>
-
-      <DefaultModal
-        isOpen={isGlobalDiscountModalOpen}
-        onClose={() => setIsGlobalDiscountModalOpen(false)}
-        title="Aplicar Desconto"
-        footer={
-          <div className="flex w-full items-center gap-3">
-            <Button variant="outline" className="flex-1" onClick={() => setIsGlobalDiscountModalOpen(false)}>
-              Cancelar
-            </Button>
-            <Button className="flex-1" onClick={() => {
-              setDiscountType(globalDiscountType)
-              setDiscountAmount(globalDiscountType === "coupon" ? 0 : globalDiscountValue)
-              setDiscountCouponCode(globalDiscountType === "coupon" ? globalDiscountCouponCode : "")
-              setIsGlobalDiscountModalOpen(false)
-            }}>
-              Aplicar
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-6 pt-2">
-          <InfoCard color="green" title="Valor total de itens" message={formatCurrency(subtotal)} />
-          <div className="grid grid-cols-1 gap-3">
-            <ListItem
-              onClick={() => setGlobalDiscountType("percentage")}
-              icon={TagIcon}
-              title="Porcentagem"
-              description="Aplica um desconto percentual sobre o subtotal"
-              className={`px-4 py-3 ${globalDiscountType === "percentage" ? "border-brand-primary bg-brand-primary/5" : ""}`}
-              right={
-                <RadioButton
-                  name="globalDiscountType"
-                  value="percentage"
-                  checked={globalDiscountType === "percentage"}
-                  onChange={() => setGlobalDiscountType("percentage")}
+            {!isMobile && (
+              <div className="min-h-0 xl:col-span-4">
+                <POSDesktopOrderPanel
+                  itemCount={itemCount}
+                  subtotal={subtotal}
+                  discountVal={discountVal}
+                  shippingFee={shippingFee}
+                  otherCosts={otherCosts}
+                  total={total}
+                  isFinalizing={isFinalizing}
+                  canContinue={!isFinalizing && cart.length > 0}
+                  canReset={cart.length > 0}
+                  onReset={() => setIsResetAlertOpen(true)}
+                  onOpenItems={() => { }}
+                  onOpenDiscount={() => setIsGlobalDiscountModalOpen(true)}
+                  onContinue={handleOpenPaymentModal}
+                  onSaveDraft={saveDraftFromMenu}
+                  onAddShipping={handleOpenShippingSheet}
+                  onOpenCreateProduct={() => setIsQuickProductSheetOpen(true)}
+                  onOpenNotes={handleOpenNotesSheet}
+                  showItemsShortcut={false}
+                  showActionsMenu={cart.length > 0}
+                  hasNotes={hasNotes}
+                  cartItems={cartItemsList}
+                  isEmpty={cart.length === 0}
+                  emptyState={
+                    <IconPlaceholder
+                      icon={SalesIcon}
+                      title="Caixa aberto e pronto para vender"
+                      subtitle="Adicione itens ao pedido para ver o resumo, aplicar descontos e continuar o atendimento."
+                      containerSize="h-20 w-20"
+                      iconSize="h-8 w-8"
+                      titleClass="text-2xl font-bold text-brand-dark dark:text-dark-heading"
+                      subtitleClass="mt-2 max-w-md text-lg text-brand-inactive-text dark:text-dark-body"
+                    />
+                  }
                 />
-              }
-            />
-            <ListItem
-              onClick={() => setGlobalDiscountType("fixed")}
-              icon={MoneyIcon}
-              title="Valor fixo"
-              description="Aplica um valor fixo de desconto em reais"
-              className={`px-4 py-3 ${globalDiscountType === "fixed" ? "border-brand-primary bg-brand-primary/5" : ""}`}
-              right={
-                <RadioButton
-                  name="globalDiscountType"
-                  value="fixed"
-                  checked={globalDiscountType === "fixed"}
-                  onChange={() => setGlobalDiscountType("fixed")}
-                />
-              }
-            />
-            <ListItem
-              onClick={() => setGlobalDiscountType("coupon")}
-              icon={FileIcon}
-              title="Cupom"
-              description="Utiliza um cupom de desconto pré-cadastrado"
-              className={`px-4 py-3 ${globalDiscountType === "coupon" ? "border-brand-primary bg-brand-primary/5" : ""}`}
-              right={
-                <RadioButton
-                  name="globalDiscountType"
-                  value="coupon"
-                  checked={globalDiscountType === "coupon"}
-                  onChange={() => setGlobalDiscountType("coupon")}
-                />
-              }
-            />
+              </div>
+            )}
           </div>
-          {globalDiscountType === "fixed" && (
-            <MoneyInput
-              label="Desconto do pedido"
-              value={globalDiscountValue}
-              onChange={(value: number) => setGlobalDiscountValue(value)}
-            />
+          {isMobile && itemCount > 0 && (
+            <button
+              className="fixed bottom-4 left-4 right-4 z-40 flex h-14 items-center justify-between rounded-full bg-brand-green px-4 font-bold text-white"
+              onClick={() => setIsMobileSummarySheetOpen(true)}
+            >
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 font-black items-center justify-center rounded-full bg-white text-sm text-brand-dark">{itemCount}</span>
+                <span>Ver Pedido</span>
+              </div>
+              <span>{formatCurrency(total)}</span>
+            </button>
           )}
-          {globalDiscountType === "percentage" && (
-            <div className="space-y-3">
-              <PercentageInput
-                label="Porcentagem a ser aplicada"
-                value={globalDiscountValue}
-                onChange={(value: number) => setGlobalDiscountValue(value)}
-              />
-              <div className="flex flex-wrap gap-3">
-                {percentagePresets.map((preset) => (
+
+          <BottomSheet isOpen={isCategorySheetOpen} onClose={() => setIsCategorySheetOpen(false)}>
+            <div className="space-y-3 px-1 pb-2">
+              <div>
+                <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Selecionar categoria</h3>
+                <p className="mt-1 text-sm text-brand-inactive-text dark:text-dark-body">Escolha uma categoria para filtrar os produtos do PDV.</p>
+              </div>
+              <div className="space-y-2">
+                {categories.map((category) => (
                   <button
-                    key={preset}
+                    key={category}
                     type="button"
-                    onClick={() => setGlobalDiscountValue(preset)}
-                    className="h-12 min-w-[72px] rounded-xl border border-transparent bg-gray-100 px-5 text-sm font-bold text-brand-dark transition-colors hover:border-brand-border hover:bg-gray-200 dark:bg-dark-border/30 dark:text-dark-heading dark:hover:bg-dark-border/50"
+                    onClick={() => {
+                      setSelectedCategory(category)
+                      setIsCategorySheetOpen(false)
+                    }}
+                    className={`flex w-full items-center justify-between rounded-2xl border px-4 py-4 text-left ${selectedCategory === category
+                      ? "border-brand-primary bg-green-50 text-brand-primary"
+                      : "border-brand-border bg-white text-brand-dark dark:bg-dark-surface dark:text-dark-heading"
+                      }`}
                   >
-                    {preset}%
+                    <span className="font-bold">{category}</span>
+                    <ChevronRightIcon className="h-4 w-4" />
                   </button>
                 ))}
               </div>
             </div>
-          )}
-          {globalDiscountType === "coupon" && (
-            <div className="space-y-1">
-              <Input
-                label="Cupom"
-                name="globalDiscountCouponCode"
-                placeholder="Digite o cupom"
-                value={globalDiscountCouponCode}
-                onChange={(e: any) => setGlobalDiscountCouponCode(e.target.value)}
+          </BottomSheet>
+
+          <BottomSheet isOpen={isMobileSummarySheetOpen} onClose={() => setIsMobileSummarySheetOpen(false)}>
+            <div className="space-y-5 px-1 pb-2">
+              <div>
+                <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Resumo do Pedido</h3>
+              </div>
+              <POSOrderSummaryContent
+                itemCount={itemCount}
+                subtotal={subtotal}
+                discountVal={discountVal}
+                shippingFee={shippingFee}
+                otherCosts={otherCosts}
+                total={total}
+                isFinalizing={isFinalizing}
+                canContinue={!isFinalizing && cart.length > 0}
+                onOpenItems={() => {
+                  setIsMobileSummarySheetOpen(false)
+                  setIsMobileItemsSheetOpen(true)
+                }}
+                onOpenDiscount={() => setIsGlobalDiscountModalOpen(true)}
+                onContinue={handleOpenPaymentModal}
+                onSaveDraft={saveDraftFromMenu}
+                onAddShipping={handleOpenShippingSheet}
+                onOpenCreateProduct={() => setIsQuickProductSheetOpen(true)}
+                onOpenNotes={handleOpenNotesSheet}
+                showActionsMenu={cart.length > 0}
               />
+            </div>
+          </BottomSheet>
+
+          <BottomSheet isOpen={isMobileItemsSheetOpen} onClose={() => setIsMobileItemsSheetOpen(false)}>
+            <div className="space-y-5 px-1 pb-2">
+              <div>
+                <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Itens do Pedido</h3>
+                <p className="mt-1 text-sm text-brand-inactive-text dark:text-dark-body">{itemCount} item(ns) no pedido</p>
+              </div>
+              {mobileCartItemsList}
               <Button
-                variant="link"
-                className="h-auto px-0 text-brand-primary"
-                onClick={() => setIsCouponSheetOpen(true)}
+                className="h-12 w-full"
+                onClick={() => {
+                  setIsMobileItemsSheetOpen(false)
+                  setIsMobileSummarySheetOpen(true)
+                }}
               >
-                Ver cupons cadastrados
+                Voltar
               </Button>
+            </div>
+          </BottomSheet>
+
+          {isMobile ? (
+            <BottomSheet isOpen={isPreSaleSheetOpen} onClose={() => setIsPreSaleSheetOpen(false)} title="Pedidos em Pré-venda">
+              <div className="grid grid-cols-1 gap-4 pt-4 md:grid-cols-2 lg:grid-cols-3">
+                {preSales.map((preSale, index) => (
+                  <div key={preSale.id} className="relative group">
+                    <POSPreSaleCard
+                      preSale={preSale}
+                      index={index}
+                      customers={customers}
+                      onClick={() => {
+                        loadPreSale(preSale)
+                        setIsPreSaleSheetOpen(false)
+                      }}
+                    />
+                    <button
+                      className="absolute right-4 top-4 text-brand-red"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        removeDraft(preSale.id)
+                      }}
+                    >
+                      <TrashIcon size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </BottomSheet>
+          ) : (
+            <DesktopPOSSheet
+              isOpen={isPreSaleSheetOpen}
+              onClose={() => setIsPreSaleSheetOpen(false)}
+              title="Pedidos em Pré-venda"
+              widthClassName="w-[560px]"
+            >
+              <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2">
+                {preSales.map((preSale, index) => (
+                  <div key={preSale.id} className="relative group">
+                    <POSPreSaleCard
+                      preSale={preSale}
+                      index={index}
+                      customers={customers}
+                      onClick={() => {
+                        loadPreSale(preSale)
+                        setIsPreSaleSheetOpen(false)
+                      }}
+                    />
+                    <button
+                      className="absolute right-4 top-4 text-brand-red opacity-0 transition-opacity group-hover:opacity-100"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        removeDraft(preSale.id)
+                      }}
+                    >
+                      <TrashIcon size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </DesktopPOSSheet>
+          )}
+
+          <AnimatePresence>
+            {isPaymentModalOpen && (
+              <PaymentModal
+                isOpen={isPaymentModalOpen}
+                onClose={() => setIsPaymentModalOpen(false)}
+                cart={paymentModalCart}
+                customer={selectedCustomer}
+                partnerId={partnerId}
+                shippingFee={shippingFee}
+                otherCosts={otherCosts}
+                discountAmount={discountVal}
+                onConfirm={handleConfirmPayment}
+              />
+            )}
+          </AnimatePresence>
+
+          {variantPickerProduct && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+              <div className="w-full max-w-sm rounded-[32px] bg-white p-6 shadow-2xl">
+                <h4 className="mb-4 text-xl font-bold tracking-tight text-brand-dark">Selecionar Variação</h4>
+                <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-1 hide-scrollbar">
+                  {variantPickerProduct.product_variants?.map((variant) => {
+                    const variantStock = Number(variant.stock_available || 0)
+                    const variantPrice = Number(variantPickerProduct.price || 0) + Number(variant.price_adjustment || 0)
+                    return (
+                      <button
+                        key={variant.id}
+                        disabled={!variantPickerProduct.allow_sell_without_stock && variantStock <= 0}
+                        className="group flex w-full items-center justify-between rounded-2xl border border-brand-border bg-brand-gray p-4 text-left transition-all hover:border-brand-primary active:scale-95 disabled:opacity-50"
+                        onClick={() => {
+                          if (!variantPickerProduct.allow_sell_without_stock && variantStock <= 0) {
+                            notifyError(`Estoque insuficiente para o item ${variantPickerProduct.name} - ${variant.variant_name}`)
+                            return
+                          }
+                          addToCart(variantPickerProduct, variant.id)
+                          setVariantPickerProduct(null)
+                        }}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-bold text-brand-dark">{variant.variant_name}</p>
+                          <p className="mt-0.5 text-xs font-medium text-brand-inactive-text">Disponível: {variantStock}</p>
+                        </div>
+                        <span className="rounded-xl border border-brand-border bg-white px-3 py-1.5 font-bold text-brand-dark group-hover:border-brand-primary">
+                          {formatCurrency(variantPrice)}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <Button variant="outline" className="mt-6 h-12 w-full rounded-full font-bold" onClick={() => setVariantPickerProduct(null)}>
+                  Fechar
+                </Button>
+              </div>
             </div>
           )}
-        </div>
-      </DefaultModal>
 
-      {isMobile && (
-        <BottomSheet isOpen={isNotesSheetOpen} onClose={() => setIsNotesSheetOpen(false)} title="Adicionar Observação">
-          <div className="space-y-4 pt-2">
-            <textarea
-              className="h-32 w-full resize-none rounded-xl border border-brand-border bg-[#F5F6F7] p-4 text-brand-dark focus:border-brand-primary focus:outline-none dark:border-dark-border dark:bg-dark-gray dark:text-dark-text"
-              placeholder="Digite alguma observação que sairá no pedido..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+          {itemToRemoveId && (
+            <AlertModal
+              isOpen={!!itemToRemoveId}
+              onClose={() => setItemToRemoveId(null)}
+              onConfirm={() => {
+                removeItem(itemToRemoveId)
+                setItemToRemoveId(null)
+                notifySuccess("Item removido.")
+              }}
+              title="Remover Item?"
+              description="Você tem certeza que deseja remover este item do carrinho?"
+              confirmText="Remover"
+              cancelText="Cancelar"
+              variant="danger"
             />
-            <div className="flex items-center gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
-                Cancelar
-              </Button>
-              <Button className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
-                Confirmar
-              </Button>
-            </div>
-          </div>
-        </BottomSheet>
-      )}
+          )}
 
-      {!isMobile && (
-        <DesktopPOSSheet
-          isOpen={isNotesSheetOpen}
-          onClose={() => setIsNotesSheetOpen(false)}
-          title="Adicionar Observação"
-        >
-          <div className="flex h-full flex-col p-6">
-            <textarea
-              className="h-40 w-full resize-none rounded-xl border border-brand-border bg-[#F5F6F7] p-4 text-brand-dark focus:border-brand-primary focus:outline-none dark:border-dark-border dark:bg-dark-gray dark:text-dark-text"
-              placeholder="Digite alguma observação que sairá no pedido..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-            <div className="mt-4 flex items-center gap-3 border-t border-brand-border pt-4 dark:border-dark-border">
-              <Button variant="outline" className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
-                Cancelar
-              </Button>
-              <Button className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
-                Confirmar
-              </Button>
-            </div>
-          </div>
-        </DesktopPOSSheet>
-      )}
+          <DefaultModal
+            isOpen={!!editingItem}
+            onClose={() => setEditingItem(null)}
+            title="Editar dados do produto"
+            footer={
+              <div className="flex w-full items-center gap-3">
+                <Button variant="outline" className="flex-1" onClick={() => setEditingItem(null)}>
+                  Cancelar
+                </Button>
+                <Button className="flex-1" onClick={saveEditedItem}>
+                  Salvar
+                </Button>
+              </div>
+            }
+          >
+            {editingItem && (
+              <div className="space-y-6 pt-2">
+                <InfoCard color="gray" title="Produto" message={editingItem.name} />
 
-      <SelectCustomerSheet
-        isOpen={isSelectCustomerOpen}
-        onClose={() => {
-          setIsSelectCustomerOpen(false)
-          setCustomerSelectIntent("default")
-        }}
-        onSelect={(customer) => {
-          setSelectedCustomerId(customer.id)
-          setCustomers((prev) => {
-            if (prev.some((c) => c.id === customer.id)) return prev
-            return [{ id: customer.id, name: customer.name, email: customer.email ?? null }, ...prev]
-          })
-          setIsSelectCustomerOpen(false)
-          if (customerSelectIntent === "shipping-preflight") {
-            setCustomerSelectIntent("default")
-            void openShippingSheetWithCustomer(customer.id)
-          }
-        }}
-        partnerId={partnerId}
-        onCreateCustomer={handleCreateQuickCustomer}
-        selectedCustomerId={selectedCustomerId}
-        pinnedCustomer={pinnedCustomerForSheet}
-        onRequestRemoveSelected={
-          selectedCustomerId
-            ? () => {
-                setIsSelectCustomerOpen(false)
-                setIsRemoveCustomerAlertOpen(true)
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Input
+                    label="Quantidade"
+                    name="editQty"
+                    type="number"
+                    value={editQty}
+                    onChange={(e: any) => setEditQty(Number(e.target.value))}
+                  />
+                  <Input
+                    label="Sub total"
+                    readOnly
+                    value={formatCurrency(editPrice * editQty)}
+                    className="flex-1 w-full"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-1">
+                  <MoneyInput
+                    label="Valor unitário"
+                    value={editPrice}
+                    onChange={(value: number) => setEditPrice(value)}
+                  />
+                </div>
+              </div>
+            )}
+          </DefaultModal>
+
+          <DefaultModal
+            isOpen={isGlobalDiscountModalOpen}
+            onClose={() => setIsGlobalDiscountModalOpen(false)}
+            title="Aplicar Desconto"
+            footer={
+              <div className="flex w-full items-center gap-3">
+                <Button variant="outline" className="flex-1" onClick={() => setIsGlobalDiscountModalOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button className="flex-1" onClick={() => {
+                  setDiscountType(globalDiscountType)
+                  setDiscountAmount(globalDiscountType === "coupon" ? 0 : globalDiscountValue)
+                  setDiscountCouponCode(globalDiscountType === "coupon" ? globalDiscountCouponCode : "")
+                  setIsGlobalDiscountModalOpen(false)
+                }}>
+                  Aplicar
+                </Button>
+              </div>
+            }
+          >
+            <div className="space-y-6 pt-2">
+              <InfoCard color="green" title="Valor total de itens" message={formatCurrency(subtotal)} />
+              <div className="grid grid-cols-1 gap-3">
+                <ListItem
+                  onClick={() => setGlobalDiscountType("percentage")}
+                  icon={TagIcon}
+                  title="Porcentagem"
+                  description="Aplica um desconto percentual sobre o subtotal"
+                  className={`px-4 py-3 ${globalDiscountType === "percentage" ? "border-brand-primary bg-brand-primary/5" : ""}`}
+                  right={
+                    <RadioButton
+                      name="globalDiscountType"
+                      value="percentage"
+                      checked={globalDiscountType === "percentage"}
+                      onChange={() => setGlobalDiscountType("percentage")}
+                    />
+                  }
+                />
+                <ListItem
+                  onClick={() => setGlobalDiscountType("fixed")}
+                  icon={MoneyIcon}
+                  title="Valor fixo"
+                  description="Aplica um valor fixo de desconto em reais"
+                  className={`px-4 py-3 ${globalDiscountType === "fixed" ? "border-brand-primary bg-brand-primary/5" : ""}`}
+                  right={
+                    <RadioButton
+                      name="globalDiscountType"
+                      value="fixed"
+                      checked={globalDiscountType === "fixed"}
+                      onChange={() => setGlobalDiscountType("fixed")}
+                    />
+                  }
+                />
+                <ListItem
+                  onClick={() => setGlobalDiscountType("coupon")}
+                  icon={FileIcon}
+                  title="Cupom"
+                  description="Utiliza um cupom de desconto pré-cadastrado"
+                  className={`px-4 py-3 ${globalDiscountType === "coupon" ? "border-brand-primary bg-brand-primary/5" : ""}`}
+                  right={
+                    <RadioButton
+                      name="globalDiscountType"
+                      value="coupon"
+                      checked={globalDiscountType === "coupon"}
+                      onChange={() => setGlobalDiscountType("coupon")}
+                    />
+                  }
+                />
+              </div>
+              {globalDiscountType === "fixed" && (
+                <MoneyInput
+                  label="Desconto do pedido"
+                  value={globalDiscountValue}
+                  onChange={(value: number) => setGlobalDiscountValue(value)}
+                />
+              )}
+              {globalDiscountType === "percentage" && (
+                <div className="space-y-3">
+                  <PercentageInput
+                    label="Porcentagem a ser aplicada"
+                    value={globalDiscountValue}
+                    onChange={(value: number) => setGlobalDiscountValue(value)}
+                  />
+                  <div className="flex flex-wrap gap-3">
+                    {percentagePresets.map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setGlobalDiscountValue(preset)}
+                        className="h-12 min-w-[72px] rounded-xl border border-transparent bg-gray-100 px-5 text-sm font-bold text-brand-dark transition-colors hover:border-brand-border hover:bg-gray-200 dark:bg-dark-border/30 dark:text-dark-heading dark:hover:bg-dark-border/50"
+                      >
+                        {preset}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {globalDiscountType === "coupon" && (
+                <div className="space-y-1">
+                  <Input
+                    label="Cupom"
+                    name="globalDiscountCouponCode"
+                    placeholder="Digite o cupom"
+                    value={globalDiscountCouponCode}
+                    onChange={(e: any) => setGlobalDiscountCouponCode(e.target.value)}
+                  />
+                  <Button
+                    variant="link"
+                    className="h-auto px-0 text-brand-primary"
+                    onClick={() => setIsCouponSheetOpen(true)}
+                  >
+                    Ver cupons cadastrados
+                  </Button>
+                </div>
+              )}
+            </div>
+          </DefaultModal>
+
+          {isMobile && (
+            <BottomSheet isOpen={isNotesSheetOpen} onClose={() => setIsNotesSheetOpen(false)} title="Adicionar Observação">
+              <div className="space-y-4 pt-2">
+                <textarea
+                  className="h-32 w-full resize-none rounded-xl border border-brand-border bg-[#F5F6F7] p-4 text-brand-dark focus:border-brand-primary focus:outline-none dark:border-dark-border dark:bg-dark-gray dark:text-dark-text"
+                  placeholder="Digite alguma observação que sairá no pedido..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+                <div className="flex items-center gap-3">
+                  <Button variant="outline" className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
+                    Confirmar
+                  </Button>
+                </div>
+              </div>
+            </BottomSheet>
+          )}
+
+          {!isMobile && (
+            <DesktopPOSSheet
+              isOpen={isNotesSheetOpen}
+              onClose={() => setIsNotesSheetOpen(false)}
+              title="Adicionar Observação"
+            >
+              <div className="flex h-full flex-col p-6">
+                <textarea
+                  className="h-40 w-full resize-none rounded-xl border border-brand-border bg-[#F5F6F7] p-4 text-brand-dark focus:border-brand-primary focus:outline-none dark:border-dark-border dark:bg-dark-gray dark:text-dark-text"
+                  placeholder="Digite alguma observação que sairá no pedido..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+                <div className="mt-4 flex items-center gap-3 border-t border-brand-border pt-4 dark:border-dark-border">
+                  <Button variant="outline" className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button className="flex-1" onClick={() => setIsNotesSheetOpen(false)}>
+                    Confirmar
+                  </Button>
+                </div>
+              </div>
+            </DesktopPOSSheet>
+          )}
+
+          <SelectCustomerSheet
+            isOpen={isSelectCustomerOpen}
+            onClose={() => {
+              setIsSelectCustomerOpen(false)
+              setCustomerSelectIntent("default")
+            }}
+            onSelect={(customer) => {
+              setSelectedCustomerId(customer.id)
+              setCustomers((prev) => {
+                if (prev.some((c) => c.id === customer.id)) return prev
+                return [{ id: customer.id, name: customer.name, email: customer.email ?? null }, ...prev]
+              })
+              setIsSelectCustomerOpen(false)
+              if (customerSelectIntent === "shipping-preflight") {
+                setCustomerSelectIntent("default")
+                void openShippingSheetWithCustomer(customer.id)
               }
-            : undefined
-        }
-      />
+            }}
+            partnerId={partnerId}
+            onCreateCustomer={handleCreateQuickCustomer}
+            selectedCustomerId={selectedCustomerId}
+            pinnedCustomer={pinnedCustomerForSheet}
+            onRequestRemoveSelected={
+              selectedCustomerId
+                ? () => {
+                  setIsSelectCustomerOpen(false)
+                  setIsRemoveCustomerAlertOpen(true)
+                }
+                : undefined
+            }
+          />
 
-      <SelectSellerSheet
-        isOpen={isSelectSellerOpen}
-        onClose={() => setIsSelectSellerOpen(false)}
-        onSelect={(seller) => {
-          setSelectedSellerId(seller.id)
-          setIsSelectSellerOpen(false)
-        }}
-      />
+          <SelectSellerSheet
+            isOpen={isSelectSellerOpen}
+            onClose={() => setIsSelectSellerOpen(false)}
+            onSelect={(seller) => {
+              setSelectedSellerId(seller.id)
+              setIsSelectSellerOpen(false)
+            }}
+          />
 
-      <SelectCouponSheet
-        isOpen={isCouponSheetOpen}
-        onClose={() => setIsCouponSheetOpen(false)}
-        partnerId={partnerId}
-        appliedCouponId={appliedCouponId}
-        onApplyCoupon={async (coupon) => {
-          if (!activePreSaleId) {
-            // Apply locally if no draft yet
-            setAppliedCouponCode(coupon.code)
-            setGlobalDiscountType("coupon")
-            setGlobalDiscountCouponCode(coupon.code)
-            setIsCouponSheetOpen(false)
-            return
-          }
-          const result = await applyCouponToPreSaleAction({
-            partnerId,
-            preSaleId: activePreSaleId,
-            couponCode: coupon.code,
-            customerId: selectedCustomerId || null,
-            subtotal,
-            shippingCost: shippingFee,
-            items: cart.map((item) => ({ productId: item.productId || null })),
-          })
-          if (!result.success) {
-            notifyError(result.error || "Cupom inválido.")
-            return
-          }
-          setAppliedCouponId(result.data?.couponId || null)
-          setAppliedCouponCode(result.data?.couponCode || coupon.code)
-          setAppliedCouponDiscount(result.data?.discountAmount || 0)
-          setGlobalDiscountType("coupon")
-          setGlobalDiscountCouponCode(result.data?.couponCode || coupon.code)
-          notifySuccess(`Cupom ${result.data?.couponCode || coupon.code} aplicado!`)
-          setIsCouponSheetOpen(false)
-        }}
-        onRemoveCoupon={async () => {
-          if (activePreSaleId) {
-            await removeCouponFromPreSaleAction({ partnerId, preSaleId: activePreSaleId })
-          }
-          setAppliedCouponId(null)
-          setAppliedCouponCode(null)
-          setAppliedCouponDiscount(0)
-          setGlobalDiscountType("fixed")
-          setGlobalDiscountCouponCode("")
-          setDiscountAmount(0)
-          notifySuccess("Cupom removido.")
-        }}
-      />
+          <SelectCouponSheet
+            isOpen={isCouponSheetOpen}
+            onClose={() => setIsCouponSheetOpen(false)}
+            partnerId={partnerId}
+            appliedCouponId={appliedCouponId}
+            onApplyCoupon={async (coupon) => {
+              if (!activePreSaleId) {
+                // Apply locally if no draft yet
+                setAppliedCouponCode(coupon.code)
+                setGlobalDiscountType("coupon")
+                setGlobalDiscountCouponCode(coupon.code)
+                setIsCouponSheetOpen(false)
+                return
+              }
+              const result = await applyCouponToPreSaleAction({
+                partnerId,
+                preSaleId: activePreSaleId,
+                couponCode: coupon.code,
+                customerId: selectedCustomerId || null,
+                subtotal,
+                shippingCost: shippingFee,
+                items: cart.map((item) => ({ productId: item.productId || null })),
+              })
+              if (!result.success) {
+                notifyError(result.error || "Cupom inválido.")
+                return
+              }
+              setAppliedCouponId(result.data?.couponId || null)
+              setAppliedCouponCode(result.data?.couponCode || coupon.code)
+              setAppliedCouponDiscount(result.data?.discountAmount || 0)
+              setGlobalDiscountType("coupon")
+              setGlobalDiscountCouponCode(result.data?.couponCode || coupon.code)
+              notifySuccess(`Cupom ${result.data?.couponCode || coupon.code} aplicado!`)
+              setIsCouponSheetOpen(false)
+            }}
+            onRemoveCoupon={async () => {
+              if (activePreSaleId) {
+                await removeCouponFromPreSaleAction({ partnerId, preSaleId: activePreSaleId })
+              }
+              setAppliedCouponId(null)
+              setAppliedCouponCode(null)
+              setAppliedCouponDiscount(0)
+              setGlobalDiscountType("fixed")
+              setGlobalDiscountCouponCode("")
+              setDiscountAmount(0)
+              notifySuccess("Cupom removido.")
+            }}
+          />
 
-      <POSQuickProductSheet
-        isOpen={isQuickProductSheetOpen}
-        onClose={() => setIsQuickProductSheetOpen(false)}
-        onCreate={handleCreateQuickProduct}
-        isCreating={isCreatingQuickProduct}
-      />
+          <POSQuickProductSheet
+            isOpen={isQuickProductSheetOpen}
+            onClose={() => setIsQuickProductSheetOpen(false)}
+            onCreate={handleCreateQuickProduct}
+            isCreating={isCreatingQuickProduct}
+          />
 
-      <POSShippingSheet
-        isOpen={isShippingSheetOpen}
-        onClose={() => setIsShippingSheetOpen(false)}
-        selectedCustomerId={selectedCustomerId}
-        customerDetails={shippingCustomerDetails}
-        currentShippingFee={shippingFee}
-        onCreateAddress={handleCreateShippingAddress}
-        onApply={({ shippingFee: fee }) => {
-          setShippingFee(Math.max(0, Number(fee || 0)))
-          setIsShippingSheetOpen(false)
-        }}
-      />
+          <POSShippingSheet
+            isOpen={isShippingSheetOpen}
+            onClose={() => setIsShippingSheetOpen(false)}
+            selectedCustomerId={selectedCustomerId}
+            customerDetails={shippingCustomerDetails}
+            currentShippingFee={shippingFee}
+            onCreateAddress={handleCreateShippingAddress}
+            onApply={({ shippingFee: fee }) => {
+              setShippingFee(Math.max(0, Number(fee || 0)))
+              setIsShippingSheetOpen(false)
+            }}
+          />
 
-      <DefaultModal
-        isOpen={isSavingDraft && isUserDraftSaveUi}
-        onClose={() => {}}
-        title=""
-        maxWidth="sm"
-        hideHeader
-      >
-        <div className="flex flex-col items-center justify-center gap-6 p-6">
-          <img src="https://img.dudit.com.br/static/mascots/Aguarde.png" alt="Aguarde" className="h-36 w-36 object-contain" />
-          <p className="text-center text-lg font-semibold leading-tight text-brand-dark dark:text-dark-heading">
-            Salvando pedido...
-          </p>
-        </div>
-      </DefaultModal>
+          <DefaultModal
+            isOpen={isSavingDraft && isUserDraftSaveUi}
+            onClose={() => { }}
+            title=""
+            maxWidth="sm"
+            hideHeader
+          >
+            <div className="flex flex-col items-center justify-center gap-6 p-6">
+              <img src="https://img.dudit.com.br/static/mascots/Aguarde.png" alt="Aguarde" className="h-36 w-36 object-contain" />
+              <p className="text-center text-lg font-semibold leading-tight text-brand-dark dark:text-dark-heading">
+                Salvando pedido...
+              </p>
+            </div>
+          </DefaultModal>
 
-      <AlertModal
-        isOpen={isResetAlertOpen}
-        onClose={() => setIsResetAlertOpen(false)}
-        onConfirm={async () => {
-          if (activePreSaleId) {
-            await removeDraft(activePreSaleId)
-          } else {
-            clearCurrentOrder()
-          }
-          setIsResetAlertOpen(false)
-        }}
-        title="Limpar pedido?"
-        description="Todos os itens adicionados serão removidos do pedido atual."
-        confirmText="Limpar"
-        cancelText="Cancelar"
-        variant="danger"
-      />
+          <AlertModal
+            isOpen={isResetAlertOpen}
+            onClose={() => setIsResetAlertOpen(false)}
+            onConfirm={async () => {
+              if (activePreSaleId) {
+                await removeDraft(activePreSaleId)
+              } else {
+                clearCurrentOrder()
+              }
+              setIsResetAlertOpen(false)
+            }}
+            title="Limpar pedido?"
+            description="Todos os itens adicionados serão removidos do pedido atual."
+            confirmText="Limpar"
+            cancelText="Cancelar"
+            variant="danger"
+          />
 
-      <AlertModal
-        isOpen={isLeaveWithoutSaveAlertOpen}
-        onClose={() => {
-          setIsLeaveWithoutSaveAlertOpen(false)
-          setPendingLeaveHref(null)
-        }}
-        onConfirm={() => {
-          const destination = pendingLeaveHref
-          setIsLeaveWithoutSaveAlertOpen(false)
-          setPendingLeaveHref(null)
-          if (destination) window.location.assign(destination)
-        }}
-        title="Sair sem salvar?"
-        description="Você tem alterações no pedido que ainda não foram salvas."
-        confirmText="Sair sem salvar"
-        cancelText="Continuar editando"
-        variant="warning"
-      />
+          <AlertModal
+            isOpen={isLeaveWithoutSaveAlertOpen}
+            onClose={() => {
+              setIsLeaveWithoutSaveAlertOpen(false)
+              setPendingLeaveHref(null)
+            }}
+            onConfirm={() => {
+              const destination = pendingLeaveHref
+              setIsLeaveWithoutSaveAlertOpen(false)
+              setPendingLeaveHref(null)
+              if (destination) window.location.assign(destination)
+            }}
+            title="Sair sem salvar?"
+            description="Você tem alterações no pedido que ainda não foram salvas."
+            confirmText="Sair sem salvar"
+            cancelText="Continuar editando"
+            variant="warning"
+          />
 
-      <AlertModal
-        isOpen={isRemoveCustomerAlertOpen}
-        onClose={() => setIsRemoveCustomerAlertOpen(false)}
-        onConfirm={() => {
-          setSelectedCustomerId(undefined)
-          setShippingCustomerDetails(null)
-          setIsRemoveCustomerAlertOpen(false)
-        }}
-        title="Remover cliente?"
-        description="O cliente será desvinculado deste pedido. Você pode selecionar outro a qualquer momento."
-        confirmText="Remover"
-        cancelText="Cancelar"
-        variant="warning"
-      />
-    </motion.div>
+          <AlertModal
+            isOpen={isRemoveCustomerAlertOpen}
+            onClose={() => setIsRemoveCustomerAlertOpen(false)}
+            onConfirm={() => {
+              setSelectedCustomerId(undefined)
+              setShippingCustomerDetails(null)
+              setIsRemoveCustomerAlertOpen(false)
+            }}
+            title="Remover cliente?"
+            description="O cliente será desvinculado deste pedido. Você pode selecionar outro a qualquer momento."
+            confirmText="Remover"
+            cancelText="Cancelar"
+            variant="warning"
+          />
+        </FadeIn>
+      )}
+    </AnimatePresence>
   )
 }

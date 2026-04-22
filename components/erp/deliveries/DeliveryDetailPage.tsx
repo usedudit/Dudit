@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { Button, Badge, InfoCard, ThreeDotsLoader } from "@/components/reusable"
+import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon } from "@/lib/icons"
 import { getERPDeliveryDetailsAction } from "@/app/actions/erp/deliveries"
 import { formatDateTime } from "@/lib/utils"
@@ -47,7 +48,7 @@ export default function DeliveryDetailPage({
   const address = order?.delivery_address || customer?.addresses?.[0]?.street || "-"
 
   return (
-    <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+    <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative">
       <div className="sticky top-0 z-20 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
         <div className="max-w-[1300px] mx-auto px-4 md:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -78,6 +79,6 @@ export default function DeliveryDetailPage({
           <InfoCard title="Pedidos na rota" message={String(links.length || 0)} color="gray" />
         </div>
       </div>
-    </div>
+    </FadeIn>
   )
 }

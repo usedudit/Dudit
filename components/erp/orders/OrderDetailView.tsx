@@ -214,187 +214,191 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                     <div className="max-w-[1300px] mx-auto p-4 md:p-6 pt-6">
                         <Tabs value={activeTab} onValueChange={setActiveTab}>
                             <TabsContent value="summary" className="mt-0">
-                                <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
-                                    <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                        <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
-                                            <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
-                                                <div className="flex justify-between items-center">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-                                                            {order.order_source === "Marketplace" ? "Canal de venda:" : "Responsável pela venda:"}
-                                                        </span>
-                                                        <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                                            {order.order_source === "Marketplace"
-                                                                ? (order.order_source || "Marketplace")
-                                                                : (order.seller_name || "Não informado")}
+                                <FadeIn key="summary">
+                                    <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
+                                        <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
+                                            <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
+                                                <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
+                                                    <div className="flex justify-between items-center">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                                                {order.order_source === "Marketplace" ? "Canal de venda:" : "Responsável pela venda:"}
+                                                            </span>
+                                                            <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
+                                                                {order.order_source === "Marketplace"
+                                                                    ? (order.order_source || "Marketplace")
+                                                                    : (order.seller_name || "Não informado")}
+                                                            </div>
+                                                        </div>
+                                                        {order.order_source !== "Marketplace" && (
+                                                            <div className="hidden md:block text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                                                Canal de venda: <strong className="text-brand-dark dark:text-dark-heading">{order.order_source || "Manual"}</strong>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-white dark:bg-dark-surface px-12 pt-12 pb-12">
+                                                    <div className="relative px-4">
+                                                        <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
+                                                            <div
+                                                                className={`absolute left-0 h-full rounded-full transition-all duration-500 ${order.delivery_status === "delivery_failed" ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
+                                                                style={{ width: `${timelineSteps.length <= 1 ? 0 : ((timelineSteps.filter((s) => s.active).length - 1) / (timelineSteps.length - 1)) * 100}%` }}
+                                                            ></div>
+
+                                                            {timelineSteps.map((step, idx) => (
+                                                                <div key={idx} className="relative flex flex-col items-center">
+                                                                    <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
+                                                                        <span className={`text-xs font-medium ${step.active ? (order.delivery_status === "delivery_failed" && idx === 3 ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
+                                                                            {step.label}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (order.delivery_status === "delivery_failed" && idx === 3 ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
+                                                                        {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
+                                                                    </div>
+                                                                    <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
+                                                                        {step.date ? (
+                                                                            <div className="flex items-center gap-1 text-xs text-brand-inactive-text">
+                                                                                <span>{step.date}</span>
+                                                                                {step.time && <span>{step.time}</span>}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
                                                         </div>
                                                     </div>
-                                                    {order.order_source !== "Marketplace" && (
-                                                        <div className="hidden md:block text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-                                                            Canal de venda: <strong className="text-brand-dark dark:text-dark-heading">{order.order_source || "Manual"}</strong>
-                                                        </div>
-                                                    )}
                                                 </div>
                                             </div>
 
-                                            <div className="bg-white dark:bg-dark-surface px-12 pt-12 pb-12">
-                                                <div className="relative px-4">
-                                                    <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
-                                                        <div
-                                                            className={`absolute left-0 h-full rounded-full transition-all duration-500 ${order.delivery_status === "delivery_failed" ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
-                                                            style={{ width: `${timelineSteps.length <= 1 ? 0 : ((timelineSteps.filter((s) => s.active).length - 1) / (timelineSteps.length - 1)) * 100}%` }}
-                                                        ></div>
-
-                                                        {timelineSteps.map((step, idx) => (
-                                                            <div key={idx} className="relative flex flex-col items-center">
-                                                                <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
-                                                                    <span className={`text-xs font-medium ${step.active ? (order.delivery_status === "delivery_failed" && idx === 3 ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
-                                                                        {step.label}
-                                                                    </span>
+                                            <div className="mt-8">
+                                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Itens do Pedido</h3>
+                                                <div className="space-y-4">
+                                                    {(order.order_items || []).map((item: any) => (
+                                                        <div key={item.id} className="flex items-start gap-4">
+                                                            <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                                <img
+                                                                    src={getR2ImageUrl(item.image, "thumbnail")}
+                                                                    className="w-full h-full object-cover rounded-xl"
+                                                                    alt={item.product_name}
+                                                                    onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }}
+                                                                />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex justify-between items-start mb-1">
+                                                                    <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.product_name || "Produto sem nome"}</h4>
+                                                                    <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">{formatCurrency(item.subtotal || item.product_price * item.quantity)}</span>
                                                                 </div>
-                                                                <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (order.delivery_status === "delivery_failed" && idx === 3 ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
-                                                                    {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
-                                                                </div>
-                                                                <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
-                                                                    {step.date ? (
-                                                                        <div className="flex items-center gap-1 text-xs text-brand-inactive-text">
-                                                                            <span>{step.date}</span>
-                                                                            {step.time && <span>{step.time}</span>}
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
-                                                                    )}
+                                                                <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "N/A"}</div>
+                                                                <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                    <span>{item.quantity} un. • {formatCurrency(item.product_price)} / un.</span>
                                                                 </div>
                                                             </div>
-                                                        ))}
-                                                    </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             </div>
-                                        </div>
 
-                                        <div className="mt-8">
-                                            <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Itens do Pedido</h3>
-                                            <div className="space-y-4">
-                                                {(order.order_items || []).map((item: any) => (
-                                                    <div key={item.id} className="flex items-start gap-4">
-                                                        <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
-                                                            <img
-                                                                src={getR2ImageUrl(item.image, "thumbnail")}
-                                                                className="w-full h-full object-cover rounded-xl"
-                                                                alt={item.product_name}
-                                                                onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }}
-                                                            />
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex justify-between items-start mb-1">
-                                                                <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.product_name || "Produto sem nome"}</h4>
-                                                                <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">{formatCurrency(item.subtotal || item.product_price * item.quantity)}</span>
-                                                            </div>
-                                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "N/A"}</div>
-                                                            <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
-                                                                <span>{item.quantity} un. • {formatCurrency(item.product_price)} / un.</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
+                                            <div className="mt-8">
+                                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                                                <div className="flex items-center justify-between">
+                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Detalhes do Pagamento</h3>
+                                                </div>
 
-                                        <div className="mt-8">
-                                            <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                            <div className="flex items-center justify-between">
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Detalhes do Pagamento</h3>
-                                            </div>
-
-                                            <div className="space-y-3">
-                                                <PaymentRow
-                                                    label="Método de Pagamento"
-                                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{paymentMethodLabel}</span>}
-                                                />
-
-                                                {paymentBreakdown.length > 0 && (
+                                                <div className="space-y-3">
                                                     <PaymentRow
-                                                        label="Valores por meio"
+                                                        label="Método de Pagamento"
+                                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{paymentMethodLabel}</span>}
+                                                    />
+
+                                                    {paymentBreakdown.length > 0 && (
+                                                        <PaymentRow
+                                                            label="Valores por meio"
+                                                            value={
+                                                                <div className="flex flex-col gap-1">
+                                                                    {paymentBreakdown.map((entry: any, index: number) => (
+                                                                        <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                            {entry.method}: {formatCurrency(entry.amount || 0)}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            }
+                                                        />
+                                                    )}
+
+                                                    <PaymentRow label="Subtotal" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{`${itemsLabel} • ${formatCurrency(subtotalValue)}`}</span>} />
+
+                                                    <PaymentRow
+                                                        label="Tipo de Entrega"
                                                         value={
-                                                            <div className="flex flex-col gap-1">
-                                                                {paymentBreakdown.map((entry: any, index: number) => (
-                                                                    <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                                        {entry.method}: {formatCurrency(entry.amount || 0)}
-                                                                    </span>
-                                                                ))}
-                                                            </div>
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
+                                                                {order.delivery_type === "pickup" ? "Retirada no local" : "Entrega no endereco"} •{" "}
+                                                                <span className={Number(order.shipping_cost || 0) <= 0 ? "text-brand-green" : "text-brand-dark dark:text-dark-heading"}>
+                                                                    {Number(order.shipping_cost || 0) <= 0 ? "Grátis" : formatCurrency(order.shipping_cost || 0)}
+                                                                </span>
+                                                            </span>
                                                         }
                                                     />
-                                                )}
 
-                                                <PaymentRow label="Subtotal" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{`${itemsLabel} • ${formatCurrency(subtotalValue)}`}</span>} />
+                                                    {Number(order.additional_costs || 0) > 0 && (
+                                                        <PaymentRow label="Custos Adicionais" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(order.additional_costs)}</span>} />
+                                                    )}
 
-                                                <PaymentRow
-                                                    label="Tipo de Entrega"
-                                                    value={
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                                            {order.delivery_type === "pickup" ? "Retirada no local" : "Entrega no endereco"} •{" "}
-                                                            <span className={Number(order.shipping_cost || 0) <= 0 ? "text-brand-green" : "text-brand-dark dark:text-dark-heading"}>
-                                                                {Number(order.shipping_cost || 0) <= 0 ? "Grátis" : formatCurrency(order.shipping_cost || 0)}
-                                                            </span>
-                                                        </span>
-                                                    }
-                                                />
+                                                    {Number(order.discount_value || 0) > 0 && (
+                                                        <PaymentRow
+                                                            label="Desconto"
+                                                            value={<span className="text-brand-red font-bold">- {formatCurrency(order.discount_value)}</span>}
+                                                        />
+                                                    )}
+                                                    {changeAmount > 0.009 && (
+                                                        <PaymentRow
+                                                            label="Troco"
+                                                            value={<span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{formatCurrency(changeAmount)}</span>}
+                                                        />
+                                                    )}
 
-                                                {Number(order.additional_costs || 0) > 0 && (
-                                                    <PaymentRow label="Custos Adicionais" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(order.additional_costs)}</span>} />
-                                                )}
-
-                                                {Number(order.discount_value || 0) > 0 && (
-                                                    <PaymentRow
-                                                        label="Desconto"
-                                                        value={<span className="text-brand-red font-bold">- {formatCurrency(order.discount_value)}</span>}
-                                                    />
-                                                )}
-                                                {changeAmount > 0.009 && (
-                                                    <PaymentRow
-                                                        label="Troco"
-                                                        value={<span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{formatCurrency(changeAmount)}</span>}
-                                                    />
-                                                )}
-
-                                                <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
-                                                    <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>
-                                                    <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(order.total_amount)}</span>
+                                                    <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
+                                                        <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>
+                                                        <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(order.total_amount)}</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                        {hasPendingPayment && (
-                                            <InfoCard
-                                                title="Valor ainda em aberto"
-                                                message={`Falta receber ${formatCurrency(remainingPaymentAmount)} para quitar este pedido.`}
-                                                color="orange"
+                                        <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
+                                            {hasPendingPayment && (
+                                                <InfoCard
+                                                    title="Valor ainda em aberto"
+                                                    message={`Falta receber ${formatCurrency(remainingPaymentAmount)} para quitar este pedido.`}
+                                                    color="orange"
+                                                />
+                                            )}
+
+                                            {(cleanNotes || cancelNote) && (
+                                                <InfoCard
+                                                    title="Observacoes do Pedido"
+                                                    message={[cleanNotes, cancelNote].filter(Boolean).join("\n")}
+                                                    color="orange"
+                                                />
+                                            )}
+
+                                            <CustomerCard
+                                                customer={order.customers || (order.customer_name ? { name: order.customer_name, email: order.buyer_email || null, phone: null } : null)}
+                                                address={order.customers?.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || order.customers?.addresses?.[0] || (order.delivery_address ? { street: order.delivery_address } : null)}
+                                                billingAddress={order.customers?.addresses?.find((a: any) => a.address_type === "billing")}
                                             />
-                                        )}
-
-                                        {(cleanNotes || cancelNote) && (
-                                            <InfoCard
-                                                title="Observacoes do Pedido"
-                                                message={[cleanNotes, cancelNote].filter(Boolean).join("\n")}
-                                                color="orange"
-                                            />
-                                        )}
-
-                                        <CustomerCard
-                                            customer={order.customers || (order.customer_name ? { name: order.customer_name, email: order.buyer_email || null, phone: null } : null)}
-                                            address={order.customers?.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || order.customers?.addresses?.[0] || (order.delivery_address ? { street: order.delivery_address } : null)}
-                                            billingAddress={order.customers?.addresses?.find((a: any) => a.address_type === "billing")}
-                                        />
+                                        </div>
                                     </div>
-                                </div>
+                                </FadeIn>
                             </TabsContent>
 
                             <TabsContent value="history" className="mt-0">
-                                <OrderHistoryTab entries={historyEntries} loading={historyLoading} />
+                                <FadeIn key="history">
+                                    <OrderHistoryTab entries={historyEntries} loading={historyLoading} />
+                                </FadeIn>
                             </TabsContent>
                         </Tabs>
                     </div>

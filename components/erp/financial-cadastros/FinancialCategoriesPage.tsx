@@ -36,6 +36,7 @@ import {
 } from "@/app/actions/erp/transaction-contacts"
 import { adjustAccountBalanceViaTransactionAction } from "@/app/actions/erp/transactions"
 import { formatCurrency } from "@/lib/utils"
+import { FadeIn } from "@/components/animations/FadeIn"
 
 interface FinancialCategoriesPageProps {
     initialCategories: {
@@ -89,6 +90,7 @@ export default function FinancialCategoriesPage({
     const [accounts, setAccounts] = useState<FinanceAccountRow[]>(initialAccounts)
     const [activeTab, setActiveTab] = useState<FinancialCadastrosTab>("categories")
     const [search, setSearch] = useState("")
+    const [debouncedSearch, setDebouncedSearch] = useState("")
     const [page, setPage] = useState(1)
     const ITEMS_PER_PAGE = 8
 
@@ -166,6 +168,13 @@ export default function FinancialCategoriesPage({
         isDeleting: boolean
     }>({ isOpen: false, item: null, isDeleting: false })
 
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(search)
+        }, 300)
+        return () => clearTimeout(timer)
+    }, [search])
+
     const [nameError, setNameError] = useState(false)
     const [accountNameError, setAccountNameError] = useState(false)
 
@@ -192,11 +201,11 @@ export default function FinancialCategoriesPage({
                 ? categories.filter((c) => !c.parent_id)
                 : categories.filter((c) => c.parent_id)
 
-        return items.filter((item) => item.name.toLowerCase().includes(search.toLowerCase()))
-    }, [activeTab, categories, search])
+        return items.filter((item) => item.name.toLowerCase().includes(debouncedSearch.toLowerCase()))
+    }, [activeTab, categories, debouncedSearch])
 
     const filteredAccounts = useMemo(() => {
-        const q = search.toLowerCase()
+        const q = debouncedSearch.toLowerCase()
         return accounts.filter((a) => {
             const typeLabel = ACCOUNT_TYPE_OPTIONS.find((o) => o.value === a.type)?.label ?? a.type
             return (
@@ -204,17 +213,17 @@ export default function FinancialCategoriesPage({
                 typeLabel.toLowerCase().includes(q)
             )
         })
-    }, [accounts, search])
+    }, [accounts, debouncedSearch])
 
     const filteredContacts = useMemo(() => {
-        const q = search.toLowerCase()
+        const q = debouncedSearch.toLowerCase()
         return contacts.filter(
             (c) =>
                 c.name.toLowerCase().includes(q) ||
                 c.type.toLowerCase().includes(q) ||
                 (c.description && c.description.toLowerCase().includes(q)),
         )
-    }, [contacts, search])
+    }, [contacts, debouncedSearch])
 
     const filteredItems =
         activeTab === "accounts"
@@ -496,10 +505,7 @@ export default function FinancialCategoriesPage({
     }
 
     return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.2 }}
+        <FadeIn
             className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
         >
             <style>{`
@@ -547,12 +553,8 @@ export default function FinancialCategoriesPage({
                 <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-0 px-4 md:px-8">
                     <AnimatePresence mode="wait">
                         {filteredItems.length === 0 ? (
-                            <motion.div
+                            <FadeIn
                                 key={`empty-${activeTab}`}
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                transition={{ duration: 0.4, ease: "easeOut" }}
                                 className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
                             >
                                 <IconPlaceholder
@@ -561,13 +563,10 @@ export default function FinancialCategoriesPage({
                                     subtitle="Ajuste os filtros ou adicione um novo cadastro."
                                     imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
                                 />
-                            </motion.div>
+                            </FadeIn>
                         ) : activeTab === "accounts" ? (
-                            <motion.div
+                            <FadeIn
                                 key="grid-accounts"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
                                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8"
                             >
                                 {(paginatedItems as FinanceAccountRow[]).map((item) => (
@@ -586,25 +585,19 @@ export default function FinancialCategoriesPage({
                                         }
                                     />
                                 ))}
-                            </motion.div>
+                            </FadeIn>
                         ) : activeTab === "contacts" ? (
-                            <motion.div
+                            <FadeIn
                                 key="grid-contacts"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
                                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8"
                             >
                                 {(paginatedItems as TransactionContactRow[]).map((item) => (
                                     <FinancialContactCard key={item.id} item={item} onClick={() => { }} />
                                 ))}
-                            </motion.div>
+                            </FadeIn>
                         ) : (
-                            <motion.div
+                            <FadeIn
                                 key="grid-categories"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
                                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8"
                             >
                                 {(paginatedItems as (typeof categories)[0][]).map((item) => (
@@ -617,7 +610,7 @@ export default function FinancialCategoriesPage({
                                         onDelete={() => handleDeleteCategory(item)}
                                     />
                                 ))}
-                            </motion.div>
+                            </FadeIn>
                         )}
                     </AnimatePresence>
                 </div>
@@ -958,6 +951,6 @@ export default function FinancialCategoriesPage({
                 isDestructive
                 isLoading={deleteModal.isDeleting}
             />
-        </motion.div>
+        </FadeIn>
     )
 }

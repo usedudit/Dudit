@@ -3,6 +3,8 @@ import CouponsPage from "@/components/erp/coupons/CouponsPage"
 import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { listCouponsAction } from "@/app/actions/erp/coupons"
+import { ERPPageHeader } from "@/components/erp/page-header-state"
+import { FadeIn } from "@/components/animations/FadeIn"
 
 export const dynamic = "force-dynamic"
 
@@ -19,10 +21,15 @@ export default async function CouponsPageServer() {
   if (!couponsRes.success) throw new Error(couponsRes.error || "Erro ao carregar cupons.")
 
   return (
-    <CouponsPage
-      partnerId={partnerId}
-      initialCoupons={couponsRes.data}
-      initialTotal={couponsRes.total ?? 0}
-    />
+    <>
+      <ERPPageHeader title="Cupons" />
+      <FadeIn className="p-4">
+        <CouponsPage
+          partnerId={partnerId}
+          initialCoupons={couponsRes.data}
+          initialTotal={couponsRes.total ?? 0}
+        />
+      </FadeIn>
+    </>
   )
 }

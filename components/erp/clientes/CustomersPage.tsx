@@ -34,6 +34,7 @@ import {
     BlockedIcon,
     CheckCircleIcon
 } from "@/lib/icons"
+import { FadeIn } from "@/components/animations/FadeIn"
 
 // --- TYPES & INTERFACES ---
 
@@ -150,7 +151,7 @@ export default function CustomersPage({
     const [scrollState, setScrollState] = useState({ left: false, right: false })
 
     useEffect(() => {
-        const t = setTimeout(() => setDebouncedSearch(search), 500)
+        const t = setTimeout(() => setDebouncedSearch(search), 300)
         return () => clearTimeout(t)
     }, [search])
 
@@ -275,6 +276,11 @@ export default function CustomersPage({
     const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage)
     const paginated = filteredCustomers.slice((page - 1) * itemsPerPage, page * itemsPerPage)
 
+    const selectedCustomer = useMemo(() => {
+        if (!ui.selectedId) return null
+        return filteredCustomers.find(c => c.originalId === ui.selectedId) || null
+    }, [ui.selectedId, filteredCustomers])
+
     useEffect(() => {
         if (page === totalPages && hasNextPage && !isFetchingNextPage) {
             void fetchNextPage()
@@ -360,304 +366,298 @@ export default function CustomersPage({
         setSelection(p => ({ ...p, ids: new Set() }))
     }
 
-    if (ui.pageState === "form") {
-        return (
-            <NewCustomerPage
-                partnerId={partnerId}
-                customerId={ui.selectedId || undefined}
-                onBack={() => setUi({ pageState: "list", selectedId: null })}
-                onSuccess={(msg) => {
-                    toast({ title: "Sucesso", description: msg })
-                    queryClient.invalidateQueries({ queryKey: ['erp', 'customers', partnerId, selectedStore?.id || 'all'] })
-                    setUi({ pageState: "list", selectedId: null })
-                }}
-                onError={(msg) => toast({ title: "Erro", description: msg, variant: "destructive" })}
-            />
-        )
-    }
-
-    const selectedCustomer = filteredCustomers.find((c: Customer) => c.originalId === ui.selectedId)
-
-    if (ui.pageState === "details" && selectedCustomer) {
-        return (
-            <CustomerDetailPage
-                customer={selectedCustomer}
-                onBack={() => setUi({ pageState: "list", selectedId: null })}
-                onEdit={handleEditCustomer}
-            />
-        )
-    }
-
     return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.2 }}
-            className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
-        >
-            <style>{`
-                .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
-                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
-                .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
-                .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-                .hide-scrollbar::-webkit-scrollbar { display: none; }
-                .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-            `}</style>
+        <>
+            <AnimatePresence mode="wait">
+            {ui.pageState === "form" ? (
+                <NewCustomerPage
+                    key="form"
+                    partnerId={partnerId}
+                    customerId={ui.selectedId || undefined}
+                    onBack={() => setUi({ pageState: "list", selectedId: null })}
+                    onSuccess={(msg) => {
+                        toast({ title: "Sucesso", description: msg })
+                        queryClient.invalidateQueries({ queryKey: ['erp', 'customers', partnerId, selectedStore?.id || 'all'] })
+                        setUi({ pageState: "list", selectedId: null })
+                    }}
+                    onError={(msg) => toast({ title: "Erro", description: msg, variant: "destructive" })}
+                />
+            ) : ui.pageState === "details" && selectedCustomer ? (
+                <CustomerDetailPage
+                    key="details"
+                    customer={selectedCustomer}
+                    onBack={() => setUi({ pageState: "list", selectedId: null })}
+                    onEdit={handleEditCustomer}
+                />
+            ) : (
+                <FadeIn
+                    key="list"
+                    className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
+                >
+                    <style>{`
+                        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
+                        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+                        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
+                        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
+                        .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                        .hide-scrollbar::-webkit-scrollbar { display: none; }
+                        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+                    `}</style>
 
-            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-                {/* Desktop Header */}
-                <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
-                    <div className="flex flex-col gap-2 pt-1">
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                                Clientes
-                            </h1>
+                    <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                        {/* Desktop Header */}
+                        <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                            <div className="flex flex-col gap-2 pt-1">
+                                <div className="flex items-center gap-3">
+                                    <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                                        Clientes
+                                    </h1>
+                                </div>
+                                <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                                    Gerencie sua base de clientes e contatos.
+                                </p>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <Button variant="outline" onClick={() => { }}>
+                                    <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
+                                </Button>
+
+                                <Button onClick={handleAddCustomer}>
+                                    <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
+                                    Novo Cliente
+                                </Button>
+                            </div>
                         </div>
-                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                            Gerencie sua base de clientes e contatos.
-                        </p>
-                    </div>
 
-                    <div className="flex items-center gap-3">
-                        <Button variant="outline" onClick={() => { }}>
-                            <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
-                        </Button>
+                        {hasCustomers && (
+                            <CustomerPageControls
+                                activeTab={activeTab}
+                                setActiveTab={setActiveTab}
+                                search={search}
+                                onSearchChange={setSearch}
+                                onOpenFilter={() => setModals({ filter: true })}
+                                onExport={() => { }}
+                                onAddCustomer={handleAddCustomer}
+                                filters={filters}
+                                setFilters={setFilters as any}
+                                viewMode={viewMode}
+                                onViewModeChange={setViewModeState}
+                                hasActiveFilters={hasActiveFilters}
+                            />
+                        )}
 
-                        <Button onClick={handleAddCustomer}>
-                            <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
-                            Novo Cliente
-                        </Button>
-                    </div>
-                </div>
-
-                {hasCustomers && (
-                    <CustomerPageControls
-                        activeTab={activeTab}
-                        setActiveTab={setActiveTab}
-                        search={search}
-                        onSearchChange={setSearch}
-                        onOpenFilter={() => setModals({ filter: true })}
-                        onExport={() => { }}
-                        onAddCustomer={handleAddCustomer}
-                        filters={filters}
-                        setFilters={setFilters as any}
-                        viewMode={viewMode}
-                        onViewModeChange={setViewModeState}
-                        hasActiveFilters={hasActiveFilters}
-                    />
-                )}
-
-                <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
-                    <AnimatePresence mode="wait">
-                        {isLoading ? (
-                            <ThreeDotsLoader key="loading" />
-                        ) : customersError && !hasCustomers ? (
-                            <motion.div key="error-state" className="w-full h-full flex items-center justify-center min-h-[500px]">
-                                <IconPlaceholder
-                                    placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/clientes/naoencontrado.png"
-                                    imageAlt="Erro ao carregar"
-                                    title="Erro ao carregar clientes"
-                                    subtitle="Não foi possível carregar seus clientes. Tente novamente."
-                                    itemButton={{
-                                        text: "Tentar Novamente",
-                                        action: () => window.location.reload(),
-                                    }}
-                                />
-                            </motion.div>
-                        ) : !hasCustomers ? (
-                            <motion.div key="empty-no-data" className="w-full h-full flex items-center justify-center min-h-[500px]">
-                                <IconPlaceholder
-                                    placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/Clientes.png"
-                                    imageAlt="Sem clientes"
-                                    title="Você ainda não tem clientes"
-                                    subtitle="Cadastre seus clientes para gerenciar vendas e contatos."
-                                    itemButton={{
-                                        text: "Cadastrar Primeiro Cliente",
-                                        action: handleAddCustomer,
-                                    }}
-                                />
-                            </motion.div>
-                        ) : paginated.length === 0 ? (
-                            <motion.div key="empty-results" className="w-full h-full flex items-center justify-center min-h-[500px]">
-                                <IconPlaceholder
-                                    placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                                    imageAlt="Nenhum cliente encontrado"
-                                    title="Nenhum cliente encontrado"
-                                    subtitle="Tente ajustar seus filtros ou termos de busca."
-                                    itemButton={{
-                                        text: "Limpar Filtros",
-                                        action: handleClearFilters,
-                                        variant: "outline"
-                                    }}
-                                />
-                            </motion.div>
-                        ) : (
-                            <motion.div
-                                key={viewMode}
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.2 }}
-                                className="w-full"
-                            >
-                                {isMobile ? (
-                                    <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
-                                        {paginated.map((c: Customer) => (
-                                            <div
-                                                key={c.originalId}
-                                                className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex items-center gap-4"
-                                                onClick={() => handleDetailsCustomer(c)}
-                                            >
-                                                <UserProfileImage
-                                                    fullName={c.name || "Cliente"}
-                                                    className="w-14 h-14 text-xl"
-                                                />
-
-                                                <div className="flex-1 min-w-0 flex flex-col gap-1">
-                                                    <div className="flex justify-between items-start">
-                                                        <div className="flex flex-col min-w-0 pr-1">
-                                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                                                                {c.name}
-                                                            </h3>
-                                                            <span className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
-                                                                {c.id !== '-' ? c.id : "Cliente"}
-                                                            </span>
-                                                        </div>
-                                                        <Badge variant={c.status === 'ativo' ? 'green' : c.status === 'inativo' ? 'gray' : 'red'} className="shrink-0 text-[10px] h-5 px-1.5">
-                                                            {c.status === 'ativo' ? "Ativo" : c.status === 'inativo' ? "Inativo" : "Bloqueado"}
-                                                        </Badge>
-                                                    </div>
-                                                    <div className="flex justify-between items-center mt-1">
-                                                        <span className="text-[14px] font-bold text-brand-primary">
-                                                            {c.totalOrderValue ? formatCurrency(c.totalOrderValue) : "-"}
-                                                        </span>
-                                                        <div className="flex items-center gap-4">
-                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                {c.orders} pedido{c.orders !== 1 && 's'}
-                                                            </span>
-                                                            <div onClick={(e) => { e.stopPropagation(); handleSelectRow(c.originalId); }}>
-                                                                <Checkbox checked={selection.ids.has(c.originalId)} onChange={() => handleSelectRow(c.originalId)} />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : viewMode === "grid" ? (
-                                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                        {paginated.map((c: Customer) => (
-                                            <CustomerGridCard
-                                                key={c.originalId}
-                                                customer={c}
-                                                selected={selection.ids.has(c.originalId)}
-                                                onSelect={() => handleSelectRow(c.originalId)}
-                                                onDetails={() => handleDetailsCustomer(c)}
-                                                onEdit={() => handleEditCustomer(c)}
-                                                onDelete={() => handleDeleteCustomer(c)}
-                                            />
-                                        ))}
-                                    </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
+                            <AnimatePresence mode="wait">
+                                {isLoading ? (
+                                    <FadeIn key="loading" className="flex items-center justify-center min-h-[500px]">
+                                        <ThreeDotsLoader />
+                                    </FadeIn>
+                                ) : customersError && !hasCustomers ? (
+                                    <FadeIn key="error-state" className="w-full h-full flex items-center justify-center min-h-[500px]">
+                                        <IconPlaceholder
+                                            placeholderType="image"
+                                            imageSrc="https://img.dudit.com.br/static/mascots/clientes/naoencontrado.png"
+                                            imageAlt="Erro ao carregar"
+                                            title="Erro ao carregar clientes"
+                                            subtitle="Não foi possível carregar seus clientes. Tente novamente."
+                                            itemButton={{
+                                                text: "Tentar Novamente",
+                                                action: () => window.location.reload(),
+                                            }}
+                                        />
+                                    </FadeIn>
+                                ) : !hasCustomers ? (
+                                    <FadeIn key="empty-no-data" className="w-full h-full flex items-center justify-center min-h-[500px]">
+                                        <IconPlaceholder
+                                            placeholderType="image"
+                                            imageSrc="https://img.dudit.com.br/static/mascots/Clientes.png"
+                                            imageAlt="Sem clientes"
+                                            title="Você ainda não tem clientes"
+                                            subtitle="Cadastre seus clientes para gerenciar vendas e contatos."
+                                            itemButton={{
+                                                text: "Cadastrar Primeiro Cliente",
+                                                action: handleAddCustomer,
+                                            }}
+                                        />
+                                    </FadeIn>
+                                ) : paginated.length === 0 ? (
+                                    <FadeIn key="empty-results" className="w-full h-full flex items-center justify-center min-h-[500px]">
+                                        <IconPlaceholder
+                                            placeholderType="image"
+                                            imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                            imageAlt="Nenhum cliente encontrado"
+                                            title="Nenhum cliente encontrado"
+                                            subtitle="Tente ajustar seus filtros ou termos de busca."
+                                            itemButton={{
+                                                text: "Limpar Filtros",
+                                                action: handleClearFilters,
+                                                variant: "outline"
+                                            }}
+                                        />
+                                    </FadeIn>
                                 ) : (
-                                    <div className="w-full overflow-hidden rounded-xl relative">
-                                        <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                                        <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+                                    <FadeIn
+                                        key={activeTab + viewMode}
+                                        className="w-full"
+                                    >
+                                        {isMobile ? (
+                                            <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
+                                                {paginated.map((c: Customer) => (
+                                                    <div
+                                                        key={c.originalId}
+                                                        className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex items-center gap-4"
+                                                        onClick={() => handleDetailsCustomer(c)}
+                                                    >
+                                                        <UserProfileImage
+                                                            fullName={c.name || "Cliente"}
+                                                            className="w-14 h-14 text-xl"
+                                                        />
 
-                                        <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
-                                                <thead>
-                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                        <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
-                                                            <div className="flex items-center">
-                                                                <Checkbox
-                                                                    checked={selection.ids.size === paginated.length && paginated.length > 0}
-                                                                    onChange={(checked) => {
-                                                                        setSelection({ ids: checked ? new Set(paginated.map((x: Customer) => x.originalId)) : new Set() })
-                                                                    }}
-                                                                    className="bg-white dark:bg-dark-background"
-                                                                />
+                                                        <div className="flex-1 min-w-0 flex flex-col gap-1">
+                                                            <div className="flex justify-between items-start">
+                                                                <div className="flex flex-col min-w-0 pr-1">
+                                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                        {c.name}
+                                                                    </h3>
+                                                                    <span className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
+                                                                        {c.id !== '-' ? c.id : "Cliente"}
+                                                                    </span>
+                                                                </div>
+                                                                <Badge variant={c.status === 'ativo' ? 'green' : c.status === 'inativo' ? 'gray' : 'red'} className="shrink-0 text-[10px] h-5 px-1.5">
+                                                                    {c.status === 'ativo' ? "Ativo" : c.status === 'inativo' ? "Inativo" : "Bloqueado"}
+                                                                </Badge>
                                                             </div>
-                                                        </th>
-                                                        {COLUMNS.map((col, idx) => {
-                                                            const isSortable = col.id !== "actions";
-                                                            const isSorted = sortConfig?.key === col.id;
-                                                            return (
-                                                                <th
-                                                                    key={col.id}
-                                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""}`}
-                                                                    style={{ width: col.width }}
-                                                                    onClick={() => {
-                                                                        if (!isSortable) return;
-                                                                        setSortConfig(prev => ({
-                                                                            key: col.id as SortKey,
-                                                                            direction: prev?.key === col.id && prev.direction === 'asc' ? 'desc' : 'asc'
-                                                                        }));
-                                                                    }}
-                                                                >
-                                                                    <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
-                                                                        <span>{col.label}</span>
-                                                                        {isSortable && (
-                                                                            <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
-                                                                                <ArrowUpDownIcon
-                                                                                    size={14}
-                                                                                    className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
-                                                                                        } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
-                                                                                />
-                                                                            </div>
-                                                                        )}
+                                                            <div className="flex justify-between items-center mt-1">
+                                                                <span className="text-[14px] font-bold text-brand-primary">
+                                                                    {c.totalOrderValue ? formatCurrency(c.totalOrderValue) : "-"}
+                                                                </span>
+                                                                <div className="flex items-center gap-4">
+                                                                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                        {c.orders} pedido{c.orders !== 1 && 's'}
+                                                                    </span>
+                                                                    <div onClick={(e) => { e.stopPropagation(); handleSelectRow(c.originalId); }}>
+                                                                        <Checkbox checked={selection.ids.has(c.originalId)} onChange={() => handleSelectRow(c.originalId)} />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : viewMode === "grid" ? (
+                                            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                                {paginated.map((c: Customer) => (
+                                                    <CustomerGridCard
+                                                        key={c.originalId}
+                                                        customer={c}
+                                                        selected={selection.ids.has(c.originalId)}
+                                                        onSelect={() => handleSelectRow(c.originalId)}
+                                                        onDetails={() => handleDetailsCustomer(c)}
+                                                        onEdit={() => handleEditCustomer(c)}
+                                                        onDelete={() => handleDeleteCustomer(c)}
+                                                    />
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="w-full overflow-hidden rounded-xl relative">
+                                                <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                                <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                                                <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                    <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
+                                                        <thead>
+                                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
+                                                                    <div className="flex items-center">
+                                                                        <Checkbox
+                                                                            checked={selection.ids.size === paginated.length && paginated.length > 0}
+                                                                            onChange={(checked) => {
+                                                                                setSelection({ ids: checked ? new Set(paginated.map((x: Customer) => x.originalId)) : new Set() })
+                                                                            }}
+                                                                            className="bg-white dark:bg-dark-background"
+                                                                        />
                                                                     </div>
                                                                 </th>
-                                                            );
-                                                        })}
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {paginated.map((c: Customer) => (
-                                                        <CustomerListItem
-                                                            key={c.originalId}
-                                                            customer={c}
-                                                            columns={COLUMNS}
-                                                            selected={selection.ids.has(c.originalId)}
-                                                            onSelect={handleSelectRow}
-                                                            onEdit={handleEditCustomer}
-                                                            onDelete={handleDeleteCustomer}
-                                                            onDetails={handleDetailsCustomer}
-                                                        />
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
+                                                                {COLUMNS.map((col, idx) => {
+                                                                    const isSortable = col.id !== "actions";
+                                                                    const isSorted = sortConfig?.key === col.id;
+                                                                    return (
+                                                                        <th
+                                                                            key={col.id}
+                                                                            className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""}`}
+                                                                            style={{ width: col.width }}
+                                                                            onClick={() => {
+                                                                                if (!isSortable) return;
+                                                                                setSortConfig(prev => ({
+                                                                                    key: col.id as SortKey,
+                                                                                    direction: prev?.key === col.id && prev.direction === 'asc' ? 'desc' : 'asc'
+                                                                                }));
+                                                                            }}
+                                                                        >
+                                                                            <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                                <span>{col.label}</span>
+                                                                                {isSortable && (
+                                                                                    <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                                                        <ArrowUpDownIcon
+                                                                                            size={14}
+                                                                                            className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
+                                                                                                } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
+                                                                                        />
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </th>
+                                                                    );
+                                                                })}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {paginated.map((c: Customer) => (
+                                                                <CustomerListItem
+                                                                    key={c.originalId}
+                                                                    customer={c}
+                                                                    columns={COLUMNS}
+                                                                    selected={selection.ids.has(c.originalId)}
+                                                                    onSelect={handleSelectRow}
+                                                                    onEdit={handleEditCustomer}
+                                                                    onDelete={handleDeleteCustomer}
+                                                                    onDetails={handleDetailsCustomer}
+                                                                />
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </FadeIn>
                                 )}
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                    {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
-                </div>
+                            </AnimatePresence>
+                            {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
+                        </div>
 
-                {hasCustomers && paginated.length > 0 && (
-                    <Pagination
-                        currentPage={page}
-                        totalPages={totalPages}
-                        onPageChange={(p) => {
-                            setPage(p)
-                            if (p === totalPages && hasNextPage && !isFetchingNextPage) {
-                                void fetchNextPage()
-                            }
-                        }}
-                    />
-                )}
-                {hasNextPage && page === totalPages && isFetchingNextPage ? (
-                    <div className="flex flex-col gap-2 py-2 px-4">
-                        <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse" />
-                        <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse opacity-70" />
+                        {hasCustomers && paginated.length > 0 && (
+                            <Pagination
+                                currentPage={page}
+                                totalPages={totalPages}
+                                onPageChange={(p) => {
+                                    setPage(p)
+                                    if (p === totalPages && hasNextPage && !isFetchingNextPage) {
+                                        void fetchNextPage()
+                                    }
+                                }}
+                            />
+                        )}
+                        {hasNextPage && page === totalPages && isFetchingNextPage ? (
+                            <div className="flex flex-col gap-2 py-2 px-4">
+                                <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse" />
+                                <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse opacity-70" />
+                            </div>
+                        ) : null}
                     </div>
-                ) : null}
-            </div>
+                </FadeIn>
+            )}
+        </AnimatePresence>
 
             <FilterSheet
                 isOpen={modals.filter}
@@ -729,6 +729,6 @@ export default function CustomersPage({
                     <TrashIcon size={16} /> Excluir
                 </Button>
             </FloatingActionBar>
-        </motion.div>
+        </>
     )
 }

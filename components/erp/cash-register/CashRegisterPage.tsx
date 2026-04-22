@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState, useRef, useEffect, useCallback } from "react"
+import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     Badge,
@@ -109,6 +110,7 @@ export default function CashRegisterPage({
 
     const [activeSession, setActiveSession] = useState<any | null>(initialActiveSession || null)
     const [search, setSearch] = useState("")
+    const [debouncedSearch, setDebouncedSearch] = useState("")
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
     const [page, setPage] = useState(1)
     const [viewMode, setViewModeState] = useState<"grid" | "list">(isMobile ? "grid" : "list")
@@ -162,8 +164,15 @@ export default function CashRegisterPage({
     }, [checkScroll, viewMode, history])
 
     useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(search);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    useEffect(() => {
         setPage(1)
-    }, [search, filters])
+    }, [debouncedSearch, filters])
 
     useEffect(() => {
         const handleReset = () => {
@@ -201,10 +210,10 @@ export default function CashRegisterPage({
         isDatePeriodFilterActive(filters.dateOpenedPeriod) ||
         isDatePeriodFilterActive(filters.dateClosedPeriod)
 
-    const isFiltered = search !== "" || hasActiveFilters
+    const isFiltered = debouncedSearch !== "" || hasActiveFilters
 
     const filtered = useMemo(() => {
-        const term = search.trim().toLowerCase()
+        const term = debouncedSearch.trim().toLowerCase()
         const statusValues = filters.status.map((value) => (value === "Aberto" ? "open" : "closed"))
         const openedBounds = resolveDatePeriodBounds(filters.dateOpenedPeriod)
         const closedBounds = resolveDatePeriodBounds(filters.dateClosedPeriod)
@@ -257,7 +266,7 @@ export default function CashRegisterPage({
         }
 
         return result
-    }, [history, search, filters, sortConfig])
+    }, [history, debouncedSearch, filters, sortConfig])
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE))
     const paginated = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
@@ -424,392 +433,382 @@ export default function CashRegisterPage({
         { id: "close_date", label: "Fechamento", align: "left", width: "300px" },
         { id: "initial_amount", label: "Saldo Inicial", align: "left", width: "250px" },
         { id: "expected_total", label: "Saldo Final", align: "left", width: "250px" },
-        { id: "status", label: "Status", align: "center", width: "120px" },
+        { id: "status", label: "Status", align: "center", width: "120px" }
     ]
 
-    if (selectedSessionId) {
-        return (
-            <CashSessionDetailPage
-                partnerId={partnerId}
-                details={detailedSession}
-                isLoading={isDetailLoading}
-                onBack={() => {
-                    setSelectedSessionId(null)
-                    setDetailedSession(null)
-                }}
-            />
-        )
-    }
-
     return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.2 }}
-            className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
-        >
-            <style>{`
-        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
-        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
-        .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
-            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-                <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
-                    <div className="flex flex-col gap-2 pt-1">
-                        <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                            Controle de Caixa
-                        </h1>
-                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                            Abertura, fechamento e auditoria de sessões do PDV.
-                        </p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        {!activeSession?.id ? (
-                            <Button onClick={() => setOpenModal(true)}>Abrir Caixa</Button>
-                        ) : (
-                            <Button onClick={openCloseModal} isLoading={isPreparingClose}>
-                                Fechar Caixa Atual
-                            </Button>
-                        )}
-                    </div>
-                </div>
-
-                <div className="md:hidden px-4 mb-4">
-                    {!activeSession?.id ? (
-                        <Button onClick={() => setOpenModal(true)} className="w-full">
-                            Abrir Caixa
-                        </Button>
-                    ) : (
-                        <Button onClick={openCloseModal} isLoading={isPreparingClose} className="w-full">
-                            Fechar Caixa Atual
-                        </Button>
-                    )}
-                </div>
-
-                <CashRegisterPageControls
-                    search={search}
-                    onSearchChange={setSearch}
-                    onOpenFilter={() => setModals((prev) => ({ ...prev, filter: true }))}
-                    onOpenSession={() => setOpenModal(true)}
-                    filters={filters}
-                    setFilters={setFilters}
-                    viewMode={viewMode}
-                    onViewModeChange={setViewModeState}
-                    hasActiveFilters={hasActiveFilters}
+        <AnimatePresence mode="wait">
+            {selectedSessionId ? (
+                <CashSessionDetailPage
+                    key="detail"
+                    partnerId={partnerId}
+                    details={detailedSession}
+                    isLoading={isDetailLoading}
+                    onBack={() => {
+                        setSelectedSessionId(null)
+                        setDetailedSession(null)
+                    }}
                 />
-
-                <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
-                    <AnimatePresence mode="wait">
-                        {paginated.length === 0 ? (
-                            <motion.div
-                                key="empty"
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                transition={{ duration: 0.4, ease: "easeOut" }}
-                                className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
-                            >
-                                <IconPlaceholder
-                                    placeholderType="image"
-                                    imageSrc={isFiltered ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png" : "https://img.dudit.com.br/static/mascots/PDV.png"}
-                                    imageAlt="Sem sessões"
-                                    title={isFiltered ? "Nenhuma sessão encontrada" : "Caixa nunca utilizado"}
-                                    subtitle={isFiltered ? "Tente ajustar seus filtros ou termos de busca." : "Abra seu primeiro caixa para começar a vender no PDV."}
-                                    itemButton={!isFiltered ? {
-                                        text: "Abrir Caixa",
-                                        action: () => setOpenModal(true),
-                                    } : {
-                                        text: "Limpar Filtros",
-                                        action: handleClearFilters,
-                                        variant: "outline",
-                                    }}
-                                />
-                            </motion.div>
-                        ) : (
-                            <motion.div
-                                key={isTablet ? "stacked" : viewMode}
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.2 }}
-                                className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
-                            >
-                                {isTablet ? (
-                                    <div className="rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
-                                        {paginated.map((session, index) => (
-                                            <div key={session.id}>
-                                                <button
-                                                    type="button"
-                                                    className="w-full text-left px-4 py-5 hover:bg-brand-gray/50 dark:hover:bg-dark-border/20 transition-colors"
-                                                    onClick={() => handleViewDetails(session.id)}
-                                                >
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <div className="min-w-0">
-                                                            <div className="flex items-center gap-2">
-                                                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                                                    Sessão {session.id.slice(0, 8).toUpperCase()}
-                                                                </h3>
-                                                                <Badge variant={session.status === "open" ? "green" : "gray"} className="whitespace-nowrap">
-                                                                    {session.status === "open" ? "Aberto" : "Fechado"}
-                                                                </Badge>
-                                                            </div>
-                                                            <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                                                Abriu: {session.opened_by_name || session.user_name}
-                                                            </p>
-                                                            <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                                                Fechou: {session.closed_by_name || "-"}
-                                                            </p>
-                                                        </div>
-                                                        <div className="text-right shrink-0">
-                                                            <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                Gaveta
-                                                            </p>
-                                                            <p className="text-[15px] font-bold text-brand-primary">
-                                                                {formatCurrency(Number(session.expected_drawer_total || 0))}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="mt-4 grid grid-cols-2 gap-3">
-                                                        <div>
-                                                            <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                Abertura
-                                                            </p>
-                                                            <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                                {formatDateTime(session.opened_at)}
-                                                            </p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                Fechamento
-                                                            </p>
-                                                            <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                                {formatDateTime(session.closed_at)}
-                                                            </p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                Saldo inicial
-                                                            </p>
-                                                            <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                                {formatCurrency(Number(session.initial_amount || 0))}
-                                                            </p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                Data da sessão
-                                                            </p>
-                                                            <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                                {formatShortDate(session.closed_at || session.opened_at)}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </button>
-                                                {index < paginated.length - 1 && (
-                                                    <Separator className="bg-brand-border dark:bg-dark-border" />
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : viewMode === "grid" ? (
-                                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                        {paginated.map((session) => (
-                                            <CashSessionGridCard
-                                                key={session.id}
-                                                session={session}
-                                                onDetails={handleViewDetails}
-                                            />
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="w-full overflow-hidden rounded-xl relative">
-                                        <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                                        <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
-
-                                        <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
-                                                <thead>
-                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                        {columns.map((col, idx) => {
-                                                            const isSorted = sortConfig?.key === col.id
-                                                            const isLast = idx === columns.length - 1
-                                                            const isFirst = idx === 0
-
-                                                            return (
-                                                                <th
-                                                                    key={col.id}
-                                                                    className={`py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${isFirst ? "rounded-l-lg pl-6" : ""} ${isLast ? "rounded-r-lg" : ""}`}
-                                                                    style={{ width: col.width }}
-                                                                    onClick={() => {
-                                                                        setSortConfig((prev) => ({
-                                                                            key: col.id,
-                                                                            direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc",
-                                                                        }))
-                                                                    }}
-                                                                >
-                                                                    <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
-                                                                        <span>{col.label}</span>
-                                                                        <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
-                                                                            <ArrowUpDownIcon
-                                                                                size={14}
-                                                                                className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
-                                                                            />
-                                                                        </div>
-                                                                    </div>
-                                                                </th>
-                                                            )
-                                                        })}
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {paginated.map((session) => (
-                                                        <CashSessionListItem
-                                                            key={session.id}
-                                                            session={session}
-                                                            columns={columns}
-                                                            selected={false}
-                                                            onSelect={() => {}}
-                                                            onDetails={handleViewDetails}
-                                                            showCheckbox={false}
-                                                        />
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                )}
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                    {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
-                </div>
-
-                {filtered.length > 0 && (
-                    <Pagination
-                        currentPage={page}
-                        totalPages={totalPages}
-                        onPageChange={(p) => {
-                            setPage(p)
-                            if (p === totalPages && hasNextPage && !isFetchingNextPage) {
-                                void fetchNextPage()
-                            }
-                        }}
-                    />
-                )}
-                {hasNextPage && page === totalPages && isFetchingNextPage ? (
-                    <div className="flex flex-col gap-2 py-2 px-4">
-                        <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse" />
-                        <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse opacity-70" />
-                    </div>
-                ) : null}
-            </div>
-
-            <FilterSheet
-                isOpen={modals.filter}
-                onClose={() => setModals((prev) => ({ ...prev, filter: false }))}
-                sections={filterSections}
-                filters={filters}
-                setFilters={setFilters}
-                onClear={handleClearFilters}
-            />
-
-            <DefaultModal isOpen={openModal} onClose={closeOpenModal} title="Abrir caixa">
-                <div className="space-y-3">
-                    <MoneyInput label="Troco inicial" value={openingBalance} onChange={setOpeningBalance} />
-                    <Input label="Observações" value={openingNotes} onChange={(e: any) => setOpeningNotes(e.target.value)} />
-                    <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={closeOpenModal}>Cancelar</Button>
-                        <Button onClick={handleOpenSession} isLoading={isOpeningSession}>Confirmar abertura</Button>
-                    </div>
-                </div>
-            </DefaultModal>
-
-            <DefaultModal isOpen={closeModal} onClose={closeCloseModal} title="Fechar caixa">
-                <div className="space-y-4">
-                    {isPreparingClose && !closeSummary ? (
-                        <>
-                            <div className="rounded-xl border border-brand-border dark:border-dark-border p-4 space-y-3">
-                                <SkeletonLoader className="h-4 w-36 rounded-full" />
-                                <SkeletonLoader className="h-8 w-48 rounded-xl" />
-                            </div>
-                            <div className="space-y-3">
-                                <SkeletonLoader className="h-12 w-full rounded-xl" />
-                                <SkeletonLoader className="h-12 w-full rounded-xl" />
-                                <SkeletonLoader className="h-12 w-full rounded-xl" />
-                            </div>
-                        </>
-                    ) : closeSummary ? (
-                        <>
-                            <div className="rounded-xl border border-brand-border dark:border-dark-border p-4">
-                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Saldo calculado (gaveta)</p>
-                                <p className="mt-2 text-2xl font-bold text-brand-dark dark:text-dark-heading">
-                                    {formatCurrency(Number(closeSummary.expectedDrawerTotal || 0))}
+            ) : (
+                <FadeIn
+                    key="list"
+                    className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
+                >
+                    <style>{`
+                        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+                        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
+                        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
+                        .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                        .hide-scrollbar::-webkit-scrollbar { display: none; }
+                        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+                    `}</style>
+                    <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                        <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                            <div className="flex flex-col gap-2 pt-1">
+                                <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                                    Controle de Caixa
+                                </h1>
+                                <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                                    Abertura, fechamento e auditoria de sessões do PDV.
                                 </p>
                             </div>
 
-                            <div className="rounded-xl border border-brand-border dark:border-dark-border p-4 space-y-2">
-                                <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                    Resumo calculado
-                                </p>
-                                {(closeSummary.groupedByMethod || []).length > 0 ? (
-                                    (closeSummary.groupedByMethod || []).map((row: any) => (
-                                        <div key={row.paymentMethodId || row.label} className="flex items-center justify-between gap-3 text-sm">
-                                            <span className="text-brand-inactive-text dark:text-dark-body">{row.label}</span>
-                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">
-                                                {formatCurrency(Number(row.calculated ?? row.total ?? 0))}
-                                            </span>
-                                        </div>
-                                    ))
+                            <div className="flex items-center gap-3">
+                                {!activeSession?.id ? (
+                                    <Button onClick={() => setOpenModal(true)}>Abrir Caixa</Button>
                                 ) : (
-                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                        Nenhum agrupamento por meio de pagamento disponível. Informe apenas o total contado.
-                                    </p>
+                                    <Button onClick={openCloseModal} isLoading={isPreparingClose}>
+                                        Fechar Caixa Atual
+                                    </Button>
                                 )}
                             </div>
+                        </div>
 
-                            {(closeSummary.groupedByMethod || []).length === 0 ? (
-                                <MoneyInput
-                                    label="Valor contado na gaveta (total)"
-                                    value={Number(countedByPm.__total__ ?? closeSummary.expectedDrawerTotal ?? 0)}
-                                    onChange={(v) => setCountedByPm((prev) => ({ ...prev, __total__: String(v) }))}
-                                />
+                        <div className="md:hidden px-4 mb-4">
+                            {!activeSession?.id ? (
+                                <Button onClick={() => setOpenModal(true)} className="w-full">
+                                    Abrir Caixa
+                                </Button>
                             ) : (
-                                <div className="space-y-3">
-                                    {(closeSummary.groupedByMethod || []).map((row: any) => {
-                                        const key = row.paymentMethodId || "__none__"
-                                        return (
-                                            <MoneyInput
-                                                key={key}
-                                                label={`Contado - ${row.label}`}
-                                                value={Number(countedByPm[key] ?? row.calculated ?? 0)}
-                                                onChange={(v) => setCountedByPm((prev) => ({ ...prev, [key]: String(v) }))}
-                                            />
-                                        )
-                                    })}
-                                </div>
+                                <Button onClick={openCloseModal} isLoading={isPreparingClose} className="w-full">
+                                    Fechar Caixa Atual
+                                </Button>
                             )}
-                        </>
-                    ) : null}
+                        </div>
 
-                    <Input
-                        label="Observações de fechamento"
-                        value={closingNotes}
-                        onChange={(e: any) => setClosingNotes(e.target.value)}
+                        <CashRegisterPageControls
+                            search={search}
+                            onSearchChange={setSearch}
+                            onOpenFilter={() => setModals((prev) => ({ ...prev, filter: true }))}
+                            onOpenSession={() => setOpenModal(true)}
+                            filters={filters}
+                            setFilters={setFilters}
+                            viewMode={viewMode}
+                            onViewModeChange={setViewModeState}
+                            hasActiveFilters={hasActiveFilters}
+                        />
+
+                        <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
+                            <AnimatePresence mode="wait">
+                                {paginated.length === 0 ? (
+                                    <FadeIn
+                                        key="empty"
+                                        className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
+                                    >
+                                        <IconPlaceholder
+                                            placeholderType="image"
+                                            imageSrc={isFiltered ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png" : "https://img.dudit.com.br/static/mascots/PDV.png"}
+                                            imageAlt="Sem sessões"
+                                            title={isFiltered ? "Nenhuma sessão encontrada" : "Caixa nunca utilizado"}
+                                            subtitle={isFiltered ? "Tente ajustar seus filtros ou termos de busca." : "Abra seu primeiro caixa para começar a vender no PDV."}
+                                            itemButton={!isFiltered ? {
+                                                text: "Abrir Caixa",
+                                                action: () => setOpenModal(true),
+                                            } : {
+                                                text: "Limpar Filtros",
+                                                action: handleClearFilters,
+                                                variant: "outline",
+                                            }}
+                                        />
+                                    </FadeIn>
+                                ) : (
+                                    <FadeIn
+                                        key={isTablet ? "stacked" : viewMode}
+                                        className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
+                                    >
+                                        {isTablet ? (
+                                            <div className="rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
+                                                {paginated.map((session, index) => (
+                                                    <div key={session.id}>
+                                                        <button
+                                                            type="button"
+                                                            className="w-full text-left px-4 py-5 hover:bg-brand-gray/50 dark:hover:bg-dark-border/20 transition-colors"
+                                                            onClick={() => handleViewDetails(session.id)}
+                                                        >
+                                                            <div className="flex items-start justify-between gap-3">
+                                                                <div className="min-w-0">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
+                                                                            Sessão {session.id.slice(0, 8).toUpperCase()}
+                                                                        </h3>
+                                                                        <Badge variant={session.status === "open" ? "green" : "gray"} className="whitespace-nowrap">
+                                                                            {session.status === "open" ? "Aberto" : "Fechado"}
+                                                                        </Badge>
+                                                                    </div>
+                                                                    <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                                        Abriu: {session.opened_by_name || session.user_name}
+                                                                    </p>
+                                                                    <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                                        Fechou: {session.closed_by_name || "-"}
+                                                                    </p>
+                                                                </div>
+                                                                <div className="text-right shrink-0">
+                                                                    <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                        Gaveta
+                                                                    </p>
+                                                                    <p className="text-[15px] font-bold text-brand-primary">
+                                                                        {formatCurrency(Number(session.expected_drawer_total || 0))}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="mt-4 grid grid-cols-2 gap-3">
+                                                                <div>
+                                                                    <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                        Abertura
+                                                                    </p>
+                                                                    <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                                        {formatDateTime(session.opened_at)}
+                                                                    </p>
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                        Fechamento
+                                                                    </p>
+                                                                    <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                                        {formatDateTime(session.closed_at)}
+                                                                    </p>
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                        Saldo inicial
+                                                                    </p>
+                                                                    <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                                        {formatCurrency(Number(session.initial_amount || 0))}
+                                                                    </p>
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                        Data da sessão
+                                                                    </p>
+                                                                    <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                                        {formatShortDate(session.closed_at || session.opened_at)}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </button>
+                                                        {index < paginated.length - 1 && (
+                                                            <Separator className="bg-brand-border dark:bg-dark-border" />
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : viewMode === "grid" ? (
+                                            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                                {paginated.map((session) => (
+                                                    <CashSessionGridCard
+                                                        key={session.id}
+                                                        session={session}
+                                                        onDetails={handleViewDetails}
+                                                    />
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="w-full overflow-hidden rounded-xl relative">
+                                                <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                                <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                                                <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                    <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                                        <thead>
+                                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                {columns.map((col, idx) => {
+                                                                    const isSorted = sortConfig?.key === col.id
+                                                                    const isLast = idx === columns.length - 1
+                                                                    const isFirst = idx === 0
+
+                                                                    return (
+                                                                        <th
+                                                                            key={col.id}
+                                                                            className={`py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${isFirst ? "rounded-l-lg pl-6" : ""} ${isLast ? "rounded-r-lg" : ""}`}
+                                                                            style={{ width: col.width }}
+                                                                            onClick={() => {
+                                                                                setSortConfig((prev) => ({
+                                                                                    key: col.id,
+                                                                                    direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc",
+                                                                                }))
+                                                                            }}
+                                                                        >
+                                                                            <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                                <span>{col.label}</span>
+                                                                                <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                                                    <ArrowUpDownIcon
+                                                                                        size={14}
+                                                                                        className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+                                                                        </th>
+                                                                    )
+                                                                })}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {paginated.map((session) => (
+                                                                <CashSessionListItem
+                                                                    key={session.id}
+                                                                    session={session}
+                                                                    columns={columns}
+                                                                    selected={false}
+                                                                    onSelect={() => { }}
+                                                                    onDetails={handleViewDetails}
+                                                                    showCheckbox={false}
+                                                                />
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </FadeIn>
+                                )}
+                            </AnimatePresence>
+                            {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
+                        </div>
+
+                        {filtered.length > 0 && (
+                            <Pagination
+                                currentPage={page}
+                                totalPages={totalPages}
+                                onPageChange={(p) => {
+                                    setPage(p)
+                                    if (p === totalPages && hasNextPage && !isFetchingNextPage) {
+                                        void fetchNextPage()
+                                    }
+                                }}
+                            />
+                        )}
+                        {hasNextPage && page === totalPages && isFetchingNextPage ? (
+                            <div className="flex flex-col gap-2 py-2 px-4">
+                                <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse" />
+                                <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse opacity-70" />
+                            </div>
+                        ) : null}
+                    </div>
+
+                    <FilterSheet
+                        isOpen={modals.filter}
+                        onClose={() => setModals((prev) => ({ ...prev, filter: false }))}
+                        sections={filterSections}
+                        filters={filters}
+                        setFilters={setFilters}
+                        onClear={handleClearFilters}
                     />
 
-                    <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={closeCloseModal}>Cancelar</Button>
-                        <Button onClick={handleCloseSession} isLoading={isClosingSession} disabled={!closeSummary}>
-                            Confirmar fechamento
-                        </Button>
-                    </div>
-                </div>
-            </DefaultModal>
-        </motion.div>
+                    <DefaultModal isOpen={openModal} onClose={closeOpenModal} title="Abrir caixa">
+                        <div className="space-y-3">
+                            <MoneyInput label="Troco inicial" value={openingBalance} onChange={setOpeningBalance} />
+                            <Input label="Observações" value={openingNotes} onChange={(e: any) => setOpeningNotes(e.target.value)} />
+                            <div className="flex justify-end gap-2">
+                                <Button variant="outline" onClick={closeOpenModal}>Cancelar</Button>
+                                <Button onClick={handleOpenSession} isLoading={isOpeningSession}>Confirmar abertura</Button>
+                            </div>
+                        </div>
+                    </DefaultModal>
+
+                    <DefaultModal isOpen={closeModal} onClose={closeCloseModal} title="Fechar caixa">
+                        <div className="space-y-4">
+                            {isPreparingClose && !closeSummary ? (
+                                <>
+                                    <div className="rounded-xl border border-brand-border dark:border-dark-border p-4 space-y-3">
+                                        <SkeletonLoader className="h-4 w-36 rounded-full" />
+                                        <SkeletonLoader className="h-8 w-48 rounded-xl" />
+                                    </div>
+                                    <div className="space-y-3">
+                                        <SkeletonLoader className="h-12 w-full rounded-xl" />
+                                        <SkeletonLoader className="h-12 w-full rounded-xl" />
+                                        <SkeletonLoader className="h-12 w-full rounded-xl" />
+                                    </div>
+                                </>
+                            ) : closeSummary ? (
+                                <>
+                                    <div className="rounded-xl border border-brand-border dark:border-dark-border p-4">
+                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">Saldo calculado (gaveta)</p>
+                                        <p className="mt-2 text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                            {formatCurrency(Number(closeSummary.expectedDrawerTotal || 0))}
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-xl border border-brand-border dark:border-dark-border p-4 space-y-2">
+                                        <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                            Resumo calculado
+                                        </p>
+                                        {(closeSummary.groupedByMethod || []).length > 0 ? (
+                                            (closeSummary.groupedByMethod || []).map((row: any) => (
+                                                <div key={row.paymentMethodId || row.label} className="flex items-center justify-between gap-3 text-sm">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body">{row.label}</span>
+                                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">
+                                                        {formatCurrency(Number(row.calculated ?? row.total ?? 0))}
+                                                    </span>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                                Nenhum agrupamento por meio de pagamento disponível. Informe apenas o total contado.
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {(closeSummary.groupedByMethod || []).length === 0 ? (
+                                        <MoneyInput
+                                            label="Valor contado na gaveta (total)"
+                                            value={Number(countedByPm.__total__ ?? closeSummary.expectedDrawerTotal ?? 0)}
+                                            onChange={(v) => setCountedByPm((prev) => ({ ...prev, __total__: String(v) }))}
+                                        />
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {(closeSummary.groupedByMethod || []).map((row: any) => {
+                                                const key = row.paymentMethodId || "__none__"
+                                                return (
+                                                    <MoneyInput
+                                                        key={key}
+                                                        label={`Contado - ${row.label}`}
+                                                        value={Number(countedByPm[key] ?? row.calculated ?? 0)}
+                                                        onChange={(v) => setCountedByPm((prev) => ({ ...prev, [key]: String(v) }))}
+                                                    />
+                                                )
+                                            })}
+                                        </div>
+                                    )}
+                                </>
+                            ) : null}
+
+                            <Input
+                                label="Observações de fechamento"
+                                value={closingNotes}
+                                onChange={(e: any) => setClosingNotes(e.target.value)}
+                            />
+                            <div className="flex justify-end gap-2">
+                                <Button variant="outline" onClick={closeCloseModal}>Cancelar</Button>
+                                <Button id="cash-close-submit" onClick={handleCloseSession} isLoading={isClosingSession}>
+                                    Confirmar fechamento
+                                </Button>
+                            </div>
+                        </div>
+                    </DefaultModal>
+                </FadeIn>
+            )}
+        </AnimatePresence>
     )
 }
