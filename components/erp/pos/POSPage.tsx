@@ -209,7 +209,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         const self = res.members.find((member) => member.userId === res.currentUserId)
         if (self) {
           defaultSellerPartnerUserIdRef.current = self.id
-          setSelectedSellerId((prev) => prev ?? self.id)
+          setSelectedSellerId((prev) => prev || self.id)
         }
       }
     }
@@ -219,6 +219,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   const isFinalizingRef = useRef(false)
   const isSavingDraftRef = useRef(false)
   const defaultSellerPartnerUserIdRef = useRef<string | undefined>(undefined)
+  const bypassBeforeUnloadRef = useRef(false)
   const desktopScrollClass = "custom-scrollbar max-lg:hide-scrollbar"
   const [customerSelectIntent, setCustomerSelectIntent] = useState<"default" | "shipping-preflight">("default")
   const [isRemoveCustomerAlertOpen, setIsRemoveCustomerAlertOpen] = useState(false)
@@ -711,6 +712,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (bypassBeforeUnloadRef.current) return
       if (!hasUnsavedOrderChanges) return
       event.preventDefault()
       event.returnValue = ""
@@ -1650,7 +1652,10 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
           const destination = pendingLeaveHref
           setIsLeaveWithoutSaveAlertOpen(false)
           setPendingLeaveHref(null)
-          if (destination) window.location.assign(destination)
+          if (destination) {
+            bypassBeforeUnloadRef.current = true
+            window.location.assign(destination)
+          }
         }}
         title="Sair sem salvar?"
         description="Você tem alterações no pedido que ainda não foram salvas."

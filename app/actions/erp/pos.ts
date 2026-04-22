@@ -97,6 +97,127 @@ function computeSubtotal(items: Array<{ quantity: number; unit_price: number }>)
   return safeMoney(items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0))
 }
 
+async function syncPosSaleToOrders(params: {
+  supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>
+  partnerId: string
+  saleId: string
+  preSaleId: string
+  financeAccountId?: string | null
+  defaultPaymentMethod: string
+  actorUserId: string
+}) {
+  const derivedOrderNumber = `PDV-${String(params.saleId).replace(/-/g, "").slice(0, 8).toUpperCase()}`
+  const { data: existingOrder } = await params.supabase
+    .from("orders")
+    .select("id")
+    .eq("partner_id", params.partnerId)
+    .eq("order_number", derivedOrderNumber)
+    .limit(1)
+    .maybeSingle()
+
+  if (existingOrder?.id) return
+
+  const [{ data: sale }, { data: saleItems }, { data: draft }] = await Promise.all([
+    params.supabase
+      .from("sales")
+      .select("id, sale_number, customer_id, notes, payment_status, final_amount, paid_amount, discount_amount, created_at")
+      .eq("id", params.saleId)
+      .eq("partner_id", params.partnerId)
+      .single(),
+    params.supabase
+      .from("sale_items")
+      .select("product_id, variant_id, product_name, unit_price, quantity, subtotal")
+      .eq("sale_id", params.saleId)
+      .eq("partner_id", params.partnerId),
+    params.supabase
+      .from("pre_sales")
+      .select("shipping_fee, other_costs")
+      .eq("id", params.preSaleId)
+      .eq("partner_id", params.partnerId)
+      .maybeSingle(),
+  ])
+
+  if (!sale) return
+
+  const shippingFee = safeMoney(Number(draft?.shipping_fee || 0))
+  const otherCosts = safeMoney(Number(draft?.other_costs || 0))
+  const deliveryType = shippingFee > 0 ? "delivery" : "pickup"
+  const deliveryStatus = shippingFee > 0 ? "preparing" : "delivered"
+  const paymentSituation = sale.payment_status === "paid"
+    ? "paid"
+    : sale.payment_status === "partially_paid"
+      ? "partially_paid"
+      : "pending"
+
+  const orderPayload: Record<string, unknown> = {
+    partner_id: params.partnerId,
+    buyer_id: sale.customer_id || null,
+    customer_name: null,
+    order_source: "Presencial",
+    delivery_type: deliveryType,
+    delivery_status: deliveryStatus,
+    situation: paymentSituation,
+    total_amount: safeMoney(Number(sale.final_amount || 0)),
+    paid_amount: safeMoney(Number(sale.paid_amount || 0)),
+    discount_value: safeMoney(Number(sale.discount_amount || 0)),
+    discount_type: "fixed",
+    discount_amount: safeMoney(Number(sale.discount_amount || 0)),
+    shipping_cost: shippingFee,
+    additional_costs: otherCosts,
+    notes: sale.notes || null,
+    payment_method: inputPaymentMethodLabel(params.defaultPaymentMethod),
+    payment_breakdown: [],
+    finance_account_id: params.financeAccountId || null,
+    created_by: params.actorUserId,
+    inventory_deducted: true,
+    order_number: derivedOrderNumber,
+    order_date: sale.created_at || new Date().toISOString(),
+  }
+
+  const insertWithPosFlag = { ...orderPayload, is_pos_sale: true }
+  let createdOrderId: string | null = null
+  const { data: insertedWithPosFlag, error: insertError } = await params.supabase
+    .from("orders")
+    .insert(insertWithPosFlag)
+    .select("id")
+    .single()
+
+  if (insertError) {
+    const missingPosFlagColumn = String(insertError.message || "").toLowerCase().includes("is_pos_sale")
+    if (!missingPosFlagColumn) return
+
+    const { data: insertedWithoutPosFlag } = await params.supabase
+      .from("orders")
+      .insert(orderPayload)
+      .select("id")
+      .single()
+    createdOrderId = insertedWithoutPosFlag?.id || null
+  } else {
+    createdOrderId = insertedWithPosFlag?.id || null
+  }
+
+  if (!createdOrderId) return
+
+  const orderItems = (saleItems || []).map((item: any, index: number) => ({
+    order_id: createdOrderId,
+    product_id: item.product_id || null,
+    variant_id: item.variant_id || null,
+    product_name: item.product_name || "Item",
+    product_price: safeMoney(Number(item.unit_price || 0)),
+    quantity: Number(item.quantity || 0),
+    subtotal: safeMoney(Number(item.subtotal || 0)),
+    sort_order: index,
+  }))
+
+  if (orderItems.length > 0) {
+    await params.supabase.from("order_items").insert(orderItems)
+  }
+}
+
+function inputPaymentMethodLabel(paymentMethod?: string | null) {
+  return String(paymentMethod || "").trim() || "PDV"
+}
+
 export async function getPOSInitialDataAction(partnerId: string) {
   await requireUser()
   await requirePartnerAccess(partnerId)
@@ -319,6 +440,16 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     .update({ delivery_status: hasShipping ? "preparing" : "delivered" })
     .eq("id", saleId)
     .eq("partner_id", input.partnerId)
+
+  await syncPosSaleToOrders({
+    supabase,
+    partnerId: input.partnerId,
+    saleId,
+    preSaleId: input.preSaleId,
+    financeAccountId: input.financeAccountId || null,
+    defaultPaymentMethod: input.paymentMethod || "PDV",
+    actorUserId: user.id,
+  })
 
   // Invalidate caches (non-blocking - sale is already safely committed)
   const draftItems = await supabase

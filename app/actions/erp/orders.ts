@@ -608,8 +608,21 @@ async function createRefundTransactionForCancelledOrder(params: {
 }) {
     const paidAmount = Math.max(0, Number(params.paidAmount || 0))
     if (paidAmount <= 0.009) return { success: true as const }
-    if (!params.financeAccountId) {
-        return { error: "Não foi possível gerar o reembolso automático porque a venda não possui conta financeira vinculada." as const }
+    let financeAccountId = params.financeAccountId || null
+    if (!financeAccountId) {
+        const { data: defaultAccount } = await params.supabase
+            .from("finance_accounts")
+            .select("id")
+            .eq("partner_id", params.partnerId)
+            .eq("is_active", true)
+            .order("is_default", { ascending: false })
+            .order("created_at", { ascending: true })
+            .limit(1)
+            .maybeSingle()
+        financeAccountId = defaultAccount?.id || null
+    }
+    if (!financeAccountId) {
+        return { error: "Não foi possível gerar o reembolso automático porque não existe conta financeira ativa para lançar o reembolso." as const }
     }
 
     const { data: existingRefunds, error: existingRefundsError } = await params.supabase
@@ -652,11 +665,66 @@ async function createRefundTransactionForCancelledOrder(params: {
             origin: "order_cancel",
             refund_kind: "revenue_refund",
             reference_note: params.orderId,
-            account_id: params.financeAccountId,
+            account_id: financeAccountId,
             created_by_user_id: params.createdByUserId || null,
         })
 
     if (error) return { error: error.message }
+    return { success: true as const }
+}
+
+async function restoreCancelledOrderInventory(params: {
+    supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>
+    partnerId: string
+    items: Array<{ product_id?: string | null; variant_id?: string | null; quantity: number }>
+}) {
+    const validItems = (params.items || []).filter((item) => item.product_id && Number(item.quantity || 0) > 0)
+    for (const item of validItems) {
+        const qty = Number(item.quantity || 0)
+        if (item.variant_id) {
+            const { data: variant, error: variantError } = await params.supabase
+                .from("product_variants")
+                .select("id, product_id, stock_quantity, stock_available, products!inner(partner_id)")
+                .eq("id", item.variant_id)
+                .eq("product_id", item.product_id)
+                .eq("products.partner_id", params.partnerId)
+                .maybeSingle()
+            if (variantError) return { error: variantError.message }
+            if (!variant?.id) continue
+
+            const { error: updateVariantError } = await params.supabase
+                .from("product_variants")
+                .update({
+                    stock_quantity: Number(variant.stock_quantity || 0) + qty,
+                    stock_available: Number(variant.stock_available || 0) + qty,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("id", variant.id)
+            if (updateVariantError) return { error: updateVariantError.message }
+            continue
+        }
+
+        const { data: product, error: productReadError } = await params.supabase
+            .from("products")
+            .select("id, stock_quantity, stock_available")
+            .eq("id", item.product_id)
+            .eq("partner_id", params.partnerId)
+            .maybeSingle()
+        if (productReadError) return { error: productReadError.message }
+        if (!product?.id) continue
+
+        const { error: productError } = await params.supabase
+            .from("products")
+            .update({
+                stock_quantity: Number(product.stock_quantity || 0) + qty,
+                stock_available: Number(product.stock_available || 0) + qty,
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", product.id)
+            .eq("partner_id", params.partnerId)
+        if (productError) return { error: productError.message }
+    }
+
     return { success: true as const }
 }
 
@@ -1445,19 +1513,14 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 processedCount += 1
 
                 if (order.inventory_deducted && stockWasRestoredOnCancel) {
-                    const movementResult = await createOrderStockMovement({
+                    const restoreResult = await restoreCancelledOrderInventory({
                         supabase,
                         partnerId: payload.partnerId,
-                        orderId: order.id,
-                        createdBy: user.id,
-                        type: "in",
-                        reason: "Cancelamento de Pedido",
-                        notes: payload.cancelReason?.trim() || undefined,
                         items: order.order_items || [],
                     })
 
-                    if ("error" in movementResult) {
-                        processingWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível restaurar estoque (${movementResult.error})`)
+                    if ("error" in restoreResult) {
+                        processingWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível restaurar estoque (${restoreResult.error})`)
                     }
                 } else if (!order.inventory_deducted) {
                     const releaseResult = await releaseOrderInventory({
@@ -1708,18 +1771,6 @@ export async function updateOrdersStatusInBatchAction(payload: {
             }
             const shouldFinalizeNow = !order.inventory_deducted && shouldDeductInventory(payload.statusValue)
 
-            const { error } = await supabase
-                .from("orders")
-                .update({
-                    delivery_status: payload.statusValue,
-                    ...(shouldFinalizeNow ? { inventory_deducted: true } : {}),
-                })
-                .eq("id", order.id)
-                .eq("partner_id", payload.partnerId)
-
-            if (error) return { error: error.message }
-            deliveryProcessedCount += 1
-
             if (shouldFinalizeNow) {
                 const finalizeResult = await finalizeOrderInventory({
                     client: supabase,
@@ -1733,6 +1784,18 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
                 if ("error" in finalizeResult) return { error: finalizeResult.error }
             }
+
+            const { error } = await supabase
+                .from("orders")
+                .update({
+                    delivery_status: payload.statusValue,
+                    ...(shouldFinalizeNow ? { inventory_deducted: true } : {}),
+                })
+                .eq("id", order.id)
+                .eq("partner_id", payload.partnerId)
+
+            if (error) return { error: error.message }
+            deliveryProcessedCount += 1
         }
         if (deliveryProcessedCount === 0) {
             return { error: "Nenhum pedido elegível para alteração de entrega." }

@@ -57,7 +57,7 @@ const SelectCustomerSheet = ({
   onClose,
   onSelect,
   onCreateCustomer,
-  partnerId: _partnerId,
+  partnerId,
   selectedCustomerId,
   pinnedCustomer,
   onRequestRemoveSelected,
@@ -110,7 +110,12 @@ const SelectCustomerSheet = ({
     [postFilter, selectedCustomerId, pinnedCustomer?.id]
   )
 
-  const picker = usePickerBucket(fetchPartnerCustomersBucket, matchesSearch, pickerOptions)
+  const loadCustomersBucket = useCallback(
+    () => fetchPartnerCustomersBucket(partnerId),
+    [partnerId]
+  )
+
+  const picker = usePickerBucket(loadCustomersBucket, matchesSearch, pickerOptions)
 
   const pickerRef = useRef(picker)
   pickerRef.current = picker

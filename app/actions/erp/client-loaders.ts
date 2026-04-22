@@ -110,12 +110,17 @@ export type PartnerCustomerBucketItem = {
   avatar_url?: string | null
 }
 
-export async function fetchPartnerCustomersBucket(): Promise<PartnerCustomerBucketItem[]> {
+export async function fetchPartnerCustomersBucket(explicitPartnerId?: string): Promise<PartnerCustomerBucketItem[]> {
   const user = await getCurrentUser()
   if (!user) throw new Error("Unauthorized")
-  const context = await getCurrentPartnerContext()
-  if (!context) throw new Error("No context")
-  const partnerId = context.partnerId
+
+  let partnerId = explicitPartnerId
+  if (!partnerId) {
+    const context = await getCurrentPartnerContext()
+    if (!context) throw new Error("No context")
+    partnerId = context.partnerId
+  }
+
   const { allowed } = await checkPartnerPermission(partnerId, "customers", "view")
   if (!allowed) throw new Error("Forbidden")
 
@@ -124,6 +129,7 @@ export async function fetchPartnerCustomersBucket(): Promise<PartnerCustomerBuck
     .from("customers")
     .select("id, name, email, phone, avatar_url")
     .eq("partner_id", partnerId)
+    .eq("status", "ativo")
     .order("name", { ascending: true })
     .limit(500)
 
