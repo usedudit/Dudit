@@ -105,6 +105,7 @@ export default function CouponsPage({
     const [couponToDelete, setCouponToDelete] = useState<CouponRow | null>(null)
     const [isDeleting, setIsDeleting] = useState(false)
     const [selection, setSelection] = useState({ ids: new Set<string>() })
+    const [actionModal, setActionModal] = useState<{ open: boolean; text: string }>({ open: false, text: "" })
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
@@ -339,6 +340,7 @@ export default function CouponsPage({
     const confirmDelete = useCallback(async () => {
         if (!couponToDelete) return
         setIsDeleting(true)
+        setActionModal({ open: true, text: "Excluindo cupom..." })
         try {
             const result = await deleteCouponAction(partnerId, couponToDelete.id)
             if (!result.success) {
@@ -358,6 +360,7 @@ export default function CouponsPage({
             await refreshCoupons()
         } finally {
             setIsDeleting(false)
+            setActionModal({ open: false, text: "" })
         }
     }, [couponToDelete, handleBackToList, partnerId, refreshCoupons, selectedCouponId, toast])
 
@@ -449,6 +452,7 @@ export default function CouponsPage({
         }
 
         setIsSaving(true)
+        setActionModal({ open: true, text: selectedCouponId ? "Salvando alteracoes..." : "Criando cupom..." })
         try {
             const result = selectedCouponId
                 ? await updateCouponAction(selectedCouponId, payload)
@@ -471,6 +475,7 @@ export default function CouponsPage({
             resetRelations()
         } finally {
             setIsSaving(false)
+            setActionModal({ open: false, text: "" })
         }
     }, [form, partnerId, refreshCoupons, relations, resetRelations, selectedCouponId, toast])
 
@@ -632,121 +637,130 @@ export default function CouponsPage({
                                 />
 
                                 <div className="flex-1 min-h-[420px]">
-                                    {isLoadingPage ? (
-                                        <div className="h-[420px] flex items-center justify-center">
-                                            <ThreeDotsLoader />
-                                        </div>
-                                    ) : filteredCoupons.length === 0 ? (
-                                        <div className="h-[520px] flex items-center justify-center px-4 md:px-8">
-                                            <IconPlaceholder
-                                                placeholderType="image"
-                                                imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                                                imageAlt="Nenhum cupom encontrado"
-                                                title="Nenhum cupom encontrado"
-                                                subtitle="Tente ajustar seus filtros ou cadastre um novo cupom."
-                                                itemButton={{ text: "Criar cupom", action: openCreate }}
-                                            />
-                                        </div>
-                                    ) : effectiveViewMode === "grid" ? (
-                                        <div className="px-4 md:px-8 pb-6">
-                                            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                                <AnimatePresence>
-                                                    {paginatedCoupons.map((coupon) => (
-                                                        <CouponGridCard
-                                                            key={coupon.id}
-                                                            coupon={coupon}
-                                                            selected={selection.ids.has(coupon.id)}
-                                                            onSelect={() => handleSelectRow(coupon.id)}
-                                                            onDetails={openDetails}
-                                                            onEdit={openEdit}
-                                                            onToggleStatus={handleToggleStatus}
-                                                            onDelete={handleDelete}
-                                                        />
-                                                    ))}
-                                                </AnimatePresence>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="px-4 md:px-8 pb-6">
-                                            <div className="relative">
-                                                <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                                                <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
-
-                                                <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                                                    <table className="w-full text-left border-separate border-spacing-0 min-w-[1380px]">
-                                                        <thead>
-                                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-l-lg pl-6 w-12">
-                                                                    <Checkbox
-                                                                        checked={paginatedCoupons.length > 0 && paginatedCoupons.every((coupon) => selection.ids.has(coupon.id))}
-                                                                        onChange={() => {
-                                                                            const allSelected = paginatedCoupons.every((coupon) => selection.ids.has(coupon.id))
-                                                                            setSelection((prev) => {
-                                                                                const next = new Set(prev.ids)
-                                                                                if (allSelected) {
-                                                                                    paginatedCoupons.forEach((coupon) => next.delete(coupon.id))
-                                                                                } else {
-                                                                                    paginatedCoupons.forEach((coupon) => next.add(coupon.id))
-                                                                                }
-                                                                                return { ids: next }
-                                                                            })
-                                                                        }}
+                                    <AnimatePresence mode="wait">
+                                        {isLoadingPage ? (
+                                            <FadeIn key="loading" className="h-[420px] flex items-center justify-center">
+                                                <ThreeDotsLoader />
+                                            </FadeIn>
+                                        ) : filteredCoupons.length === 0 ? (
+                                            <FadeIn key="empty" className="h-[600px] flex items-center justify-center px-4 md:px-8">
+                                                <IconPlaceholder
+                                                    placeholderType="image"
+                                                    imageSrc={hasActiveFilters ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png" : "https://img.dudit.com.br/static/mascots/Aguarde.png"}
+                                                    imageAlt="Nenhum cupom encontrado"
+                                                    title={hasActiveFilters ? "Nenhum cupom encontrado" : "Nenhum cupom cadastrado"}
+                                                    subtitle={hasActiveFilters ? "Tente ajustar seus filtros ou termos de busca." : "Comece criando seu primeiro cupom promocional."}
+                                                    itemButton={{ text: "Criar cupom", action: openCreate }}
+                                                />
+                                            </FadeIn>
+                                        ) : (
+                                            <FadeIn
+                                                key={`${effectiveViewMode}-${activeTab}-${debouncedSearch}`}
+                                                className="w-full"
+                                            >
+                                                {effectiveViewMode === "grid" ? (
+                                                    <div className="px-4 md:px-8 pb-6">
+                                                        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                                            <AnimatePresence>
+                                                                {paginatedCoupons.map((coupon) => (
+                                                                    <CouponGridCard
+                                                                        key={coupon.id}
+                                                                        coupon={coupon}
+                                                                        selected={selection.ids.has(coupon.id)}
+                                                                        onSelect={() => handleSelectRow(coupon.id)}
+                                                                        onDetails={openDetails}
+                                                                        onEdit={openEdit}
+                                                                        onToggleStatus={handleToggleStatus}
+                                                                        onDelete={handleDelete}
                                                                     />
-                                                                </th>
-                                                                {COLUMNS.map((column, index) => {
-                                                                    const isSortable = column.id !== "actions"
-                                                                    const isSorted = sortConfig?.key === column.id
-                                                                    const isLast = index === COLUMNS.length - 1
+                                                                ))}
+                                                            </AnimatePresence>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="px-4 md:px-8 pb-6">
+                                                        <div className="relative">
+                                                            <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                                            <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
 
-                                                                    return (
-                                                                        <th
-                                                                            key={column.id}
-                                                                            className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${column.align === "right" ? "text-right" : column.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isLast ? "rounded-r-lg pr-6" : ""}`}
-                                                                            style={{ width: column.width }}
-                                                                            onClick={() => {
-                                                                                if (!isSortable) return
-                                                                                setSortConfig((prev) => ({
-                                                                                    key: column.id as SortKey,
-                                                                                    direction: prev?.key === column.id && prev.direction === "asc" ? "desc" : "asc",
-                                                                                }))
-                                                                            }}
-                                                                        >
-                                                                            <div className={`flex items-center gap-1.5 ${column.align === "right" ? "justify-end" : column.align === "center" ? "justify-center" : ""}`}>
-                                                                                {column.label}
-                                                                                {isSortable && (
-                                                                                    <div className="w-4 h-4 flex items-center justify-center shrink-0">
-                                                                                        <ArrowUpDownIcon
-                                                                                            size={14}
-                                                                                            className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-0 group-hover:opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
-                                                                                        />
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        </th>
-                                                                    )
-                                                                })}
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {paginatedCoupons.map((coupon) => (
-                                                                <CouponListItem
-                                                                    key={coupon.id}
-                                                                    coupon={coupon}
-                                                                    columns={COLUMNS}
-                                                                    selected={selection.ids.has(coupon.id)}
-                                                                    onSelect={handleSelectRow}
-                                                                    onDetails={openDetails}
-                                                                    onEdit={openEdit}
-                                                                    onToggleStatus={handleToggleStatus}
-                                                                    onDelete={handleDelete}
-                                                                />
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
+                                                            <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                                <table className="w-full text-left border-separate border-spacing-0 min-w-[1380px]">
+                                                                    <thead>
+                                                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-l-lg pl-6 w-12">
+                                                                                <Checkbox
+                                                                                    checked={paginatedCoupons.length > 0 && paginatedCoupons.every((coupon) => selection.ids.has(coupon.id))}
+                                                                                    onChange={() => {
+                                                                                        const allSelected = paginatedCoupons.every((coupon) => selection.ids.has(coupon.id))
+                                                                                        setSelection((prev) => {
+                                                                                            const next = new Set(prev.ids)
+                                                                                            if (allSelected) {
+                                                                                                paginatedCoupons.forEach((coupon) => next.delete(coupon.id))
+                                                                                            } else {
+                                                                                                paginatedCoupons.forEach((coupon) => next.add(coupon.id))
+                                                                                            }
+                                                                                            return { ids: next }
+                                                                                        })
+                                                                                    }}
+                                                                                />
+                                                                            </th>
+                                                                            {COLUMNS.map((column, index) => {
+                                                                                const isSortable = column.id !== "actions"
+                                                                                const isSorted = sortConfig?.key === column.id
+                                                                                const isLast = index === COLUMNS.length - 1
+
+                                                                                return (
+                                                                                    <th
+                                                                                        key={column.id}
+                                                                                        className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${column.align === "right" ? "text-right" : column.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isLast ? "rounded-r-lg pr-6" : ""}`}
+                                                                                        style={{ width: column.width }}
+                                                                                        onClick={() => {
+                                                                                            if (!isSortable) return
+                                                                                            setSortConfig((prev) => ({
+                                                                                                key: column.id as SortKey,
+                                                                                                direction: prev?.key === column.id && prev.direction === "asc" ? "desc" : "asc",
+                                                                                            }))
+                                                                                        }}
+                                                                                    >
+                                                                                        <div className={`flex items-center gap-1.5 ${column.align === "right" ? "justify-end" : column.align === "center" ? "justify-center" : ""}`}>
+                                                                                            {column.label}
+                                                                                            {isSortable && (
+                                                                                                <div className="w-4 h-4 flex items-center justify-center shrink-0">
+                                                                                                    <ArrowUpDownIcon
+                                                                                                        size={14}
+                                                                                                        className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-0 group-hover:opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                                                                                    />
+                                                                                                </div>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </th>
+                                                                                )
+                                                                            })}
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {paginatedCoupons.map((coupon) => (
+                                                                            <CouponListItem
+                                                                                key={coupon.id}
+                                                                                coupon={coupon}
+                                                                                columns={COLUMNS}
+                                                                                selected={selection.ids.has(coupon.id)}
+                                                                                onSelect={handleSelectRow}
+                                                                                onDetails={openDetails}
+                                                                                onEdit={openEdit}
+                                                                                onToggleStatus={handleToggleStatus}
+                                                                                onDelete={handleDelete}
+                                                                            />
+                                                                        ))}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </FadeIn>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
 
                                 <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
@@ -776,6 +790,22 @@ export default function CouponsPage({
                 isDestructive
                 isLoading={isDeleting}
             />
+
+            <AnimatePresence>
+                {actionModal.open && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 backdrop-blur-[2px]"
+                    >
+                        <div className="bg-white dark:bg-dark-surface rounded-3xl p-8 shadow-2xl flex flex-col items-center gap-6 max-w-sm w-full mx-4">
+                            <img src="https://img.dudit.com.br/static/mascots/Aguarde.png" alt="Aguarde" className="w-36 h-36 object-contain" />
+                            <p className="text-lg font-semibold text-brand-dark dark:text-dark-heading text-center leading-tight">{actionModal.text}</p>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </>
     )
 }

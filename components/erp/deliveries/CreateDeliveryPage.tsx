@@ -217,7 +217,7 @@ export default function CreateDeliveryPage({
                                                                     <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border" />
                                                                     <div className="flex-1 min-w-0">
                                                                         <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{item.product_name || "Item"}</p>
-                                                                        <p className="text-xs text-brand-inactive-text">{item.sku || "SKU não informado"}</p>
+                                                                        <p className="text-xs text-brand-inactive-text">{item.products?.sku || "SKU não informado"}</p>
                                                                     </div>
                                                                     <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">x{item.quantity || 0}</span>
                                                                 </div>

@@ -198,7 +198,7 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
       situation,
       delivery_status,
       created_at,
-      order_items(id, product_name, quantity, sku)
+      order_items(id, product_name, product_price, quantity, subtotal, product_id, products(sku, images))
     `)
     .eq("partner_id", partnerId)
     .order("created_at", { ascending: false })

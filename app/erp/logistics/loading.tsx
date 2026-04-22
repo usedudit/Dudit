@@ -1,4 +1,4 @@
-import SkeletonLoader from "@/components/erp/skeleton-loader"
+import SkeletonLoader from "@/components/erp/SkeletonLoader"
 
 export default function LogisticsLoading() {
   return <SkeletonLoader />
