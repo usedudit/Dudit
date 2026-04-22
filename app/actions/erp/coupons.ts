@@ -229,3 +229,90 @@ export async function getCouponCustomersAction(partnerId: string, couponId: stri
   if (error) return { success: false, error: error.message }
   return { success: true, data: (data || []).map((r: any) => r.customer_id) }
 }
+
+// ---------------------------------------------------------------------------
+// MARKETPLACE-SAFE: Validate coupon for marketplace checkout (no partner access needed)
+// ---------------------------------------------------------------------------
+export async function validateMarketplaceCouponAction(input: {
+  partnerId: string
+  code: string
+  customerId?: string | null
+  subtotal: number
+  shippingCost?: number
+  items?: Array<{ productId?: string | null; serviceId?: string | null }>
+}) {
+  // Only require authenticated user — marketplace buyers are NOT partner members
+  await requireUser()
+  return validateCoupon(input)
+}
+
+// ---------------------------------------------------------------------------
+// DATA-FETCHING: For CouponsPage scope pickers
+// ---------------------------------------------------------------------------
+
+export async function getCouponScopeDataAction(partnerId: string) {
+  await requireUser()
+  await requirePartnerAccessWithPermission(partnerId, "orders", "view")
+  const supabase = await getSupabaseServerClient()
+
+  const [{ data: products }, { data: services }, { data: categories }, { data: customers }] = await Promise.all([
+    supabase
+      .from("products")
+      .select("id, name, category, price")
+      .eq("partner_id", partnerId)
+      .eq("is_active", true)
+      .order("name")
+      .limit(200),
+    supabase
+      .from("services")
+      .select("id, name, price")
+      .eq("partner_id", partnerId)
+      .eq("is_active", true)
+      .order("name")
+      .limit(200),
+    supabase
+      .from("products")
+      .select("category")
+      .eq("partner_id", partnerId)
+      .eq("is_active", true)
+      .not("category", "is", null),
+    supabase
+      .from("customers")
+      .select("id, name, email, phone")
+      .eq("partner_id", partnerId)
+      .order("name")
+      .limit(300),
+  ])
+
+  // Deduplicate categories from products
+  const uniqueCategories = Array.from(
+    new Set((categories || []).map((r: any) => r.category).filter(Boolean))
+  ).sort()
+
+  return {
+    success: true,
+    products: (products || []).map((p: any) => ({ id: p.id, name: p.name, category: p.category, price: p.price })),
+    services: (services || []).map((s: any) => ({ id: s.id, name: s.name, price: s.price })),
+    categories: uniqueCategories,
+    customers: (customers || []).map((c: any) => ({ id: c.id, name: c.name, email: c.email, phone: c.phone })),
+  }
+}
+
+export async function getCouponLinkedItemsAction(partnerId: string, couponId: string) {
+  await requireUser()
+  await requirePartnerAccessWithPermission(partnerId, "orders", "view")
+  const supabase = await getSupabaseServerClient()
+
+  const [{ data: products }, { data: categories }, { data: services }] = await Promise.all([
+    supabase.from("coupon_products").select("product_id").eq("coupon_id", couponId),
+    supabase.from("coupon_categories").select("category_id").eq("coupon_id", couponId),
+    supabase.from("coupon_services").select("service_id").eq("coupon_id", couponId),
+  ])
+
+  return {
+    success: true,
+    productIds: (products || []).map((r: any) => r.product_id),
+    categoryIds: (categories || []).map((r: any) => r.category_id),
+    serviceIds: (services || []).map((r: any) => r.service_id),
+  }
+}

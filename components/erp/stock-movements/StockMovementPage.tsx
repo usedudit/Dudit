@@ -22,7 +22,6 @@ import StockMovementGridCard from './StockMovementGridCard';
 import { undoStockMovementAction, undoBatchStockMovementsAction, getStockMovementDetails, getERPStockMovementsPageAction, type ERPStockMovementListCursor } from '@/app/actions/erp/stock-movements';
 import { useNotification } from '@/hooks/use-notification';
 import { useMediaQuery } from '@/components/erp/hooks';
-import { FadeIn } from '@/components/animations/FadeIn';
 import { useInfiniteList } from '@/hooks/use-infinite-list';
 import { useInfiniteScrollObserver } from '@/hooks/use-infinite-scroll-observer';
 import {
@@ -103,15 +102,17 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
             if (!res.success) throw new Error(res.error || 'Erro ao carregar movimentações.')
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
-        dedupeKey: (m) => String(m?.id || ''),
+        dedupeKey: useCallback((m: any) => String(m?.id || ''), []),
     });
 
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return;
         const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current;
-        setScrollState({
-            left: scrollLeft > 0,
-            right: scrollLeft < scrollWidth - clientWidth - 2,
+        setScrollState((prev) => {
+            const nextLeft = scrollLeft > 0
+            const nextRight = scrollLeft < scrollWidth - clientWidth - 2
+            if (prev.left === nextLeft && prev.right === nextRight) return prev
+            return { left: nextLeft, right: nextRight }
         });
     }, []);
 

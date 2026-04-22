@@ -12,7 +12,6 @@ import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { formatCurrency } from "@/lib/utils"
 import { diffCalendarDaysInSaoPaulo } from "@/lib/utils/formatters"
-import { DueDateCountdown } from "@/lib/utils/transaction-due-countdown"
 import {
     PlusIcon,
     ExportFileIcon,
@@ -194,7 +193,7 @@ export default function TransactionsPage({
             if (!res.success) throw new Error(res.error || "Erro ao carregar transações.")
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
-        dedupeKey: (t) => t.id,
+        dedupeKey: useCallback((t: any) => t.id, []),
     })
     const [settlePaymentsByInstallment, setSettlePaymentsByInstallment] = useState<
         Record<string, { paymentAmount: string; interestAmount: string; discountAmount: string; paymentMethodId: string }>
@@ -241,9 +240,11 @@ export default function TransactionsPage({
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return
         const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
-        setScrollState({
-            left: scrollLeft > 0,
-            right: scrollLeft < scrollWidth - clientWidth - 2,
+        setScrollState((prev) => {
+            const nextLeft = scrollLeft > 0
+            const nextRight = scrollLeft < scrollWidth - clientWidth - 2
+            if (prev.left === nextLeft && prev.right === nextRight) return prev
+            return { left: nextLeft, right: nextRight }
         })
     }, [])
 
@@ -1047,7 +1048,7 @@ export default function TransactionsPage({
                                                 </div>
                                             )
                                         })}
-                                       {/* <div ref={observerTarget} className="h-10" /> */}
+                                        {/* <div ref={observerTarget} className="h-10" /> */}
                                     </div>
                                 ) : viewMode === "grid" ? (
                                     <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
@@ -1136,7 +1137,7 @@ export default function TransactionsPage({
                                                     ))}
                                                 </tbody>
                                             </table>
-                                             {/* <div ref={observerTarget} className="h-10" /> */}
+                                            {/* <div ref={observerTarget} className="h-10" /> */}
                                         </div>
                                     </div>
                                 )}
@@ -1225,44 +1226,44 @@ export default function TransactionsPage({
                         <div className="flex flex-col w-full max-h-[60vh] overflow-y-auto px-1 pr-1 custom-scrollbar border-t border-brand-border dark:border-dark-border mt-4">
                             {(installmentDetail.installments || []).map((row: any) => (
                                 <div key={row.id} className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 flex items-start gap-4 hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 px-2 transition-colors rounded-lg">
-                                     <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-                                          <div className="flex justify-between items-start gap-3">
-                                               <div className="min-w-0">
-                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                                                        {row.description}
-                                                    </h3>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-brand-slate dark:bg-dark-border text-brand-dark dark:text-dark-heading">
-                                                            Parcela {row.installmentNumber}/{installmentDetail.group?.installments_count}
-                                                        </span>
-                                                        <Badge variant={row.status === "paid" ? "green" : row.status === "overdue" ? "red" : "orange"} className="scale-90">
-                                                            {row.status === "paid" ? "Pago" : row.status === "overdue" ? "Vencido" : "Pendente"}
-                                                        </Badge>
-                                                    </div>
-                                               </div>
-                                               <div className="flex flex-col items-end gap-1 shrink-0">
-                                                    <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
-                                                        {formatCurrency(row.originalAmount || 0)}
+                                    <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                                        <div className="flex justify-between items-start gap-3">
+                                            <div className="min-w-0">
+                                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                    {row.description}
+                                                </h3>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-brand-slate dark:bg-dark-border text-brand-dark dark:text-dark-heading">
+                                                        Parcela {row.installmentNumber}/{installmentDetail.group?.installments_count}
                                                     </span>
-                                                    <span className="text-[12px] font-medium text-brand-inactive-text">
-                                                        Vence em {row.dueDate || "-"}
-                                                    </span>
-                                               </div>
-                                          </div>
-                                          <div className="flex items-center gap-4 mt-2 py-2 px-3 rounded-lg bg-brand-gray/50 dark:bg-dark-border/20 border border-brand-border/50 dark:border-dark-border/30">
-                                               <div className="flex flex-col"><span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider">Restante</span><span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{formatCurrency(row.remainingAmount || 0)}</span></div>
-                                               <div className="flex flex-col border-l border-brand-border dark:border-dark-border pl-4"><span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider">Pago</span><span className="font-bold text-[13px] text-brand-green">{formatCurrency(row.paidAmount || 0)}</span></div>
-                                          </div>
-                                     </div>
-                                     {row.status !== "paid" && (
-                                         <div className="shrink-0 flex items-center justify-center pt-1 ml-2 action-btn">
-                                              <ActionsDropdown
-                                                   onEdit={() => handleEditInstallment(row.id)}
-                                                   onCancel={() => void handlePayInstallment(row.id)}
-                                                   cancelLabel="Marcar como paga"
-                                              />
-                                         </div>
-                                     )}
+                                                    <Badge variant={row.status === "paid" ? "green" : row.status === "overdue" ? "red" : "orange"} className="scale-90">
+                                                        {row.status === "paid" ? "Pago" : row.status === "overdue" ? "Vencido" : "Pendente"}
+                                                    </Badge>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-end gap-1 shrink-0">
+                                                <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
+                                                    {formatCurrency(row.originalAmount || 0)}
+                                                </span>
+                                                <span className="text-[12px] font-medium text-brand-inactive-text">
+                                                    Vence em {row.dueDate || "-"}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-4 mt-2 py-2 px-3 rounded-lg bg-brand-gray/50 dark:bg-dark-border/20 border border-brand-border/50 dark:border-dark-border/30">
+                                            <div className="flex flex-col"><span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider">Restante</span><span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{formatCurrency(row.remainingAmount || 0)}</span></div>
+                                            <div className="flex flex-col border-l border-brand-border dark:border-dark-border pl-4"><span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider">Pago</span><span className="font-bold text-[13px] text-brand-green">{formatCurrency(row.paidAmount || 0)}</span></div>
+                                        </div>
+                                    </div>
+                                    {row.status !== "paid" && (
+                                        <div className="shrink-0 flex items-center justify-center pt-1 ml-2 action-btn">
+                                            <ActionsDropdown
+                                                onEdit={() => handleEditInstallment(row.id)}
+                                                onCancel={() => void handlePayInstallment(row.id)}
+                                                cancelLabel="Marcar como paga"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>

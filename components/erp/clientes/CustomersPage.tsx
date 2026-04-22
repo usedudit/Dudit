@@ -140,7 +140,7 @@ export default function CustomersPage({
             if (!res.success) throw new Error(res.error || "Erro ao carregar clientes.")
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
-        dedupeKey: (c) => String(c?.id || ""),
+        dedupeKey: useCallback((c: any) => String(c?.id || ""), []),
     })
 
     const isLoading = storeLoading || (isQueryLoading && !rawCustomers)
@@ -157,9 +157,11 @@ export default function CustomersPage({
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return
         const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
-        setScrollState({
-            left: scrollLeft > 0,
-            right: scrollLeft < scrollWidth - clientWidth - 2,
+        setScrollState((prev) => {
+            const nextLeft = scrollLeft > 0
+            const nextRight = scrollLeft < scrollWidth - clientWidth - 2
+            if (prev.left === nextLeft && prev.right === nextRight) return prev
+            return { left: nextLeft, right: nextRight }
         })
     }, [])
 

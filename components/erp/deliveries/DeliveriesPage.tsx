@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, IconPlaceholder } from "@/components/reusable"
 import Pagination from "@/components/reusable/Pagination"
@@ -69,7 +69,7 @@ export default function DeliveriesPage({
       if (!res.success) throw new Error(res.error || "Erro ao carregar entregas.")
       return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
     },
-    dedupeKey: (d) => String(d?.id || ""),
+    dedupeKey: useCallback((d: any) => String(d?.id || ""), []),
   })
 
   useInfiniteScrollObserver(observerTarget, {
@@ -84,7 +84,12 @@ export default function DeliveriesPage({
   const checkScroll = () => {
     if (!tableContainerRef.current) return
     const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
-    setScrollState({ left: scrollLeft > 0, right: scrollLeft < scrollWidth - clientWidth - 2 })
+    setScrollState((prev) => {
+      const nextLeft = scrollLeft > 0
+      const nextRight = scrollLeft < scrollWidth - clientWidth - 2
+      if (prev.left === nextLeft && prev.right === nextRight) return prev
+      return { left: nextLeft, right: nextRight }
+    })
   }
 
   useEffect(() => {

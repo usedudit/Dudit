@@ -251,14 +251,14 @@ export const RATE_LIMIT_CONFIGS: Record<RateLimitCategory, RateLimitConfig> = {
     failClosed: true,
   },
   [RateLimitCategory.SUBSCRIPTION_CREATE]: {
-    maxRequests: 3,
-    window: "1 h",
+    maxRequests: 10,
+    window: "15 m",
     identifierType: IdentifierType.USER_PLUS_IP,
     failClosed: true,
   },
   [RateLimitCategory.SUBSCRIPTION_CANCEL]: {
-    maxRequests: 3,
-    window: "1 h",
+    maxRequests: 10,
+    window: "15 m",
     identifierType: IdentifierType.USER_PLUS_IP,
     failClosed: true,
   },

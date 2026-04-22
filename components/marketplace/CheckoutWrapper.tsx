@@ -17,7 +17,7 @@ import { useSupabase } from "@/providers/supabase-provider"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import Link from "next/link"
 import { formatCurrency } from "@/lib/utils"
-import { validateCouponAction } from "@/app/actions/erp/coupons"
+import { validateMarketplaceCouponAction } from "@/app/actions/erp/coupons"
 
 interface ProductItem {
     id: string
@@ -757,7 +757,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                             setCouponValidating(true)
                                             setCouponError(null)
                                             try {
-                                                const result = await validateCouponAction({
+                                                const result = await validateMarketplaceCouponAction({
                                                     partnerId,
                                                     code,
                                                     subtotal: totalAmount,
