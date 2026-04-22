@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react"
 import { AnimatePresence } from "framer-motion"
+import { toast } from "sonner"
 
 import { FadeIn } from "@/components/animations/FadeIn"
 import { usePickerBucket } from "@/components/erp/hooks"
@@ -133,18 +134,27 @@ export default function CreateDeliveryPage({
         if (!selectedOrder || !date || !time) return
 
         setIsSaving(true)
-        const startedAt = new Date(`${date}T${time}:00`).toISOString()
-        const response = await createERPDeliveryAction({
-            partnerId,
-            orderIds: [selectedOrder.id],
-            deliveryPersonId: selectedDeliveryPersonId || null,
-            status: status as any,
-            startedAt,
-            notes,
-        })
-        setIsSaving(false)
-
-        if (response.success) onSuccess()
+        try {
+            const startedAt = new Date(`${date}T${time}:00`).toISOString()
+            const response = await createERPDeliveryAction({
+                partnerId,
+                orderIds: [selectedOrder.id],
+                deliveryPersonId: selectedDeliveryPersonId || null,
+                status: status as any,
+                startedAt,
+                notes,
+            })
+            if (response.success) {
+                toast.success("Entrega criada com sucesso!")
+                onSuccess()
+            } else {
+                toast.error(response.error || "Erro ao criar entrega.")
+            }
+        } catch (err: any) {
+            toast.error(err?.message || "Erro inesperado ao criar entrega.")
+        } finally {
+            setIsSaving(false)
+        }
     }
 
     return (

@@ -123,6 +123,7 @@ export default function CustomersPage({
         fetchNextPage,
         hasNextPage,
         isFetchingNextPage,
+        isFetching,
         isLoading: isQueryLoading,
         isError: customersError,
     } = useInfiniteList<any, ERPCustomerListCursor>({
@@ -144,7 +145,7 @@ export default function CustomersPage({
         dedupeKey: useCallback((c: any) => String(c?.id || ""), []),
     })
 
-    const isLoading = storeLoading || (isQueryLoading && !rawCustomers)
+    const isLoading = storeLoading || isQueryLoading
     const itemsPerPage = 8
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
@@ -288,7 +289,7 @@ export default function CustomersPage({
     }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
 
     const hasActiveFilters = filters.status.length > 0 || debouncedSearch.length > 0
-    const hasCustomers = (rawCustomers?.length || 0) > 0
+    const hasCustomers = (rawCustomers?.length || 0) > 0 || isFetching
 
     // Handlers
     const handleAddCustomer = () => setUi({ pageState: "form", selectedId: null })
