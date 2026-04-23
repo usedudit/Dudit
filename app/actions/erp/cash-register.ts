@@ -19,7 +19,7 @@ type CashMovementFallbackInput = {
   type: "withdrawal" | "deposit"
   description: string
   amount: number
-  cashFinanceAccountId: string
+  cashFinanceAccountId?: string | null
   userId: string
 }
 
@@ -204,6 +204,13 @@ async function createCashMovementFallback(
 
   if (movementError || !movement) {
     return { success: false as const, error: movementError?.message || "Falha ao registrar movimentação." }
+  }
+
+  if (!input.cashFinanceAccountId) {
+    return {
+      success: true as const,
+      data: movement,
+    }
   }
 
   const transactionType = input.type === "withdrawal" ? "expense" : "income"
@@ -487,11 +494,11 @@ export async function createCashMovementAction(input: {
       .eq("partner_id", input.partnerId)
       .maybeSingle()
     if (!s?.id || s.status !== "open") {
-      return { success: false as const, error: "SessÃ£o invÃ¡lida ou caixa fechado." }
+      return { success: false as const, error: "Sessão inválida ou caixa fechado." }
     }
   }
 
-  if (!sessionId) return { success: false as const, error: "NÃ£o existe caixa aberto para esta operaÃ§Ã£o." }
+  if (!sessionId) return { success: false as const, error: "Não existe caixa aberto para esta operação." }
 
   const rawAmount = Number(input.amount || 0)
   if (!Number.isFinite(rawAmount) || !(rawAmount > 0)) {
@@ -501,8 +508,38 @@ export async function createCashMovementAction(input: {
 
   const cashAccountId =
     input.cashFinanceAccountId?.trim() || (await resolveDefaultCashFinanceAccountId(supabase, input.partnerId))
+
   if (!cashAccountId) {
-    return { success: false as const, error: "Cadastre uma conta financeira do tipo caixa para registrar sangrias e reforÃ§os." }
+    // Bypass the RPC entirely if there's no cash account, as the RPC likely requires one.
+    const fallbackResult = await createCashMovementFallback(supabase, {
+      partnerId: input.partnerId,
+      cashSessionId: sessionId,
+      type: input.type,
+      description: normalizedDescription,
+      amount: money(rawAmount),
+      cashFinanceAccountId: null,
+      userId: user.id,
+    })
+
+    if (!fallbackResult.success) return fallbackResult
+
+    const fallbackMovementId = (fallbackResult.data as any)?.id as string | undefined
+    const fallbackTypeLabel = input.type === "withdrawal" ? "Sangria" : "Reforço"
+    await logAuditEvent({
+      partnerId: input.partnerId,
+      actorUserId: user.id,
+      entityType: "cash_session",
+      entityId: sessionId,
+      actionType: input.type === "withdrawal" ? "withdrawal_created" : "deposit_created",
+      changeLines: [`registrou ${fallbackTypeLabel.toLowerCase()} de R$ ${money(rawAmount).toFixed(2)} - ${normalizedDescription}`],
+      metadata: fallbackMovementId ? { movement_id: fallbackMovementId } : null,
+      source: "manual",
+    })
+    await revalidateEntityTimeline("cash_session", sessionId)
+    revalidatePath("/erp/cash-register")
+    revalidatePath("/erp/transactions")
+
+    return fallbackResult
   }
 
   const { data: rpcData, error: rpcError } = await supabase.rpc("erp_create_cash_manual_movement", {
@@ -516,7 +553,7 @@ export async function createCashMovementAction(input: {
 
   if (rpcError) {
     if (!shouldFallbackCashMovementRpc(rpcError.message)) {
-      return { success: false as const, error: rpcError.message || "Falha ao registrar movimentaÃ§Ã£o." }
+      return { success: false as const, error: rpcError.message || "Falha ao registrar movimentação." }
     }
 
     const fallbackResult = await createCashMovementFallback(supabase, {
@@ -532,7 +569,7 @@ export async function createCashMovementAction(input: {
     if (!fallbackResult.success) return fallbackResult
 
     const fallbackMovementId = (fallbackResult.data as any)?.id as string | undefined
-    const fallbackTypeLabel = input.type === "withdrawal" ? "Sangria" : "ReforÃ§o"
+    const fallbackTypeLabel = input.type === "withdrawal" ? "Sangria" : "Reforço"
     await logAuditEvent({
       partnerId: input.partnerId,
       actorUserId: user.id,
@@ -551,7 +588,7 @@ export async function createCashMovementAction(input: {
   }
 
   const movementId = (rpcData as any)?.movement_id as string | undefined
-  const typeLabel = input.type === "withdrawal" ? "Sangria" : "ReforÃ§o"
+  const typeLabel = input.type === "withdrawal" ? "Sangria" : "Reforço"
   await logAuditEvent({
     partnerId: input.partnerId,
     actorUserId: user.id,
@@ -594,7 +631,7 @@ export async function reverseCashMovementAction(input: {
 
   if (rpcError) {
     if (!shouldFallbackCashMovementRpc(rpcError.message)) {
-      return { success: false as const, error: rpcError.message || "NÃ£o foi possÃ­vel estornar a movimentaÃ§Ã£o." }
+      return { success: false as const, error: rpcError.message || "Não foi possível estornar a movimentação." }
     }
 
     const fallbackResult = await reverseCashMovementFallback(supabase, {
@@ -618,7 +655,7 @@ export async function reverseCashMovementAction(input: {
         entityId: fallbackMovement.cash_session_id,
         actionType: "movement_reversed",
         changeLines: [
-          `estornou ${fallbackMovement.type === "withdrawal" ? "sangria" : "reforÃ§o"} de R$ ${money(Number(fallbackMovement.amount || 0)).toFixed(2)} - ${String(fallbackMovement.description || "").slice(0, 120)}`,
+          `estornou ${fallbackMovement.type === "withdrawal" ? "sangria" : "reforço"} de R$ ${money(Number(fallbackMovement.amount || 0)).toFixed(2)} - ${String(fallbackMovement.description || "").slice(0, 120)}`,
         ],
         source: "manual",
       })
@@ -645,7 +682,7 @@ export async function reverseCashMovementAction(input: {
       entityId: movement.cash_session_id,
       actionType: "movement_reversed",
       changeLines: [
-        `estornou ${movement.type === "withdrawal" ? "sangria" : "reforÃ§o"} de R$ ${money(Number(movement.amount || 0)).toFixed(2)} - ${String(movement.description || "").slice(0, 120)}`,
+        `estornou ${movement.type === "withdrawal" ? "sangria" : "reforço"} de R$ ${money(Number(movement.amount || 0)).toFixed(2)} - ${String(movement.description || "").slice(0, 120)}`,
       ],
       source: "manual",
     })

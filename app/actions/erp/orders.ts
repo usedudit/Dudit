@@ -800,14 +800,14 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     await requireRateLimit(RateLimitCategory.ORDER_CREATE)
 
     const user = await requireUser()
-    if (!user) return { error: "NÃ£o autenticado" }
+    if (!user) return { error: "Não autenticado" }
 
     const partnerId = data.partnerId
     await requirePartnerAccess(partnerId)
 
     const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
     const csrfValidation = await requireCSRF(data.csrf_token)
-    if (!csrfValidation.valid) return { error: csrfValidation.error || "Token CSRF invÃ¡lido" }
+    if (!csrfValidation.valid) return { error: csrfValidation.error || "Token CSRF inválido" }
 
     const limitCheck = await checkLimit(partnerId, "orders_per_month")
     if (!limitCheck.allowed) return { error: limitCheck.message || "Limite mensal atingido." }
@@ -1050,7 +1050,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
 
 export async function getOrderDetailsAction(orderId: string, partnerId: string) {
     const user = await requireUser()
-    if (!user) return { error: "NÃ£o autenticado" }
+    if (!user) return { error: "Não autenticado" }
 
     await requirePartnerAccess(partnerId)
     const supabase = await getSupabaseServerClient()
@@ -1098,7 +1098,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         .eq("partner_id", partnerId)
         .maybeSingle()
 
-    if (saleError || !sale) return { error: "Pedido nÃ£o encontrado" }
+    if (saleError || !sale) return { error: "Pedido não encontrado" }
 
     let customers = null
     if (sale.customer_id) {
@@ -1180,7 +1180,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
 
 export async function getOrderHistoryAction(orderId: string, partnerId: string) {
     const user = await requireUser()
-    if (!user) return { error: "NÃ£o autenticado" }
+    if (!user) return { error: "Não autenticado" }
 
     await requirePartnerAccess(partnerId)
 
@@ -1201,13 +1201,13 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     await requireRateLimit(RateLimitCategory.ORDER_CREATE)
 
     const user = await requireUser()
-    if (!user) return { error: "NÃ£o autenticado" }
+    if (!user) return { error: "Não autenticado" }
 
     await requirePartnerAccess(data.partnerId)
 
     const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
     const csrfValidation = await requireCSRF(data.csrf_token)
-    if (!csrfValidation.valid) return { error: csrfValidation.error || "Token CSRF invÃ¡lido" }
+    if (!csrfValidation.valid) return { error: csrfValidation.error || "Token CSRF inválido" }
 
     const supabase = await getSupabaseServerClient()
     const sanitizedItemsResult = sanitizeERPItems(data.items)
@@ -1242,7 +1242,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         .eq("partner_id", data.partnerId)
         .single()
 
-    if (currentOrderError || !currentOrder) return { error: currentOrderError?.message || "Pedido nÃ£o encontrado" }
+    if (currentOrderError || !currentOrder) return { error: currentOrderError?.message || "Pedido não encontrado" }
     const delta = buildInventoryMovementDelta(currentOrder.order_items || [], sanitizedItems)
     const stockItemsToValidate = currentOrder.inventory_deducted
         ? delta.outgoing.map((item) => ({
@@ -1507,7 +1507,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
 
 export async function deleteOrdersInBatchAction(orderIds: string[], partnerId: string) {
     const user = await requireUser()
-    if (!user) return { error: "NÃ£o autenticado" }
+    if (!user) return { error: "Não autenticado" }
 
     await requirePartnerAccess(partnerId)
     const supabase = await getSupabaseServerClient()

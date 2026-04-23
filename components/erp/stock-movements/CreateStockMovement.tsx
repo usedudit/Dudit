@@ -507,7 +507,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                             value={reason}
                                                             setValue={handleReasonChange}
                                                             error={fieldErrors.has('reason')}
-                                                            errorMessage={fieldErrors.has('reason') ? 'Selecione um motivo para a movimentaÃ§Ã£o.' : undefined}
+                                                            errorMessage={fieldErrors.has('reason') ? 'Selecione um motivo para a movimentação.' : undefined}
                                                             options={type === 'in' ? [
                                                                 { value: 'Compra de Fornecedor', label: 'Compra de Fornecedor' },
                                                                 { value: 'Devolução de Cliente', label: 'Devolução de Cliente' },

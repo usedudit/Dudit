@@ -136,7 +136,6 @@ export default function QuotesPage({
 
     useEffect(() => {
         const handleReset = () => {
-            console.log("--- Resetting QuotesPage via erp-sidebar-reset event")
             setWrapperMode(null)
             setActiveQuote(null)
         }
@@ -154,12 +153,6 @@ export default function QuotesPage({
     const [page, setPage] = useState(1)
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
 
-    useEffect(() => {
-        console.log(">>> MOUNTED QuotesPage client component")
-        return () => console.log("<<< UNMOUNTED QuotesPage client component")
-    }, [])
-
-    console.log("--- RENDER QuotesPage client component")
     const [modals, setModals] = useState({ filter: false, delete: false })
     const [selection, setSelection] = useState({ ids: new Set<string>() })
     const [isDeleting, setIsDeleting] = useState(false)

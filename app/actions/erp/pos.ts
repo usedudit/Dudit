@@ -409,6 +409,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     .map((entry) => ({
       amount: safeMoney(Number(entry.amount || 0)),
       paymentMethodId: entry.paymentMethodId || null,
+      payment_method_id: entry.paymentMethodId || null,
     }))
     .filter((entry) => entry.amount > 0)
 

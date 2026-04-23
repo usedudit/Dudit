@@ -10,7 +10,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import Dropdown from "@/components/reusable/Dropdown"
 import DropdownItem from "@/components/reusable/DropdownItem"
-import { AdjustIcon, ArrowUpIcon, ChevronLeftIcon, ThreeDotsIcon } from "@/lib/icons"
+import { AdjustIcon, ArrowUpIcon, ChevronLeftIcon, ThreeDotsIcon, MoneyIcon, CreditCardIcon, QRCodeIcon, MoreHorizontalIcon } from "@/lib/icons"
 
 type DetailPayload = {
     session: any
@@ -24,7 +24,7 @@ type DetailPayload = {
 
 const formatShortDateTime = (iso: string) => {
     try {
-        return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).replace(",", " Ã s")
+        return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).replace(",", " às")
     } catch { return iso }
 }
 
@@ -121,7 +121,7 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
         setIsPreparingClose(true)
         try {
             const sum = await getCashSessionCloseSummaryAction(partnerId, session.id)
-            if (!sum.success) return notifyError(sum.error || "NÃ£o foi possÃ­vel carregar o resumo.")
+            if (!sum.success) return notifyError(sum.error || "Não foi possí­vel carregar o resumo.")
             const init: Record<string, string> = {}
             const rows = sum.data.groupedByMethod || []
             if (rows.length === 0) init.__total__ = String(Number(sum.data.expectedDrawerTotal || 0).toFixed(2))
@@ -152,7 +152,7 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
         try {
             const res = await createCashMovementAction({ partnerId, cashSessionId: session.id, type: movModal, amount: movAmount, description: movDesc })
             if (!res.success) return notifyError(res.error || "Falha ao registrar.")
-            notifySuccess(movModal === "withdrawal" ? "Sangria registrada." : "ReforÃ§o registrado.")
+            notifySuccess(movModal === "withdrawal" ? "Sangria registrada." : "Reforço registrado.")
             closeMovementModal()
             await refresh()
         } finally {
@@ -162,12 +162,12 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
 
     const handleReverse = async (movementId: string) => {
         const res = await reverseCashMovementAction({ partnerId, movementId })
-        if (!res.success) return notifyError(res.error || "NÃ£o foi possÃ­vel estornar.")
-        notifySuccess("MovimentaÃ§Ã£o estornada.")
+        if (!res.success) return notifyError(res.error || "Não foi possível estornar.")
+        notifySuccess("Movimentação estornada.")
         await refresh()
     }
 
-    const movementModalTitle = movModal === "withdrawal" ? "Registrar sangria" : movModal === "deposit" ? "Registrar reforÃ§o" : "MovimentaÃ§Ã£o de caixa"
+    const movementModalTitle = movModal === "withdrawal" ? "Registrar sangria" : movModal === "deposit" ? "Registrar reforço" : "Movimentação de caixa"
 
     return (
         <FadeIn>
@@ -237,34 +237,85 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                                     <div className="mt-8">
                                         <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
                                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Resumo por forma de recebimento</h3>
-                                        <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
-                                            <Table>
-                                                <TableHeader>
-                                                    <TableRow className="bg-brand-gray dark:bg-dark-border/50">
-                                                        <TableHead>Forma de recebimento</TableHead>
-                                                        <TableHead className="text-right">Valor</TableHead>
-                                                        {!isOpen && <TableHead className="text-right">Valor informado</TableHead>}
-                                                        {!isOpen && <TableHead className="text-right">Diferença</TableHead>}
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {(details.summaryByPaymentMethod || []).map((row) => (
-                                                        <TableRow key={row.paymentMethodId || row.label}>
-                                                            <TableCell className="font-medium text-brand-dark dark:text-dark-heading">{row.label}</TableCell>
-                                                            <TableCell className="text-right font-semibold">{formatCurrency(row.calculated)}</TableCell>
-                                                            {!isOpen && <TableCell className="text-right">{row.counted != null ? formatCurrency(row.counted) : "-"}</TableCell>}
-                                                            {!isOpen && <TableCell className={`text-right font-semibold ${getDifferenceTone(row.difference)}`}>{row.difference != null ? formatCurrency(row.difference) : "-"}</TableCell>}
-                                                        </TableRow>
-                                                    ))}
-                                                    {(details.summaryByPaymentMethod || []).length === 0 && <TableRow><TableCell colSpan={isOpen ? 2 : 4} className="text-brand-inactive-text text-sm py-8">Sem vendas em dinheiro nesta sessão.</TableCell></TableRow>}
-                                                    <TableRow>
-                                                        <TableCell className="font-bold">Total</TableCell>
-                                                        <TableCell className="text-right font-bold">{formatCurrency(paymentMethodTotal)}</TableCell>
-                                                        {!isOpen && <TableCell className="text-right font-bold">{countedTotal != null ? formatCurrency(countedTotal) : "-"}</TableCell>}
-                                                        {!isOpen && <TableCell className={`text-right font-bold ${getDifferenceTone(differenceTotal)}`}>{differenceTotal != null ? formatCurrency(differenceTotal) : "-"}</TableCell>}
-                                                    </TableRow>
-                                                </TableBody>
-                                            </Table>
+                                        <div className="flex flex-col">
+                                            {(details.summaryByPaymentMethod || []).map((row) => {
+                                                const lowerLabel = row.label.toLowerCase()
+                                                let Icon = MoreHorizontalIcon
+                                                if (lowerLabel.includes("dinheiro")) Icon = MoneyIcon
+                                                if (lowerLabel.includes("cartão") || lowerLabel.includes("cartao")) Icon = CreditCardIcon
+                                                if (lowerLabel.includes("pix")) Icon = QRCodeIcon
+
+                                                return (
+                                                    <div key={row.paymentMethodId || row.label} className="py-4 flex items-center gap-4 border-b border-brand-border dark:border-dark-border last:border-none">
+                                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                            <Icon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate mb-0.5">
+                                                                {row.label}
+                                                            </h3>
+                                                            <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                                Recebimentos no PDV
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-6 ml-3 shrink-0">
+                                                            <div className="flex flex-col items-end">
+                                                                <span className="text-xs font-bold text-brand-inactive-text mb-1">Registrado</span>
+                                                                <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(row.calculated)}</span>
+                                                            </div>
+
+                                                            {!isOpen && (
+                                                                <>
+                                                                    <div className="hidden sm:flex flex-col items-end border-l border-brand-border dark:border-dark-border pl-6">
+                                                                        <span className="text-xs font-bold text-brand-inactive-text mb-1">Informado</span>
+                                                                        <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">{row.counted != null ? formatCurrency(row.counted) : "-"}</span>
+                                                                    </div>
+
+                                                                    <div className="hidden sm:flex flex-col items-end border-l border-brand-border dark:border-dark-border pl-6">
+                                                                        <span className="text-xs font-bold text-brand-inactive-text mb-1">Diferença</span>
+                                                                        <span className={`text-[15px] font-bold ${getDifferenceTone(row.difference)}`}>{row.difference != null ? formatCurrency(row.difference) : "-"}</span>
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+
+                                            {(details.summaryByPaymentMethod || []).length === 0 && (
+                                                <div className="text-center p-8 border border-dashed border-brand-border dark:border-dark-border rounded-2xl">
+                                                    <span className="text-brand-inactive-text text-sm font-medium">Nenhuma venda registrada nesta sessão.</span>
+                                                </div>
+                                            )}
+
+                                            <div className="py-4 flex items-center gap-4 mt-2">
+                                                <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                    <MoreHorizontalIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate mb-0.5">
+                                                        Total
+                                                    </h3>
+                                                    <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                        Soma de todos os métodos
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-6 ml-3 shrink-0">
+                                                    <div className="flex flex-col items-end">
+                                                        <span className="text-[15px] font-black text-brand-dark dark:text-dark-heading">{formatCurrency(paymentMethodTotal)}</span>
+                                                    </div>
+                                                    {!isOpen && (
+                                                        <>
+                                                            <div className="hidden sm:flex flex-col items-end border-l border-brand-border dark:border-dark-border pl-6">
+                                                                <span className="text-[15px] font-black text-brand-dark dark:text-dark-heading">{countedTotal != null ? formatCurrency(countedTotal) : "-"}</span>
+                                                            </div>
+                                                            <div className="hidden sm:flex flex-col items-end border-l border-brand-border dark:border-dark-border pl-6">
+                                                                <span className={`text-[15px] font-black ${getDifferenceTone(differenceTotal)}`}>{differenceTotal != null ? formatCurrency(differenceTotal) : "-"}</span>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -272,7 +323,7 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
                                     <InfoCard title={isOpen ? "Caixa em operação" : "Caixa encerrado"} message={isOpen ? `Sessão aberta em ${formatLongDateTime(session.opened_at)} por ${details.operators.open_name}.` : `Sessão encerrada em ${session.closed_at ? formatLongDateTime(session.closed_at) : "-"} por ${details.operators.close_name || "Não informado"}.`} color={isOpen ? "green" : "orange"} />
                                     {!isOpen && details.totals.difference != null && <InfoCard title="Conferência do fechamento" message={`Valor informado: ${details.totals.informedDrawerTotal != null ? formatCurrency(details.totals.informedDrawerTotal) : "-"}
-DiferenÃ§a final: ${formatCurrency(details.totals.difference)}`} color={details.totals.difference === 0 ? "green" : "orange"} />}
+Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.totals.difference === 0 ? "green" : "orange"} />}
                                     <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
                                         <div className="p-5 border-b border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/30"><h3 className="font-bold text-brand-dark dark:text-dark-heading">Dados da sessão</h3></div>
                                         <div className="p-5 space-y-4 bg-white dark:bg-dark-surface">
@@ -333,16 +384,16 @@ DiferenÃ§a final: ${formatCurrency(details.totals.difference)}`} color={detail
                     </div>
                 </div>
 
-                {isOpen && <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3"><Button variant="outline" className="flex-1" onClick={() => setMovModal("withdrawal")}>Sangria</Button><Button variant="outline" className="flex-1" onClick={() => setMovModal("deposit")}>ReforÃ§o</Button><Button className="flex-1" onClick={openCloseModal} isLoading={isPreparingClose}>Fechar</Button></div>}
+                {isOpen && <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3"><Button variant="outline" className="flex-1" onClick={() => setMovModal("withdrawal")}>Sangria</Button><Button variant="outline" className="flex-1" onClick={() => setMovModal("deposit")}>Reforço</Button><Button className="flex-1" onClick={openCloseModal} isLoading={isPreparingClose}>Fechar</Button></div>}
 
                 <DefaultModal isOpen={closeOpen} onClose={closeCloseModal} title="Fechar caixa">
                     <div className="space-y-4">
-                        {closeSummary && <InfoCard title="Saldo calculado (gaveta)" message={formatCurrency(Number(closeSummary.expectedDrawerTotal || 0))} color="gray" />}
-                        {(closeSummary?.groupedByMethod || []).length === 0 ? <MoneyInput label="Valor contado na gaveta (total)" value={Number(countedByPm.__total__ ?? closeSummary?.expectedDrawerTotal ?? 0)} onChange={(v) => setCountedByPm((prev) => ({ ...prev, __total__: String(v) }))} /> : (closeSummary?.groupedByMethod || []).map((row: any) => {
+                        {closeSummary && <InfoCard title="Saldo total registrado" message={formatCurrency(Number(closeSummary.expectedDrawerTotal || 0))} color="gray" />}
+                        {(closeSummary?.groupedByMethod || []).length === 0 ? <MoneyInput label="Valor registrado" value={Number(countedByPm.__total__ ?? closeSummary?.expectedDrawerTotal ?? 0)} onChange={(v) => setCountedByPm((prev) => ({ ...prev, __total__: String(v) }))} /> : (closeSummary?.groupedByMethod || []).map((row: any) => {
                             const key = row.paymentMethodId || "__none__"
-                            return <MoneyInput key={key} label={`Contado - ${row.label}`} value={Number(countedByPm[key] ?? row.calculated ?? 0)} onChange={(v) => setCountedByPm((prev) => ({ ...prev, [key]: String(v) }))} />
+                            return <MoneyInput key={key} label={`Valor informado - ${row.label}`} value={Number(countedByPm[key] ?? row.calculated ?? 0)} onChange={(v) => setCountedByPm((prev) => ({ ...prev, [key]: String(v) }))} />
                         })}
-                        <Input label="ObservaÃ§Ãµes" value={closingNotes} onChange={(e: any) => setClosingNotes(e.target.value)} />
+                        <Input label="Observações" value={closingNotes} onChange={(e: any) => setClosingNotes(e.target.value)} />
                         <div className="flex justify-end gap-2">
                             <Button variant="outline" onClick={closeCloseModal}>Cancelar</Button>
                             <Button id="cash-close-submit" onClick={handleClose} isLoading={isClosing}>Confirmar fechamento</Button>

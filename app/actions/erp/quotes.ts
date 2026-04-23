@@ -233,7 +233,7 @@ async function validateQuoteItemsStock(partnerId: string, items: QuoteItemPayloa
 
     const { data: products, error } = await supabase
         .from("products")
-    .select("id, name, stock_available")
+        .select("id, name, stock_available")
         .eq("partner_id", partnerId)
         .in("id", productIds)
 
@@ -246,7 +246,7 @@ async function validateQuoteItemsStock(partnerId: string, items: QuoteItemPayloa
         product.id,
         {
             name: product.name || "Produto",
-      stock: Number(product.stock_available || 0),
+            stock: Number(product.stock_available || 0),
         },
     ]))
 
@@ -284,7 +284,7 @@ async function getQuoteItemsForValidation(
 
     if (error) {
         console.error("[getQuoteItemsForValidation] Error:", error)
-        return { items: null, error: "NÃ£o foi possÃ­vel validar os itens do orÃ§amento." }
+        return { items: null, error: "Não foi possível validar os itens do orçamento." }
     }
 
     return {
@@ -476,7 +476,7 @@ export async function updateQuoteAction(data: {
             const supabase = await getSupabaseServerClient()
             const existingItemsResult = await getQuoteItemsForValidation(data.quoteId, data.partnerId, supabase)
             if (existingItemsResult.error || !existingItemsResult.items) {
-                return errorResponse(existingItemsResult.error || "NÃ£o foi possÃ­vel validar o orÃ§amento")
+                return errorResponse(existingItemsResult.error || "Não foi possí­vel validar o orçamento")
             }
 
             const { data: currentQuote, error: currentQuoteError } = await supabase
@@ -490,7 +490,7 @@ export async function updateQuoteAction(data: {
 
             if (currentQuoteError || !currentQuote) {
                 console.error("[updateQuoteAction] Error fetching current quote:", currentQuoteError)
-                return errorResponse("OrÃ§amento nÃ£o encontrado")
+                return errorResponse("Orçamento não encontrado")
             }
 
             if (currentQuote.converted) {
@@ -812,14 +812,14 @@ export async function addQuoteItemAction(data: {
         await requirePartnerAccessWithPermission(data.partnerId, "quotes", "edit", user)
 
         if (data.quantity <= 0) return errorResponse("Quantidade deve ser maior que zero")
-        if (data.quantity > 999999) return errorResponse("Quantidade m\u00e1xima excedida")
-        if (data.unitPrice < 0) return errorResponse("Pre\u00e7o unit\u00e1rio n\u00e3o pode ser negativo")
-        if (data.unitPrice > 99999999.99) return errorResponse("Pre\u00e7o unit\u00e1rio m\u00e1ximo excedido")
+        if (data.quantity > 999999) return errorResponse("Quantidade máxima excedida")
+        if (data.unitPrice < 0) return errorResponse("Preço unitário não pode ser negativo")
+        if (data.unitPrice > 99999999.99) return errorResponse("Preço unitário máximo excedido")
         if (!data.productId && !String(data.customName || "").trim()) {
-            return errorResponse("Nome do item manual Ã© obrigatÃ³rio")
+            return errorResponse("Nome do item manual é obrigatório")
         }
         if (!data.productId && data.unitPrice <= 0) {
-            return errorResponse("PreÃ§o do item manual deve ser maior que zero")
+            return errorResponse("Preço do item manual deve ser maior que zero")
         }
 
         const supabase = await getSupabaseServerClient()
@@ -895,7 +895,7 @@ export async function updateQuoteItemAction(data: {
 
         if (existingItemError || !existingItem) {
             console.error("[updateQuoteItemAction] Error fetching current item:", existingItemError)
-            return errorResponse("Item do orÃ§amento nÃ£o encontrado")
+            return errorResponse("Item do orçamento não encontrado")
         }
 
         const itemGuard = await assertQuoteAllowsItemEdits(supabase, existingItem.quote_id, data.partnerId)
@@ -906,11 +906,11 @@ export async function updateQuoteItemAction(data: {
             const resolvedUnitPrice = data.unitPrice !== undefined ? data.unitPrice : Number(existingItem.unit_price || 0)
 
             if (!String(resolvedCustomName || "").trim()) {
-                return errorResponse("Nome do item manual Ã© obrigatÃ³rio")
+                return errorResponse("Nome do item manual é obrigatório")
             }
 
             if (Number(resolvedUnitPrice || 0) <= 0) {
-                return errorResponse("PreÃ§o do item manual deve ser maior que zero")
+                return errorResponse("Preço do item manual deve ser maior que zero")
             }
         }
 
@@ -1096,7 +1096,7 @@ export async function searchProductsForQuotes(query: string) {
             id: p.id,
             name: p.name,
             sku: p.sku || 'N/A',
-      stock: p.stock_available || 0,
+            stock: p.stock_available || 0,
             allow_sell_without_stock: Boolean(p.allow_sell_without_stock),
             price: p.price || 0,
             unit: p.unit || 'un',
@@ -1105,7 +1105,7 @@ export async function searchProductsForQuotes(query: string) {
                 id: v.id,
                 name: v.variant_name,
                 sku: v.sku || 'N/A',
-      stock: v.stock_available || 0,
+                stock: v.stock_available || 0,
                 price: (p.price || 0) + (v.price_adjustment || 0)
             })) : []
         }))
