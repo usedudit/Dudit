@@ -717,7 +717,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       const paymentBreakdown = (paymentData.paymentBreakdown || []).map((entry) => ({
         method: normalizePDVPaymentMethodLabel(entry.method),
         amount: Number(entry.amount || 0),
-        paymentMethodId: getPaymentMethodId(entry.method),
+        paymentMethodId: entry.paymentMethodId || getPaymentMethodId(entry.method),
       }))
 
       const result = await finalizePreSaleAction({
