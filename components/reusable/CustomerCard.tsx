@@ -34,9 +34,10 @@ interface CustomerCardProps {
     showMap?: boolean;
     className?: string;
     onRemove?: () => void;
+    chrome?: "default" | "minimal";
 }
 
-const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingAddress, showMap = true, className = "", onRemove }) => {
+const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingAddress, showMap = true, className = "", onRemove, chrome = "default" }) => {
     const hasAddress = !!address?.street || !!address?.city;
     const hasBillingAddress = !!billingAddress?.street || !!billingAddress?.city;
     const hasContact = !!customer?.email || !!customer?.phone;
@@ -54,9 +55,16 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
     const formattedAddress = formatAddress(address);
     const formattedBillingAddress = formatAddress(billingAddress);
 
+    const chromeClass =
+        chrome === "minimal"
+            ? "border-0 rounded-2xl"
+            : "rounded-2xl border border-brand-border dark:border-dark-border"
+
     return (
-        <div className={`bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors ${className}`}>
-            <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
+        <div className={`bg-white dark:bg-dark-surface ${chromeClass} relative overflow-hidden transition-colors ${className}`}>
+            {chrome !== "minimal" && (
+                <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
+            )}
 
             {/* Top Part: Customer Identity */}
             <div className="p-6 pb-0 text-left">

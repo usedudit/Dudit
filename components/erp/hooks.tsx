@@ -156,6 +156,55 @@ export function useProductBucket(loadFn: () => Promise<ProductBucketItem[]>) {
   }
 }
 
+// ─── COUPON BUCKET (instant client-side search) ─────────────────────────────
+
+export type CouponBucketItem = {
+  id: string
+  code: string
+  discount_type: string
+  discount_value: number | null
+  is_active: boolean
+  is_automatic?: boolean
+}
+
+export function useCouponBucket(loadFn: () => Promise<CouponBucketItem[]>) {
+  const [bucket, setBucket] = useState<CouponBucketItem[]>([])
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+
+  const loadBucket = useCallback(async () => {
+    if (isLoaded || isLoading) return
+    setIsLoading(true)
+    try {
+      const data = await loadFn()
+      setBucket(data)
+      setIsLoaded(true)
+    } catch (err) {
+      console.error("[useCouponBucket] Error loading bucket:", err)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [loadFn, isLoaded, isLoading])
+
+  const filteredResults = useMemo(() => {
+    if (!searchQuery.trim()) return []
+    const search = searchQuery.toLowerCase().trim()
+    return bucket
+      .filter((c) => c.code.toLowerCase().includes(search))
+      .slice(0, 12)
+  }, [bucket, searchQuery])
+
+  return {
+    searchQuery,
+    setSearchQuery,
+    filteredResults,
+    isLoading: isLoading && !isLoaded,
+    isLoaded,
+    loadBucket,
+  }
+}
+
 // ─── PICKER BUCKET (cache once + filtro local + paginação por fatias) ───────
 
 export type PickerBucketOptions<T extends { id: string }> = {

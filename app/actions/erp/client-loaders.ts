@@ -101,6 +101,53 @@ export async function fetchPartnerProductsBucket() {
   }))
 }
 
+/**
+ * Fetch a lightweight bucket of active coupons for the current partner.
+ * Used for instant client-side filtering (no debounced server roundtrips).
+ */
+export async function fetchPartnerCouponsBucket(): Promise<Array<{
+  id: string
+  code: string
+  discount_type: string
+  discount_value: number | null
+  is_active: boolean
+  is_automatic?: boolean
+}>> {
+  const user = await getCurrentUser()
+  if (!user) throw new Error("Unauthorized")
+  const context = await getCurrentPartnerContext()
+  if (!context) throw new Error("No context")
+  const partnerId = context.partnerId
+
+  const { allowed } = await checkPartnerPermission(partnerId, "orders", "view")
+  if (!allowed) throw new Error("Forbidden")
+
+  const { getAdminClient } = await import("@/lib/supabase/admin")
+  const supabase = getAdminClient()
+
+  const { data, error } = await supabase
+    .from("coupons")
+    .select("id, code, discount_type, discount_value, is_active, is_automatic")
+    .eq("partner_id", partnerId)
+    .eq("is_active", true)
+    .order("code")
+    .limit(500)
+
+  if (error) {
+    console.error("[fetchPartnerCouponsBucket] Error:", error)
+    return []
+  }
+
+  return (data || []).map((c: any) => ({
+    id: String(c.id),
+    code: String(c.code || "").trim(),
+    discount_type: String(c.discount_type || ""),
+    discount_value: c.discount_value == null ? null : Number(c.discount_value),
+    is_active: Boolean(c.is_active),
+    is_automatic: Boolean(c.is_automatic),
+  }))
+}
+
 /** Lista única em cache para busca instantânea em pickers (client-side), p.ex. PDV / orçamentos. */
 export type PartnerCustomerBucketItem = {
   id: string

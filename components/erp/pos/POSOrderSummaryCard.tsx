@@ -11,6 +11,10 @@ type SummaryProps = {
   itemCount: number
   subtotal: number
   discountVal: number
+  discountType?: "fixed" | "percentage" | "coupon"
+  discountInputValue?: number
+  discountCouponCode?: string
+  couponDiscountValue?: number
   shippingFee: number
   otherCosts: number
   total: number
@@ -76,6 +80,10 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
   itemCount,
   subtotal,
   discountVal,
+  discountType = "fixed",
+  discountInputValue = 0,
+  discountCouponCode = "",
+  couponDiscountValue = 0,
   shippingFee,
   otherCosts,
   total,
@@ -132,7 +140,13 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
         </div>
         {discountVal > 0 && (
           <div className="flex items-center justify-between text-brand-inactive-text dark:text-dark-body">
-            <span>Desconto</span>
+            <span>
+              {discountType === "percentage"
+                ? `Desconto (${Number(discountInputValue || 0)}%)`
+                : discountType === "coupon"
+                  ? `Desconto (Cupom ${discountCouponCode || "—"} - ${formatCurrency(Number(couponDiscountValue || discountVal || 0))} OFF)`
+                  : `Desconto (${formatCurrency(Number(discountInputValue || 0))})`}
+            </span>
             <span className="font-bold text-brand-red">-{formatCurrency(discountVal)}</span>
           </div>
         )}

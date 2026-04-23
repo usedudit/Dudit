@@ -9,6 +9,57 @@ import { requireUser, requirePartnerAccessWithPermission, requireCustomerOwnersh
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { createAddressAction } from "@/app/actions/shared/addresses"
+import { validateCPF } from "@/lib/input-validator"
+
+async function prepareEncryptedCpf(
+  supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+  partnerId: string,
+  cpf?: string | null,
+  currentCustomerId?: string,
+) {
+  if (!cpf) {
+    return { cpf: null }
+  }
+
+  if (!validateCPF(cpf)) {
+    return { error: "CPF inválido" }
+  }
+
+  const cleanCpf = cpf.replace(/\D/g, "")
+  const { encryptCPF, decryptCPF } = await import("@/lib/crypto")
+
+  const cpfQuery = supabase
+    .from("customers")
+    .select("id, cpf")
+    .eq("partner_id", partnerId)
+    .not("cpf", "is", null)
+
+  const { data: existingCpfs, error: fetchError } = currentCustomerId
+    ? await cpfQuery.neq("id", currentCustomerId)
+    : await cpfQuery
+
+  if (fetchError) {
+    console.error("Erro ao buscar CPFs de clientes para verificar unicidade:", fetchError)
+  } else if (existingCpfs && existingCpfs.length > 0) {
+    for (const row of existingCpfs) {
+      try {
+        const decrypted = await decryptCPF(row.cpf)
+        if (decrypted === cleanCpf) {
+          return { error: "Já existe um cliente com este CPF." }
+        }
+      } catch {
+        continue
+      }
+    }
+  }
+
+  try {
+    return { cpf: await encryptCPF(cleanCpf) }
+  } catch (err) {
+    console.error("Error encrypting CPF:", err)
+    return { error: "Erro ao criptografar o CPF" }
+  }
+}
 
 export async function createComprehensiveCustomerAction(data: {
   partnerId: string
@@ -64,6 +115,10 @@ export async function createComprehensiveCustomerAction(data: {
   }
 
   const supabase = await getSupabaseServerClient()
+  const cpfResult = await prepareEncryptedCpf(supabase, data.partnerId, data.cpf)
+  if (cpfResult.error) {
+    return { error: cpfResult.error }
+  }
 
   const { data: newCustomer, error } = await supabase.from("customers").insert({
     partner_id: data.partnerId,
@@ -71,7 +126,7 @@ export async function createComprehensiveCustomerAction(data: {
     email: data.email || null,
     phone: data.phone || null,
     person_type: data.personType,
-    cpf: data.cpf ? await (await import("@/lib/crypto")).encryptCPF(data.cpf.replace(/\D/g, "")) : null,
+    cpf: cpfResult.cpf,
     contribuinte: data.contribuinte || null,
     cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
     nome_fantasia: data.nomeFantasia || null,
@@ -220,6 +275,10 @@ export async function updateComprehensiveCustomerAction(data: {
 
 
   const supabase = await getSupabaseServerClient()
+  const cpfResult = await prepareEncryptedCpf(supabase, data.partnerId, data.cpf, data.customerId)
+  if (cpfResult.error) {
+    return { error: cpfResult.error }
+  }
 
   // SECURITY: partner_id is intentionally excluded from the update payload.
   // A customer's tenant ownership must NEVER be changeable via update.
@@ -230,7 +289,7 @@ export async function updateComprehensiveCustomerAction(data: {
       email: data.email || null,
       phone: data.phone || null,
       person_type: data.personType,
-      cpf: data.cpf ? await (await import("@/lib/crypto")).encryptCPF(data.cpf.replace(/\D/g, "")) : null,
+      cpf: cpfResult.cpf,
       contribuinte: data.contribuinte || null,
       cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
       nome_fantasia: data.nomeFantasia || null,

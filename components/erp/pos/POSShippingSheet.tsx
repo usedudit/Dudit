@@ -111,7 +111,8 @@ export default function POSShippingSheet({
             customer={{ name: customerDetails.name || "", email: customerDetails.email || "", phone: customerDetails.phone || "" }}
             address={customerDetails.address || null}
             showMap={hasStreet}
-            className="border-brand-border"
+            chrome="minimal"
+            className="shadow-none"
           />
         )}
 

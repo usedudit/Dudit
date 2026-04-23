@@ -1,6 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { createAdminClient } from "@/lib/supabase/server"
 import { requirePartnerAccess, requireUser } from "@/lib/auth/authorization"
 import { revalidateOrders, revalidateTransactions, revalidateStockMovements } from "@/lib/utils/revalidation"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
@@ -102,17 +103,21 @@ function computeSubtotal(items: Array<{ quantity: number; unit_price: number }>)
   return safeMoney(items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0))
 }
 
+/**
+ * Mirrors POS `sales` into `orders` so the ERP pedidos list shows PDV checkout.
+ * Uses the service-role client: partner RLS often allows only marketplace buyers to INSERT orders.
+ */
 async function syncPosSaleToOrders(params: {
-  supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>
   partnerId: string
   saleId: string
   preSaleId: string
   financeAccountId?: string | null
   defaultPaymentMethod: string
   actorUserId: string
-}) {
+}): Promise<string | null> {
+  const admin = createAdminClient()
   const derivedOrderNumber = `PDV-${String(params.saleId).replace(/-/g, "").slice(0, 8).toUpperCase()}`
-  const { data: existingOrder } = await params.supabase
+  const { data: existingOrder } = await admin
     .from("orders")
     .select("id")
     .eq("partner_id", params.partnerId)
@@ -120,21 +125,21 @@ async function syncPosSaleToOrders(params: {
     .limit(1)
     .maybeSingle()
 
-  if (existingOrder?.id) return
+  if (existingOrder?.id) return existingOrder.id
 
   const [{ data: sale }, { data: saleItems }, { data: draft }] = await Promise.all([
-    params.supabase
+    admin
       .from("sales")
       .select("id, sale_number, customer_id, notes, payment_status, final_amount, paid_amount, discount_amount, created_at")
       .eq("id", params.saleId)
       .eq("partner_id", params.partnerId)
       .single(),
-    params.supabase
+    admin
       .from("sale_items")
       .select("product_id, variant_id, product_name, unit_price, quantity, subtotal")
       .eq("sale_id", params.saleId)
       .eq("partner_id", params.partnerId),
-    params.supabase
+    admin
       .from("pre_sales")
       .select("shipping_fee, other_costs")
       .eq("id", params.preSaleId)
@@ -142,7 +147,21 @@ async function syncPosSaleToOrders(params: {
       .maybeSingle(),
   ])
 
-  if (!sale) return
+  if (!sale) return null
+
+  let customerName: string | null = null
+  if (sale.customer_id) {
+    const { data: cust } = await admin
+      .from("customers")
+      .select("name")
+      .eq("id", sale.customer_id)
+      .eq("partner_id", params.partnerId)
+      .maybeSingle()
+    customerName = cust?.name?.trim() || null
+  }
+  if (!customerName) {
+    customerName = "Cliente balcão (PDV)"
+  }
 
   const shippingFee = safeMoney(Number(draft?.shipping_fee || 0))
   const otherCosts = safeMoney(Number(draft?.other_costs || 0))
@@ -157,7 +176,7 @@ async function syncPosSaleToOrders(params: {
   const orderPayload: Record<string, unknown> = {
     partner_id: params.partnerId,
     buyer_id: sale.customer_id || null,
-    customer_name: null,
+    customer_name: customerName,
     order_source: "Presencial",
     delivery_type: deliveryType,
     delivery_status: deliveryStatus,
@@ -181,7 +200,7 @@ async function syncPosSaleToOrders(params: {
 
   const insertWithPosFlag = { ...orderPayload, is_pos_sale: true }
   let createdOrderId: string | null = null
-  const { data: insertedWithPosFlag, error: insertError } = await params.supabase
+  const { data: insertedWithPosFlag, error: insertError } = await admin
     .from("orders")
     .insert(insertWithPosFlag)
     .select("id")
@@ -189,19 +208,26 @@ async function syncPosSaleToOrders(params: {
 
   if (insertError) {
     const missingPosFlagColumn = String(insertError.message || "").toLowerCase().includes("is_pos_sale")
-    if (!missingPosFlagColumn) return
+    if (!missingPosFlagColumn) {
+      console.error("[syncPosSaleToOrders] orders insert failed:", insertError.message, insertError)
+      return null
+    }
 
-    const { data: insertedWithoutPosFlag } = await params.supabase
+    const { data: insertedWithoutPosFlag, error: insertError2 } = await admin
       .from("orders")
       .insert(orderPayload)
       .select("id")
       .single()
+    if (insertError2) {
+      console.error("[syncPosSaleToOrders] orders insert (no is_pos_sale) failed:", insertError2.message, insertError2)
+      return null
+    }
     createdOrderId = insertedWithoutPosFlag?.id || null
   } else {
     createdOrderId = insertedWithPosFlag?.id || null
   }
 
-  if (!createdOrderId) return
+  if (!createdOrderId) return null
 
   const orderItems = (saleItems || []).map((item: any, index: number) => ({
     order_id: createdOrderId,
@@ -215,8 +241,15 @@ async function syncPosSaleToOrders(params: {
   }))
 
   if (orderItems.length > 0) {
-    await params.supabase.from("order_items").insert(orderItems)
+    const { error: itemsErr } = await admin.from("order_items").insert(orderItems)
+    if (itemsErr) {
+      console.error("[syncPosSaleToOrders] order_items insert failed:", itemsErr.message, itemsErr)
+      await admin.from("orders").delete().eq("id", createdOrderId).eq("partner_id", params.partnerId)
+      return null
+    }
   }
+
+  return createdOrderId
 }
 
 function inputPaymentMethodLabel(paymentMethod?: string | null) {
@@ -450,8 +483,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     .eq("id", saleId)
     .eq("partner_id", input.partnerId)
 
-  await syncPosSaleToOrders({
-    supabase,
+  const syncedOrderId = await syncPosSaleToOrders({
     partnerId: input.partnerId,
     saleId,
     preSaleId: input.preSaleId,
@@ -491,12 +523,13 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
   })
 
   // ── Record coupon usage if coupon was applied ─────────────────────────
-  if (finalizedPreSale?.coupon_id) {
-    await supabase.from("coupon_usages").upsert(
+  if (finalizedPreSale?.coupon_id && syncedOrderId) {
+    const adminForCoupon = createAdminClient()
+    await adminForCoupon.from("coupon_usages").upsert(
       {
         coupon_id: finalizedPreSale.coupon_id,
         customer_id: finalizedPreSale.customer_id || null,
-        order_id: saleId,
+        order_id: syncedOrderId,
       },
       { onConflict: "coupon_id,order_id", ignoreDuplicates: true }
     )
