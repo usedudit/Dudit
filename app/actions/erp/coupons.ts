@@ -41,7 +41,7 @@ export async function listCouponsAction(partnerId: string, params?: { search?: s
 
   let query = supabase
     .from("coupons")
-    .select("*, coupon_usages(count)", { count: "exact" })
+    .select("*, coupon_usages(count), coupon_customers(customer_id)", { count: "exact" })
     .eq("partner_id", partnerId)
     .order("created_at", { ascending: false })
     .range(from, to)

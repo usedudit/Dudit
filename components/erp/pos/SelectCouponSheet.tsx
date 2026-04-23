@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react"
 import { SearchIcon, PlusIcon, XIcon, TagIcon, CheckCircleIcon } from "@/lib/icons"
-import { Button, Input, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
+import { Badge, Button, Input, IconPlaceholder, ThreeDotsLoader, Tooltip } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -16,6 +16,8 @@ interface SelectCouponSheetProps {
   onApplyCoupon: (coupon: { code: string; id: string }) => void
   appliedCouponId?: string | null
   onRemoveCoupon?: () => void
+  subtotal: number
+  selectedCustomerId?: string | null
 }
 
 type CouponItem = {
@@ -25,6 +27,10 @@ type CouponItem = {
   discount_value: number | null
   is_active: boolean
   is_automatic?: boolean
+  min_cart_value?: number | null
+  apply_scope?: "all" | "categories" | "products" | "services" | string | null
+  customer_scope?: "all" | "specific" | string | null
+  coupon_customers?: Array<{ customer_id: string | null }>
 }
 
 const SelectCouponSheet = ({
@@ -34,6 +40,8 @@ const SelectCouponSheet = ({
   onApplyCoupon,
   appliedCouponId,
   onRemoveCoupon,
+  subtotal,
+  selectedCustomerId,
 }: SelectCouponSheetProps) => {
   const [search, setSearch] = useState("")
   const [manualCode, setManualCode] = useState("")
@@ -47,7 +55,6 @@ const SelectCouponSheet = ({
     setLoading(true)
     try {
       const res = await listCouponsAction(partnerId, {
-        isActive: "active",
         limit: 50,
         search: search.trim() || undefined,
       })
@@ -68,6 +75,41 @@ const SelectCouponSheet = ({
     if (coupon.discount_type === "fixed") return `${formatCurrency(Number(coupon.discount_value || 0))} off`
     return "Frete grátis"
   }
+
+  const getCouponBlockReason = (coupon: CouponItem) => {
+    if (!coupon.is_active) {
+      return "Cupom inativo."
+    }
+
+    const applyScope = String(coupon.apply_scope || "all")
+    if (applyScope !== "all") {
+      return "Cupom com regras de categoria/produto/serviço não pode ser usado no PDV."
+    }
+
+    const minCartValue = Number(coupon.min_cart_value || 0)
+    if (minCartValue > 0 && Number(subtotal || 0) < minCartValue) {
+      return `Disponível apenas para pedidos acima de ${formatCurrency(minCartValue)}.`
+    }
+
+    if (coupon.customer_scope === "specific") {
+      if (!selectedCustomerId) {
+        return "Cupom exclusivo para clientes específicos. Selecione um cliente no pedido."
+      }
+      const customerIds = (coupon.coupon_customers || []).map((item) => item.customer_id).filter(Boolean) as string[]
+      if (customerIds.length > 0 && !customerIds.includes(selectedCustomerId)) {
+        return "Cupom exclusivo para clientes específicos e o cliente selecionado não é elegível."
+      }
+    }
+
+    return null
+  }
+
+  const sortedCoupons = [...coupons].sort((a, b) => {
+    const aBlocked = !!getCouponBlockReason(a)
+    const bBlocked = !!getCouponBlockReason(b)
+    if (aBlocked !== bBlocked) return aBlocked ? 1 : -1
+    return 0
+  })
 
   const content = (
     <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
@@ -121,12 +163,16 @@ const SelectCouponSheet = ({
           <div className="py-12 flex justify-center"><ThreeDotsLoader /></div>
         ) : coupons.length > 0 ? (
           <div className="flex flex-col gap-2">
-            {coupons.map((coupon) => {
+            {sortedCoupons.map((coupon) => {
               const isApplied = appliedCouponId === coupon.id
+              const blockedReason = getCouponBlockReason(coupon)
+              const isBlocked = Boolean(blockedReason)
               return (
                 <button
                   key={coupon.id}
+                  disabled={isBlocked}
                   onClick={() => {
+                    if (isBlocked) return
                     if (isApplied) {
                       onRemoveCoupon?.()
                     } else {
@@ -137,7 +183,9 @@ const SelectCouponSheet = ({
                   className={`group flex items-center gap-4 rounded-xl border p-3 text-left transition-all ${
                     isApplied
                       ? "border-brand-green bg-green-50/50 dark:bg-green-900/10"
-                      : "border-transparent hover:border-brand-border hover:bg-brand-gray/30 dark:hover:border-dark-border dark:hover:bg-dark-border/30"
+                      : isBlocked
+                        ? "border-brand-border/60 bg-brand-gray/20 opacity-80 cursor-not-allowed"
+                        : "border-transparent hover:border-brand-border hover:bg-brand-gray/30 dark:hover:border-dark-border dark:hover:bg-dark-border/30"
                   }`}
                 >
                   <div className={`flex h-12 w-12 items-center justify-center rounded-full border ${
@@ -157,9 +205,17 @@ const SelectCouponSheet = ({
                           AUTO
                         </span>
                       )}
+                      {isBlocked && blockedReason && (
+                        <Tooltip text={blockedReason}>
+                          <span>
+                            <Badge variant="orange">Restrito no PDV</Badge>
+                          </span>
+                        </Tooltip>
+                      )}
                     </div>
                     <p className="truncate text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
                       {formatDiscount(coupon)}
+                      {Number(coupon.min_cart_value || 0) > 0 && ` - Acima de ${formatCurrency(Number(coupon.min_cart_value || 0))}`}
                     </p>
                   </div>
                   <div className="flex h-8 w-8 items-center justify-center rounded-full text-brand-inactive-text opacity-0 transition-opacity group-hover:opacity-100">

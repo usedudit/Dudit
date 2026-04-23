@@ -8,7 +8,7 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input, IconPlaceholder, ListItem, RadioButton } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
-import { useCouponBucket, useMediaQuery } from "@/components/erp/hooks"
+import { useMediaQuery } from "@/components/erp/hooks"
 import { useNotification } from "@/hooks/use-notification"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import {
@@ -23,7 +23,6 @@ import {
 } from "@/app/actions/erp/pos"
 import { validateCouponAction } from "@/app/actions/erp/coupons"
 import { createProductComprehensiveAction } from "@/app/actions/erp/products"
-import { fetchPartnerCouponsBucket } from "@/app/actions/erp/client-loaders"
 import { openCashSessionAction } from "@/app/actions/erp/cash-register"
 import { getTeamMembers } from "@/app/actions/erp/team"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
@@ -165,9 +164,6 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   const [globalDiscountValue, setGlobalDiscountValue] = useState(0)
   const [globalDiscountType, setGlobalDiscountType] = useState<"fixed" | "percentage" | "coupon">("fixed")
   const [globalDiscountCouponCode, setGlobalDiscountCouponCode] = useState("")
-  const couponBucket = useCouponBucket(fetchPartnerCouponsBucket)
-  const [isCouponSearchOpen, setIsCouponSearchOpen] = useState(false)
-  const couponSearchRef = useRef<HTMLDivElement>(null)
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false)
   const [isCouponSheetOpen, setIsCouponSheetOpen] = useState(false)
   const [isQuickProductSheetOpen, setIsQuickProductSheetOpen] = useState(false)
@@ -303,10 +299,10 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       return (subtotal * discountAmount) / 100
     }
     if (discountType === "coupon") {
-      return 0
+      return Number(appliedCouponDiscount || discountAmount || 0)
     }
     return discountAmount
-  }, [subtotal, discountAmount, discountType])
+  }, [subtotal, discountAmount, discountType, appliedCouponDiscount])
   const total = useMemo(() => Math.max(0, subtotal - discountVal + shippingFee + otherCosts), [subtotal, discountVal, shippingFee, otherCosts])
   const mobileCategoryLabel = selectedCategory === "Todos" ? "Categorias" : selectedCategory
   const selectedCustomer = useMemo(
@@ -838,16 +834,6 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
   }, [editingItem])
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (couponSearchRef.current && !couponSearchRef.current.contains(event.target as Node)) {
-        setIsCouponSearchOpen(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
-
-  useEffect(() => {
     if (!isGlobalDiscountModalOpen) return
     setGlobalDiscountValue(discountAmount)
     setGlobalDiscountType(discountType)
@@ -971,6 +957,9 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       setAppliedCouponId(couponId)
       setAppliedCouponCode(couponCode)
       setAppliedCouponDiscount(discountAmount)
+      setDiscountType("coupon")
+      setDiscountAmount(discountAmount)
+      setDiscountCouponCode(couponCode)
       setGlobalDiscountType("coupon")
       setGlobalDiscountCouponCode(couponCode)
       notifySuccess(`Cupom ${couponCode} aplicado!`)
@@ -1504,11 +1493,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 </Button>
                 <Button className="flex-1" isLoading={isApplyingCoupon} onClick={async () => {
                   if (globalDiscountType === "coupon") {
-                    await applyCouponCode(globalDiscountCouponCode)
-                    setDiscountType("coupon")
-                    setDiscountAmount(0)
-                    setDiscountCouponCode(globalDiscountCouponCode.trim().toUpperCase())
                     setIsGlobalDiscountModalOpen(false)
+                    setIsCouponSheetOpen(true)
                     return
                   }
                   setDiscountType(globalDiscountType)
@@ -1600,104 +1586,21 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
               )}
               {globalDiscountType === "coupon" && (
                 <div className="space-y-2">
-                  <div ref={couponSearchRef} className="relative">
-                    <Input
-                      label="Cupom"
-                      name="globalDiscountCouponCode"
-                      placeholder="Digite o cupom"
-                      value={globalDiscountCouponCode}
-                      onChange={(e: any) => {
-                        setGlobalDiscountCouponCode(e.target.value)
-                        couponBucket.setSearchQuery(e.target.value)
-                        setIsCouponSearchOpen(true)
-                      }}
-                      onFocus={() => {
-                        couponBucket.loadBucket()
-                        couponBucket.setSearchQuery(globalDiscountCouponCode || "")
-                        setIsCouponSearchOpen(true)
-                      }}
-                      onKeyDown={(e: any) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault()
-                          void applyCouponCode(globalDiscountCouponCode)
-                          setIsCouponSearchOpen(false)
-                        }
-                      }}
-                    />
-
-                    {isCouponSearchOpen && couponBucket.searchQuery.trim().length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="absolute z-[90] top-full left-0 right-0 mt-2 overflow-hidden rounded-xl border border-brand-border bg-white shadow-xl dark:border-dark-border dark:bg-dark-surface"
-                      >
-                        {couponBucket.isLoading ? (
-                          <div className="p-6 flex justify-center"><IconPlaceholder title="Carregando cupons..." /></div>
-                        ) : couponBucket.filteredResults.length > 0 ? (
-                          <div className="max-h-72 overflow-y-auto">
-                            {couponBucket.filteredResults.map((coupon) => {
-                              const type = coupon.discount_type
-                              const value = Number(coupon.discount_value || 0)
-                              const meta =
-                                type === "percentage"
-                                  ? `${value}% OFF`
-                                  : type === "fixed"
-                                    ? `${formatCurrency(value)} OFF`
-                                    : "Frete grátis"
-                              const isApplied = (appliedCouponCode || "").toUpperCase() === (coupon.code || "").toUpperCase()
-                              return (
-                                <button
-                                  key={coupon.id}
-                                  type="button"
-                                  className={`flex w-full items-center gap-4 border-b border-brand-border p-3.5 text-left last:border-0 dark:border-dark-border ${
-                                    isApplied ? "bg-green-50/60 dark:bg-green-900/10" : "hover:bg-gray-50 dark:hover:bg-dark-border"
-                                  }`}
-                                  onClick={() => {
-                                    setGlobalDiscountCouponCode(coupon.code)
-                                    void applyCouponCode(coupon.code)
-                                    setIsCouponSearchOpen(false)
-                                  }}
-                                >
-                                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border ${
-                                    isApplied
-                                      ? "border-brand-green bg-green-100 text-brand-green dark:bg-green-900/20"
-                                      : "border-brand-border bg-brand-gray text-brand-inactive-text dark:border-dark-border dark:bg-dark-border/50"
-                                  }`}>
-                                    <TagIcon className="h-5 w-5" />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{coupon.code}</div>
-                                    <div className="mt-0.5 truncate text-[11px] font-medium tracking-wider text-brand-inactive-text uppercase">{meta}</div>
-                                  </div>
-                                </button>
-                              )
-                            })}
-                          </div>
-                        ) : (
-                          <div className="p-6 text-center text-sm text-brand-inactive-text">Nenhum cupom encontrado.</div>
-                        )}
-                      </motion.div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      disabled={!globalDiscountCouponCode.trim() || isApplyingCoupon}
-                      isLoading={isApplyingCoupon}
-                      onClick={() => void applyCouponCode(globalDiscountCouponCode)}
-                    >
-                      Validar cupom
-                    </Button>
-                    <Button
-                      variant="link"
-                      className="h-auto px-0 text-brand-primary"
-                      onClick={() => setIsCouponSheetOpen(true)}
-                    >
-                      Ver cupons cadastrados
-                    </Button>
-                  </div>
+                  <InfoCard
+                    color="gray"
+                    title="Cupom de desconto"
+                    message="Selecione um cupom na lista de cupons cadastrados."
+                  />
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setIsGlobalDiscountModalOpen(false)
+                      setIsCouponSheetOpen(true)
+                    }}
+                  >
+                    Ver cupons cadastrados
+                  </Button>
                 </div>
               )}
             </div>
@@ -1794,6 +1697,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             isOpen={isCouponSheetOpen}
             onClose={() => setIsCouponSheetOpen(false)}
             partnerId={partnerId}
+            subtotal={subtotal}
+            selectedCustomerId={selectedCustomerId || null}
             appliedCouponId={appliedCouponId}
             onApplyCoupon={async (coupon) => {
               await applyCouponCode(coupon.code)
