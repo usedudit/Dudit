@@ -379,7 +379,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                             {(cleanNotes || cancelNote) && (
                                                 <InfoCard
-                                                    title="Observacoes do Pedido"
+                                                    title="Observações do Pedido"
                                                     message={[cleanNotes, cancelNote].filter(Boolean).join("\n")}
                                                     color="orange"
                                                 />

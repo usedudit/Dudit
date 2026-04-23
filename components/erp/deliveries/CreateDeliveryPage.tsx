@@ -76,6 +76,11 @@ function buildCustomerAddress(address?: string) {
     }
 }
 
+function getOrderPreviewImage(order?: OrderPickerItem | null) {
+    const firstItemImage = order?.items?.find((item) => item?.products?.images)?.products?.images
+    return getR2ImageUrl(firstItemImage || null, "thumb")
+}
+
 export default function CreateDeliveryPage({
     partnerId,
     onBack,
@@ -113,11 +118,6 @@ export default function CreateDeliveryPage({
     const selectedStatusMeta = getDeliveryStatusMeta(status)
     const paymentMeta = getPaymentStatusMeta(selectedOrder?.status)
     const deliveryMeta = getDeliveryStatusMeta(selectedOrder?.deliveryStatus)
-
-    const selectedOrderImage = useMemo(() => {
-        const firstItemImage = selectedOrder?.items?.find((item) => item?.products?.images)?.products?.images
-        return getR2ImageUrl(firstItemImage || null, "thumb")
-    }, [selectedOrder?.items])
 
     const customerAddress = useMemo(
         () => buildCustomerAddress(selectedOrder?.address),
@@ -227,85 +227,117 @@ export default function CreateDeliveryPage({
 
                                                 {isOrderSearchOpen && orderPicker.searchQuery.trim() && (
                                                     <FadeIn className="absolute left-0 right-0 top-full z-50 mt-2 max-h-72 overflow-y-auto overflow-hidden rounded-2xl border border-brand-border bg-white shadow-xl dark:border-dark-border dark:bg-dark-surface">
-                                                        {orderPicker.displayed.map((order) => (
-                                                            <button
-                                                                key={order.id}
-                                                                type="button"
-                                                                className="w-full border-b border-brand-border p-3.5 text-left transition-colors last:border-0 hover:bg-gray-50 dark:border-dark-border dark:hover:bg-dark-border"
-                                                                onClick={() => {
-                                                                    setSelectedOrderId(order.id)
-                                                                    orderPicker.setSearchQuery(order.displayId)
-                                                                    setIsOrderSearchOpen(false)
-                                                                }}
-                                                            >
-                                                                <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                                    {order.displayId}
-                                                                </div>
-                                                                <div className="text-xs text-brand-inactive-text">
-                                                                    {order.customer?.name || "Cliente"} • {formatCurrency(order.totalAmount || 0)}
-                                                                </div>
-                                                            </button>
-                                                        ))}
+                                                        {orderPicker.displayed.map((order) => {
+                                                            const searchPaymentMeta = getPaymentStatusMeta(order.status)
+                                                            const searchDeliveryMeta = getDeliveryStatusMeta(order.deliveryStatus)
+
+                                                            return (
+                                                                <button
+                                                                    key={order.id}
+                                                                    type="button"
+                                                                    className="w-full border-b border-brand-border p-3 text-left transition-colors last:border-0 hover:bg-gray-50 dark:border-dark-border dark:hover:bg-dark-border"
+                                                                    onClick={() => {
+                                                                        setSelectedOrderId(order.id)
+                                                                        orderPicker.setSearchQuery(order.displayId)
+                                                                        setIsOrderSearchOpen(false)
+                                                                    }}
+                                                                >
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-brand-border bg-brand-gray dark:border-dark-border dark:bg-dark-border/40">
+                                                                            <img
+                                                                                src={getOrderPreviewImage(order)}
+                                                                                alt={order.displayId}
+                                                                                className="h-full w-full object-cover"
+                                                                            />
+                                                                        </div>
+
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                                {order.displayId}
+                                                                            </div>
+                                                                            <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                                {order.customer?.name || "Cliente"} • {order.orderDate ? formatDate(order.orderDate) : "-"}
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div className="flex shrink-0 flex-col items-end gap-1">
+                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                                {formatCurrency(order.totalAmount || 0)}
+                                                                            </div>
+                                                                            <div className="flex items-center gap-1">
+                                                                                <Badge variant={searchPaymentMeta.variant} className="scale-90 whitespace-nowrap">
+                                                                                    {searchPaymentMeta.label}
+                                                                                </Badge>
+                                                                                <Badge variant={searchDeliveryMeta.variant} className="scale-90 whitespace-nowrap">
+                                                                                    {searchDeliveryMeta.label}
+                                                                                </Badge>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </button>
+                                                            )
+                                                        })}
                                                     </FadeIn>
                                                 )}
                                             </div>
 
                                             {selectedOrder && (
-                                                <div className="overflow-hidden rounded-[26px] border border-brand-border bg-white shadow-[0_18px_50px_-36px_rgba(12,59,46,0.45)] dark:border-dark-border dark:bg-dark-surface">
-                                                    <div className="grid gap-5 p-4 md:grid-cols-[132px_minmax(0,1fr)] md:p-5">
-                                                        <div className="overflow-hidden rounded-2xl bg-brand-gray dark:bg-dark-border/40">
-                                                            <img
-                                                                src={selectedOrderImage}
-                                                                alt={selectedOrder.displayId}
-                                                                className="h-full min-h-[132px] w-full object-cover"
-                                                            />
-                                                        </div>
-
-                                                        <div className="min-w-0">
-                                                            <div className="mb-4 flex flex-wrap items-center gap-2">
-                                                                <span className="rounded-full bg-brand-gray px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-brand-inactive-text dark:bg-dark-border/40">
-                                                                    Pedido
+                                                <div className="overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border">
+                                                    <div className="border-b border-brand-border bg-brand-gray p-6 dark:border-dark-border dark:bg-dark-border/50">
+                                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                    Pedido:
                                                                 </span>
-                                                                <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
                                                                     {selectedOrder.displayId}
-                                                                </h3>
+                                                                </span>
                                                             </div>
 
-                                                            <div className="grid gap-3 md:grid-cols-4">
-                                                                <div className="rounded-2xl border border-brand-border bg-brand-gray/35 p-4 dark:border-dark-border dark:bg-dark-border/20">
-                                                                    <div className="mb-2 flex items-center gap-2 text-brand-inactive-text">
-                                                                        <CalendarIcon className="h-4 w-4" />
-                                                                        <span className="text-xs font-bold uppercase tracking-[0.14em]">
-                                                                            Data
-                                                                        </span>
-                                                                    </div>
-                                                                    <p className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                                                                        {selectedOrder.orderDate ? formatDate(selectedOrder.orderDate) : "-"}
-                                                                    </p>
-                                                                </div>
+                                                            <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body md:text-right">
+                                                                Cliente:{" "}
+                                                                <strong className="text-brand-dark dark:text-dark-heading">
+                                                                    {selectedOrder.customer?.name || "Cliente"}
+                                                                </strong>
+                                                            </div>
+                                                        </div>
+                                                    </div>
 
-                                                                <div className="rounded-2xl border border-brand-border bg-brand-gray/35 p-4 dark:border-dark-border dark:bg-dark-border/20">
-                                                                    <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text">
-                                                                        Pagamento
-                                                                    </p>
-                                                                    <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
+                                                    <div className="bg-white dark:bg-dark-surface">
+                                                        <div className="grid grid-cols-1 divide-y divide-brand-border dark:divide-dark-border md:grid-cols-4 md:divide-x md:divide-y-0">
+                                                            <div className="p-5">
+                                                                <div className="mb-3 flex items-center gap-2 text-brand-inactive-text dark:text-dark-body">
+                                                                    <CalendarIcon className="h-4 w-4" />
+                                                                    <span className="text-xs font-bold uppercase tracking-[0.14em]">
+                                                                        Data
+                                                                    </span>
                                                                 </div>
+                                                                <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                                                    {selectedOrder.orderDate ? formatDate(selectedOrder.orderDate) : "-"}
+                                                                </p>
+                                                            </div>
 
-                                                                <div className="rounded-2xl border border-brand-border bg-brand-gray/35 p-4 dark:border-dark-border dark:bg-dark-border/20">
-                                                                    <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text">
-                                                                        Entrega
-                                                                    </p>
-                                                                    <Badge variant={deliveryMeta.variant}>{deliveryMeta.label}</Badge>
-                                                                </div>
+                                                            <div className="p-5">
+                                                                <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text dark:text-dark-body">
+                                                                    Pagamento
+                                                                </p>
+                                                                <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
+                                                            </div>
 
-                                                                <div className="rounded-2xl border border-brand-border bg-brand-gray/35 p-4 dark:border-dark-border dark:bg-dark-border/20">
-                                                                    <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text">
-                                                                        Total
-                                                                    </p>
-                                                                    <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
-                                                                        {formatCurrency(selectedOrder.totalAmount || 0)}
-                                                                    </p>
-                                                                </div>
+                                                            <div className="p-5">
+                                                                <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text dark:text-dark-body">
+                                                                    Entrega
+                                                                </p>
+                                                                <Badge variant={deliveryMeta.variant}>{deliveryMeta.label}</Badge>
+                                                            </div>
+
+                                                            <div className="p-5">
+                                                                <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text dark:text-dark-body">
+                                                                    Total
+                                                                </p>
+                                                                <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                                                    {formatCurrency(selectedOrder.totalAmount || 0)}
+                                                                </p>
                                                             </div>
                                                         </div>
                                                     </div>
