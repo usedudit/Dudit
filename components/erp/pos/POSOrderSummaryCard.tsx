@@ -152,7 +152,7 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
         )}
         {shippingFee > 0 && (
           <div className="flex items-center justify-between text-brand-inactive-text dark:text-dark-body">
-            <span>Taxa</span>
+            <span>Taxa de entrega</span>
             <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(shippingFee)}</span>
           </div>
         )}

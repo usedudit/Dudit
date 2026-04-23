@@ -196,7 +196,7 @@ const SelectCustomerSheet = ({
             ))}
           </div>
         ) : picker.displayed.length > 0 ? (
-          <div className="flex flex-col px-2 pb-2 pt-1">
+          <div className="flex flex-col px-2 pb-2">
             {picker.displayed.map((customer) => {
               const isSelected = selectedCustomerId === customer.id
               return (
@@ -208,18 +208,17 @@ const SelectCustomerSheet = ({
                   onKeyDown={
                     !isSelected
                       ? (e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault()
-                            onSelect(customer)
-                          }
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault()
+                          onSelect(customer)
                         }
+                      }
                       : undefined
                   }
-                  className={`group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border ${
-                    isSelected
-                      ? "bg-brand-primary/5 dark:bg-brand-primary/10"
-                      : "cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40"
-                  }`}
+                  className={`group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border ${isSelected
+                    ? "bg-brand-primary/5 dark:bg-brand-primary/10"
+                    : "cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40"
+                    }`}
                 >
                   <UserProfileImage
                     fullName={customer.name || "Cliente"}
@@ -418,13 +417,12 @@ const SelectCustomerSheet = ({
           onClick={onClose}
         >
           <div
-            className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${
-              isOpen
-                ? isNewCustomerSheetOpen
-                  ? "-translate-x-10 scale-[0.97] opacity-70"
-                  : "translate-x-0 opacity-100"
-                : "translate-x-[120%] opacity-100"
-            }`}
+            className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen
+              ? isNewCustomerSheetOpen
+                ? "-translate-x-10 scale-[0.97] opacity-70"
+                : "translate-x-0 opacity-100"
+              : "translate-x-[120%] opacity-100"
+              }`}
             onClick={(e) => e.stopPropagation()}
           >
             {content}

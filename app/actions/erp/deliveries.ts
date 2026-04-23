@@ -222,7 +222,7 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
       orderDate: order.created_at || null,
       customer: {
         id: order.buyer_id || null,
-        name: order.customer_name || "Cliente balcão",
+        name: order.customer_name || "Consumidor final",
         email: null,
         phone: null,
       },

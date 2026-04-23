@@ -117,19 +117,23 @@ export default function POSShippingSheet({
         )}
 
         {hasSelectedCustomer && hasStreet && (
-          <MoneyInput
-            label="Envio personalizado"
-            name="customShippingFee"
-            value={shippingFree ? 0 : shippingInput}
-            onChange={(value) => setShippingInput(value)}
-            suffix={(
-              <label className="flex items-center gap-1 text-xs text-brand-dark">
-                <Checkbox checked={shippingFree} onChange={() => setShippingFree((prev) => !prev)} name="shippingFree" />
-                Sem custo
-              </label>
-            )}
-            readOnly={shippingFree}
-          />
+          <div className="mt-6">
+            <div className="border-t border-brand-border dark:border-dark-border mb-6 w-full"></div>
+
+            <MoneyInput
+              label="Envio personalizado"
+              name="customShippingFee"
+              value={shippingFree ? 0 : shippingInput}
+              onChange={(value) => setShippingInput(value)}
+              suffix={(
+                <label className="flex items-center gap-1 text-xs text-brand-dark dark:text-dark-heading">
+                  <Checkbox checked={shippingFree} onChange={() => setShippingFree((prev) => !prev)} name="shippingFree" />
+                  Sem custo
+                </label>
+              )}
+              readOnly={shippingFree}
+            />
+          </div>
         )}
 
         {hasSelectedCustomer && !hasStreet && (
@@ -231,13 +235,12 @@ export default function POSShippingSheet({
           onClick={onClose}
         >
           <div
-            className={`fixed right-4 top-4 bottom-4 w-[520px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${
-              isOpen
-                ? isAddressSheetOpen
-                  ? "-translate-x-10 scale-[0.97] opacity-70"
-                  : "translate-x-0 opacity-100"
-                : "translate-x-[120%] opacity-100"
-            }`}
+            className={`fixed right-4 top-4 bottom-4 w-[520px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen
+              ? isAddressSheetOpen
+                ? "-translate-x-10 scale-[0.97] opacity-70"
+                : "translate-x-0 opacity-100"
+              : "translate-x-[120%] opacity-100"
+              }`}
             onClick={(e) => e.stopPropagation()}
           >
             {content}

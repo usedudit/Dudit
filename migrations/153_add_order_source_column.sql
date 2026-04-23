@@ -1,4 +1,4 @@
 -- Add order_source column to track where the order came from
--- Default to 'Marketplace' for now
+-- Default to 'Vitrine Online' for now
 
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_source VARCHAR(50) DEFAULT 'Marketplace';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_source VARCHAR(50) DEFAULT 'Vitrine Online';

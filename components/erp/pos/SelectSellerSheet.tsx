@@ -112,7 +112,7 @@ const SelectSellerSheet = ({ isOpen, onClose, onSelect }: SelectSellerSheetProps
             ))}
           </div>
         ) : picker.displayed.length > 0 ? (
-          <div className="flex flex-col px-2 pb-2 pt-1">
+          <div className="flex flex-col px-2 pb-2">
             {picker.displayed.map((member) => (
               <button
                 key={member.id}

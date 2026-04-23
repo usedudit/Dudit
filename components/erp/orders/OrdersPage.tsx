@@ -276,7 +276,7 @@ export default function OrdersPage({
                 return {
                     originalId: o.id,
                     displayId: o.mp_payment_id || o.order_number || `#${o.id.substring(0, 8)}`,
-                    customer_name: o.customer_name || "Cliente Balcão",
+                    customer_name: o.customer_name || "Consumidor final",
                     customer_id: o.buyer_id || "-",
                     total_amount: Number(o.total_amount),
                     statusLabel: statusInfo.label,
@@ -563,72 +563,72 @@ export default function OrdersPage({
     return (
         <>
             <AnimatePresence mode="wait">
-            {wrapperMode === 'view' && selectedOrderId ? (
-                <FadeIn key="view-order" className="w-full h-full bg-white dark:bg-dark-background">
-                    <OrderDetailView
-                        orderId={selectedOrderId}
-                        partnerId={partnerId}
-                        onBack={invalidateAndRefresh}
-                        onEditOrder={(order: any) => {
-                            setSelectedOrderId(order.id)
-                            setWrapperMode('edit')
-                        }}
-                        onUpdateDeliveryStatus={(order: any) => {
-                            openDeliveryStatusModal({
-                                originalId: order.id,
-                                displayId: order.order_number || `#${String(order.id).substring(0, 8)}`,
-                                customer_name: order.customer_name || "Cliente Balcão",
-                                customer_id: order.buyer_id || "-",
-                                total_amount: Number(order.total_amount || 0),
-                                statusLabel: "",
-                                statusColor: "gray",
-                                deliveryStatusLabel: getDeliveryStatusMeta(order.delivery_status).label,
-                                deliveryStatusColor: getDeliveryStatusMeta(order.delivery_status).variant,
-                                isUnfulfilled: false,
-                                formattedDate: "",
-                                formattedTime: "",
-                                store_name: "",
-                                order_source: order.order_source || "Manual",
-                                items_count: Number(order.order_items?.length || 0),
-                                created_at_time: new Date(order.created_at || Date.now()).getTime(),
-                                situation: order.situation || "pending",
-                                previousSituationBeforeCancel: order.previous_situation_before_cancel || null,
-                                canEdit: order.situation !== "cancelled",
-                                canReopen: order.situation === "cancelled",
-                                paidAmount: Number(order.paid_amount || 0),
-                            })
-                        }}
-                        onCancelOrReopenOrder={(order: any) => {
-                            if (order.situation === "cancelled") {
-                                void handleReopenOrder(order.id)
-                                return
-                            }
-                            openCancelModal(order.id)
-                        }}
-                        initialOrder={effectiveOrders?.find((o: any) => o.id === selectedOrderId) || undefined}
-                    />
-                </FadeIn>
-            ) : wrapperMode === 'edit' && selectedOrderId ? (
-                <FadeIn key="edit-order" className="w-full h-full bg-white dark:bg-dark-background">
-                    <CreateOrder
-                        partnerId={partnerId}
-                        editOrderId={selectedOrderId}
-                        onBack={invalidateAndRefresh}
-                    />
-                </FadeIn>
-            ) : wrapperMode === 'create' ? (
-                <FadeIn key="create-order" className="w-full h-full bg-white dark:bg-dark-background">
-                    <CreateOrder
-                        partnerId={partnerId}
-                        onBack={invalidateAndRefresh}
-                    />
-                </FadeIn>
-            ) : (
-                <FadeIn
-                    key="list"
-                    className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
-                >
-                    <style>{`
+                {wrapperMode === 'view' && selectedOrderId ? (
+                    <FadeIn key="view-order" className="w-full h-full bg-white dark:bg-dark-background">
+                        <OrderDetailView
+                            orderId={selectedOrderId}
+                            partnerId={partnerId}
+                            onBack={invalidateAndRefresh}
+                            onEditOrder={(order: any) => {
+                                setSelectedOrderId(order.id)
+                                setWrapperMode('edit')
+                            }}
+                            onUpdateDeliveryStatus={(order: any) => {
+                                openDeliveryStatusModal({
+                                    originalId: order.id,
+                                    displayId: order.order_number || `#${String(order.id).substring(0, 8)}`,
+                                    customer_name: order.customer_name || "Consumidor final",
+                                    customer_id: order.buyer_id || "-",
+                                    total_amount: Number(order.total_amount || 0),
+                                    statusLabel: "",
+                                    statusColor: "gray",
+                                    deliveryStatusLabel: getDeliveryStatusMeta(order.delivery_status).label,
+                                    deliveryStatusColor: getDeliveryStatusMeta(order.delivery_status).variant,
+                                    isUnfulfilled: false,
+                                    formattedDate: "",
+                                    formattedTime: "",
+                                    store_name: "",
+                                    order_source: order.order_source || "Manual",
+                                    items_count: Number(order.order_items?.length || 0),
+                                    created_at_time: new Date(order.created_at || Date.now()).getTime(),
+                                    situation: order.situation || "pending",
+                                    previousSituationBeforeCancel: order.previous_situation_before_cancel || null,
+                                    canEdit: order.situation !== "cancelled",
+                                    canReopen: order.situation === "cancelled",
+                                    paidAmount: Number(order.paid_amount || 0),
+                                })
+                            }}
+                            onCancelOrReopenOrder={(order: any) => {
+                                if (order.situation === "cancelled") {
+                                    void handleReopenOrder(order.id)
+                                    return
+                                }
+                                openCancelModal(order.id)
+                            }}
+                            initialOrder={effectiveOrders?.find((o: any) => o.id === selectedOrderId) || undefined}
+                        />
+                    </FadeIn>
+                ) : wrapperMode === 'edit' && selectedOrderId ? (
+                    <FadeIn key="edit-order" className="w-full h-full bg-white dark:bg-dark-background">
+                        <CreateOrder
+                            partnerId={partnerId}
+                            editOrderId={selectedOrderId}
+                            onBack={invalidateAndRefresh}
+                        />
+                    </FadeIn>
+                ) : wrapperMode === 'create' ? (
+                    <FadeIn key="create-order" className="w-full h-full bg-white dark:bg-dark-background">
+                        <CreateOrder
+                            partnerId={partnerId}
+                            onBack={invalidateAndRefresh}
+                        />
+                    </FadeIn>
+                ) : (
+                    <FadeIn
+                        key="list"
+                        className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
+                    >
+                        <style>{`
                         .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
                         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
                         .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
@@ -637,272 +637,272 @@ export default function OrdersPage({
                         .hide-scrollbar::-webkit-scrollbar { display: none; }
                         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
                     `}</style>
-                    <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-                        {/* Desktop Header */}
-                        <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
-                            <div className="flex flex-col gap-2 pt-1">
-                                <div className="flex items-center gap-3">
-                                    <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                                        Pedidos
-                                    </h1>
+                        <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                            {/* Desktop Header */}
+                            <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                                <div className="flex flex-col gap-2 pt-1">
+                                    <div className="flex items-center gap-3">
+                                        <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                                            Pedidos
+                                        </h1>
+                                    </div>
+                                    <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                                        Gerencie as vendas e pedidos da sua loja.
+                                    </p>
                                 </div>
-                                <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                                    Gerencie as vendas e pedidos da sua loja.
-                                </p>
+
+                                <div className="flex items-center gap-3">
+                                    <Button variant="outline" onClick={() => { }}>
+                                        <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
+                                    </Button>
+
+                                    <Button onClick={handleAddOrder}>
+                                        <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
+                                        Novo Pedido
+                                    </Button>
+                                </div>
                             </div>
 
-                            <div className="flex items-center gap-3">
-                                <Button variant="outline" onClick={() => { }}>
-                                    <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
-                                </Button>
+                            {hasOrders && (
+                                <OrderPageControls
+                                    activeTab={activeTab}
+                                    setActiveTab={setActiveTab}
+                                    search={search}
+                                    onSearchChange={setSearch}
+                                    onOpenFilter={() => setModals({ filter: true })}
+                                    onExport={() => { }}
+                                    onAddOrder={handleAddOrder}
+                                    filters={filters}
+                                    setFilters={setFilters as any}
+                                    viewMode={viewMode}
+                                    onViewModeChange={setViewModeState}
+                                    hasActiveFilters={hasActiveFilters}
+                                />
+                            )}
 
-                                <Button onClick={handleAddOrder}>
-                                    <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
-                                    Novo Pedido
-                                </Button>
-                            </div>
-                        </div>
-
-                        {hasOrders && (
-                            <OrderPageControls
-                                activeTab={activeTab}
-                                setActiveTab={setActiveTab}
-                                search={search}
-                                onSearchChange={setSearch}
-                                onOpenFilter={() => setModals({ filter: true })}
-                                onExport={() => { }}
-                                onAddOrder={handleAddOrder}
-                                filters={filters}
-                                setFilters={setFilters as any}
-                                viewMode={viewMode}
-                                onViewModeChange={setViewModeState}
-                                hasActiveFilters={hasActiveFilters}
-                            />
-                        )}
-
-                        <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
-                            <AnimatePresence mode="wait">
-                                {isLoading ? (
-                                    <FadeIn key="loading" className="flex-1 flex items-center justify-center p-8">
-                                        <ThreeDotsLoader />
-                                    </FadeIn>
-                                ) : !hasOrders ? (
-                                    <FadeIn
-                                        key="empty-no-data"
-                                        className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
-                                    >
-                                        <IconPlaceholder
-                                            placeholderType="image"
-                                            imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
-                                            imageAlt="Sem pedidos"
-                                            title="Você ainda não tem pedidos"
-                                            subtitle="Seus pedidos aparecerão aqui assim que seus clientes começarem a comprar."
-                                        />
-                                    </FadeIn>
-                                ) : paginated.length === 0 ? (
-                                    <FadeIn
-                                        key="empty-results"
-                                        className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
-                                    >
-                                        <IconPlaceholder
-                                            placeholderType="image"
-                                            imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                                            imageAlt="Nenhum pedido encontrado"
-                                            title="Nenhum pedido encontrado"
-                                            subtitle="Tente ajustar seus filtros ou termos de busca."
-                                            itemButton={{
-                                                text: "Limpar Filtros",
-                                                action: handleClearFilters,
-                                                variant: "outline"
-                                            }}
-                                        />
-                                    </FadeIn>
-                                ) : (
-                                    <AnimatePresence mode="wait">
+                            <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
+                                <AnimatePresence mode="wait">
+                                    {isLoading ? (
+                                        <FadeIn key="loading" className="flex-1 flex items-center justify-center p-8">
+                                            <ThreeDotsLoader />
+                                        </FadeIn>
+                                    ) : !hasOrders ? (
                                         <FadeIn
-                                            key={activeTab + (isMobile ? "mobile" : effectiveViewMode)}
-                                            className="w-full"
+                                            key="empty-no-data"
+                                            className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
                                         >
-                                        {isMobile ? (
-                                            <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
-                                                {paginated.map((o: Order) => (
-                                                    <div
-                                                        key={o.originalId}
-                                                        className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none cursor-pointer"
-                                                        onClick={() => handleDetailsOrder(o)}
-                                                    >
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex justify-between items-start mb-0.5">
-                                                                <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate pr-2">
-                                                                    {o.displayId}
-                                                                </h3>
-                                                                <div className="flex gap-1.5 shrink-0 items-center">
-                                                                    {o.situation === "cancelled" ? (
-                                                                        <Badge variant="red" className="h-5 text-[10px] px-1.5">
-                                                                            Cancelado
-                                                                        </Badge>
-                                                                    ) : (
-                                                                        <>
-                                                                            <Badge variant={o.statusColor} icon={o.statusIcon as any} className="h-5 text-[10px] px-1.5">
-                                                                                {o.statusLabel}
-                                                                            </Badge>
-                                                                            <Badge variant={o.deliveryStatusColor} icon={o.deliveryStatusIcon as any} className="h-5 text-[10px] px-1.5">
-                                                                                {o.deliveryStatusLabel}
-                                                                            </Badge>
-                                                                        </>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mb-1">
-                                                                {o.customer_name} • {o.formattedDate}
-                                                            </div>
-                                                            <div className="flex items-center gap-2 text-[14px]">
-                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">
-                                                                    {o.items_count} {o.items_count === 1 ? 'item' : 'itens'}
-                                                                </span>
-                                                                <span className="text-gray-300 dark:text-gray-600 font-medium font-bold">•</span>
-                                                                <span className="font-bold text-brand-primary">
-                                                                    {formatCurrency(o.total_amount)}
-                                                                </span>
-
-                                                                <div className="flex-none ml-auto -mb-1" onClick={(e) => e.stopPropagation()}>
-                                                                    <Checkbox checked={selection.ids.has(o.originalId)} onChange={() => handleSelectRow(o.originalId)} />
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : effectiveViewMode === "grid" ? (
-                                            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                                {paginated.map((o: Order) => (
-                                                    <OrderGridCard
-                                                        key={o.originalId}
-                                                        order={o}
-                                                        selected={selection.ids.has(o.originalId)}
-                                                        onSelect={() => handleSelectRow(o.originalId)}
-                                                        onDetails={() => handleDetailsOrder(o)}
-                                                        onEdit={() => handleEditOrder(o)}
-                                                        canEdit={o.canEdit}
-                                                        cancelLabel={o.canReopen ? "Reabrir" : "Cancelar"}
-                                                        onCancel={() => o.canReopen ? handleReopenOrder(o.originalId) : openCancelModal(o.originalId)}
-                                                        extraActions={o.situation !== "cancelled" ? (
-                                                            <DropdownItem onClick={() => openDeliveryStatusModal(o)}>
-                                                                Alterar status de entrega
-                                                            </DropdownItem>
-                                                        ) : null}
-                                                    />
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="w-full overflow-hidden rounded-xl relative">
-                                                <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                                                <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
-
-                                                <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                                                    <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
-                                                        <thead>
-                                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
-                                                                    <div className="flex items-center">
-                                                                        <Checkbox
-                                                                            checked={selection.ids.size === paginated.length && paginated.length > 0}
-                                                                            onChange={(checked) => {
-                                                                                setSelection({ ids: checked ? new Set(paginated.map((x: Order) => x.originalId)) : new Set() })
-                                                                            }}
-                                                                            className="bg-white dark:bg-dark-background"
-                                                                        />
+                                            <IconPlaceholder
+                                                placeholderType="image"
+                                                imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
+                                                imageAlt="Sem pedidos"
+                                                title="Você ainda não tem pedidos"
+                                                subtitle="Seus pedidos aparecerão aqui assim que seus clientes começarem a comprar."
+                                            />
+                                        </FadeIn>
+                                    ) : paginated.length === 0 ? (
+                                        <FadeIn
+                                            key="empty-results"
+                                            className="flex flex-col items-center justify-center h-[600px] text-center p-8 w-full"
+                                        >
+                                            <IconPlaceholder
+                                                placeholderType="image"
+                                                imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                                imageAlt="Nenhum pedido encontrado"
+                                                title="Nenhum pedido encontrado"
+                                                subtitle="Tente ajustar seus filtros ou termos de busca."
+                                                itemButton={{
+                                                    text: "Limpar Filtros",
+                                                    action: handleClearFilters,
+                                                    variant: "outline"
+                                                }}
+                                            />
+                                        </FadeIn>
+                                    ) : (
+                                        <AnimatePresence mode="wait">
+                                            <FadeIn
+                                                key={activeTab + (isMobile ? "mobile" : effectiveViewMode)}
+                                                className="w-full"
+                                            >
+                                                {isMobile ? (
+                                                    <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
+                                                        {paginated.map((o: Order) => (
+                                                            <div
+                                                                key={o.originalId}
+                                                                className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none cursor-pointer"
+                                                                onClick={() => handleDetailsOrder(o)}
+                                                            >
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex justify-between items-start mb-0.5">
+                                                                        <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate pr-2">
+                                                                            {o.displayId}
+                                                                        </h3>
+                                                                        <div className="flex gap-1.5 shrink-0 items-center">
+                                                                            {o.situation === "cancelled" ? (
+                                                                                <Badge variant="red" className="h-5 text-[10px] px-1.5">
+                                                                                    Cancelado
+                                                                                </Badge>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <Badge variant={o.statusColor} icon={o.statusIcon as any} className="h-5 text-[10px] px-1.5">
+                                                                                        {o.statusLabel}
+                                                                                    </Badge>
+                                                                                    <Badge variant={o.deliveryStatusColor} icon={o.deliveryStatusIcon as any} className="h-5 text-[10px] px-1.5">
+                                                                                        {o.deliveryStatusLabel}
+                                                                                    </Badge>
+                                                                                </>
+                                                                            )}
+                                                                        </div>
                                                                     </div>
-                                                                </th>
-                                                                {COLUMNS.map((col, idx) => {
-                                                                    const isSortable = col.id !== 'actions';
-                                                                    const isSorted = sortConfig?.key === col.id;
-                                                                    const isLast = idx === COLUMNS.length - 1;
+                                                                    <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mb-1">
+                                                                        {o.customer_name} • {o.formattedDate}
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2 text-[14px]">
+                                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">
+                                                                            {o.items_count} {o.items_count === 1 ? 'item' : 'itens'}
+                                                                        </span>
+                                                                        <span className="text-gray-300 dark:text-gray-600 font-medium font-bold">•</span>
+                                                                        <span className="font-bold text-brand-primary">
+                                                                            {formatCurrency(o.total_amount)}
+                                                                        </span>
 
-                                                                    return (
-                                                                        <th
-                                                                            key={col.id}
-                                                                            className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isLast ? "rounded-r-lg" : ""}`}
-                                                                            style={{ width: col.width }}
-                                                                            onClick={() => {
-                                                                                if (!isSortable) return
-                                                                                setSortConfig(prev => ({
-                                                                                    key: col.id as SortKey,
-                                                                                    direction: prev?.key === col.id && prev.direction === 'asc' ? 'desc' : 'asc'
-                                                                                }))
-                                                                            }}
-                                                                        >
-                                                                            <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
-                                                                                <span>{col.label}</span>
-                                                                                {isSortable && (
-                                                                                    <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
-                                                                                        <ArrowUpDownIcon
-                                                                                            size={14}
-                                                                                            className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
-                                                                                                } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
-                                                                                        />
-                                                                                    </div>
-                                                                                )}
+                                                                        <div className="flex-none ml-auto -mb-1" onClick={(e) => e.stopPropagation()}>
+                                                                            <Checkbox checked={selection.ids.has(o.originalId)} onChange={() => handleSelectRow(o.originalId)} />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : effectiveViewMode === "grid" ? (
+                                                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                                        {paginated.map((o: Order) => (
+                                                            <OrderGridCard
+                                                                key={o.originalId}
+                                                                order={o}
+                                                                selected={selection.ids.has(o.originalId)}
+                                                                onSelect={() => handleSelectRow(o.originalId)}
+                                                                onDetails={() => handleDetailsOrder(o)}
+                                                                onEdit={() => handleEditOrder(o)}
+                                                                canEdit={o.canEdit}
+                                                                cancelLabel={o.canReopen ? "Reabrir" : "Cancelar"}
+                                                                onCancel={() => o.canReopen ? handleReopenOrder(o.originalId) : openCancelModal(o.originalId)}
+                                                                extraActions={o.situation !== "cancelled" ? (
+                                                                    <DropdownItem onClick={() => openDeliveryStatusModal(o)}>
+                                                                        Alterar status de entrega
+                                                                    </DropdownItem>
+                                                                ) : null}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-full overflow-hidden rounded-xl relative">
+                                                        <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                                        <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                                                        <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
+                                                                <thead>
+                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                        <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
+                                                                            <div className="flex items-center">
+                                                                                <Checkbox
+                                                                                    checked={selection.ids.size === paginated.length && paginated.length > 0}
+                                                                                    onChange={(checked) => {
+                                                                                        setSelection({ ids: checked ? new Set(paginated.map((x: Order) => x.originalId)) : new Set() })
+                                                                                    }}
+                                                                                    className="bg-white dark:bg-dark-background"
+                                                                                />
                                                                             </div>
                                                                         </th>
-                                                                    )
-                                                                })}
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {paginated.map((o: Order) => (
-                                                                <OrderListItem
-                                                                    key={o.originalId}
-                                                                    order={o}
-                                                                    columns={COLUMNS}
-                                                                    selected={selection.ids.has(o.originalId)}
-                                                                    onSelect={handleSelectRow}
-                                                                    onEdit={handleEditOrder}
-                                                                    canEdit={o.canEdit}
-                                                                    cancelLabel={o.canReopen ? "Reabrir" : "Cancelar"}
-                                                                    onCancel={() => o.canReopen ? handleReopenOrder(o.originalId) : openCancelModal(o.originalId)}
-                                                                    onDetails={handleDetailsOrder}
-                                                                    extraActions={o.situation !== "cancelled" ? (
-                                                                        <DropdownItem onClick={() => openDeliveryStatusModal(o)}>
-                                                                            Alterar status de entrega
-                                                                        </DropdownItem>
-                                                                    ) : null}
-                                                                />
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        )}
-                                        </FadeIn>
-                                    </AnimatePresence>
-                                )}
-                            </AnimatePresence>
-                            {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
-                        </div>
+                                                                        {COLUMNS.map((col, idx) => {
+                                                                            const isSortable = col.id !== 'actions';
+                                                                            const isSorted = sortConfig?.key === col.id;
+                                                                            const isLast = idx === COLUMNS.length - 1;
 
-                        {hasOrders && paginated.length > 0 && (
-                            <Pagination
-                                currentPage={page}
-                                totalPages={totalPages}
-                                onPageChange={(p) => {
-                                    setPage(p)
-                                    if (p === totalPages && hasNextPage && !isFetchingNextPage) {
-                                        void fetchNextPage()
-                                    }
-                                }}
-                            />
-                        )}
-                        {hasNextPage && page === totalPages && isFetchingNextPage ? (
-                            <div className="flex flex-col gap-2 py-2 px-4">
-                                <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse" />
-                                <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse opacity-70" />
+                                                                            return (
+                                                                                <th
+                                                                                    key={col.id}
+                                                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isLast ? "rounded-r-lg" : ""}`}
+                                                                                    style={{ width: col.width }}
+                                                                                    onClick={() => {
+                                                                                        if (!isSortable) return
+                                                                                        setSortConfig(prev => ({
+                                                                                            key: col.id as SortKey,
+                                                                                            direction: prev?.key === col.id && prev.direction === 'asc' ? 'desc' : 'asc'
+                                                                                        }))
+                                                                                    }}
+                                                                                >
+                                                                                    <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                                        <span>{col.label}</span>
+                                                                                        {isSortable && (
+                                                                                            <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                                                                <ArrowUpDownIcon
+                                                                                                    size={14}
+                                                                                                    className={`transition-all duration-200 ${isSorted ? 'text-brand-dark dark:text-dark-heading opacity-100 block' : 'text-brand-inactive-text hidden group-hover:block opacity-40'
+                                                                                                        } ${isSorted && sortConfig.direction === 'desc' ? 'rotate-180' : ''}`}
+                                                                                                />
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </th>
+                                                                            )
+                                                                        })}
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {paginated.map((o: Order) => (
+                                                                        <OrderListItem
+                                                                            key={o.originalId}
+                                                                            order={o}
+                                                                            columns={COLUMNS}
+                                                                            selected={selection.ids.has(o.originalId)}
+                                                                            onSelect={handleSelectRow}
+                                                                            onEdit={handleEditOrder}
+                                                                            canEdit={o.canEdit}
+                                                                            cancelLabel={o.canReopen ? "Reabrir" : "Cancelar"}
+                                                                            onCancel={() => o.canReopen ? handleReopenOrder(o.originalId) : openCancelModal(o.originalId)}
+                                                                            onDetails={handleDetailsOrder}
+                                                                            extraActions={o.situation !== "cancelled" ? (
+                                                                                <DropdownItem onClick={() => openDeliveryStatusModal(o)}>
+                                                                                    Alterar status de entrega
+                                                                                </DropdownItem>
+                                                                            ) : null}
+                                                                        />
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </FadeIn>
+                                        </AnimatePresence>
+                                    )}
+                                </AnimatePresence>
+                                {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
                             </div>
-                        ) : null}
-                    </div>
-                </FadeIn>
-            )}
-        </AnimatePresence>
+
+                            {hasOrders && paginated.length > 0 && (
+                                <Pagination
+                                    currentPage={page}
+                                    totalPages={totalPages}
+                                    onPageChange={(p) => {
+                                        setPage(p)
+                                        if (p === totalPages && hasNextPage && !isFetchingNextPage) {
+                                            void fetchNextPage()
+                                        }
+                                    }}
+                                />
+                            )}
+                            {hasNextPage && page === totalPages && isFetchingNextPage ? (
+                                <div className="flex flex-col gap-2 py-2 px-4">
+                                    <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse" />
+                                    <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse opacity-70" />
+                                </div>
+                            ) : null}
+                        </div>
+                    </FadeIn>
+                )}
+            </AnimatePresence>
 
             <FilterSheet
                 isOpen={modals.filter}

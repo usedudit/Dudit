@@ -517,7 +517,7 @@ const PaymentModal = ({
                                                         {customer?.name?.substring(0, 2).toUpperCase() || 'CB'}
                                                     </div>
                                                     <div className="flex flex-col overflow-hidden">
-                                                        <span className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight truncate max-w-[150px]">{customer?.name || 'Cliente Balcão'}</span>
+                                                        <span className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight truncate max-w-[150px]">{customer?.name || 'Consumidor final'}</span>
                                                         <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">Order ERP / Presencial</span>
                                                     </div>
                                                 </div>

@@ -116,12 +116,11 @@ async function syncPosSaleToOrders(params: {
   actorUserId: string
 }): Promise<string | null> {
   const admin = createAdminClient()
-  const derivedOrderNumber = `PDV-${String(params.saleId).replace(/-/g, "").slice(0, 8).toUpperCase()}`
   const { data: existingOrder } = await admin
     .from("orders")
     .select("id")
     .eq("partner_id", params.partnerId)
-    .eq("order_number", derivedOrderNumber)
+    .eq("sale_id", params.saleId)
     .limit(1)
     .maybeSingle()
 
@@ -136,18 +135,21 @@ async function syncPosSaleToOrders(params: {
       .single(),
     admin
       .from("sale_items")
-      .select("product_id, variant_id, product_name, unit_price, quantity, subtotal")
-      .eq("sale_id", params.saleId)
-      .eq("partner_id", params.partnerId),
+      .select("*")
+      .eq("sale_id", params.saleId),
     admin
       .from("pre_sales")
-      .select("shipping_fee, other_costs, coupon_id")
+      .select("id, seller_id, shipping_fee, other_costs, coupon_id")
       .eq("id", params.preSaleId)
-      .eq("partner_id", params.partnerId)
       .maybeSingle(),
   ])
 
-  if (!sale) return null
+  if (!sale) {
+    throw new Error(`Venda ${params.saleId} não encontrada.`)
+  }
+
+  // Use the pre-generated DDT number instead of creating a PDV- prefix
+  const finalOrderNumber = sale.sale_number || `DDT-${String(params.saleId).substring(0, 8).toUpperCase()}`
 
   let customerName: string | null = null
   if (sale.customer_id) {
@@ -159,8 +161,10 @@ async function syncPosSaleToOrders(params: {
       .maybeSingle()
     customerName = cust?.name?.trim() || null
   }
-  if (!customerName) {
-    customerName = "Cliente balcão (PDV)"
+
+  // Normalize customer name and ensure it's "Consumidor final" if empty or incorrectly set
+  if (!customerName || customerName.toLowerCase().includes("cliente balcão")) {
+    customerName = "Consumidor final"
   }
 
   const shippingFee = safeMoney(Number(draft?.shipping_fee || 0))
@@ -195,7 +199,7 @@ async function syncPosSaleToOrders(params: {
     finance_account_id: params.financeAccountId || null,
     created_by: params.actorUserId,
     inventory_deducted: true,
-    order_number: derivedOrderNumber,
+    order_number: finalOrderNumber,
   }
 
   const insertWithPosFlag = { ...orderPayload, is_pos_sale: true }

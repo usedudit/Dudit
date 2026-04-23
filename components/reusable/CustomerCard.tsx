@@ -67,7 +67,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
             )}
 
             {/* Top Part: Customer Identity */}
-            <div className="p-6 pb-0 text-left">
+            <div className={chrome === "minimal" ? "text-left" : "p-6 pb-0 text-left"}>
                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">
                     Cliente
                 </h3>
@@ -104,7 +104,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
             <div className="border-t border-brand-border dark:border-dark-border w-full"></div>
 
             {/* Bottom Part: Addresses */}
-            <div className="p-6 text-left space-y-6">
+            <div className={chrome === "minimal" ? "mt-6 p-0 text-left" : "p-6 text-left space-y-6"}>
                 {/* Delivery Address */}
                 <div>
                     <div className="flex justify-between items-center mb-4">

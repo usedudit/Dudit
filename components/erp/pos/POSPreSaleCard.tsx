@@ -38,7 +38,7 @@ export const POSPreSaleCard = memo(function POSPreSaleCard({ preSale, index, cus
       </div>
       <div className="mt-4 flex items-center justify-between gap-3">
         <span className="max-w-[150px] truncate text-sm font-medium text-brand-inactive-text">
-          {customers.find((customer) => customer.id === preSale.customer_id)?.name || "Cliente Balcão"}
+          {customers.find((customer) => customer.id === preSale.customer_id)?.name || "Consumidor final"}
         </span>
         <span className="text-lg font-bold text-brand-primary">
           {formatCurrency(Number(preSale.total_amount || 0))}
