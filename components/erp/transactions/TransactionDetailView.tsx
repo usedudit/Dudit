@@ -87,7 +87,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
 
     const subtitleParts: string[] = [detail.paymentMethodSubtitle]
     if (detail.paymentDateSubtitle) {
-        subtitleParts.push(`Pago em ${detail.paymentDateSubtitle}`)
+        subtitleParts.push(`${detail.transactionType === "refund" ? "Reembolsado" : "Pago"} em ${detail.paymentDateSubtitle}`)
     }
     const subtitleLeft = subtitleParts.join(" • ")
 
