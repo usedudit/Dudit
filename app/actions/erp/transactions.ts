@@ -1847,6 +1847,7 @@ export type TransactionDetailPayload = {
     headerTitle: string
     statusLabel: string
     statusVariant: ERPTransaction["statusVariant"]
+    transactionType: ERPTransaction["transactionType"]
     isRecurring: boolean
     paymentMethodSubtitle: string
     paymentDateSubtitle: string | null
@@ -1982,6 +1983,8 @@ export async function getTransactionDetailsAction(
         const cancelled = isCancelledStatus(row.status)
         const step2Label = cancelled
             ? "Cancelado"
+            : row.transaction_type === "refund"
+              ? "Reembolsado"
             : paid
               ? row.transaction_type === "income" ||
                   (row.transaction_type === "refund" && row.refund_kind === "expense_refund")
@@ -2257,6 +2260,7 @@ export async function getTransactionDetailsAction(
             headerTitle,
             statusLabel,
             statusVariant,
+            transactionType: row.transaction_type,
             isRecurring: !!row.recurring_id,
             paymentMethodSubtitle: paymentSubtitle,
             paymentDateSubtitle,

@@ -52,7 +52,8 @@ import AlertModal from "../../reusable/AlertModal"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { DropdownItem } from "@/components/reusable/Dropdown"
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
-import { updateOrdersStatusInBatchAction, getERPOrdersPageAction, type ERPOrderListCursor } from "@/app/actions/erp/orders"
+import NotesSheet from "@/components/erp/shared/NotesSheet"
+import { updateOrderNotesAction, updateOrdersStatusInBatchAction, getERPOrdersPageAction, type ERPOrderListCursor } from "@/app/actions/erp/orders"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
 import { FadeIn } from "@/components/animations/FadeIn"
 
@@ -77,9 +78,9 @@ interface Order {
     created_at_time: number;
     situation: string;
     delivery_status?: string;
+    notes?: string;
     previousSituationBeforeCancel?: string | null;
     canEdit: boolean;
-    canReopen: boolean;
     paidAmount: number;
     statusIcon?: React.ReactNode;
     deliveryStatusIcon?: React.ReactNode;
@@ -150,6 +151,9 @@ export default function OrdersPage({
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
     const [deliveryStatusModal, setDeliveryStatusModal] = useState<{ open: boolean; order: Order | null }>({ open: false, order: null })
     const [deliveryStatusValue, setDeliveryStatusValue] = useState("not_sent")
+    const [notesSheet, setNotesSheet] = useState<{ open: boolean; orderId: string | null; notes: string }>({ open: false, orderId: null, notes: "" })
+    const [notesSheetSaving, setNotesSheetSaving] = useState(false)
+    const [detailRefreshToken, setDetailRefreshToken] = useState(0)
 
     const queryClient = useQueryClient()
 
@@ -294,9 +298,9 @@ export default function OrdersPage({
                     created_at_time: new Date(o.order_date || o.created_at).getTime(),
                     situation: o.situation,
                     delivery_status: o.delivery_status,
+                    notes: o.notes || "",
                     previousSituationBeforeCancel: o.previous_situation_before_cancel || null,
                     canEdit: o.situation !== "cancelled",
-                    canReopen: o.situation === "cancelled",
                     paidAmount: Number(o.paid_amount || 0)
                 }
             })
@@ -455,9 +459,37 @@ export default function OrdersPage({
         return filteredOrders.filter((order) => selectedIds.has(order.originalId))
     }, [filteredOrders, selection.ids])
 
-    const handleReopenOrder = async (orderId: string) => {
-        setSingleCancelId(orderId)
-        await confirmBulk("reopen", [orderId])
+    const openNotesSheet = (order: { originalId?: string; id?: string; notes?: string | null }) => {
+        const orderId = order.originalId || order.id || null
+        if (!orderId) return
+        const cleanNotes = String(order.notes || "").replace(/\n*Pedido cancelado por:[\s\S]*$/, "").trim()
+        setNotesSheet({ open: true, orderId, notes: cleanNotes })
+    }
+
+    const handleSaveOrderNotes = async () => {
+        if (!notesSheet.orderId) return
+        setNotesSheetSaving(true)
+        try {
+            const result = await updateOrderNotesAction({
+                orderId: notesSheet.orderId,
+                partnerId,
+                notes: notesSheet.notes,
+            })
+            if (!result.success) {
+                toast({ title: "Erro", description: result.error, variant: "destructive" })
+                return
+            }
+            await queryClient.invalidateQueries({ queryKey: ['erp', 'orders', partnerId] })
+            await queryClient.refetchQueries({ queryKey: ['erp', 'orders', partnerId], type: 'active' })
+            setDetailRefreshToken((value) => value + 1)
+            setNotesSheet({ open: false, orderId: null, notes: "" })
+            toast({ title: "Sucesso", description: "Observação salva com sucesso." })
+        } catch (error) {
+            console.error(error)
+            toast({ title: "Erro", description: "Falha ao salvar observação.", variant: "destructive" })
+        } finally {
+            setNotesSheetSaving(false)
+        }
     }
 
     const handleBulkEditApply = async (payload: BulkActionPayload) => {
@@ -498,32 +530,22 @@ export default function OrdersPage({
         }
     }
 
-    const confirmBulk = async (action: 'cancel' | 'reopen', explicitIds?: string[]) => {
+    const confirmBulk = async (action: 'cancel', explicitIds?: string[]) => {
         const ids = explicitIds?.length ? explicitIds : (singleCancelId ? [singleCancelId] : Array.from(selection.ids))
         if (ids.length === 0) return
 
-        setActionModal({ open: true, text: action === 'reopen' ? "Reabrindo pedidos..." : "Cancelando pedidos..." })
+        setActionModal({ open: true, text: "Cancelando pedidos..." })
 
         try {
-            let result;
-            if (action === 'reopen') {
-                result = await updateOrdersStatusInBatchAction({
-                    orderIds: ids,
-                    partnerId,
-                    actionType: 'reopen',
-                    userName: currentUserName
-                })
-            } else {
-                result = await updateOrdersStatusInBatchAction({
-                    orderIds: ids,
-                    partnerId,
-                    actionType: 'cancel',
-                    cancelReason: cancelReason.trim() || undefined,
-                    restoreStock: restoreStockOnCancel,
-                    generateAutomaticRefund: shouldShowAutomaticRefundCheckbox ? generateAutomaticRefundOnCancel : false,
-                    userName: currentUserName
-                })
-            }
+            const result = await updateOrdersStatusInBatchAction({
+                orderIds: ids,
+                partnerId,
+                actionType: 'cancel',
+                cancelReason: cancelReason.trim() || undefined,
+                restoreStock: restoreStockOnCancel,
+                generateAutomaticRefund: shouldShowAutomaticRefundCheckbox ? generateAutomaticRefundOnCancel : false,
+                userName: currentUserName
+            })
 
             if (result.success) {
                 await queryClient.invalidateQueries({ queryKey: ['erp', 'orders', partnerId] })
@@ -531,9 +553,7 @@ export default function OrdersPage({
                 if (!singleCancelId) setSelection({ ids: new Set() })
                 toast({
                     title: "Sucesso",
-                    description: action === 'reopen'
-                        ? "Pedidos reabertos"
-                        : "Pedidos cancelados"
+                    description: "Pedidos cancelados"
                 })
                 if ((result as any).warning) {
                     toast({ title: "Atenção", description: (result as any).warning, variant: "destructive" })
@@ -592,20 +612,16 @@ export default function OrdersPage({
                                     items_count: Number(order.order_items?.length || 0),
                                     created_at_time: new Date(order.created_at || Date.now()).getTime(),
                                     situation: order.situation || "pending",
+                                    notes: order.notes || "",
                                     previousSituationBeforeCancel: order.previous_situation_before_cancel || null,
                                     canEdit: order.situation !== "cancelled",
-                                    canReopen: order.situation === "cancelled",
                                     paidAmount: Number(order.paid_amount || 0),
                                 })
                             }}
-                            onCancelOrReopenOrder={(order: any) => {
-                                if (order.situation === "cancelled") {
-                                    void handleReopenOrder(order.id)
-                                    return
-                                }
-                                openCancelModal(order.id)
-                            }}
+                            onCancelOrder={(order: any) => openCancelModal(order.id)}
+                            onOpenNotes={(order: any) => openNotesSheet(order)}
                             initialOrder={effectiveOrders?.find((o: any) => o.id === selectedOrderId) || undefined}
+                            key={`order-detail-${selectedOrderId}-${detailRefreshToken}`}
                         />
                     </FadeIn>
                 ) : wrapperMode === 'edit' && selectedOrderId ? (
@@ -784,8 +800,8 @@ export default function OrdersPage({
                                                                 onDetails={() => handleDetailsOrder(o)}
                                                                 onEdit={() => handleEditOrder(o)}
                                                                 canEdit={o.canEdit}
-                                                                cancelLabel={o.canReopen ? "Reabrir" : "Cancelar"}
-                                                                onCancel={() => o.canReopen ? handleReopenOrder(o.originalId) : openCancelModal(o.originalId)}
+                                                                cancelLabel={o.situation === "cancelled" ? "Observação" : "Cancelar"}
+                                                                onCancel={() => o.situation === "cancelled" ? openNotesSheet(o) : openCancelModal(o.originalId)}
                                                                 extraActions={o.situation !== "cancelled" ? (
                                                                     <DropdownItem onClick={() => openDeliveryStatusModal(o)}>
                                                                         Alterar status de entrega
@@ -859,8 +875,8 @@ export default function OrdersPage({
                                                                             onSelect={handleSelectRow}
                                                                             onEdit={handleEditOrder}
                                                                             canEdit={o.canEdit}
-                                                                            cancelLabel={o.canReopen ? "Reabrir" : "Cancelar"}
-                                                                            onCancel={() => o.canReopen ? handleReopenOrder(o.originalId) : openCancelModal(o.originalId)}
+                                                                            cancelLabel={o.situation === "cancelled" ? "Observação" : "Cancelar"}
+                                                                            onCancel={() => o.situation === "cancelled" ? openNotesSheet(o) : openCancelModal(o.originalId)}
                                                                             onDetails={handleDetailsOrder}
                                                                             extraActions={o.situation !== "cancelled" ? (
                                                                                 <DropdownItem onClick={() => openDeliveryStatusModal(o)}>
@@ -995,6 +1011,17 @@ export default function OrdersPage({
                     cancelledCount: selectedOrdersForBulkActions.filter((order) => order.situation === "cancelled").length,
                 }}
                 onApply={handleBulkEditApply}
+            />
+
+            <NotesSheet
+                isOpen={notesSheet.open}
+                onClose={() => setNotesSheet({ open: false, orderId: null, notes: "" })}
+                onConfirm={handleSaveOrderNotes}
+                title="Adicionar Observação"
+                value={notesSheet.notes}
+                onChange={(value) => setNotesSheet((current) => ({ ...current, notes: value }))}
+                placeholder="Digite alguma observação que sairá no pedido..."
+                confirmText={notesSheetSaving ? "Salvando..." : "Confirmar"}
             />
 
             <DefaultModal

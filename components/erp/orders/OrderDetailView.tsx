@@ -31,11 +31,12 @@ interface OrderDetailViewProps {
     onBack: () => void
     onEditOrder: (order: any) => void
     onUpdateDeliveryStatus: (order: any) => void
-    onCancelOrReopenOrder: (order: any) => void
+    onCancelOrder: (order: any) => void
+    onOpenNotes: (order: any) => void
     initialOrder?: any
 }
 
-export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrder, onUpdateDeliveryStatus, onCancelOrReopenOrder, initialOrder }: OrderDetailViewProps) {
+export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrder, onUpdateDeliveryStatus, onCancelOrder, onOpenNotes, initialOrder }: OrderDetailViewProps) {
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [order, setOrder] = useState<any>(initialOrder || null)
@@ -104,8 +105,6 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const cancelNote = (String(order.notes || "").match(/Pedido cancelado por:[\s\S]*$/)?.[0] || "").trim()
     const changeAmount = Math.max(0, Number(order.paid_amount || 0) - Number(order.total_amount || 0))
     const canEdit = order.situation !== "cancelled"
-    const canReopen = order.situation === "cancelled"
-    const cancelLabel = canReopen ? "Reabrir" : "Cancelar"
     const isPickupOrder = order.delivery_type === "pickup" || Number(order.shipping_cost || 0) <= 0
     const timelineDate = (isActive: boolean) => {
         if (!isActive) return { date: "", time: "" }
@@ -190,8 +189,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                 <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                     <ActionsDropdown
                                         onEdit={canEdit ? () => onEditOrder(order) : undefined}
-                                        onCancel={() => onCancelOrReopenOrder(order)}
-                                        cancelLabel={cancelLabel}
+                                        onCancel={order.situation === "cancelled" ? () => onOpenNotes(order) : () => onCancelOrder(order)}
+                                        cancelLabel={order.situation === "cancelled" ? "Observação" : "Cancelar"}
                                     >
                                         {order.situation !== "cancelled" && (
                                             <DropdownItem onClick={() => onUpdateDeliveryStatus(order)}>
@@ -407,8 +406,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                 <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
                     <ActionsDropdown
                         onEdit={canEdit ? () => onEditOrder(order) : undefined}
-                        onCancel={() => onCancelOrReopenOrder(order)}
-                        cancelLabel={cancelLabel}
+                        onCancel={order.situation === "cancelled" ? () => onOpenNotes(order) : () => onCancelOrder(order)}
+                        cancelLabel={order.situation === "cancelled" ? "Observação" : "Cancelar"}
                         trigger={
                             <Button variant="outline" className="flex-1">
                                 <ThreeDotsIcon className="w-4 h-4 mr-2" />

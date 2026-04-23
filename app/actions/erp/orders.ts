@@ -598,6 +598,7 @@ async function createRefundTransactionForCancelledOrder(params: {
     orderNumber: string
     orderId: string
     customerId?: string | null
+    customerName?: string | null
     paidAmount: number
     financeAccountId?: string | null
     createdByUserId?: string | null
@@ -637,6 +638,12 @@ async function createRefundTransactionForCancelledOrder(params: {
     const refundableAmount = Math.max(0, paidAmount - alreadyRefundedAmount)
     if (refundableAmount <= 0.009) return { success: true as const }
 
+    const transactionContactId = await resolveOrCreateTransactionContactByName({
+        supabase: params.supabase,
+        partnerId: params.partnerId,
+        name: params.customerName,
+    })
+
     const paymentDate = new Date().toISOString()
     const { error } = await params.supabase
         .from("transactions")
@@ -645,7 +652,7 @@ async function createRefundTransactionForCancelledOrder(params: {
             description: `Reembolso automático da venda ${params.orderNumber}`,
             category: "Reembolso",
             customer_id: params.customerId || null,
-            contact_id: null,
+            contact_id: transactionContactId,
             contact_type: "customer",
             amount: refundableAmount,
             due_date: null,
@@ -724,12 +731,64 @@ async function restoreCancelledOrderInventory(params: {
     return { success: true as const }
 }
 
+async function resolveOrCreateTransactionContactByName(params: {
+    supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>
+    partnerId: string
+    name?: string | null
+}) {
+    const normalizedName = String(params.name || "").trim().replace(/\s+/g, " ")
+    if (!normalizedName) return null
+
+    const { data: existing, error: existingError } = await params.supabase
+        .from("transaction_contacts")
+        .select("id")
+        .eq("partner_id", params.partnerId)
+        .eq("type", "customer")
+        .ilike("name", normalizedName)
+        .limit(1)
+        .maybeSingle()
+
+    if (existingError) {
+        console.error("[orders_cancel_refund] failed_to_find_transaction_contact", {
+            partnerId: params.partnerId,
+            name: normalizedName,
+            error: existingError,
+        })
+        return null
+    }
+
+    if (existing?.id) return existing.id
+
+    const { data: created, error: createError } = await params.supabase
+        .from("transaction_contacts")
+        .insert({
+            partner_id: params.partnerId,
+            name: normalizedName,
+            type: "customer",
+            description: "Contato criado automaticamente a partir de reembolso de venda.",
+        })
+        .select("id")
+        .maybeSingle()
+
+    if (createError) {
+        console.error("[orders_cancel_refund] failed_to_create_transaction_contact", {
+            partnerId: params.partnerId,
+            name: normalizedName,
+            error: createError,
+        })
+        return null
+    }
+
+    return created?.id || null
+}
+
 async function createRefundTransactionForCancelledOrderSafe(params: {
     supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>
     partnerId: string
     orderNumber: string
     orderId: string
     customerId?: string | null
+    customerName?: string | null
     paidAmount: number
     financeAccountId?: string | null
     createdByUserId?: string | null
@@ -762,7 +821,7 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
     }
 
     if (!financeAccountId) {
-        const message = "NÃ£o foi possÃ­vel gerar o reembolso automÃ¡tico porque nÃ£o existe conta financeira ativa para lanÃ§ar o reembolso."
+        const message = "Não foi possível gerar o reembolso automático porque não existe conta financeira ativa para lançar o reembolso."
         console.error("[orders_cancel_refund] missing_finance_account", {
             orderId: params.orderId,
             partnerId: params.partnerId,
@@ -794,13 +853,19 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
     const refundableAmount = Math.max(0, paidAmount - alreadyRefundedAmount)
     if (refundableAmount <= 0.009) return { success: true as const }
 
+    const transactionContactId = await resolveOrCreateTransactionContactByName({
+        supabase: params.supabase,
+        partnerId: params.partnerId,
+        name: params.customerName,
+    })
+
     const paymentDate = new Date().toISOString()
     const refundPayload = {
         partner_id: params.partnerId,
         description: `Reembolso automÃ¡tico da venda ${params.orderNumber}`,
         category: "Reembolso",
         customer_id: params.customerId || null,
-        contact_id: null,
+        contact_id: transactionContactId,
         contact_type: "customer",
         amount: refundableAmount,
         due_date: null,
@@ -850,7 +915,7 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
             refundableAmount,
             error: insertResult.error,
         })
-        return { error: insertResult.error?.message || "NÃ£o foi possÃ­vel gerar o reembolso automÃ¡tico." }
+        return { error: insertResult.error?.message || "Não foi possível gerar o reembolso automático." }
     }
 
     const { error: balanceError } = await params.supabase.rpc("apply_account_balance_delta", {
@@ -1691,10 +1756,69 @@ export async function deleteOrdersInBatchAction(orderIds: string[], partnerId: s
     return { success: true }
 }
 
+export async function updateOrderNotesAction(input: {
+    orderId: string
+    partnerId: string
+    notes: string
+}) {
+    const user = await requireUser()
+    if (!user) return { success: false as const, error: "NÃ£o autenticado" }
+
+    await requirePartnerAccess(input.partnerId)
+    const supabase = await getSupabaseServerClient()
+
+    const { data: currentOrder, error: currentOrderError } = await supabase
+        .from("orders")
+        .select("id, notes")
+        .eq("id", input.orderId)
+        .eq("partner_id", input.partnerId)
+        .maybeSingle()
+
+    if (currentOrderError || !currentOrder?.id) {
+        return { success: false as const, error: currentOrderError?.message || "Pedido nÃ£o encontrado." }
+    }
+
+    const cleanNotes = String(input.notes || "").trim()
+    const cancelNote = (String(currentOrder.notes || "").match(/Pedido cancelado por:[\s\S]*$/)?.[0] || "").trim()
+    const nextNotes = [cleanNotes, cancelNote].filter(Boolean).join("\n").trim() || null
+
+    const { error: updateError } = await supabase
+        .from("orders")
+        .update({ notes: nextNotes })
+        .eq("id", input.orderId)
+        .eq("partner_id", input.partnerId)
+
+    if (updateError) {
+        console.error("[orders_notes] failed_to_update_order_notes", {
+            orderId: input.orderId,
+            partnerId: input.partnerId,
+            error: updateError,
+        })
+        return { success: false as const, error: updateError.message }
+    }
+
+    try {
+        await logAuditEvent({
+            partnerId: input.partnerId,
+            actorUserId: user.id,
+            entityType: "order",
+            entityId: input.orderId,
+            actionType: "updated",
+            changeLines: ["alterou as observaÃ§Ãµes do pedido."],
+            source: "manual",
+        })
+    } catch (historyError) {
+        console.error("[orders_notes] audit_log_failed", historyError)
+    }
+
+    await revalidateOrders(input.partnerId)
+    return { success: true as const }
+}
+
 export async function updateOrdersStatusInBatchAction(payload: {
     orderIds: string[]
     partnerId: string
-    actionType: 'payment_status' | 'delivery_status' | 'cancel' | 'reopen'
+    actionType: 'payment_status' | 'delivery_status' | 'cancel'
     statusValue?: string
     cancelReason?: string
     restoreStock?: boolean
@@ -1703,6 +1827,11 @@ export async function updateOrdersStatusInBatchAction(payload: {
 }) {
     const user = await requireUser()
     if (!user) return { error: "Nao autenticado" }
+
+    const runtimeActionType = String((payload as { actionType?: string }).actionType || "")
+    if (!["payment_status", "delivery_status", "cancel"].includes(runtimeActionType)) {
+        return { error: "Ação inválida para pedidos." }
+    }
 
     await requirePartnerAccess(payload.partnerId)
     const supabase = await getSupabaseServerClient()
@@ -1717,7 +1846,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
         return { error: "Nenhum pedido válido foi encontrado para processar." }
     }
 
-    if (payload.actionType === "cancel" || payload.actionType === "reopen") {
+    if (payload.actionType === "cancel") {
         const { data: profile } = await supabase
             .from("user_profiles")
             .select("full_name")
@@ -1802,6 +1931,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                             orderNumber: order.order_number || order.id,
                             orderId: order.id,
                             customerId: order.buyer_id || null,
+                            customerName: order.customer_name || null,
                             paidAmount: refundAmount,
                             financeAccountId: order.finance_account_id || null,
                             createdByUserId: user.id,
