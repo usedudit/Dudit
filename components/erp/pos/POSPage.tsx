@@ -36,7 +36,6 @@ import POSHeader from "@/components/erp/pos/POSHeader"
 import POSDesktopOrderPanel, { POSOrderSummaryContent } from "@/components/erp/pos/POSOrderSummaryCard"
 import POSQuickProductSheet from "@/components/erp/pos/POSQuickProductSheet"
 import POSShippingSheet from "@/components/erp/pos/POSShippingSheet"
-import NotesSheet from "@/components/erp/shared/NotesSheet"
 import type {
   PDVCartItem as CartItem,
   PDVCustomer as Customer,

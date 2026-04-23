@@ -1945,7 +1945,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 }
             }
 
-            if (payload.actionType === "reopen") {
+            if (false) {
                 if (order.situation !== "cancelled") continue
 
                 const restoredSituation = order.previous_situation_before_cancel || "pending"
@@ -2035,7 +2035,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         }
                     }
 
-                    if (payload.actionType === "reopen") {
+                    if (false) {
                         lines.push(`reabriu o pedido e restaurou o status para ${getPaymentStatusLabel(order.previous_situation_before_cancel || "pending")}`)
                         if (order.stock_restored_on_cancel) {
                             lines.push("removeu novamente os itens do estoque")
