@@ -141,7 +141,7 @@ async function syncPosSaleToOrders(params: {
       .eq("partner_id", params.partnerId),
     admin
       .from("pre_sales")
-      .select("shipping_fee, other_costs")
+      .select("shipping_fee, other_costs, coupon_id")
       .eq("id", params.preSaleId)
       .eq("partner_id", params.partnerId)
       .maybeSingle(),
@@ -186,6 +186,7 @@ async function syncPosSaleToOrders(params: {
     discount_value: safeMoney(Number(sale.discount_amount || 0)),
     discount_type: "fixed",
     discount_amount: safeMoney(Number(sale.discount_amount || 0)),
+    coupon_id: draft?.coupon_id || null,
     shipping_cost: shippingFee,
     additional_costs: otherCosts,
     notes: sale.notes || null,
@@ -195,7 +196,6 @@ async function syncPosSaleToOrders(params: {
     created_by: params.actorUserId,
     inventory_deducted: true,
     order_number: derivedOrderNumber,
-    order_date: sale.created_at || new Date().toISOString(),
   }
 
   const insertWithPosFlag = { ...orderPayload, is_pos_sale: true }

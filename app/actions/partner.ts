@@ -128,6 +128,27 @@ export async function createPartnerAction(data: CreatePartnerData) {
       })
     }
 
+    // Criar conta financeira padrão para uso no ERP/PDV
+    const { data: existingCashAccount } = await supabaseAdmin
+      .from("finance_accounts")
+      .select("id")
+      .eq("partner_id", partner.id)
+      .ilike("name", "caixa")
+      .limit(1)
+      .maybeSingle()
+
+    if (!existingCashAccount?.id) {
+      await supabaseAdmin.from("finance_accounts").insert({
+        partner_id: partner.id,
+        name: "Caixa",
+        type: "cash",
+        initial_balance: 0,
+        current_balance: 0,
+        is_active: true,
+        is_default: true,
+      })
+    }
+
     // Criar métodos de pagamento padrão
     await supabaseAdmin.from("payment_methods").insert([
       {

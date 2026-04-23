@@ -1888,25 +1888,6 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         variant="warning"
       />
           <AlertModal
-            isOpen={isLeaveWithoutSaveAlertOpen}
-            onClose={() => {
-              setIsLeaveWithoutSaveAlertOpen(false)
-              setPendingLeaveHref(null)
-            }}
-            onConfirm={() => {
-              const destination = pendingLeaveHref
-              setIsLeaveWithoutSaveAlertOpen(false)
-              setPendingLeaveHref(null)
-              if (destination) window.location.assign(destination)
-            }}
-            title="Sair sem salvar?"
-            description="Você tem alterações no pedido que ainda não foram salvas."
-            confirmText="Sair sem salvar"
-            cancelText="Continuar editando"
-            variant="warning"
-          />
-
-          <AlertModal
             isOpen={isRemoveCustomerAlertOpen}
             onClose={() => setIsRemoveCustomerAlertOpen(false)}
             onConfirm={() => {
