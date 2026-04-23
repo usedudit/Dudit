@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { Badge, Button, DefaultModal, InfoCard, Input, ListItem, MoneyInput, Tabs, TabsContent, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
+import { Badge, Button, DefaultModal, InfoCard, Input, MoneyInput, Tabs, TabsContent, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency } from "@/lib/utils"
 import { closeCashSessionAction, createCashMovementAction, getCashSessionCloseSummaryAction, getCashSessionDetailsAction, reverseCashMovementAction } from "@/app/actions/erp/cash-register"
@@ -10,7 +10,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import Dropdown from "@/components/reusable/Dropdown"
 import DropdownItem from "@/components/reusable/DropdownItem"
-import { AdjustIcon, ArrowUpIcon, ChevronLeftIcon, ThreeDotsIcon, MoneyIcon, CreditCardIcon, QRCodeIcon, MoreHorizontalIcon } from "@/lib/icons"
+import { ChevronLeftIcon, ThreeDotsIcon, MoneyIcon, CreditCardIcon, QRCodeIcon, MoreHorizontalIcon } from "@/lib/icons"
 
 type DetailPayload = {
     session: any
@@ -54,12 +54,23 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
     const [movAmount, setMovAmount] = useState(0)
     const [movDesc, setMovDesc] = useState("")
     const [isSavingMovement, setIsSavingMovement] = useState(false)
+    const [movementsSort, setMovementsSort] = useState<"newest" | "oldest" | "amount_desc" | "amount_asc">("newest")
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
     }, [])
 
     const sangriasReforcos = useMemo(() => (details?.movements || []).filter((m) => m.type === "withdrawal" || m.type === "deposit"), [details])
+    const sortedSangriasReforcos = useMemo(() => {
+        const rows = [...sangriasReforcos]
+        rows.sort((a, b) => {
+            if (movementsSort === "newest") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            if (movementsSort === "oldest") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            if (movementsSort === "amount_desc") return Number(b.amount || 0) - Number(a.amount || 0)
+            return Number(a.amount || 0) - Number(b.amount || 0)
+        })
+        return rows
+    }, [sangriasReforcos, movementsSort])
     const paymentMethodTotal = useMemo(() => (details?.summaryByPaymentMethod || []).reduce((acc, row) => acc + Number(row.calculated || 0), 0), [details])
     const countedTotal = useMemo(() => {
         if (!details) return null
@@ -344,11 +355,45 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                         <TabsContent value="movements" className="mt-0">
                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
                                 <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                    <div className="space-y-3">
-                                        {sangriasReforcos.map((m) => {
+                                    <div className="mb-4 flex flex-wrap items-center gap-2">
+                                        <Button variant={movementsSort === "newest" ? "filled" : "outline"} onClick={() => setMovementsSort("newest")} className="h-9">Mais recentes</Button>
+                                        <Button variant={movementsSort === "oldest" ? "filled" : "outline"} onClick={() => setMovementsSort("oldest")} className="h-9">Mais antigas</Button>
+                                        <Button variant={movementsSort === "amount_desc" ? "filled" : "outline"} onClick={() => setMovementsSort("amount_desc")} className="h-9">Maior valor</Button>
+                                        <Button variant={movementsSort === "amount_asc" ? "filled" : "outline"} onClick={() => setMovementsSort("amount_asc")} className="h-9">Menor valor</Button>
+                                    </div>
+                                    <div className="rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden divide-y divide-brand-border dark:divide-dark-border">
+                                        {sortedSangriasReforcos.map((m) => {
                                             const reversed = !!m.reversed_at
                                             const isDeposit = m.type === "deposit"
-                                            return <ListItem key={m.id} icon={isDeposit ? ArrowUpIcon : AdjustIcon} title={isDeposit ? "Reforço no caixa" : "Sangria do caixa"} description={`${formatShortDateTime(m.created_at)} - ${m.creator_name || "Sem responsável"}${m.description ? ` - ${m.description}` : ""}`} className="px-4 py-4 gap-4" titleClassName="text-[15px]" descriptionClassName="text-[13px]" right={<div className="flex items-center gap-3 ml-3 shrink-0"><div className="hidden sm:flex flex-col items-end"><Badge variant={reversed ? "gray" : isDeposit ? "green" : "red"}>{reversed ? "Estornado" : isDeposit ? "Reforço" : "Sangria"}</Badge><span className={`mt-2 text-sm font-bold ${isDeposit ? "text-brand-green" : "text-brand-dark dark:text-dark-heading"}`}>{formatCurrency(Number(m.amount || 0))}</span></div>{isOpen && !reversed ? <Dropdown trigger={<button type="button" className="p-2 rounded-full border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading" aria-label="Ações"><ThreeDotsIcon size={16} /></button>} showChevron={false} width="w-44"><DropdownItem onClick={() => handleReverse(m.id)}>Estornar</DropdownItem></Dropdown> : <div className="hidden sm:flex items-center justify-center w-10" />}</div>} />
+                                            return (
+                                                <div key={m.id} className="bg-white dark:bg-dark-surface px-4 py-4">
+                                                    <div className="hidden md:grid grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_minmax(0,1fr)_auto] gap-4 items-center">
+                                                        <div className="min-w-0">
+                                                            <p className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">{isDeposit ? "Reforço no caixa" : "Sangria do caixa"}</p>
+                                                            <p className="text-[13px] text-brand-inactive-text dark:text-dark-body truncate">{m.description || "-"}</p>
+                                                        </div>
+                                                        <div className="text-[13px] text-brand-dark dark:text-dark-heading">{formatShortDateTime(m.created_at)}</div>
+                                                        <div className="text-[13px] text-brand-dark dark:text-dark-heading">{m.creator_name || "Sem responsável"}</div>
+                                                        <div className="flex items-center gap-3 shrink-0">
+                                                            <Badge variant={reversed ? "gray" : isDeposit ? "green" : "red"}>{reversed ? "Estornado" : isDeposit ? "Reforço" : "Sangria"}</Badge>
+                                                            <span className={`text-sm font-bold ${isDeposit ? "text-brand-green" : "text-brand-dark dark:text-dark-heading"}`}>{formatCurrency(Number(m.amount || 0))}</span>
+                                                            {isOpen && !reversed ? <Dropdown trigger={<button type="button" className="p-2 rounded-full border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading" aria-label="Ações"><ThreeDotsIcon size={16} /></button>} showChevron={false} width="w-44"><DropdownItem onClick={() => handleReverse(m.id)}>Estornar</DropdownItem></Dropdown> : null}
+                                                        </div>
+                                                    </div>
+                                                    <div className="md:hidden flex flex-col gap-2">
+                                                        <div className="flex items-center justify-between gap-3">
+                                                            <p className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">{isDeposit ? "Reforço no caixa" : "Sangria do caixa"}</p>
+                                                            <Badge variant={reversed ? "gray" : isDeposit ? "green" : "red"}>{reversed ? "Estornado" : isDeposit ? "Reforço" : "Sangria"}</Badge>
+                                                        </div>
+                                                        <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">{m.description || "-"}</p>
+                                                        <p className="text-[13px] text-brand-dark dark:text-dark-heading">{formatShortDateTime(m.created_at)} - {m.creator_name || "Sem responsável"}</p>
+                                                        <div className="flex items-center justify-between">
+                                                            <span className={`text-sm font-bold ${isDeposit ? "text-brand-green" : "text-brand-dark dark:text-dark-heading"}`}>{formatCurrency(Number(m.amount || 0))}</span>
+                                                            {isOpen && !reversed ? <Dropdown trigger={<button type="button" className="p-2 rounded-full border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading" aria-label="Ações"><ThreeDotsIcon size={16} /></button>} showChevron={false} width="w-44"><DropdownItem onClick={() => handleReverse(m.id)}>Estornar</DropdownItem></Dropdown> : null}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )
                                         })}
                                     </div>
                                     {sangriasReforcos.length === 0 && <div className="border border-dashed border-brand-border dark:border-dark-border rounded-2xl p-8 text-sm text-brand-inactive-text dark:text-dark-body">Nenhuma sangria ou reforço registrado nesta sessão.</div>}

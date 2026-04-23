@@ -92,6 +92,21 @@ const SuccessActionCard = ({ icon: Icon, label, onClick }: { icon: any, label: s
 
 // --- MAIN COMPONENT ---
 
+type PartnerPaymentMethod = {
+    id: string;
+    name: string;
+    type: string;
+    is_active?: boolean;
+};
+
+const normalizeMethodType = (value?: string | null) => {
+    const raw = String(value || "").toLowerCase().trim();
+    if (raw === "cash" || raw === "dinheiro") return "cash";
+    if (raw === "pix") return "pix";
+    if (["credit_card", "debit_card", "card", "cartao", "cartão", "credito", "debito"].includes(raw)) return "card";
+    return "other";
+};
+
 const PaymentModal = ({
     isOpen,
     onClose,
@@ -130,10 +145,11 @@ const PaymentModal = ({
     const [isPendingDelivery, setIsPendingDelivery] = useState(false);
 
     // Split Payment Logic - LIMITED TO 2 AS REQUESTED
-    const [payments, setPayments] = useState<{ id: number, method: string | null, amount: number }[]>([
-        { id: 1, method: null, amount: 0 },
-        { id: 2, method: null, amount: 0 }
+    const [payments, setPayments] = useState<{ id: number, method: string | null, paymentMethodId: string | null, amount: number }[]>([
+        { id: 1, method: null, paymentMethodId: null, amount: 0 },
+        { id: 2, method: null, paymentMethodId: null, amount: 0 }
     ]);
+    const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
     const [editingPaymentIndex, setEditingPaymentIndex] = useState<number | null>(null);
 
     const subTotal = cart.reduce((acc: number, item: any) => acc + (item.unitPrice * item.quantity), 0);
@@ -142,7 +158,11 @@ const PaymentModal = ({
     const itemCount = cart.reduce((acc: number, item: any) => acc + item.quantity, 0);
 
     // Fetch Partner Payment Methods
-    const [availableMethods, setAvailableMethods] = useState<any[]>([]);
+    const [availableMethods, setAvailableMethods] = useState<PartnerPaymentMethod[]>([]);
+    const activeMethods = useMemo(
+        () => (availableMethods || []).filter((method) => method?.is_active !== false),
+        [availableMethods],
+    );
     useEffect(() => {
         if (isOpen && partnerId) {
             getPaymentMethodsAction(partnerId).then(res => {
@@ -167,9 +187,10 @@ const PaymentModal = ({
             setErrorMessage("Não conseguimos concluir a venda agora.");
 
             setPayments([
-                { id: 1, method: null, amount: 0 },
-                { id: 2, method: null, amount: 0 }
+                { id: 1, method: null, paymentMethodId: null, amount: 0 },
+                { id: 2, method: null, paymentMethodId: null, amount: 0 }
             ]);
+            setSelectedMethodId(null);
         }
     }, [isOpen, total]);
 
@@ -284,14 +305,16 @@ const PaymentModal = ({
         }
     };
 
-    const handleMethodSelectionInSplit = (methodType: 'Dinheiro' | 'Cartão' | 'Pix') => {
+    const handleMethodSelectionInSplit = (method: PartnerPaymentMethod) => {
         if (editingPaymentIndex !== null) {
             const newPayments = [...payments];
-            newPayments[editingPaymentIndex].method = methodType;
+            newPayments[editingPaymentIndex].method = method.name;
+            newPayments[editingPaymentIndex].paymentMethodId = method.id;
             setPayments(newPayments);
-            if (methodType === 'Dinheiro') setView('money');
-            else if (methodType === 'Cartão') setView('card');
-            else if (methodType === 'Pix') setView('pix');
+            const normalizedType = normalizeMethodType(method.type);
+            if (normalizedType === 'cash') setView('money');
+            else if (normalizedType === 'pix') setView('pix');
+            else setView('card');
         }
     };
 
@@ -304,10 +327,12 @@ const PaymentModal = ({
                     .map((payment) => ({
                         method: normalizePaymentMethodLabel(payment.method),
                         amount: Number(payment.amount || 0),
+                        paymentMethodId: payment.paymentMethodId || null,
                     }))
                 : [{
-                    method: normalizePaymentMethodLabel(view === 'money' ? 'dinheiro' : (view === 'pix' ? 'pix' : 'cartao')),
+                    method: normalizePaymentMethodLabel(activeMethods.find((method) => method.id === selectedMethodId)?.name || (view === 'money' ? 'dinheiro' : (view === 'pix' ? 'pix' : 'cartao'))),
                     amount: Number(totalPaidCalculated || 0),
+                    paymentMethodId: selectedMethodId || null,
                 }];
 
         const mergedPaymentBreakdown = [...(existingPaymentBreakdown || []), ...newPaymentBreakdown]
@@ -402,14 +427,13 @@ const PaymentModal = ({
         </div>
     );
 
-    const getIconForMethod = (method: string | null) => {
-        if (method === 'Dinheiro') return MoneyIcon;
-        if (method === 'Cartão') return CreditCardIcon;
-        if (method === 'Pix') return QRCodeIcon;
+    const getIconForMethod = (method: string | null, paymentMethodId?: string | null) => {
+        const resolvedType = normalizeMethodType(activeMethods.find((m) => m.id === paymentMethodId)?.type || method);
+        if (resolvedType === 'cash') return MoneyIcon;
+        if (resolvedType === 'pix') return QRCodeIcon;
+        if (resolvedType === 'card') return CreditCardIcon;
         return PlusIcon;
     }
-
-    const currentPaymentMethodName = view === 'card' ? 'Cartão' : view === 'pix' ? 'Pix' : view === 'money' ? 'Dinheiro' : 'Pagamento';
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
@@ -528,11 +552,27 @@ const PaymentModal = ({
                                             </div>
 
                                             <div className="grid grid-cols-2 gap-4">
-                                                <PaymentMethodCard icon={MoneyIcon} label="Dinheiro" onClick={() => setView('money')} />
-                                                <PaymentMethodCard icon={QRCodeIcon} label="Pix" onClick={() => setView('pix')} />
-                                                <PaymentMethodCard icon={CreditCardIcon} label="Cartão" onClick={() => setView('card')} />
+                                                {activeMethods.map((method) => {
+                                                    const normalizedType = normalizeMethodType(method.type);
+                                                    const MethodIcon = normalizedType === "cash"
+                                                        ? MoneyIcon
+                                                        : normalizedType === "pix"
+                                                            ? QRCodeIcon
+                                                            : CreditCardIcon;
+                                                    const targetView = normalizedType === "cash" ? "money" : normalizedType === "pix" ? "pix" : "card";
+                                                    return (
+                                                        <PaymentMethodCard
+                                                            key={method.id}
+                                                            icon={MethodIcon}
+                                                            label={method.name}
+                                                            onClick={() => {
+                                                                setSelectedMethodId(method.id);
+                                                                setView(targetView);
+                                                            }}
+                                                        />
+                                                    );
+                                                })}
                                                 <PaymentMethodCard icon={SplitIcon} label="Dividir" onClick={() => setView('split')} />
-                                                <PaymentMethodCard icon={MoreHorizontalIcon} label="Outros" onClick={() => { }} />
                                             </div>
 
                                             <div className="border-t border-brand-border dark:border-dark-border my-6"></div>
@@ -651,7 +691,7 @@ const PaymentModal = ({
                                                     {payments.map((p, idx) => (
                                                         <SplitPaymentCard
                                                             key={p.id}
-                                                            icon={getIconForMethod(p.method)}
+                                                            icon={getIconForMethod(p.method, p.paymentMethodId)}
                                                             label={p.method || "Selecionar método"}
                                                             amount={formatCurrency(p.amount)}
                                                             onClick={() => { setEditingPaymentIndex(idx); setView('split_method_select'); }}
@@ -666,10 +706,24 @@ const PaymentModal = ({
                                         <motion.div key="split_method_select" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="w-full">
                                             <h3 className="text-sm font-bold text-brand-inactive-text mb-4 tracking-wide uppercase">Selecione o método</h3>
                                             <div className="grid grid-cols-2 gap-4">
-                                                <PaymentMethodCard icon={MoneyIcon} label="Dinheiro" onClick={() => handleMethodSelectionInSplit('Dinheiro')} />
-                                                <PaymentMethodCard icon={QRCodeIcon} label="Pix" onClick={() => handleMethodSelectionInSplit('Pix')} />
-                                                <PaymentMethodCard icon={CreditCardIcon} label="Cartão" onClick={() => handleMethodSelectionInSplit('Cartão')} />
-                                                <PaymentMethodCard icon={MoreHorizontalIcon} label="Outros" onClick={() => { }} />
+                                                {activeMethods.map((method) => {
+                                                    const normalizedType = normalizeMethodType(method.type);
+                                                    const MethodIcon = normalizedType === "cash"
+                                                        ? MoneyIcon
+                                                        : normalizedType === "pix"
+                                                            ? QRCodeIcon
+                                                            : normalizedType === "card"
+                                                                ? CreditCardIcon
+                                                                : MoreHorizontalIcon;
+                                                    return (
+                                                        <PaymentMethodCard
+                                                            key={`split-${method.id}`}
+                                                            icon={MethodIcon}
+                                                            label={method.name}
+                                                            onClick={() => handleMethodSelectionInSplit(method)}
+                                                        />
+                                                    );
+                                                })}
                                             </div>
                                         </motion.div>
                                     )}
