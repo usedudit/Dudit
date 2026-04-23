@@ -36,6 +36,7 @@ import POSHeader from "@/components/erp/pos/POSHeader"
 import POSDesktopOrderPanel, { POSOrderSummaryContent } from "@/components/erp/pos/POSOrderSummaryCard"
 import POSQuickProductSheet from "@/components/erp/pos/POSQuickProductSheet"
 import POSShippingSheet from "@/components/erp/pos/POSShippingSheet"
+import SelectProductVariantSheet from "@/components/erp/pos/SelectProductVariantSheet"
 import type {
   PDVCartItem as CartItem,
   PDVCustomer as Customer,
@@ -382,7 +383,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     return byName?.id || null
   }, [paymentMethods])
 
-  const addToCart = useCallback((product: Product, variantId?: string | null) => {
+  const addToCart = useCallback((product: Product, variantId?: string | null, quantity: number = 1) => {
+    const normalizedQty = Math.max(1, Number(quantity || 1))
     const selectedVariant = variantId
       ? product.product_variants?.find((variant) => variant.id === variantId)
       : null
@@ -405,6 +407,10 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       const found = prev.find((item) => item.productId === product.id && item.variantId === (variantId || null))
       if (!found) {
         const listUnit = Number(product.price || 0) + Number(selectedVariant?.price_adjustment || 0)
+        if (!product.allow_sell_without_stock && normalizedQty > availableStock) {
+          notifyError(`Estoque insuficiente para o item ${product.name}${selectedVariant?.variant_name ? ` - ${selectedVariant.variant_name}` : ""}`)
+          return prev
+        }
         return [
           ...prev,
           {
@@ -417,13 +423,13 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             lineDiscountType: null,
             lineDiscountValue: null,
             price: listUnit,
-            qty: 1,
+            qty: normalizedQty,
             image: (selectedVariant?.variant_options?.image as string | undefined) || product.images?.[0] || null,
           },
         ]
       }
 
-      const nextQty = found.qty + 1
+      const nextQty = found.qty + normalizedQty
       if (!product.allow_sell_without_stock && nextQty > availableStock) {
         notifyError(`Estoque insuficiente para o item ${found.name}${found.variantName ? ` - ${found.variantName}` : ""}`)
         return prev
@@ -525,7 +531,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         const availableStock = variant ? Number(variant.stock_available || 0) : Number(product?.stock_available || 0)
 
         if (product && !product.allow_sell_without_stock && nextQty > availableStock) {
-          notifyError(`Estoque insuficiente para o item ${item.name}`)
+          notifyError(`Estoque insuficiente para o item ${item.name}${item.variantName ? ` - ${item.variantName}` : ""}`)
           return item
         }
 
@@ -693,6 +699,13 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     setIsPaymentModalOpen(true)
   }, [cart.length, notifyError])
 
+  const handleConfirmVariantSelection = useCallback((selections: Array<{ variantId: string; qty: number }>) => {
+    if (!variantPickerProduct) return
+    for (const selection of selections) {
+      addToCart(variantPickerProduct, selection.variantId, selection.qty)
+    }
+  }, [addToCart, variantPickerProduct])
+
   const handleConfirmPayment = async (paymentData: {
     paymentMethod?: string
     paymentBreakdown?: PaymentBreakdownEntry[]
@@ -735,6 +748,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       }
 
       notifySuccess("Venda finalizada com sucesso.")
+      setIsPaymentModalOpen(false)
       setPreSales((prev) => prev.filter((draft) => draft.id !== preSaleIdToFinalize))
       clearCurrentOrder()
       setLastSavedOrderSignature(EMPTY_ORDER_SIGNATURE)
@@ -850,7 +864,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     const available = variant ? Number(variant.stock_available || 0) : Number(product?.stock_available || 0)
 
     if (product && !product.allow_sell_without_stock && editQty > available) {
-      notifyError(`Estoque insuficiente para o item ${editingItem.name}`)
+      notifyError(`Estoque insuficiente para o item ${editingItem.name}${editingItem.variantName ? ` - ${editingItem.variantName}` : ""}`)
       return
     }
 
@@ -1379,45 +1393,12 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             )}
           </AnimatePresence>
 
-          {variantPickerProduct && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-              <div className="w-full max-w-sm rounded-[32px] bg-white p-6 shadow-2xl">
-                <h4 className="mb-4 text-xl font-bold tracking-tight text-brand-dark">Selecionar Variação</h4>
-                <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-1 hide-scrollbar">
-                  {variantPickerProduct.product_variants?.map((variant) => {
-                    const variantStock = Number(variant.stock_available || 0)
-                    const variantPrice = Number(variantPickerProduct.price || 0) + Number(variant.price_adjustment || 0)
-                    return (
-                      <button
-                        key={variant.id}
-                        disabled={!variantPickerProduct.allow_sell_without_stock && variantStock <= 0}
-                        className="group flex w-full items-center justify-between rounded-2xl border border-brand-border bg-brand-gray p-4 text-left transition-all hover:border-brand-primary active:scale-95 disabled:opacity-50"
-                        onClick={() => {
-                          if (!variantPickerProduct.allow_sell_without_stock && variantStock <= 0) {
-                            notifyError(`Estoque insuficiente para o item ${variantPickerProduct.name} - ${variant.variant_name}`)
-                            return
-                          }
-                          addToCart(variantPickerProduct, variant.id)
-                          setVariantPickerProduct(null)
-                        }}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-bold text-brand-dark">{variant.variant_name}</p>
-                          <p className="mt-0.5 text-xs font-medium text-brand-inactive-text">Disponível: {variantStock}</p>
-                        </div>
-                        <span className="rounded-xl border border-brand-border bg-white px-3 py-1.5 font-bold text-brand-dark group-hover:border-brand-primary">
-                          {formatCurrency(variantPrice)}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-                <Button variant="outline" className="mt-6 h-12 w-full rounded-full font-bold" onClick={() => setVariantPickerProduct(null)}>
-                  Fechar
-                </Button>
-              </div>
-            </div>
-          )}
+          <SelectProductVariantSheet
+            isOpen={!!variantPickerProduct}
+            product={variantPickerProduct}
+            onClose={() => setVariantPickerProduct(null)}
+            onConfirm={handleConfirmVariantSelection}
+          />
 
           {itemToRemoveId && (
             <AlertModal
@@ -1515,7 +1496,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                   icon={TagIcon}
                   title="Porcentagem"
                   description="Aplica um desconto percentual sobre o subtotal"
-                  className={`px-4 py-3 ${globalDiscountType === "percentage" ? "border-brand-primary bg-brand-primary/5" : ""}`}
+                  className={`px-4 py-3 gap-4 ${globalDiscountType === "percentage" ? "border-brand-primary bg-brand-primary/5" : ""}`}
                   right={
                     <RadioButton
                       name="globalDiscountType"
@@ -1530,7 +1511,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                   icon={MoneyIcon}
                   title="Valor fixo"
                   description="Aplica um valor fixo de desconto em reais"
-                  className={`px-4 py-3 ${globalDiscountType === "fixed" ? "border-brand-primary bg-brand-primary/5" : ""}`}
+                  className={`px-4 py-3 gap-4 ${globalDiscountType === "fixed" ? "border-brand-primary bg-brand-primary/5" : ""}`}
                   right={
                     <RadioButton
                       name="globalDiscountType"
@@ -1545,7 +1526,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                   icon={FileIcon}
                   title="Cupom"
                   description="Utiliza um cupom de desconto pré-cadastrado"
-                  className={`px-4 py-3 ${globalDiscountType === "coupon" ? "border-brand-primary bg-brand-primary/5" : ""}`}
+                  className={`px-4 py-3 gap-4 ${globalDiscountType === "coupon" ? "border-brand-primary bg-brand-primary/5" : ""}`}
                   right={
                     <RadioButton
                       name="globalDiscountType"

@@ -440,7 +440,6 @@ export default function ProductsPage({
 
     const handleSaveProduct = async (formData: any) => {
         setUi((p) => ({ ...p, isSaving: true }))
-        setActionModal({ open: true, text: ui.formMode === "add" ? "Criando produto..." : "Salvando produto..." })
         try {
             const action = ui.formMode === "add" ? createProductComprehensiveAction : updateProductAction
             const payload =
@@ -490,7 +489,6 @@ export default function ProductsPage({
             toast({ title: "Erro", variant: "destructive" })
         } finally {
             setUi((p) => ({ ...p, isSaving: false }))
-            setActionModal({ open: false, text: "" })
         }
     }
 

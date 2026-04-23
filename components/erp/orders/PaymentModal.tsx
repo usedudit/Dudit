@@ -26,6 +26,25 @@ import { getPaymentMethodsAction } from '@/app/actions/payment-methods';
 import { useToast } from "@/components/ui/use-toast";
 import { formatCurrency, formatDate, formatTime } from '@/lib/utils';
 
+const PAYMENT_METHODS_VERSION_PREFIX = "payment-methods-version:";
+const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated";
+
+const paymentMethodsCache = new Map<string, {
+    methods: PartnerPaymentMethod[];
+    signature: string;
+}>();
+
+const buildMethodsSignature = (methods: PartnerPaymentMethod[]) =>
+    JSON.stringify(
+        (methods || []).map((method: any) => ({
+            id: method.id,
+            name: method.name,
+            type: method.type,
+            is_active: method.is_active,
+            updated_at: method.updated_at || null,
+        }))
+    );
+
 const normalizePaymentMethodLabel = (value?: string | null) => {
     const normalized = String(value || '').trim().toLowerCase();
     if (!normalized) return '';
@@ -163,13 +182,57 @@ const PaymentModal = ({
         () => (availableMethods || []).filter((method) => method?.is_active !== false),
         [availableMethods],
     );
+
     useEffect(() => {
-        if (isOpen && partnerId) {
-            getPaymentMethodsAction(partnerId).then(res => {
-                if (res.methods) setAvailableMethods(res.methods);
-            });
+        if (!isOpen || !partnerId) return;
+
+        const cacheKey = String(partnerId);
+        const versionKey = `${PAYMENT_METHODS_VERSION_PREFIX}${cacheKey}`;
+        const cached = paymentMethodsCache.get(cacheKey);
+        if (cached?.methods?.length) {
+            setAvailableMethods(cached.methods);
         }
+
+        const storedVersion = typeof window !== "undefined" ? window.localStorage.getItem(versionKey) : null;
+        const hasVersionChange = Boolean(storedVersion && storedVersion !== cached?.signature);
+
+        if (cached && !hasVersionChange) return;
+
+        getPaymentMethodsAction(partnerId).then(res => {
+            if (!res.methods) return;
+            const methods = res.methods as PartnerPaymentMethod[];
+            setAvailableMethods(methods);
+            const signature = buildMethodsSignature(methods);
+            paymentMethodsCache.set(cacheKey, { methods, signature });
+            if (typeof window !== "undefined") {
+                window.localStorage.setItem(versionKey, signature);
+            }
+        });
     }, [isOpen, partnerId]);
+
+    useEffect(() => {
+        if (!partnerId || typeof window === "undefined") return;
+        const cacheKey = String(partnerId);
+        const versionKey = `${PAYMENT_METHODS_VERSION_PREFIX}${cacheKey}`;
+
+        const refreshOnChange = () => {
+            const expectedSignature = window.localStorage.getItem(versionKey);
+            const cached = paymentMethodsCache.get(cacheKey);
+            if (!expectedSignature || cached?.signature === expectedSignature) return;
+
+            getPaymentMethodsAction(partnerId).then((res) => {
+                if (!res.methods) return;
+                const methods = res.methods as PartnerPaymentMethod[];
+                setAvailableMethods(methods);
+                const signature = buildMethodsSignature(methods);
+                paymentMethodsCache.set(cacheKey, { methods, signature });
+                window.localStorage.setItem(versionKey, signature);
+            });
+        };
+
+        window.addEventListener(PAYMENT_METHODS_UPDATED_EVENT, refreshOnChange);
+        return () => window.removeEventListener(PAYMENT_METHODS_UPDATED_EVENT, refreshOnChange);
+    }, [partnerId]);
 
     // Reset when opening
     useEffect(() => {

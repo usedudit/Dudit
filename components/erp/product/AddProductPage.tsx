@@ -379,6 +379,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
 
     const [showDeleteModal, setShowDeleteModal] = useState(false)
     const [isSavingProduct, setIsSavingProduct] = useState(false)
+    const isSubmittingRef = useRef(false)
 
     const handleDeleteProduct = useCallback(async () => {
         if (!initialProduct?.id && !productId) return
@@ -391,11 +392,14 @@ const AddProductPage: FC<AddProductPageProps> = ({
     }, [initialProduct, productId, onBack, toast])
 
     const handleSaveProduct = useCallback(async () => {
+        if (isSubmittingRef.current) return
+        isSubmittingRef.current = true
+
         const errors = validateProductData()
         if (errors.length > 0) {
-            setValidationErrors(errors); setFieldErrors(new Set(errors.map((e) => e.field))); setShowValidationModal(true); return
+            setValidationErrors(errors); setFieldErrors(new Set(errors.map((e) => e.field))); setShowValidationModal(true); isSubmittingRef.current = false; return
         }
-        if (blockedImages.size > 0) { notifyError("Remova as imagens bloqueadas antes de salvar"); return }
+        if (blockedImages.size > 0) { notifyError("Remova as imagens bloqueadas antes de salvar"); isSubmittingRef.current = false; return }
 
         setIsSavingProduct(true)
         let cleanedFinalImages: string[] = []
@@ -452,6 +456,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                     }
                     setUploadingImages(new Set())
                     setIsSavingProduct(false)
+                    isSubmittingRef.current = false
                     return
                 }
 
@@ -550,6 +555,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                     pending_variants: productData.pending_variants || [],
                 })
                 setPendingImages([])
+                isSubmittingRef.current = false
                 return
             }
 
@@ -583,7 +589,10 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 notifyError(result.error || "Erro ao salvar")
             }
         } catch (err) { console.error(err); notifyError("Erro ao salvar produto") }
-        finally { setIsSavingProduct(false) }
+        finally {
+            setIsSavingProduct(false)
+            isSubmittingRef.current = false
+        }
     }, [validateProductData, productData, partnerId, storeId, internalMode, initialProduct, productId, notifySuccess, notifyError, onClose, onSave, blockedImages])
 
     const handleSavePendingVariants = useCallback((variantsToSave: any[]) => {

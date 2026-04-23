@@ -45,7 +45,7 @@ begin
         new.partner_id,
         'out',
         'Venda confirmada',
-        'Baixa automÃ¡tica do pedido ' || coalesce(new.order_number, new.id::text),
+        'Baixa automática do pedido ' || coalesce(new.order_number, new.id::text),
         new.created_by,
         v_items
       );

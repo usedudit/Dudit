@@ -8,9 +8,8 @@ import { formatCurrency } from "@/lib/utils"
 import { closeCashSessionAction, createCashMovementAction, getCashSessionCloseSummaryAction, getCashSessionDetailsAction, reverseCashMovementAction } from "@/app/actions/erp/cash-register"
 import { useNotification } from "@/hooks/use-notification"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import Dropdown from "@/components/reusable/Dropdown"
-import DropdownItem from "@/components/reusable/DropdownItem"
-import { ChevronLeftIcon, ThreeDotsIcon, MoneyIcon, CreditCardIcon, QRCodeIcon, MoreHorizontalIcon } from "@/lib/icons"
+import { ChevronLeftIcon, MoneyIcon, CreditCardIcon, QRCodeIcon, MoreHorizontalIcon } from "@/lib/icons"
+import OrderListItem from "@/components/erp/orders/OrderListItem"
 
 type DetailPayload = {
     session: any
@@ -18,9 +17,17 @@ type DetailPayload = {
     operators: { open_name: string; close_name: string | null }
     drawer: { initial: number; cashSales: number; deposits: number; withdrawals: number; refunds: number; total: number }
     summaryByPaymentMethod: Array<{ paymentMethodId: string | null; label: string; calculated: number; counted: number | null; difference: number | null }>
-    totals: { initial: number; totalCashSales: number; totalWithdrawals: number; totalDeposits: number; totalRefunds: number; calculatedDrawerTotal: number; informedDrawerTotal: number | null; difference: number | null }
+    totals: { initial: number; totalCashSales: number; totalSalesAllMethods?: number; totalWithdrawals: number; totalDeposits: number; totalRefunds: number; calculatedDrawerTotal: number; informedDrawerTotal: number | null; difference: number | null }
     adjustmentMovementCount: number
 }
+
+const MOVEMENT_COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
+    { id: "order_id", label: "Movimentação", align: "left", width: "260px" },
+    { id: "total", label: "Valor", align: "left", width: "180px" },
+    { id: "status", label: "Status", align: "left", width: "240px" },
+    { id: "date", label: "Data", align: "left", width: "220px" },
+    { id: "actions", label: "Ações", align: "center", width: "120px" },
+]
 
 const formatShortDateTime = (iso: string) => {
     try {
@@ -54,23 +61,51 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
     const [movAmount, setMovAmount] = useState(0)
     const [movDesc, setMovDesc] = useState("")
     const [isSavingMovement, setIsSavingMovement] = useState(false)
-    const [movementsSort, setMovementsSort] = useState<"newest" | "oldest" | "amount_desc" | "amount_asc">("newest")
+    const [movementsSortConfig, setMovementsSortConfig] = useState<{ key: string; direction: "asc" | "desc" }>({ key: "date", direction: "desc" })
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
     }, [])
 
     const sangriasReforcos = useMemo(() => (details?.movements || []).filter((m) => m.type === "withdrawal" || m.type === "deposit"), [details])
-    const sortedSangriasReforcos = useMemo(() => {
+    const movementRows = useMemo(() => {
         const rows = [...sangriasReforcos]
-        rows.sort((a, b) => {
-            if (movementsSort === "newest") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-            if (movementsSort === "oldest") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-            if (movementsSort === "amount_desc") return Number(b.amount || 0) - Number(a.amount || 0)
-            return Number(a.amount || 0) - Number(b.amount || 0)
+        const mapped = rows.map((m) => {
+            const reversed = !!m.reversed_at
+            const isDeposit = m.type === "deposit"
+            return {
+                ...m,
+                originalId: m.id,
+                displayId: `${isDeposit ? "Reforço" : "Sangria"} ${String(m.id).slice(0, 8).toUpperCase()}`,
+                items_count: 1,
+                total_amount: Number(m.amount || 0),
+                statusLabel: reversed ? "Estornado" : isDeposit ? "Reforço" : "Sangria",
+                statusColor: reversed ? "gray" : isDeposit ? "green" : "red",
+                deliveryStatusLabel: m.creator_name || "Sem responsável",
+                deliveryStatusColor: "gray",
+                formattedDate: formatShortDateTime(m.created_at),
+                formattedTime: "",
+                created_at_time: new Date(m.created_at).getTime(),
+                situation: reversed ? "cancelled" : "open",
+            }
         })
-        return rows
-    }, [sangriasReforcos, movementsSort])
+        mapped.sort((a, b) => {
+            let aVal: any
+            let bVal: any
+            switch (movementsSortConfig.key) {
+                case "order_id": aVal = a.displayId; bVal = b.displayId; break
+                case "total": aVal = a.total_amount; bVal = b.total_amount; break
+                case "status": aVal = a.statusLabel; bVal = b.statusLabel; break
+                case "date":
+                default:
+                    aVal = a.created_at_time; bVal = b.created_at_time; break
+            }
+            if (aVal === bVal) return 0
+            const comparison = aVal < bVal ? -1 : 1
+            return movementsSortConfig.direction === "asc" ? comparison : -comparison
+        })
+        return mapped
+    }, [sangriasReforcos, movementsSortConfig])
     const paymentMethodTotal = useMemo(() => (details?.summaryByPaymentMethod || []).reduce((acc, row) => acc + Number(row.calculated || 0), 0), [details])
     const countedTotal = useMemo(() => {
         if (!details) return null
@@ -239,7 +274,7 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                                         </div>
                                         <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-gray-200 dark:divide-dark-border bg-white dark:bg-dark-surface">
                                             <div className="p-6 flex flex-col justify-center"><span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mb-1.5">Troco inicial</span><div className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(details.totals.initial)}</div></div>
-                                            <div className="p-6 flex flex-col justify-center"><span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mb-1.5">Vendas em dinheiro</span><div className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(details.totals.totalCashSales)}</div></div>
+                                            <div className="p-6 flex flex-col justify-center"><span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mb-1.5">Vendas na sessão (todos os meios)</span><div className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(details.totals.totalSalesAllMethods ?? details.totals.totalCashSales)}</div></div>
                                             <div className="p-6 flex flex-col justify-center"><span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mb-1.5">Sangrias</span><div className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(details.totals.totalWithdrawals)}</div></div>
                                             <div className="p-6 flex flex-col justify-center"><span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mb-1.5">Reforços</span><div className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(details.totals.totalDeposits)}</div></div>
                                         </div>
@@ -355,46 +390,71 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                         <TabsContent value="movements" className="mt-0">
                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
                                 <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                    <div className="mb-4 flex flex-wrap items-center gap-2">
-                                        <Button variant={movementsSort === "newest" ? "filled" : "outline"} onClick={() => setMovementsSort("newest")} className="h-9">Mais recentes</Button>
-                                        <Button variant={movementsSort === "oldest" ? "filled" : "outline"} onClick={() => setMovementsSort("oldest")} className="h-9">Mais antigas</Button>
-                                        <Button variant={movementsSort === "amount_desc" ? "filled" : "outline"} onClick={() => setMovementsSort("amount_desc")} className="h-9">Maior valor</Button>
-                                        <Button variant={movementsSort === "amount_asc" ? "filled" : "outline"} onClick={() => setMovementsSort("amount_asc")} className="h-9">Menor valor</Button>
-                                    </div>
-                                    <div className="rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden divide-y divide-brand-border dark:divide-dark-border">
-                                        {sortedSangriasReforcos.map((m) => {
-                                            const reversed = !!m.reversed_at
-                                            const isDeposit = m.type === "deposit"
-                                            return (
-                                                <div key={m.id} className="bg-white dark:bg-dark-surface px-4 py-4">
-                                                    <div className="hidden md:grid grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_minmax(0,1fr)_auto] gap-4 items-center">
-                                                        <div className="min-w-0">
-                                                            <p className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">{isDeposit ? "Reforço no caixa" : "Sangria do caixa"}</p>
-                                                            <p className="text-[13px] text-brand-inactive-text dark:text-dark-body truncate">{m.description || "-"}</p>
-                                                        </div>
-                                                        <div className="text-[13px] text-brand-dark dark:text-dark-heading">{formatShortDateTime(m.created_at)}</div>
-                                                        <div className="text-[13px] text-brand-dark dark:text-dark-heading">{m.creator_name || "Sem responsável"}</div>
-                                                        <div className="flex items-center gap-3 shrink-0">
-                                                            <Badge variant={reversed ? "gray" : isDeposit ? "green" : "red"}>{reversed ? "Estornado" : isDeposit ? "Reforço" : "Sangria"}</Badge>
-                                                            <span className={`text-sm font-bold ${isDeposit ? "text-brand-green" : "text-brand-dark dark:text-dark-heading"}`}>{formatCurrency(Number(m.amount || 0))}</span>
-                                                            {isOpen && !reversed ? <Dropdown trigger={<button type="button" className="p-2 rounded-full border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading" aria-label="Ações"><ThreeDotsIcon size={16} /></button>} showChevron={false} width="w-44"><DropdownItem onClick={() => handleReverse(m.id)}>Estornar</DropdownItem></Dropdown> : null}
-                                                        </div>
+                                    <div className="md:hidden flex flex-col border-b border-brand-border dark:border-dark-border">
+                                        {movementRows.map((m: any) => (
+                                            <div
+                                                key={m.originalId}
+                                                className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none"
+                                            >
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-start mb-0.5">
+                                                        <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate pr-2">{m.displayId}</h3>
+                                                        <Badge variant={m.statusColor}>{m.statusLabel}</Badge>
                                                     </div>
-                                                    <div className="md:hidden flex flex-col gap-2">
-                                                        <div className="flex items-center justify-between gap-3">
-                                                            <p className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">{isDeposit ? "Reforço no caixa" : "Sangria do caixa"}</p>
-                                                            <Badge variant={reversed ? "gray" : isDeposit ? "green" : "red"}>{reversed ? "Estornado" : isDeposit ? "Reforço" : "Sangria"}</Badge>
-                                                        </div>
-                                                        <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">{m.description || "-"}</p>
-                                                        <p className="text-[13px] text-brand-dark dark:text-dark-heading">{formatShortDateTime(m.created_at)} - {m.creator_name || "Sem responsável"}</p>
-                                                        <div className="flex items-center justify-between">
-                                                            <span className={`text-sm font-bold ${isDeposit ? "text-brand-green" : "text-brand-dark dark:text-dark-heading"}`}>{formatCurrency(Number(m.amount || 0))}</span>
-                                                            {isOpen && !reversed ? <Dropdown trigger={<button type="button" className="p-2 rounded-full border border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading" aria-label="Ações"><ThreeDotsIcon size={16} /></button>} showChevron={false} width="w-44"><DropdownItem onClick={() => handleReverse(m.id)}>Estornar</DropdownItem></Dropdown> : null}
-                                                        </div>
+                                                    <div className="text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mb-1">{m.formattedDate}</div>
+                                                    <div className="flex items-center gap-2 text-[14px]">
+                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">{m.deliveryStatusLabel}</span>
+                                                        <span className="text-gray-300 dark:text-gray-600 font-medium font-bold">•</span>
+                                                        <span className="font-bold text-brand-primary">{formatCurrency(m.total_amount)}</span>
                                                     </div>
+                                                    {isOpen && !m.reversed_at ? <div className="mt-2"><Button variant="outline" className="h-8" onClick={() => handleReverse(m.originalId)}>Estornar</Button></div> : null}
                                                 </div>
-                                            )
-                                        })}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
+                                        <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                                <thead>
+                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                        {MOVEMENT_COLUMNS.map((col, idx) => {
+                                                            const isSorted = movementsSortConfig?.key === col.id
+                                                            const isFirst = idx === 0
+                                                            const isLast = idx === MOVEMENT_COLUMNS.length - 1
+                                                            return (
+                                                                <th
+                                                                    key={col.id}
+                                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${isFirst ? "rounded-l-lg pl-6" : ""} ${isLast ? "rounded-r-lg pr-6" : ""}`}
+                                                                    style={{ width: col.width }}
+                                                                    onClick={() => setMovementsSortConfig((prev) => ({ key: col.id, direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc" }))}
+                                                                >
+                                                                    <div className="flex items-center gap-1.5">{col.label}</div>
+                                                                </th>
+                                                            )
+                                                        })}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {movementRows.map((m: any) => (
+                                                        <OrderListItem
+                                                            key={m.originalId}
+                                                            order={m}
+                                                            columns={MOVEMENT_COLUMNS}
+                                                            selected={false}
+                                                            onSelect={() => { }}
+                                                            onEdit={() => { }}
+                                                            onCancel={() => {
+                                                                if (isOpen && !m.reversed_at) handleReverse(m.originalId)
+                                                            }}
+                                                            onDetails={() => { }}
+                                                            canEdit={false}
+                                                            cancelLabel="Estornar"
+                                                            showCheckbox={false}
+                                                        />
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                     {sangriasReforcos.length === 0 && <div className="border border-dashed border-brand-border dark:border-dark-border rounded-2xl p-8 text-sm text-brand-inactive-text dark:text-dark-body">Nenhuma sangria ou reforço registrado nesta sessão.</div>}
                                 </div>

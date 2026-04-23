@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { ChevronLeftIcon, EditIcon, ThreeDotsIcon } from "@/lib/icons"
-import { Button, Badge, ActionsDropdown, ThreeDotsLoader, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/reusable"
+import { Button, Badge, ActionsDropdown, ThreeDotsLoader, Tabs, TabsContent, TabsList, TabsTrigger, CustomerCard } from "@/components/reusable"
 import { getTransactionDetailsAction, getTransactionHistoryAction, type TransactionDetailPayload } from "@/app/actions/erp/transactions"
 import { TransactionHistoryTab } from "./TransactionHistoryTab"
 import { TransactionContactCard } from "./TransactionContactCard"
@@ -314,7 +314,18 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                     </div>
 
                                     <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                        <TransactionContactCard title={detail.contactCard.title} name={detail.contactCard.name} />
+                                        {detail.contactCard.isCustomer ? (
+                                            <CustomerCard
+                                                customer={{
+                                                    name: detail.contactCard.name,
+                                                    email: detail.contactCard.email,
+                                                    phone: detail.contactCard.phone,
+                                                }}
+                                                showMap={false}
+                                            />
+                                        ) : (
+                                            <TransactionContactCard title={detail.contactCard.title} name={detail.contactCard.name} />
+                                        )}
                                     </div>
                                 </div>
                             </TabsContent>

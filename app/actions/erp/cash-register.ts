@@ -34,9 +34,33 @@ function normalizeCashMovementDescription(type: "withdrawal" | "deposit", descri
   return type === "withdrawal" ? "Sangria de caixa" : "Reforço de caixa"
 }
 
-function shouldFallbackCashMovementRpc(errorMessage?: string | null) {
-  const message = String(errorMessage || "").toLowerCase()
-  return message.includes("payment_date") && message.includes("timestamp with time zone") && message.includes("text")
+async function insertCashTransactionWithSchemaFallback(
+  supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+  payload: Record<string, any>,
+) {
+  const tryCustomerPayload = { ...payload, customer_id: null, contact_type: null }
+  const { data: txWithCustomer, error: customerErr } = await supabase
+    .from("transactions")
+    .insert(tryCustomerPayload)
+    .select("id")
+    .single()
+
+  if (!customerErr && txWithCustomer?.id) {
+    return { data: txWithCustomer, error: null as any }
+  }
+
+  const tryContactPayload = { ...payload, contact_id: null, contact_type: null }
+  const { data: txWithContact, error: contactErr } = await supabase
+    .from("transactions")
+    .insert(tryContactPayload)
+    .select("id")
+    .single()
+
+  if (!contactErr && txWithContact?.id) {
+    return { data: txWithContact, error: null as any }
+  }
+
+  return { data: null, error: contactErr || customerErr || new Error("Falha ao inserir transação financeira.") }
 }
 
 async function resolveDefaultCashFinanceAccountId(
@@ -217,33 +241,27 @@ async function createCashMovementFallback(
   const transactionNote =
     input.type === "withdrawal" ? "Sangria de caixa registrada no PDV." : "Reforço de caixa registrado no PDV."
 
-  const { data: transaction, error: transactionError } = await supabase
-    .from("transactions")
-    .insert({
-      partner_id: input.partnerId,
-      description: input.type === "withdrawal" ? "Sangria de caixa" : "Reforço de caixa",
-      category: "Caixa PDV",
-      customer_id: null,
-      contact_type: null,
-      amount: input.amount,
-      due_date: null,
-      payment_date: nowIso,
-      transaction_date: nowIso,
-      status: "paid",
-      notes: transactionNote,
-      payment_type: "Caixa",
-      original_amount: input.amount,
-      interest_amount: null,
-      fee_amount: 0,
-      transaction_type: transactionType,
-      origin: "system",
-      reference_note: `cash_mv:${movement.id}`,
-      account_id: input.cashFinanceAccountId,
-      payment_method_id: null,
-      created_by_user_id: input.userId,
-    })
-    .select("id")
-    .single()
+  const { data: transaction, error: transactionError } = await insertCashTransactionWithSchemaFallback(supabase, {
+    partner_id: input.partnerId,
+    description: input.type === "withdrawal" ? "Sangria de caixa" : "Reforço de caixa",
+    category: "Caixa PDV",
+    amount: input.amount,
+    due_date: null,
+    payment_date: nowIso,
+    transaction_date: nowIso,
+    status: "paid",
+    notes: transactionNote,
+    payment_type: "Caixa",
+    original_amount: input.amount,
+    interest_amount: null,
+    fee_amount: 0,
+    transaction_type: transactionType,
+    origin: "system",
+    reference_note: `cash_mv:${movement.id}`,
+    account_id: input.cashFinanceAccountId,
+    payment_method_id: null,
+    created_by_user_id: input.userId,
+  })
 
   if (transactionError || !transaction) {
     await supabase.from("cash_movements").delete().eq("id", movement.id)
@@ -335,33 +353,27 @@ async function reverseCashMovementFallback(
   const reverseTransactionType = movement.type === "withdrawal" ? "income" : "expense"
   const reverseNotes = movement.type === "withdrawal" ? "Estorno de sangria registrada no PDV." : "Estorno de reforço registrado no PDV."
 
-  const { data: reversalTransaction, error: reversalError } = await supabase
-    .from("transactions")
-    .insert({
-      partner_id: input.partnerId,
-      description: movement.type === "withdrawal" ? "Estorno de sangria" : "Estorno de reforço",
-      category: "Caixa PDV",
-      customer_id: null,
-      contact_type: null,
-      amount,
-      due_date: null,
-      payment_date: nowIso,
-      transaction_date: nowIso,
-      status: "paid",
-      notes: reverseNotes,
-      payment_type: "Caixa",
-      original_amount: amount,
-      interest_amount: null,
-      fee_amount: 0,
-      transaction_type: reverseTransactionType,
-      origin: "system",
-      reference_note: `cash_mv_rev:${movement.id}`,
-      account_id: originalTransaction.account_id,
-      payment_method_id: null,
-      created_by_user_id: input.userId,
-    })
-    .select("id")
-    .single()
+  const { data: reversalTransaction, error: reversalError } = await insertCashTransactionWithSchemaFallback(supabase, {
+    partner_id: input.partnerId,
+    description: movement.type === "withdrawal" ? "Estorno de sangria" : "Estorno de reforço",
+    category: "Caixa PDV",
+    amount,
+    due_date: null,
+    payment_date: nowIso,
+    transaction_date: nowIso,
+    status: "paid",
+    notes: reverseNotes,
+    payment_type: "Caixa",
+    original_amount: amount,
+    interest_amount: null,
+    fee_amount: 0,
+    transaction_type: reverseTransactionType,
+    origin: "system",
+    reference_note: `cash_mv_rev:${movement.id}`,
+    account_id: originalTransaction.account_id,
+    payment_method_id: null,
+    created_by_user_id: input.userId,
+  })
 
   if (reversalError || !reversalTransaction) {
     return { success: false as const, error: reversalError?.message || "Falha ao registrar estorno financeiro." }
@@ -552,10 +564,6 @@ export async function createCashMovementAction(input: {
   })
 
   if (rpcError) {
-    if (!shouldFallbackCashMovementRpc(rpcError.message)) {
-      return { success: false as const, error: rpcError.message || "Falha ao registrar movimentação." }
-    }
-
     const fallbackResult = await createCashMovementFallback(supabase, {
       partnerId: input.partnerId,
       cashSessionId: sessionId,
@@ -630,10 +638,6 @@ export async function reverseCashMovementAction(input: {
   })
 
   if (rpcError) {
-    if (!shouldFallbackCashMovementRpc(rpcError.message)) {
-      return { success: false as const, error: rpcError.message || "Não foi possível estornar a movimentação." }
-    }
-
     const fallbackResult = await reverseCashMovementFallback(supabase, {
       partnerId: input.partnerId,
       movementId: input.movementId,
@@ -1165,6 +1169,7 @@ export async function getCashSessionDetailsAction(partnerId: string, cashSession
       totals: {
         initial,
         totalCashSales: drawer.cashSales,
+        totalSalesAllMethods: summaryByPaymentMethod.reduce((acc, row) => money(acc + Number(row.calculated || 0)), 0),
         totalWithdrawals: drawer.withdrawals,
         totalDeposits: drawer.deposits,
         totalRefunds: drawer.refunds,

@@ -10,6 +10,9 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency } from "@/lib/utils"
 import { PaymentMethodDialog } from "@/components/erp/payment-method-dialog"
 
+const PAYMENT_METHODS_VERSION_PREFIX = "payment-methods-version:"
+const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated"
+
 interface PaymentMethodsSubPageProps {
     partner: any
     paymentMethods: any[]
@@ -32,6 +35,21 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
 
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+    const notifyPaymentMethodsChanged = useCallback((nextMethods: any[]) => {
+        if (typeof window === "undefined") return
+        const signature = JSON.stringify(
+            (nextMethods || []).map((method) => ({
+                id: method.id,
+                name: method.name,
+                type: method.type,
+                is_active: method.is_active,
+                updated_at: method.updated_at || null,
+            }))
+        )
+        window.localStorage.setItem(`${PAYMENT_METHODS_VERSION_PREFIX}${partner.id}`, signature)
+        window.dispatchEvent(new CustomEvent(PAYMENT_METHODS_UPDATED_EVENT))
+    }, [partner.id])
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
@@ -61,7 +79,9 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
         try {
             const res = await deletePaymentMethodAction(id)
             if (res.success) {
-                setMethods(prev => prev.filter(m => m.id !== id))
+                const nextMethods = methods.filter(m => m.id !== id)
+                setMethods(nextMethods)
+                notifyPaymentMethodsChanged(nextMethods)
                 notifySuccess("Método removido com sucesso!")
             } else {
                 notifyError(res.error || "Erro ao remover método")
@@ -79,7 +99,8 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
 
     const togglePaymentStatus = async (method: any, checked: boolean) => {
         const originalStatus = method.is_active
-        setMethods(prev => prev.map(m => m.id === method.id ? { ...m, is_active: checked } : m))
+        const optimisticMethods = methods.map(m => m.id === method.id ? { ...m, is_active: checked } : m)
+        setMethods(optimisticMethods)
         setIsTogglingStatus(prev => new Set(prev).add(method.id))
 
         try {
@@ -88,6 +109,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                 setMethods(prev => prev.map(m => m.id === method.id ? { ...m, is_active: originalStatus } : m))
                 notifyError(res.error || "Erro ao alterar status")
             } else {
+                notifyPaymentMethodsChanged(optimisticMethods)
                 notifySuccess(`Método ${checked ? 'ativado' : 'desativado'} com sucesso!`)
             }
         } catch {
@@ -383,7 +405,10 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                         setPaymentModalOpen(false)
                         if (shouldReload) {
                             const result = await getPaymentMethodsAction(partner.id)
-                            if (result.methods) setMethods(result.methods)
+                            if (result.methods) {
+                                setMethods(result.methods)
+                                notifyPaymentMethodsChanged(result.methods)
+                            }
                         }
                     }}
                     partnerId={partner.id}

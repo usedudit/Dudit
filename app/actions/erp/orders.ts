@@ -862,7 +862,7 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
     const paymentDate = new Date().toISOString()
     const refundPayload = {
         partner_id: params.partnerId,
-        description: `Reembolso automÃ¡tico da venda ${params.orderNumber}`,
+        description: `Reembolso automático da venda ${params.orderNumber}`,
         category: "Reembolso",
         customer_id: params.customerId || null,
         contact_id: transactionContactId,
@@ -2090,7 +2090,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
         let paymentProcessedCount = 0
         for (const order of currentOrders || []) {
             if (order.situation === "cancelled") {
-                paymentWarnings.push(`Pedido ${order.order_number || order.id}: estÃ¡ cancelado e nÃ£o pode ter o pagamento alterado.`)
+                paymentWarnings.push(`Pedido ${order.order_number || order.id}: está cancelado e não pode ter o pagamento alterado.`)
                 continue
             }
             if (order.situation === "paid") {
@@ -2159,7 +2159,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
         let deliveryProcessedCount = 0
         for (const order of currentOrders || []) {
             if (order.situation === "cancelled") {
-                deliveryWarnings.push(`Pedido ${order.order_number || order.id}: estÃ¡ cancelado e nÃ£o pode ter o status de entrega alterado.`)
+                deliveryWarnings.push(`Pedido ${order.order_number || order.id}: está cancelado e não pode ter o status de entrega alterado.`)
                 continue
             }
             if (order.delivery_status === "delivered") {

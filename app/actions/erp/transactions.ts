@@ -666,8 +666,12 @@ export async function createManualTransactionAction(input: CreateManualTransacti
         const status = input.status || "pending"
 
         const absAmount = input.transactionType === "adjustment" ? Math.abs(amount) : amount
-        const customerId = input.customerId?.trim() || null
-        const contactId = customerId ? null : input.contactId ?? null
+        const normalizedContactType = String(input.contactType || "").toLowerCase()
+        const customerId =
+            input.customerId?.trim()
+            || ((normalizedContactType === "customer" || normalizedContactType === "cliente") ? (input.contactId?.trim() || null) : null)
+            || null
+        const contactId = customerId ? null : (input.contactId?.trim() || null)
         const contactTypeResolved = customerId ? "customer" : input.contactType ?? null
 
         const isVendaIncome =
@@ -972,9 +976,20 @@ export async function updateManualTransactionAction(
             if (patch.categoryId !== undefined) payload.category_id = patch.categoryId
             if (patch.subcategoryId !== undefined) payload.subcategory_id = patch.subcategoryId
             if (!systemGateway && patch.accountId !== undefined) payload.account_id = patch.accountId
-            if (patch.contactId !== undefined) payload.contact_id = patch.contactId
-            if (patch.customerId !== undefined) payload.customer_id = patch.customerId
-            if (patch.contactType !== undefined) payload.contact_type = patch.contactType
+            if (patch.contactId !== undefined || patch.customerId !== undefined || patch.contactType !== undefined) {
+                const nextContactType = patch.contactType ?? null
+                const nextCustomerIdRaw = patch.customerId ?? null
+                const nextContactIdRaw = patch.contactId ?? null
+                const nextCustomerId =
+                    nextCustomerIdRaw
+                    || ((String(nextContactType || "").toLowerCase() === "customer" || String(nextContactType || "").toLowerCase() === "cliente")
+                        ? nextContactIdRaw
+                        : null)
+
+                payload.customer_id = nextCustomerId
+                payload.contact_id = nextCustomerId ? null : nextContactIdRaw
+                payload.contact_type = nextCustomerId ? "customer" : nextContactType
+            }
             if (patch.dueDate !== undefined) payload.due_date = patch.dueDate
             if (patch.notes !== undefined) payload.notes = patch.notes
         }
@@ -1877,7 +1892,7 @@ export type TransactionDetailPayload = {
     notesLine: string | null
     amount: number
     ledgerDirection: ERPTransaction["ledgerDirection"]
-    contactCard: { title: string; name: string; email: string | null; phone: string | null }
+    contactCard: { title: string; name: string; email: string | null; phone: string | null; isCustomer?: boolean }
     canEdit: boolean
     /** Quando false, a UI não exibe a linha "Data de vencimento" (ex.: vendas PDV/pedido sem vencimento). */
     showDueDateRow: boolean
@@ -2191,6 +2206,7 @@ export async function getTransactionDetailsAction(
                     name: cust?.name || ord.customer_name || "Cliente",
                     email: cust?.email ?? null,
                     phone: cust?.phone ?? null,
+                    isCustomer: true,
                 }
             } else {
                 const nm =
@@ -2200,6 +2216,7 @@ export async function getTransactionDetailsAction(
                     name: nm,
                     email: null,
                     phone: null,
+                    isCustomer: true,
                 }
             }
         } else if (row.category === "Vendas" && posSaleCustomerId !== undefined) {
@@ -2215,6 +2232,7 @@ export async function getTransactionDetailsAction(
                     name: cust?.name || "Cliente",
                     email: cust?.email ?? null,
                     phone: cust?.phone ?? null,
+                    isCustomer: true,
                 }
             } else {
                 contactCard = {
@@ -2222,13 +2240,15 @@ export async function getTransactionDetailsAction(
                     name: "Consumidor final",
                     email: null,
                     phone: null,
+                    isCustomer: true,
                 }
             }
-        } else if (row.customer_id) {
+        } else if (row.customer_id || ((row.contact_type === "customer" || row.contact_type === "cliente") && row.contact_id)) {
+            const effectiveCustomerId = row.customer_id || row.contact_id
             const { data: cust } = await supabase
                 .from("customers")
                 .select("name, email, phone")
-                .eq("id", row.customer_id)
+                .eq("id", effectiveCustomerId)
                 .eq("partner_id", partnerId)
                 .maybeSingle()
             contactCard = {
@@ -2236,6 +2256,7 @@ export async function getTransactionDetailsAction(
                 name: cust?.name || "Cliente",
                 email: cust?.email ?? null,
                 phone: cust?.phone ?? null,
+                isCustomer: true,
             }
         } else if (row.contact_id && row.transaction_contacts?.name) {
             contactCard = {
@@ -2243,6 +2264,7 @@ export async function getTransactionDetailsAction(
                 name: row.transaction_contacts.name,
                 email: null,
                 phone: null,
+                isCustomer: row.contact_type === "customer" || row.transaction_contacts?.type === "customer",
             }
         }
 
