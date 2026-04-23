@@ -90,8 +90,8 @@ export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
 
                 <div className="flex-1 overflow-y-auto no-scrollbar pb-10">
                   <AnimatePresence mode="wait">
-                    {activeTab === "empresa" && (
-                      <TabsContent value="empresa" key="empresa" className="mt-0 focus-visible:outline-none">
+                    <TabsContent value="empresa" key="empresa" className="mt-0 focus-visible:outline-none">
+                      {activeTab === "empresa" && (
                         <FadeIn className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                           <SettingsCard
                             icon={Store}
@@ -112,11 +112,11 @@ export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
                             onClick={() => setActivePage("subscription")}
                           />
                         </FadeIn>
-                      </TabsContent>
-                    )}
+                      )}
+                    </TabsContent>
 
-                    {activeTab === "vendas" && (
-                      <TabsContent value="vendas" key="vendas" className="mt-0 focus-visible:outline-none">
+                    <TabsContent value="vendas" key="vendas" className="mt-0 focus-visible:outline-none">
+                      {activeTab === "vendas" && (
                         <FadeIn className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                           <SettingsCard
                             icon={MoneyIcon}
@@ -143,11 +143,11 @@ export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
                             onClick={() => setActivePage("recibo")}
                           />
                         </FadeIn>
-                      </TabsContent>
-                    )}
+                      )}
+                    </TabsContent>
 
-                    {activeTab === "adicionais" && (
-                      <TabsContent value="adicionais" key="adicionais" className="mt-0 focus-visible:outline-none">
+                    <TabsContent value="adicionais" key="adicionais" className="mt-0 focus-visible:outline-none">
+                      {activeTab === "adicionais" && (
                         <FadeIn className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                           {showVitrine && (
                             <SettingsCard
@@ -178,8 +178,8 @@ export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
                             onClick={() => setActivePage("integrations")}
                           />
                         </FadeIn>
-                      </TabsContent>
-                    )}
+                      )}
+                    </TabsContent>
                   </AnimatePresence>
                 </div>
               </Tabs>
