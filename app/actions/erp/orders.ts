@@ -658,7 +658,7 @@ async function createRefundTransactionForCancelledOrder(params: {
             interest_amount: null,
             fee_amount: 0,
             transaction_type: "expense",
-            origin: "order_cancel",
+            origin: "system",
             refund_kind: "revenue_refund",
             reference_note: params.orderId,
             account_id: financeAccountId,
@@ -813,7 +813,7 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
         interest_amount: null,
         fee_amount: 0,
         transaction_type: "refund",
-        origin: "order_cancel",
+        origin: "system",
         refund_kind: "revenue_refund",
         reference_note: params.orderId,
         account_id: financeAccountId,
@@ -1739,7 +1739,13 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     reason: payload.cancelReason?.trim(),
                 })
 
-                const stockWasRestoredOnCancel = Boolean(payload.restoreStock && order.inventory_deducted)
+                const shouldRestoreStockWithMovement = Boolean(
+                    payload.restoreStock && (
+                        order.inventory_deducted ||
+                        shouldDeductInventory(order.delivery_status || null)
+                    )
+                )
+                const stockWasRestoredOnCancel = shouldRestoreStockWithMovement
                 const { error } = await supabase
                     .from("orders")
                     .update({
@@ -1757,7 +1763,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 }
                 processedCount += 1
 
-                if (order.inventory_deducted && stockWasRestoredOnCancel) {
+                if (stockWasRestoredOnCancel) {
                     const restoreResult = await createOrderStockMovement({
                         supabase,
                         partnerId: payload.partnerId,
@@ -1770,7 +1776,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     })
 
                     if ("error" in restoreResult) {
-                        console.error("[orders_cancel_stock] failed_to_restore_stock_movement", { orderId: order.id, orderNumber: order.order_number, partnerId: payload.partnerId, restoreStock: payload.restoreStock, inventoryDeducted: order.inventory_deducted, error: restoreResult.error })
+                        console.error("[orders_cancel_stock] failed_to_restore_stock_movement", { orderId: order.id, orderNumber: order.order_number, partnerId: payload.partnerId, restoreStock: payload.restoreStock, inventoryDeducted: order.inventory_deducted, deliveryStatus: order.delivery_status, error: restoreResult.error })
                         processingWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível restaurar estoque (${restoreResult.error})`)
                     }
                 } else if (!order.inventory_deducted) {
