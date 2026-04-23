@@ -576,10 +576,22 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         }
     }
 
-    const buildOrderPayload = (paymentOverrides?: { paymentStatus?: 'paid' | 'partially_paid' | 'unpaid'; paidAmount?: number; paymentMethod?: string; paymentBreakdown?: PaymentBreakdownEntry[] }) => {
+    const buildOrderPayload = (paymentOverrides?: {
+        paymentStatus?: 'paid' | 'partially_paid' | 'unpaid'
+        paidAmount?: number
+        paymentMethod?: string
+        paymentBreakdown?: PaymentBreakdownEntry[]
+        deliveryStatus?: string
+    }) => {
         const finalPaymentStatus = paymentOverrides?.paymentStatus || paymentStatus;
-        let finalDeliveryStatus = deliveryStatus;
-        if (!editOrderId && finalPaymentStatus === 'paid' && deliveryMethod === 'pickup' && deliveryStatus === 'not_sent') {
+        let finalDeliveryStatus = paymentOverrides?.deliveryStatus || deliveryStatus;
+        if (
+            !editOrderId &&
+            paymentOverrides?.deliveryStatus === undefined &&
+            finalPaymentStatus === 'paid' &&
+            deliveryMethod === 'pickup' &&
+            deliveryStatus === 'not_sent'
+        ) {
             finalDeliveryStatus = 'delivered';
         }
 
@@ -651,7 +663,13 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         notifySuccess("Cupom aplicado com sucesso.")
     }
 
-    const submitOrder = async (paymentOverrides?: { paymentStatus?: 'paid' | 'partially_paid' | 'unpaid'; paidAmount?: number; paymentMethod?: string; paymentBreakdown?: PaymentBreakdownEntry[] }) => {
+    const submitOrder = async (paymentOverrides?: {
+        paymentStatus?: 'paid' | 'partially_paid' | 'unpaid'
+        paidAmount?: number
+        paymentMethod?: string
+        paymentBreakdown?: PaymentBreakdownEntry[]
+        deliveryStatus?: string
+    }) => {
         setIsSaving(true)
         try {
             const payload = buildOrderPayload(paymentOverrides)
@@ -690,6 +708,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             paymentMethod: paymentData.paymentMethod,
             paymentBreakdown: paymentData.paymentBreakdown,
             paidAmount: paymentData.paidAmount,
+            deliveryStatus: paymentData.isPendingDelivery ? "not_sent" : undefined,
         })
     }
 

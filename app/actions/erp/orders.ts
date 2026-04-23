@@ -724,6 +724,156 @@ async function restoreCancelledOrderInventory(params: {
     return { success: true as const }
 }
 
+async function createRefundTransactionForCancelledOrderSafe(params: {
+    supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>
+    partnerId: string
+    orderNumber: string
+    orderId: string
+    customerId?: string | null
+    paidAmount: number
+    financeAccountId?: string | null
+    createdByUserId?: string | null
+}) {
+    const paidAmount = Math.max(0, Number(params.paidAmount || 0))
+    if (paidAmount <= 0.009) return { success: true as const }
+
+    let financeAccountId = params.financeAccountId || null
+    if (!financeAccountId) {
+        const { data: defaultAccount, error: defaultAccountError } = await params.supabase
+            .from("finance_accounts")
+            .select("id")
+            .eq("partner_id", params.partnerId)
+            .eq("is_active", true)
+            .order("is_default", { ascending: false })
+            .order("created_at", { ascending: true })
+            .limit(1)
+            .maybeSingle()
+
+        if (defaultAccountError) {
+            console.error("[orders_cancel_refund] failed_to_resolve_default_account", {
+                orderId: params.orderId,
+                partnerId: params.partnerId,
+                error: defaultAccountError,
+            })
+            return { error: defaultAccountError.message }
+        }
+
+        financeAccountId = defaultAccount?.id || null
+    }
+
+    if (!financeAccountId) {
+        const message = "NÃ£o foi possÃ­vel gerar o reembolso automÃ¡tico porque nÃ£o existe conta financeira ativa para lanÃ§ar o reembolso."
+        console.error("[orders_cancel_refund] missing_finance_account", {
+            orderId: params.orderId,
+            partnerId: params.partnerId,
+            paidAmount,
+        })
+        return { error: message }
+    }
+
+    const { data: existingRefunds, error: existingRefundsError } = await params.supabase
+        .from("transactions")
+        .select("id, amount, status")
+        .eq("partner_id", params.partnerId)
+        .eq("refund_kind", "revenue_refund")
+        .eq("reference_note", params.orderId)
+        .in("status", ["paid", "partially_paid"])
+
+    if (existingRefundsError) {
+        console.error("[orders_cancel_refund] failed_to_check_existing_refunds", {
+            orderId: params.orderId,
+            partnerId: params.partnerId,
+            error: existingRefundsError,
+        })
+        return { error: existingRefundsError.message }
+    }
+
+    const alreadyRefundedAmount = (existingRefunds || []).reduce((sum: number, tx: any) => {
+        return sum + Math.abs(Number(tx.amount || 0))
+    }, 0)
+    const refundableAmount = Math.max(0, paidAmount - alreadyRefundedAmount)
+    if (refundableAmount <= 0.009) return { success: true as const }
+
+    const paymentDate = new Date().toISOString()
+    const refundPayload = {
+        partner_id: params.partnerId,
+        description: `Reembolso automÃ¡tico da venda ${params.orderNumber}`,
+        category: "Reembolso",
+        customer_id: params.customerId || null,
+        contact_id: null,
+        contact_type: "customer",
+        amount: refundableAmount,
+        due_date: null,
+        payment_date: paymentDate,
+        transaction_date: paymentDate,
+        status: "paid",
+        notes: "Gerado automaticamente ao cancelar venda.",
+        payment_type: "Reembolso",
+        original_amount: refundableAmount,
+        interest_amount: null,
+        fee_amount: 0,
+        transaction_type: "refund",
+        origin: "order_cancel",
+        refund_kind: "revenue_refund",
+        reference_note: params.orderId,
+        account_id: financeAccountId,
+        created_by_user_id: params.createdByUserId || null,
+    }
+
+    let insertResult = await params.supabase
+        .from("transactions")
+        .insert(refundPayload)
+        .select("id")
+        .maybeSingle()
+
+    if (insertResult.error) {
+        const message = String(insertResult.error.message || "").toLowerCase()
+        if (message.includes("created_by_user_id") && message.includes("transactions")) {
+            const fallbackPayload = { ...refundPayload }
+            delete (fallbackPayload as Record<string, unknown>).created_by_user_id
+            insertResult = await params.supabase
+                .from("transactions")
+                .insert(fallbackPayload)
+                .select("id")
+                .maybeSingle()
+        }
+    }
+
+    if (insertResult.error || !insertResult.data?.id) {
+        console.error("[orders_cancel_refund] failed_to_create_refund", {
+            orderId: params.orderId,
+            orderNumber: params.orderNumber,
+            partnerId: params.partnerId,
+            financeAccountId,
+            paidAmount,
+            alreadyRefundedAmount,
+            refundableAmount,
+            error: insertResult.error,
+        })
+        return { error: insertResult.error?.message || "NÃ£o foi possÃ­vel gerar o reembolso automÃ¡tico." }
+    }
+
+    const { error: balanceError } = await params.supabase.rpc("apply_account_balance_delta", {
+        p_account_id: financeAccountId,
+        p_partner_id: params.partnerId,
+        p_delta: -Math.abs(refundableAmount),
+    })
+
+    if (balanceError) {
+        console.error("[orders_cancel_refund] failed_to_apply_account_balance_delta", {
+            orderId: params.orderId,
+            orderNumber: params.orderNumber,
+            transactionId: insertResult.data.id,
+            partnerId: params.partnerId,
+            financeAccountId,
+            refundableAmount,
+            error: balanceError,
+        })
+    }
+
+    return { success: true as const }
+}
+
 function buildReopenStockErrorMessage(items: OrderStockItem[]) {
     const validItems = (items || []).filter((item) => item.product_id && Number(item.quantity || 0) > 0)
     return validItems.length <= 1
@@ -762,17 +912,36 @@ async function createOrderStockMovement(params: {
         p_items: movementItems,
     })
 
-    if (error) return { error: error.message }
+    if (error) {
+        console.error("[orders_stock_movement] create_batch_stock_movement_failed", {
+            partnerId: params.partnerId,
+            orderId: params.orderId,
+            type: params.type,
+            reason: params.reason,
+            items: movementItems,
+            error,
+        })
+        return { error: error.message }
+    }
 
     const movementId = (movementRecord as any)?.id
     if (movementId) {
-        await params.supabase
+        const { error: linkError } = await params.supabase
             .from("stock_movements")
             .update({
                 order_id: params.orderId,
                 reference_name: `Pedido: ${params.orderId}`,
             })
             .eq("id", movementId)
+
+        if (linkError) {
+            console.error("[orders_stock_movement] failed_to_link_order", {
+                partnerId: params.partnerId,
+                orderId: params.orderId,
+                movementId,
+                error: linkError,
+            })
+        }
     }
 
     revalidateStockMovements(params.partnerId)
@@ -1589,13 +1758,19 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 processedCount += 1
 
                 if (order.inventory_deducted && stockWasRestoredOnCancel) {
-                    const restoreResult = await restoreCancelledOrderInventory({
+                    const restoreResult = await createOrderStockMovement({
                         supabase,
                         partnerId: payload.partnerId,
+                        orderId: order.id,
+                        createdBy: user.id,
+                        type: "in",
+                        reason: "Cancelamento de pedido",
+                        notes: nextNotes || undefined,
                         items: order.order_items || [],
                     })
 
                     if ("error" in restoreResult) {
+                        console.error("[orders_cancel_stock] failed_to_restore_stock_movement", { orderId: order.id, orderNumber: order.order_number, partnerId: payload.partnerId, restoreStock: payload.restoreStock, inventoryDeducted: order.inventory_deducted, error: restoreResult.error })
                         processingWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível restaurar estoque (${restoreResult.error})`)
                     }
                 } else if (!order.inventory_deducted) {
@@ -1607,6 +1782,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     })
 
                     if ("error" in releaseResult) {
+                        console.error("[orders_cancel_stock] failed_to_release_stock_reservation", { orderId: order.id, orderNumber: order.order_number, partnerId: payload.partnerId, error: releaseResult.error })
                         processingWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível liberar reserva de estoque (${releaseResult.error})`)
                     }
                 }
@@ -1614,7 +1790,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 if (payload.generateAutomaticRefund) {
                     const refundAmount = Math.max(0, Number(order.paid_amount || 0))
                     if (refundAmount > 0.009) {
-                        const refundResult = await createRefundTransactionForCancelledOrder({
+                        const refundResult = await createRefundTransactionForCancelledOrderSafe({
                             supabase,
                             partnerId: payload.partnerId,
                             orderNumber: order.order_number || order.id,
@@ -1626,6 +1802,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         })
 
                         if ("error" in refundResult) {
+                            console.error("[orders_cancel_refund] failed_to_generate_automatic_refund", { orderId: order.id, orderNumber: order.order_number, partnerId: payload.partnerId, refundAmount, financeAccountId: order.finance_account_id || null, error: refundResult.error })
                             processingWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível gerar reembolso (${refundResult.error})`)
                         }
                     }
@@ -1776,6 +1953,10 @@ export async function updateOrdersStatusInBatchAction(payload: {
         const paymentWarnings: string[] = []
         let paymentProcessedCount = 0
         for (const order of currentOrders || []) {
+            if (order.situation === "cancelled") {
+                paymentWarnings.push(`Pedido ${order.order_number || order.id}: estÃ¡ cancelado e nÃ£o pode ter o pagamento alterado.`)
+                continue
+            }
             if (order.situation === "paid") {
                 paymentWarnings.push(`Pedido ${order.order_number || order.id}: já está pago e não pode ter o pagamento alterado.`)
                 continue
@@ -1841,6 +2022,10 @@ export async function updateOrdersStatusInBatchAction(payload: {
         const deliveryWarnings: string[] = []
         let deliveryProcessedCount = 0
         for (const order of currentOrders || []) {
+            if (order.situation === "cancelled") {
+                deliveryWarnings.push(`Pedido ${order.order_number || order.id}: estÃ¡ cancelado e nÃ£o pode ter o status de entrega alterado.`)
+                continue
+            }
             if (order.delivery_status === "delivered") {
                 deliveryWarnings.push(`Pedido ${order.order_number || order.id}: já está entregue e não pode ter o status de entrega alterado.`)
                 continue
@@ -1885,6 +2070,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 const lines: string[] = []
 
                 if (payload.actionType === "payment_status") {
+                    if (order.situation === "cancelled") return Promise.resolve()
                     const requestedStatus = paymentStatusMap[payload.statusValue || ""]
 
                     if (requestedStatus) {
@@ -1906,6 +2092,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 }
 
                 if (payload.actionType === "delivery_status" && payload.statusValue && order.delivery_status !== payload.statusValue) {
+                    if (order.situation === "cancelled") return Promise.resolve()
                     lines.push(`alterou status de entrega: ${getDeliveryStatusLabel(order.delivery_status)} -> ${getDeliveryStatusLabel(payload.statusValue)}`)
                 }
 

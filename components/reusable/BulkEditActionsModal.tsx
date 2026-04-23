@@ -43,6 +43,7 @@ interface BulkEditActionsModalProps {
     orderSelectionGuards?: {
         paidCount: number
         deliveredCount: number
+        cancelledCount: number
         totalCount: number
     }
     onApply: (payload: BulkActionPayload) => Promise<void>
@@ -129,18 +130,19 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
         }
     }, [isOpen])
 
-    const isOrderPaymentFullyBlocked = targetType === "order"
-        && (orderSelectionGuards?.totalCount || 0) > 0
-        && (orderSelectionGuards?.paidCount || 0) >= (orderSelectionGuards?.totalCount || 0)
-    const isOrderDeliveryFullyBlocked = targetType === "order"
-        && (orderSelectionGuards?.totalCount || 0) > 0
-        && (orderSelectionGuards?.deliveredCount || 0) >= (orderSelectionGuards?.totalCount || 0)
+    const cancelledCount = orderSelectionGuards?.cancelledCount || 0
     const ignoredByRuleCount = view === "order_payment"
-        ? (orderSelectionGuards?.paidCount || 0)
+        ? (orderSelectionGuards?.paidCount || 0) + cancelledCount
         : view === "order_delivery"
-            ? (orderSelectionGuards?.deliveredCount || 0)
+            ? (orderSelectionGuards?.deliveredCount || 0) + cancelledCount
             : 0
     const selectableCount = Math.max(0, (orderSelectionGuards?.totalCount || 0) - ignoredByRuleCount)
+    const isOrderPaymentFullyBlocked = targetType === "order"
+        && (orderSelectionGuards?.totalCount || 0) > 0
+        && selectableCount === 0
+    const isOrderDeliveryFullyBlocked = targetType === "order"
+        && (orderSelectionGuards?.totalCount || 0) > 0
+        && selectableCount === 0
     const isCurrentViewBlocked =
         (view === "order_payment" && isOrderPaymentFullyBlocked)
         || (view === "order_delivery" && isOrderDeliveryFullyBlocked)

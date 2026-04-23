@@ -992,6 +992,7 @@ export default function OrdersPage({
                     totalCount: selectedOrdersForBulkActions.length,
                     paidCount: selectedOrdersForBulkActions.filter((order) => order.situation === "paid").length,
                     deliveredCount: selectedOrdersForBulkActions.filter((order) => order.delivery_status === "delivered").length,
+                    cancelledCount: selectedOrdersForBulkActions.filter((order) => order.situation === "cancelled").length,
                 }}
                 onApply={handleBulkEditApply}
             />
