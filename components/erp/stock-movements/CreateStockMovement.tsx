@@ -49,6 +49,7 @@ interface CreateStockMovementProps {
 const REQUIRED_FIELDS = [
     { field: "items", tab: "Geral" },
     { field: "reason", tab: "Geral" },
+    { field: "customReason", tab: "Geral" },
 ]
 
 const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }) => {
@@ -65,6 +66,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     const [type, setType] = useState<'in' | 'out'>('in');
     const [notes, setNotes] = useState('');
     const [reason, setReason] = useState('Selecione um motivo...');
+    const [customReason, setCustomReason] = useState('');
 
     // Multi-item state
     const [items, setItems] = useState<MovementItem[]>([]);
@@ -77,8 +79,8 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set());
 
     const isDirty = useMemo(() => {
-        return items.length > 0 || notes !== '' || reason !== 'Selecione um motivo...';
-    }, [items, notes, reason]);
+        return items.length > 0 || notes !== '' || reason !== 'Selecione um motivo...' || customReason !== '';
+    }, [items, notes, reason, customReason]);
 
     const showSearchDropdown = isProductSearchOpen && productBucket.searchQuery.length > 0;
 
@@ -145,9 +147,11 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
 
     const handleReasonChange = useCallback((value: string) => {
         setReason(value);
+        if (value !== 'Outro') setCustomReason('');
         setFieldErrors(prev => {
             const next = new Set(prev);
             next.delete('reason');
+            next.delete('customReason');
             return next;
         });
     }, []);
@@ -166,6 +170,10 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
         if (reason === 'Selecione um motivo...') {
             errors.add('reason');
             notifyError("Selecione um motivo para a movimentação.");
+        }
+        if (reason === 'Outro' && !customReason.trim()) {
+            errors.add('customReason');
+            notifyError("Informe o motivo da movimentação.");
         }
 
         // Validate individual quantities
@@ -192,7 +200,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
         try {
             const res = await createBatchStockMovementAction({
                 type,
-                reason,
+                reason: reason === 'Outro' ? customReason : reason,
                 notes,
                 items: items.map(item => ({
                     productId: item.product.id,
@@ -502,22 +510,54 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                         <div className="h-px bg-brand-border dark:bg-dark-border w-full" />
 
                                                         {/* Reason Dropdown */}
-                                                        <FormDropdown
-                                                            label="Motivo"
-                                                            value={reason}
-                                                            setValue={handleReasonChange}
-                                                            error={fieldErrors.has('reason')}
-                                                            errorMessage={fieldErrors.has('reason') ? 'Selecione um motivo para a movimentação.' : undefined}
-                                                            options={type === 'in' ? [
-                                                                { value: 'Compra de Fornecedor', label: 'Compra de Fornecedor' },
-                                                                { value: 'Devolução de Cliente', label: 'Devolução de Cliente' },
-                                                                { value: 'Ajuste de Estoque', label: 'Ajuste de Estoque' }
-                                                            ] : [
-                                                                { value: 'Avaria / Perda', label: 'Avaria / Perda' },
-                                                                { value: 'Ajuste de Estoque', label: 'Ajuste de Estoque' },
-                                                                { value: 'Uso Interno', label: 'Uso Interno' }
-                                                            ]}
-                                                        />
+                                                        <div className="flex flex-col md:flex-row gap-4 items-start">
+                                                            <div className="flex-1 w-full">
+                                                                <FormDropdown
+                                                                    label="Motivo"
+                                                                    value={reason}
+                                                                    setValue={handleReasonChange}
+                                                                    error={fieldErrors.has('reason')}
+                                                                    errorMessage={fieldErrors.has('reason') ? 'Selecione um motivo para a movimentação.' : undefined}
+                                                                    options={type === 'in' ? [
+                                                                        { value: 'Compra de Fornecedor', label: 'Compra de Fornecedor' },
+                                                                        { value: 'Devolução de Cliente', label: 'Devolução de Cliente' },
+                                                                        { value: 'Ajuste de Estoque', label: 'Ajuste de Estoque' },
+                                                                        { value: 'Outro', label: 'Outro' }
+                                                                    ] : [
+                                                                        { value: 'Avaria / Perda', label: 'Avaria / Perda' },
+                                                                        { value: 'Ajuste de Estoque', label: 'Ajuste de Estoque' },
+                                                                        { value: 'Uso Interno', label: 'Uso Interno' },
+                                                                        { value: 'Outro', label: 'Outro' }
+                                                                    ]}
+                                                                />
+                                                            </div>
+
+                                                            {reason === 'Outro' && (
+                                                                <motion.div
+                                                                    initial={{ opacity: 0, x: -10 }}
+                                                                    animate={{ opacity: 1, x: 0 }}
+                                                                    className="flex-[2] w-full"
+                                                                >
+                                                                    <Input
+                                                                        label="Descreva o motivo"
+                                                                        placeholder="Digite o motivo aqui..."
+                                                                        value={customReason}
+                                                                        onChange={(e) => {
+                                                                            setCustomReason(e.target.value);
+                                                                            if (e.target.value.trim()) {
+                                                                                setFieldErrors(prev => {
+                                                                                    const next = new Set(prev);
+                                                                                    next.delete('customReason');
+                                                                                    return next;
+                                                                                });
+                                                                            }
+                                                                        }}
+                                                                        error={fieldErrors.has('customReason')}
+                                                                        errorMessage={fieldErrors.has('customReason') ? 'Informe o motivo da movimentação.' : undefined}
+                                                                    />
+                                                                </motion.div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </section>
                                             </motion.div>
@@ -582,8 +622,8 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                 : Math.max(0, item.product.stock - item.quantity);
 
                                                             return (
-                                                                <div key={item.product.id} className={`py-4 ${index > 0 ? 'border-t border-brand-border/40 dark:border-dark-border/40' : ''}`}>
-                                                                    <div className="flex items-center gap-3 mb-3">
+                                                                <div key={item.product.id} className={`py-4 flex items-center justify-between gap-4 ${index > 0 ? 'border-t border-brand-border/40 dark:border-dark-border/40' : ''}`}>
+                                                                    <div className="flex items-center gap-3 flex-1 min-w-0">
                                                                         <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
                                                                             <img src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className="w-full h-full object-cover rounded-full" alt="" />
                                                                         </div>
@@ -592,7 +632,10 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                             <div className="text-[10px] font-medium text-brand-inactive-text uppercase tracking-wider">{item.product.sku}</div>
                                                                         </div>
                                                                     </div>
-                                                                    <div className="flex items-center gap-3 pl-11">
+
+                                                                    <div className="h-8 w-px bg-brand-border dark:bg-dark-border shrink-0" />
+
+                                                                    <div className="flex items-center gap-2 shrink-0">
                                                                         <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{item.product.stock} <span className="text-[10px] font-medium opacity-60">un</span></span>
                                                                         <ArrowRightIcon size={14} className="text-brand-inactive-text" />
                                                                         <span className={`text-[15px] font-bold ${type === 'in' ? 'text-brand-green' : 'text-brand-red'}`}>

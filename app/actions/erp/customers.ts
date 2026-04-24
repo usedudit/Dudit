@@ -9,7 +9,7 @@ import { requireUser, requirePartnerAccessWithPermission, requireCustomerOwnersh
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { createAddressAction } from "@/app/actions/shared/addresses"
-import { validateCPF } from "@/lib/input-validator"
+import { validateCPF, validateCNPJ, validateEmail, validatePhoneBR, validateURL, validateCEP } from "@/lib/input-validator"
 
 async function prepareEncryptedCpf(
   supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
@@ -22,7 +22,7 @@ async function prepareEncryptedCpf(
   }
 
   if (!validateCPF(cpf)) {
-    return { error: "CPF inválido" }
+    return { error: "CPF invÃ¡lido" }
   }
 
   const cleanCpf = cpf.replace(/\D/g, "")
@@ -45,7 +45,7 @@ async function prepareEncryptedCpf(
       try {
         const decrypted = await decryptCPF(row.cpf)
         if (decrypted === cleanCpf) {
-          return { error: "Já existe um cliente com este CPF." }
+          return { error: "JÃ¡ existe um cliente com este CPF." }
         }
       } catch {
         continue
@@ -108,7 +108,7 @@ export async function createComprehensiveCustomerAction(data: {
   const csrfToken = extractCSRFTokenFromObject(data as Record<string, unknown>)
   const csrfValidation = await requireCSRF(csrfToken)
   if (!csrfValidation.valid) {
-    return { error: csrfValidation.error || "Token CSRF inválido" }
+    return { error: csrfValidation.error || "Token CSRF invÃ¡lido" }
   }
 
   const user = await requireUser()
@@ -117,6 +117,41 @@ export async function createComprehensiveCustomerAction(data: {
 
   if (!data.name.trim()) {
     return { error: "Nome é obrigatório" }
+  }
+
+  if (data.email && !validateEmail(data.email)) {
+    return { error: "E-mail inválido" }
+  }
+  
+  if (data.phone && !validatePhoneBR(data.phone)) {
+    return { error: "Celular inválido. Use o formato (00) 90000-0000" }
+  }
+  
+  if (data.phoneFixed && !validatePhoneBR(data.phoneFixed)) {
+    return { error: "Telefone fixo inválido. Use o formato (00) 0000-0000" }
+  }
+  
+  if (data.website && !validateURL(data.website)) {
+    const urlWithProto = data.website.startsWith("http") ? data.website : `https://${data.website}`
+    if (!validateURL(urlWithProto)) {
+      return { error: "Website inválido" }
+    }
+  }
+
+  if (data.personType === "pf" && data.cpf && !validateCPF(data.cpf)) {
+    return { error: "CPF inválido" }
+  }
+
+  if (data.personType === "pj" && data.cnpj && !validateCNPJ(data.cnpj)) {
+    return { error: "CNPJ inválido" }
+  }
+
+  if (data.zipCode && !validateCEP(data.zipCode)) {
+    return { error: "CEP inválido" }
+  }
+
+  if (data.hasDifferentBillingAddress && data.billingZipCode && !validateCEP(data.billingZipCode)) {
+    return { error: "CEP de cobrança inválido" }
   }
 
   const supabase = await getSupabaseServerClient()
@@ -152,7 +187,7 @@ export async function createComprehensiveCustomerAction(data: {
     return { error: error.message }
   }
 
-  // Criar endereço na tabela addresses
+  // Criar endereÃ§o na tabela addresses
   if (data.street || data.city) {
     const addressResult = await createAddressAction({
       entityId: newCustomer.id,
@@ -172,11 +207,11 @@ export async function createComprehensiveCustomerAction(data: {
     })
     
     if (addressResult && addressResult.error) {
-      console.error("[createComprehensiveCustomerAction] Erro ao salvar endereço principal:", addressResult.error)
+      console.error("[createComprehensiveCustomerAction] Erro ao salvar endereÃ§o principal:", addressResult.error)
     }
   }
 
-  // Criar endereço de cobrança se for diferente
+  // Criar endereÃ§o de cobranÃ§a se for diferente
   if (data.hasDifferentBillingAddress && (data.billingStreet || data.billingCity)) {
     const billingResult = await createAddressAction({
       entityId: newCustomer.id,
@@ -195,7 +230,7 @@ export async function createComprehensiveCustomerAction(data: {
     })
     
     if (billingResult && billingResult.error) {
-      console.error("[createComprehensiveCustomerAction] Erro ao salvar endereço de cobrança:", billingResult.error)
+      console.error("[createComprehensiveCustomerAction] Erro ao salvar endereÃ§o de cobranÃ§a:", billingResult.error)
     }
   }
 
@@ -210,7 +245,7 @@ export async function deleteCustomerAction(customerId: string, csrf_token?: stri
   const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
   const csrfValidation = await requireCSRF(csrf_token)
   if (!csrfValidation.valid) {
-    return { error: csrfValidation.error || "Token CSRF inválido" }
+    return { error: csrfValidation.error || "Token CSRF invÃ¡lido" }
   }
 
   const user = await requireUser()
@@ -281,15 +316,49 @@ export async function updateComprehensiveCustomerAction(data: {
   const csrfToken = extractCSRFTokenFromObject(data as Record<string, unknown>)
   const csrfValidation = await requireCSRF(csrfToken)
   if (!csrfValidation.valid) {
-    return { error: csrfValidation.error || "Token CSRF inválido" }
+    return { error: csrfValidation.error || "Token CSRF invÃ¡lido" }
   }
 
   const user = await requireUser()
 
   await requireCustomerOwnership(data.customerId)
 
-
   const supabase = await getSupabaseServerClient()
+
+  if (data.email && !validateEmail(data.email)) {
+    return { error: "E-mail inválido" }
+  }
+  
+  if (data.phone && !validatePhoneBR(data.phone)) {
+    return { error: "Celular inválido. Use o formato (00) 90000-0000" }
+  }
+  
+  if (data.phoneFixed && !validatePhoneBR(data.phoneFixed)) {
+    return { error: "Telefone fixo inválido. Use o formato (00) 0000-0000" }
+  }
+  
+  if (data.website && !validateURL(data.website)) {
+    const urlWithProto = data.website.startsWith("http") ? data.website : `https://${data.website}`
+    if (!validateURL(urlWithProto)) {
+      return { error: "Website inválido" }
+    }
+  }
+
+  if (data.personType === "pf" && data.cpf && !validateCPF(data.cpf)) {
+    return { error: "CPF inválido" }
+  }
+
+  if (data.personType === "pj" && data.cnpj && !validateCNPJ(data.cnpj)) {
+    return { error: "CNPJ inválido" }
+  }
+
+  if (data.zipCode && !validateCEP(data.zipCode)) {
+    return { error: "CEP inválido" }
+  }
+
+  if (data.hasDifferentBillingAddress && data.billingZipCode && !validateCEP(data.billingZipCode)) {
+    return { error: "CEP de cobrança inválido" }
+  }
   const cpfResult = await prepareEncryptedCpf(supabase, data.partnerId, data.cpf, data.customerId)
   if (cpfResult.error) {
     return { error: cpfResult.error }
@@ -327,7 +396,7 @@ export async function updateComprehensiveCustomerAction(data: {
     return { error: error.message }
   }
 
-  // Sincronizar endereço na tabela addresses
+  // Sincronizar endereÃ§o na tabela addresses
   if (data.street || data.city) {
     const { data: existingAddresses } = await supabase
       .from("addresses")
@@ -350,7 +419,7 @@ export async function updateComprehensiveCustomerAction(data: {
       }).eq("id", existingAddresses[0].id)
       
       if (addressUpdateError) {
-        console.error("[updateComprehensiveCustomerAction] Erro ao atualizar endereço principal:", addressUpdateError.message)
+        console.error("[updateComprehensiveCustomerAction] Erro ao atualizar endereÃ§o principal:", addressUpdateError.message)
       }
     } else {
       const addressResult = await createAddressAction({
@@ -371,12 +440,12 @@ export async function updateComprehensiveCustomerAction(data: {
       })
       
       if (addressResult && addressResult.error) {
-        console.error("[updateComprehensiveCustomerAction] Erro ao criar novo endereço principal:", addressResult.error)
+        console.error("[updateComprehensiveCustomerAction] Erro ao criar novo endereÃ§o principal:", addressResult.error)
       }
     }
   }
 
-  // Sincronizar endereço de cobrança
+  // Sincronizar endereÃ§o de cobranÃ§a
   if (data.hasDifferentBillingAddress && (data.billingStreet || data.billingCity)) {
     const { data: existingBilling } = await supabase
       .from("addresses")
@@ -398,7 +467,7 @@ export async function updateComprehensiveCustomerAction(data: {
       }).eq("id", existingBilling[0].id)
       
       if (billingUpdateError) {
-        console.error("[updateComprehensiveCustomerAction] Erro ao atualizar endereço de cobrança:", billingUpdateError.message)
+        console.error("[updateComprehensiveCustomerAction] Erro ao atualizar endereÃ§o de cobranÃ§a:", billingUpdateError.message)
       }
     } else {
       const billingResult = await createAddressAction({
@@ -418,11 +487,11 @@ export async function updateComprehensiveCustomerAction(data: {
       })
       
       if (billingResult && billingResult.error) {
-        console.error("[updateComprehensiveCustomerAction] Erro ao criar novo endereço de cobrança:", billingResult.error)
+        console.error("[updateComprehensiveCustomerAction] Erro ao criar novo endereÃ§o de cobranÃ§a:", billingResult.error)
       }
     }
   } else if (!data.hasDifferentBillingAddress) {
-    // Se não tiver mais endereço de cobrança diferente, remover existente se houver
+    // Se nÃ£o tiver mais endereÃ§o de cobranÃ§a diferente, remover existente se houver
     await supabase
       .from("addresses")
       .delete()
@@ -437,7 +506,7 @@ export async function updateComprehensiveCustomerAction(data: {
 
 export async function getCustomerOrdersAction(customerId: string) {
   const user = await requireUser()
-  if (!user) return { error: "Não autenticado" }
+  if (!user) return { error: "NÃ£o autenticado" }
 
   const supabase = await getSupabaseServerClient()
 
@@ -533,7 +602,7 @@ export async function getPartnerCustomersAction(partnerId: string, currentStoreI
 
 export async function deleteCustomersInBatchAction(customerIds: string[]) {
   const user = await requireUser()
-  if (!user) return { error: "Não autenticado" }
+  if (!user) return { error: "NÃ£o autenticado" }
 
   const supabase = await getSupabaseServerClient()
 
@@ -557,7 +626,7 @@ export async function deleteCustomersInBatchAction(customerIds: string[]) {
 
 export async function toggleCustomersStatusAction(customerIds: string[], isActive: boolean) {
   const user = await requireUser()
-  if (!user) return { error: "Não autenticado" }
+  if (!user) return { error: "NÃ£o autenticado" }
 
   const supabase = await getSupabaseServerClient()
 

@@ -17,14 +17,15 @@ import {
     FixedPhoneInput,
     WebsiteInput,
     DatePicker,
-    ListItem
+    ListItem,
+    RadioButton
 } from "@/components/reusable"
 import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { CpfCnpjInput } from "@/components/reusable/Inputs/CpfCnpjInput"
 import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
 import { StateComboBox } from "@/components/reusable/Inputs/StateComboBox"
 import { NumberInputWithCheckbox } from "@/components/reusable/Inputs/NumberInputWithCheckbox"
-import { ChevronLeftIcon, SaveIcon, EditIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, EditIcon, UserIcon, StoreIcon } from "@/lib/icons"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useNotification } from "@/hooks/use-notification"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -32,6 +33,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { createComprehensiveCustomerAction, updateComprehensiveCustomerAction, getPartnerCustomersAction } from "@/app/actions/erp/customers"
 import { getAddressesAction } from "@/app/actions/shared/addresses"
 import { consultarCNPJ } from "@/lib/nuvem-fiscal"
+import { validateEmail, validateCPF, validateCNPJ, validatePhoneBR, validateURL, validateCEP } from "@/lib/input-validator"
 
 interface NewCustomerPageProps {
     onBack: () => void;
@@ -245,9 +247,44 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
             errors.add("customerName")
         }
 
+        if (email && !validateEmail(email)) {
+            errors.add("email")
+        }
+
+        if (mobile && !validatePhoneBR(mobile)) {
+            errors.add("mobile")
+        }
+
+        if (phone && !validatePhoneBR(phone)) {
+            errors.add("phone")
+        }
+
+        if (website && !validateURL(website)) {
+            const urlWithProto = website.startsWith("http") ? website : `https://${website}`
+            if (!validateURL(urlWithProto)) {
+                errors.add("website")
+            }
+        }
+
+        if (personType === "Pessoa Física" && cpf && !validateCPF(cpf)) {
+            errors.add("cpf")
+        }
+
+        if (personType === "Pessoa Jurídica" && cnpj && !validateCNPJ(cnpj)) {
+            errors.add("cnpj")
+        }
+
+        if (cep && !validateCEP(cep)) {
+            errors.add("cep")
+        }
+
+        if (hasDifferentBillingAddress && billingCep && !validateCEP(billingCep)) {
+            errors.add("billingCep")
+        }
+
         if (errors.size > 0) {
             setFieldErrors(errors)
-            notifyError("Preencha os campos obrigatórios.")
+            notifyError("Corrija os erros no formulário antes de salvar.")
             return
         }
         setFieldErrors(new Set())
@@ -431,25 +468,33 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                             <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Tipo de pessoa</label>
                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                                 <ListItem
+                                                                    icon={UserIcon}
                                                                     title="Pessoa Física"
                                                                     description="Cadastro para cliente individual."
                                                                     onClick={() => setPersonType("Pessoa Física")}
-                                                                    className={`px-4 py-4 ${personType === "Pessoa Física" ? "border-brand-dark dark:border-dark-body bg-brand-slate/60 dark:bg-dark-border/40" : ""}`}
+                                                                    className={`px-4 py-4 gap-4 ${personType === "Pessoa Física" ? "border-brand-dark dark:border-dark-body bg-brand-slate/60 dark:bg-dark-border/40" : ""}`}
                                                                     right={
-                                                                        <Badge variant={personType === "Pessoa Física" ? "green" : "gray"}>
-                                                                            {personType === "Pessoa Física" ? "Selecionado" : "Selecionar"}
-                                                                        </Badge>
+                                                                        <RadioButton
+                                                                            name="personType"
+                                                                            value="pf"
+                                                                            checked={personType === "Pessoa Física"}
+                                                                            onChange={() => setPersonType("Pessoa Física")}
+                                                                        />
                                                                     }
                                                                 />
                                                                 <ListItem
+                                                                    icon={StoreIcon}
                                                                     title="Pessoa Jurídica"
-                                                                    description="Cadastro para empresa ou organiza??o."
+                                                                    description="Cadastro para empresa ou organização."
                                                                     onClick={() => setPersonType("Pessoa Jurídica")}
-                                                                    className={`px-4 py-4 ${personType === "Pessoa Jurídica" ? "border-brand-dark dark:border-dark-body bg-brand-slate/60 dark:bg-dark-border/40" : ""}`}
+                                                                    className={`px-4 py-4 gap-4 ${personType === "Pessoa Jurídica" ? "border-brand-dark dark:border-dark-body bg-brand-slate/60 dark:bg-dark-border/40" : ""}`}
                                                                     right={
-                                                                        <Badge variant={personType === "Pessoa Jurídica" ? "green" : "gray"}>
-                                                                            {personType === "Pessoa Jurídica" ? "Selecionado" : "Selecionar"}
-                                                                        </Badge>
+                                                                        <RadioButton
+                                                                            name="personType"
+                                                                            value="pj"
+                                                                            checked={personType === "Pessoa Jurídica"}
+                                                                            onChange={() => setPersonType("Pessoa Jurídica")}
+                                                                        />
                                                                     }
                                                                 />
                                                             </div>
@@ -463,9 +508,18 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                             label="CNPJ"
                                                                             placeholder="00.000.000/0000-00"
                                                                             value={cnpj}
-                                                                            onChange={(e) => setCnpj(e.target.value)}
+                                                                            onChange={(e) => {
+                                                                                setCnpj(e.target.value)
+                                                                                setFieldErrors(prev => {
+                                                                                    const next = new Set(prev)
+                                                                                    next.delete("cnpj")
+                                                                                    return next
+                                                                                })
+                                                                            }}
                                                                             onBlur={handleCnpjBlur}
                                                                             name="cnpj"
+                                                                            error={fieldErrors.has("cnpj")}
+                                                                            errorMessage={fieldErrors.has("cnpj") ? "CNPJ inválido" : undefined}
                                                                         />
                                                                         {isSearchingCnpj && <span className="text-[11px] text-brand-primary animate-pulse font-medium">Consultando CNPJ...</span>}
                                                                     </div>
@@ -485,7 +539,22 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                             </motion.div>
                                                         ) : (
                                                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                                                <CpfCnpjInput label="CPF" placeholder="000.000.000-00" value={cpf} onChange={(e) => setCpf(e.target.value)} name="cpf" />
+                                                                <CpfCnpjInput
+                                                                    label="CPF"
+                                                                    placeholder="000.000.000-00"
+                                                                    value={cpf}
+                                                                    onChange={(e) => {
+                                                                        setCpf(e.target.value)
+                                                                        setFieldErrors(prev => {
+                                                                            const next = new Set(prev)
+                                                                            next.delete("cpf")
+                                                                            return next
+                                                                        })
+                                                                    }}
+                                                                    name="cpf"
+                                                                    error={fieldErrors.has("cpf")}
+                                                                    errorMessage={fieldErrors.has("cpf") ? "CPF inválido" : undefined}
+                                                                />
                                                                 <FormInput label="RG" placeholder="00.000.000-0" value={rg} onChange={(e) => setRg(e.target.value)} />
                                                             </motion.div>
                                                         )}
@@ -498,10 +567,62 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                 <section>
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Contato</h3>
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                                        <EmailInput label="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
-                                                        <PhoneInput label="Celular (WhatsApp)" value={mobile} onChange={(e) => setMobile(e.target.value)} />
-                                                        <FixedPhoneInput label="Telefone Fixo" value={phone} onChange={(e) => setPhone(e.target.value)} />
-                                                        <WebsiteInput label="Site" value={website} onChange={(e) => setWebsite(e.target.value)} />
+                                                        <EmailInput
+                                                            label="E-mail"
+                                                            value={email}
+                                                            onChange={(e) => {
+                                                                setEmail(e.target.value)
+                                                                setFieldErrors(prev => {
+                                                                    const next = new Set(prev)
+                                                                    next.delete("email")
+                                                                    return next
+                                                                })
+                                                            }}
+                                                            error={fieldErrors.has("email")}
+                                                            errorMessage={fieldErrors.has("email") ? "E-mail inválido" : undefined}
+                                                        />
+                                                        <PhoneInput
+                                                            label="Celular (WhatsApp)"
+                                                            value={mobile}
+                                                            onChange={(e) => {
+                                                                setMobile(e.target.value)
+                                                                setFieldErrors(prev => {
+                                                                    const next = new Set(prev)
+                                                                    next.delete("mobile")
+                                                                    return next
+                                                                })
+                                                            }}
+                                                            error={fieldErrors.has("mobile")}
+                                                            errorMessage={fieldErrors.has("mobile") ? "Celular inválido" : undefined}
+                                                        />
+                                                        <FixedPhoneInput
+                                                            label="Telefone Fixo"
+                                                            value={phone}
+                                                            onChange={(e) => {
+                                                                setPhone(e.target.value)
+                                                                setFieldErrors(prev => {
+                                                                    const next = new Set(prev)
+                                                                    next.delete("phone")
+                                                                    return next
+                                                                })
+                                                            }}
+                                                            error={fieldErrors.has("phone")}
+                                                            errorMessage={fieldErrors.has("phone") ? "Telefone inválido" : undefined}
+                                                        />
+                                                        <WebsiteInput
+                                                            label="Site"
+                                                            value={website}
+                                                            onChange={(e) => {
+                                                                setWebsite(e.target.value)
+                                                                setFieldErrors(prev => {
+                                                                    const next = new Set(prev)
+                                                                    next.delete("website")
+                                                                    return next
+                                                                })
+                                                            }}
+                                                            error={fieldErrors.has("website")}
+                                                            errorMessage={fieldErrors.has("website") ? "Website inválido" : undefined}
+                                                        />
                                                     </div>
                                                 </section>
                                             </FadeIn>
@@ -516,7 +637,14 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                             label="CEP"
                                                             placeholder="00000-000"
                                                             value={cep}
-                                                            onChange={setCep}
+                                                            onChange={(val) => {
+                                                                setCep(val)
+                                                                setFieldErrors(prev => {
+                                                                    const next = new Set(prev)
+                                                                    next.delete("cep")
+                                                                    return next
+                                                                })
+                                                            }}
                                                             name="cep"
                                                             onAddressFetched={(data) => {
                                                                 setStreet(data.street)
@@ -524,6 +652,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 setCity(data.city)
                                                                 setUf(data.state || "SP")
                                                             }}
+                                                            error={fieldErrors.has("cep")}
+                                                            errorMessage={fieldErrors.has("cep") ? "CEP inválido" : undefined}
                                                         />
                                                         <FormInput label="Logradouro" placeholder="Rua, Avenida, etc." value={street} onChange={e => setStreet(e.target.value)} />
 
@@ -568,7 +698,14 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                     label="CEP"
                                                                     placeholder="00000-000"
                                                                     value={billingCep}
-                                                                    onChange={setBillingCep}
+                                                                    onChange={(val) => {
+                                                                        setBillingCep(val)
+                                                                        setFieldErrors(prev => {
+                                                                            const next = new Set(prev)
+                                                                            next.delete("billingCep")
+                                                                            return next
+                                                                        })
+                                                                    }}
                                                                     name="billingCep"
                                                                     onAddressFetched={(data) => {
                                                                         setBillingStreet(data.street)
@@ -576,6 +713,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                         setBillingCity(data.city)
                                                                         setBillingUf(data.state || "SP")
                                                                     }}
+                                                                    error={fieldErrors.has("billingCep")}
+                                                                    errorMessage={fieldErrors.has("billingCep") ? "CEP inválido" : undefined}
                                                                 />
                                                                 <FormInput label="Logradouro" placeholder="Rua, Avenida, etc." value={billingStreet} onChange={e => setBillingStreet(e.target.value)} />
                                                                 <div className="grid grid-cols-2 gap-3 flex-row items-center">

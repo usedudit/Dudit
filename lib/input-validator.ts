@@ -150,3 +150,8 @@ export function validatePhoneBR(phone: string): boolean {
   const cleanPhone = phone.replace(/\D/g, "")
   return /^[1-9]{2}9?[0-9]{8}$/.test(cleanPhone)
 }
+
+export function validateCEP(cep: string): boolean {
+  const cleanCep = cep.replace(/\D/g, "")
+  return /^[0-9]{8}$/.test(cleanCep)
+}
