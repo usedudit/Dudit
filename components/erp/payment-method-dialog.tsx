@@ -53,21 +53,19 @@ interface PaymentMethodDialogProps {
 }
 
 const AVAILABLE_BRANDS = [
-  { id: "visa", label: "Visa", image: "https://logo.clearbit.com/visa.com" },
-  { id: "mastercard", label: "Mastercard", image: "https://logo.clearbit.com/mastercard.com" },
-  { id: "elo", label: "Elo", image: "https://logo.clearbit.com/elo.com.br" },
-  { id: "american_express", label: "American Express", image: "https://logo.clearbit.com/americanexpress.com" },
-  { id: "diners", label: "Diners Club", image: "https://logo.clearbit.com/dinersclub.com" },
-  { id: "hipercard", label: "Hipercard", image: "https://logo.clearbit.com/itau.com.br" },
-  { id: "aura", label: "Aura", image: "https://logo.clearbit.com/aura.com" },
-  { id: "cabal", label: "Cabal", image: "https://logo.clearbit.com/cabal.coop" },
-  { id: "sorocred", label: "Sorocred", image: "https://logo.clearbit.com/sorocred.com.br" },
-  { id: "outros", label: "Outros", image: "https://logo.clearbit.com/discover.com" },
+  { id: "american_express", label: "American Express", image: "https://img.dudit.com.br/static/icons/payments/Amex.png" },
+  { id: "diners", label: "Diners Club", image: "https://img.dudit.com.br/static/icons/payments/Diners.png" },
+  { id: "discover", label: "Discover", image: "https://img.dudit.com.br/static/icons/payments/Discover.png" },
+  { id: "elo", label: "Elo", image: "https://img.dudit.com.br/static/icons/payments/Elo.png" },
+  { id: "hipercard", label: "Hipercard", image: "https://img.dudit.com.br/static/icons/payments/Hipercard.png" },
+  { id: "jcb", label: "JCB", image: "https://img.dudit.com.br/static/icons/payments/JCB.png" },
+  { id: "mastercard", label: "Mastercard", image: "https://img.dudit.com.br/static/icons/payments/Mastercard.png" },
+  { id: "visa", label: "Visa", image: "https://img.dudit.com.br/static/icons/payments/Visa.png" },
 ]
 
 const ACCOUNT_TYPE_OPTIONS = [
-  { value: "cash", label: "Caixa" },
   { value: "bank", label: "Banco" },
+  { value: "cash", label: "Caixa" },
   { value: "wallet", label: "Carteira" },
 ] as const
 
@@ -281,7 +279,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
         isDefault: newAccountIsDefault,
       })
       if (!created.success || !created.data) {
-        setError(created.error || "N„o foi possÌvel criar a conta financeira.")
+        setError(created.error || "N√£o foi poss√≠vel criar a conta financeira.")
         return
       }
       await refreshFinanceAccounts(created.data.id)
@@ -304,16 +302,16 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
     const nextFieldErrors: Record<string, string> = {}
 
     if (!formData.name.trim()) {
-      nextFieldErrors.name = "Nome È obrigatÛrio"
+      nextFieldErrors.name = "Nome √© obrigat√≥rio"
     }
     if (!formData.default_finance_account_id) {
-      nextFieldErrors.default_finance_account_id = "Selecione a conta financeira padr„o"
+      nextFieldErrors.default_finance_account_id = "Selecione a conta financeira padr√£o"
     }
     if (isCard && selectedBrandIds.length === 0) {
       nextFieldErrors.card_brand = "Selecione ao menos uma bandeira"
     }
     if (formData.supports_installments && (formData.max_installments < 1 || formData.max_installments > 24)) {
-      nextFieldErrors.max_installments = "Informe de 1 atÈ 24 parcelas"
+      nextFieldErrors.max_installments = "Informe de 1 at√© 24 parcelas"
     }
     if (isCreditCard && formData.supports_installments) {
       const invalidInstallment = formData.installment_fees.find((row) => row.fee_percent < 0 || row.fee_percent > 100)
@@ -324,7 +322,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
 
     if (Object.keys(nextFieldErrors).length > 0) {
       setFieldErrors(nextFieldErrors)
-      setError("Revise os campos obrigatÛrios antes de salvar.")
+      setError("Revise os campos obrigat√≥rios antes de salvar.")
       setIsLoading(false)
       return
     }
@@ -374,7 +372,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
         }
       }
     } catch {
-      setError("Erro ao salvar mÈtodo de pagamento")
+      setError("Erro ao salvar m√©todo de pagamento")
     } finally {
       setIsLoading(false)
     }
@@ -385,16 +383,16 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
       <DefaultModal
         isOpen={open}
         onClose={() => onClose(false)}
-        title={`${editingMethod ? "Editar" : "Adicionar"} MÈtodo de Pagamento`}
+        title={`${editingMethod ? "Editar" : "Adicionar"} M√©todo de Pagamento`}
         maxWidth="2xl"
       >
         {isLoadingDetails ? (
-          <div className="text-sm text-brand-inactive-text py-8 text-center">Carregando dados do mÈtodo...</div>
+          <div className="text-sm text-brand-inactive-text py-8 text-center">Carregando dados do m√©todo...</div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-4">
               <Input
-                label="Nome / DescriÁ„o"
+                label="Nome / Descri√ß√£o"
                 id="name"
                 name="name"
                 required
@@ -403,7 +401,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                   setFormData({ ...formData, name: e.target.value })
                   clearFieldError("name")
                 }}
-                placeholder="Ex: Cart„o Visa, PIX, etc"
+                placeholder="Ex: Cart√£o Visa, PIX, etc"
                 error={Boolean(fieldErrors.name)}
                 errorMessage={fieldErrors.name}
               />
@@ -433,15 +431,15 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                   options={[
                     { value: "cash", label: "Dinheiro" },
                     { value: "pix", label: "PIX" },
-                    { value: "credit_card", label: "Cart„o de CrÈdito" },
-                    { value: "debit_card", label: "Cart„o de DÈbito" },
+                    { value: "credit_card", label: "Cart√£o de Cr√©dito" },
+                    { value: "debit_card", label: "Cart√£o de D√©bito" },
                     { value: "other", label: "Outros" },
                   ]}
                 />
               </div>
 
               <Combobox
-                label="Conta padr„o no financeiro"
+                label="Conta padr√£o no financeiro"
                 value={formData.default_finance_account_id || undefined}
                 onChange={(value) => {
                   setFormData({ ...formData, default_finance_account_id: value })
@@ -490,7 +488,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                       { value: "cnpj", label: "CNPJ" },
                       { value: "email", label: "Email" },
                       { value: "phone", label: "Telefone" },
-                      { value: "random", label: "Chave aleatÛria" },
+                      { value: "random", label: "Chave aleat√©ria" },
                     ]}
                   />
                   <Input
@@ -520,7 +518,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                     <div className="space-y-4 pt-2">
                       <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
                         <Input
-                          label="M·ximo de parcelas"
+                          label="M√°ximo de parcelas"
                           id="max_installments"
                           type="number"
                           min="1"
@@ -572,7 +570,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
               )}
 
               <div className="space-y-4 border-t border-brand-border dark:border-dark-border pt-4">
-                <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">ConfiguraÁıes de taxa</h3>
+                <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">Configura√ß√µes de taxa</h3>
                 <FormDropdown
                   label="Quem paga a taxa?"
                   value={formData.fee_bearer}
@@ -608,7 +606,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                   onChange={(value) => setFormData({ ...formData, discount_percent: value })}
                   placeholder="0"
                 />
-                <p className="text-[10px] text-brand-inactive-text dark:text-dark-body -mt-3">Desconto autom·tico aplicado ao cliente para este mÈtodo</p>
+                <p className="text-[10px] text-brand-inactive-text dark:text-dark-body -mt-3">Desconto autom√°tico aplicado ao cliente para este m√©todo</p>
               </div>
 
               <div className="flex items-center gap-2">
@@ -619,7 +617,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                   onChange={(checked) => setFormData({ ...formData, is_active: checked as boolean })}
                 />
                 <label htmlFor="is_active" className="text-sm font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
-                  MÈtodo ativo
+                  M√©todo ativo
                 </label>
               </div>
             </div>
@@ -751,7 +749,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
             }}
             placeholder="Ex: Banco Inter PJ"
             error={newAccountNameError}
-            errorMessage={newAccountNameError ? "O nome È obrigatÛrio." : undefined}
+            errorMessage={newAccountNameError ? "O nome   obrigat√≥rio." : undefined}
           />
           <FormDropdown
             label="Tipo"
@@ -766,7 +764,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
           />
           <Checkbox
             id="new_account_default"
-            label="Conta padr„o deste tipo"
+            label="Conta padr√£o deste tipo"
             checked={newAccountIsDefault}
             onChange={(checked) => setNewAccountIsDefault(Boolean(checked))}
           />
