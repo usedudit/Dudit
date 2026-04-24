@@ -12,10 +12,7 @@ import {
     MoneyInput,
     PercentageInput,
     ListItem,
-    Separator,
-    Pagination,
     AlertModal,
-    RadioButton,
 } from "@/components/reusable"
 import {
     createPaymentMethodAction,
@@ -95,8 +92,6 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
         name: "",
         payment_type: "cash",
         is_active: true,
-        max_installments: 1,
-        supports_installments: false,
         fee_percent: 0,
         fee_fixed: 0,
         fee_bearer: "merchant" as "merchant" | "customer",
@@ -107,6 +102,8 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
         card_brand: "" as string,
         default_finance_account_id: "",
         has_fees: false,
+        supports_installments: false,
+        max_installments: 1,
         installment_fees: [{ installment_number: 1, fee_percent: 0 }] as Array<{ installment_number: number; fee_percent: number }>,
     })
 
@@ -120,7 +117,9 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
 
     const isDirty = useMemo(() => {
         if (!baselineFormData || !open) return false
-        return JSON.stringify(formData) !== JSON.stringify(baselineFormData)
+        const current = JSON.stringify(formData)
+        const baseline = JSON.stringify(baselineFormData)
+        return current !== baseline
     }, [formData, baselineFormData, open])
 
     useEffect(() => {
@@ -130,8 +129,6 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                 name: "",
                 payment_type: "cash",
                 is_active: true,
-                max_installments: 1,
-                supports_installments: false,
                 fee_percent: 0,
                 fee_fixed: 0,
                 fee_bearer: "merchant" as const,
@@ -142,6 +139,8 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                 card_brand: "",
                 default_finance_account_id: "",
                 has_fees: false,
+                supports_installments: false,
+                max_installments: 1,
                 installment_fees: [{ installment_number: 1, fee_percent: 0 }],
             }
             setFormData(initial)
@@ -161,8 +160,6 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                     name: full.name || "",
                     payment_type: resolvedType,
                     is_active: full.is_active ?? true,
-                    max_installments: maxInstallments,
-                    supports_installments: Boolean(full.supports_installments || maxInstallments > 1),
                     fee_percent: Number(full.fee_percent || 0),
                     fee_fixed: Number(full.fee_fixed || 0),
                     fee_bearer: (full.fee_bearer || "merchant") as "merchant" | "customer",
@@ -173,7 +170,9 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                     card_brand: full.card_brand || "",
                     default_finance_account_id: full.default_finance_account_id || "",
                     has_fees: Number(full.fee_percent || 0) > 0 || Number(full.fee_fixed || 0) > 0 || (full.installment_fees && full.installment_fees.length > 0),
-                    installment_fees: buildInstallments(maxInstallments, full.installment_fees),
+                    supports_installments: resolvedType === "credit_card" ? Boolean(full.supports_installments || maxInstallments > 1) : false,
+                    max_installments: resolvedType === "credit_card" ? maxInstallments : 1,
+                    installment_fees: resolvedType === "credit_card" ? buildInstallments(maxInstallments, full.installment_fees) : [{ installment_number: 1, fee_percent: 0 }],
                 }
                 setFormData(data)
                 setBaselineFormData(data)
@@ -186,10 +185,17 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
         getPartnerFinanceAccountsForPaymentMethodsAction(partnerId).then((res: any) => {
             if (res?.accounts) {
                 setFinanceAccounts(res.accounts)
+                const initialAccountId = formData.default_finance_account_id || res.accounts?.[0]?.id || ""
                 setFormData((prev) => ({
                     ...prev,
-                    default_finance_account_id: prev.default_finance_account_id || res.accounts?.[0]?.id || "",
+                    default_finance_account_id: initialAccountId,
                 }))
+                setBaselineFormData((prev: any) => {
+                    if (prev && !prev.default_finance_account_id && initialAccountId) {
+                        return { ...prev, default_finance_account_id: initialAccountId }
+                    }
+                    return prev
+                })
             }
         })
     }, [open, partnerId])
@@ -202,23 +208,6 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
     const selectedBrandIds = formData.card_brand ? formData.card_brand.split(";").map((b) => b.trim()).filter(Boolean) : []
     const selectedBrands = AVAILABLE_BRANDS.filter((brand) => selectedBrandIds.includes(brand.id))
     const selectedInstallments = formData.installment_fees.filter((row) => row.installment_number > 0)
-
-    useEffect(() => {
-        if (!isCreditCard) {
-            setFormData((prev) => ({
-                ...prev,
-                supports_installments: false,
-                max_installments: 1,
-                installment_fees: [{ installment_number: 1, fee_percent: 0 }],
-            }))
-            return
-        }
-        setFormData((prev) => ({
-            ...prev,
-            installment_fees: buildInstallments(prev.max_installments || 1, prev.installment_fees),
-        }))
-    }, [isCreditCard, formData.max_installments])
-
 
     const clearFieldError = (key: string) => {
         setFieldErrors((prev) => {
@@ -440,7 +429,14 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                                 <FormDropdown
                                     value={formData.payment_type}
                                     setValue={(value) => {
-                                        setFormData({ ...formData, payment_type: value })
+                                        const isNowCreditCard = value === "credit_card"
+                                        setFormData({
+                                            ...formData,
+                                            payment_type: value,
+                                            supports_installments: isNowCreditCard ? formData.supports_installments : false,
+                                            max_installments: isNowCreditCard ? formData.max_installments : 1,
+                                            installment_fees: isNowCreditCard ? formData.installment_fees : [{ installment_number: 1, fee_percent: 0 }],
+                                        })
                                         if (value !== "credit_card") {
                                             setInstallmentsModalOpen(false)
                                         }
@@ -589,23 +585,17 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                             )}
 
                             <div className="space-y-4 border-t border-brand-border dark:border-dark-border pt-4">
-                                <div className="space-y-3">
+                                <div className="space-y-4">
                                     <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">Configurações de taxa</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                        <ListItem
-                                            title="Sem taxas"
-                                            description="Não será cobrada nenhuma taxa para este método."
-                                            onClick={() => setFormData({ ...formData, has_fees: false })}
-                                            className={`px-4 py-3 cursor-pointer transition-all border ${!formData.has_fees ? "border-brand-green/30 bg-brand-green/5" : "border-brand-border dark:border-dark-border"}`}
-                                            right={<RadioButton name="has_fees" value="no" checked={!formData.has_fees} onChange={() => setFormData({ ...formData, has_fees: false })} />}
+                                    <div className="flex items-center gap-2 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-gray-50/50 dark:bg-dark-border/10">
+                                        <Checkbox
+                                            id="has_fees"
+                                            checked={formData.has_fees}
+                                            onChange={(checked) => setFormData({ ...formData, has_fees: checked as boolean })}
                                         />
-                                        <ListItem
-                                            title="Com taxas"
-                                            description="Configurar taxas de recebimento e parcelamento."
-                                            onClick={() => setFormData({ ...formData, has_fees: true })}
-                                            className={`px-4 py-3 cursor-pointer transition-all border ${formData.has_fees ? "border-brand-green/30 bg-brand-green/5" : "border-brand-border dark:border-dark-border"}`}
-                                            right={<RadioButton name="has_fees" value="yes" checked={formData.has_fees} onChange={() => setFormData({ ...formData, has_fees: true })} />}
-                                        />
+                                        <label htmlFor="has_fees" className="text-sm font-medium text-brand-dark dark:text-dark-heading cursor-pointer select-none">
+                                            Possui taxas de recebimento ou parcelamento
+                                        </label>
                                     </div>
                                 </div>
 
@@ -779,7 +769,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                         }}
                         placeholder="Ex: Banco Inter PJ"
                         error={newAccountNameError}
-                        errorMessage={newAccountNameError ? "O nome   obrigatório." : undefined}
+                        errorMessage={newAccountNameError ? "O nome é obrigatório." : undefined}
                     />
                     <FormDropdown
                         label="Tipo"

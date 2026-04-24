@@ -1,6 +1,6 @@
 export { default as TransactionsPage } from "./TransactionsPage"
 export { default as TransactionDetailView } from "./TransactionDetailView"
 export { default as TransactionPageControls } from "./TransactionPageControls"
-export { default as TransactionListItem } from "./TransactionListItem"
+export { default as TransactionListItem } from "./TransactionListRow"
 export { default as TransactionGridCard } from "./TransactionGridCard"
 export type { ERPTransaction, TransactionTab } from "../../../lib/services/transactions.types"

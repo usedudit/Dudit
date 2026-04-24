@@ -10,8 +10,8 @@ import {
     Badge,
     AlertModal,
     FormDropdown,
-    Input as FormInput,
-    Checkbox as FormCheckbox,
+    Input,
+    Checkbox,
     PhoneInput,
     EmailInput,
     FixedPhoneInput,
@@ -46,6 +46,14 @@ interface NewCustomerPageProps {
 
 const REQUIRED_FIELDS = [
     { field: "customerName", tab: "general" },
+    { field: "email", tab: "general" },
+    { field: "mobile", tab: "general" },
+    { field: "phone", tab: "general" },
+    { field: "website", tab: "general" },
+    { field: "cpf", tab: "general" },
+    { field: "cnpj", tab: "general" },
+    { field: "cep", tab: "address" },
+    { field: "billingCep", tab: "address" },
 ]
 
 const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customerId, onSuccess, onError }) => {
@@ -401,7 +409,10 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                             Dados gerais
                                             {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
                                         </TabsTrigger>
-                                        <TabsTrigger value="address">Endereço</TabsTrigger>
+                                        <TabsTrigger value="address">
+                                            Endereço
+                                            {getTabErrorCount("address") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                        </TabsTrigger>
                                         <TabsTrigger value="notes">Observações</TabsTrigger>
                                     </TabsList>
                                 </div>
@@ -427,7 +438,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Identificação</h3>
                                                     <div className="grid grid-cols-12 gap-5">
                                                         <div className="col-span-12 md:col-span-6">
-                                                            <FormInput
+                                                            <Input
                                                                 label="Nome ou Razão Social"
                                                                 placeholder="Ex: João da Silva ou Empresa LTDA"
                                                                 value={customerName}
@@ -471,9 +482,9 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 <ListItem
                                                                     icon={UserIcon}
                                                                     title="Pessoa Física"
-                                                                    description="Cadastro para cliente individual."
+                                                                    description="Usado para pessoas"
                                                                     onClick={() => setPersonType("Pessoa Física")}
-                                                                    className={`px-4 py-4 gap-4 ${personType === "Pessoa Física" ? "border-brand-dark dark:border-dark-body bg-brand-slate/60 dark:bg-dark-border/40" : ""}`}
+                                                                    className={`px-4 py-3 gap-4 ${personType === "Pessoa Física" ? "border-brand-green dark:border-brand-green" : ""}`}
                                                                     right={
                                                                         <RadioButton
                                                                             name="personType"
@@ -486,9 +497,9 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 <ListItem
                                                                     icon={StoreIcon}
                                                                     title="Pessoa Jurídica"
-                                                                    description="Cadastro para empresa ou organização."
+                                                                    description="Usado para empresas"
                                                                     onClick={() => setPersonType("Pessoa Jurídica")}
-                                                                    className={`px-4 py-4 gap-4 ${personType === "Pessoa Jurídica" ? "border-brand-dark dark:border-dark-body bg-brand-slate/60 dark:bg-dark-border/40" : ""}`}
+                                                                    className={`px-4 py-3 gap-4" ${personType === "Pessoa Jurídica" ? "border-brand-dark dark:border-dark-body bg-brand-slate/60 dark:bg-dark-border/40" : ""}`}
                                                                     right={
                                                                         <RadioButton
                                                                             name="personType"
@@ -524,9 +535,9 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                         />
                                                                         {isSearchingCnpj && <span className="text-[11px] text-brand-primary animate-pulse font-medium">Consultando CNPJ...</span>}
                                                                     </div>
-                                                                    <FormInput label="Inscrição Estadual" placeholder="Isento ou número da IE" value={ie} onChange={(e) => setIe(e.target.value)} />
+                                                                    <Input label="Inscrição Estadual" placeholder="Isento ou número da IE" value={ie} onChange={(e) => setIe(e.target.value)} />
                                                                 </div>
-                                                                <FormInput label="Nome Fantasia" placeholder="Nome comercial" value={fantasia} onChange={(e) => setFantasia(e.target.value)} />
+                                                                <Input label="Nome Fantasia" placeholder="Nome comercial" value={fantasia} onChange={(e) => setFantasia(e.target.value)} />
                                                                 <FormDropdown
                                                                     label="Contribuinte"
                                                                     value={contribuinte}
@@ -556,7 +567,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                     error={fieldErrors.has("cpf")}
                                                                     errorMessage={fieldErrors.has("cpf") ? "CPF inválido" : undefined}
                                                                 />
-                                                                <FormInput label="RG" placeholder="00.000.000-0" value={rg} onChange={(e) => setRg(e.target.value)} />
+                                                                <Input label="RG" placeholder="00.000.000-0" value={rg} onChange={(e) => setRg(e.target.value)} />
                                                             </motion.div>
                                                         )}
                                                     </div>
@@ -656,7 +667,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                             error={fieldErrors.has("cep")}
                                                             errorMessage={fieldErrors.has("cep") ? "CEP inválido" : undefined}
                                                         />
-                                                        <FormInput label="Logradouro" placeholder="Rua, Avenida, etc." value={street} onChange={e => setStreet(e.target.value)} />
+                                                        <Input label="Logradouro" placeholder="Rua, Avenida, etc." value={street} onChange={e => setStreet(e.target.value)} />
 
                                                         <div className="grid grid-cols-2 gap-3 flex-row items-center pt-1.5 pb-1.5">
                                                             <NumberInputWithCheckbox
@@ -666,12 +677,12 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 onNumberChange={val => setNumber(val)}
                                                                 onNoNumberChange={checked => { setNoNumber(checked); if (checked) setNumber(""); }}
                                                             />
-                                                            <FormInput label="Complemento" placeholder="Apto, Bloco, etc." value={complement} onChange={e => setComplement(e.target.value)} />
+                                                            <Input label="Complemento" placeholder="Apto, Bloco, etc." value={complement} onChange={e => setComplement(e.target.value)} />
                                                         </div>
-                                                        <FormInput label="Bairro" placeholder="Nome do bairro" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} />
+                                                        <Input label="Bairro" placeholder="Nome do bairro" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} />
 
                                                         <div className="grid grid-cols-2 gap-3 items-end">
-                                                            <FormInput label="Cidade" placeholder="Nome da cidade" value={city} onChange={e => setCity(e.target.value)} />
+                                                            <Input label="Cidade" placeholder="Nome da cidade" value={city} onChange={e => setCity(e.target.value)} />
                                                             <StateComboBox
                                                                 label="Estado"
                                                                 value={uf}
@@ -685,7 +696,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                 <div className="h-px bg-brand-border dark:bg-dark-border w-full" />
 
                                                 <section>
-                                                    <FormCheckbox
+                                                    <Checkbox
                                                         label="Endereço de cobrança diferente do principal"
                                                         checked={hasDifferentBillingAddress}
                                                         onChange={() => setHasDifferentBillingAddress(!hasDifferentBillingAddress)}
@@ -717,7 +728,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                     error={fieldErrors.has("billingCep")}
                                                                     errorMessage={fieldErrors.has("billingCep") ? "CEP inválido" : undefined}
                                                                 />
-                                                                <FormInput label="Logradouro" placeholder="Rua, Avenida, etc." value={billingStreet} onChange={e => setBillingStreet(e.target.value)} />
+                                                                <Input label="Logradouro" placeholder="Rua, Avenida, etc." value={billingStreet} onChange={e => setBillingStreet(e.target.value)} />
                                                                 <div className="grid grid-cols-2 gap-3 flex-row items-center">
                                                                     <NumberInputWithCheckbox
                                                                         label="Número"
@@ -726,11 +737,11 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                         onNumberChange={val => setBillingNumber(val)}
                                                                         onNoNumberChange={checked => { setBillingNoNumber(checked); if (checked) setBillingNumber(""); }}
                                                                     />
-                                                                    <FormInput label="Complemento" placeholder="Apto, Bloco, etc." value={billingComplement} onChange={e => setBillingComplement(e.target.value)} />
+                                                                    <Input label="Complemento" placeholder="Apto, Bloco, etc." value={billingComplement} onChange={e => setBillingComplement(e.target.value)} />
                                                                 </div>
-                                                                <FormInput label="Bairro" placeholder="Nome do bairro" value={billingNeighborhood} onChange={e => setBillingNeighborhood(e.target.value)} />
+                                                                <Input label="Bairro" placeholder="Nome do bairro" value={billingNeighborhood} onChange={e => setBillingNeighborhood(e.target.value)} />
                                                                 <div className="grid grid-cols-2 gap-3 items-end">
-                                                                    <FormInput label="Cidade" placeholder="Nome da cidade" value={billingCity} onChange={e => setBillingCity(e.target.value)} />
+                                                                    <Input label="Cidade" placeholder="Nome da cidade" value={billingCity} onChange={e => setBillingCity(e.target.value)} />
                                                                     <StateComboBox
                                                                         label="Estado"
                                                                         value={billingUf}
@@ -799,13 +810,13 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 setBirthDate(`${year}-${month}-${day}`)
                                                             }}
                                                         />
-                                                        <FormInput
+                                                        <Input
                                                             label="Nome da mãe"
                                                             placeholder="Ex: Maria da Silva"
                                                             value={motherName}
                                                             onChange={(e) => setMotherName(e.target.value)}
                                                         />
-                                                        <FormInput
+                                                        <Input
                                                             label="Nome do pai"
                                                             placeholder="Ex: José da Silva"
                                                             value={fatherName}

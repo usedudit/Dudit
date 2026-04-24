@@ -18,7 +18,7 @@ import FloatingActionBar from "@/components/reusable/FloatingActionBar";
 import CreateStockMovement from './CreateStockMovement';
 import StockMovementDetailPage from './StockMovementDetailPage';
 import StockMovementPageControls from './StockMovementPageControls';
-import StockMovementListItem from './StockMovementListItem';
+import StockMovementListItem from './StockMovementListRow';
 import StockMovementGridCard from './StockMovementGridCard';
 import { undoStockMovementAction, undoBatchStockMovementsAction, getStockMovementDetails, getERPStockMovementsPageAction, type ERPStockMovementListCursor } from '@/app/actions/erp/stock-movements';
 import { useNotification } from '@/hooks/use-notification';

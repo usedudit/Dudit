@@ -894,7 +894,10 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                             Dados Gerais
                                             {getTabErrorCount("Dados Gerais") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
                                         </TabsTrigger>
-                                        <TabsTrigger value="Observações" className={`px-0 transition-all duration-300 ${activeTab === 'Observações' ? 'text-brand-primary' : ''} ${isScrolled ? "pb-2 text-[13px]" : "pb-3 text-sm"}`}>Observações</TabsTrigger>
+                                        <TabsTrigger value="Observações" className={`px-0 transition-all duration-300 ${activeTab === 'Observações' ? 'text-brand-primary' : ''} ${isScrolled ? "pb-2 text-[13px]" : "pb-3 text-sm"}`}>
+                                            Observações
+                                            {getTabErrorCount("Observações") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                        </TabsTrigger>
                                         <TabsTrigger value="Visualização" className={`px-0 transition-all duration-300 md:hidden ${activeTab === 'Visualização' ? 'text-brand-primary' : ''} ${isScrolled ? "pb-2 text-[13px]" : "pb-3 text-sm"}`}>Visualização</TabsTrigger>
                                     </TabsList>
                                 </div>

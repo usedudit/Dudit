@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useCallback, useRef, useMemo, useEffect, type FC } from 'react';
+import { useState, useCallback, useRef, useMemo, useEffect, type FC } from 'react';
 import {
     ChevronLeftIcon,
     SaveIcon,
@@ -78,6 +78,9 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     const productBucket = useProductBucket(fetchPartnerProductsBucket);
     const [isSaving, setIsSaving] = useState(false);
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set());
+    const getTabErrorCount = useCallback((tab: string) => {
+        return REQUIRED_FIELDS.filter(({ field, tab: fieldTab }) => fieldTab === tab && fieldErrors.has(field)).length
+    }, [fieldErrors]);
 
     const isDirty = useMemo(() => {
         return items.length > 0 || notes !== '' || reason !== 'Selecione um motivo...' || customReason !== '';
@@ -113,9 +116,6 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
         setShowAlertModal(false)
     }, [nextAction])
 
-    const getTabErrorCount = useCallback((tab: string) => {
-        return REQUIRED_FIELDS.filter(({ field, tab: fieldTab }) => fieldTab === tab && fieldErrors.has(field)).length
-    }, [fieldErrors])
 
     const addProduct = useCallback((product: ProductBucketItem) => {
         // Check if product is already in the list
@@ -260,7 +260,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                             Cancelar
                                         </Button>
                                         <Button onClick={handleSave} disabled={isSaving}>
-                                            <SaveIcon className="w-4.5 h-4.5 mr-2" />
+                                            <SaveIcon className="w-4 h-4 mr-2" />
                                             {isSaving ? "Salvando..." : "Salvar"}
                                         </Button>
                                     </div>
@@ -273,8 +273,14 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                             Dados gerais
                                             {getTabErrorCount("Geral") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
                                         </TabsTrigger>
-                                        <TabsTrigger value="Observações" className="px-0 pb-3">Observações</TabsTrigger>
-                                        <TabsTrigger value="Anexos" className="px-0 pb-3">Anexos</TabsTrigger>
+                                        <TabsTrigger value="Observações" className="px-0 pb-3">
+                                            Observações
+                                            {getTabErrorCount("Observações") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                        </TabsTrigger>
+                                        <TabsTrigger value="Anexos" className="px-0 pb-3">
+                                            Anexos
+                                            {getTabErrorCount("Anexos") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                        </TabsTrigger>
                                     </TabsList>
                                 </div>
                             </div>

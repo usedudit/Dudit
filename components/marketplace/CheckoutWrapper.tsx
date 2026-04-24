@@ -423,7 +423,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                 className="fixed inset-0 z-[100] bg-white dark:bg-dark-surface overflow-y-auto custom-scrollbar"
             >
                 <header className="lg:flex flex-col w-full bg-brand-dark sticky top-0 z-50 shadow-md">
-                    <div className="w-full h-[68px] flex items-center justify-between max-w-[1300px] px-4 mx-auto gap-4">
+                    <div className="w-full h-[68px] flex items-center justify-between max-w-[1300px] px-2 mx-auto gap-4">
                         <Link href="/" prefetch={true} className="cursor-pointer shrink-0 z-110 pt-1">
                             <img
                                 src="https://img.dudit.com.br/static/Logo.png"

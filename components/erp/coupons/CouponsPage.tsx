@@ -21,7 +21,7 @@ import {
 } from "@/app/actions/erp/coupons"
 import CouponPageControls from "./CouponPageControls"
 import CouponGridCard from "./CouponGridCard"
-import CouponListItem from "./CouponListItem"
+import CouponListItem from "./CouponListRow"
 import CouponFormPage from "./CouponFormPage"
 import CouponDetailPage from "./CouponDetailPage"
 import {

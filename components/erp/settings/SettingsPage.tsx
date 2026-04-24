@@ -23,7 +23,7 @@ import { BusinessDataSubPage } from "./BusinessDataSubPage"
 import { IntegrationsSubPage } from "./IntegrationsSubPage"
 import { TeamSubPage } from "./TeamSubPage"
 import { SubscriptionSubPage } from "./SubscriptionSubPage"
-import { PaymentMethodsSubPage } from "./PaymentMethodsSubPage"
+import { PaymentMethodsSubPage } from "./payments/PaymentMethodsSubPage"
 import { SimpleSettingsSubPage } from "./SimpleSettingsSubPage"
 import { FadeIn } from "@/components/animations/FadeIn"
 

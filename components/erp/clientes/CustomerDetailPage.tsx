@@ -10,7 +10,7 @@ import { getCustomerOrdersAction, deleteCustomerAction } from '@/app/actions/erp
 import { getAddressesAction } from '@/app/actions/shared/addresses';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { useMediaQuery } from '../hooks';
-import OrderListItem from '../orders/OrderListItem';
+import OrderListItem from '../orders/OrderListRow';
 import { useRouter } from 'next/navigation';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { FadeIn } from '@/components/animations/FadeIn';

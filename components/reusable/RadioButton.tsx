@@ -41,7 +41,7 @@ const RadioButton: React.FC<RadioButtonProps> = ({ name, value, checked, onChang
     return (
         <label
             className={`
-        relative flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-all duration-200 group
+        relative flex items-center gap-3 py-2.5 cursor-pointer transition-all duration-200 group
       `}
         >
             <div className="relative flex items-center">

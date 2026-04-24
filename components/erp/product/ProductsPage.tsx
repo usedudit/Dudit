@@ -43,7 +43,7 @@ import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSh
 import Pagination from "@/components/reusable/Pagination"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import ProductGridCard from "./ProductGridCard"
-import ProductListItem from "./ProductListItem"
+import ProductListItem from "./ProductListRow"
 import ProductMobileItem from "./ProductMobileItem"
 import ProductPageControls from "./ProductPageControls"
 import { getStockStatus } from "./product-utils"

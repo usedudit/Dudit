@@ -42,7 +42,7 @@ import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 
 import CashRegisterPageControls from "./CashRegisterPageControls"
 import CashSessionGridCard from "./CashSessionGridCard"
-import CashSessionListItem from "./CashSessionListItem"
+import CashSessionListItem from "./CashSessionListRow"
 import CashSessionDetailPage from "./CashSessionDetailPage"
 
 type SessionItem = {

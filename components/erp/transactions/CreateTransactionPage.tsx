@@ -1518,9 +1518,9 @@ export default function CreateTransactionPage({
                         <FormDropdown
                             label="Modo"
                             options={[
-                                { value: "single", label: "Single" },
-                                { value: "installment", label: "Installment" },
-                                { value: "recurring", label: "Recurring" },
+                                { value: "single", label: "Única" },
+                                { value: "installment", label: "Parcelada" },
+                                { value: "recurring", label: "Recorrente" },
                             ]}
                             value={transactionMode}
                             setValue={(v) => setTransactionMode(v as TransactionMode)}

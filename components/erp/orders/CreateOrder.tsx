@@ -54,6 +54,7 @@ const REQUIRED_FIELDS = [
     { field: "productSearch", tab: "general" },
     { field: "manualItemNames", tab: "general" },
     { field: "manualItemPrices", tab: "general" },
+    { field: "financeAccountId", tab: "general" },
 ]
 
 export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOrderProps) {
@@ -828,8 +829,16 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                         Dados gerais
                                         {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
                                     </TabsTrigger>
-                                    {deliveryMethod === 'delivery' && <TabsTrigger value="delivery">Entrega</TabsTrigger>}
-                                    <TabsTrigger value="observations">Observações</TabsTrigger>
+                                    {deliveryMethod === 'delivery' && (
+                                        <TabsTrigger value="delivery">
+                                            Entrega
+                                            {getTabErrorCount("delivery") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                        </TabsTrigger>
+                                    )}
+                                    <TabsTrigger value="observations">
+                                        Observações
+                                        {getTabErrorCount("observations") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                    </TabsTrigger>
                                 </TabsList>
                             </div>
                         </div>

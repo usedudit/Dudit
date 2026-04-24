@@ -8,7 +8,7 @@ import { formatCurrency } from "@/lib/utils"
 import { closeCashSessionAction, createCashMovementAction, getCashSessionCloseSummaryAction, getCashSessionDetailsAction, reverseCashMovementAction } from "@/app/actions/erp/cash-register"
 import { useNotification } from "@/hooks/use-notification"
 import { ChevronLeftIcon, MoneyIcon, CreditCardIcon, QRCodeIcon, MoreHorizontalIcon, ArrowUpDownIcon, ArrowDownIcon, ArrowUpIcon, EyeIcon, ReturnIcon, CheckCircleIcon } from "@/lib/icons"
-import OrderListItem from "@/components/erp/orders/OrderListItem"
+import OrderListItem from "@/components/erp/orders/OrderListRow"
 
 type DetailPayload = {
     session: any
@@ -518,8 +518,8 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                                                             onCancel={
                                                                 isOpen && !m.reversed_at
                                                                     ? () => {
-                                                                          handleReverse(m.originalId)
-                                                                      }
+                                                                        handleReverse(m.originalId)
+                                                                    }
                                                                     : undefined
                                                             }
                                                             onDetails={() => setDetailMovement(m)}

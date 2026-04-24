@@ -349,7 +349,7 @@ export const BusinessDataSubPage = ({
                                                             title={opt.title}
                                                             description={opt.description}
                                                             onClick={() => toggleArrayItem("sells", opt.value)}
-                                                            left={
+                                                            right={
                                                                 <FormCheckbox
                                                                     checked={generalInfo.sells.includes(opt.value)}
                                                                     onChange={() => toggleArrayItem("sells", opt.value)}
@@ -372,7 +372,7 @@ export const BusinessDataSubPage = ({
                                                             title={opt.title}
                                                             description={opt.description}
                                                             onClick={() => toggleArrayItem("channels", opt.value)}
-                                                            left={
+                                                            right={
                                                                 <FormCheckbox
                                                                     checked={generalInfo.channels.includes(opt.value)}
                                                                     onChange={() => toggleArrayItem("channels", opt.value)}

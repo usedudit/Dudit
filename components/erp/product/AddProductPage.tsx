@@ -307,8 +307,19 @@ const AddProductPage: FC<AddProductPageProps> = ({
     }, [])
 
     const getTabErrorCount = useCallback((tab: string) => {
-        const fields = tab === "general" ? ["name", "price", "stock"] : tab === "fiscal" ? ["origin", "cest"] : []
-        return fields.filter((f) => fieldErrors.has(f)).length
+        const fieldTabs: Record<string, string> = {
+            name: "general",
+            price: "general",
+            stock: "general",
+            sku: "general",
+            gtin: "general",
+            costPrice: "general",
+            category_id: "general",
+            origin: "fiscal",
+            cest: "fiscal",
+            ncm: "fiscal",
+        }
+        return Array.from(fieldErrors).filter(field => fieldTabs[field] === tab).length
     }, [fieldErrors])
 
     const [showNcmModal, setShowNcmModal] = useState(false)
@@ -714,10 +725,19 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                 {variantsPlanBlocked ? (
                                                     <img src={planStarIconForTarget("vendedor")!} alt="" className="w-4 h-4 object-contain" />
                                                 ) : null}
+                                                {getTabErrorCount("variations") > 0 && <span className="w-2 h-2 bg-red-500 rounded-full inline-block" />}
                                             </span>
                                         </TabsTrigger>
-                                        <TabsTrigger value="suppliers" disabled={isLoadingDetails}>Fornecedores</TabsTrigger>
-                                        {productData.show_in_marketplace && <TabsTrigger value="marketplace" disabled={isLoadingDetails}>Marketplace</TabsTrigger>}
+                                        <TabsTrigger value="suppliers" disabled={isLoadingDetails}>
+                                            Fornecedores
+                                            {getTabErrorCount("suppliers") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                        </TabsTrigger>
+                                        {productData.show_in_marketplace && (
+                                            <TabsTrigger value="marketplace" disabled={isLoadingDetails}>
+                                                Marketplace
+                                                {getTabErrorCount("marketplace") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                            </TabsTrigger>
+                                        )}
                                     </TabsList>
                                 </div>
                             </div>
