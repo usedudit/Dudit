@@ -435,7 +435,7 @@ export function PaymentWrapper({
                         >
                             {/* Header igual ao step pix */}
                             <div className="w-16 h-16 bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-full flex justify-center items-center mb-6">
-                                <img src="https://img.dudit.com.br/static/icons/Pix.png" alt="Pagamento" className="w-8 h-8 object-contain" />
+                                <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pagamento" className="w-8 h-8 object-contain" />
                             </div>
 
                             <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading text-center mb-2">
@@ -482,7 +482,7 @@ export function PaymentWrapper({
                             className="bg-transparent overflow-hidden px-4 sm:px-0 flex flex-col items-center"
                         >
                             <div className="w-16 h-16 bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-full flex justify-center items-center mb-6">
-                                <img src="https://img.dudit.com.br/static/icons/Pix.png" alt="Pix" className="w-8 h-8 object-contain" />
+                                <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-8 h-8 object-contain" />
                             </div>
 
                             <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading text-center mb-2">

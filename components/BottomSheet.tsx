@@ -123,7 +123,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
                                     ref={contentRef}
                                     // onPointerDown para o evento aqui pra não competir com o drag da sheet
                                     onPointerDown={(e) => e.stopPropagation()}
-                                    className="flex-1 overflow-y-auto px-4 pb-6"
+                                    className="flex-1 overflow-y-auto px-4 pb-6 custom-scrollbar"
                                     style={{ overscrollBehavior: "contain" }}
                                 >
                                     {children}

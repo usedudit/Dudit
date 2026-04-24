@@ -108,7 +108,7 @@ const DefaultModal: React.FC<DefaultModalProps> = ({
                     )}
 
                     {/* Content */}
-                    <div className="flex-1 overflow-y-auto px-6 py-4">{children}</div>
+                    <div className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar">{children}</div>
 
                     {footer && (
                         <div className="flex items-center justify-end gap-3 p-6 pt-2">

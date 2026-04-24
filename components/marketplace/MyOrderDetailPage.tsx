@@ -144,7 +144,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
     const isPix = order.payment_method?.toLowerCase() === "pix" || order.payment_method?.toLowerCase() === "bank_transfer";
     const paymentMethodName = isPix ? "Pix" : (order.payment_method || order.payment_provider || "Pix");
-    const PaymentIcon = isPix ? () => <img src="https://img.dudit.com.br/static/icons/Pix.png" alt="Pix" className="w-[18px] h-[18px] object-contain" /> : CreditCardIcon;
+    const PaymentIcon = isPix ? () => <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-[18px] h-[18px] object-contain" /> : CreditCardIcon;
 
     const handlePixClick = async () => {
         if (order.situation !== "pending" || !isPix) return;

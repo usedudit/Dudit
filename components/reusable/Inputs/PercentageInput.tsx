@@ -35,13 +35,13 @@ export function PercentageInput({ value = 0, onChange, ...props }: PercentageInp
         const parts = numericString.split(".")
         const cleanValue = parts[0] + (parts.length > 1 ? "." + parts[1] : "")
         
+        setDisplayValue(cleanValue)
+
         const numericValue = parseFloat(cleanValue)
         
         if (!isNaN(numericValue)) {
-            // Cap at 100%? Usually yes for percentages in this context
             const cappedValue = Math.min(100, numericValue)
             onChange?.(cappedValue)
-            setDisplayValue(cappedValue.toString())
         }
     }
 
