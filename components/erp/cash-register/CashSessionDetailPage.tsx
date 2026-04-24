@@ -459,7 +459,6 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                                     {sangriasReforcos.length === 0 && <div className="border border-dashed border-brand-border dark:border-dark-border rounded-2xl p-8 text-sm text-brand-inactive-text dark:text-dark-body">Nenhuma sangria ou reforço registrado nesta sessão.</div>}
                                 </div>
                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                    <InfoCard title="Movimentações de ajuste" message={`${String(sangriasReforcos.length).padStart(2, "0")} registro(s) de sangria e reforço nesta sessão.`} color="orange" />
                                     <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
                                         <div className="p-5 border-b border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/30"><h3 className="font-bold text-brand-dark dark:text-dark-heading">Conferência rápida</h3></div>
                                         <div className="p-5 space-y-4 bg-white dark:bg-dark-surface">
@@ -468,10 +467,6 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                                             <div className="flex justify-between items-start gap-4 text-[14px]"><span className="text-brand-inactive-text dark:text-dark-body font-medium">Saldo calculado</span><span className="text-right font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(details.totals.calculatedDrawerTotal)}</span></div>
                                         </div>
                                     </div>
-                                    {isOpen && <div className="flex flex-col gap-3">
-                                        <Button variant="outline" onClick={() => setMovModal("withdrawal")}>Lançar nova sangria</Button>
-                                        <Button variant="outline" onClick={() => setMovModal("deposit")}>Lançar novo reforço</Button>
-                                    </div>}
                                 </div>
                             </div>
                         </TabsContent>

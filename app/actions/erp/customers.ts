@@ -66,6 +66,8 @@ export async function createComprehensiveCustomerAction(data: {
   name: string
   email: string
   phone: string
+  phoneFixed?: string | null
+  website?: string | null
   personType: "pf" | "pj" | "foreign"
   cpf?: string | null
   contribuinte?: string | null
@@ -86,6 +88,9 @@ export async function createComprehensiveCustomerAction(data: {
   store_credit?: number
   status?: string
   notes?: string | null
+  birthDate?: string | null
+  motherName?: string | null
+  fatherName?: string | null
   csrf_token?: string
   hasDifferentBillingAddress?: boolean
   billingZipCode?: string
@@ -125,6 +130,8 @@ export async function createComprehensiveCustomerAction(data: {
     name: data.name,
     email: data.email || null,
     phone: data.phone || null,
+    phone_fixed: data.phoneFixed || null,
+    website: data.website || null,
     person_type: data.personType,
     cpf: cpfResult.cpf,
     contribuinte: data.contribuinte || null,
@@ -136,6 +143,9 @@ export async function createComprehensiveCustomerAction(data: {
     store_credit: data.store_credit ?? 0,
     status: data.status || "ativo",
     notes: data.notes || null,
+    birth_date: data.birthDate || null,
+    mother_name: data.motherName || null,
+    father_name: data.fatherName || null,
   }).select().single()
 
   if (error) {
@@ -231,6 +241,8 @@ export async function updateComprehensiveCustomerAction(data: {
   name: string
   email: string
   phone: string
+  phoneFixed?: string | null
+  website?: string | null
   personType: "pf" | "pj" | "foreign"
   cpf?: string | null
   contribuinte?: string | null
@@ -251,6 +263,9 @@ export async function updateComprehensiveCustomerAction(data: {
   store_credit?: number
   status?: string
   notes?: string | null
+  birthDate?: string | null
+  motherName?: string | null
+  fatherName?: string | null
   csrf_token?: string
   hasDifferentBillingAddress?: boolean
   billingZipCode?: string
@@ -288,6 +303,8 @@ export async function updateComprehensiveCustomerAction(data: {
       name: data.name,
       email: data.email || null,
       phone: data.phone || null,
+      phone_fixed: data.phoneFixed || null,
+      website: data.website || null,
       person_type: data.personType,
       cpf: cpfResult.cpf,
       contribuinte: data.contribuinte || null,
@@ -299,6 +316,9 @@ export async function updateComprehensiveCustomerAction(data: {
       store_credit: data.store_credit,
       status: data.status || "ativo",
       notes: data.notes || null,
+      birth_date: data.birthDate || null,
+      mother_name: data.motherName || null,
+      father_name: data.fatherName || null,
     })
     .eq("id", data.customerId)
     .eq("partner_id", data.partnerId) // Defense in depth

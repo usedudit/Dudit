@@ -28,6 +28,22 @@ export function formatBrazilMobile(phone: string): string {
 }
 
 /**
+ * Format digits to Brazilian landline display
+ * 1134567890 -> (11) 3456-7890
+ */
+export function formatBrazilLandline(phone: string): string {
+  const digits = getPhoneDigits(phone).slice(0, 10)
+
+  if (digits.length === 0) return ""
+  if (digits.length <= 2) return `(${digits}`
+  if (digits.length <= 6) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
+  }
+
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
+}
+
+/**
  * Convert to E.164 format
  * (11) 99876-5432 -> +5511998765432
  */
@@ -66,4 +82,13 @@ export function isValidBrazilMobile(phone: string): boolean {
   const digits = getPhoneDigits(phone)
 
   return digits.length === 11 && digits[2] === "9"
+}
+
+/**
+ * Validate Brazilian landline number
+ */
+export function isValidBrazilLandline(phone: string): boolean {
+  const digits = getPhoneDigits(phone)
+
+  return digits.length === 10
 }

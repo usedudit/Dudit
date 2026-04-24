@@ -10,11 +10,14 @@ import {
     Badge,
     AlertModal,
     FormDropdown,
-    RadioButton,
     Input as FormInput,
     Checkbox as FormCheckbox,
     PhoneInput,
-    EmailInput
+    EmailInput,
+    FixedPhoneInput,
+    WebsiteInput,
+    DatePicker,
+    ListItem
 } from "@/components/reusable"
 import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { CpfCnpjInput } from "@/components/reusable/Inputs/CpfCnpjInput"
@@ -65,6 +68,9 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
     const [phone, setPhone] = useState("")
     const [mobile, setMobile] = useState("")
     const [website, setWebsite] = useState("")
+    const [birthDate, setBirthDate] = useState("")
+    const [motherName, setMotherName] = useState("")
+    const [fatherName, setFatherName] = useState("")
     const [observacoes, setObservacoes] = useState("")
     const [status, setStatus] = useState("Ativo")
     const [contribuinte, setContribuinte] = useState("9")
@@ -98,9 +104,9 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
 
     const isDirty = useMemo(() => {
         return customerName !== "" || fantasia !== "" || cnpj !== "" || ie !== "" || cpf !== "" || rg !== "" ||
-            email !== "" || phone !== "" || mobile !== "" || website !== "" || observacoes !== "" ||
+            email !== "" || phone !== "" || mobile !== "" || website !== "" || birthDate !== "" || motherName !== "" || fatherName !== "" || observacoes !== "" ||
             cep !== "" || street !== "" || number !== "" || neighborhood !== "" || city !== ""
-    }, [customerName, fantasia, cnpj, ie, cpf, rg, email, phone, mobile, website, observacoes, cep, street, number, neighborhood, city])
+    }, [customerName, fantasia, cnpj, ie, cpf, rg, email, phone, mobile, website, birthDate, motherName, fatherName, observacoes, cep, street, number, neighborhood, city])
 
     const { showConfirmDialog: unsavedChangesDialogOpen, confirmNavigation: handleUnsavedChangesConfirm, cancelNavigation: handleUnsavedChangesDialogClose } = useUnsavedChanges(isDirty)
 
@@ -132,6 +138,9 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                             setContribuinte(c.contribuinte || "9")
                             setObservacoes(c.notes || "")
                             setWebsite(c.website || "")
+                            setBirthDate(c.birth_date || "")
+                            setMotherName(c.mother_name || "")
+                            setFatherName(c.father_name || "")
                             setRg(c.rg || "")
                             if (c.phone_fixed) setPhone(c.phone_fixed)
 
@@ -252,7 +261,9 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                 partnerId,
                 name: customerName,
                 email: email,
-                phone: mobile || phone || "",
+                phone: mobile || "",
+                phoneFixed: phone || "",
+                website: website || "",
                 personType: pType as "pj" | "pf",
                 cpf: cpf,
                 contribuinte: contribuinte,
@@ -270,6 +281,9 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                 store_credit: storeCredit,
                 status: status === "Ativo" ? "ativo" : status === "Inativo" ? "inativo" : "bloqueado",
                 notes: observacoes,
+                birthDate: birthDate || null,
+                motherName: motherName || null,
+                fatherName: fatherName || null,
                 hasDifferentBillingAddress: hasDifferentBillingAddress,
                 billingZipCode: hasDifferentBillingAddress ? billingCep : undefined,
                 billingStreet: hasDifferentBillingAddress ? billingStreet : undefined,
@@ -368,7 +382,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                 <section>
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Identificação</h3>
                                                     <div className="grid grid-cols-12 gap-5">
-                                                        <div className="col-span-12 md:col-span-8">
+                                                        <div className="col-span-12 md:col-span-6">
                                                             <FormInput
                                                                 label="Nome ou Razão Social"
                                                                 placeholder="Ex: João da Silva ou Empresa LTDA"
@@ -386,7 +400,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 errorMessage={fieldErrors.has("customerName") ? "O nome é obrigatório" : undefined}
                                                             />
                                                         </div>
-                                                        <div className="col-span-12 md:col-span-4 mt-[1px]">
+                                                        <div className="col-span-12 md:col-span-6 mt-[1px]">
                                                             <FormDropdown
                                                                 label="Status"
                                                                 value={status}
@@ -409,20 +423,28 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                     <div className="space-y-6">
                                                         <div>
                                                             <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Tipo de pessoa</label>
-                                                            <div className="flex gap-8">
-                                                                <RadioButton
-                                                                    name="personType"
-                                                                    value="Pessoa Física"
-                                                                    checked={personType === "Pessoa Física"}
-                                                                    onChange={() => setPersonType("Pessoa Física")}
-                                                                    label="Pessoa Física"
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                <ListItem
+                                                                    title="Pessoa Física"
+                                                                    description="Cadastro para cliente individual."
+                                                                    onClick={() => setPersonType("Pessoa Física")}
+                                                                    className={`px-4 py-4 ${personType === "Pessoa Física" ? "border-brand-dark dark:border-dark-body bg-brand-slate/60 dark:bg-dark-border/40" : ""}`}
+                                                                    right={
+                                                                        <Badge variant={personType === "Pessoa Física" ? "green" : "gray"}>
+                                                                            {personType === "Pessoa Física" ? "Selecionado" : "Selecionar"}
+                                                                        </Badge>
+                                                                    }
                                                                 />
-                                                                <RadioButton
-                                                                    name="personType"
-                                                                    value="Pessoa Jurídica"
-                                                                    checked={personType === "Pessoa Jurídica"}
-                                                                    onChange={() => setPersonType("Pessoa Jurídica")}
-                                                                    label="Pessoa Jurídica"
+                                                                <ListItem
+                                                                    title="Pessoa Jurídica"
+                                                                    description="Cadastro para empresa ou organiza??o."
+                                                                    onClick={() => setPersonType("Pessoa Jurídica")}
+                                                                    className={`px-4 py-4 ${personType === "Pessoa Jurídica" ? "border-brand-dark dark:border-dark-body bg-brand-slate/60 dark:bg-dark-border/40" : ""}`}
+                                                                    right={
+                                                                        <Badge variant={personType === "Pessoa Jurídica" ? "green" : "gray"}>
+                                                                            {personType === "Pessoa Jurídica" ? "Selecionado" : "Selecionar"}
+                                                                        </Badge>
+                                                                    }
                                                                 />
                                                             </div>
                                                         </div>
@@ -472,8 +494,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                                         <EmailInput label="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
                                                         <PhoneInput label="Celular (WhatsApp)" value={mobile} onChange={(e) => setMobile(e.target.value)} />
-                                                        <FormInput label="Telefone Fixo" placeholder="(00) 0000-0000" value={phone} onChange={(e) => setPhone(e.target.value)} />
-                                                        <FormInput label="Site" placeholder="www.site.com.br" value={website} onChange={(e) => setWebsite(e.target.value)} />
+                                                        <FixedPhoneInput label="Telefone Fixo" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                                                        <WebsiteInput label="Site" value={website} onChange={(e) => setWebsite(e.target.value)} />
                                                     </div>
                                                 </section>
                                             </FadeIn>
@@ -610,6 +632,40 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                         </div>
                                                     </div>
                                                     <p className="text-xs text-brand-inactive-text max-w-[200px]">Formatos aceitos: PNG, JPG ou WEBP (máx. 2MB)</p>
+                                                </div>
+
+                                                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border mt-8 relative overflow-hidden">
+                                                    <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
+                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Informações adicionais</h3>
+                                                    <div className="space-y-5">
+                                                        <DatePicker
+                                                            label="Data de aniversário"
+                                                            value={birthDate}
+                                                            onChange={(date: Date | undefined) => {
+                                                                if (!date) {
+                                                                    setBirthDate("")
+                                                                    return
+                                                                }
+
+                                                                const year = date.getFullYear()
+                                                                const month = String(date.getMonth() + 1).padStart(2, "0")
+                                                                const day = String(date.getDate()).padStart(2, "0")
+                                                                setBirthDate(`${year}-${month}-${day}`)
+                                                            }}
+                                                        />
+                                                        <FormInput
+                                                            label="Nome da mãe"
+                                                            placeholder="Ex: Maria da Silva"
+                                                            value={motherName}
+                                                            onChange={(e) => setMotherName(e.target.value)}
+                                                        />
+                                                        <FormInput
+                                                            label="Nome do pai"
+                                                            placeholder="Ex: José da Silva"
+                                                            value={fatherName}
+                                                            onChange={(e) => setFatherName(e.target.value)}
+                                                        />
+                                                    </div>
                                                 </div>
 
                                                 <div className="bg-white dark:bg-dark-surface p-0 rounded-2xl space-y-3 mt-8">
