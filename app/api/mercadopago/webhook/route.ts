@@ -15,7 +15,7 @@ const RETRY_DELAYS = [3000, 5000, 8000]
 
 /**
  * Validates the webhook signature from Mercado Pago.
- * SECURITY: This is mandatory — never bypass this check.
+ * SECURITY: This is mandatory - never bypass this check.
  */
 function validateWebhookSignature(
   signature: string,
@@ -26,7 +26,7 @@ function validateWebhookSignature(
     const webhookSecret = process.env.MP_WEBHOOK_SECRET
 
     if (!webhookSecret) {
-      SecureLogger.error("[WEBHOOK] MP_WEBHOOK_SECRET not configured — rejecting request")
+      SecureLogger.error("[WEBHOOK] MP_WEBHOOK_SECRET not configured - rejecting request")
       return false
     }
 
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 })
     }
 
-    // ── Step 3: Validate signature (MANDATORY — no bypass) ──
+    // ── Step 3: Validate signature (MANDATORY - no bypass) ──
     const isValid = validateWebhookSignature(
       signature,
       requestId,
@@ -389,7 +389,7 @@ async function processWebhookWithRetry(
       }
     }
 
-    console.log(`[WEBHOOK] ✅ PAYMENT WEBHOOK PROCESSED SUCCESSFULLY — Order ${orderId} → "${orderStatus}"`)
+    console.log(`[WEBHOOK] ✅ PAYMENT WEBHOOK PROCESSED SUCCESSFULLY - Order ${orderId} → "${orderStatus}"`)
     console.log("[WEBHOOK] ==========================================================\n")
   } catch (error: any) {
     console.error("[WEBHOOK] Processing error:", error.message)

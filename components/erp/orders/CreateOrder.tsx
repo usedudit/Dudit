@@ -16,7 +16,12 @@ import { useRouter } from "next/navigation"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import PaymentModal from "./PaymentModal"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
-import { createFinanceAccountAction, getFinanceAccountsAction, type FinanceAccountType } from "@/app/actions/erp/finance-accounts"
+import {
+    createFinanceAccountAction,
+    getFinanceAccountsAction,
+    pickBankThenCashDefaultFinanceAccountId,
+    type FinanceAccountType,
+} from "@/app/actions/erp/finance-accounts"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { Input, MoneyInput, Combobox, Checkbox } from "@/components/reusable"
 
@@ -246,8 +251,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
     useEffect(() => {
         if (editOrderId || financeAccountId || financeAccounts.length === 0) return
-        const defaultAccount = financeAccounts.find((acc) => acc.is_default)
-        if (defaultAccount?.id) setFinanceAccountId(defaultAccount.id)
+        const defaultOrderAccountId = pickBankThenCashDefaultFinanceAccountId(financeAccounts)
+        if (defaultOrderAccountId) setFinanceAccountId(defaultOrderAccountId)
     }, [editOrderId, financeAccountId, financeAccounts])
 
     // --- Handlers ---

@@ -303,7 +303,7 @@ export async function createERPDeliveryAction(payload: CreateDeliveryPayload) {
   const firstOrder = selectedOrders[0]
   const deliveryAddress = formatAddress(firstOrder)
 
-  // Geocoding & route estimation are best-effort — never block delivery creation
+  // Geocoding & route estimation are best-effort - never block delivery creation
   let distanceKm: number | null = null
   let estimatedDurationMinutes: number | null = null
 

@@ -24,7 +24,7 @@ function validateWebhookSignature(
   try {
     const webhookSecret = process.env.MP_SUBSCRIPTION_WEBHOOK_SECRET
     if (!webhookSecret) {
-      SecureLogger.error("[SUB_WEBHOOK] MP_SUBSCRIPTION_WEBHOOK_SECRET not configured — rejecting")
+      SecureLogger.error("[SUB_WEBHOOK] MP_SUBSCRIPTION_WEBHOOK_SECRET not configured - rejecting")
       return false
     }
 
@@ -73,7 +73,7 @@ function validateWebhookSignature(
 
 /**
  * Fetch the actual subscription status from Mercado Pago API.
- * SECURITY: Never trust the webhook body alone — always verify with MP.
+ * SECURITY: Never trust the webhook body alone - always verify with MP.
  */
 async function verifySubscriptionWithMpApi(
   mpSubscriptionId: string,
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
       dataId,
     }))
 
-    // ── Step 3: Validate signature (MANDATORY — no bypass) ──
+    // ── Step 3: Validate signature (MANDATORY - no bypass) ──
     const isValid = validateWebhookSignature(signature, requestId, dataId)
     if (!isValid) {
       SecureLogger.error("[SUB_WEBHOOK] Rejected: invalid signature", {
@@ -200,7 +200,7 @@ async function processSubscriptionWebhook(
     const supabase = createAdminClient()
 
     // ── DB-Level Idempotency ──
-    // Uses UNIQUE constraint on idempotency_key — if a duplicate INSERT
+    // Uses UNIQUE constraint on idempotency_key - if a duplicate INSERT
     // is attempted, ON CONFLICT DO NOTHING makes it a no-op.
     // This is enforced by the database, not application logic.
     const idempotencyKey = `sub_${resourceId}_${action}_${requestId}`
@@ -223,7 +223,7 @@ async function processSubscriptionWebhook(
         console.log(`[SUB_WEBHOOK] Duplicate webhook blocked by DB constraint (key=${idempotencyKey})`)
         return
       }
-      // Other DB error — log but continue (don't block processing on logging failure)
+      // Other DB error - log but continue (don't block processing on logging failure)
       console.error("[SUB_WEBHOOK] Idempotency table insert error:", idempotencyError.message)
     }
 
@@ -266,7 +266,7 @@ async function processSubscriptionWebhook(
       return
     }
 
-    console.log(`[SUB_WEBHOOK] MP API verified — actual status: "${mpStatus}" (webhook action: "${action}")`)
+    console.log(`[SUB_WEBHOOK] MP API verified - actual status: "${mpStatus}" (webhook action: "${action}")`)
 
     // ── Map the VERIFIED MP status to our internal status ──
     const newStatus = mapMpStatusToInternal(mpStatus)

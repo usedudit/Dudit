@@ -7,7 +7,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency } from "@/lib/utils"
 import { closeCashSessionAction, createCashMovementAction, getCashSessionCloseSummaryAction, getCashSessionDetailsAction, reverseCashMovementAction } from "@/app/actions/erp/cash-register"
 import { useNotification } from "@/hooks/use-notification"
-import { ChevronLeftIcon, MoneyIcon, CreditCardIcon, QRCodeIcon, MoreHorizontalIcon, ArrowUpDownIcon, ArrowDownIcon, ArrowUpIcon, EyeIcon } from "@/lib/icons"
+import { ChevronLeftIcon, MoneyIcon, CreditCardIcon, QRCodeIcon, MoreHorizontalIcon, ArrowUpDownIcon, ArrowDownIcon, ArrowUpIcon, EyeIcon, ReturnIcon, CheckCircleIcon } from "@/lib/icons"
 import OrderListItem from "@/components/erp/orders/OrderListItem"
 
 type DetailPayload = {
@@ -89,7 +89,7 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                 ...m,
                 originalId: m.id,
                 displayId: isDeposit ? "Reforço" : "Sangria",
-                creator_subtitle: m.creator_name ? `Por ${m.creator_name}` : "—",
+                creator_subtitle: m.creator_name ? `Por ${m.creator_name}` : "-",
                 items_count: 1,
                 total_amount: Number(m.amount || 0),
                 statusLabel: reversed ? "Estornado" : "Concluída",
@@ -264,9 +264,6 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                                 <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                     {isOpen && (
                                         <>
-                                            <Button onClick={openCloseModal} className="whitespace-nowrap" isLoading={isPreparingClose}>
-                                                Fechar caixa
-                                            </Button>
                                             <ActionsDropdown
                                                 trigger={
                                                     <Button
@@ -279,13 +276,16 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                                                     </Button>
                                                 }
                                             >
-                                                <DropdownItem onClick={() => setMovModal("withdrawal")}>
-                                                    <ArrowDownIcon className="w-4 h-4 shrink-0" /> Nova sangria
-                                                </DropdownItem>
                                                 <DropdownItem onClick={() => setMovModal("deposit")}>
-                                                    <ArrowUpIcon className="w-4 h-4 shrink-0" /> Novo reforço
+                                                    <ArrowDownIcon className="w-4 h-4 shrink-0" /> Novo reforço
+                                                </DropdownItem>
+                                                <DropdownItem onClick={() => setMovModal("withdrawal")}>
+                                                    <ArrowUpIcon className="w-4 h-4 shrink-0" /> Nova sangria
                                                 </DropdownItem>
                                             </ActionsDropdown>
+                                            <Button onClick={openCloseModal} className="whitespace-nowrap" isLoading={isPreparingClose}>
+                                                Fechar caixa
+                                            </Button>
                                         </>
                                     )}
                                 </div>
@@ -462,7 +462,7 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                                                     </div>
                                                     <div className="text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mb-1">{m.formattedDate}</div>
                                                     <div className="flex flex-wrap items-center gap-2 text-[14px]">
-                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">{m.creator_subtitle || (m.creator_name ? `Por ${m.creator_name}` : "—")}</span>
+                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">{m.creator_subtitle || (m.creator_name ? `Por ${m.creator_name}` : "-")}</span>
                                                         <span className="text-gray-300 dark:text-gray-600 font-medium font-bold">•</span>
                                                         <span className="font-bold text-brand-primary">{formatCurrency(m.total_amount)}</span>
                                                     </div>
@@ -609,21 +609,21 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                             </div>
                             <div className="flex justify-between items-center gap-4">
                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status</span>
-                                <Badge variant={detailMovement.reversed_at ? "gray" : "green"}>
+                                <Badge variant={detailMovement.reversed_at ? "gray" : "green"} icon={detailMovement.reversed_at ? <ReturnIcon size={12} /> : <CheckCircleIcon size={12} />}>
                                     {detailMovement.reversed_at ? "Estornado" : "Concluída"}
                                 </Badge>
                             </div>
                             <div className="flex justify-between items-start gap-4">
                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium shrink-0">Registrado por</span>
                                 <span className="font-semibold text-brand-dark dark:text-dark-heading text-right">
-                                    {detailMovement.creator_name || "—"}
+                                    {detailMovement.creator_name || "-"}
                                 </span>
                             </div>
                             {detailMovement.reversed_at ? (
                                 <div className="flex justify-between items-start gap-4">
                                     <span className="text-brand-inactive-text dark:text-dark-body font-medium shrink-0">Estornado por</span>
                                     <span className="font-semibold text-brand-dark dark:text-dark-heading text-right">
-                                        {detailMovement.reversed_by_name || "—"}
+                                        {detailMovement.reversed_by_name || "-"}
                                     </span>
                                 </div>
                             ) : null}
@@ -644,17 +644,12 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                             <div className="flex justify-between items-start gap-4">
                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium shrink-0">Descrição</span>
                                 <span className="font-semibold text-brand-dark dark:text-dark-heading text-right whitespace-pre-wrap break-words max-w-[65%]">
-                                    {String(detailMovement.description || "").trim() || "—"}
+                                    {String(detailMovement.description || "").trim() || "-"}
                                 </span>
                             </div>
                             <div className="flex justify-between items-center gap-4 pt-2 border-t border-brand-border dark:border-dark-border">
                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor</span>
                                 <span className="text-lg font-black text-brand-primary">{formatCurrency(detailMovement.total_amount)}</span>
-                            </div>
-                            <div className="flex justify-end pt-2">
-                                <Button variant="outline" onClick={() => setDetailMovement(null)}>
-                                    Fechar
-                                </Button>
                             </div>
                         </div>
                     ) : null}

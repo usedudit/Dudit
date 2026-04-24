@@ -6,7 +6,7 @@
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
--- 1A) CUSTOMER SCOPE — restrict coupons to specific customers
+-- 1A) CUSTOMER SCOPE - restrict coupons to specific customers
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.coupons
   ADD COLUMN IF NOT EXISTS customer_scope text NOT NULL DEFAULT 'all';
@@ -24,7 +24,7 @@ BEGIN
 END$$;
 
 -- ---------------------------------------------------------------------------
--- 1B) AUTOMATIC COUPONS — auto-applied at checkout when valid
+-- 1B) AUTOMATIC COUPONS - auto-applied at checkout when valid
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.coupons
   ADD COLUMN IF NOT EXISTS is_automatic boolean NOT NULL DEFAULT false;

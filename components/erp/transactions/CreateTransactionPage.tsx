@@ -47,7 +47,7 @@ import {
     createInstallmentGroupAction,
 } from "@/app/actions/erp/transactions"
 import { createFinancialCategoryAction } from "@/app/actions/erp/financial-category-metadata"
-import { createFinanceAccountAction, type FinanceAccountType } from "@/app/actions/erp/finance-accounts"
+import { createFinanceAccountAction, pickPreferredDefaultAccountId, type FinanceAccountType } from "@/app/actions/erp/finance-accounts"
 import {
     listTransactionContactsByTypeAction,
     createTransactionContactAction,
@@ -217,7 +217,7 @@ export default function CreateTransactionPage({
     const [accountId, setAccountId] = useState<string | undefined>(() => {
         const explicitId = editRecurringTemplate?.account_id ?? editTransaction?.accountId ?? undefined
         if (explicitId) return explicitId
-        return accounts.find((acc) => acc.is_default && acc.is_active)?.id ?? undefined
+        return pickPreferredDefaultAccountId(accounts.filter((a) => a.is_active))
     })
     const [fromAccountId, setFromAccountId] = useState<string | undefined>(undefined)
     const [toAccountId, setToAccountId] = useState<string | undefined>(undefined)

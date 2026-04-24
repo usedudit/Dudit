@@ -281,9 +281,10 @@ export async function getPOSInitialDataAction(partnerId: string) {
       .limit(120),
     supabase
       .from("finance_accounts")
-      .select("id, name, is_default, is_active")
+      .select("id, name, type, is_default, is_active")
       .eq("partner_id", partnerId)
       .eq("is_active", true)
+      .eq("type", "cash")
       .order("is_default", { ascending: false }),
     supabase
       .from("pre_sales")

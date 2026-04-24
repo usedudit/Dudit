@@ -11,6 +11,8 @@ import { revalidateQuotes } from "@/lib/utils/revalidation"
 import { getQuoteHistoryEntries } from "@/lib/services/quote-history.service"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { createERPOrderAction } from "@/app/actions/erp/orders"
+import { getAdminClient } from "@/lib/supabase/admin"
+import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
 import {
     getQuoteEditCaps,
     MSG_APPROVED_FINANCIAL,
@@ -1297,17 +1299,15 @@ export async function convertQuoteToOrderAction(data: {
             }))
 
             const primaryAddress = pickPrimaryCustomerAddress(quote.customers?.addresses)
-            const { data: defaultFinanceAccount } = await supabase
-                .from("finance_accounts")
-                .select("id")
-                .eq("partner_id", data.partnerId)
-                .eq("is_active", true)
-                .eq("is_default", true)
-                .or("integration_source.is.null,integration_source.neq.mercadopago")
-                .limit(1)
-                .maybeSingle()
-            if (!defaultFinanceAccount?.id) {
-                return errorResponse("Defina uma conta financeira padrão para converter o orçamento em pedido.")
+            const defaultFinanceAccountId = await resolveMarketplaceOrderFinanceAccountId(
+                getAdminClient(),
+                data.partnerId,
+                false,
+            )
+            if (!defaultFinanceAccountId) {
+                return errorResponse(
+                    "Cadastre contas financeiras (conta bancária ou caixa) para converter o orçamento em pedido.",
+                )
             }
             const hasFullDeliveryAddress = Boolean(
                 primaryAddress?.street
@@ -1325,7 +1325,7 @@ export async function convertQuoteToOrderAction(data: {
                 sourceQuoteId: data.quoteId,
                 salesChannel: "Orçamento",
                 deliveryMethod: hasFullDeliveryAddress ? ("delivery" as const) : ("pickup" as const),
-                financeAccountId: defaultFinanceAccount.id,
+                financeAccountId: defaultFinanceAccountId,
                 paymentStatus: "unpaid" as const,
                 deliveryStatus: "not_sent" as const,
                 paymentMethod: "pendente",

@@ -13,6 +13,8 @@ import { releaseOrderInventory, reserveOrderInventory } from "@/lib/stock/reserv
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
+import { getAdminClient } from "@/lib/supabase/admin"
+import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
 
 // Single revalidation to minimize cache calls
 const revalidateOrdersCache = async () => await revalidateOrders("")
@@ -180,6 +182,21 @@ export async function createOrderAction(data: {
 
   const { data: buyerProfile } = await supabase.from("user_profiles").select("full_name").eq("user_id", buyerId).single()
 
+  const paymentIsMp = String(data.paymentMethod || "").toLowerCase().includes("mercado pago")
+  const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(
+    getAdminClient(),
+    data.partnerId,
+    paymentIsMp,
+  )
+
+  if (!financeAccountId) {
+    return {
+      error: paymentIsMp
+        ? "Esta loja não possui conta Mercado Pago cadastrada no financeiro."
+        : "Esta loja não possui conta bancária ou caixa ativa para registrar o pedido.",
+    }
+  }
+
   const orderData: any = {
     buyer_id: buyerId,
     customer_name: buyerProfile?.full_name || null,
@@ -193,6 +210,7 @@ export async function createOrderAction(data: {
     notes: data.notes || null,
     coupon_id: couponIdToSave,
     discount_amount: couponDiscountAmount,
+    finance_account_id: financeAccountId,
   }
 
   const { data: order, error } = await supabase.from("orders").insert(orderData).select().single()

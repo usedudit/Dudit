@@ -144,7 +144,7 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
               {discountType === "percentage"
                 ? `Desconto (${Number(discountInputValue || 0)}%)`
                 : discountType === "coupon"
-                  ? `Desconto (Cupom ${discountCouponCode || "—"} - ${formatCurrency(Number(couponDiscountValue || discountVal || 0))} OFF)`
+                  ? `Desconto (Cupom ${discountCouponCode || "-"} - ${formatCurrency(Number(couponDiscountValue || discountVal || 0))} OFF)`
                   : `Desconto (${formatCurrency(Number(discountInputValue || 0))})`}
             </span>
             <span className="font-bold text-brand-red">-{formatCurrency(discountVal)}</span>

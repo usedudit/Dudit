@@ -62,7 +62,7 @@ const OrderListItem = React.memo(
                                         {order.displayId}
                                     </span>
                                     <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate max-w-[220px]">
-                                        {order.creator_subtitle || (order.creator_name ? `Por ${order.creator_name}` : "—")}
+                                        {order.creator_subtitle || (order.creator_name ? `Por ${order.creator_name}` : "-")}
                                     </span>
                                 </div>
                             </div>

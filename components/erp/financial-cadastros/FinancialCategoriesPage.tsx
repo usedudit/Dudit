@@ -255,7 +255,11 @@ export default function FinancialCategoriesPage({
                     type: "cash",
                     initialBalanceStr: "0",
                     is_active: true,
-                    is_default: !accounts.some((acc) => acc.integration_source !== "mercadopago"),
+                    is_default: !accounts.some(
+                        (acc) =>
+                            acc.type === "cash" &&
+                            (!acc.integration_source || acc.integration_source !== "mercadopago"),
+                    ),
                 },
                 isSaving: false,
             })
@@ -751,12 +755,24 @@ export default function FinancialCategoriesPage({
                         label="Tipo"
                         options={ACCOUNT_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
                         value={accountModal.item.type}
-                        onChange={(val: string) =>
+                        onChange={(val: string) => {
+                            const nextType = val as FinanceAccountType
                             setAccountModal((prev) => ({
                                 ...prev,
-                                item: { ...prev.item, type: val as FinanceAccountType },
+                                item: {
+                                    ...prev.item,
+                                    type: nextType,
+                                    is_default:
+                                        prev.mode === "add"
+                                            ? !accounts.some(
+                                                  (acc) =>
+                                                      acc.type === nextType &&
+                                                      (!acc.integration_source || acc.integration_source !== "mercadopago"),
+                                              )
+                                            : prev.item.is_default,
+                                },
                             }))
-                        }
+                        }}
                     />
 
                     <MoneyInput
@@ -789,7 +805,7 @@ export default function FinancialCategoriesPage({
 
                     <Checkbox
                         id="finance_account_is_default"
-                        label="Conta padrão"
+                        label="Conta padrão deste tipo (caixa, banco ou carteira)"
                         checked={accountModal.item.is_default}
                         disabled={accountModal.item.id ? accounts.find((acc) => acc.id === accountModal.item.id)?.integration_source === "mercadopago" : false}
                         onChange={(checked) =>

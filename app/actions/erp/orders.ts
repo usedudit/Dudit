@@ -605,21 +605,11 @@ async function createRefundTransactionForCancelledOrder(params: {
 }) {
     const paidAmount = Math.max(0, Number(params.paidAmount || 0))
     if (paidAmount <= 0.009) return { success: true as const }
-    let financeAccountId = params.financeAccountId || null
+    const financeAccountId = params.financeAccountId || null
     if (!financeAccountId) {
-        const { data: defaultAccount } = await params.supabase
-            .from("finance_accounts")
-            .select("id")
-            .eq("partner_id", params.partnerId)
-            .eq("is_active", true)
-            .order("is_default", { ascending: false })
-            .order("created_at", { ascending: true })
-            .limit(1)
-            .maybeSingle()
-        financeAccountId = defaultAccount?.id || null
-    }
-    if (!financeAccountId) {
-        return { error: "Não foi possível gerar o reembolso automático porque não existe conta financeira ativa para lançar o reembolso." as const }
+        return {
+            error: "Não foi possível gerar o reembolso automático: o pedido não tem conta financeira de origem. Atualize o pedido com a conta correta antes de cancelar.",
+        } as const
     }
 
     const { data: existingRefunds, error: existingRefundsError } = await params.supabase
@@ -796,32 +786,10 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
     const paidAmount = Math.max(0, Number(params.paidAmount || 0))
     if (paidAmount <= 0.009) return { success: true as const }
 
-    let financeAccountId = params.financeAccountId || null
+    const financeAccountId = params.financeAccountId || null
     if (!financeAccountId) {
-        const { data: defaultAccount, error: defaultAccountError } = await params.supabase
-            .from("finance_accounts")
-            .select("id")
-            .eq("partner_id", params.partnerId)
-            .eq("is_active", true)
-            .order("is_default", { ascending: false })
-            .order("created_at", { ascending: true })
-            .limit(1)
-            .maybeSingle()
-
-        if (defaultAccountError) {
-            console.error("[orders_cancel_refund] failed_to_resolve_default_account", {
-                orderId: params.orderId,
-                partnerId: params.partnerId,
-                error: defaultAccountError,
-            })
-            return { error: defaultAccountError.message }
-        }
-
-        financeAccountId = defaultAccount?.id || null
-    }
-
-    if (!financeAccountId) {
-        const message = "Não foi possível gerar o reembolso automático porque não existe conta financeira ativa para lançar o reembolso."
+        const message =
+            "Não foi possível gerar o reembolso automático: o pedido não tem conta financeira de origem. Atualize o pedido com a conta correta antes de cancelar."
         console.error("[orders_cancel_refund] missing_finance_account", {
             orderId: params.orderId,
             partnerId: params.partnerId,
@@ -1110,7 +1078,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             couponDiscountAmount = Number(couponValidation.discountAmount || 0)
             couponPricingData = couponValidation.pricingCoupon || null
         } else {
-            // Coupon no longer valid — clear it silently
+            // Coupon no longer valid - clear it silently
             couponIdToSave = null
             couponDiscountAmount = 0
         }

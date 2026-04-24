@@ -11,6 +11,7 @@ import { getUserSessionData } from "@/lib/data/user"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
 import { reserveOrderInventory } from "@/lib/stock/reservations"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
+import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
 
 export async function getCartItemCountAction() {
   try {
@@ -492,6 +493,20 @@ export async function checkoutCartAction(
 
   const partnerId = products[0].partner_id
 
+  const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(
+    adminClient,
+    partnerId,
+    Boolean(useMercadoPago),
+  )
+
+  if (!financeAccountId) {
+    return {
+      error: useMercadoPago
+        ? "Esta loja não possui conta Mercado Pago cadastrada no financeiro. Configure em Financeiro > Contas."
+        : "Esta loja não possui conta bancária ou caixa ativa para registrar o pedido. Configure em Financeiro > Contas.",
+    }
+  }
+
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .insert({
@@ -505,6 +520,7 @@ export async function checkoutCartAction(
       payment_provider: useMercadoPago ? "Mercado Pago" : paymentMethod,
       situation: "pending",
       notes,
+      finance_account_id: financeAccountId,
     })
     .select()
     .single()

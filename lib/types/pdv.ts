@@ -43,6 +43,8 @@ export type PDVCustomer = {
 export type PDVFinanceAccount = {
   id: string
   name: string
+  /** Sempre `cash` no carregamento atual do PDV. */
+  type?: string
   is_default?: boolean
   is_active?: boolean
 }

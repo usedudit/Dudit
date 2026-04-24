@@ -84,7 +84,7 @@ interface CacheEntry<T> {
 }
 
 /**
- * Plan cache TTL — kept short (10 seconds) to limit stale access windows.
+ * Plan cache TTL - kept short (10 seconds) to limit stale access windows.
  * Webhooks force-invalidate the cache immediately on status changes,
  * so this TTL only matters for the gap between a webhook updating the DB
  * and the next plan resolution call.
@@ -181,7 +181,7 @@ export async function getPlanById(planId: string): Promise<Plan | null> {
 
 /**
  * Get the non-cancelled subscription for a partner, or null.
- * Includes pending and past_due — used for UI display, race condition guards,
+ * Includes pending and past_due - used for UI display, race condition guards,
  * and preventing duplicate checkout creation.
  *
  * ⚠️ DO NOT use this for access control. Use getPartnerPlan() instead.
@@ -211,7 +211,7 @@ export async function getPartnerSubscription(partnerId: string): Promise<Subscri
 }
 
 /**
- * Get the EFFECTIVE plan for a partner — used for access control.
+ * Get the EFFECTIVE plan for a partner - used for access control.
  *
  * SECURITY: This function determines what features and limits a partner has.
  * It ONLY grants access for:
@@ -255,7 +255,7 @@ export async function getPartnerPlan(partnerId: string): Promise<Plan> {
 
   if (candidates && candidates.length > 0) {
     // Deterministic selection priority:
-    // 1. active or trialing (highest priority — confirmed payment)
+    // 1. active or trialing (highest priority - confirmed payment)
     // 2. past_due within grace period (temporary access)
     // 3. nothing qualifies → free plan
 
@@ -267,7 +267,7 @@ export async function getPartnerPlan(partnerId: string): Promise<Plan> {
       plan = activeSub.plan as Plan
     } else {
       // Check past_due subscriptions against grace period.
-      // Grace period is measured from past_due_at — a dedicated column set
+      // Grace period is measured from past_due_at - a dedicated column set
       // EXCLUSIVELY by the webhook when payment failure is confirmed.
       // This is 100% deterministic: no other code path can modify it.
       // Fallback to created_at if past_due_at is null (legacy rows before migration).

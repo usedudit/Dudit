@@ -362,7 +362,7 @@ async function reverseCashMovementFallback(
   const amount = money(Number(movement.amount || 0))
 
   if (!hasFinancialLink) {
-    console.warn("[cash-register] reverseCashMovementFallback: movement without financial_transaction_id — reversing drawer only", {
+    console.warn("[cash-register] reverseCashMovementFallback: movement without financial_transaction_id - reversing drawer only", {
       movementId: movement.id,
       partnerId: input.partnerId,
     })

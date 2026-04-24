@@ -27,7 +27,7 @@ COMMENT ON COLUMN public.subscriptions.past_due_at IS
 -- ─── 2. Processed Webhook Events (DB-level idempotency) ─────────────────────
 -- 
 -- Guarantees that duplicate webhook events are physically impossible to process.
--- Uses a UNIQUE constraint on idempotency_key — if a duplicate INSERT is 
+-- Uses a UNIQUE constraint on idempotency_key - if a duplicate INSERT is 
 -- attempted, the DB rejects it via ON CONFLICT, and the webhook handler skips.
 
 CREATE TABLE IF NOT EXISTS public.processed_webhook_events (

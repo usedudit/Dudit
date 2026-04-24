@@ -82,7 +82,7 @@ const FinancialAccountCard = React.memo(
                                 </Badge>
                                 {item.is_default ? (
                                     <Badge variant="blue" className="whitespace-nowrap scale-90 shrink-0">
-                                        Padrão
+                                        Padrão ({TYPE_LABELS[item.type] || item.type})
                                     </Badge>
                                 ) : null}
                             </div>

@@ -1,5 +1,6 @@
 "use server"
 
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -7,6 +8,114 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { createManualTransactionAction } from "@/app/actions/erp/transactions"
 
 export type FinanceAccountType = "cash" | "bank" | "wallet"
+
+/** Conta padrão do tipo (caixa, banco ou carteira) entre contas ativas. */
+export function pickDefaultAccountIdForType(
+  accounts: { id: string; type: string; is_active?: boolean | null; is_default?: boolean | null }[],
+  accountType: FinanceAccountType,
+): string | undefined {
+  const rows = accounts.filter((a) => a.is_active !== false)
+  return rows.find((a) => a.type === accountType && a.is_default)?.id ?? rows.find((a) => a.type === accountType)?.id
+}
+
+/** Para formulários genéricos: prioriza padrão caixa, depois banco, depois carteira. */
+export function pickPreferredDefaultAccountId(
+  accounts: { id: string; type: string; is_active?: boolean | null; is_default?: boolean | null }[],
+): string | undefined {
+  for (const t of ["cash", "bank", "wallet"] as const) {
+    const id = pickDefaultAccountIdForType(accounts, t)
+    if (id) return id
+  }
+  return undefined
+}
+
+/** Pedidos ERP (não-PDV): padrão banco → caixa. PDV continua escolhendo só caixa na UI. */
+export function pickBankThenCashDefaultFinanceAccountId(
+  accounts: { id: string; type: string; is_active?: boolean | null; is_default?: boolean | null }[],
+): string | undefined {
+  return pickDefaultAccountIdForType(accounts, "bank") ?? pickDefaultAccountIdForType(accounts, "cash")
+}
+
+const NON_MP_FINANCE_ACCOUNTS = "integration_source.is.null,integration_source.neq.mercadopago"
+
+/**
+ * Pedidos do marketplace (comprador): use admin/service client (RLS do comprador não lê finance_accounts).
+ * Mercado Pago → conta da integração MP; demais → banco padrão → qualquer banco → caixa padrão → qualquer caixa.
+ */
+export async function resolveMarketplaceOrderFinanceAccountId(
+  supabase: SupabaseClient,
+  partnerId: string,
+  useMercadoPago: boolean,
+): Promise<string | null> {
+  if (useMercadoPago) {
+    const { data: bySource } = await supabase
+      .from("finance_accounts")
+      .select("id")
+      .eq("partner_id", partnerId)
+      .eq("is_active", true)
+      .eq("integration_source", "mercadopago")
+      .limit(1)
+      .maybeSingle()
+    if (bySource?.id) return bySource.id
+    const { data: byName } = await supabase
+      .from("finance_accounts")
+      .select("id")
+      .eq("partner_id", partnerId)
+      .eq("is_active", true)
+      .ilike("name", "%Mercado Pago%")
+      .limit(1)
+      .maybeSingle()
+    return byName?.id ?? null
+  }
+
+  const { data: bankDef } = await supabase
+    .from("finance_accounts")
+    .select("id")
+    .eq("partner_id", partnerId)
+    .eq("is_active", true)
+    .eq("type", "bank")
+    .eq("is_default", true)
+    .or(NON_MP_FINANCE_ACCOUNTS)
+    .limit(1)
+    .maybeSingle()
+  if (bankDef?.id) return bankDef.id
+
+  const { data: anyBank } = await supabase
+    .from("finance_accounts")
+    .select("id")
+    .eq("partner_id", partnerId)
+    .eq("is_active", true)
+    .eq("type", "bank")
+    .or(NON_MP_FINANCE_ACCOUNTS)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (anyBank?.id) return anyBank.id
+
+  const { data: cashDef } = await supabase
+    .from("finance_accounts")
+    .select("id")
+    .eq("partner_id", partnerId)
+    .eq("is_active", true)
+    .eq("type", "cash")
+    .eq("is_default", true)
+    .or(NON_MP_FINANCE_ACCOUNTS)
+    .limit(1)
+    .maybeSingle()
+  if (cashDef?.id) return cashDef.id
+
+  const { data: anyCash } = await supabase
+    .from("finance_accounts")
+    .select("id")
+    .eq("partner_id", partnerId)
+    .eq("is_active", true)
+    .eq("type", "cash")
+    .or(NON_MP_FINANCE_ACCOUNTS)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  return anyCash?.id ?? null
+}
 
 export async function getFinanceAccountsAction(partnerId: string) {
   try {
@@ -97,12 +206,16 @@ export async function createFinanceAccountAction(data: {
         "id, name, type, initial_balance, current_balance, is_active, is_default, created_at, updated_at, is_system_managed, integration_source",
       )
       .single()
+
+    if (error) throw error
+
     if (!inserted.integration_source || inserted.integration_source !== "mercadopago") {
       if (Boolean(data.isDefault)) {
         await supabase
           .from("finance_accounts")
           .update({ is_default: false })
           .eq("partner_id", data.partnerId)
+          .eq("type", data.type)
           .neq("id", inserted.id)
           .or("integration_source.is.null,integration_source.neq.mercadopago")
       } else {
@@ -110,6 +223,7 @@ export async function createFinanceAccountAction(data: {
           .from("finance_accounts")
           .select("id", { count: "exact", head: true })
           .eq("partner_id", data.partnerId)
+          .eq("type", data.type)
           .eq("is_default", true)
           .neq("id", inserted.id)
           .or("integration_source.is.null,integration_source.neq.mercadopago")
@@ -123,9 +237,6 @@ export async function createFinanceAccountAction(data: {
         }
       }
     }
-
-
-    if (error) throw error
 
     if (Math.abs(targetCurrent) >= 0.005) {
       const today = new Date().toISOString().slice(0, 10)
@@ -185,7 +296,7 @@ export async function updateFinanceAccountAction(
 
     const { data: account, error: accErr } = await supabase
       .from("finance_accounts")
-      .select("id, is_system_managed, integration_source")
+      .select("id, is_system_managed, integration_source, type, is_default")
       .eq("id", id)
       .eq("partner_id", partnerId)
       .single()
@@ -224,6 +335,20 @@ export async function updateFinanceAccountAction(
     if (data.isActive !== undefined) payload.is_active = data.isActive
     if (data.isDefault !== undefined) payload.is_default = data.isDefault
 
+    const targetType = (data.type ?? account.type) as string
+    const willBeDefault =
+      data.isDefault === true || (data.isDefault === undefined && account.is_default === true)
+
+    if (account.integration_source !== "mercadopago" && willBeDefault && ["cash", "bank", "wallet"].includes(targetType)) {
+      await supabase
+        .from("finance_accounts")
+        .update({ is_default: false })
+        .eq("partner_id", partnerId)
+        .eq("type", targetType)
+        .neq("id", id)
+        .or("integration_source.is.null,integration_source.neq.mercadopago")
+    }
+
     const { data: updated, error } = await supabase
       .from("finance_accounts")
       .update(payload)
@@ -235,15 +360,6 @@ export async function updateFinanceAccountAction(
       .single()
 
     if (error) throw error
-
-    if (updated.integration_source !== "mercadopago" && data.isDefault === true) {
-      await supabase
-        .from("finance_accounts")
-        .update({ is_default: false })
-        .eq("partner_id", partnerId)
-        .neq("id", id)
-        .or("integration_source.is.null,integration_source.neq.mercadopago")
-    }
 
     return { success: true, data: updated }
   } catch (error: any) {
