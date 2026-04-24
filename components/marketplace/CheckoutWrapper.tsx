@@ -207,7 +207,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
     const [formData, setFormData] = useState({
         deliveryType: "pickup" as "delivery" | "pickup",
         deliveryAddress: "",
-        paymentMethod: partnerInfo.paymentMethods?.[0] || "Dinheiro",
+        paymentMethod: partnerInfo.paymentMethods?.[0] || "cash",
         notes: "",
         installments: 1,
     })
@@ -353,7 +353,18 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
     }
 
     const totalAmount = products.reduce((sum, p) => sum + p.price * (quantities[p.id] || p.quantity), 0)
-    const paymentMethods = partnerInfo.paymentMethods?.length > 0 ? partnerInfo.paymentMethods : ["Dinheiro", "PIX"]
+    const paymentTypeLabelMap: Record<string, string> = {
+        pix: "Pix",
+        credit_card: "Cartão de crédito",
+        debit_card: "Cartão de débito",
+        cash: "Dinheiro",
+        other: "Outros",
+    }
+    const paymentMethods = (partnerInfo.paymentMethods?.length ? partnerInfo.paymentMethods : ["cash", "pix"])
+        .map((method) => ({
+            value: method,
+            label: paymentTypeLabelMap[method] || method,
+        }))
     const isPickup = formData.deliveryType === "pickup"
     const traditionalPaymentLabel = isPickup ? "Pagar na Retirada" : "Pagar na Entrega"
 
@@ -645,7 +656,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                                                         <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                                                                         <SelectContent>
                                                                             {paymentMethods.map((method) => (
-                                                                                <SelectItem key={method} value={method}>{method}</SelectItem>
+                                                                                <SelectItem key={method.value} value={method.value}>{method.label}</SelectItem>
                                                                             ))}
                                                                         </SelectContent>
                                                                     </Select>
@@ -665,7 +676,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                                                 <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                                                                 <SelectContent>
                                                                     {paymentMethods.map((method) => (
-                                                                        <SelectItem key={method} value={method}>{method}</SelectItem>
+                                                                        <SelectItem key={method.value} value={method.value}>{method.label}</SelectItem>
                                                                     ))}
                                                                 </SelectContent>
                                                             </Select>

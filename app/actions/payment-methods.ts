@@ -9,6 +9,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { calculatePaymentAmounts } from "@/lib/payments/calculation"
 import { toCanonicalPaymentType, toLegacyPaymentType } from "@/lib/payments/payment-method"
 import { decryptCPF, encryptCPF } from "@/lib/crypto"
+import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
 
 type InstallmentFeeInput = { installmentNumber: number; feePercent: number }
 
@@ -29,6 +30,9 @@ type UpsertPaymentMethodInput = {
   pixKey?: string | null
   usePartnerPixData?: boolean
   cardBrand?: string | null
+  defaultFinanceAccountId: string
+  priority?: number
+  isDefault?: boolean
 }
 
 async function resolvePixKeyFromPartner(
@@ -119,6 +123,8 @@ export async function getPaymentMethodsAction(partnerId: string) {
     .from("payment_methods")
     .select("*")
     .eq("partner_id", partnerId)
+    .order("is_default", { ascending: false })
+    .order("priority", { ascending: false })
     .order("created_at", { ascending: true })
 
   if (error) {
@@ -214,6 +220,9 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
   await requirePartnerAccessWithPermission(data.partnerId, "financial", "create")
 
   const canonicalType = toCanonicalPaymentType(data.paymentType)
+  if (!data.defaultFinanceAccountId) {
+    return { error: "Selecione a conta financeira padrão para este método." }
+  }
   const maxInstallments = Math.max(1, Math.min(24, Number(data.maxInstallments || 1)))
   const supportsInstallments = canonicalType === "credit_card" && Boolean(data.supportsInstallments)
   const validatedInstallmentFees = sanitizeInstallmentFees(data.installmentFees, maxInstallments)
@@ -237,6 +246,9 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
     maxInstallments,
     discountPercent: data.discountPercent,
     cardBrand: data.cardBrand,
+    defaultFinanceAccountId: data.defaultFinanceAccountId,
+    priority: Math.max(0, Number(data.priority || 0)),
+    isDefault: Boolean(data.isDefault),
     installmentFees: supportsInstallments ? (data.installmentFees || []) : [],
   })
 
@@ -247,16 +259,16 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
 
   const supabase = await getSupabaseServerClient()
 
-  // Check for duplicate payment type
-  const { data: existingMethod } = await supabase
-    .from("payment_methods")
+  const { data: financeAccount } = await supabase
+    .from("finance_accounts")
     .select("id")
+    .eq("id", data.defaultFinanceAccountId)
     .eq("partner_id", data.partnerId)
-    .eq("type", canonicalType)
+    .eq("is_active", true)
     .maybeSingle()
 
-  if (existingMethod) {
-    return { error: `Já existe uma forma de pagamento cadastrada para o tipo "${canonicalType === 'pix' ? 'PIX' : canonicalType === 'cash' ? 'Dinheiro' : canonicalType === 'credit_card' ? 'Cartão de Crédito' : canonicalType === 'debit_card' ? 'Cartão de Débito' : 'Outros'}".` }
+  if (!financeAccount?.id) {
+    return { error: "Conta financeira inválida ou inativa para este parceiro." }
   }
 
   const { data: method, error: methodError } = await supabase
@@ -280,6 +292,9 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
       pix_key_type: isPix ? (data.pixKeyType || null) : null,
       pix_key: isPix ? persistedPixKey : null,
       use_partner_pix_data: isPix ? Boolean(data.usePartnerPixData) : false,
+      default_finance_account_id: data.defaultFinanceAccountId,
+      priority: Math.max(0, Number(data.priority || 0)),
+      is_default: Boolean(data.isDefault),
     })
     .select()
     .single()
@@ -318,6 +333,9 @@ export async function updatePaymentMethodAction(
     pixKey?: string | null
     usePartnerPixData?: boolean
     cardBrand?: string | null
+    defaultFinanceAccountId?: string
+    priority?: number
+    isDefault?: boolean
   },
 ) {
   await requireRateLimit(RateLimitCategory.PAYMENT)
@@ -325,7 +343,7 @@ export async function updatePaymentMethodAction(
   const supabase = await getSupabaseServerClient()
   const { data: method } = await supabase
     .from("payment_methods")
-    .select("partner_id, type, payment_type")
+    .select("partner_id, type, payment_type, default_finance_account_id")
     .eq("id", methodId)
     .single()
 
@@ -335,19 +353,11 @@ export async function updatePaymentMethodAction(
 
   await requirePartnerAccessWithPermission(method.partner_id, "financial", "edit")
 
-  if (data.paymentType !== undefined) {
-    const canonicalType = toCanonicalPaymentType(data.paymentType)
-    const { data: existingMethod } = await supabase
-      .from("payment_methods")
-      .select("id")
-      .eq("partner_id", method.partner_id)
-      .eq("type", canonicalType)
-      .neq("id", methodId) // Exclude current method
-      .maybeSingle()
-
-    if (existingMethod) {
-      return { error: `Já existe uma forma de pagamento cadastrada para o tipo "${canonicalType === 'pix' ? 'PIX' : canonicalType === 'cash' ? 'Dinheiro' : canonicalType === 'credit_card' ? 'Cartão de Crédito' : canonicalType === 'debit_card' ? 'Cartão de Débito' : 'Outros'}".` }
-    }
+  if (data.feePercent !== undefined && (Number(data.feePercent) < 0 || Number(data.feePercent) > 100)) {
+    return { error: "Taxa percentual deve estar entre 0 e 100." }
+  }
+  if (data.discountPercent !== undefined && (Number(data.discountPercent) < 0 || Number(data.discountPercent) > 100)) {
+    return { error: "Desconto deve estar entre 0 e 100." }
   }
 
   const updateData: any = {}
@@ -393,6 +403,25 @@ export async function updatePaymentMethodAction(
   if (data.cardBrand !== undefined) {
     updateData.card_brand = data.cardBrand
   }
+  const expectedFinanceAccountId = data.defaultFinanceAccountId ?? method.default_finance_account_id
+  if (!expectedFinanceAccountId) {
+    return { error: "Método de pagamento precisa ter uma conta financeira vinculada." }
+  }
+  if (data.defaultFinanceAccountId !== undefined) {
+    const { data: financeAccount } = await supabase
+      .from("finance_accounts")
+      .select("id")
+      .eq("id", data.defaultFinanceAccountId)
+      .eq("partner_id", method.partner_id)
+      .eq("is_active", true)
+      .maybeSingle()
+    if (!financeAccount?.id) {
+      return { error: "Conta financeira inválida ou inativa para este parceiro." }
+    }
+    updateData.default_finance_account_id = data.defaultFinanceAccountId
+  }
+  if (data.priority !== undefined) updateData.priority = Math.max(0, Number(data.priority || 0))
+  if (data.isDefault !== undefined) updateData.is_default = Boolean(data.isDefault)
   const { error: methodError } = await supabase
     .from("payment_methods")
     .update(updateData)
@@ -456,4 +485,30 @@ export async function deletePaymentMethodAction(methodId: string) {
   revalidatePath("/erp/settings")
 
   return { success: true }
+}
+
+export async function pickBestPaymentMethodAction(input: {
+  partnerId: string
+  type: string
+  context?: { preferDefault?: boolean }
+}) {
+  await requirePartnerAccessWithPermission(input.partnerId, "financial", "view")
+  const supabase = await getSupabaseServerClient()
+  const method = await pickBestPaymentMethod(supabase as any, input.type, input.partnerId, input.context || {})
+  if (!method) return { error: "Nenhum método ativo encontrado para este tipo." }
+  return { success: true, method }
+}
+
+export async function getPartnerFinanceAccountsForPaymentMethodsAction(partnerId: string) {
+  await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+  const supabase = await getSupabaseServerClient()
+  const { data, error } = await supabase
+    .from("finance_accounts")
+    .select("id, name, type, is_active")
+    .eq("partner_id", partnerId)
+    .eq("is_active", true)
+    .order("name", { ascending: true })
+
+  if (error) return { error: error.message }
+  return { success: true, accounts: data || [] }
 }

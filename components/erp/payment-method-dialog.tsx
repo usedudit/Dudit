@@ -12,6 +12,7 @@ import {
 import {
   createPaymentMethodAction,
   getPaymentMethodDetailsAction,
+  getPartnerFinanceAccountsForPaymentMethodsAction,
   updatePaymentMethodAction,
 } from "@/app/actions/payment-methods"
 
@@ -33,6 +34,9 @@ interface PaymentMethod {
   use_partner_pix_data?: boolean
   card_brand?: string | null
   installment_fees?: Array<{ installment_number: number; fee_percent: number }>
+  default_finance_account_id?: string | null
+  priority?: number | null
+  is_default?: boolean | null
 }
 
 interface PaymentMethodDialogProps {
@@ -60,6 +64,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoadingDetails, setIsLoadingDetails] = useState(false)
+  const [financeAccounts, setFinanceAccounts] = useState<Array<{ id: string; name: string; type?: string }>>([])
 
   const [formData, setFormData] = useState({
     name: "",
@@ -76,6 +81,9 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
     pix_key: "",
     use_partner_pix_data: false,
     card_brand: "" as string,
+    default_finance_account_id: "",
+    priority: 0,
+    is_default: false,
     installment_fees: [{ installment_number: 1, fee_percent: 0 }] as Array<{ installment_number: number; fee_percent: number }>,
   })
 
@@ -105,6 +113,9 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
         pix_key: "",
         use_partner_pix_data: false,
         card_brand: "",
+        default_finance_account_id: "",
+        priority: 0,
+        is_default: false,
         installment_fees: [{ installment_number: 1, fee_percent: 0 }],
       })
       setError(null)
@@ -132,11 +143,27 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
           pix_key: full.pix_key || "",
           use_partner_pix_data: Boolean(full.use_partner_pix_data),
           card_brand: full.card_brand || "",
+          default_finance_account_id: full.default_finance_account_id || "",
+          priority: Number(full.priority || 0),
+          is_default: Boolean(full.is_default),
           installment_fees: buildInstallments(maxInstallments, full.installment_fees),
         })
       })
       .finally(() => setIsLoadingDetails(false))
   }, [editingMethod, open])
+
+  useEffect(() => {
+    if (!open) return
+    getPartnerFinanceAccountsForPaymentMethodsAction(partnerId).then((res: any) => {
+      if (res?.accounts) {
+        setFinanceAccounts(res.accounts)
+        setFormData((prev) => ({
+          ...prev,
+          default_finance_account_id: prev.default_finance_account_id || res.accounts?.[0]?.id || "",
+        }))
+      }
+    })
+  }, [open, partnerId])
 
   const isPix = formData.payment_type === "pix"
   const isCreditCard = formData.payment_type === "credit_card"
@@ -187,6 +214,11 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
       setIsLoading(false)
       return
     }
+    if (!formData.default_finance_account_id) {
+      setError("Selecione a conta financeira padrão do método")
+      setIsLoading(false)
+      return
+    }
 
     try {
       const payload = {
@@ -207,6 +239,9 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
         pixKey: isPix ? formData.pix_key : null,
         usePartnerPixData: isPix ? formData.use_partner_pix_data : false,
         cardBrand: isCard ? formData.card_brand : null,
+        defaultFinanceAccountId: formData.default_finance_account_id,
+        priority: Number(formData.priority || 0),
+        isDefault: Boolean(formData.is_default),
       }
 
       if (editingMethod) {
@@ -270,6 +305,37 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                 { value: "other", label: "Outros" },
               ]}
             />
+
+            <FormDropdown
+              label="Conta padrão no financeiro*"
+              value={formData.default_finance_account_id}
+              setValue={(value) => setFormData({ ...formData, default_finance_account_id: value })}
+              options={financeAccounts.map((account) => ({
+                value: account.id,
+                label: `${account.name}${account.type ? ` (${account.type})` : ""}`,
+              }))}
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Prioridade"
+                id="priority"
+                type="number"
+                min="0"
+                value={formData.priority}
+                onChange={(e) => setFormData({ ...formData, priority: Math.max(0, Number(e.target.value || 0)) })}
+              />
+              <div className="flex items-center gap-2 mt-8">
+                <Checkbox
+                  id="is_default_method"
+                  checked={formData.is_default}
+                  onChange={(checked) => setFormData({ ...formData, is_default: checked as boolean })}
+                />
+                <label htmlFor="is_default_method" className="text-sm font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
+                  Usar como fallback (método padrão)
+                </label>
+              </div>
+            </div>
 
             {isPix && (
               <div className="space-y-4 bg-brand-gray/30 dark:bg-dark-border/10 p-4 rounded-xl">

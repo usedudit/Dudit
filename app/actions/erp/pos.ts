@@ -12,6 +12,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
+import { pickBestPaymentMethod, toPaymentMethodTypeFromLabel } from "@/lib/services/payment-method.service"
 
 type DraftItemInput = {
   productId?: string | null
@@ -295,10 +296,11 @@ export async function getPOSInitialDataAction(partnerId: string) {
       .limit(20),
     supabase
       .from("payment_methods")
-      .select("id, name, type, is_default, is_active")
+      .select("id, name, type, is_default, is_active, fee_percent, discount_percent, priority")
       .eq("partner_id", partnerId)
       .eq("is_active", true)
       .order("is_default", { ascending: false })
+      .order("priority", { ascending: false })
       .order("name"),
   ])
 
@@ -443,13 +445,26 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
   }
 
   // Build payment breakdown for RPC
-  const breakdownForRpc = (input.paymentBreakdown || [])
-    .map((entry) => ({
-      amount: safeMoney(Number(entry.amount || 0)),
-      paymentMethodId: entry.paymentMethodId || null,
-      payment_method_id: entry.paymentMethodId || null,
-    }))
-    .filter((entry) => entry.amount > 0)
+  const resolvedBreakdown: Array<{ amount: number; paymentMethodId: string | null; payment_method_id: string | null }> = []
+  for (const entry of input.paymentBreakdown || []) {
+    const amount = safeMoney(Number(entry.amount || 0))
+    if (amount <= 0) continue
+    let paymentMethodId = entry.paymentMethodId || null
+    if (!paymentMethodId) {
+      const inferredType = toPaymentMethodTypeFromLabel(entry.method)
+      if (inferredType) {
+        const method = await pickBestPaymentMethod(supabase as any, inferredType, input.partnerId, { preferDefault: true })
+        paymentMethodId = method?.id || null
+      }
+    }
+    resolvedBreakdown.push({
+      amount,
+      paymentMethodId,
+      payment_method_id: paymentMethodId,
+    })
+  }
+
+  const breakdownForRpc = resolvedBreakdown
 
   // Call atomic RPC
   const { data: saleId, error: rpcError } = await supabase.rpc("finalize_pos_sale", {

@@ -15,6 +15,8 @@ import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
+import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
+import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
 
 // Single revalidation to minimize cache calls
 const revalidateOrdersCache = async () => await revalidateOrders("")
@@ -183,11 +185,22 @@ export async function createOrderAction(data: {
   const { data: buyerProfile } = await supabase.from("user_profiles").select("full_name").eq("user_id", buyerId).single()
 
   const paymentIsMp = String(data.paymentMethod || "").toLowerCase().includes("mercado pago")
-  const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(
-    getAdminClient(),
-    data.partnerId,
-    paymentIsMp,
-  )
+  let financeAccountId: string | null = null
+  if (paymentIsMp) {
+    financeAccountId = await resolveMarketplaceOrderFinanceAccountId(
+      getAdminClient(),
+      data.partnerId,
+      true,
+    )
+  } else {
+    const bestMethod = await pickBestPaymentMethod(
+      supabase as any,
+      toCanonicalPaymentType(data.paymentMethod),
+      data.partnerId,
+      { preferDefault: true },
+    )
+    financeAccountId = bestMethod?.default_finance_account_id || null
+  }
 
   if (!financeAccountId) {
     return {

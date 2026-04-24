@@ -54,6 +54,9 @@ export type PDVPaymentMethodOption = {
   name: string
   type: string
   is_default?: boolean | null
+  fee_percent?: number | null
+  discount_percent?: number | null
+  priority?: number | null
 }
 
 export type PDVPaymentBreakdownEntry = {

@@ -12,6 +12,8 @@ import { checkLimit, increment_usage_counter } from "@/lib/services/subscription
 import { reserveOrderInventory } from "@/lib/stock/reservations"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
+import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
+import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
 
 export async function getCartItemCountAction() {
   try {
@@ -66,7 +68,7 @@ export const getCachedCart = async (userId: string) => {
 
   const { data: paymentMethods } = await supabase
     .from("payment_methods")
-    .select("partner_id, payment_type, is_active")
+    .select("partner_id, payment_type, type, is_active")
     .in("partner_id", partnerIds)
     .eq("is_active", true)
 
@@ -101,10 +103,13 @@ export const getCachedCart = async (userId: string) => {
       acc[partnerId] = {
         partner,
         items: [],
-        paymentMethods:
-          paymentMethods
-            ?.filter((pm: any) => pm.partner_id === partnerId)
-            .map((pm: any) => pm.payment_type) || [],
+        paymentMethods: Array.from(
+          new Set(
+            (paymentMethods || [])
+              .filter((pm: any) => pm.partner_id === partnerId)
+              .map((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type))
+          )
+        ),
       }
     }
     acc[partnerId].items.push(item)
@@ -492,6 +497,11 @@ export async function checkoutCartAction(
   }
 
   const partnerId = products[0].partner_id
+  const chosenType = toCanonicalPaymentType(paymentMethod)
+  const bestMethod = await pickBestPaymentMethod(supabase as any, chosenType, partnerId, { preferDefault: true })
+  if (!bestMethod) {
+    return { error: "Nenhum método de pagamento ativo foi encontrado para o tipo selecionado." }
+  }
 
   const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(
     adminClient,
@@ -517,6 +527,9 @@ export async function checkoutCartAction(
       delivery_type: deliveryType,
       delivery_address: deliveryAddress,
       payment_method: useMercadoPago ? "Mercado Pago" : paymentMethod,
+      payment_breakdown: useMercadoPago
+        ? []
+        : [{ method: chosenType, amount: totalAmount, paymentMethodId: bestMethod.id }],
       payment_provider: useMercadoPago ? "Mercado Pago" : paymentMethod,
       situation: "pending",
       notes,
