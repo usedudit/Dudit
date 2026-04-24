@@ -14,6 +14,7 @@ import OrderListItem from '../orders/OrderListItem';
 import { useRouter } from 'next/navigation';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { FadeIn } from '@/components/animations/FadeIn';
+import SavingStatusModal from '@/components/reusable/SavingStatusModal';
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
     { id: "order_id", label: "Pedido", align: "left", width: "200px" },
@@ -665,6 +666,8 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                     confirmText={isDeleting ? "Excluindo..." : "Excluir"}
                     variant="danger"
                 />
+
+                <SavingStatusModal isOpen={isDeleting} text="Excluindo cliente..." />
             </div >
         </FadeIn>
     );

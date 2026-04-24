@@ -30,6 +30,7 @@ import { useSidebar } from '@/lib/sidebar-context';
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { useRouter } from "next/navigation";
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh";
+import SavingStatusModal from "@/components/reusable/SavingStatusModal";
 
 interface CreateQuoteProps {
     partnerId: string;
@@ -1073,6 +1074,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     confirmText="Ok, entendi"
                     variant="warning"
                 />
+
+                <SavingStatusModal isOpen={isSaving} text={mode === "edit" ? "Salvando orçamento..." : "Criando orçamento..."} />
             </div>
         </FadeIn>
     );

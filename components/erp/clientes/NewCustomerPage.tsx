@@ -33,6 +33,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { createComprehensiveCustomerAction, updateComprehensiveCustomerAction, getPartnerCustomersAction } from "@/app/actions/erp/customers"
 import { getAddressesAction } from "@/app/actions/shared/addresses"
 import { consultarCNPJ } from "@/lib/nuvem-fiscal"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { validateEmail, validateCPF, validateCNPJ, validatePhoneBR, validateURL, validateCEP } from "@/lib/input-validator"
 
 interface NewCustomerPageProps {
@@ -902,6 +903,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                         variant="warning"
                     />
                 )}
+
+                <SavingStatusModal isOpen={isSaving} text={customerId ? "Salvando cliente..." : "Criando cliente..."} />
             </div>
         </FadeIn>
     )

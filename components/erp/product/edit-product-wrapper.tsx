@@ -9,6 +9,7 @@ import { UNITS } from "@/lib/constants/product-constants"
 import { toast } from "sonner"
 import AlertModal from "@/components/reusable/AlertModal"
 import { TrashIcon } from "@/lib/icons"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 
 interface EditProductWrapperProps {
     product: Product & {
@@ -140,6 +141,8 @@ export function EditProductWrapper({ product, suppliers, partnerId, onDuplicate 
                     disabled={isDeleting}
                 />
             )}
+
+            <SavingStatusModal isOpen={isDeleting} text="Excluindo produto..." />
         </>
     )
 }

@@ -9,6 +9,7 @@ import { PlusIcon } from "@/lib/icons"
 import { Button, IconPlaceholder, Combobox, Input, Checkbox, FormDropdown, MoneyInput } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import Pagination from "@/components/reusable/Pagination"
 
 import FinancialCategoryCard from "./FinancialCategoryCard"
@@ -177,6 +178,12 @@ export default function FinancialCategoriesPage({
 
     const [nameError, setNameError] = useState(false)
     const [accountNameError, setAccountNameError] = useState(false)
+    const isProcessing =
+        modal.isSaving ||
+        accountModal.isSaving ||
+        contactModal.saving ||
+        adjustBalanceModal.saving ||
+        deleteModal.isDeleting
 
     const refreshData = useCallback(async () => {
         const [catsRes, accRes] = await Promise.all([
@@ -966,6 +973,19 @@ export default function FinancialCategoriesPage({
                 description={`Tem certeza que deseja excluir "${deleteModal.item?.name}"? Esta ação não pode ser desfeita.`}
                 isDestructive
                 isLoading={deleteModal.isDeleting}
+            />
+
+            <SavingStatusModal
+                isOpen={isProcessing}
+                text={deleteModal.isDeleting
+                    ? "Excluindo cadastro financeiro..."
+                    : adjustBalanceModal.saving
+                        ? "Ajustando saldo..."
+                        : contactModal.saving
+                            ? "Salvando contato financeiro..."
+                            : accountModal.isSaving
+                                ? "Salvando conta financeira..."
+                                : "Salvando categoria financeira..."}
             />
         </FadeIn>
     )

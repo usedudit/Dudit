@@ -24,6 +24,7 @@ import { Spinner } from "@/components/reusable/Spinner"
 
 import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import NcmSelectionModal from "./NcmSelectionModal"
 import { ProductGeneralTab } from "./ProductGeneralTab"
@@ -932,14 +933,10 @@ const AddProductPage: FC<AddProductPageProps> = ({
                     </div>
                 </DefaultModal>
 
-                <DefaultModal isOpen={isSavingProduct} onClose={() => { }} title="" maxWidth="sm" hideHeader>
-                    <div className="flex flex-col items-center justify-center p-6 gap-6 h-full mt-4">
-                        <img src="https://img.dudit.com.br/static/mascots/Aguarde.png" alt="Aguarde" className="w-36 h-36 object-contain" />
-                        <p className="text-lg font-semibold text-brand-dark dark:text-dark-heading text-center leading-tight">
-                            {internalMode === "add" ? "Criando produto..." : "Salvando alterações..."}
-                        </p>
-                    </div>
-                </DefaultModal>
+                <SavingStatusModal
+                    isOpen={isSavingProduct}
+                    text={internalMode === "add" ? "Criando produto..." : "Salvando alterações..."}
+                />
             </div>
         </FadeIn>
     )

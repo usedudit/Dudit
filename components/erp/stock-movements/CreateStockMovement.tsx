@@ -33,6 +33,7 @@ import { useNotification } from '@/hooks/use-notification';
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 
 import { useProductBucket, type ProductBucketItem } from '../hooks'
 
@@ -713,6 +714,8 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                         variant="warning"
                     />
                 )}
+
+                <SavingStatusModal isOpen={isSaving} text="Salvando movimentação de estoque..." />
             </div>
         </FadeIn>
     );

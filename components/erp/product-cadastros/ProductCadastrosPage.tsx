@@ -8,6 +8,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { Button, IconPlaceholder, Combobox, Input, Checkbox } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import Pagination from "@/components/reusable/Pagination"
 
 // Components
@@ -63,6 +64,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
     }>({ isOpen: false, item: null, isDeleting: false })
 
     const [nameError, setNameError] = useState(false)
+    const isProcessing = modal.isSaving || deleteModal.isDeleting
 
     React.useEffect(() => {
         const timer = setTimeout(() => {
@@ -361,6 +363,8 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                 isDestructive
                 isLoading={deleteModal.isDeleting}
             />
+
+            <SavingStatusModal isOpen={isProcessing} text={deleteModal.isDeleting ? "Excluindo cadastro..." : "Salvando cadastro..."} />
         </FadeIn>
     )
 }
