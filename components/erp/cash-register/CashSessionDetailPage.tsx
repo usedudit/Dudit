@@ -2,13 +2,12 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { Badge, Button, DefaultModal, InfoCard, Input, MoneyInput, Tabs, TabsContent, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
+import { ActionsDropdown, Badge, Button, DefaultModal, DropdownItem, InfoCard, Input, MoneyInput, Tabs, TabsContent, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency } from "@/lib/utils"
 import { closeCashSessionAction, createCashMovementAction, getCashSessionCloseSummaryAction, getCashSessionDetailsAction, reverseCashMovementAction } from "@/app/actions/erp/cash-register"
 import { useNotification } from "@/hooks/use-notification"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ChevronLeftIcon, MoneyIcon, CreditCardIcon, QRCodeIcon, MoreHorizontalIcon } from "@/lib/icons"
+import { ChevronLeftIcon, MoneyIcon, CreditCardIcon, QRCodeIcon, MoreHorizontalIcon, ArrowUpDownIcon, ArrowDownIcon, ArrowUpIcon, EyeIcon } from "@/lib/icons"
 import OrderListItem from "@/components/erp/orders/OrderListItem"
 
 type DetailPayload = {
@@ -62,6 +61,19 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
     const [movDesc, setMovDesc] = useState("")
     const [isSavingMovement, setIsSavingMovement] = useState(false)
     const [movementsSortConfig, setMovementsSortConfig] = useState<{ key: string; direction: "asc" | "desc" }>({ key: "date", direction: "desc" })
+    const [detailMovement, setDetailMovement] = useState<any | null>(null)
+    const movementsTableRef = useRef<HTMLDivElement>(null)
+    const [movementsScroll, setMovementsScroll] = useState({ left: false, right: false })
+
+    const checkMovementsScroll = useCallback(() => {
+        const el = movementsTableRef.current
+        if (!el) return
+        const { scrollLeft, scrollWidth, clientWidth } = el
+        setMovementsScroll({
+            left: scrollLeft > 0,
+            right: scrollLeft < scrollWidth - clientWidth - 2,
+        })
+    }, [])
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
@@ -76,11 +88,12 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
             return {
                 ...m,
                 originalId: m.id,
-                displayId: `${isDeposit ? "Reforço" : "Sangria"} ${String(m.id).slice(0, 8).toUpperCase()}`,
+                displayId: isDeposit ? "Reforço" : "Sangria",
+                creator_subtitle: m.creator_name ? `Por ${m.creator_name}` : "—",
                 items_count: 1,
                 total_amount: Number(m.amount || 0),
-                statusLabel: reversed ? "Estornado" : isDeposit ? "Reforço" : "Sangria",
-                statusColor: reversed ? "gray" : isDeposit ? "green" : "red",
+                statusLabel: reversed ? "Estornado" : "Concluída",
+                statusColor: reversed ? "gray" : "green",
                 deliveryStatusLabel: m.creator_name || "Sem responsável",
                 deliveryStatusColor: "gray",
                 formattedDate: formatShortDateTime(m.created_at),
@@ -148,6 +161,12 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
     }, [resetMovementForm])
 
     useEffect(() => setDetails(initialDetails), [initialDetails])
+
+    useEffect(() => {
+        checkMovementsScroll()
+        window.addEventListener("resize", checkMovementsScroll)
+        return () => window.removeEventListener("resize", checkMovementsScroll)
+    }, [checkMovementsScroll, sangriasReforcos.length, activeTab])
 
     useEffect(() => {
         if (!isOpen || !closeOpen) return
@@ -243,9 +262,32 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                                     </div>
                                 </div>
                                 <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                    {isOpen && <Button variant="outline" onClick={() => setMovModal("withdrawal")}>Nova sangria</Button>}
-                                    {isOpen && <Button variant="outline" onClick={() => setMovModal("deposit")}>Novo reforço</Button>}
-                                    {isOpen && <Button onClick={openCloseModal} className="whitespace-nowrap" isLoading={isPreparingClose}>Fechar caixa</Button>}
+                                    {isOpen && (
+                                        <>
+                                            <Button onClick={openCloseModal} className="whitespace-nowrap" isLoading={isPreparingClose}>
+                                                Fechar caixa
+                                            </Button>
+                                            <ActionsDropdown
+                                                trigger={
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        className="w-10 h-10 p-0 flex items-center justify-center shrink-0"
+                                                        aria-label="Mais opções de caixa"
+                                                    >
+                                                        <MoreHorizontalIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-heading" />
+                                                    </Button>
+                                                }
+                                            >
+                                                <DropdownItem onClick={() => setMovModal("withdrawal")}>
+                                                    <ArrowDownIcon className="w-4 h-4 shrink-0" /> Nova sangria
+                                                </DropdownItem>
+                                                <DropdownItem onClick={() => setMovModal("deposit")}>
+                                                    <ArrowUpIcon className="w-4 h-4 shrink-0" /> Novo reforço
+                                                </DropdownItem>
+                                            </ActionsDropdown>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                             <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"} pt-4 md:pt-0 flex items-center`}>
@@ -379,7 +421,7 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                                             <div className="flex justify-between items-start gap-4 text-[14px]"><span className="text-brand-inactive-text dark:text-dark-body font-medium">Devoluções</span><span className="text-right font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(details.totals.totalRefunds)}</span></div>
                                             <div className="pt-3 border-t border-brand-border dark:border-dark-border space-y-3">
                                                 <button type="button" className="text-left text-sm font-semibold text-brand-dark dark:text-dark-heading hover:underline" onClick={() => notifyError("Reimpressão em breve.")}>{isOpen ? "Reimprimir cupom de abertura" : "Reimprimir cupom de fechamento"}</button>
-                                                <Link href="/erp/transactions" className="block text-sm font-semibold text-brand-dark dark:text-dark-heading hover:underline">Ver relatório de movimentação do caixa</Link>
+                                                <Link href="/erp/financial/transactions" className="block text-sm font-semibold text-brand-dark dark:text-dark-heading hover:underline">Ver relatório de movimentação do caixa</Link>
                                             </div>
                                         </div>
                                     </div>
@@ -390,30 +432,52 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                         <TabsContent value="movements" className="mt-0">
                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
                                 <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                    <div className="md:hidden flex flex-col border-b border-brand-border dark:border-dark-border">
+                                    <div className="lg:hidden flex flex-col border-b border-brand-border dark:border-dark-border">
                                         {movementRows.map((m: any) => (
-                                            <div
+                                            <button
+                                                type="button"
                                                 key={m.originalId}
-                                                className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none"
+                                                className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none text-left w-full bg-transparent"
+                                                onClick={() => setDetailMovement(m)}
                                             >
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="flex justify-between items-start mb-0.5">
+                                                    <div className="flex justify-between items-start gap-3 mb-0.5">
                                                         <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate pr-2">{m.displayId}</h3>
-                                                        <Badge variant={m.statusColor}>{m.statusLabel}</Badge>
+                                                        <div className="flex flex-col items-end gap-2 shrink-0">
+                                                            <Badge variant={m.statusColor}>{m.statusLabel}</Badge>
+                                                            {isOpen && !m.reversed_at ? (
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    className="h-8"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        handleReverse(m.originalId)
+                                                                    }}
+                                                                >
+                                                                    Estornar
+                                                                </Button>
+                                                            ) : null}
+                                                        </div>
                                                     </div>
                                                     <div className="text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mb-1">{m.formattedDate}</div>
-                                                    <div className="flex items-center gap-2 text-[14px]">
-                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">{m.deliveryStatusLabel}</span>
+                                                    <div className="flex flex-wrap items-center gap-2 text-[14px]">
+                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">{m.creator_subtitle || (m.creator_name ? `Por ${m.creator_name}` : "—")}</span>
                                                         <span className="text-gray-300 dark:text-gray-600 font-medium font-bold">•</span>
                                                         <span className="font-bold text-brand-primary">{formatCurrency(m.total_amount)}</span>
                                                     </div>
-                                                    {isOpen && !m.reversed_at ? <div className="mt-2"><Button variant="outline" className="h-8" onClick={() => handleReverse(m.originalId)}>Estornar</Button></div> : null}
                                                 </div>
-                                            </div>
+                                            </button>
                                         ))}
                                     </div>
-                                    <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
-                                        <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                    <div className="hidden lg:block w-full overflow-hidden rounded-xl relative">
+                                        <div
+                                            className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${movementsScroll.left ? "opacity-100" : "opacity-0"}`}
+                                        />
+                                        <div
+                                            className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${movementsScroll.right ? "opacity-100" : "opacity-0"}`}
+                                        />
+                                        <div className="overflow-x-auto pb-4 custom-scrollbar" ref={movementsTableRef} onScroll={checkMovementsScroll}>
                                             <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                                                 <thead>
                                                     <tr className="bg-brand-gray dark:bg-dark-border/50">
@@ -428,7 +492,15 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                                                                     style={{ width: col.width }}
                                                                     onClick={() => setMovementsSortConfig((prev) => ({ key: col.id, direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc" }))}
                                                                 >
-                                                                    <div className="flex items-center gap-1.5">{col.label}</div>
+                                                                    <div className={`relative flex items-center gap-1.5 ${col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : "justify-start"}`}>
+                                                                        <span>{col.label}</span>
+                                                                        <div className="w-4 shrink-0 flex items-center justify-center">
+                                                                            <ArrowUpDownIcon
+                                                                                size={14}
+                                                                                className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-0 group-hover:opacity-40"} ${isSorted && movementsSortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
                                                                 </th>
                                                             )
                                                         })}
@@ -443,13 +515,23 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                                                             selected={false}
                                                             onSelect={() => { }}
                                                             onEdit={() => { }}
-                                                            onCancel={() => {
-                                                                if (isOpen && !m.reversed_at) handleReverse(m.originalId)
-                                                            }}
-                                                            onDetails={() => { }}
+                                                            onCancel={
+                                                                isOpen && !m.reversed_at
+                                                                    ? () => {
+                                                                          handleReverse(m.originalId)
+                                                                      }
+                                                                    : undefined
+                                                            }
+                                                            onDetails={() => setDetailMovement(m)}
                                                             canEdit={false}
                                                             cancelLabel="Estornar"
                                                             showCheckbox={false}
+                                                            rowVariant="cash_movement"
+                                                            actionMenuExtra={
+                                                                <DropdownItem onClick={() => setDetailMovement(m)}>
+                                                                    <EyeIcon className="w-4 h-4 shrink-0" /> Ver detalhes
+                                                                </DropdownItem>
+                                                            }
                                                         />
                                                     ))}
                                                 </tbody>
@@ -510,6 +592,72 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                             <Button onClick={handleMovement} isLoading={isSavingMovement}>Salvar</Button>
                         </div>
                     </div>
+                </DefaultModal>
+
+                <DefaultModal
+                    isOpen={detailMovement !== null}
+                    onClose={() => setDetailMovement(null)}
+                    title={detailMovement?.type === "deposit" ? "Detalhes do reforço" : "Detalhes da sangria"}
+                >
+                    {detailMovement ? (
+                        <div className="space-y-4 text-[14px]">
+                            <div className="flex justify-between items-center gap-4">
+                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Tipo</span>
+                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                    {detailMovement.type === "deposit" ? "Reforço" : "Sangria"}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center gap-4">
+                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status</span>
+                                <Badge variant={detailMovement.reversed_at ? "gray" : "green"}>
+                                    {detailMovement.reversed_at ? "Estornado" : "Concluída"}
+                                </Badge>
+                            </div>
+                            <div className="flex justify-between items-start gap-4">
+                                <span className="text-brand-inactive-text dark:text-dark-body font-medium shrink-0">Registrado por</span>
+                                <span className="font-semibold text-brand-dark dark:text-dark-heading text-right">
+                                    {detailMovement.creator_name || "—"}
+                                </span>
+                            </div>
+                            {detailMovement.reversed_at ? (
+                                <div className="flex justify-between items-start gap-4">
+                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium shrink-0">Estornado por</span>
+                                    <span className="font-semibold text-brand-dark dark:text-dark-heading text-right">
+                                        {detailMovement.reversed_by_name || "—"}
+                                    </span>
+                                </div>
+                            ) : null}
+                            <div className="flex justify-between items-center gap-4">
+                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data e hora</span>
+                                <span className="font-semibold text-brand-dark dark:text-dark-heading text-right">
+                                    {formatLongDateTime(detailMovement.created_at)}
+                                </span>
+                            </div>
+                            {detailMovement.reversed_at ? (
+                                <div className="flex justify-between items-center gap-4">
+                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Estornado em</span>
+                                    <span className="font-semibold text-brand-dark dark:text-dark-heading text-right">
+                                        {formatLongDateTime(detailMovement.reversed_at)}
+                                    </span>
+                                </div>
+                            ) : null}
+                            <div className="flex justify-between items-start gap-4">
+                                <span className="text-brand-inactive-text dark:text-dark-body font-medium shrink-0">Descrição</span>
+                                <span className="font-semibold text-brand-dark dark:text-dark-heading text-right whitespace-pre-wrap break-words max-w-[65%]">
+                                    {String(detailMovement.description || "").trim() || "—"}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center gap-4 pt-2 border-t border-brand-border dark:border-dark-border">
+                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor</span>
+                                <span className="text-lg font-black text-brand-primary">{formatCurrency(detailMovement.total_amount)}</span>
+                            </div>
+                            <div className="flex justify-end pt-2">
+                                <Button variant="outline" onClick={() => setDetailMovement(null)}>
+                                    Fechar
+                                </Button>
+                            </div>
+                        </div>
+                    ) : null}
                 </DefaultModal>
             </Tabs>
         </FadeIn>

@@ -231,9 +231,10 @@ async function createCashMovementFallback(
   }
 
   if (!input.cashFinanceAccountId) {
+    await supabase.from("cash_movements").delete().eq("id", movement.id)
     return {
-      success: true as const,
-      data: movement,
+      success: false as const,
+      error: "Cadastre uma conta financeira do tipo caixa para registrar sangrias e reforços (e vê-las em Transações).",
     }
   }
 
@@ -336,20 +337,60 @@ async function reverseCashMovementFallback(
     return { success: false as const, error: "O caixa não está aberto." }
   }
 
-  const { data: originalTransaction, error: originalTransactionError } = movement.financial_transaction_id
-    ? await supabase
+  let accountId: string | null = null
+
+  if (movement.financial_transaction_id) {
+    const { data: originalTransaction, error: originalTransactionError } = await supabase
       .from("transactions")
       .select("id, account_id")
       .eq("id", movement.financial_transaction_id)
       .eq("partner_id", input.partnerId)
-      .single()
-    : { data: null, error: null }
+      .maybeSingle()
 
-  if (originalTransactionError || !originalTransaction?.account_id) {
-    return { success: false as const, error: originalTransactionError?.message || "Conta financeira da movimentação não encontrada." }
+    if (originalTransactionError) {
+      return { success: false as const, error: originalTransactionError.message }
+    }
+    accountId = originalTransaction?.account_id ?? null
+  }
+
+  const hasFinancialLink = !!movement.financial_transaction_id
+
+  if (hasFinancialLink && !accountId) {
+    accountId = await resolveDefaultCashFinanceAccountId(supabase, input.partnerId)
   }
 
   const amount = money(Number(movement.amount || 0))
+
+  if (!hasFinancialLink) {
+    console.warn("[cash-register] reverseCashMovementFallback: movement without financial_transaction_id — reversing drawer only", {
+      movementId: movement.id,
+      partnerId: input.partnerId,
+    })
+    const { error: reverseUpdateError } = await supabase
+      .from("cash_movements")
+      .update({
+        reversed_at: nowIso,
+        reversed_by_user_id: input.userId,
+      })
+      .eq("id", movement.id)
+
+    if (reverseUpdateError) {
+      return { success: false as const, error: reverseUpdateError.message }
+    }
+
+    return {
+      success: true as const,
+      data: {
+        movement_id: movement.id,
+        reversal_transaction_id: null as unknown as string,
+      },
+    }
+  }
+
+  if (!accountId) {
+    return { success: false as const, error: "Conta financeira da movimentação não encontrada." }
+  }
+
   const reverseTransactionType = movement.type === "withdrawal" ? "income" : "expense"
   const reverseNotes = movement.type === "withdrawal" ? "Estorno de sangria registrada no PDV." : "Estorno de reforço registrado no PDV."
 
@@ -370,7 +411,7 @@ async function reverseCashMovementFallback(
     transaction_type: reverseTransactionType,
     origin: "system",
     reference_note: `cash_mv_rev:${movement.id}`,
-    account_id: originalTransaction.account_id,
+    account_id: accountId,
     payment_method_id: null,
     created_by_user_id: input.userId,
   })
@@ -393,7 +434,7 @@ async function reverseCashMovementFallback(
 
   const delta = reverseTransactionType === "income" ? amount : -amount
   const { error: balanceError } = await supabase.rpc("apply_account_balance_delta", {
-    p_account_id: originalTransaction.account_id,
+    p_account_id: accountId,
     p_partner_id: input.partnerId,
     p_delta: delta,
   })
@@ -522,36 +563,11 @@ export async function createCashMovementAction(input: {
     input.cashFinanceAccountId?.trim() || (await resolveDefaultCashFinanceAccountId(supabase, input.partnerId))
 
   if (!cashAccountId) {
-    // Bypass the RPC entirely if there's no cash account, as the RPC likely requires one.
-    const fallbackResult = await createCashMovementFallback(supabase, {
-      partnerId: input.partnerId,
-      cashSessionId: sessionId,
-      type: input.type,
-      description: normalizedDescription,
-      amount: money(rawAmount),
-      cashFinanceAccountId: null,
-      userId: user.id,
-    })
-
-    if (!fallbackResult.success) return fallbackResult
-
-    const fallbackMovementId = (fallbackResult.data as any)?.id as string | undefined
-    const fallbackTypeLabel = input.type === "withdrawal" ? "Sangria" : "Reforço"
-    await logAuditEvent({
-      partnerId: input.partnerId,
-      actorUserId: user.id,
-      entityType: "cash_session",
-      entityId: sessionId,
-      actionType: input.type === "withdrawal" ? "withdrawal_created" : "deposit_created",
-      changeLines: [`registrou ${fallbackTypeLabel.toLowerCase()} de R$ ${money(rawAmount).toFixed(2)} - ${normalizedDescription}`],
-      metadata: fallbackMovementId ? { movement_id: fallbackMovementId } : null,
-      source: "manual",
-    })
-    await revalidateEntityTimeline("cash_session", sessionId)
-    revalidatePath("/erp/cash-register")
-    revalidatePath("/erp/transactions")
-
-    return fallbackResult
+    return {
+      success: false as const,
+      error:
+        "Nenhuma conta financeira do tipo caixa ativa encontrada. Cadastre uma em Financeiro para registrar sangrias/reforços e sincronizar com Transações.",
+    }
   }
 
   const { data: rpcData, error: rpcError } = await supabase.rpc("erp_create_cash_manual_movement", {
@@ -590,7 +606,14 @@ export async function createCashMovementAction(input: {
     })
     await revalidateEntityTimeline("cash_session", sessionId)
     revalidatePath("/erp/cash-register")
-    revalidatePath("/erp/transactions")
+    revalidatePath("/erp/financial/transactions")
+
+    console.log("[cash-register] createCashMovementAction OK (fallback path)", {
+      partnerId: input.partnerId,
+      sessionId,
+      movementId: fallbackMovementId,
+      financial_transaction_id: (fallbackResult.data as any)?.financial_transaction_id ?? null,
+    })
 
     return fallbackResult
   }
@@ -609,13 +632,21 @@ export async function createCashMovementAction(input: {
   })
   await revalidateEntityTimeline("cash_session", sessionId)
   revalidatePath("/erp/cash-register")
-  revalidatePath("/erp/transactions")
+  revalidatePath("/erp/financial/transactions")
 
   const { data: movement } = await supabase
     .from("cash_movements")
     .select("*")
     .eq("id", movementId || "")
     .maybeSingle()
+
+  const txId = (rpcData as any)?.transaction_id as string | undefined
+  console.log("[cash-register] createCashMovementAction OK (rpc)", {
+    partnerId: input.partnerId,
+    sessionId,
+    movementId,
+    transactionId: txId ?? movement?.financial_transaction_id ?? null,
+  })
 
   return { success: true as const, data: movement || rpcData }
 }
@@ -667,7 +698,7 @@ export async function reverseCashMovementAction(input: {
     }
 
     revalidatePath("/erp/cash-register")
-    revalidatePath("/erp/transactions")
+    revalidatePath("/erp/financial/transactions")
 
     return fallbackResult
   }
@@ -694,7 +725,7 @@ export async function reverseCashMovementAction(input: {
   }
 
   revalidatePath("/erp/cash-register")
-  revalidatePath("/erp/transactions")
+  revalidatePath("/erp/financial/transactions")
 
   return { success: true as const, data: rpcData }
 }

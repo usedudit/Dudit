@@ -4,7 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
-import { ShoppingCartIcon } from "@/lib/icons"
+import { ShoppingCartIcon, ArrowDownIcon, ArrowUpIcon } from "@/lib/icons"
 
 interface ColumnDef {
     id: string
@@ -19,12 +19,15 @@ interface OrderListItemProps {
     selected: boolean
     onSelect: (id: string) => void
     onEdit: (order: any) => void
-    onCancel: (order: any) => void
+    onCancel?: (order: any) => void
     onDetails: (order: any) => void
     canEdit?: boolean
     cancelLabel?: string
     showCheckbox?: boolean
     extraActions?: React.ReactNode
+    /** Sangrias/reforços: título curto, subtítulo com operador, status simplificado. */
+    rowVariant?: "order" | "cash_movement"
+    actionMenuExtra?: React.ReactNode
 }
 
 const OrderListItem = React.memo(
@@ -40,11 +43,31 @@ const OrderListItem = React.memo(
         cancelLabel = "Cancelar",
         showCheckbox = true,
         extraActions,
+        rowVariant = "order",
+        actionMenuExtra,
     }: OrderListItemProps) => {
 
         const renderCellContent = (colId: string) => {
             switch (colId) {
                 case "order_id":
+                    if (rowVariant === "cash_movement") {
+                        const MvIcon = order.type === "deposit" ? ArrowUpIcon : ArrowDownIcon
+                        return (
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                    <MvIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                </div>
+                                <div className="flex flex-col text-left min-w-0">
+                                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[180px] leading-tight mb-0.5">
+                                        {order.displayId}
+                                    </span>
+                                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate max-w-[220px]">
+                                        {order.creator_subtitle || (order.creator_name ? `Por ${order.creator_name}` : "—")}
+                                    </span>
+                                </div>
+                            </div>
+                        )
+                    }
                     return (
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
@@ -69,6 +92,17 @@ const OrderListItem = React.memo(
                     )
 
                 case "status":
+                    if (rowVariant === "cash_movement") {
+                        return (
+                            <div className={`flex gap-2 w-full flex-wrap ${getJustifyClass(columns.find(c => c.id === 'status')?.align)}`}>
+                                {order.situation === "cancelled" ? (
+                                    <Badge variant="gray">Estornado</Badge>
+                                ) : (
+                                    <Badge variant={order.statusColor}>{order.statusLabel}</Badge>
+                                )}
+                            </div>
+                        )
+                    }
                     return (
                         <div className={`flex gap-2 w-full ${getJustifyClass(columns.find(c => c.id === 'status')?.align)}`}>
                             {order.situation === "cancelled" ? (
@@ -117,14 +151,15 @@ const OrderListItem = React.memo(
                 case "actions":
                     return (
                         <div
-                            className="flex justify-center action-btn"
+                            className="flex justify-center items-center min-h-[44px] action-btn"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <ActionsDropdown
                                 onEdit={canEdit ? () => onEdit(order) : undefined}
-                                onCancel={() => onCancel(order)}
+                                onCancel={onCancel ? () => onCancel(order) : undefined}
                                 cancelLabel={cancelLabel}
                             >
+                                {actionMenuExtra}
                                 {extraActions}
                             </ActionsDropdown>
                         </div>
@@ -179,7 +214,10 @@ const OrderListItem = React.memo(
     (prev, next) =>
         prev.order === next.order &&
         prev.selected === next.selected &&
-        prev.columns === next.columns
+        prev.columns === next.columns &&
+        prev.rowVariant === next.rowVariant &&
+        prev.actionMenuExtra === next.actionMenuExtra &&
+        prev.canEdit === next.canEdit
 )
 
 OrderListItem.displayName = "OrderListItem"
