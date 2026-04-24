@@ -14,6 +14,7 @@ import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
 import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
+import { calculatePaymentAmounts } from "@/lib/payments/calculation"
 
 export async function getCartItemCountAction() {
   try {
@@ -503,6 +504,30 @@ export async function checkoutCartAction(
     return { error: "Nenhum método de pagamento ativo foi encontrado para o tipo selecionado." }
   }
 
+  let paymentAwareTotal = totalAmount
+  if (bestMethod?.id) {
+    const { data: fees } = await supabase
+      .from("payment_method_installment_fees")
+      .select("installment_number, fee_percent")
+      .eq("payment_method_id", bestMethod.id)
+    const calc = calculatePaymentAmounts({
+      originalAmount: totalAmount,
+      installmentNumber: 1,
+      paymentMethod: {
+        feePercent: Number(bestMethod.fee_percent || bestMethod.percentage_rate || 0),
+        feeFixed: Number(bestMethod.fee_fixed || bestMethod.fixed_amount || 0),
+        feeBearer: (bestMethod.fee_bearer || "merchant") as "merchant" | "customer",
+        discountPercent: Number(bestMethod.discount_percent || 0),
+        maxInstallments: Number(bestMethod.max_installments || 1),
+        installmentFees: (fees || []).map((row: any) => ({
+          installmentNumber: Number(row.installment_number || 1),
+          feePercent: Number(row.fee_percent || 0),
+        })),
+      },
+    })
+    paymentAwareTotal = Number(calc.finalAmount || totalAmount)
+  }
+
   const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(
     adminClient,
     partnerId,
@@ -523,13 +548,13 @@ export async function checkoutCartAction(
       buyer_id: user.id,
       customer_name: buyerProfile?.full_name || null,
       partner_id: partnerId,
-      total_amount: totalAmount,
+      total_amount: paymentAwareTotal,
       delivery_type: deliveryType,
       delivery_address: deliveryAddress,
       payment_method: useMercadoPago ? "Mercado Pago" : paymentMethod,
       payment_breakdown: useMercadoPago
         ? []
-        : [{ method: chosenType, amount: totalAmount, paymentMethodId: bestMethod.id }],
+        : [{ method: chosenType, amount: paymentAwareTotal, paymentMethodId: bestMethod.id, installmentNumber: 1 }],
       payment_provider: useMercadoPago ? "Mercado Pago" : paymentMethod,
       situation: "pending",
       notes,

@@ -222,42 +222,65 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
 
                                         <div className="mt-8">
                                             <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Itens da Transação</h3>
+                                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">
+                                                {detail.installmentBreakdown?.length ? "Parcelas" : "Itens da Transação"}
+                                            </h3>
                                             <div className="space-y-4">
-                                                {detail.items.map((item) => (
-                                                    <div key={item.id} className="flex items-start gap-4">
-                                                        {!detail.transactionItemsCompact && (
-                                                            <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
-                                                                <img
-                                                                    src={item.image ? getR2ImageUrl(item.image, "thumbnail") : "https://img.dudit.com.br/static/Placeholder.png"}
-                                                                    className="w-full h-full object-cover rounded-xl"
-                                                                    alt={item.title}
-                                                                    onError={(e: any) => {
-                                                                        e.target.src = "https://img.dudit.com.br/static/Placeholder.png"
-                                                                    }}
-                                                                />
+                                                {detail.installmentBreakdown?.length ? (
+                                                    detail.installmentBreakdown.map((row) => (
+                                                        <div key={row.id} className="rounded-full bg-brand-gray dark:bg-dark-border/30 px-5 py-3 border border-brand-border dark:border-dark-border flex items-center justify-between gap-4">
+                                                            <div className="min-w-0">
+                                                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                                                    Parcela {row.installmentNumber}/{row.totalCount}
+                                                                </p>
+                                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                    Vencimento: {row.dueDate || "-"} • Pagamento: {row.paymentDate || "-"}
+                                                                </p>
                                                             </div>
-                                                        )}
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex justify-between items-start mb-1 gap-3">
-                                                                <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.title}</h4>
-                                                                <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading shrink-0">
-                                                                    {formatCurrency(item.lineTotal)}
-                                                                </span>
+                                                            <div className="text-right shrink-0">
+                                                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{formatCurrency(row.originalAmount)}</p>
+                                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                    Pago: {formatCurrency(row.paidAmount)}
+                                                                </p>
                                                             </div>
-                                                            {!detail.transactionItemsCompact && (
-                                                                <>
-                                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku}</div>
-                                                                    <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
-                                                                        <span>
-                                                                            {item.quantity} un. • {formatCurrency(item.unitPrice)} / un.
-                                                                        </span>
-                                                                    </div>
-                                                                </>
-                                                            )}
                                                         </div>
-                                                    </div>
-                                                ))}
+                                                    ))
+                                                ) : (
+                                                    detail.items.map((item) => (
+                                                        <div key={item.id} className="flex items-start gap-4">
+                                                            {!detail.transactionItemsCompact && (
+                                                                <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                                    <img
+                                                                        src={item.image ? getR2ImageUrl(item.image, "thumbnail") : "https://img.dudit.com.br/static/Placeholder.png"}
+                                                                        className="w-full h-full object-cover rounded-xl"
+                                                                        alt={item.title}
+                                                                        onError={(e: any) => {
+                                                                            e.target.src = "https://img.dudit.com.br/static/Placeholder.png"
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex justify-between items-start mb-1 gap-3">
+                                                                    <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.title}</h4>
+                                                                    <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading shrink-0">
+                                                                        {formatCurrency(item.lineTotal)}
+                                                                    </span>
+                                                                </div>
+                                                                {!detail.transactionItemsCompact && (
+                                                                    <>
+                                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku}</div>
+                                                                        <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                            <span>
+                                                                                {item.quantity} un. • {formatCurrency(item.unitPrice)} / un.
+                                                                            </span>
+                                                                        </div>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                )}
                                             </div>
                                         </div>
 

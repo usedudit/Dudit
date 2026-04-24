@@ -22,7 +22,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { Input, Button, Checkbox } from '@/components/reusable';
 import { ReceiptContent, PaymentMethodCard, Numpad, SplitPaymentCard } from './POSComponents';
-import { getPaymentMethodsAction } from '@/app/actions/payment-methods';
+import { calculatePaymentMethodAmountsAction, getPaymentMethodsAction } from '@/app/actions/payment-methods';
 import { useToast } from "@/components/ui/use-toast";
 import { formatCurrency, formatDate, formatTime } from '@/lib/utils';
 
@@ -116,6 +116,11 @@ type PartnerPaymentMethod = {
     name: string;
     type: string;
     is_active?: boolean;
+    fee_percent?: number | null;
+    fee_fixed?: number | null;
+    fee_bearer?: "merchant" | "customer";
+    discount_percent?: number | null;
+    max_installments?: number | null;
 };
 
 const normalizeMethodType = (value?: string | null) => {
@@ -142,7 +147,7 @@ const PaymentModal = ({
     lockPaymentCompletion = false
 }: any) => {
     const { toast } = useToast();
-    // Views: methods (main) | money | card | pix | split | split_method_select
+    // Views: methods (main) | method_type_select | money | card | pix | split | split_method_select
     const [view, setView] = useState<string>('methods');
     const [amountPaid, setAmountPaid] = useState<string>('');
     const [installments, setInstallments] = useState<string>('1');
@@ -169,7 +174,9 @@ const PaymentModal = ({
         { id: 2, method: null, paymentMethodId: null, amount: 0 }
     ]);
     const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
+    const [selectedMethodType, setSelectedMethodType] = useState<string | null>(null);
     const [editingPaymentIndex, setEditingPaymentIndex] = useState<number | null>(null);
+    const [paymentCalculation, setPaymentCalculation] = useState<any | null>(null);
 
     const subTotal = cart.reduce((acc: number, item: any) => acc + (item.unitPrice * item.quantity), 0);
     const total = subTotal + shippingFee + otherCosts - discountAmount;
@@ -279,6 +286,35 @@ const PaymentModal = ({
         }
     }, [view, editingPaymentIndex, chargeTarget, payments]);
 
+    useEffect(() => {
+        let active = true;
+        if (!selectedMethodId) {
+            setPaymentCalculation(null);
+            return;
+        }
+        const currentViewIsCardLike = view === "card" || view === "pix" || view === "money";
+        if (!currentViewIsCardLike) return;
+        const installmentNumber = Math.max(1, Number(installments || 1));
+        calculatePaymentMethodAmountsAction({
+            originalAmount: Math.max(0, Number(chargeTarget || 0)),
+            paymentMethodId: selectedMethodId,
+            installmentNumber,
+        }).then((res: any) => {
+            if (!active) return;
+            if (res?.success) {
+                setPaymentCalculation(res);
+                if (view === "card") {
+                    setAmountPaid(String(Number(res.finalAmount || chargeTarget).toFixed(2)));
+                }
+            } else {
+                setPaymentCalculation(null);
+            }
+        });
+        return () => {
+            active = false;
+        };
+    }, [selectedMethodId, installments, chargeTarget, view]);
+
     const handleQuickAdd = (val: number) => {
         setAmountPaid(val.toString());
     }
@@ -326,8 +362,13 @@ const PaymentModal = ({
     const changeAmount = isOverpaid ? diff : 0;
 
     const getTitle = () => {
+        const selectedTypeLabel =
+            selectedMethodType === "pix" ? "Pix" :
+                selectedMethodType === "cash" ? "Dinheiro" :
+                    selectedMethodType === "card" ? "Cartão" : "Método";
         switch (view) {
             case 'methods': return 'Método de Pagamento';
+            case 'method_type_select': return `Selecionar ${selectedTypeLabel}`;
             case 'money': return 'Dinheiro';
             case 'card': return 'Cartão';
             case 'pix': return 'Pix';
@@ -347,6 +388,9 @@ const PaymentModal = ({
         } else if (view === 'split_method_select') {
             setView('split');
             setEditingPaymentIndex(null);
+        } else if (view === 'method_type_select') {
+            setView('methods');
+            setSelectedMethodType(null);
         } else if (view === 'split') {
             setView('methods');
         } else {
@@ -381,6 +425,26 @@ const PaymentModal = ({
         }
     };
 
+    const openMethodTypeSelection = (methodType: "cash" | "pix" | "card") => {
+        const methodsOfType = activeMethods.filter((method) => normalizeMethodType(method.type) === methodType);
+        if (methodsOfType.length === 0) {
+            toast({
+                title: "Sem métodos ativos",
+                description: `Nenhum método ${methodType === "cash" ? "de dinheiro" : methodType === "pix" ? "de PIX" : "de cartão"} ativo encontrado.`,
+                variant: "destructive",
+            });
+            return;
+        }
+        if (methodsOfType.length === 1) {
+            const only = methodsOfType[0];
+            setSelectedMethodId(only.id);
+            setView(methodType === "cash" ? "money" : methodType === "pix" ? "pix" : "card");
+            return;
+        }
+        setSelectedMethodType(methodType);
+        setView("method_type_select");
+    };
+
     const buildConfirmPayload = () => {
         const newPaymentBreakdown = isPendingPayment
             ? []
@@ -396,6 +460,7 @@ const PaymentModal = ({
                     method: normalizePaymentMethodLabel(activeMethods.find((method) => method.id === selectedMethodId)?.name || (view === 'money' ? 'dinheiro' : (view === 'pix' ? 'pix' : 'cartao'))),
                     amount: Number(totalPaidCalculated || 0),
                     paymentMethodId: selectedMethodId || null,
+                    installmentNumber: Math.max(1, Number(installments || 1)),
                 }];
 
         const mergedPaymentBreakdown = [...(existingPaymentBreakdown || []), ...newPaymentBreakdown]
@@ -620,26 +685,9 @@ const PaymentModal = ({
                                             </div>
 
                                             <div className="grid grid-cols-2 gap-4">
-                                                {activeMethods.map((method) => {
-                                                    const normalizedType = normalizeMethodType(method.type);
-                                                    const MethodIcon = normalizedType === "cash"
-                                                        ? MoneyIcon
-                                                        : normalizedType === "pix"
-                                                            ? QRCodeIcon
-                                                            : CreditCardIcon;
-                                                    const targetView = normalizedType === "cash" ? "money" : normalizedType === "pix" ? "pix" : "card";
-                                                    return (
-                                                        <PaymentMethodCard
-                                                            key={method.id}
-                                                            icon={MethodIcon}
-                                                            label={method.name}
-                                                            onClick={() => {
-                                                                setSelectedMethodId(method.id);
-                                                                setView(targetView);
-                                                            }}
-                                                        />
-                                                    );
-                                                })}
+                                                <PaymentMethodCard icon={MoneyIcon} label="Dinheiro" onClick={() => openMethodTypeSelection("cash")} />
+                                                <PaymentMethodCard icon={QRCodeIcon} label="Pix" onClick={() => openMethodTypeSelection("pix")} />
+                                                <PaymentMethodCard icon={CreditCardIcon} label="Cartão" onClick={() => openMethodTypeSelection("card")} />
                                                 <PaymentMethodCard icon={SplitIcon} label="Dividir" onClick={() => setView('split')} />
                                             </div>
 
@@ -747,6 +795,15 @@ const PaymentModal = ({
                                             <div className="w-full text-left space-y-4">
                                                 <Input label="Valor a Cobrar" name="cardAmount" prefix="R$" value={amountPaid} onChange={(e: any) => handleManualInput(e)} className="font-bold text-lg" />
                                                 <Input label="Parcelas" name="installments" type="number" value={installments} onChange={(e: any) => setInstallments(e.target.value)} min="1" className="w-full text-lg font-bold" />
+                                                {paymentCalculation?.success && (
+                                                    <div className="rounded-xl border border-brand-border dark:border-dark-border p-4 bg-brand-gray/30 dark:bg-dark-border/20 space-y-1.5 text-sm">
+                                                        <div className="flex justify-between"><span className="text-brand-inactive-text">Subtotal</span><span className="font-semibold">{formatCurrency(chargeTarget)}</span></div>
+                                                        <div className="flex justify-between"><span className="text-brand-inactive-text">Desc. meio pagamento</span><span className="font-semibold">- {formatCurrency(Number(paymentCalculation.paymentMethodDiscountAmount || 0))}</span></div>
+                                                        <div className="flex justify-between"><span className="text-brand-inactive-text">Juros</span><span className="font-semibold">+ {formatCurrency(Number(paymentCalculation.interestAmount || 0))}</span></div>
+                                                        <div className="flex justify-between"><span className="text-brand-inactive-text">Taxa</span><span className="font-semibold">{formatCurrency(Number(paymentCalculation.feeAmount || 0))}</span></div>
+                                                        <div className="flex justify-between border-t border-brand-border dark:border-dark-border pt-2 mt-2"><span className="font-bold">Total final</span><span className="font-bold">{formatCurrency(Number(paymentCalculation.finalAmount || 0))}</span></div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </motion.div>
                                     )}
@@ -792,6 +849,36 @@ const PaymentModal = ({
                                                         />
                                                     );
                                                 })}
+                                            </div>
+                                        </motion.div>
+                                    )}
+
+                                    {view === 'method_type_select' && (
+                                        <motion.div key="method_type_select" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="w-full">
+                                            <h3 className="text-sm font-bold text-brand-inactive-text mb-4 tracking-wide uppercase">Selecione um método</h3>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                {activeMethods
+                                                    .filter((method) => normalizeMethodType(method.type) === selectedMethodType)
+                                                    .map((method) => {
+                                                        const normalizedType = normalizeMethodType(method.type);
+                                                        const MethodIcon = normalizedType === "cash"
+                                                            ? MoneyIcon
+                                                            : normalizedType === "pix"
+                                                                ? QRCodeIcon
+                                                                : CreditCardIcon;
+                                                        const targetView = normalizedType === "cash" ? "money" : normalizedType === "pix" ? "pix" : "card";
+                                                        return (
+                                                            <PaymentMethodCard
+                                                                key={`single-${method.id}`}
+                                                                icon={MethodIcon}
+                                                                label={method.name}
+                                                                onClick={() => {
+                                                                    setSelectedMethodId(method.id);
+                                                                    setView(targetView);
+                                                                }}
+                                                            />
+                                                        );
+                                                    })}
                                             </div>
                                         </motion.div>
                                     )}
@@ -946,7 +1033,7 @@ const PaymentModal = ({
                             )}
 
                             {/* 4. Split Method Select Footer */}
-                            {view === 'split_method_select' && (
+                            {(view === 'split_method_select' || view === 'method_type_select') && (
                                 <ActionFooter showConfirm={false} />
                             )}
                         </div>

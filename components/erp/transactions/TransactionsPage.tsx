@@ -38,6 +38,7 @@ import { getInstallmentGroupDetailsAction } from "@/app/actions/erp/transactions
 import { recordInstallmentPaymentAction } from "@/app/actions/erp/transactions"
 import { settleInstallmentGroupAction } from "@/app/actions/erp/transactions"
 import { getFinancialTransactionsAction } from "@/app/actions/erp/transactions"
+import { getPaymentMethodsAction } from "@/app/actions/payment-methods"
 import { useRouter } from "next/navigation"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import { useNotification } from "@/hooks/use-notification"
@@ -166,6 +167,7 @@ export default function TransactionsPage({
     const [interestAmount, setInterestAmount] = useState("0")
     const [discountAmount, setDiscountAmount] = useState("0")
     const [paymentMethodId, setPaymentMethodId] = useState("")
+    const [fallbackPaymentMethods, setFallbackPaymentMethods] = useState<any[]>([])
     const [confirmRecurringPayment, setConfirmRecurringPayment] = useState<ERPTransaction | null>(null)
     const [confirmSettleGroup, setConfirmSettleGroup] = useState<ERPTransaction | null>(null)
     const [settlingGroup, setSettlingGroup] = useState(false)
@@ -192,6 +194,7 @@ export default function TransactionsPage({
     const [settlePaymentsByInstallment, setSettlePaymentsByInstallment] = useState<
         Record<string, { paymentAmount: string; interestAmount: string; discountAmount: string; paymentMethodId: string }>
     >({})
+    const resolvedPaymentMethods = paymentMethods?.length ? paymentMethods : fallbackPaymentMethods
     const settleSummary = useMemo(() => {
         if (!confirmSettleGroup) return null
         const rows = installmentDetail?.installments || []
@@ -247,6 +250,19 @@ export default function TransactionsPage({
         window.addEventListener("resize", checkScroll)
         return () => window.removeEventListener("resize", checkScroll)
     }, [checkScroll, viewMode, loadedTransactions.length])
+
+    useEffect(() => {
+        let active = true
+        if (paymentMethods?.length) return
+        ;(async () => {
+            const methods = await getPaymentMethodsAction(partnerId)
+            if (!active) return
+            setFallbackPaymentMethods(Array.isArray(methods) ? methods : [])
+        })()
+        return () => {
+            active = false
+        }
+    }, [paymentMethods, partnerId])
 
     // ── Search debounce (300ms) ──────────────────────────────────────
     useEffect(() => {
@@ -404,6 +420,13 @@ export default function TransactionsPage({
         const passthrough: ERPTransaction[] = []
         for (const item of result) {
             if (!item.isRecurringOccurrence && item.installmentGroupId) {
+                const fullStats = fullGroupStats.get(item.installmentGroupId)
+                const totalCount = fullStats?.total || item.installmentTotalCount || 0
+                const paidCount = fullStats?.paid || 0
+                const hasGroupPending = totalCount > 0 && paidCount < totalCount
+                if (activeTab === "Transações" && hasGroupPending) {
+                    continue
+                }
                 if (String(item.rawStatus || "").toLowerCase() === "paid") {
                     passthrough.push(item)
                     continue
@@ -427,8 +450,10 @@ export default function TransactionsPage({
             const pendingCount = Math.max(0, totalCount - paidCount)
             if (pendingCount <= 0) continue
 
-            const amountRemainingOnCurrent =
-                nextPending.installmentRemainingAmount ?? nextPending.amount
+            const groupRemainingAmount =
+                Math.round(
+                    sortedPending.reduce((acc, row) => acc + Number(row.installmentRemainingAmount ?? row.amount ?? 0), 0) * 100,
+                ) / 100
 
             collapsedGroups.push({
                 ...nextPending,
@@ -439,7 +464,7 @@ export default function TransactionsPage({
                 installmentPaidCount: paidCount,
                 installmentPendingCount: pendingCount,
                 isInstallmentGroup: true,
-                amount: amountRemainingOnCurrent,
+                amount: groupRemainingAmount,
                 status: `${pendingCount}/${totalCount} pendentes`,
                 statusVariant: "orange",
             })
@@ -669,13 +694,13 @@ export default function TransactionsPage({
                     paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
                     interestAmount: "0",
                     discountAmount: "0",
-                    paymentMethodId: paymentMethods?.[0]?.id || "",
+                    paymentMethodId: resolvedPaymentMethods?.[0]?.id || "",
                 }
             }
             setSettlePaymentsByInstallment(nextState)
             setConfirmSettleGroup(transaction)
         },
-        [installmentDetail, paymentMethods, partnerId, notifyError],
+        [installmentDetail, resolvedPaymentMethods, partnerId, notifyError],
     )
 
     const handleConfirmSettleInstallmentGroup = useCallback(async () => {
@@ -771,9 +796,9 @@ export default function TransactionsPage({
         setPaymentAmount(String(Number(row.remainingAmount || 0).toFixed(2)))
         setInterestAmount("0")
         setDiscountAmount("0")
-        setPaymentMethodId(paymentMethods?.[0]?.id || "")
+        setPaymentMethodId(resolvedPaymentMethods?.[0]?.id || "")
         setPaymentModalOpen(true)
-    }, [installmentDetail, notifyError, paymentMethods])
+    }, [installmentDetail, notifyError, resolvedPaymentMethods])
 
     const handleConfirmInstallmentPayment = useCallback(async () => {
         if (!selectedInstallmentForPayment) return
@@ -1208,9 +1233,12 @@ export default function TransactionsPage({
                                     <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                                         <div className="flex justify-between items-start gap-3">
                                             <div className="min-w-0">
-                                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                                                    {row.description}
-                                                </h3>
+                                                <div className="w-10 h-10 rounded-full bg-brand-slate dark:bg-dark-border/50 flex items-center justify-center mb-2">
+                                                    {(() => {
+                                                        const PaymentIcon = getPaymentIcon(String(row.paymentType || ""))
+                                                        return <PaymentIcon className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
+                                                    })()}
+                                                </div>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <span className="text-xs font-semibold px-2 py-0.5 rounded bg-brand-slate dark:bg-dark-border text-brand-dark dark:text-dark-heading">
                                                         Parcela {row.installmentNumber}/{installmentDetail.group?.installments_count}
@@ -1229,9 +1257,10 @@ export default function TransactionsPage({
                                                 </span>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-4 mt-2 py-2 px-3 rounded-lg bg-brand-gray/50 dark:bg-dark-border/20 border border-brand-border/50 dark:border-dark-border/30">
+                                        <div className="flex items-center gap-4 mt-2 py-2 px-3 rounded-full bg-brand-gray/50 dark:bg-dark-border/20 border border-brand-border/50 dark:border-dark-border/30">
                                             <div className="flex flex-col"><span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider">Restante</span><span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{formatCurrency(row.remainingAmount || 0)}</span></div>
                                             <div className="flex flex-col border-l border-brand-border dark:border-dark-border pl-4"><span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider">Pago</span><span className="font-bold text-[13px] text-brand-green">{formatCurrency(row.paidAmount || 0)}</span></div>
+                                            <div className="flex flex-col border-l border-brand-border dark:border-dark-border pl-4"><span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider">Meio</span><span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{row.paymentType || "-"}</span></div>
                                         </div>
                                     </div>
                                     {row.status !== "paid" && (
@@ -1355,7 +1384,7 @@ export default function TransactionsPage({
                                                 <div className="flex flex-col gap-1.5">
                                                     <label className="text-[10px] font-bold text-brand-inactive-text uppercase">Meio</label>
                                                     <select value={values.paymentMethodId} onChange={(e) => setSettlePaymentsByInstallment((prev) => ({ ...prev, [row.id]: { ...values, paymentMethodId: e.target.value } }))} className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-2 bg-white dark:bg-dark-surface/50 text-sm transition-all focus:border-brand-primary outline-none">
-                                                        {(paymentMethods || []).map((pm: any) => (<option key={pm.id} value={pm.id}>{pm.name}</option>))}
+                                                        {(resolvedPaymentMethods || []).map((pm: any) => (<option key={pm.id} value={pm.id}>{pm.name}</option>))}
                                                     </select>
                                                 </div>
                                                 <div className="flex flex-col gap-1.5">
@@ -1430,7 +1459,7 @@ export default function TransactionsPage({
                                     <div className="flex flex-col gap-1.5">
                                         <label className="text-xs font-bold text-brand-inactive-text uppercase ml-1">Meio de Pagamento</label>
                                         <select value={paymentMethodId} onChange={(e) => setPaymentMethodId(e.target.value)} className="w-full rounded-xl h-11 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm font-medium transition-all focus:border-brand-primary outline-none shadow-sm">
-                                            {(paymentMethods || []).map((pm: any) => (<option key={pm.id} value={pm.id}>{pm.name}</option>))}
+                                            {(resolvedPaymentMethods || []).map((pm: any) => (<option key={pm.id} value={pm.id}>{pm.name}</option>))}
                                         </select>
                                     </div>
                                     <div className="flex flex-col gap-1.5">

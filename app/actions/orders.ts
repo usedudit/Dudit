@@ -17,6 +17,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
 import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
+import { calculatePaymentAmounts } from "@/lib/payments/calculation"
 
 // Single revalidation to minimize cache calls
 const revalidateOrdersCache = async () => await revalidateOrders("")
@@ -202,6 +203,37 @@ export async function createOrderAction(data: {
     financeAccountId = bestMethod?.default_finance_account_id || null
   }
 
+  let paymentAwareTotal = finalTotal
+  const chosenType = toCanonicalPaymentType(data.paymentMethod)
+  const bestMethodForPricing = await pickBestPaymentMethod(
+    supabase as any,
+    chosenType,
+    data.partnerId,
+    { preferDefault: true },
+  )
+  if (bestMethodForPricing?.id) {
+    const { data: fees } = await supabase
+      .from("payment_method_installment_fees")
+      .select("installment_number, fee_percent")
+      .eq("payment_method_id", bestMethodForPricing.id)
+    const calc = calculatePaymentAmounts({
+      originalAmount: finalTotal,
+      installmentNumber: 1,
+      paymentMethod: {
+        feePercent: Number(bestMethodForPricing.fee_percent || bestMethodForPricing.percentage_rate || 0),
+        feeFixed: Number(bestMethodForPricing.fee_fixed || bestMethodForPricing.fixed_amount || 0),
+        feeBearer: (bestMethodForPricing.fee_bearer || "merchant") as "merchant" | "customer",
+        discountPercent: Number(bestMethodForPricing.discount_percent || 0),
+        maxInstallments: Number(bestMethodForPricing.max_installments || 1),
+        installmentFees: (fees || []).map((row: any) => ({
+          installmentNumber: Number(row.installment_number || 1),
+          feePercent: Number(row.fee_percent || 0),
+        })),
+      },
+    })
+    paymentAwareTotal = Number(calc.finalAmount || finalTotal)
+  }
+
   if (!financeAccountId) {
     return {
       error: paymentIsMp
@@ -214,7 +246,7 @@ export async function createOrderAction(data: {
     buyer_id: buyerId,
     customer_name: buyerProfile?.full_name || null,
     partner_id: data.partnerId,
-    total_amount: finalTotal,
+    total_amount: paymentAwareTotal,
     delivery_type: data.deliveryType,
     delivery_address: data.deliveryAddress,
     payment_method: data.paymentMethod,
@@ -285,7 +317,7 @@ export async function createOrderAction(data: {
     orderId: order.id,
     couponApplied: couponIdToSave ? true : false,
     couponDiscount: couponDiscountAmount,
-    finalTotal,
+    finalTotal: paymentAwareTotal,
   }
 }
 

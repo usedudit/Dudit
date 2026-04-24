@@ -748,7 +748,6 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
       }
 
       notifySuccess("Venda finalizada com sucesso.")
-      setIsPaymentModalOpen(false)
       setPreSales((prev) => prev.filter((draft) => draft.id !== preSaleIdToFinalize))
       clearCurrentOrder()
       setLastSavedOrderSignature(EMPTY_ORDER_SIGNATURE)

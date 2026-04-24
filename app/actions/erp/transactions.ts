@@ -1203,7 +1203,7 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
 
         const { data: rows, error: rowsErr } = await supabase
             .from("transactions")
-            .select("id, description, amount, original_amount, due_date, payment_date, status, installment_number")
+            .select("id, description, amount, original_amount, due_date, payment_date, status, installment_number, payment_method_id, payment_type")
             .eq("partner_id", input.partnerId)
             .eq("installment_group_id", input.installmentGroupId)
             .order("installment_number", { ascending: true })
@@ -1225,6 +1225,22 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
             }
         }
 
+        const paymentMethodIds = new Set<string>()
+        for (const row of rows || []) {
+            if ((row as any).payment_method_id) paymentMethodIds.add(String((row as any).payment_method_id))
+        }
+        const paymentMethodLabelById = new Map<string, string>()
+        if (paymentMethodIds.size > 0) {
+            const { data: pms } = await supabase
+                .from("payment_methods")
+                .select("id, name, payment_type")
+                .eq("partner_id", input.partnerId)
+                .in("id", [...paymentMethodIds])
+            for (const pm of pms || []) {
+                paymentMethodLabelById.set(String((pm as any).id), formatPaymentMethodLabel((pm as any).name, (pm as any).payment_type) || "Não informado")
+            }
+        }
+
         return {
             success: true as const,
             data: {
@@ -1239,6 +1255,8 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
                         payment_date: string | null
                         status: string | null
                         installment_number: number | null
+                        payment_method_id: string | null
+                        payment_type: string | null
                     }) => {
                     const paid = String(row.status || "").toLowerCase() === "paid"
                     const dueYmdRow = row.due_date ? String(row.due_date).slice(0, 10) : ""
@@ -1262,6 +1280,11 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
                             ? formatBrazilDateFromDbInput(String(row.due_date).slice(0, 10), "dayMonthYear")
                             : "-",
                         paymentDate: row.payment_date,
+                        paymentMethodId: row.payment_method_id || null,
+                        paymentType:
+                            (row.payment_method_id ? paymentMethodLabelById.get(String(row.payment_method_id)) : null) ||
+                            (row.payment_type ? formatPaymentMethodLabel(row.payment_type, null) : null) ||
+                            "Não informado",
                         status: paid || remainingAmount <= 0 ? "paid" : overdue ? "overdue" : "pending",
                     }
                 }),
@@ -1353,57 +1376,23 @@ export async function recordInstallmentPaymentAction(input: {
             refund_kind: tx.refund_kind,
         })
 
-        const { data: groupData } = await supabase
-            .from("installment_groups")
-            .select("id, description, installments_count")
-            .eq("id", tx.installment_group_id)
-            .eq("partner_id", input.partnerId)
-            .maybeSingle()
-
-        const installmentCount = Number(groupData?.installments_count || 0) || null
-        const installmentNumber = Number(tx.installment_number || 0) || null
-        await insertTransactionsWithOptionalCreator(supabase, {
-            partner_id: input.partnerId,
-            description: installmentNumber && installmentCount
-                ? `Pagamento parcela ${installmentNumber}/${installmentCount} - ${tx.description}`
-                : `Pagamento de parcela - ${tx.description}`,
-            category: tx.category || "Parcelado",
-            category_id: tx.category_id || null,
-            subcategory_id: tx.subcategory_id || null,
-            account_id: tx.account_id || null,
-            contact_id: tx.contact_id || null,
-            customer_id: tx.customer_id || null,
-            contact_type: tx.contact_type || null,
-            amount: finalPaid,
-            due_date: null,
+        const updatePayload: Record<string, unknown> = {
+            updated_at: nowIso,
             payment_date: nowIso,
-            transaction_date: nowIso,
-            status: "paid",
-            notes: null,
-            payment_type: tx.payment_type || null,
-            payment_method_id: input.paymentMethodId || null,
-            original_amount: finalPaid,
-            interest_amount: Math.max(0, interestAmount),
-            fee_amount: 0,
-            transaction_type: tx.transaction_type,
-            origin: "manual",
-            refund_kind: tx.refund_kind || null,
-            reference_note: `installment_payment:${input.transactionId}`,
-            created_by_user_id: userId,
-        })
-
-        if (fullyPaid) {
-            const { error: updateErr } = await supabase
-                .from("transactions")
-                .update({
-                    status: "paid",
-                    payment_date: nowIso,
-                    updated_at: nowIso,
-                })
-                .eq("id", input.transactionId)
-                .eq("partner_id", input.partnerId)
-            if (updateErr) throw updateErr
         }
+        if (input.paymentMethodId !== undefined) {
+            updatePayload.payment_method_id = input.paymentMethodId || null
+            updatePayload.payment_type = await paymentMethodDisplayLabel(supabase, input.partnerId, input.paymentMethodId || null)
+        }
+        if (fullyPaid) {
+            updatePayload.status = "paid"
+        }
+        const { error: updateErr } = await supabase
+            .from("transactions")
+            .update(updatePayload)
+            .eq("id", input.transactionId)
+            .eq("partner_id", input.partnerId)
+        if (updateErr) throw updateErr
 
         await logAuditEvent({
             partnerId: input.partnerId,
@@ -1456,13 +1445,6 @@ export async function settleInstallmentGroupAction(input: {
         const supabase = await getSupabaseServerClient()
         const nowIso = new Date().toISOString()
 
-        const { data: groupData } = await supabase
-            .from("installment_groups")
-            .select("id, description, installments_count")
-            .eq("id", input.installmentGroupId)
-            .eq("partner_id", input.partnerId)
-            .maybeSingle()
-
         const { data: txRows, error: txErr } = await supabase
             .from("transactions")
             .select("id, status, installment_number, description, category, category_id, subcategory_id, account_id, contact_id, customer_id, contact_type, payment_type, notes, due_date, amount, original_amount, transaction_type, refund_kind")
@@ -1493,8 +1475,6 @@ export async function settleInstallmentGroupAction(input: {
         const paymentsToInsert: Record<string, unknown>[] = []
         const txIdsToMarkPaid: string[] = []
         let affectedCount = 0
-        let settlementTotal = 0
-        let baseTxForConsolidated: any = null
 
         for (const row of rows as any[]) {
             const original = Math.abs(Number(row.original_amount ?? row.amount ?? 0))
@@ -1529,10 +1509,11 @@ export async function settleInstallmentGroupAction(input: {
                 amount: finalPaid,
                 refund_kind: row.refund_kind,
             })
-            txIdsToMarkPaid.push(row.id)
+            const paidAfter = paidSoFar + finalPaid
+            if (paidAfter + 0.0001 >= original) {
+                txIdsToMarkPaid.push(row.id)
+            }
             affectedCount += 1
-            settlementTotal += finalPaid
-            baseTxForConsolidated = baseTxForConsolidated || row
         }
 
         if (paymentsToInsert.length > 0) {
@@ -1551,36 +1532,6 @@ export async function settleInstallmentGroupAction(input: {
                 .eq("partner_id", input.partnerId)
                 .in("id", txIdsToMarkPaid)
             if (updErr) throw updErr
-        }
-
-        if (settlementTotal > 0 && baseTxForConsolidated) {
-            await insertTransactionsWithOptionalCreator(supabase, {
-                partner_id: input.partnerId,
-                description: `Quitação parcelado: ${groupData?.description || baseTxForConsolidated.description || "Parcelado"}`,
-                category: baseTxForConsolidated.category || "Parcelado",
-                category_id: baseTxForConsolidated.category_id || null,
-                subcategory_id: baseTxForConsolidated.subcategory_id || null,
-                account_id: baseTxForConsolidated.account_id || null,
-                contact_id: baseTxForConsolidated.contact_id || null,
-                customer_id: baseTxForConsolidated.customer_id || null,
-                contact_type: baseTxForConsolidated.contact_type || null,
-                amount: settlementTotal,
-                due_date: null,
-                payment_date: nowIso,
-                transaction_date: nowIso,
-                status: "paid",
-                notes: null,
-                payment_type: baseTxForConsolidated.payment_type || null,
-                payment_method_id: null,
-                original_amount: settlementTotal,
-                interest_amount: null,
-                fee_amount: 0,
-                transaction_type: baseTxForConsolidated.transaction_type,
-                origin: "manual",
-                refund_kind: baseTxForConsolidated.refund_kind || null,
-                reference_note: `installment_settlement:${input.installmentGroupId}`,
-                created_by_user_id: userId,
-            })
         }
 
         await Promise.allSettled(
@@ -1884,6 +1835,19 @@ export type TransactionDetailPayload = {
     }>
     /** Itens só com descrição + valor (pagamentos de parcela / quitação parcelada). */
     transactionItemsCompact?: boolean
+    installmentBreakdown?: Array<{
+        id: string
+        installmentNumber: number
+        totalCount: number
+        dueDate: string | null
+        paymentDate: string | null
+        originalAmount: number
+        paidAmount: number
+        interestAmount: number
+        discountAmount: number
+        paymentType: string
+        status: "paid" | "pending" | "overdue"
+    }>
     categoryLine: string
     subcategoryLine: string | null
     accountLine: string | null
@@ -1913,7 +1877,7 @@ export async function getTransactionDetailsAction(
         id, description, category, amount, due_date, payment_date, created_at, updated_at, status, notes,
         payment_type, transaction_type, contact_id, customer_id, contact_type, transfer_group_id,
         refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id,
-        payment_method_id, transaction_date, created_by_user_id,
+        payment_method_id, transaction_date, created_by_user_id, installment_group_id,
         transaction_contacts(name, type, description)
       `,
             )
@@ -1928,7 +1892,7 @@ export async function getTransactionDetailsAction(
         id, description, category, amount, due_date, payment_date, created_at, updated_at, status, notes,
         payment_type, transaction_type, contact_id, customer_id, contact_type, transfer_group_id,
         refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id,
-        payment_method_id, transaction_date,
+        payment_method_id, transaction_date, installment_group_id,
         transaction_contacts(name, type, description)
       `,
                 )
@@ -2026,6 +1990,66 @@ export async function getTransactionDetailsAction(
                 active: paid || cancelled,
                 danger: cancelled,
             },
+        }
+
+        let installmentBreakdown: TransactionDetailPayload["installmentBreakdown"] | undefined = undefined
+        if (row.installment_group_id) {
+            const { data: groupRows } = await supabase
+                .from("transactions")
+                .select("id, installment_number, due_date, payment_date, status, amount, original_amount, payment_type")
+                .eq("partner_id", partnerId)
+                .eq("installment_group_id", row.installment_group_id)
+                .order("installment_number", { ascending: true })
+            const txIds = (groupRows || []).map((g: any) => g.id)
+            const paymentByTx = new Map<string, number>()
+            if (txIds.length > 0) {
+                const { data: paymentRows } = await supabase
+                    .from("transaction_payments")
+                    .select("transaction_id, amount")
+                    .eq("partner_id", partnerId)
+                    .in("transaction_id", txIds)
+                for (const p of paymentRows || []) {
+                    const tid = String((p as any).transaction_id || "")
+                    paymentByTx.set(tid, (paymentByTx.get(tid) || 0) + Number((p as any).amount || 0))
+                }
+            }
+            const totalCount = groupRows?.length || 0
+            installmentBreakdown = (groupRows || []).map((g: any) => {
+                const original = Math.abs(Number(g.original_amount ?? g.amount ?? 0))
+                const paidAmount = Math.min(original, Math.max(0, paymentByTx.get(String(g.id)) || 0))
+                const dueYmdInstallment = g.due_date ? String(g.due_date).slice(0, 10) : ""
+                const overdue =
+                    String(g.status || "").toLowerCase() !== "paid" &&
+                    !!dueYmdInstallment &&
+                    /^\d{4}-\d{2}-\d{2}$/.test(dueYmdInstallment) &&
+                    diffCalendarDaysInSaoPaulo(dueYmdInstallment) < 0
+                return {
+                    id: String(g.id),
+                    installmentNumber: Number(g.installment_number || 0),
+                    totalCount,
+                    dueDate: g.due_date ? formatDateLabel(g.due_date) : null,
+                    paymentDate: g.payment_date ? formatDateTime(g.payment_date) : null,
+                    originalAmount: original,
+                    paidAmount,
+                    interestAmount: 0,
+                    discountAmount: 0,
+                    paymentType: g.payment_type ? formatPaymentMethodLabel(g.payment_type, null) : "Não informado",
+                    status: String(g.status || "").toLowerCase() === "paid" ? "paid" : overdue ? "overdue" : "pending",
+                }
+            })
+            const allInstallmentsPaid = installmentBreakdown.length > 0 && installmentBreakdown.every((i) => i.status === "paid")
+            if (allInstallmentsPaid) {
+                const latestPayment = (groupRows || [])
+                    .map((g: any) => (g.payment_date ? new Date(String(g.payment_date)).getTime() : 0))
+                    .reduce((max: number, n: number) => Math.max(max, n), 0)
+                timeline.step2 = {
+                    label: row.transaction_type === "income" ? "Finalizado (Recebido)" : "Finalizado (Pago)",
+                    date: latestPayment ? formatDayMonth(new Date(latestPayment).toISOString()) : timeline.step2.date,
+                    time: latestPayment ? formatTime(new Date(latestPayment).toISOString()) : timeline.step2.time,
+                    active: true,
+                    danger: false,
+                }
+            }
         }
 
         let items: TransactionDetailPayload["items"] = []
@@ -2292,6 +2316,7 @@ export async function getTransactionDetailsAction(
             timeline,
             items,
             transactionItemsCompact,
+            installmentBreakdown,
             categoryLine: String(row.category || "").trim() || "-",
             subcategoryLine,
             accountLine,

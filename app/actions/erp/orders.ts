@@ -16,6 +16,7 @@ import { revalidateStockMovements } from "@/lib/utils/revalidation"
 import { finalizeOrderInventory, releaseOrderInventory, reserveOrderInventory, shouldDeductInventory } from "@/lib/stock/reservations"
 import { validateCoupon, validateCouponById } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
+import { calculatePaymentAmounts } from "@/lib/payments/calculation"
 
 type ERPItemPayload = {
     productId: string | null
@@ -53,6 +54,8 @@ type ERPOrderPayload = {
     paymentBreakdown?: Array<{
         method: string
         amount: number
+        paymentMethodId?: string | null
+        installmentNumber?: number
     }>
     address?: {
         zipCode: string
@@ -75,6 +78,8 @@ type OrderStockItem = {
 type PaymentBreakdownEntry = {
     method: string
     amount: number
+    paymentMethodId?: string | null
+    installmentNumber?: number
 }
 
 function isMissingOrdersIsPosSaleColumnError(error: unknown): boolean {
@@ -170,10 +175,116 @@ function sanitizePaymentBreakdown(entries: ERPOrderPayload["paymentBreakdown"]) 
         .map((entry) => ({
             method: normalizePaymentMethodLabel(entry?.method),
             amount: Math.max(0, Number(entry?.amount || 0)),
+            paymentMethodId: entry?.paymentMethodId || null,
+            installmentNumber: Math.max(1, Math.floor(Number(entry?.installmentNumber || 1))),
         }))
         .filter((entry) => entry.method && entry.amount > 0.009)
 
     return normalizedEntries
+}
+
+async function applyPaymentMethodPricingToTotal(
+    supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+    partnerId: string,
+    baseTotal: number,
+    paymentBreakdown: PaymentBreakdownEntry[],
+) {
+    const safeBase = Math.max(0, Math.round(Number(baseTotal || 0) * 100) / 100)
+    const breakdown = paymentBreakdown || []
+    if (breakdown.length === 0) {
+        return { finalTotal: safeBase, feeAmount: 0, interestAmount: 0, paymentMethodDiscountAmount: 0, adjustedBreakdown: [] as PaymentBreakdownEntry[] }
+    }
+
+    const methodIds = Array.from(new Set(breakdown.map((b) => b.paymentMethodId).filter(Boolean))) as string[]
+    if (methodIds.length === 0) {
+        return { finalTotal: safeBase, feeAmount: 0, interestAmount: 0, paymentMethodDiscountAmount: 0, adjustedBreakdown: breakdown }
+    }
+
+    const [{ data: methods }, { data: fees }] = await Promise.all([
+        supabase
+            .from("payment_methods")
+            .select("id, fee_percent, fee_fixed, fee_bearer, discount_percent, max_installments")
+            .eq("partner_id", partnerId)
+            .eq("is_active", true)
+            .in("id", methodIds),
+        supabase
+            .from("payment_method_installment_fees")
+            .select("payment_method_id, installment_number, fee_percent")
+            .in("payment_method_id", methodIds),
+    ])
+
+    const methodById = new Map<string, any>((methods || []).map((m: any) => [String(m.id), m]))
+    const feesByMethod = new Map<string, Array<{ installmentNumber: number; feePercent: number }>>()
+    for (const row of fees || []) {
+        const key = String((row as any).payment_method_id || "")
+        if (!key) continue
+        const arr = feesByMethod.get(key) || []
+        arr.push({
+            installmentNumber: Number((row as any).installment_number || 1),
+            feePercent: Number((row as any).fee_percent || 0),
+        })
+        feesByMethod.set(key, arr)
+    }
+
+    const rawSum = breakdown.reduce((acc, row) => acc + Math.max(0, Number(row.amount || 0)), 0)
+    const baseCents = Math.round(safeBase * 100)
+    const tempBaseCents: number[] = []
+    let allocated = 0
+    for (let i = 0; i < breakdown.length; i += 1) {
+        if (i === breakdown.length - 1) {
+            tempBaseCents.push(baseCents - allocated)
+            break
+        }
+        const weight = rawSum > 0 ? Math.max(0, Number(breakdown[i].amount || 0)) / rawSum : 1 / breakdown.length
+        const cents = Math.max(0, Math.round(baseCents * weight))
+        tempBaseCents.push(cents)
+        allocated += cents
+    }
+
+    const adjustedBreakdown: PaymentBreakdownEntry[] = []
+    let finalTotal = 0
+    let feeAmount = 0
+    let interestAmount = 0
+    let paymentMethodDiscountAmount = 0
+
+    for (let i = 0; i < breakdown.length; i += 1) {
+        const row = breakdown[i]
+        const method = row.paymentMethodId ? methodById.get(String(row.paymentMethodId)) : null
+        const rowBase = Math.max(0, tempBaseCents[i] || 0) / 100
+        if (!method?.id) {
+            adjustedBreakdown.push({ ...row, amount: rowBase })
+            finalTotal += rowBase
+            continue
+        }
+        const calc = calculatePaymentAmounts({
+            originalAmount: rowBase,
+            installmentNumber: row.installmentNumber || 1,
+            paymentMethod: {
+                feePercent: Number(method.fee_percent || 0),
+                feeFixed: Number(method.fee_fixed || 0),
+                feeBearer: (method.fee_bearer || "merchant") as "merchant" | "customer",
+                discountPercent: Number(method.discount_percent || 0),
+                maxInstallments: Number(method.max_installments || 1),
+                installmentFees: feesByMethod.get(String(method.id)) || [],
+            },
+        })
+        adjustedBreakdown.push({
+            ...row,
+            amount: Number(calc.finalAmount || 0),
+        })
+        finalTotal += Number(calc.finalAmount || 0)
+        feeAmount += Number(calc.feeAmount || 0)
+        interestAmount += Number(calc.interestAmount || 0)
+        paymentMethodDiscountAmount += Number(calc.paymentMethodDiscountAmount || 0)
+    }
+
+    return {
+        finalTotal: Math.round(finalTotal * 100) / 100,
+        feeAmount: Math.round(feeAmount * 100) / 100,
+        interestAmount: Math.round(interestAmount * 100) / 100,
+        paymentMethodDiscountAmount: Math.round(paymentMethodDiscountAmount * 100) / 100,
+        adjustedBreakdown,
+    }
 }
 
 function buildPaymentMethodSummary(
@@ -1024,13 +1135,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         items: sanitizedItems,
     })
     if (stockValidationError) return { error: stockValidationError }
-    const paymentState = resolvePaymentState({
-        requestedStatus: data.paymentStatus,
-        totalAmount: data.totalAmount,
-        paidAmount: data.paidAmount,
-    })
     const sanitizedPaymentBreakdown = sanitizePaymentBreakdown(data.paymentBreakdown)
-    const paymentMethodSummary = buildPaymentMethodSummary(sanitizedPaymentBreakdown, data.paymentMethod)
     if (!data.financeAccountId) {
         return { error: "Selecione a conta de recebimento da venda." }
     }
@@ -1099,8 +1204,25 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
 
     // Override client-sent values with server-computed ones
     couponDiscountAmount = pricingResult.couponDiscountAmount
-    const serverTotalAmount = pricingResult.finalTotal
+    let serverTotalAmount = pricingResult.finalTotal
     const serverShippingCost = pricingResult.shipping
+    const paymentPricing = await applyPaymentMethodPricingToTotal(
+        supabase,
+        partnerId,
+        serverTotalAmount,
+        sanitizedPaymentBreakdown,
+    )
+    serverTotalAmount = paymentPricing.finalTotal
+    const adjustedPaymentBreakdown =
+        paymentPricing.adjustedBreakdown?.length > 0
+            ? paymentPricing.adjustedBreakdown
+            : sanitizedPaymentBreakdown
+    const paymentMethodSummary = buildPaymentMethodSummary(adjustedPaymentBreakdown, data.paymentMethod)
+    const paymentState = resolvePaymentState({
+        requestedStatus: data.paymentStatus,
+        totalAmount: serverTotalAmount,
+        paidAmount: data.paidAmount,
+    })
 
     let deliveryAddressStr = ""
     if (data.deliveryMethod === "delivery" && data.address) {
@@ -1129,7 +1251,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             additional_costs: data.additionalCosts,
             notes: data.notes || null,
             payment_method: paymentMethodSummary,
-            payment_breakdown: sanitizedPaymentBreakdown,
+            payment_breakdown: adjustedPaymentBreakdown,
             payment_provider: null,
             delivery_address: deliveryAddressStr || null,
             finance_account_id: data.financeAccountId,
@@ -1236,7 +1358,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             totalAmount: Number(order.total_amount || 0),
             paymentMethod: paymentMethodSummary,
             paymentProvider: order.payment_provider,
-            paymentBreakdown: sanitizedPaymentBreakdown,
+            paymentBreakdown: adjustedPaymentBreakdown,
             customerId: order.buyer_id,
             customerName: order.customer_name,
             paymentDate: new Date().toISOString(),
@@ -1459,14 +1581,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         items: stockItemsToValidate,
     })
     if (stockValidationError) return { error: stockValidationError }
-    const paymentState = resolvePaymentState({
-        requestedStatus: data.paymentStatus,
-        totalAmount: data.totalAmount,
-        paidAmount: data.paidAmount,
-        fallbackPaidAmount: Number(currentOrder.paid_amount || 0),
-    })
     const sanitizedPaymentBreakdown = sanitizePaymentBreakdown(data.paymentBreakdown)
-    const paymentMethodSummary = buildPaymentMethodSummary(sanitizedPaymentBreakdown, data.paymentMethod)
     if (!data.financeAccountId) {
         return { error: "Selecione a conta de recebimento da venda." }
     }
@@ -1549,7 +1664,25 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     })
 
     couponDiscountAmount = updatePricingResult.couponDiscountAmount
-    const updateServerTotal = updatePricingResult.finalTotal
+    let updateServerTotal = updatePricingResult.finalTotal
+    const updatePaymentPricing = await applyPaymentMethodPricingToTotal(
+        supabase,
+        partnerId,
+        updateServerTotal,
+        sanitizedPaymentBreakdown,
+    )
+    updateServerTotal = updatePaymentPricing.finalTotal
+    const adjustedPaymentBreakdown =
+        updatePaymentPricing.adjustedBreakdown?.length > 0
+            ? updatePaymentPricing.adjustedBreakdown
+            : sanitizedPaymentBreakdown
+    const paymentMethodSummary = buildPaymentMethodSummary(adjustedPaymentBreakdown, data.paymentMethod)
+    const paymentState = resolvePaymentState({
+        requestedStatus: data.paymentStatus,
+        totalAmount: updateServerTotal,
+        paidAmount: data.paidAmount,
+        fallbackPaidAmount: Number(currentOrder.paid_amount || 0),
+    })
     const updateServerShipping = updatePricingResult.shipping
 
     const { error: orderError } = await supabase
@@ -1571,7 +1704,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             additional_costs: data.additionalCosts,
             notes: data.notes || null,
             payment_method: paymentMethodSummary,
-            payment_breakdown: sanitizedPaymentBreakdown,
+            payment_breakdown: adjustedPaymentBreakdown,
             finance_account_id: data.financeAccountId,
             payment_provider: null,
             ...(deliveryAddressStr ? { delivery_address: deliveryAddressStr } : {})
@@ -1588,7 +1721,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             totalAmount: Number(data.totalAmount || 0),
             paymentMethod: paymentMethodSummary,
             paymentProvider: null,
-            paymentBreakdown: sanitizedPaymentBreakdown,
+            paymentBreakdown: adjustedPaymentBreakdown,
             customerId: data.customerId || null,
             customerName: data.customerName || null,
             paymentDate: new Date().toISOString(),

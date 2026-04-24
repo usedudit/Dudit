@@ -185,7 +185,7 @@ export async function calculatePaymentMethodAmountsAction(input: {
 
   const { data: method } = await supabase
     .from("payment_methods")
-    .select("id, partner_id, fee_percent, fee_fixed, fee_bearer")
+    .select("id, partner_id, fee_percent, fee_fixed, fee_bearer, discount_percent, max_installments")
     .eq("id", input.paymentMethodId)
     .single()
 
@@ -204,6 +204,8 @@ export async function calculatePaymentMethodAmountsAction(input: {
       feePercent: Number(method.fee_percent || 0),
       feeFixed: Number(method.fee_fixed || 0),
       feeBearer: (method.fee_bearer || "merchant") as "merchant" | "customer",
+      discountPercent: Number(method.discount_percent || 0),
+      maxInstallments: Number(method.max_installments || 1),
       installmentFees: (fees || []).map((row: any) => ({
         installmentNumber: row.installment_number,
         feePercent: Number(row.fee_percent || 0),

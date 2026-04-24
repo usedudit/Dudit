@@ -13,6 +13,7 @@ import { logAuditEvent } from "@/lib/services/timeline.service"
 import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { pickBestPaymentMethod, toPaymentMethodTypeFromLabel } from "@/lib/services/payment-method.service"
+import { calculatePaymentAmounts } from "@/lib/payments/calculation"
 
 type DraftItemInput = {
   productId?: string | null
@@ -48,6 +49,7 @@ type FinalizePaymentEntry = {
   method: string
   amount: number
   paymentMethodId?: string | null
+  installmentNumber?: number
 }
 
 type FinalizePreSaleInput = {
@@ -57,6 +59,110 @@ type FinalizePreSaleInput = {
   paidAmount: number
   paymentMethod?: string | null
   paymentBreakdown?: FinalizePaymentEntry[]
+}
+
+async function resolvePosFinalTotalWithPaymentMethod(params: {
+  supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>
+  partnerId: string
+  preSaleId: string
+  paymentBreakdown: Array<{ amount?: number; paymentMethodId?: string | null; installmentNumber?: number }>
+}) {
+  const { data: draft } = await params.supabase
+    .from("pre_sales")
+    .select("total_amount")
+    .eq("id", params.preSaleId)
+    .eq("partner_id", params.partnerId)
+    .eq("status", "draft")
+    .maybeSingle()
+  if (!draft) return null
+  const baseTotal = Math.max(0, Number(draft.total_amount || 0))
+  const rows = params.paymentBreakdown || []
+  if (rows.length === 0) return { totalAmount: baseTotal, adjustedBreakdown: [] as Array<{ amount: number; paymentMethodId: string | null; installmentNumber: number }> }
+
+  const methodIds = Array.from(new Set(rows.map((row) => row.paymentMethodId).filter(Boolean))) as string[]
+  if (methodIds.length === 0) return { totalAmount: baseTotal, adjustedBreakdown: rows.map((row) => ({ amount: Math.max(0, Number(row.amount || 0)), paymentMethodId: row.paymentMethodId || null, installmentNumber: Math.max(1, Math.floor(Number(row.installmentNumber || 1))) })) }
+
+  const [{ data: methods }, { data: fees }] = await Promise.all([
+    params.supabase
+      .from("payment_methods")
+      .select("id, fee_percent, fee_fixed, fee_bearer, discount_percent, max_installments")
+      .eq("partner_id", params.partnerId)
+      .eq("is_active", true)
+      .in("id", methodIds),
+    params.supabase
+      .from("payment_method_installment_fees")
+      .select("payment_method_id, installment_number, fee_percent")
+      .in("payment_method_id", methodIds),
+  ])
+  const methodById = new Map<string, any>((methods || []).map((m: any) => [String(m.id), m]))
+  const feesByMethod = new Map<string, Array<{ installmentNumber: number; feePercent: number }>>()
+  for (const row of fees || []) {
+    const key = String((row as any).payment_method_id || "")
+    if (!key) continue
+    const list = feesByMethod.get(key) || []
+    list.push({
+      installmentNumber: Number((row as any).installment_number || 1),
+      feePercent: Number((row as any).fee_percent || 0),
+    })
+    feesByMethod.set(key, list)
+  }
+
+  const rowSum = rows.reduce((acc, row) => acc + Math.max(0, Number(row.amount || 0)), 0)
+  const baseCents = Math.round(baseTotal * 100)
+  let allocated = 0
+  const rowBaseCents: number[] = []
+  for (let i = 0; i < rows.length; i += 1) {
+    if (i === rows.length - 1) {
+      rowBaseCents.push(baseCents - allocated)
+      break
+    }
+    const weight = rowSum > 0 ? Math.max(0, Number(rows[i].amount || 0)) / rowSum : 1 / rows.length
+    const cents = Math.max(0, Math.round(baseCents * weight))
+    rowBaseCents.push(cents)
+    allocated += cents
+  }
+
+  const adjustedBreakdown: Array<{ amount: number; paymentMethodId: string | null; installmentNumber: number }> = []
+  let totalAmount = 0
+  for (let i = 0; i < rows.length; i += 1) {
+    const row = rows[i]
+    const method = row.paymentMethodId ? methodById.get(String(row.paymentMethodId)) : null
+    const rowBase = Math.max(0, rowBaseCents[i] || 0) / 100
+    const installmentNumber = Math.max(1, Math.floor(Number(row.installmentNumber || 1)))
+    if (!method?.id) {
+      adjustedBreakdown.push({
+        amount: rowBase,
+        paymentMethodId: row.paymentMethodId || null,
+        installmentNumber,
+      })
+      totalAmount += rowBase
+      continue
+    }
+    const calc = calculatePaymentAmounts({
+      originalAmount: rowBase,
+      installmentNumber,
+      paymentMethod: {
+        feePercent: Number(method.fee_percent || 0),
+        feeFixed: Number(method.fee_fixed || 0),
+        feeBearer: (method.fee_bearer || "merchant") as "merchant" | "customer",
+        discountPercent: Number(method.discount_percent || 0),
+        maxInstallments: Number(method.max_installments || 1),
+        installmentFees: feesByMethod.get(String(method.id)) || [],
+      },
+    })
+    const amount = Number(calc.finalAmount || 0)
+    adjustedBreakdown.push({
+      amount,
+      paymentMethodId: row.paymentMethodId || null,
+      installmentNumber,
+    })
+    totalAmount += amount
+  }
+
+  return {
+    totalAmount: Math.round(totalAmount * 100) / 100,
+    adjustedBreakdown,
+  }
 }
 
 function safeMoney(n: number) {
@@ -336,7 +442,18 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
   const discountAmount = safeMoney(Math.min(Math.max(0, input.discountAmount), subtotalFromItems))
   const shippingFee = safeMoney(input.shippingFee ?? 0)
   const otherCosts = safeMoney(input.otherCosts ?? 0)
-  const totalAmount = safeMoney(subtotalFromItems - discountAmount + shippingFee + otherCosts)
+  const pricingResult = calculateOrderPricing({
+    items: normalizedItems.map((item) => ({
+      productId: item.product_id || null,
+      unitPrice: Number(item.unit_price || 0),
+      quantity: Number(item.quantity || 0),
+    })),
+    shippingCost: shippingFee,
+    additionalCosts: otherCosts,
+    manualDiscount: discountAmount > 0 ? { type: "fixed", value: discountAmount } : null,
+    coupon: null,
+  })
+  const totalAmount = safeMoney(pricingResult.finalTotal)
 
   if (normalizedItems.length === 0) return { success: false as const, error: "Não é possível salvar pré-venda sem itens." }
   if (discountAmount < 0 || totalAmount < 0 || shippingFee < 0 || otherCosts < 0) {
@@ -445,7 +562,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
   }
 
   // Build payment breakdown for RPC
-  const resolvedBreakdown: Array<{ amount: number; paymentMethodId: string | null; payment_method_id: string | null }> = []
+  const resolvedBreakdown: Array<{ amount: number; paymentMethodId: string | null; payment_method_id: string | null; installmentNumber?: number }> = []
   for (const entry of input.paymentBreakdown || []) {
     const amount = safeMoney(Number(entry.amount || 0))
     if (amount <= 0) continue
@@ -461,10 +578,41 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
       amount,
       paymentMethodId,
       payment_method_id: paymentMethodId,
+      installmentNumber: Math.max(1, Math.floor(Number(entry.installmentNumber || 1))),
     })
   }
 
-  const breakdownForRpc = resolvedBreakdown
+  let breakdownForRpc = resolvedBreakdown
+
+  const paymentAware = await resolvePosFinalTotalWithPaymentMethod({
+    supabase,
+    partnerId: input.partnerId,
+    preSaleId: input.preSaleId,
+    paymentBreakdown: resolvedBreakdown,
+  })
+  if (paymentAware !== null) {
+    if ((paymentAware.adjustedBreakdown || []).length > 0) {
+      breakdownForRpc = paymentAware.adjustedBreakdown.map((row) => ({
+        amount: safeMoney(Number(row.amount || 0)),
+        paymentMethodId: row.paymentMethodId || null,
+        payment_method_id: row.paymentMethodId || null,
+        installmentNumber: Math.max(1, Math.floor(Number(row.installmentNumber || 1))),
+      }))
+    }
+    await supabase
+      .from("pre_sales")
+      .update({
+        total_amount: safeMoney(Number(paymentAware.totalAmount || 0)),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", input.preSaleId)
+      .eq("partner_id", input.partnerId)
+      .eq("status", "draft")
+  }
+  const paidAmountForRpc =
+    breakdownForRpc.length > 0
+      ? safeMoney(breakdownForRpc.reduce((acc, row) => acc + Number(row.amount || 0), 0))
+      : paidAmount
 
   // Call atomic RPC
   const { data: saleId, error: rpcError } = await supabase.rpc("finalize_pos_sale", {
@@ -472,7 +620,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     p_pre_sale_id: input.preSaleId,
     p_finance_account_id: input.financeAccountId || null,
     p_cash_session_id: activeSessionResult.data.id,
-    p_paid_amount: paidAmount,
+    p_paid_amount: paidAmountForRpc,
     p_payment_method: input.paymentMethod || "PDV",
     p_payment_breakdown: breakdownForRpc.length > 0 ? breakdownForRpc : null,
     p_user_id: user.id,
