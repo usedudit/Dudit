@@ -28,8 +28,8 @@ import {
     updateFinanceAccountAction,
     deleteFinanceAccountAction,
     getFinanceAccountsAction,
-    type FinanceAccountType,
 } from "@/app/actions/erp/finance-accounts"
+import { type FinanceAccountType } from "@/lib/finance-utils"
 import {
     listAllTransactionContactsAction,
     createTransactionContactAction,

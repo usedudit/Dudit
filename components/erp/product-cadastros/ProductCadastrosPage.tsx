@@ -61,7 +61,8 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
         isOpen: boolean
         item: any | null
         isDeleting: boolean
-    }>({ isOpen: false, item: null, isDeleting: false })
+        subcategoryCount: number
+    }>({ isOpen: false, item: null, isDeleting: false, subcategoryCount: 0 })
 
     const [nameError, setNameError] = useState(false)
     const isProcessing = modal.isSaving || deleteModal.isDeleting
@@ -132,7 +133,11 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
     }
 
     const handleDeleteClick = (item: any) => {
-        setDeleteModal({ isOpen: true, item, isDeleting: false })
+        let subcategoryCount = 0
+        if (activeTab === "categories") {
+            subcategoryCount = metadata.categories.filter(c => c.parent_id === item.id).length
+        }
+        setDeleteModal({ isOpen: true, item, isDeleting: false, subcategoryCount })
     }
 
     const handleSave = async () => {
@@ -190,7 +195,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
             if (result.success) {
                 success("Item excluído com sucesso!")
                 refreshData()
-                setDeleteModal({ isOpen: false, item: null, isDeleting: false })
+                setDeleteModal({ isOpen: false, item: null, isDeleting: false, subcategoryCount: 0 })
             } else {
                 error(result.error || "Erro ao excluir")
                 setDeleteModal(prev => ({ ...prev, isDeleting: false }))
@@ -356,10 +361,14 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
 
             <AlertModal
                 isOpen={deleteModal.isOpen}
-                onClose={() => setDeleteModal({ isOpen: false, item: null, isDeleting: false })}
+                onClose={() => setDeleteModal({ isOpen: false, item: null, isDeleting: false, subcategoryCount: 0 })}
                 onConfirm={confirmDelete}
                 title="Excluir Item"
-                description={`Tem certeza que deseja excluir "${deleteModal.item?.name}"? Esta ação não pode ser desfeita.`}
+                description={
+                    deleteModal.subcategoryCount > 0
+                        ? `Tem certeza que deseja excluir "${deleteModal.item?.name}"? Esta categoria possui ${deleteModal.subcategoryCount} subcategoria(s) que também serão excluídas. Esta ação não pode ser desfeita.`
+                        : `Tem certeza que deseja excluir "${deleteModal.item?.name}"? Esta ação não pode ser desfeita.`
+                }
                 isDestructive
                 isLoading={deleteModal.isDeleting}
             />

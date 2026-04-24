@@ -19,9 +19,8 @@ import { useCSRFToken } from "@/hooks/use-csrf-token"
 import {
     createFinanceAccountAction,
     getFinanceAccountsAction,
-    pickBankThenCashDefaultFinanceAccountId,
-    type FinanceAccountType,
 } from "@/app/actions/erp/finance-accounts"
+import { pickBankThenCashDefaultFinanceAccountId, type FinanceAccountType } from "@/lib/finance-utils"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { Input, MoneyInput, Combobox, Checkbox } from "@/components/reusable"
 

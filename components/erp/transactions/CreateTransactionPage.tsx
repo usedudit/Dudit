@@ -47,7 +47,8 @@ import {
     createInstallmentGroupAction,
 } from "@/app/actions/erp/transactions"
 import { createFinancialCategoryAction } from "@/app/actions/erp/financial-category-metadata"
-import { createFinanceAccountAction, pickPreferredDefaultAccountId, type FinanceAccountType } from "@/app/actions/erp/finance-accounts"
+import { createFinanceAccountAction } from "@/app/actions/erp/finance-accounts"
+import { pickPreferredDefaultAccountId, type FinanceAccountType } from "@/lib/finance-utils"
 import {
     listTransactionContactsByTypeAction,
     createTransactionContactAction,
