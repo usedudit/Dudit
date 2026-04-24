@@ -22,10 +22,10 @@ export const MainView = ({ navigate }: MainViewProps) => (
     </div>
 
     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-      <ListItem icon={UserIcon} title="Informações da conta" description="Gerencie seus dados pessoais, email e telefone de contato."className="px-4 py-3 gap-4" onClick={() => navigate("account")} />
-      <ListItem icon={MapPinIcon} title="Endereço" description="Atualize seu endereço de entrega ou cobrança."className="px-4 py-3 gap-4" onClick={() => navigate("address")} />
-      <ListItem icon={LockIcon} title="Segurança" description="Altere sua senha de acesso à conta."className="px-4 py-3 gap-4" onClick={() => navigate("password")} />
-      <ListItem icon={LockIcon} title="Autenticação 2FA" description="Adicione uma camada extra de segurança com autenticador."className="px-4 py-3 gap-4" onClick={() => navigate("two-factor")} />
+      <ListItem icon={UserIcon} title="Informações da conta" description="Gerencie seus dados pessoais, email e telefone de contato." className="px-4 py-3 gap-4" onClick={() => navigate("account")} />
+      <ListItem icon={MapPinIcon} title="Endereço" description="Atualize seu endereço de entrega ou cobrança." className="px-4 py-3 gap-4" onClick={() => navigate("address")} />
+      <ListItem icon={LockIcon} title="Segurança" description="Altere sua senha de acesso à conta." className="px-4 py-3 gap-4" onClick={() => navigate("password")} />
+      <ListItem icon={LockIcon} title="Autenticação 2FA" description="Adicione uma camada extra de segurança com autenticador." className="px-4 py-3 gap-4" onClick={() => navigate("two-factor")} />
     </div>
   </motion.div>
 )

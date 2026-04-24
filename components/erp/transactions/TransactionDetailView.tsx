@@ -318,8 +318,8 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                             <CustomerCard
                                                 customer={{
                                                     name: detail.contactCard.name,
-                                                    email: detail.contactCard.email,
-                                                    phone: detail.contactCard.phone,
+                                                    email: detail.contactCard.email ?? undefined,
+                                                    phone: detail.contactCard.phone ?? undefined,
                                                 }}
                                                 showMap={false}
                                             />
