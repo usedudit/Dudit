@@ -8,6 +8,12 @@ import {
   Input,
   Checkbox,
   FormDropdown,
+  Combobox,
+  MoneyInput,
+  PercentageInput,
+  ListItem,
+  Separator,
+  Pagination,
 } from "@/components/reusable"
 import {
   createPaymentMethodAction,
@@ -15,6 +21,8 @@ import {
   getPartnerFinanceAccountsForPaymentMethodsAction,
   updatePaymentMethodAction,
 } from "@/app/actions/payment-methods"
+import { createFinanceAccountAction, getFinanceAccountsAction } from "@/app/actions/erp/finance-accounts"
+import { PlusIcon } from "@/lib/icons"
 
 interface PaymentMethod {
   id: string
@@ -31,12 +39,9 @@ interface PaymentMethod {
   discount_percent?: number | null
   pix_key_type?: "cpf" | "cnpj" | "email" | "phone" | "random" | null
   pix_key?: string | null
-  use_partner_pix_data?: boolean
   card_brand?: string | null
   installment_fees?: Array<{ installment_number: number; fee_percent: number }>
   default_finance_account_id?: string | null
-  priority?: number | null
-  is_default?: boolean | null
 }
 
 interface PaymentMethodDialogProps {
@@ -48,23 +53,43 @@ interface PaymentMethodDialogProps {
 }
 
 const AVAILABLE_BRANDS = [
-  { id: "visa", label: "Visa" },
-  { id: "mastercard", label: "Mastercard" },
-  { id: "elo", label: "Elo" },
-  { id: "american_express", label: "American Express" },
-  { id: "diners", label: "Diners Club" },
-  { id: "hipercard", label: "Hipercard" },
-  { id: "aura", label: "Aura" },
-  { id: "cabal", label: "Cabal" },
-  { id: "sorocred", label: "Sorocred" },
-  { id: "outros", label: "Outros" },
+  { id: "visa", label: "Visa", image: "https://logo.clearbit.com/visa.com" },
+  { id: "mastercard", label: "Mastercard", image: "https://logo.clearbit.com/mastercard.com" },
+  { id: "elo", label: "Elo", image: "https://logo.clearbit.com/elo.com.br" },
+  { id: "american_express", label: "American Express", image: "https://logo.clearbit.com/americanexpress.com" },
+  { id: "diners", label: "Diners Club", image: "https://logo.clearbit.com/dinersclub.com" },
+  { id: "hipercard", label: "Hipercard", image: "https://logo.clearbit.com/itau.com.br" },
+  { id: "aura", label: "Aura", image: "https://logo.clearbit.com/aura.com" },
+  { id: "cabal", label: "Cabal", image: "https://logo.clearbit.com/cabal.coop" },
+  { id: "sorocred", label: "Sorocred", image: "https://logo.clearbit.com/sorocred.com.br" },
+  { id: "outros", label: "Outros", image: "https://logo.clearbit.com/discover.com" },
 ]
+
+const ACCOUNT_TYPE_OPTIONS = [
+  { value: "cash", label: "Caixa" },
+  { value: "bank", label: "Banco" },
+  { value: "wallet", label: "Carteira" },
+] as const
 
 export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }: PaymentMethodDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoadingDetails, setIsLoadingDetails] = useState(false)
   const [financeAccounts, setFinanceAccounts] = useState<Array<{ id: string; name: string; type?: string }>>([])
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+
+  const [brandsModalOpen, setBrandsModalOpen] = useState(false)
+  const [installmentsModalOpen, setInstallmentsModalOpen] = useState(false)
+  const [brandPage, setBrandPage] = useState(1)
+  const [installmentPage, setInstallmentPage] = useState(1)
+
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
+  const [isSavingAccount, setIsSavingAccount] = useState(false)
+  const [newAccountName, setNewAccountName] = useState("")
+  const [newAccountType, setNewAccountType] = useState<"cash" | "bank" | "wallet">("bank")
+  const [newAccountInitialBalance, setNewAccountInitialBalance] = useState(0)
+  const [newAccountIsDefault, setNewAccountIsDefault] = useState(false)
+  const [newAccountNameError, setNewAccountNameError] = useState(false)
 
   const [formData, setFormData] = useState({
     name: "",
@@ -79,11 +104,8 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
     discount_percent: 0,
     pix_key_type: "email" as "cpf" | "cnpj" | "email" | "phone" | "random",
     pix_key: "",
-    use_partner_pix_data: false,
     card_brand: "" as string,
     default_finance_account_id: "",
-    priority: 0,
-    is_default: false,
     installment_fees: [{ installment_number: 1, fee_percent: 0 }] as Array<{ installment_number: number; fee_percent: number }>,
   })
 
@@ -111,14 +133,12 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
         discount_percent: 0,
         pix_key_type: "email",
         pix_key: "",
-        use_partner_pix_data: false,
         card_brand: "",
         default_finance_account_id: "",
-        priority: 0,
-        is_default: false,
         installment_fees: [{ installment_number: 1, fee_percent: 0 }],
       })
       setError(null)
+      setFieldErrors({})
       return
     }
 
@@ -141,11 +161,8 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
           discount_percent: Number(full.discount_percent || 0),
           pix_key_type: full.pix_key_type || "email",
           pix_key: full.pix_key || "",
-          use_partner_pix_data: Boolean(full.use_partner_pix_data),
           card_brand: full.card_brand || "",
           default_finance_account_id: full.default_finance_account_id || "",
-          priority: Number(full.priority || 0),
-          is_default: Boolean(full.is_default),
           installment_fees: buildInstallments(maxInstallments, full.installment_fees),
         })
       })
@@ -170,6 +187,10 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
   const isDebitCard = formData.payment_type === "debit_card"
   const isCard = isCreditCard || isDebitCard
   const showFeeFields = isPix || isDebitCard
+  const selectedBrandIds = formData.card_brand ? formData.card_brand.split(";").map((b) => b.trim()).filter(Boolean) : []
+  const selectedBrands = AVAILABLE_BRANDS.filter((brand) => selectedBrandIds.includes(brand.id))
+  const selectedInstallments = formData.installment_fees.filter((row) => row.installment_number > 0)
+  const ITEMS_PER_PAGE = 4
 
   useEffect(() => {
     if (!isCreditCard) {
@@ -187,8 +208,25 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
     }))
   }, [isCreditCard, formData.max_installments])
 
+  useEffect(() => {
+    setBrandPage(1)
+  }, [formData.card_brand])
+
+  useEffect(() => {
+    setInstallmentPage(1)
+  }, [formData.max_installments, formData.supports_installments])
+
+  const clearFieldError = (key: string) => {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }
+
   const handleBrandToggle = (brandId: string) => {
-    const brands = formData.card_brand ? formData.card_brand.split(";").map(b => b.trim()).filter(Boolean) : []
+    const brands = formData.card_brand ? formData.card_brand.split(";").map((b) => b.trim()).filter(Boolean) : []
     const index = brands.indexOf(brandId)
     if (index > -1) {
       brands.splice(index, 1)
@@ -196,6 +234,66 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
       brands.push(brandId)
     }
     setFormData({ ...formData, card_brand: brands.join("; ") })
+    clearFieldError("card_brand")
+  }
+
+  const renderBrandAvatar = (brand: (typeof AVAILABLE_BRANDS)[number]) => (
+    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border/40 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
+      <img
+        src={brand.image}
+        alt={brand.label}
+        className="w-7 h-7 object-contain"
+        onError={(e) => {
+          e.currentTarget.style.display = "none"
+          const sibling = e.currentTarget.nextElementSibling as HTMLSpanElement | null
+          if (sibling) sibling.style.display = "inline-flex"
+        }}
+      />
+      <span className="text-[10px] font-bold hidden">{brand.label.slice(0, 2).toUpperCase()}</span>
+    </div>
+  )
+
+  const refreshFinanceAccounts = async (preferredAccountId?: string) => {
+    const refreshed = await getFinanceAccountsAction(partnerId)
+    if (refreshed.success && refreshed.data) {
+      const active = (refreshed.data.accounts || []).filter((acc: any) => acc.is_active)
+      setFinanceAccounts(active.map((acc: any) => ({ id: acc.id, name: acc.name, type: acc.type })))
+      setFormData((prev) => ({
+        ...prev,
+        default_finance_account_id: preferredAccountId || prev.default_finance_account_id || active?.[0]?.id || "",
+      }))
+      if (preferredAccountId) clearFieldError("default_finance_account_id")
+    }
+  }
+
+  const handleCreateAccount = async () => {
+    if (!newAccountName.trim()) {
+      setNewAccountNameError(true)
+      return
+    }
+    setIsSavingAccount(true)
+    try {
+      const created = await createFinanceAccountAction({
+        partnerId,
+        name: newAccountName.trim(),
+        type: newAccountType,
+        initialBalance: newAccountInitialBalance,
+        isDefault: newAccountIsDefault,
+      })
+      if (!created.success || !created.data) {
+        setError(created.error || "N„o foi possÌvel criar a conta financeira.")
+        return
+      }
+      await refreshFinanceAccounts(created.data.id)
+      setIsAccountModalOpen(false)
+      setNewAccountName("")
+      setNewAccountType("bank")
+      setNewAccountInitialBalance(0)
+      setNewAccountIsDefault(false)
+      setNewAccountNameError(false)
+    } finally {
+      setIsSavingAccount(false)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -203,22 +301,35 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
     setIsLoading(true)
     setError(null)
 
+    const nextFieldErrors: Record<string, string> = {}
+
     if (!formData.name.trim()) {
-      setError("Nome √© obrigat√≥rio")
+      nextFieldErrors.name = "Nome È obrigatÛrio"
+    }
+    if (!formData.default_finance_account_id) {
+      nextFieldErrors.default_finance_account_id = "Selecione a conta financeira padr„o"
+    }
+    if (isCard && selectedBrandIds.length === 0) {
+      nextFieldErrors.card_brand = "Selecione ao menos uma bandeira"
+    }
+    if (formData.supports_installments && (formData.max_installments < 1 || formData.max_installments > 24)) {
+      nextFieldErrors.max_installments = "Informe de 1 atÈ 24 parcelas"
+    }
+    if (isCreditCard && formData.supports_installments) {
+      const invalidInstallment = formData.installment_fees.find((row) => row.fee_percent < 0 || row.fee_percent > 100)
+      if (invalidInstallment) {
+        nextFieldErrors.installment_fees = "As taxas de parcela devem estar entre 0% e 100%"
+      }
+    }
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors)
+      setError("Revise os campos obrigatÛrios antes de salvar.")
       setIsLoading(false)
       return
     }
 
-    if (formData.max_installments > 24) {
-      setError("O m√°ximo de parcelas permitido √© 24")
-      setIsLoading(false)
-      return
-    }
-    if (!formData.default_finance_account_id) {
-      setError("Selecione a conta financeira padr√£o do m√©todo")
-      setIsLoading(false)
-      return
-    }
+    setFieldErrors({})
 
     try {
       const payload = {
@@ -237,11 +348,9 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
           : [],
         pixKeyType: isPix ? formData.pix_key_type : null,
         pixKey: isPix ? formData.pix_key : null,
-        usePartnerPixData: isPix ? formData.use_partner_pix_data : false,
+        usePartnerPixData: false,
         cardBrand: isCard ? formData.card_brand : null,
         defaultFinanceAccountId: formData.default_finance_account_id,
-        priority: Number(formData.priority || 0),
-        isDefault: Boolean(formData.is_default),
       }
 
       if (editingMethod) {
@@ -264,280 +373,405 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
           onClose(true)
         }
       }
-    } catch (err) {
-      setError("Erro ao salvar m√©todo de pagamento")
+    } catch {
+      setError("Erro ao salvar mÈtodo de pagamento")
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <DefaultModal
-      isOpen={open}
-      onClose={() => onClose(false)}
-      title={`${editingMethod ? "Editar" : "Adicionar"} M√©todo de Pagamento`}
-      maxWidth="2xl"
-    >
-      {isLoadingDetails ? (
-        <div className="text-sm text-brand-inactive-text py-8 text-center">Carregando dados do m√©todo...</div>
-      ) : (
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-4">
-            <Input
-              label="Nome / Descri√ß√£o*"
-              id="name"
-              name="name"
-              required
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Ex: Cart√£o Visa, PIX, etc"
-            />
-
-            <FormDropdown
-              label="Tipo de Pagamento*"
-              value={formData.payment_type}
-              setValue={(value) => setFormData({ ...formData, payment_type: value })}
-              options={[
-                { value: "cash", label: "Dinheiro" },
-                { value: "pix", label: "PIX" },
-                { value: "credit_card", label: "Cart√£o de Cr√©dito" },
-                { value: "debit_card", label: "Cart√£o de D√©bito" },
-                { value: "other", label: "Outros" },
-              ]}
-            />
-
-            <FormDropdown
-              label="Conta padr√£o no financeiro*"
-              value={formData.default_finance_account_id}
-              setValue={(value) => setFormData({ ...formData, default_finance_account_id: value })}
-              options={financeAccounts.map((account) => ({
-                value: account.id,
-                label: `${account.name}${account.type ? ` (${account.type})` : ""}`,
-              }))}
-            />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <>
+      <DefaultModal
+        isOpen={open}
+        onClose={() => onClose(false)}
+        title={`${editingMethod ? "Editar" : "Adicionar"} MÈtodo de Pagamento`}
+        maxWidth="2xl"
+      >
+        {isLoadingDetails ? (
+          <div className="text-sm text-brand-inactive-text py-8 text-center">Carregando dados do mÈtodo...</div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-4">
               <Input
-                label="Prioridade"
-                id="priority"
-                type="number"
-                min="0"
-                value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: Math.max(0, Number(e.target.value || 0)) })}
+                label="Nome / DescriÁ„o"
+                id="name"
+                name="name"
+                required
+                value={formData.name}
+                onChange={(e) => {
+                  setFormData({ ...formData, name: e.target.value })
+                  clearFieldError("name")
+                }}
+                placeholder="Ex: Cart„o Visa, PIX, etc"
+                error={Boolean(fieldErrors.name)}
+                errorMessage={fieldErrors.name}
               />
-              <div className="flex items-center gap-2 mt-8">
-                <Checkbox
-                  id="is_default_method"
-                  checked={formData.is_default}
-                  onChange={(checked) => setFormData({ ...formData, is_default: checked as boolean })}
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading truncate">Tipo de Pagamento</label>
+                  {isCard && (
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="px-0 py-0 h-auto"
+                      onClick={() => setBrandsModalOpen(true)}
+                    >
+                      Selecionar bandeiras
+                    </Button>
+                  )}
+                </div>
+                <FormDropdown
+                  value={formData.payment_type}
+                  setValue={(value) => {
+                    setFormData({ ...formData, payment_type: value })
+                    if (value !== "credit_card") {
+                      setInstallmentsModalOpen(false)
+                    }
+                  }}
+                  options={[
+                    { value: "cash", label: "Dinheiro" },
+                    { value: "pix", label: "PIX" },
+                    { value: "credit_card", label: "Cart„o de CrÈdito" },
+                    { value: "debit_card", label: "Cart„o de DÈbito" },
+                    { value: "other", label: "Outros" },
+                  ]}
                 />
-                <label htmlFor="is_default_method" className="text-sm font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
-                  Usar como fallback (m√©todo padr√£o)
+              </div>
+
+              <Combobox
+                label="Conta padr„o no financeiro"
+                value={formData.default_finance_account_id || undefined}
+                onChange={(value) => {
+                  setFormData({ ...formData, default_finance_account_id: value })
+                  clearFieldError("default_finance_account_id")
+                }}
+                options={financeAccounts.map((account) => ({
+                  value: account.id,
+                  label: `${account.name}${account.type ? ` (${account.type})` : ""}`,
+                }))}
+                actionItem={{ label: "Criar conta", icon: <PlusIcon className="w-4 h-4" />, onClick: () => setIsAccountModalOpen(true) }}
+                error={Boolean(fieldErrors.default_finance_account_id)}
+              />
+              {fieldErrors.default_finance_account_id && (
+                <p className="text-xs text-brand-red -mt-2">{fieldErrors.default_finance_account_id}</p>
+              )}
+
+              {selectedBrands.length > 0 && isCard && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Bandeiras aceitas</p>
+                  <div className="relative">
+                    <div className="pointer-events-none absolute left-0 top-0 h-full w-10 bg-gradient-to-r from-white dark:from-dark-surface to-transparent z-10" />
+                    <div className="pointer-events-none absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-white dark:from-dark-surface to-transparent z-10" />
+                    <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 px-2">
+                      {selectedBrands.map((brand) => (
+                        <div key={brand.id} className="shrink-0 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-border/20 px-3 py-2 min-w-[120px]">
+                          <div className="flex items-center gap-2">
+                            {renderBrandAvatar(brand)}
+                            <span className="text-xs font-semibold text-brand-dark dark:text-dark-heading truncate">{brand.label}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {fieldErrors.card_brand && isCard && <p className="text-xs text-brand-red -mt-2">{fieldErrors.card_brand}</p>}
+
+              {isPix && (
+                <div className="space-y-4 bg-brand-gray/30 dark:bg-dark-border/10 p-4 rounded-xl">
+                  <FormDropdown
+                    label="Tipo da chave PIX"
+                    value={formData.pix_key_type}
+                    setValue={(value: any) => setFormData({ ...formData, pix_key_type: value })}
+                    options={[
+                      { value: "cpf", label: "CPF" },
+                      { value: "cnpj", label: "CNPJ" },
+                      { value: "email", label: "Email" },
+                      { value: "phone", label: "Telefone" },
+                      { value: "random", label: "Chave aleatÛria" },
+                    ]}
+                  />
+                  <Input
+                    label="Chave PIX"
+                    id="pix_key"
+                    name="pix_key"
+                    value={formData.pix_key}
+                    onChange={(e) => setFormData({ ...formData, pix_key: e.target.value })}
+                    placeholder="Informe a chave PIX"
+                  />
+                </div>
+              )}
+
+              {isCreditCard && (
+                <div className="space-y-4 bg-brand-gray/30 dark:bg-dark-border/10 p-4 rounded-xl">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="supports_installments"
+                      checked={formData.supports_installments}
+                      onChange={(checked) => setFormData({ ...formData, supports_installments: checked as boolean })}
+                    />
+                    <label htmlFor="supports_installments" className="text-sm font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
+                      Aceita parcelamento
+                    </label>
+                  </div>
+                  {formData.supports_installments && (
+                    <div className="space-y-4 pt-2">
+                      <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
+                        <Input
+                          label="M·ximo de parcelas"
+                          id="max_installments"
+                          type="number"
+                          min="1"
+                          max="24"
+                          value={formData.max_installments}
+                          error={Boolean(fieldErrors.max_installments)}
+                          errorMessage={fieldErrors.max_installments}
+                          onChange={(e) => {
+                            const nextMax = Math.max(1, Math.min(24, Number(e.target.value || 1)))
+                            setFormData((prev) => ({
+                              ...prev,
+                              max_installments: nextMax,
+                              installment_fees: buildInstallments(nextMax, prev.installment_fees),
+                            }))
+                            clearFieldError("max_installments")
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="link"
+                          className="px-0 py-0 h-[42px] justify-end"
+                          onClick={() => setInstallmentsModalOpen(true)}
+                        >
+                          Configurar parcelas
+                        </Button>
+                      </div>
+
+                      {selectedInstallments.length > 0 && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Parcelas e taxas</label>
+                          <div className="relative">
+                            <div className="pointer-events-none absolute left-0 top-0 h-full w-10 bg-gradient-to-r from-brand-gray/10 dark:from-dark-border/10 to-transparent z-10" />
+                            <div className="pointer-events-none absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-brand-gray/10 dark:from-dark-border/10 to-transparent z-10" />
+                            <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 px-2">
+                              {selectedInstallments.map((row) => (
+                                <div key={row.installment_number} className="shrink-0 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 py-2 min-w-[128px]">
+                                  <p className="text-xs font-bold text-brand-dark dark:text-dark-heading">{row.installment_number}x</p>
+                                  <p className="text-xs text-brand-inactive-text dark:text-dark-body">{row.fee_percent}% taxa</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {fieldErrors.installment_fees && <p className="text-xs text-brand-red">{fieldErrors.installment_fees}</p>}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-4 border-t border-brand-border dark:border-dark-border pt-4">
+                <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">ConfiguraÁıes de taxa</h3>
+                <FormDropdown
+                  label="Quem paga a taxa?"
+                  value={formData.fee_bearer}
+                  setValue={(value: any) => setFormData({ ...formData, fee_bearer: value })}
+                  options={[
+                    { value: "merchant", label: "Empresa (absorve)" },
+                    { value: "customer", label: "Cliente (acrescenta no valor)" },
+                  ]}
+                />
+
+                {(!isCreditCard || !formData.supports_installments) && (showFeeFields || isCreditCard) && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <PercentageInput
+                      label="Taxa percentual"
+                      id="fee_percent"
+                      value={formData.fee_percent}
+                      onChange={(value) => setFormData({ ...formData, fee_percent: value })}
+                    />
+                    <MoneyInput
+                      label="Taxa fixa"
+                      id="fee_fixed"
+                      value={formData.fee_fixed}
+                      onChange={(value) => setFormData({ ...formData, fee_fixed: value })}
+                    />
+                  </div>
+                )}
+
+                <PercentageInput
+                  label="Desconto"
+                  id="discount_percent"
+                  name="discount_percent"
+                  value={formData.discount_percent}
+                  onChange={(value) => setFormData({ ...formData, discount_percent: value })}
+                  placeholder="0"
+                />
+                <p className="text-[10px] text-brand-inactive-text dark:text-dark-body -mt-3">Desconto autom·tico aplicado ao cliente para este mÈtodo</p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="is_active"
+                  name="is_active"
+                  checked={formData.is_active}
+                  onChange={(checked) => setFormData({ ...formData, is_active: checked as boolean })}
+                />
+                <label htmlFor="is_active" className="text-sm font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
+                  MÈtodo ativo
                 </label>
               </div>
             </div>
 
-            {isPix && (
-              <div className="space-y-4 bg-brand-gray/30 dark:bg-dark-border/10 p-4 rounded-xl">
-                <FormDropdown
-                  label="Tipo da chave PIX"
-                  value={formData.pix_key_type}
-                  setValue={(value: any) => setFormData({ ...formData, pix_key_type: value })}
-                  options={[
-                    { value: "cpf", label: "CPF" },
-                    { value: "cnpj", label: "CNPJ" },
-                    { value: "email", label: "Email" },
-                    { value: "phone", label: "Telefone" },
-                    { value: "random", label: "Chave aleat√≥ria" },
-                  ]}
-                />
-                <Input
-                  label="Chave PIX"
-                  id="pix_key"
-                  name="pix_key"
-                  value={formData.pix_key}
-                  onChange={(e) => setFormData({ ...formData, pix_key: e.target.value })}
-                  disabled={formData.use_partner_pix_data}
-                  placeholder="Informe a chave PIX"
-                />
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="use_partner_pix_data"
-                    checked={formData.use_partner_pix_data}
-                    onChange={(checked) => setFormData({ ...formData, use_partner_pix_data: checked as boolean })}
-                  />
-                  <label htmlFor="use_partner_pix_data" className="text-sm font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
-                    Usar dados do parceiro automaticamente
-                  </label>
-                </div>
-                <div className="rounded-lg border border-brand-red/30 bg-brand-red/5 p-3 text-xs text-brand-red">
-                  Aten√ß√£o! O sistema n√£o valida a chave PIX. Por favor, informe a chave correta.
-                </div>
-              </div>
-            )}
+            {error && <p className="text-sm text-brand-red font-bold">{error}</p>}
 
-            {isCard && (
-              <div className="space-y-4 bg-brand-gray/30 dark:bg-dark-border/10 p-4 rounded-xl">
-                <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading">Bandeiras Aceitas</h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {AVAILABLE_BRANDS.map((brand) => {
-                    const isChecked = formData.card_brand.split(";").map(b => b.trim()).includes(brand.id)
-                    return (
-                      <div key={brand.id} className="flex items-center gap-2">
-                        <Checkbox
-                          id={`brand-${brand.id}`}
-                          checked={isChecked}
-                          onChange={() => handleBrandToggle(brand.id)}
-                        />
-                        <label htmlFor={`brand-${brand.id}`} className="text-sm text-brand-dark dark:text-dark-heading cursor-pointer">
-                          {brand.label}
-                        </label>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {isCreditCard && (
-              <div className="space-y-4 bg-brand-gray/30 dark:bg-dark-border/10 p-4 rounded-xl">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="supports_installments"
-                    checked={formData.supports_installments}
-                    onChange={(checked) => setFormData({ ...formData, supports_installments: checked as boolean })}
-                  />
-                  <label htmlFor="supports_installments" className="text-sm font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
-                    Aceita parcelamento
-                  </label>
-                </div>
-                {formData.supports_installments && (
-                  <div className="space-y-4 pt-2">
-                    <Input
-                      label="M√°ximo de parcelas"
-                      id="max_installments"
-                      type="number"
-                      min="1"
-                      max="24"
-                      value={formData.max_installments}
-                      onChange={(e) => {
-                        const nextMax = Math.max(1, Math.min(24, Number(e.target.value || 1)))
-                        setFormData((prev) => ({
-                          ...prev,
-                          max_installments: nextMax,
-                          installment_fees: buildInstallments(nextMax, prev.installment_fees),
-                        }))
-                      }}
-                    />
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Taxa por parcela (%)</label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[200px] overflow-y-auto pr-2 no-scrollbar">
-                        {formData.installment_fees.map((row, index) => (
-                          <div key={row.installment_number} className="flex items-center gap-2">
-                            <span className="text-xs font-bold w-8">{row.installment_number}x</span>
-                            <Input
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.01"
-                              className="h-9"
-                              value={row.fee_percent}
-                              onChange={(e) => {
-                                const next = [...formData.installment_fees]
-                                next[index] = { ...row, fee_percent: Number(e.target.value || 0) }
-                                setFormData({ ...formData, installment_fees: next })
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {(showFeeFields || isCreditCard) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Taxa percentual (%)"
-                  id="fee_percent"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={formData.fee_percent}
-                  onChange={(e) => setFormData({ ...formData, fee_percent: Number(e.target.value || 0) })}
-                />
-                <Input
-                  label="Taxa fixa (R$)"
-                  id="fee_fixed"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.fee_fixed}
-                  onChange={(e) => setFormData({ ...formData, fee_fixed: Number(e.target.value || 0) })}
-                />
-              </div>
-            )}
-
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="is_active"
-                name="is_active"
-                checked={formData.is_active}
-                onChange={(checked) => setFormData({ ...formData, is_active: checked as boolean })}
-              />
-              <label htmlFor="is_active" className="text-sm font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
-                M√©todo ativo
-              </label>
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onClose()}
+                className="flex-1"
+                disabled={isLoading}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" className="flex-1" disabled={isLoading}>
+                {isLoading ? "Salvando..." : editingMethod ? "Atualizar" : "Adicionar"}
+              </Button>
             </div>
+          </form>
+        )}
+      </DefaultModal>
+
+      <DefaultModal
+        isOpen={brandsModalOpen}
+        onClose={() => setBrandsModalOpen(false)}
+        title="Selecionar bandeiras aceitas"
+        maxWidth="lg"
+      >
+        <div className="space-y-3 py-1">
+          {AVAILABLE_BRANDS.slice((brandPage - 1) * ITEMS_PER_PAGE, brandPage * ITEMS_PER_PAGE).map((brand, idx) => {
+            const checked = selectedBrandIds.includes(brand.id)
+            const pageItems = AVAILABLE_BRANDS.slice((brandPage - 1) * ITEMS_PER_PAGE, brandPage * ITEMS_PER_PAGE)
+            return (
+              <div key={brand.id}>
+                <ListItem
+                  title={brand.label}
+                  left={<div className="pr-3">{renderBrandAvatar(brand)}</div>}
+                  right={<Checkbox checked={checked} onChange={() => handleBrandToggle(brand.id)} />}
+                  onClick={() => handleBrandToggle(brand.id)}
+                  className="px-3 py-3"
+                />
+                {idx < pageItems.length - 1 && <Separator className="my-2" />}
+              </div>
+            )
+          })}
+          <Pagination
+            currentPage={brandPage}
+            totalPages={Math.max(1, Math.ceil(AVAILABLE_BRANDS.length / ITEMS_PER_PAGE))}
+            onPageChange={setBrandPage}
+          />
+          <div className="flex justify-end pt-1">
+            <Button type="button" onClick={() => setBrandsModalOpen(false)}>Salvar</Button>
           </div>
+        </div>
+      </DefaultModal>
 
-          <div className="space-y-4 border-t border-brand-border dark:border-dark-border pt-4">
-            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">Configura√ß√µes de taxa</h3>
-            <FormDropdown
-              label="Quem paga a taxa?"
-              value={formData.fee_bearer}
-              setValue={(value: any) => setFormData({ ...formData, fee_bearer: value })}
-              options={[
-                { value: "merchant", label: "Empresa (absorve)" },
-                { value: "customer", label: "Cliente (acrescenta no valor)" },
-              ]}
-            />
-            <Input
-              label="Desconto (%)"
-              id="discount_percent"
-              name="discount_percent"
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              value={formData.discount_percent}
-              onChange={(e) => setFormData({ ...formData, discount_percent: Number.parseFloat(e.target.value) || 0 })}
-              placeholder="0,00"
-            />
-            <p className="text-[10px] text-brand-inactive-text dark:text-dark-body -mt-3">Desconto autom√°tico aplicado ao cliente para este m√©todo</p>
+      <DefaultModal
+        isOpen={installmentsModalOpen}
+        onClose={() => setInstallmentsModalOpen(false)}
+        title="Configurar taxas por parcela"
+        maxWidth="lg"
+      >
+        <div className="space-y-3 py-1">
+          {formData.installment_fees.slice((installmentPage - 1) * ITEMS_PER_PAGE, installmentPage * ITEMS_PER_PAGE).map((row, idx) => {
+            const absoluteIndex = (installmentPage - 1) * ITEMS_PER_PAGE + idx
+            const pageItems = formData.installment_fees.slice((installmentPage - 1) * ITEMS_PER_PAGE, installmentPage * ITEMS_PER_PAGE)
+            return (
+              <div key={row.installment_number}>
+                <ListItem
+                  title={`${row.installment_number}x parcela`}
+                  description="Taxa percentual da parcela"
+                  right={
+                    <div className="w-[130px]" onClick={(e) => e.stopPropagation()}>
+                      <PercentageInput
+                        value={row.fee_percent}
+                        onChange={(value) => {
+                          const next = [...formData.installment_fees]
+                          next[absoluteIndex] = { ...row, fee_percent: value }
+                          setFormData({ ...formData, installment_fees: next })
+                          clearFieldError("installment_fees")
+                        }}
+                      />
+                    </div>
+                  }
+                  className="px-3 py-3"
+                />
+                {idx < pageItems.length - 1 && <Separator className="my-2" />}
+              </div>
+            )
+          })}
+          <Pagination
+            currentPage={installmentPage}
+            totalPages={Math.max(1, Math.ceil(formData.installment_fees.length / ITEMS_PER_PAGE))}
+            onPageChange={setInstallmentPage}
+          />
+          <div className="flex justify-end pt-1">
+            <Button type="button" onClick={() => setInstallmentsModalOpen(false)}>Salvar</Button>
           </div>
+        </div>
+      </DefaultModal>
 
-          {error && <p className="text-sm text-brand-red font-bold">{error}</p>}
-
-          <div className="flex gap-3 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onClose()}
-              className="flex-1"
-              disabled={isLoading}
-            >
+      <DefaultModal
+        isOpen={isAccountModalOpen}
+        onClose={() => {
+          if (isSavingAccount) return
+          setIsAccountModalOpen(false)
+        }}
+        title="Nova conta"
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <Button variant="outline" onClick={() => setIsAccountModalOpen(false)} disabled={isSavingAccount}>
               Cancelar
             </Button>
-            <Button type="submit" className="flex-1" disabled={isLoading}>
-              {isLoading ? "Salvando..." : editingMethod ? "Atualizar" : "Adicionar"}
+            <Button isLoading={isSavingAccount} onClick={handleCreateAccount}>
+              Salvar
             </Button>
           </div>
-        </form>
-      )}
-    </DefaultModal>
+        }
+      >
+        <div className="space-y-4 p-2">
+          <Input
+            label="Nome"
+            value={newAccountName}
+            onChange={(e) => {
+              setNewAccountName(e.target.value)
+              setNewAccountNameError(false)
+            }}
+            placeholder="Ex: Banco Inter PJ"
+            error={newAccountNameError}
+            errorMessage={newAccountNameError ? "O nome È obrigatÛrio." : undefined}
+          />
+          <FormDropdown
+            label="Tipo"
+            options={ACCOUNT_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+            value={newAccountType}
+            setValue={(v) => setNewAccountType(v as "cash" | "bank" | "wallet")}
+          />
+          <MoneyInput
+            label="Saldo inicial"
+            value={newAccountInitialBalance}
+            onChange={setNewAccountInitialBalance}
+          />
+          <Checkbox
+            id="new_account_default"
+            label="Conta padr„o deste tipo"
+            checked={newAccountIsDefault}
+            onChange={(checked) => setNewAccountIsDefault(Boolean(checked))}
+          />
+        </div>
+      </DefaultModal>
+    </>
   )
 }
