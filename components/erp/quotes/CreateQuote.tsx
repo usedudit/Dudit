@@ -838,6 +838,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const itemsCount = currentItems.length;
     const hasItems = itemsCount > 0;
     const isLoadingProposalItems = isLoadingDetails && mode !== 'create';
+    const isEditLoadingLocked = mode !== "create" && isLoadingDetails;
 
     return (
         <FadeIn>
@@ -875,10 +876,10 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <Button variant="outline" onClick={handleBackWithSafety} disabled={isSaving} className={isScrolled ? "h-9 px-3 text-xs" : ""}>
+                                        <Button variant="outline" onClick={handleBackWithSafety} disabled={isSaving || isEditLoadingLocked} className={isScrolled ? "h-9 px-3 text-xs" : ""}>
                                             Cancelar
                                         </Button>
-                                        <Button onClick={handleSave} disabled={isSaving} isLoading={isSaving} className={isScrolled ? "h-9 px-4 text-xs" : ""}>
+                                        <Button onClick={handleSave} disabled={isSaving || isEditLoadingLocked} isLoading={isSaving} className={isScrolled ? "h-9 px-4 text-xs" : ""}>
                                             {!isSaving && <SaveIcon className={`${isScrolled ? "w-3.5 h-3.5" : "w-[18px] h-[18px]"} mr-2`} />}
                                             {mode === 'edit' ? "Salvar" : "Salvar"}
                                         </Button>
@@ -903,10 +904,15 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
                             {/* LEFT SIDE - EDITOR */}
                             <div
-                                className="w-full lg:w-1/2 flex flex-col shrink-0 border-r-0 lg:border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background overflow-y-auto no-scrollbar"
+                                className={`w-full lg:w-1/2 flex flex-col shrink-0 border-r-0 lg:border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background overflow-y-auto no-scrollbar relative ${isEditLoadingLocked ? "pointer-events-none" : ""}`}
                                 ref={scrollContainerRef}
                                 onScroll={handleScroll}
                             >
+                                {isEditLoadingLocked && (
+                                    <div className="absolute inset-0 z-20 bg-white/65 dark:bg-dark-background/65 backdrop-blur-[2px] flex items-center justify-center">
+                                        <div className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Carregando dados do orçamento...</div>
+                                    </div>
+                                )}
                                 <div className={`flex-1 pt-4 pb-12 px-4 md:px-6 ${activeTab === 'Visualização' ? 'hidden lg:block' : 'block'}`}>
                                     <QuoteEditor
                                         searchQuery={productBucket.searchQuery}
@@ -1004,7 +1010,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                         <Button
                             variant="outline"
                             onClick={handleBackWithSafety}
-                            disabled={isSaving}
+                            disabled={isSaving || isEditLoadingLocked}
                             className="flex-1 h-12"
                         >
                             {mode === 'view' ? "Voltar" : "Cancelar"}
@@ -1012,6 +1018,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                         {mode !== 'view' && (
                             <Button
                                 onClick={handleSave}
+                                disabled={isEditLoadingLocked}
                                 isLoading={isSaving}
                                 className="flex-1 h-12"
                             >

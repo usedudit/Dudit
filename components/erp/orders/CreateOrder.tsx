@@ -133,6 +133,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [newAccountType, setNewAccountType] = useState<FinanceAccountType>("cash")
     const [newAccountInitialBalance, setNewAccountInitialBalance] = useState(0)
     const [newAccountIsDefault, setNewAccountIsDefault] = useState(false)
+    const isPaymentProcessing = isPaymentModalOpen && isSaving
 
     // --- Calculations ---
     const subtotal = useMemo(() => {
@@ -947,7 +948,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
                 <SelectCustomerSheet
                     isOpen={isCustomerSheetOpen}
-                    onClose={() => setIsCustomerSheetOpen(false)}
+                    onClose={() => {
+                        if (isSaving) return
+                        setIsCustomerSheetOpen(false)
+                    }}
                     onSelect={(customer) => {
                         setSelectedCustomer(customer)
                         setIsCustomerSheetOpen(false)
@@ -957,7 +961,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
                 <SelectVariantSheet
                     isOpen={isVariantSheetOpen}
-                    onClose={() => setIsVariantSheetOpen(false)}
+                    onClose={() => {
+                        if (isSaving) return
+                        setIsVariantSheetOpen(false)
+                    }}
                     product={selectedProductForVariant}
                     onConfirm={handleVariantsConfirm}
                 />
@@ -987,7 +994,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     {isPaymentModalOpen && (
                         <PaymentModal
                             isOpen={isPaymentModalOpen}
-                            onClose={handleClosePaymentModal}
+                            onClose={() => {
+                                if (isPaymentProcessing) return
+                                handleClosePaymentModal()
+                            }}
                             cart={items}
                             customer={selectedCustomer}
                             partnerId={partnerId}
@@ -1005,11 +1015,14 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
                 <DefaultModal
                     isOpen={isAccountModalOpen}
-                    onClose={() => setIsAccountModalOpen(false)}
+                    onClose={() => {
+                        if (isSavingAccount) return
+                        setIsAccountModalOpen(false)
+                    }}
                     title="Nova conta"
                     footer={
                         <div className="flex justify-end gap-3 w-full">
-                            <Button variant="outline" onClick={() => setIsAccountModalOpen(false)}>
+                            <Button variant="outline" onClick={() => setIsAccountModalOpen(false)} disabled={isSavingAccount}>
                                 Cancelar
                             </Button>
                             <Button

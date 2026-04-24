@@ -456,6 +456,11 @@ const PaymentModal = ({
     };
 
     if (!isOpen) return null;
+    const isCloseLocked = paymentStatus === 'processing';
+    const handleSafeClose = () => {
+        if (isCloseLocked) return;
+        onClose();
+    };
 
     const ActionFooter = ({ showConfirm = true, confirmText = "Registrar venda", disabled = false, buttonVariant = 'default', onCustomConfirm }: any) => (
         <div className="w-full bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-4 md:p-6 mt-auto shrink-0 relative z-30">
@@ -500,7 +505,7 @@ const PaymentModal = ({
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleSafeClose} />
 
             <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -575,7 +580,7 @@ const PaymentModal = ({
                                     {getTitle()}
                                 </motion.h2>
                             </div>
-                            <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading hover:bg-gray-200 transition-colors">
+                            <button onClick={handleSafeClose} className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading hover:bg-gray-200 transition-colors">
                                 <XIcon size={20} />
                             </button>
                         </div>
@@ -958,7 +963,7 @@ const PaymentModal = ({
                     )}
                     {paymentStatus === 'error' && (
                         <div className="w-full bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-4 md:p-6 mt-auto shrink-0 relative z-30 flex gap-3">
-                            <Button variant="outline" className="flex-1 h-[52px]" onClick={onClose}>
+                            <Button variant="outline" className="flex-1 h-[52px]" onClick={handleSafeClose}>
                                 Cancelar
                             </Button>
                             <Button className="flex-1 h-[52px]" onClick={() => handleStartProcessing(lastPaymentPayload)}>

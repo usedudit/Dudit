@@ -268,6 +268,8 @@ export default function CreateTransactionPage({
     const [adjustFromTransferOpen, setAdjustFromTransferOpen] = useState(false)
     const [adjustFromTransferNewBalance, setAdjustFromTransferNewBalance] = useState(0)
     const [adjustFromTransferSaving, setAdjustFromTransferSaving] = useState(false)
+    const isQuickModalCloseLocked = quickSaving
+    const isAdjustModalCloseLocked = adjustFromTransferSaving
 
     const defaultDayYmd = useMemo(() => format(new Date(), "yyyy-MM-dd"), [])
     const defaultRecurrenceNext = useMemo(
@@ -1875,12 +1877,15 @@ export default function CreateTransactionPage({
 
                 <DefaultModal
                     isOpen={quickModal === "category"}
-                    onClose={() => setQuickModal(null)}
+                    onClose={() => {
+                        if (isQuickModalCloseLocked) return
+                        setQuickModal(null)
+                    }}
                     title="Nova categoria"
                     maxWidth="md"
                     footer={
                         <div className="flex justify-end gap-2 w-full">
-                            <Button variant="outline" onClick={() => setQuickModal(null)}>
+                            <Button variant="outline" onClick={() => setQuickModal(null)} disabled={isQuickModalCloseLocked}>
                                 Cancelar
                             </Button>
                             <Button onClick={handleQuickSave} isLoading={quickSaving}>
@@ -1894,12 +1899,15 @@ export default function CreateTransactionPage({
 
                 <DefaultModal
                     isOpen={quickModal === "subcategory"}
-                    onClose={() => setQuickModal(null)}
+                    onClose={() => {
+                        if (isQuickModalCloseLocked) return
+                        setQuickModal(null)
+                    }}
                     title="Nova subcategoria"
                     maxWidth="md"
                     footer={
                         <div className="flex justify-end gap-2 w-full">
-                            <Button variant="outline" onClick={() => setQuickModal(null)}>
+                            <Button variant="outline" onClick={() => setQuickModal(null)} disabled={isQuickModalCloseLocked}>
                                 Cancelar
                             </Button>
                             <Button onClick={handleQuickSave} isLoading={quickSaving}>
@@ -1916,12 +1924,15 @@ export default function CreateTransactionPage({
 
                 <DefaultModal
                     isOpen={quickModal === "account"}
-                    onClose={() => setQuickModal(null)}
+                    onClose={() => {
+                        if (isQuickModalCloseLocked) return
+                        setQuickModal(null)
+                    }}
                     title="Nova conta"
                     maxWidth="md"
                     footer={
                         <div className="flex justify-end gap-2 w-full">
-                            <Button variant="outline" onClick={() => setQuickModal(null)}>
+                            <Button variant="outline" onClick={() => setQuickModal(null)} disabled={isQuickModalCloseLocked}>
                                 Cancelar
                             </Button>
                             <Button onClick={handleQuickSave} isLoading={quickSaving}>
@@ -1948,12 +1959,15 @@ export default function CreateTransactionPage({
 
                 <DefaultModal
                     isOpen={quickModal === "contact"}
-                    onClose={() => setQuickModal(null)}
+                    onClose={() => {
+                        if (isQuickModalCloseLocked) return
+                        setQuickModal(null)
+                    }}
                     title="Novo contato financeiro"
                     maxWidth="md"
                     footer={
                         <div className="flex justify-end gap-2 w-full">
-                            <Button variant="outline" onClick={() => setQuickModal(null)}>
+                            <Button variant="outline" onClick={() => setQuickModal(null)} disabled={isQuickModalCloseLocked}>
                                 Cancelar
                             </Button>
                             <Button onClick={handleQuickSave} isLoading={quickSaving}>
@@ -2026,12 +2040,15 @@ export default function CreateTransactionPage({
 
                 <DefaultModal
                     isOpen={adjustFromTransferOpen}
-                    onClose={() => setAdjustFromTransferOpen(false)}
+                    onClose={() => {
+                        if (isAdjustModalCloseLocked) return
+                        setAdjustFromTransferOpen(false)
+                    }}
                     title="Ajustar saldo da conta"
                     maxWidth="md"
                     footer={
                         <div className="flex justify-end gap-2 w-full">
-                            <Button variant="outline" onClick={() => setAdjustFromTransferOpen(false)}>
+                            <Button variant="outline" onClick={() => setAdjustFromTransferOpen(false)} disabled={isAdjustModalCloseLocked}>
                                 Cancelar
                             </Button>
                             <Button

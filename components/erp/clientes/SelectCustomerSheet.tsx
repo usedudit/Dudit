@@ -74,6 +74,11 @@ const SelectCustomerSheet = ({
   const listScrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const isMobile = useMediaQuery("(max-width: 768px)")
+  const isCloseLocked = isCreatingCustomer
+  const handleSafeClose = useCallback(() => {
+    if (isCloseLocked) return
+    onClose()
+  }, [isCloseLocked, onClose])
 
   const matchesSearch = useCallback((item: PartnerCustomerBucketItem, q: string) => {
     return (
@@ -167,7 +172,7 @@ const SelectCustomerSheet = ({
     <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
       <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</h2>
-        <Button variant="ghost" onClick={onClose} size="icon">
+        <Button variant="ghost" onClick={handleSafeClose} size="icon" disabled={isCloseLocked}>
           <XIcon className="h-5 w-5" />
         </Button>
       </header>
@@ -293,7 +298,7 @@ const SelectCustomerSheet = ({
       <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         {onCreateCustomer ? (
           <div className="flex items-center gap-3">
-            <Button variant="outline" className="h-12 flex-1" onClick={onClose}>
+            <Button variant="outline" className="h-12 flex-1" onClick={handleSafeClose} disabled={isCloseLocked}>
               Cancelar
             </Button>
             <Button
@@ -307,7 +312,7 @@ const SelectCustomerSheet = ({
             </Button>
           </div>
         ) : (
-          <Button variant="outline" className="h-12 w-full" onClick={onClose}>
+          <Button variant="outline" className="h-12 w-full" onClick={handleSafeClose} disabled={isCloseLocked}>
             Cancelar
           </Button>
         )}
@@ -319,7 +324,7 @@ const SelectCustomerSheet = ({
     <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
       <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Novo cliente</h2>
-        <Button variant="ghost" onClick={() => setIsNewCustomerSheetOpen(false)} size="icon">
+        <Button variant="ghost" onClick={() => { if (!isCloseLocked) setIsNewCustomerSheetOpen(false) }} size="icon" disabled={isCloseLocked}>
           <XIcon className="h-5 w-5" />
         </Button>
       </header>
@@ -353,7 +358,7 @@ const SelectCustomerSheet = ({
 
       <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="flex-1" onClick={() => setIsNewCustomerSheetOpen(false)}>
+          <Button variant="outline" className="flex-1" onClick={() => setIsNewCustomerSheetOpen(false)} disabled={isCloseLocked}>
             Voltar
           </Button>
           <Button
@@ -399,10 +404,10 @@ const SelectCustomerSheet = ({
   if (isMobile) {
     return (
       <>
-        <BottomSheet isOpen={isOpen} onClose={onClose}>
+        <BottomSheet isOpen={isOpen} onClose={handleSafeClose}>
           {content}
         </BottomSheet>
-        <BottomSheet isOpen={isNewCustomerSheetOpen} onClose={() => setIsNewCustomerSheetOpen(false)}>
+        <BottomSheet isOpen={isNewCustomerSheetOpen} onClose={() => { if (!isCloseLocked) setIsNewCustomerSheetOpen(false) }}>
           {newCustomerSheetContent}
         </BottomSheet>
       </>
@@ -414,7 +419,7 @@ const SelectCustomerSheet = ({
       <Portal>
         <div
           className={`fixed inset-0 z-50 bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-          onClick={onClose}
+          onClick={handleSafeClose}
         >
           <div
             className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen
@@ -432,7 +437,7 @@ const SelectCustomerSheet = ({
       <Portal>
         <div
           className={`fixed inset-0 z-[60] bg-black/50 transition-opacity duration-300 ${isNewCustomerSheetOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-          onClick={() => setIsNewCustomerSheetOpen(false)}
+          onClick={() => { if (!isCloseLocked) setIsNewCustomerSheetOpen(false) }}
         >
           <div
             className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isNewCustomerSheetOpen ? "translate-x-0" : "translate-x-[120%]"}`}
