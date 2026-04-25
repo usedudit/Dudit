@@ -540,6 +540,7 @@ export async function getFinancialTransactionsAction(
                 dateNote: isOverdue ? "Atrasado" : "-",
                 createdAtDate: formatDateLabel(t.created_at || now.toISOString()),
                 createdAtTime: formatTime(t.created_at || now.toISOString()),
+                createdAtRaw: t.created_at || now.toISOString(),
                 daysUntilDue,
                 isOverdue,
                 paymentType:
@@ -1291,7 +1292,9 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
                             diffCalendarDaysInSaoPaulo(dueYmdRow) < 0
                         const original = Math.abs(Number(row.original_amount ?? row.amount ?? 0))
                         const agg = paymentByTxId.get(row.id) || { base: 0, cash: 0, interest: 0, discount: 0 }
-                        const paidPrincipal = Math.max(0, Math.round(agg.base * 100) / 100)
+                        const fallbackPaid = paid && agg.base <= 0 ? original : 0
+                        const paidPrincipal = Math.max(0, Math.round((agg.base + fallbackPaid) * 100) / 100)
+                        const paidCash = Math.max(0, Math.round((agg.cash + fallbackPaid) * 100) / 100)
                         const remainingAmount = Math.max(0, Math.round((original - paidPrincipal) * 100) / 100)
                         return {
                             id: row.id,
@@ -1299,7 +1302,7 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
                             installmentNumber: row.installment_number,
                             originalAmount: original,
                             /** Valor pago (caixa) na parcela = base + juros - desconto em cada registro, soma em amount. */
-                            paidAmount: Math.max(0, Math.round(agg.cash * 100) / 100),
+                            paidAmount: paidCash,
                             interestAmount: Math.round(agg.interest * 100) / 100,
                             discountAmount: Math.round(agg.discount * 100) / 100,
                             principalCleared: paidPrincipal,
@@ -2045,16 +2048,17 @@ export async function getTransactionDetailsAction(
             installmentBreakdown = (groupRows || []).map((g: any) => {
                 const original = Math.abs(Number(g.original_amount ?? g.amount ?? 0))
                 const agg = paymentByTx.get(String(g.id)) || { base: 0, cash: 0, interest: 0, discount: 0 }
-                const principalCleared = Math.max(0, Math.round(agg.base * 100) / 100)
+                const paidFlagFromStatus = String(g.status || "").toLowerCase() === "paid"
+                const fallbackPaid = paidFlagFromStatus && agg.base <= 0 ? original : 0
+                const principalCleared = Math.max(0, Math.round((agg.base + fallbackPaid) * 100) / 100)
                 const dueYmdInstallment = g.due_date ? String(g.due_date).slice(0, 10) : ""
                 const overdue =
-                    String(g.status || "").toLowerCase() !== "paid" &&
+                    !paidFlagFromStatus &&
                     principalCleared + 0.0001 < original &&
                     !!dueYmdInstallment &&
                     /^\d{4}-\d{2}-\d{2}$/.test(dueYmdInstallment) &&
                     diffCalendarDaysInSaoPaulo(dueYmdInstallment) < 0
-                const paidFlag =
-                    String(g.status || "").toLowerCase() === "paid" || principalCleared + 0.0001 >= original
+                const paidFlag = paidFlagFromStatus || principalCleared + 0.0001 >= original
                 return {
                     id: String(g.id),
                     installmentNumber: Number(g.installment_number || 0),
@@ -2062,7 +2066,7 @@ export async function getTransactionDetailsAction(
                     dueDate: g.due_date ? formatDateLabel(g.due_date) : null,
                     paymentDate: g.payment_date ? formatDateTime(g.payment_date) : null,
                     originalAmount: original,
-                    paidAmount: Math.max(0, Math.round(agg.cash * 100) / 100),
+                    paidAmount: Math.max(0, Math.round((agg.cash + fallbackPaid) * 100) / 100),
                     interestAmount: Math.round(agg.interest * 100) / 100,
                     discountAmount: Math.round(agg.discount * 100) / 100,
                     principalCleared,

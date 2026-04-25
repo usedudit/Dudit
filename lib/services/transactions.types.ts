@@ -21,6 +21,7 @@ export interface ERPTransaction {
   dateNote: string
   createdAtDate: string
   createdAtTime: string
+  createdAtRaw?: string | null
   daysUntilDue: number
   isOverdue: boolean
   paymentType: string
@@ -65,6 +66,7 @@ export interface ERPTransaction {
   /** Total do installment_groups (contrato) para exibir no cartão do grupo. */
   installmentGroupTotalAmount?: number | null
   isInstallmentGroup?: boolean
+  groupRepresentativeTransactionId?: string | null
   installmentPendingCount?: number
   installmentPaidCount?: number
   /** Parcela pendente: saldo em aberto (considera pagamentos parciais em transaction_payments). */

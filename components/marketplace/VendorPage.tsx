@@ -21,6 +21,8 @@ interface VendorPageClientProps {
   ratingDistribution: { star: number; count: number }[]
   productCategories: string[]
   serviceCategories: string[]
+  userProfile?: any
+  cartCount?: number
 }
 
 // --- CONSTANTS ---
@@ -437,7 +439,7 @@ const BottomSheetModal = ({ open, onClose, title, options, active, onSelect }: {
 )
 
 // --- MAIN COMPONENT ---
-export function VendorPageClient({ partner, products, services, reviews, stats, ratingDistribution, productCategories, serviceCategories }: VendorPageClientProps) {
+export function VendorPageClient({ partner, products, services, reviews, stats, ratingDistribution, productCategories, serviceCategories, userProfile, cartCount }: VendorPageClientProps) {
   const router = useRouter()
   const [activeTag, setActiveTag] = useState("todos")
   const [activeSection, setActiveSection] = useState<"products" | "reviews" | "info">("products")
@@ -561,6 +563,8 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
       <MarketplaceHeader 
         productName={partner.storeName}
         onShare={() => setShowShareModal(true)}
+        userProfile={userProfile}
+        cartCount={cartCount}
       />
 
       {/* Banner - rounded a partir de md, sem margem lateral no mobile para ocupar tudo sob o header */}

@@ -12,7 +12,7 @@ import { getProductUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
-import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
+
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
 // Removed force-dynamic - getCurrentUser() calls cookies() which already makes this dynamic
@@ -182,8 +182,6 @@ export default async function ProductDetailsPage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaJsonLd) }}
       />
 
-      <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />
-
       <ProductDetailsPageClient
         product={product}
         variants={variants || []}
@@ -191,7 +189,6 @@ export default async function ProductDetailsPage({
         currentUserId={user?.id || null}
         userProfile={userProfile}
         cartCount={cartCount}
-        hideHeaderAndFooter={true}
       />
 
       <MarketplaceFooter />

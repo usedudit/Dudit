@@ -78,7 +78,7 @@ const OrderListItem = React.memo(
                                     {order.displayId}
                                 </span>
                                 <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                    {order.items_count} {order.items_count === 1 ? 'item' : 'itens'}
+                                    {order.secondaryLine || `${order.items_count} ${order.items_count === 1 ? 'item' : 'itens'}`}
                                 </span>
                             </div>
                         </div>

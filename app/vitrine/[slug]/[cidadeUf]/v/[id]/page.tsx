@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation"
 import type { Metadata } from 'next'
 import { VendorPageClient } from "@/components/marketplace/VendorPage"
-import MarketplaceHeader from "@/components/marketplace/MarketplaceHeader"
+
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import { getPartnerUrl } from "@/lib/utils/url-generator"
 import { getCurrentUser } from "@/lib/auth/authorization"
@@ -191,7 +191,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaJsonLd) }}
       />
-      <MarketplaceHeader currentView="shop" userProfile={userProfile} cartCount={cartCount} />
+
 
       <main className="pt-[120px] flex-grow">
         <VendorPageClient
@@ -203,6 +203,8 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
           ratingDistribution={ratingDistribution}
           productCategories={productCategories}
           serviceCategories={serviceCategories}
+          userProfile={userProfile}
+          cartCount={cartCount}
         />
       </main>
 

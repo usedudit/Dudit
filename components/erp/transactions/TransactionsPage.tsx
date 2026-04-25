@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, Checkbox, IconPlaceholder, Badge, ActionsDropdown } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, Badge, ActionsDropdown, DropdownItem, FormDropdown, MoneyInput } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
@@ -60,6 +60,20 @@ function ymdFromRaw(raw: string | null | undefined): string | null {
     const t = new Date(raw as string).getTime()
     if (Number.isNaN(t)) return String(raw).slice(0, 10)
     return msToBrazilYmd(t)
+}
+
+function formatDateFromRaw(raw: string | null | undefined): string | null {
+    if (!raw) return null
+    const dt = new Date(raw)
+    if (Number.isNaN(dt.getTime())) return null
+    return dt.toLocaleDateString("pt-BR")
+}
+
+function formatTimeFromRaw(raw: string | null | undefined): string | null {
+    if (!raw) return null
+    const dt = new Date(raw)
+    if (Number.isNaN(dt.getTime())) return null
+    return dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
 }
 
 /** Previstos: vencimento/ocorrência. Transações: pagamento efetivo, senão vencimento. */
@@ -453,6 +467,13 @@ export default function TransactionsPage({
             if (items.length === 0) continue
             const sorted = [...items].sort((a, b) => (a.installmentNumber ?? 0) - (b.installmentNumber ?? 0))
             const first = sorted[0]
+            const latestPaidItem =
+                [...items].sort((a, b) => {
+                    const aTs = new Date(a.paymentDateRaw || a.createdAtRaw || 0).getTime()
+                    const bTs = new Date(b.paymentDateRaw || b.createdAtRaw || 0).getTime()
+                    return bTs - aTs
+                })[0] || first
+            const latestPaidAt = latestPaidItem?.paymentDateRaw || latestPaidItem?.createdAtRaw || first.createdAtRaw || null
             const fullStats = fullGroupStats.get(groupId)
             const totalCount = fullStats?.total || first.installmentTotalCount || sorted.length
             const gAmt =
@@ -468,6 +489,11 @@ export default function TransactionsPage({
                 installmentPaidCount: totalCount,
                 installmentPendingCount: 0,
                 isInstallmentGroup: true,
+                groupRepresentativeTransactionId: first.id,
+                createdAtRaw: latestPaidAt,
+                createdAtDate: latestPaidAt ? formatDateFromRaw(latestPaidAt) || first.createdAtDate : first.createdAtDate,
+                createdAtTime: latestPaidAt ? formatTimeFromRaw(latestPaidAt) || first.createdAtTime : first.createdAtTime,
+                paymentDateRaw: latestPaidAt,
                 amount: gAmt,
                 status: first.transactionType === "income" ? "Recebido" : "Pago",
                 statusVariant: "green",
@@ -506,6 +532,13 @@ export default function TransactionsPage({
         }
         result = [...passthrough, ...collapsedGroups, ...collapsedPaidInstallmentGroups]
 
+        const transactionSortTime = (item: ERPTransaction) => {
+            const raw = item.createdAtRaw || item.paymentDateRaw || item.dueDateRaw || null
+            if (!raw) return 0
+            const ts = new Date(raw).getTime()
+            return Number.isFinite(ts) ? ts : 0
+        }
+
         if (sortConfig) {
             result = [...result].sort((a, b) => {
                 let aVal: string | number = ""
@@ -525,16 +558,20 @@ export default function TransactionsPage({
                         bVal = b.contactName
                         break
                     case "date": {
-                        const at = a.occurrenceDate
-                            ? new Date(`${a.occurrenceDate}T12:00:00`).getTime()
-                            : a.dueDateRaw
-                                ? new Date(a.dueDateRaw).getTime()
-                                : new Date(a.dueDate).getTime()
-                        const bt = b.occurrenceDate
-                            ? new Date(`${b.occurrenceDate}T12:00:00`).getTime()
-                            : b.dueDateRaw
-                                ? new Date(b.dueDateRaw).getTime()
-                                : new Date(b.dueDate).getTime()
+                        const at = activeTab === "Previstos"
+                            ? a.occurrenceDate
+                                ? new Date(`${a.occurrenceDate}T12:00:00`).getTime()
+                                : a.dueDateRaw
+                                    ? new Date(a.dueDateRaw).getTime()
+                                    : new Date(a.dueDate).getTime()
+                            : transactionSortTime(a)
+                        const bt = activeTab === "Previstos"
+                            ? b.occurrenceDate
+                                ? new Date(`${b.occurrenceDate}T12:00:00`).getTime()
+                                : b.dueDateRaw
+                                    ? new Date(b.dueDateRaw).getTime()
+                                    : new Date(b.dueDate).getTime()
+                            : transactionSortTime(b)
                         aVal = at
                         bVal = bt
                         break
@@ -565,6 +602,8 @@ export default function TransactionsPage({
                 const bDate = b.occurrenceDate || b.dueDateRaw || b.dueDate
                 return String(aDate).localeCompare(String(bDate))
             })
+        } else {
+            result = [...result].sort((a, b) => transactionSortTime(b) - transactionSortTime(a))
         }
 
         return result
@@ -770,7 +809,7 @@ export default function TransactionsPage({
 
     const handleOpenTransactionDetail = useCallback(
         (transaction: ERPTransaction) => {
-            if (transaction.isInstallmentGroup && transaction.installmentGroupId) {
+            if (transaction.isInstallmentGroup && transaction.installmentGroupId && Number(transaction.installmentPendingCount || 0) > 0) {
                 setOpenInstallmentGroupId(transaction.installmentGroupId)
                 setInstallmentDetail(null)
                 setInstallmentDetailLoading(true)
@@ -783,6 +822,14 @@ export default function TransactionsPage({
                     else notifyError(res.error || "Erro ao carregar parcelado")
                     setInstallmentDetailLoading(false)
                 })()
+                return
+            }
+            if (transaction.isInstallmentGroup && Number(transaction.installmentPendingCount || 0) === 0) {
+                const representativeId = transaction.groupRepresentativeTransactionId || transaction.id
+                setViewingTransactionId(representativeId)
+                setShowCreateTransaction(false)
+                setEditingTransaction(null)
+                setEditingRecurringTemplateId(null)
                 return
             }
             if (transaction.isRecurringOccurrence) {
@@ -1275,7 +1322,9 @@ export default function TransactionsPage({
                                             paidAmount: Number(row.paidAmount || 0),
                                             interestAmount: row.interestAmount != null ? Number(row.interestAmount) : undefined,
                                             discountAmount: row.discountAmount != null ? Number(row.discountAmount) : undefined,
+                                            dueDate: row.dueDate ? String(row.dueDate) : null,
                                             finalizationDate: row.paymentDate ? String(row.paymentDate) : null,
+                                            paymentType: row.paymentType ? String(row.paymentType) : null,
                                             reason: String(installmentDetail.group?.description || "Parcela"),
                                             reference: String(row.description || "—"),
                                         }),
@@ -1283,11 +1332,10 @@ export default function TransactionsPage({
                                 }
                                 getActionsSlot={(row) =>
                                     row.status === "paid" ? null : (
-                                        <ActionsDropdown
-                                            onEdit={() => handleEditInstallment(row.id)}
-                                            onCancel={() => void handlePayInstallment(row.id)}
-                                            cancelLabel="Marcar como paga"
-                                        />
+                                        <>
+                                            <DropdownItem onClick={() => handleEditInstallment(row.id)}>Editar</DropdownItem>
+                                            <DropdownItem onClick={() => void handlePayInstallment(row.id)}>Registrar pagamento</DropdownItem>
+                                        </>
                                     )
                                 }
                             />
@@ -1446,58 +1494,70 @@ export default function TransactionsPage({
             >
                 {selectedInstallmentForPayment ? (
                     <div className="space-y-4">
-                        <div className="flex flex-col w-full">
-                            <div className="py-4 flex flex-col gap-6">
-                                <div className="flex justify-between items-start gap-4">
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                                            {selectedInstallmentForPayment.description}
-                                        </h3>
-                                        <div className="flex items-center gap-2 mt-1.5 font-medium">
-                                            <span className="text-[12px] px-2.5 py-1 rounded-md bg-brand-slate dark:bg-dark-border text-brand-dark dark:text-dark-heading uppercase tracking-wide">
-                                                Parcela {selectedInstallmentForPayment.installmentNumber}
-                                            </span>
-                                            <span className="text-[12px] text-brand-inactive-text">
-                                                Vence em {selectedInstallmentForPayment.dueDate || "-"}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col items-end gap-1 px-4 py-2 bg-brand-gray dark:bg-dark-border rounded-xl">
-                                        <span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider">Valor Original</span>
-                                        <span className="font-bold text-[16px] text-brand-dark dark:text-dark-heading">{formatCurrency(Number(selectedInstallmentForPayment.originalAmount || 0))}</span>
+                        <div className="rounded-xl border border-brand-border dark:border-dark-border p-4 space-y-4">
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="min-w-0">
+                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
+                                        {selectedInstallmentForPayment.description}
+                                    </h3>
+                                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                        <Badge variant="gray">
+                                            Parcela {selectedInstallmentForPayment.installmentNumber}
+                                        </Badge>
+                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                            Vence em {selectedInstallmentForPayment.dueDate || "-"}
+                                        </span>
                                     </div>
                                 </div>
+                                <div className="text-right shrink-0">
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">Restante</p>
+                                    <p className="font-bold text-[18px] text-brand-dark dark:text-dark-heading">
+                                        {formatCurrency(Number(selectedInstallmentForPayment.remainingAmount || 0))}
+                                    </p>
+                                </div>
+                            </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                                    <div className="flex flex-col gap-1.5">
-                                        <label className="text-xs font-bold text-brand-inactive-text uppercase ml-1">Valor do Pagamento</label>
-                                        <input type="number" step="0.01" min="0" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="w-full rounded-xl h-11 border border-brand-border dark:border-dark-border px-4 bg-white dark:bg-dark-surface/50 text-sm font-bold transition-all focus:border-brand-primary outline-none shadow-sm" />
-                                    </div>
-                                    <div className="flex flex-col gap-1.5">
-                                        <label className="text-xs font-bold text-brand-inactive-text uppercase ml-1">Meio de Pagamento</label>
-                                        <select value={paymentMethodId} onChange={(e) => setPaymentMethodId(e.target.value)} className="w-full rounded-xl h-11 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm font-medium transition-all focus:border-brand-primary outline-none shadow-sm">
-                                            {(resolvedPaymentMethods || []).map((pm: any) => (<option key={pm.id} value={pm.id}>{pm.name}</option>))}
-                                        </select>
-                                    </div>
-                                    <div className="flex flex-col gap-1.5">
-                                        <label className="text-xs font-bold text-brand-inactive-text uppercase ml-1">Juros (+)</label>
-                                        <input type="number" step="0.01" min="0" value={interestAmount} onChange={(e) => setInterestAmount(e.target.value)} className="w-full rounded-xl h-11 border border-brand-border dark:border-dark-border px-4 bg-white dark:bg-dark-surface/50 text-sm transition-all focus:border-brand-primary outline-none shadow-sm" />
-                                    </div>
-                                    <div className="flex flex-col gap-1.5">
-                                        <label className="text-xs font-bold text-brand-inactive-text uppercase ml-1">Desconto (-)</label>
-                                        <input type="number" step="0.01" min="0" value={discountAmount} onChange={(e) => setDiscountAmount(e.target.value)} className="w-full rounded-xl h-11 border border-brand-border dark:border-dark-border px-4 bg-white dark:bg-dark-surface/50 text-sm transition-all focus:border-brand-primary outline-none shadow-sm" />
-                                    </div>
-                                </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <MoneyInput
+                                    label="Valor do pagamento"
+                                    value={Number(paymentAmount || 0)}
+                                    onChange={(value) => setPaymentAmount(String(value))}
+                                    min={0}
+                                />
+                                <FormDropdown
+                                    label="Meio de pagamento"
+                                    value={paymentMethodId}
+                                    setValue={setPaymentMethodId}
+                                    options={(resolvedPaymentMethods || []).map((pm: any) => ({
+                                        value: pm.id,
+                                        label: pm.name,
+                                    }))}
+                                    placeholder="Selecione"
+                                />
+                                <MoneyInput
+                                    label="Juros"
+                                    value={Number(interestAmount || 0)}
+                                    onChange={(value) => setInterestAmount(String(value))}
+                                    min={0}
+                                />
+                                <MoneyInput
+                                    label="Desconto"
+                                    value={Number(discountAmount || 0)}
+                                    onChange={(value) => setDiscountAmount(String(value))}
+                                    min={0}
+                                />
+                            </div>
 
-                                <div className="p-4 rounded-xl border border-brand-green/20 bg-brand-green/5 flex justify-between items-center mt-2">
-                                    <div className="flex flex-col">
-                                        <span className="text-[10px] text-brand-green font-bold uppercase tracking-widest">Total a Processar</span>
-                                        <span className="text-brand-inactive-text text-xs">Considerando descontos/juros</span>
-                                    </div>
-                                    <span className="font-bold text-2xl text-brand-green">
-                                        {formatCurrency(Math.max(0, Number(paymentAmount || 0) + Number(interestAmount || 0) - Number(discountAmount || 0)))}
-                                    </span>
+                            <div className="rounded-xl border border-brand-border dark:border-dark-border p-4 flex items-center justify-between gap-4">
+                                <div>
+                                    <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">Total a processar</p>
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                        Valor final com juros e desconto aplicados.
+                                    </p>
                                 </div>
+                                <p className="font-bold text-[20px] text-brand-dark dark:text-dark-heading">
+                                    {formatCurrency(Math.max(0, Number(paymentAmount || 0) + Number(interestAmount || 0) - Number(discountAmount || 0)))}
+                                </p>
                             </div>
                         </div>
 

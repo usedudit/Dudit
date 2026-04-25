@@ -224,7 +224,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                         <div className="mt-8">
                                             <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
                                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">
-                                                {detail.installmentBreakdown?.length ? "Parcelas" : "Itens da Transação"}
+                                                {detail.installmentBreakdown?.length ? "Parcelas da transa��o" : "Itens da Transação"}
                                             </h3>
                                             <div className="space-y-4">
                                                 {detail.installmentBreakdown?.length ? (
@@ -240,7 +240,9 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                                     paidAmount: row.paidAmount,
                                                                     interestAmount: row.interestAmount,
                                                                     discountAmount: row.discountAmount,
+                                                                    dueDate: row.dueDate,
                                                                     finalizationDate: row.paymentDate,
+                                                                    paymentType: row.paymentType,
                                                                     reason: detail.categoryLine,
                                                                     reference: detail.headerTitle,
                                                                 }),
@@ -384,3 +386,4 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
         </FadeIn>
     )
 }
+
