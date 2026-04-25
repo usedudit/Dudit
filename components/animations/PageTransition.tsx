@@ -32,30 +32,23 @@ function PageTransitionInner({ children }: PageTransitionProps) {
   }
 
   const variants: Variants = {
-    initial: (direction: "forward" | "back") => ({
+    initial: {
       opacity: 0,
-      scale: 0.985,
-      x: direction === "forward" ? "40px" : "-40px",
-    }),
+    },
     animate: {
       opacity: 1,
-      scale: 1,
-      x: 0,
       transition: {
-        type: "tween",
-        duration: 0.25,
+        duration: 0.2,
         ease: "easeOut",
       },
     },
-    exit: (direction: "forward" | "back") => ({
+    exit: {
       opacity: 0,
-      x: direction === "forward" ? "-40px" : "40px",
       transition: {
-        type: "tween",
-        duration: 0.2,
+        duration: 0.15,
         ease: "easeIn",
       },
-    }),
+    },
   }
 
   return (

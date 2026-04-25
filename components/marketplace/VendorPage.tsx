@@ -557,13 +557,13 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
   }
 
   return (
-    <div className="container mx-auto px-4 lg:px-6 max-w-[1300px] animate-fade-in mt-6">
+    <div className="container mx-auto px-0 lg:px-6 max-w-[1300px] animate-fade-in lg:mt-6">
       <MarketplaceHeader 
         productName={partner.storeName}
         onShare={() => setShowShareModal(true)}
       />
 
-      {/* Banner - rounded a partir de md */}
+      {/* Banner - rounded a partir de md, sem margem lateral no mobile para ocupar tudo sob o header */}
       <div className="w-full h-[220px] md:rounded-[24px] md:mb-4 overflow-hidden relative">
         <img
           src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80&w=1400"

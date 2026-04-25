@@ -218,7 +218,7 @@ const Header: React.FC<HeaderProps> = ({
 
     if (simpleTitle) {
       return (
-        <header className="lg:hidden w-full fixed top-0 left-0 right-0 z-50 bg-brand-green">
+        <header className="lg:hidden w-full fixed top-0 left-0 right-0 z-50 bg-brand-dark">
           <div className="px-4 py-3 flex items-center justify-between min-h-[50px]">
             <button onClick={handleGoBack} className="shrink-0 text-white p-1 -ml-1">
               <ChevronLeftIcon size={24} strokeWidth={2.5} />
@@ -235,7 +235,7 @@ const Header: React.FC<HeaderProps> = ({
     }
 
     return (
-      <header className={`lg:hidden w-full fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isProductDetail && !isScrolled ? "bg-transparent" : "bg-brand-green"}`}>
+      <header className={`lg:hidden w-full fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isProductDetail && !isScrolled ? "bg-transparent" : "bg-brand-dark"}`}>
         {/* standard logo header only if not product detail or if scrolled */}
         {isHome && (
           <div className={`flex items-center justify-between px-4 overflow-hidden transition-all duration-300 ease-in-out ${isScrolled ? "h-0 opacity-0" : "h-[50px] opacity-100 pt-3 pb-1"}`}>
@@ -268,7 +268,7 @@ const Header: React.FC<HeaderProps> = ({
               }}
             >
               {(!isHome || isProductDetail) ? (
-                <ChevronLeftIcon size={24} className={`${isProductDetail && !isScrolled ? "text-brand-green" : "text-white"}`} strokeWidth={2.5} />
+                <ChevronLeftIcon size={24} className={`${isProductDetail && !isScrolled ? "text-brand-dark" : "text-white"}`} strokeWidth={2.5} />
               ) : user ? (
                 <img
                   src="https://img.dudit.com.br/static/Placeholder.png"
@@ -287,8 +287,8 @@ const Header: React.FC<HeaderProps> = ({
             {/* Middle Section: Search or Product Name */}
             <div className="flex-1 flex items-center justify-center min-w-0 transition-all duration-300">
               {isProductDetail ? (
-                <div className={`w-full transition-all duration-500 ${isScrolled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
-                   <h1 className="text-white font-bold text-[15px] truncate text-center px-2">
+                <div className={`flex-1 flex items-center justify-center min-w-0 transition-all duration-300`}>
+                   <h1 className={`font-bold text-[15px] truncate text-center px-2 transition-all duration-300 ${isScrolled ? "text-white" : "text-brand-dark"}`}>
                     {productName}
                    </h1>
                 </div>
@@ -313,14 +313,14 @@ const Header: React.FC<HeaderProps> = ({
                 <>
                   <button
                     onClick={(e) => { e.stopPropagation(); onShare?.(); }}
-                    className={`transition-all duration-300 flex items-center justify-center ${!isScrolled ? "w-10 h-10 bg-white rounded-full shadow-md text-brand-green" : "w-8 h-8 text-white"}`}
+                    className={`transition-all duration-300 flex items-center justify-center ${!isScrolled ? "w-10 h-10 bg-white rounded-full shadow-md text-brand-dark" : "w-8 h-8 text-white"}`}
                   >
                     <ShareIcon size={!isScrolled ? 20 : 22} />
                   </button>
                   {onFavorite && (
                     <button
                       onClick={(e) => { e.stopPropagation(); onFavorite?.(); }}
-                      className={`transition-all duration-300 flex items-center justify-center ${!isScrolled ? "w-10 h-10 bg-white rounded-full shadow-md text-brand-green" : "w-8 h-8 text-white"}`}
+                      className={`transition-all duration-300 flex items-center justify-center ${!isScrolled ? "w-10 h-10 bg-white rounded-full shadow-md text-brand-dark" : "w-8 h-8 text-white"}`}
                     >
                       <HeartIcon size={!isScrolled ? 20 : 22} className={isFavorite ? "fill-current" : ""} />
                     </button>
