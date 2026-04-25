@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect, useRef, Suspense } from "react"
+import { useState, useEffect, useLayoutEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import dynamic from "next/dynamic"
 import { useSupabase } from "@/providers/supabase-provider"
+import { getUserHasAnyPartnerAccess } from "@/app/actions/auth/partner-access"
 
 // Importação estática (Leve, carregamento imediato)
 import AuthView from "@/components/auth/AuthView"
@@ -24,17 +25,29 @@ const PartnerWizard = dynamic(
 type PageMode = "auth" | "partner"
 type AuthMode = "login" | "signup" | "verify-email" | "forgot-password"
 
+function RedirectToHome() {
+  const router = useRouter()
+  useLayoutEffect(() => {
+    router.replace("/")
+  }, [router])
+  return <div className="min-h-screen bg-brand-gray" />
+}
+
 function AuthContent() {
   const { user } = useSupabase()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const hasCheckedUser = useRef(false)
-
-  // Estado para controlar se o usuário já está logado
-  const [isUserLoggedIn, setIsUserLoggedIn] = useState(false)
 
   const rawModeParam = searchParams.get("mode")
   const verifiedParam = searchParams.get("verified")
+  const isPartnerMode = rawModeParam === "partner"
+
+  /**
+   * Logged-in + mode=partner: `null` = ainda decidir (mostrar loading);
+   * `true` = pode exibir o wizard (sem acesso a ERP ainda);
+   * `false` = não usado (redirect /erp/switch ocorre antes).
+   */
+  const [canShowPartnerWizardWhenLoggedIn, setCanShowPartnerWizardWhenLoggedIn] = useState<null | boolean>(null)
 
   // Estado principal de navegação
   const [pageMode, setPageMode] = useState<PageMode>(() => {
@@ -46,19 +59,37 @@ function AuthContent() {
     return "auth"
   })
 
-  // Handle direct redirection for verified partners
+  // Handle direct redirection for verified partners (e-mail de verificação)
   useEffect(() => {
     if (verifiedParam === "true" && rawModeParam === "partner") {
-      router.push("/erp/dashboard")
+      router.push("/erp/switch")
     }
   }, [verifiedParam, rawModeParam, router])
 
-  // Checa sessão do usuário ao carregar
+  // Sessão logada + ?mode=partner: com ERP -> /erp/switch; sem ERP -> fica no wizard
   useEffect(() => {
-    if (user) {
-      setIsUserLoggedIn(true)
+    if (!user || !isPartnerMode) {
+      setCanShowPartnerWizardWhenLoggedIn(null)
+      return
     }
-  }, [user])
+    let gone = false
+    setCanShowPartnerWizardWhenLoggedIn(null)
+    getUserHasAnyPartnerAccess()
+      .then((has) => {
+        if (gone) return
+        if (has) {
+          router.replace("/erp/switch")
+          return
+        }
+        setCanShowPartnerWizardWhenLoggedIn(true)
+      })
+      .catch(() => {
+        if (!gone) setCanShowPartnerWizardWhenLoggedIn(true)
+      })
+    return () => {
+      gone = true
+    }
+  }, [user, isPartnerMode, router])
 
   // Força tema light no modo parceiro
   useEffect(() => {
@@ -67,6 +98,14 @@ function AuthContent() {
       document.documentElement.setAttribute("data-theme", "light")
     }
   }, [pageMode])
+
+  if (user && !isPartnerMode) {
+    return <RedirectToHome />
+  }
+
+  if (user && isPartnerMode && canShowPartnerWizardWhenLoggedIn === null) {
+    return <div className="min-h-screen bg-[#022C2B]" />
+  }
 
   // Layout específico do Modo Parceiro (VISUAL ORIGINAL MANTIDO)
   const PartnerLayout = () => (
@@ -97,7 +136,7 @@ function AuthContent() {
           <div className="w-full max-w-md mx-auto">
             <PartnerWizard
               onBack={() => setPageMode("auth")}
-              isUserLoggedIn={isUserLoggedIn}
+              isUserLoggedIn={!!user}
             />
           </div>
         </div>

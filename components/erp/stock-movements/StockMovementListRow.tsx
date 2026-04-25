@@ -20,6 +20,8 @@ interface StockMovementListItemProps {
     onUndo: (id: string) => void
     onDetails: (id: string) => void
     showCheckbox?: boolean
+    /** Quando false, oculta a coluna de ações (ex.: parcelas no detalhe da transação). */
+    showActions?: boolean
 }
 
 const StockMovementListItem = React.memo(
@@ -31,6 +33,7 @@ const StockMovementListItem = React.memo(
         onUndo,
         onDetails,
         showCheckbox = true,
+        showActions = true,
     }: StockMovementListItemProps) => {
 
         const renderCellContent = (colId: string) => {
@@ -47,7 +50,9 @@ const StockMovementListItem = React.memo(
                                     {movement.displayId}
                                 </span>
                                 <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                    {movement.items_count} {movement.items_count === 1 ? 'item' : 'itens'}
+                                    {movement.parcelSubtitle != null && String(movement.parcelSubtitle).length > 0
+                                        ? String(movement.parcelSubtitle)
+                                        : `${movement.items_count} ${movement.items_count === 1 ? "item" : "itens"}`}
                                 </span>
                             </div>
                         </div>
@@ -79,6 +84,16 @@ const StockMovementListItem = React.memo(
                     )
 
                 case "type":
+                    if (movement.statusTag) {
+                        const st = movement.statusTag as { label: string; variant: "green" | "red" | "orange" | "blue" | "cyan" | "purple" | "gray" }
+                        return (
+                            <div className={`flex ${getJustifyClass(columns.find(c => c.id === "type")?.align)}`}>
+                                <Badge variant={st.variant} icon={null} className="w-fit whitespace-nowrap">
+                                    {st.label}
+                                </Badge>
+                            </div>
+                        )
+                    }
                     return (
                         <div className={`flex ${getJustifyClass(columns.find(c => c.id === 'type')?.align)}`}>
                             <Badge variant={movement.type === 'in' ? "green" : "red"} icon={movement.type === 'in' ? <ChevronDownIcon /> : <ChevronUpIcon />} className="w-fit whitespace-nowrap">
@@ -88,6 +103,19 @@ const StockMovementListItem = React.memo(
                     )
 
                 case "actions":
+                    if (movement.actionsSlot) {
+                        return (
+                            <div
+                                className="flex justify-center action-btn"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {movement.actionsSlot}
+                            </div>
+                        )
+                    }
+                    if (!showActions) {
+                        return <span className="text-brand-inactive-text dark:text-dark-body text-xs"> </span>
+                    }
                     return (
                         <div
                             className="flex justify-center action-btn"
@@ -148,7 +176,8 @@ const StockMovementListItem = React.memo(
     (prev, next) =>
         prev.movement === next.movement &&
         prev.selected === next.selected &&
-        prev.columns === next.columns
+        prev.columns === next.columns &&
+        prev.showActions === next.showActions
 )
 
 StockMovementListItem.displayName = "StockMovementListItem"

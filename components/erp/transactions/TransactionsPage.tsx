@@ -26,6 +26,7 @@ import TransactionListItem from "./TransactionListRow"
 import TransactionGridCard from "./TransactionGridCard"
 import CreateTransactionPage, { type CategoryItem, type AccountItem } from "./CreateTransactionPage"
 import TransactionDetailView from "./TransactionDetailView"
+import InstallmentParcelsTable, { type InstallmentParcelRow } from "./InstallmentParcelsTable"
 import type {
     ERPTransaction,
     FinancialTransactionCursor,
@@ -408,6 +409,7 @@ export default function TransactionsPage({
         })
 
         const groupedInstallments = new Map<string, ERPTransaction[]>()
+        const paidInstallmentByGroup = new Map<string, ERPTransaction[]>()
         const fullGroupStats = new Map<string, { total: number; paid: number }>()
         for (const tx of loadedTransactions) {
             if (!tx.installmentGroupId) continue
@@ -427,6 +429,13 @@ export default function TransactionsPage({
                 if (activeTab === "Transações" && hasGroupPending) {
                     continue
                 }
+                if (activeTab === "Transações" && !hasGroupPending && totalCount > 0 && paidCount === totalCount) {
+                    const key = item.installmentGroupId
+                    const pl = paidInstallmentByGroup.get(key) || []
+                    pl.push(item)
+                    paidInstallmentByGroup.set(key, pl)
+                    continue
+                }
                 if (String(item.rawStatus || "").toLowerCase() === "paid") {
                     passthrough.push(item)
                     continue
@@ -438,6 +447,32 @@ export default function TransactionsPage({
             } else {
                 passthrough.push(item)
             }
+        }
+        const collapsedPaidInstallmentGroups: ERPTransaction[] = []
+        for (const [groupId, items] of paidInstallmentByGroup) {
+            if (items.length === 0) continue
+            const sorted = [...items].sort((a, b) => (a.installmentNumber ?? 0) - (b.installmentNumber ?? 0))
+            const first = sorted[0]
+            const fullStats = fullGroupStats.get(groupId)
+            const totalCount = fullStats?.total || first.installmentTotalCount || sorted.length
+            const gAmt =
+                first.installmentGroupTotalAmount && first.installmentGroupTotalAmount > 0
+                    ? first.installmentGroupTotalAmount
+                    : Math.round(sorted.reduce((acc, r) => acc + Number(r.amount || 0), 0) * 100) / 100
+            const paidRow: ERPTransaction = {
+                ...first,
+                id: `group-${groupId}`,
+                description: `${first.installmentGroupDescription || first.description} - ${totalCount}x`,
+                installmentGroupId: groupId,
+                installmentTotalCount: totalCount,
+                installmentPaidCount: totalCount,
+                installmentPendingCount: 0,
+                isInstallmentGroup: true,
+                amount: gAmt,
+                status: first.transactionType === "income" ? "Recebido" : "Pago",
+                statusVariant: "green",
+            }
+            collapsedPaidInstallmentGroups.push(paidRow)
         }
         const collapsedGroups: ERPTransaction[] = []
         for (const [groupId, items] of groupedInstallments) {
@@ -469,7 +504,7 @@ export default function TransactionsPage({
                 statusVariant: "orange",
             })
         }
-        result = [...passthrough, ...collapsedGroups]
+        result = [...passthrough, ...collapsedGroups, ...collapsedPaidInstallmentGroups]
 
         if (sortConfig) {
             result = [...result].sort((a, b) => {
@@ -1227,53 +1262,35 @@ export default function TransactionsPage({
                                 ))
                             })()}
                         </div>
-                        <div className="flex flex-col w-full max-h-[60vh] overflow-y-auto px-1 pr-1 custom-scrollbar border-t border-brand-border dark:border-dark-border mt-4">
-                            {(installmentDetail.installments || []).map((row: any) => (
-                                <div key={row.id} className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 flex items-start gap-4 hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 px-2 transition-colors rounded-lg">
-                                    <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-                                        <div className="flex justify-between items-start gap-3">
-                                            <div className="min-w-0">
-                                                <div className="w-10 h-10 rounded-full bg-brand-slate dark:bg-dark-border/50 flex items-center justify-center mb-2">
-                                                    {(() => {
-                                                        const PaymentIcon = getPaymentIcon(String(row.paymentType || ""))
-                                                        return <PaymentIcon className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
-                                                    })()}
-                                                </div>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-brand-slate dark:bg-dark-border text-brand-dark dark:text-dark-heading">
-                                                        Parcela {row.installmentNumber}/{installmentDetail.group?.installments_count}
-                                                    </span>
-                                                    <Badge variant={row.status === "paid" ? "green" : row.status === "overdue" ? "red" : "orange"} className="scale-90">
-                                                        {row.status === "paid" ? "Pago" : row.status === "overdue" ? "Vencido" : "Pendente"}
-                                                    </Badge>
-                                                </div>
-                                            </div>
-                                            <div className="flex flex-col items-end gap-1 shrink-0">
-                                                <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
-                                                    {formatCurrency(row.originalAmount || 0)}
-                                                </span>
-                                                <span className="text-[12px] font-medium text-brand-inactive-text">
-                                                    Vence em {row.dueDate || "-"}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-4 mt-2 py-2 px-3 rounded-full bg-brand-gray/50 dark:bg-dark-border/20 border border-brand-border/50 dark:border-dark-border/30">
-                                            <div className="flex flex-col"><span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider">Restante</span><span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{formatCurrency(row.remainingAmount || 0)}</span></div>
-                                            <div className="flex flex-col border-l border-brand-border dark:border-dark-border pl-4"><span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider">Pago</span><span className="font-bold text-[13px] text-brand-green">{formatCurrency(row.paidAmount || 0)}</span></div>
-                                            <div className="flex flex-col border-l border-brand-border dark:border-dark-border pl-4"><span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider">Meio</span><span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{row.paymentType || "-"}</span></div>
-                                        </div>
-                                    </div>
-                                    {row.status !== "paid" && (
-                                        <div className="shrink-0 flex items-center justify-center pt-1 ml-2 action-btn">
-                                            <ActionsDropdown
-                                                onEdit={() => handleEditInstallment(row.id)}
-                                                onCancel={() => void handlePayInstallment(row.id)}
-                                                cancelLabel="Marcar como paga"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
+                        <div className="mt-4 border-t border-brand-border dark:border-dark-border pt-2">
+                            <InstallmentParcelsTable
+                                rows={
+                                    (installmentDetail.installments || []).map(
+                                        (row: any): InstallmentParcelRow => ({
+                                            id: row.id,
+                                            installmentNumber: row.installmentNumber,
+                                            totalCount: Number(installmentDetail.group?.installments_count) || 0,
+                                            status: row.status,
+                                            originalAmount: Number(row.originalAmount || 0),
+                                            paidAmount: Number(row.paidAmount || 0),
+                                            interestAmount: row.interestAmount != null ? Number(row.interestAmount) : undefined,
+                                            discountAmount: row.discountAmount != null ? Number(row.discountAmount) : undefined,
+                                            finalizationDate: row.paymentDate ? String(row.paymentDate) : null,
+                                            reason: String(installmentDetail.group?.description || "Parcela"),
+                                            reference: String(row.description || "—"),
+                                        }),
+                                    )
+                                }
+                                getActionsSlot={(row) =>
+                                    row.status === "paid" ? null : (
+                                        <ActionsDropdown
+                                            onEdit={() => handleEditInstallment(row.id)}
+                                            onCancel={() => void handlePayInstallment(row.id)}
+                                            cancelLabel="Marcar como paga"
+                                        />
+                                    )
+                                }
+                            />
                         </div>
                     </div>
                 ) : (

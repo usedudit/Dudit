@@ -10,6 +10,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
+import InstallmentParcelsTable, { type InstallmentParcelRow } from "./InstallmentParcelsTable"
 
 interface TransactionDetailViewProps {
     transactionId: string
@@ -227,24 +228,25 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                             </h3>
                                             <div className="space-y-4">
                                                 {detail.installmentBreakdown?.length ? (
-                                                    detail.installmentBreakdown.map((row) => (
-                                                        <div key={row.id} className="rounded-full bg-brand-gray dark:bg-dark-border/30 px-5 py-3 border border-brand-border dark:border-dark-border flex items-center justify-between gap-4">
-                                                            <div className="min-w-0">
-                                                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                                                    Parcela {row.installmentNumber}/{row.totalCount}
-                                                                </p>
-                                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                                    Vencimento: {row.dueDate || "-"} • Pagamento: {row.paymentDate || "-"}
-                                                                </p>
-                                                            </div>
-                                                            <div className="text-right shrink-0">
-                                                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{formatCurrency(row.originalAmount)}</p>
-                                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                                    Pago: {formatCurrency(row.paidAmount)}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    ))
+                                                    <InstallmentParcelsTable
+                                                        rows={
+                                                            detail.installmentBreakdown.map(
+                                                                (row): InstallmentParcelRow => ({
+                                                                    id: row.id,
+                                                                    installmentNumber: row.installmentNumber,
+                                                                    totalCount: row.totalCount,
+                                                                    status: row.status,
+                                                                    originalAmount: row.originalAmount,
+                                                                    paidAmount: row.paidAmount,
+                                                                    interestAmount: row.interestAmount,
+                                                                    discountAmount: row.discountAmount,
+                                                                    finalizationDate: row.paymentDate,
+                                                                    reason: detail.categoryLine,
+                                                                    reference: detail.headerTitle,
+                                                                }),
+                                                            )
+                                                        }
+                                                    />
                                                 ) : (
                                                     detail.items.map((item) => (
                                                         <div key={item.id} className="flex items-start gap-4">
@@ -313,7 +315,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                 )}
                                                 {detail.paymentDateLine && (
                                                     <PaymentRow
-                                                        label="Data de pagamento"
+                                                        label={detail.paymentDateRowLabel || "Data de pagamento"}
                                                         value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.paymentDateLine}</span>}
                                                     />
                                                 )}

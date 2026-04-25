@@ -62,6 +62,8 @@ export interface ERPTransaction {
   installmentNumber?: number | null
   installmentGroupDescription?: string | null
   installmentTotalCount?: number | null
+  /** Total do installment_groups (contrato) para exibir no cartão do grupo. */
+  installmentGroupTotalAmount?: number | null
   isInstallmentGroup?: boolean
   installmentPendingCount?: number
   installmentPaidCount?: number

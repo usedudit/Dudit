@@ -418,15 +418,19 @@ export async function getFinancialTransactionsAction(
         if (pendingInstallmentTxIds.length > 0) {
             const { data: payRows, error: payErr } = await supabase
                 .from("transaction_payments")
-                .select("transaction_id, amount")
+                .select("transaction_id, amount, base_amount")
                 .eq("partner_id", partnerId)
                 .in("transaction_id", pendingInstallmentTxIds)
             if (payErr) throw payErr
             for (const p of payRows || []) {
                 const tid = String((p as { transaction_id?: string }).transaction_id || "")
-                const amt = Number((p as { amount?: number | string }).amount || 0)
+                const pBase = Number(
+                    (p as { base_amount?: number | string | null; amount?: number | string | null }).base_amount ??
+                        (p as { amount?: number | string | null }).amount ??
+                        0,
+                )
                 if (!tid) continue
-                installmentPaidSumByTxId.set(tid, (installmentPaidSumByTxId.get(tid) || 0) + amt)
+                installmentPaidSumByTxId.set(tid, (installmentPaidSumByTxId.get(tid) || 0) + pBase)
             }
         }
 
@@ -570,6 +574,14 @@ export async function getFinancialTransactionsAction(
                     : null,
                 installmentTotalCount: t.installment_group_id
                     ? Number(installmentGroupById.get(t.installment_group_id)?.installments_count || 0) || null
+                    : null,
+                installmentGroupTotalAmount: t.installment_group_id
+                    ? Math.abs(
+                          Number(
+                              (installmentGroupById.get(t.installment_group_id) as { total_amount?: number } | undefined)
+                                  ?.total_amount ?? 0,
+                          ) || 0,
+                      ) || null
                     : null,
                 ...(installmentRemainingAmount !== undefined ? { installmentRemainingAmount } : {}),
             }
@@ -1210,18 +1222,30 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
         if (rowsErr) throw rowsErr
 
         const transactionIds = (rows || []).map((row: any) => row.id).filter(Boolean)
-        const paymentByTxId = new Map<string, number>()
+        const paymentByTxId = new Map<string, { base: number; cash: number; interest: number; discount: number }>()
         if (transactionIds.length > 0) {
             const { data: payments, error: paymentsErr } = await supabase
                 .from("transaction_payments")
-                .select("transaction_id, amount")
+                .select("transaction_id, amount, base_amount, interest_amount, discount_amount")
                 .eq("partner_id", input.partnerId)
                 .in("transaction_id", transactionIds)
             if (paymentsErr) throw paymentsErr
             for (const payment of payments || []) {
                 const txId = String((payment as any).transaction_id || "")
-                const amount = Number((payment as any).amount || 0)
-                paymentByTxId.set(txId, (paymentByTxId.get(txId) || 0) + amount)
+                const pBase = Number(
+                    (payment as any).base_amount ?? (payment as any).amount ?? 0,
+                )
+                const pCash = Number((payment as any).amount || 0)
+                const pInt = Number((payment as any).interest_amount || 0)
+                const pDisc = Number((payment as any).discount_amount || 0)
+                const cur: { base: number; cash: number; interest: number; discount: number } =
+                    paymentByTxId.get(txId) || { base: 0, cash: 0, interest: 0, discount: 0 }
+                paymentByTxId.set(txId, {
+                    base: cur.base + pBase,
+                    cash: cur.cash + pCash,
+                    interest: cur.interest + pInt,
+                    discount: cur.discount + pDisc,
+                })
             }
         }
 
@@ -1266,20 +1290,24 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
                         /^\d{4}-\d{2}-\d{2}$/.test(dueYmdRow) &&
                         diffCalendarDaysInSaoPaulo(dueYmdRow) < 0
                     const original = Math.abs(Number(row.original_amount ?? row.amount ?? 0))
-                    const paymentTotal = paymentByTxId.get(row.id) || 0
-                    const paidAmount = Math.min(original, Math.max(0, paymentTotal))
-                    const remainingAmount = Math.max(0, original - paidAmount)
+                    const agg = paymentByTxId.get(row.id) || { base: 0, cash: 0, interest: 0, discount: 0 }
+                    const paidPrincipal = Math.max(0, Math.round(agg.base * 100) / 100)
+                    const remainingAmount = Math.max(0, Math.round((original - paidPrincipal) * 100) / 100)
                     return {
                         id: row.id,
                         description: row.description,
                         installmentNumber: row.installment_number,
                         originalAmount: original,
-                        paidAmount,
+                        /** Valor pago (caixa) na parcela = base + juros - desconto em cada registro, soma em amount. */
+                        paidAmount: Math.max(0, Math.round(agg.cash * 100) / 100),
+                        interestAmount: Math.round(agg.interest * 100) / 100,
+                        discountAmount: Math.round(agg.discount * 100) / 100,
+                        principalCleared: paidPrincipal,
                         remainingAmount,
                         dueDate: row.due_date
                             ? formatBrazilDateFromDbInput(String(row.due_date).slice(0, 10), "dayMonthYear")
                             : "-",
-                        paymentDate: row.payment_date,
+                        paymentDate: row.payment_date ? formatDateTime(row.payment_date) : null,
                         paymentMethodId: row.payment_method_id || null,
                         paymentType:
                             (row.payment_method_id ? paymentMethodLabelById.get(String(row.payment_method_id)) : null) ||
@@ -1326,28 +1354,37 @@ export async function recordInstallmentPaymentAction(input: {
         if (!Number.isFinite(paymentAmount) || !Number.isFinite(interestAmount) || !Number.isFinite(discountAmount)) {
             throw new Error("Valores de pagamento inválidos.")
         }
-        let finalPaid = Math.round((paymentAmount + interestAmount - discountAmount) * 100) / 100
-        if (!(finalPaid > 0)) throw new Error("O valor final pago deve ser maior que zero.")
 
         const { data: existingPayments, error: paymentsErr } = await supabase
             .from("transaction_payments")
-            .select("amount")
+            .select("amount, base_amount")
             .eq("partner_id", input.partnerId)
             .eq("transaction_id", input.transactionId)
         if (paymentsErr) throw paymentsErr
 
-        const paidSoFar = (existingPayments || []).reduce((acc: number, row: { amount: number | string | null }) => acc + Number(row.amount || 0), 0)
         const originalAmount = Math.abs(Number(tx.original_amount ?? tx.amount ?? 0))
-        const remainingAmount = Math.max(0, originalAmount - paidSoFar)
+        const paidPrincipalSoFar = (existingPayments || []).reduce(
+            (acc: number, row: { amount: number | string | null; base_amount?: number | string | null }) =>
+                acc + Number(row.base_amount ?? row.amount ?? 0),
+            0,
+        )
+        const remainingPrincipal = Math.max(0, Math.round((originalAmount - paidPrincipalSoFar) * 100) / 100)
 
-        // Overpayment guard: clamp to remaining amount
-        if (finalPaid > remainingAmount + 0.01) {
-            finalPaid = Math.round(remainingAmount * 100) / 100
-            if (!(finalPaid > 0)) throw new Error("Esta parcela já está totalmente quitada.")
+        const baseRequest = Math.max(0, Math.round(paymentAmount * 100) / 100)
+        let baseApplied = Math.min(remainingPrincipal, baseRequest)
+        baseApplied = Math.round(baseApplied * 100) / 100
+
+        let finalPaid = Math.round((baseApplied + interestAmount - discountAmount) * 100) / 100
+        if (finalPaid <= 0) {
+            throw new Error("O valor final pago (após juros e desconto) deve ser maior que zero.")
         }
 
-        const paidAfter = paidSoFar + finalPaid
-        const fullyPaid = paidAfter + 0.0001 >= originalAmount
+        if (baseApplied < 0.0001 && remainingPrincipal > 0.01) {
+            throw new Error("Não é possível abater a parcela sem informar o valor de principal.")
+        }
+
+        const fullyPaid = paidPrincipalSoFar + baseApplied + 0.0001 >= originalAmount
+        const paidAfter = paidPrincipalSoFar + baseApplied
         const nowIso = new Date().toISOString()
         const idempotencyKey = `installment:${input.transactionId}:${nowIso}:${finalPaid}`
 
@@ -1357,6 +1394,9 @@ export async function recordInstallmentPaymentAction(input: {
                 partner_id: input.partnerId,
                 transaction_id: input.transactionId,
                 amount: finalPaid,
+                base_amount: baseApplied,
+                interest_amount: interestAmount,
+                discount_amount: discountAmount,
                 payment_method_id: input.paymentMethodId || null,
                 created_by_user_id: userId,
                 created_at: nowIso,
@@ -1414,10 +1454,11 @@ export async function recordInstallmentPaymentAction(input: {
             success: true as const,
             data: {
                 originalAmount,
-                paidSoFar,
-                remainingBefore: remainingAmount,
+                paidSoFar: paidPrincipalSoFar,
+                remainingBefore: remainingPrincipal,
                 paidNow: finalPaid,
-                remainingAfter: Math.max(0, originalAmount - paidAfter),
+                principalApplied: baseApplied,
+                remainingAfter: Math.max(0, Math.round((originalAmount - paidAfter) * 100) / 100),
                 fullyPaid,
             },
         }
@@ -1457,16 +1498,16 @@ export async function settleInstallmentGroupAction(input: {
         const txIds = rows.map((r: any) => r.id)
         const { data: paymentRows, error: paymentErr } = await supabase
             .from("transaction_payments")
-            .select("transaction_id, amount")
+            .select("transaction_id, amount, base_amount")
             .eq("partner_id", input.partnerId)
             .in("transaction_id", txIds)
         if (paymentErr) throw paymentErr
 
-        const paidByTx = new Map<string, number>()
+        const paidPrincipalByTx = new Map<string, number>()
         for (const payment of paymentRows || []) {
             const txId = String((payment as any).transaction_id || "")
-            const amount = Number((payment as any).amount || 0)
-            paidByTx.set(txId, (paidByTx.get(txId) || 0) + amount)
+            const pBase = Number((payment as any).base_amount ?? (payment as any).amount ?? 0)
+            paidPrincipalByTx.set(txId, (paidPrincipalByTx.get(txId) || 0) + pBase)
         }
 
         const paymentInputByTxId = new Map(
@@ -1475,33 +1516,41 @@ export async function settleInstallmentGroupAction(input: {
         const paymentsToInsert: Record<string, unknown>[] = []
         const txIdsToMarkPaid: string[] = []
         let affectedCount = 0
+        let payIdx = 0
 
         for (const row of rows as any[]) {
             const original = Math.abs(Number(row.original_amount ?? row.amount ?? 0))
-            const paidSoFar = paidByTx.get(row.id) || 0
-            const remaining = Math.max(0, Math.round((original - paidSoFar) * 100) / 100)
+            const paidPrincipalSoFar = paidPrincipalByTx.get(row.id) || 0
+            const remainingPrincipal = Math.max(0, Math.round((original - paidPrincipalSoFar) * 100) / 100)
             const alreadyPaid = String(row.status || "").toLowerCase() === "paid"
 
-            if (remaining <= 0) {
+            if (remainingPrincipal <= 0) {
                 if (!alreadyPaid) txIdsToMarkPaid.push(row.id)
                 continue
             }
 
             const custom = paymentInputByTxId.get(String(row.id))
-            const basePayment = Number(custom?.paymentAmount ?? remaining)
+            const baseRequest = Math.max(0, Number(custom?.paymentAmount ?? remainingPrincipal))
             const interest = Number(custom?.interestAmount || 0)
             const discount = Number(custom?.discountAmount || 0)
-            let finalPaid = Math.round((basePayment + interest - discount) * 100) / 100
-            if (finalPaid > remaining + 0.01) finalPaid = Math.round(remaining * 100) / 100
-            if (!(finalPaid > 0)) continue
+            const baseApplied = Math.round(Math.min(remainingPrincipal, baseRequest) * 100) / 100
+            let finalPaid = Math.round((baseApplied + interest - discount) * 100) / 100
+            if (finalPaid <= 0) continue
+            if (baseApplied < 0.0001) continue
+
+            const idemKey = `settle:${input.installmentGroupId}:${row.id}:${nowIso}:${payIdx++}`
 
             paymentsToInsert.push({
                 partner_id: input.partnerId,
                 transaction_id: row.id,
                 amount: finalPaid,
+                base_amount: baseApplied,
+                interest_amount: interest,
+                discount_amount: discount,
                 payment_method_id: custom?.paymentMethodId || null,
                 created_by_user_id: userId,
                 created_at: nowIso,
+                idempotency_key: idemKey,
             })
 
             await applyFinanceAccountBalanceDelta(supabase, input.partnerId, row.account_id, {
@@ -1509,8 +1558,8 @@ export async function settleInstallmentGroupAction(input: {
                 amount: finalPaid,
                 refund_kind: row.refund_kind,
             })
-            const paidAfter = paidSoFar + finalPaid
-            if (paidAfter + 0.0001 >= original) {
+            const paidPrincipalAfter = paidPrincipalSoFar + baseApplied
+            if (paidPrincipalAfter + 0.0001 >= original) {
                 txIdsToMarkPaid.push(row.id)
             }
             affectedCount += 1
@@ -1842,12 +1891,19 @@ export type TransactionDetailPayload = {
         dueDate: string | null
         paymentDate: string | null
         originalAmount: number
+        /** Soma de transaction_payments.amount (efetivo de caixa). */
         paidAmount: number
         interestAmount: number
         discountAmount: number
+        /** Soma de base_amount (abatimento do principal). */
+        principalCleared: number
         paymentType: string
         status: "paid" | "pending" | "overdue"
     }>
+    /** Quando a transação faz parte de um parcelado: rótulo da data no resumo. */
+    paymentDateRowLabel?: string
+    /** Total do grupo (installment_groups.total_amount) quando parcelado. */
+    installmentGroupTotalAmount?: number | null
     categoryLine: string
     subcategoryLine: string | null
     accountLine: string | null
@@ -1993,7 +2049,20 @@ export async function getTransactionDetailsAction(
         }
 
         let installmentBreakdown: TransactionDetailPayload["installmentBreakdown"] | undefined = undefined
+        let installmentGroupTotalAmount: number | null = null
+        let paymentDateRowLabel: TransactionDetailPayload["paymentDateRowLabel"] = "Data de pagamento"
         if (row.installment_group_id) {
+            paymentDateRowLabel = "Data de finalização"
+            const { data: igGroup } = await supabase
+                .from("installment_groups")
+                .select("total_amount")
+                .eq("id", String(row.installment_group_id))
+                .eq("partner_id", partnerId)
+                .maybeSingle()
+            if (igGroup && igGroup.total_amount != null) {
+                installmentGroupTotalAmount = Math.abs(Number(igGroup.total_amount) || 0) || null
+            }
+
             const { data: groupRows } = await supabase
                 .from("transactions")
                 .select("id, installment_number, due_date, payment_date, status, amount, original_amount, payment_type")
@@ -2001,28 +2070,42 @@ export async function getTransactionDetailsAction(
                 .eq("installment_group_id", row.installment_group_id)
                 .order("installment_number", { ascending: true })
             const txIds = (groupRows || []).map((g: any) => g.id)
-            const paymentByTx = new Map<string, number>()
+            const paymentByTx = new Map<string, { base: number; cash: number; interest: number; discount: number }>()
             if (txIds.length > 0) {
                 const { data: paymentRows } = await supabase
                     .from("transaction_payments")
-                    .select("transaction_id, amount")
+                    .select("transaction_id, amount, base_amount, interest_amount, discount_amount")
                     .eq("partner_id", partnerId)
                     .in("transaction_id", txIds)
                 for (const p of paymentRows || []) {
                     const tid = String((p as any).transaction_id || "")
-                    paymentByTx.set(tid, (paymentByTx.get(tid) || 0) + Number((p as any).amount || 0))
+                    const pBase = Number((p as any).base_amount ?? (p as any).amount ?? 0)
+                    const pCash = Number((p as any).amount || 0)
+                    const pInt = Number((p as any).interest_amount || 0)
+                    const pDisc = Number((p as any).discount_amount || 0)
+                    const cur = paymentByTx.get(tid) || { base: 0, cash: 0, interest: 0, discount: 0 }
+                    paymentByTx.set(tid, {
+                        base: cur.base + pBase,
+                        cash: cur.cash + pCash,
+                        interest: cur.interest + pInt,
+                        discount: cur.discount + pDisc,
+                    })
                 }
             }
             const totalCount = groupRows?.length || 0
             installmentBreakdown = (groupRows || []).map((g: any) => {
                 const original = Math.abs(Number(g.original_amount ?? g.amount ?? 0))
-                const paidAmount = Math.min(original, Math.max(0, paymentByTx.get(String(g.id)) || 0))
+                const agg = paymentByTx.get(String(g.id)) || { base: 0, cash: 0, interest: 0, discount: 0 }
+                const principalCleared = Math.max(0, Math.round(agg.base * 100) / 100)
                 const dueYmdInstallment = g.due_date ? String(g.due_date).slice(0, 10) : ""
                 const overdue =
                     String(g.status || "").toLowerCase() !== "paid" &&
+                    principalCleared + 0.0001 < original &&
                     !!dueYmdInstallment &&
                     /^\d{4}-\d{2}-\d{2}$/.test(dueYmdInstallment) &&
                     diffCalendarDaysInSaoPaulo(dueYmdInstallment) < 0
+                const paidFlag =
+                    String(g.status || "").toLowerCase() === "paid" || principalCleared + 0.0001 >= original
                 return {
                     id: String(g.id),
                     installmentNumber: Number(g.installment_number || 0),
@@ -2030,11 +2113,12 @@ export async function getTransactionDetailsAction(
                     dueDate: g.due_date ? formatDateLabel(g.due_date) : null,
                     paymentDate: g.payment_date ? formatDateTime(g.payment_date) : null,
                     originalAmount: original,
-                    paidAmount,
-                    interestAmount: 0,
-                    discountAmount: 0,
+                    paidAmount: Math.max(0, Math.round(agg.cash * 100) / 100),
+                    interestAmount: Math.round(agg.interest * 100) / 100,
+                    discountAmount: Math.round(agg.discount * 100) / 100,
+                    principalCleared,
                     paymentType: g.payment_type ? formatPaymentMethodLabel(g.payment_type, null) : "Não informado",
-                    status: String(g.status || "").toLowerCase() === "paid" ? "paid" : overdue ? "overdue" : "pending",
+                    status: (paidFlag ? "paid" : overdue ? "overdue" : "pending") as "paid" | "overdue" | "pending",
                 }
             })
             const allInstallmentsPaid = (installmentBreakdown?.length ?? 0) > 0 && installmentBreakdown?.every((i) => i.status === "paid")
@@ -2299,7 +2383,14 @@ export async function getTransactionDetailsAction(
         const paymentDateSubtitle = row.payment_date ? formatDateTime(row.payment_date) : null
 
         const showDueDateRow =
-            (String(row.category || "").trim() !== "Vendas" || !!row.due_date) && !transactionItemsCompact
+            !installmentBreakdown?.length &&
+            (String(row.category || "").trim() !== "Vendas" || !!row.due_date) &&
+            !transactionItemsCompact
+
+        const detailAmount =
+            installmentGroupTotalAmount != null && installmentGroupTotalAmount > 0
+                ? installmentGroupTotalAmount
+                : Math.abs(Number(row.amount || 0))
 
         const payload: TransactionDetailPayload = {
             id: row.id,
@@ -2317,13 +2408,15 @@ export async function getTransactionDetailsAction(
             items,
             transactionItemsCompact,
             installmentBreakdown,
+            paymentDateRowLabel: paymentDateRowLabel || "Data de pagamento",
+            installmentGroupTotalAmount: installmentGroupTotalAmount ?? null,
             categoryLine: String(row.category || "").trim() || "-",
             subcategoryLine,
             accountLine,
             dueDateLine: row.due_date ? formatDateLabel(row.due_date) : null,
             paymentDateLine: row.payment_date ? formatDateTime(row.payment_date) : null,
             notesLine: transactionItemsCompact ? null : row.notes ? String(row.notes) : null,
-            amount: Math.abs(Number(row.amount || 0)),
+            amount: detailAmount,
             ledgerDirection: ledgerDirectionFromRow(row as DbTransaction),
             contactCard,
             canEdit,
