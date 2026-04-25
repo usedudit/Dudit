@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { ChevronLeftIcon, EditIcon, ThreeDotsIcon } from "@/lib/icons"
@@ -224,7 +224,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                         <div className="mt-8">
                                             <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
                                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">
-                                                {detail.installmentBreakdown?.length ? "Parcelas da transa��o" : "Itens da Transação"}
+                                                {detail.installmentBreakdown?.length ? "Parcelas da transação" : "Itens da Transação"}
                                             </h3>
                                             <div className="space-y-4">
                                                 {detail.installmentBreakdown?.length ? (

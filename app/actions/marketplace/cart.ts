@@ -401,6 +401,7 @@ export async function checkoutCartAction(
   deliveryType: "delivery" | "pickup",
   deliveryAddress: string,
   paymentMethod: string,
+  installments = 1,
   notes?: string,
   couponCode?: string | null,
   useMercadoPago?: boolean,
@@ -558,7 +559,7 @@ export async function checkoutCartAction(
       .eq("payment_method_id", bestMethod.id)
     const calc = calculatePaymentAmounts({
       originalAmount: totalAmount,
-      installmentNumber: 1,
+      installmentNumber: Math.max(1, Number(installments || 1)),
       paymentMethod: {
         feePercent: Number(bestMethod.fee_percent || bestMethod.percentage_rate || 0),
         feeFixed: Number(bestMethod.fee_fixed || bestMethod.fixed_amount || 0),
@@ -600,7 +601,12 @@ export async function checkoutCartAction(
       payment_method: useMercadoPago ? "Mercado Pago" : paymentMethod,
       payment_breakdown: useMercadoPago
         ? []
-        : [{ method: chosenType, amount: paymentAwareTotal, paymentMethodId: bestMethod.id, installmentNumber: 1 }],
+        : [{
+          method: chosenType,
+          amount: paymentAwareTotal,
+          paymentMethodId: bestMethod.id,
+          installmentNumber: Math.max(1, Number(installments || 1)),
+        }],
       payment_provider: useMercadoPago ? "Mercado Pago" : paymentMethod,
       situation: "pending",
       notes,

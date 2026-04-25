@@ -1494,7 +1494,7 @@ export default function TransactionsPage({
             >
                 {selectedInstallmentForPayment ? (
                     <div className="space-y-4">
-                        <div className="rounded-xl border border-brand-border dark:border-dark-border p-4 space-y-4">
+                        <div className="space-y-4">
                             <div className="flex items-start justify-between gap-4">
                                 <div className="min-w-0">
                                     <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">

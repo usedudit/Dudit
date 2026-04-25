@@ -8,8 +8,8 @@ import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
 export const metadata: Metadata = {
-    title: "Explorar | Vitrine Digital Dudit",
-    description: "Explore a vitrine digital Dudit com os melhores produtos, serviços e lojistas da sua região.",
+    title: "Explorar Produtos e Serviços Perto de Você | Dudit",
+    description: "Chega de esperar dias pela entrega. Encontre os melhores produtos, serviços e negócios locais na sua cidade e compre sem pagar taxas extras.",
     alternates: {
         canonical: "https://dudit.com.br/explorar",
     },

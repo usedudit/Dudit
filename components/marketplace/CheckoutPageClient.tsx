@@ -8,6 +8,8 @@ import {
     HomeIcon,
     TruckIcon,
     MoneyIcon,
+    TagIcon,
+    StoreIcon,
 } from "@/lib/icons"
 import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
@@ -25,6 +27,7 @@ import { useRouter } from "next/navigation"
 import { PaymentWrapper } from "@/components/PaymentWrapper"
 import { checkoutCartAction } from "@/app/actions/marketplace/cart"
 import { createOrderAction } from "@/app/actions/marketplace/orders"
+import { previewMarketplacePaymentAction } from "@/app/actions/marketplace/payment-preview"
 import { invalidateCartCache } from "@/hooks/use-cart"
 
 interface ProductItem {
@@ -84,6 +87,20 @@ interface MarketplaceAvailableCoupon {
     endsAt: string | null
     discountAmount: number
     freeShipping?: boolean
+}
+
+interface MarketplacePaymentPreview {
+    success: true
+    methodId: string
+    methodName: string
+    methodType: string
+    maxInstallments: number
+    finalAmount: number
+    interestAmount: number
+    feeAmount: number
+    paymentMethodDiscountAmount: number
+    installmentNumber: number
+    installmentAmounts: number[]
 }
 
 const fadeVariants = {
@@ -192,6 +209,8 @@ export function CheckoutPageClient() {
     })
 
     const [paymentOption, setPaymentOption] = useState<"traditional" | "mercadopago">("traditional")
+    const [paymentPreview, setPaymentPreview] = useState<MarketplacePaymentPreview | null>(null)
+    const [paymentPreviewLoading, setPaymentPreviewLoading] = useState(false)
 
     useEffect(() => {
         if (sessionData) {
@@ -311,6 +330,7 @@ export function CheckoutPageClient() {
     }
 
     const totalAmount = products.reduce((sum, p) => sum + p.price * (quantities[p.id] || p.quantity), 0)
+    const checkoutBaseTotal = Math.max(0, totalAmount - couponDiscount)
     const paymentTypeLabelMap: Record<string, string> = {
         pix: "Pix",
         credit_card: "Cartão de crédito",
@@ -325,6 +345,11 @@ export function CheckoutPageClient() {
         }))
     const isPickup = formData.deliveryType === "pickup"
     const traditionalPaymentLabel = isPickup ? "Pagar na Retirada" : "Pagar na Entrega"
+    const shouldPreviewTraditionalPayment = Boolean(
+        partnerId &&
+        paymentOption === "traditional" &&
+        formData.paymentMethod
+    )
     const couponItems = useMemo(
         () =>
             products.map((product) => (
@@ -339,9 +364,76 @@ export function CheckoutPageClient() {
         [availableCoupons, couponCode]
     )
 
+    useEffect(() => {
+        let active = true
+
+        if (!shouldPreviewTraditionalPayment) {
+            setPaymentPreview(null)
+            setPaymentPreviewLoading(false)
+            if (paymentOption !== "traditional") {
+                setPaymentError(null)
+            }
+            return
+        }
+
+        setPaymentPreviewLoading(true)
+        setPaymentError(null)
+
+        const timer = window.setTimeout(async () => {
+            const result = await previewMarketplacePaymentAction({
+                partnerId,
+                paymentMethod: formData.paymentMethod,
+                originalAmount: checkoutBaseTotal,
+                installmentNumber: Math.max(1, Number(formData.installments || 1)),
+            })
+
+            if (!active) return
+
+            if (result.success) {
+                setPaymentPreview(result)
+                setPaymentError(null)
+            } else {
+                setPaymentPreview(null)
+                setPaymentError(result.error)
+            }
+
+            setPaymentPreviewLoading(false)
+        }, 180)
+
+        return () => {
+            active = false
+            window.clearTimeout(timer)
+        }
+    }, [
+        shouldPreviewTraditionalPayment,
+        partnerId,
+        paymentOption,
+        formData.paymentMethod,
+        formData.installments,
+        checkoutBaseTotal,
+    ])
+
+    useEffect(() => {
+        if (!paymentPreview?.success) return
+
+        const maxInstallments = Math.max(1, Number(paymentPreview.maxInstallments || 1))
+        if (formData.installments > maxInstallments) {
+            setFormData((prev) => ({ ...prev, installments: maxInstallments }))
+        }
+    }, [paymentPreview, formData.installments])
+
+    const checkoutTotalToCharge = paymentOption === "traditional" && paymentPreview?.success
+        ? Number(paymentPreview.finalAmount || checkoutBaseTotal)
+        : checkoutBaseTotal
+    const shouldShowInstallments = paymentOption === "traditional"
+        && formData.paymentMethod === "credit_card"
+        && Number(paymentPreview?.maxInstallments || 1) > 1
+    const disableCheckoutSubmit = isLoading
+        || (paymentOption === "traditional" && (paymentPreviewLoading || (!paymentPreview?.success && shouldPreviewTraditionalPayment)))
+
     const getCouponCountLabel = (count: number) => {
-        if (count === 1) return "1 cupom disponivel"
-        return `${count} cupons disponiveis`
+        if (count === 1) return "1 cupom disponível"
+        return `${count} cupons disponíveis`
     }
 
     const getCouponTitle = (coupon: MarketplaceAvailableCoupon) => {
@@ -356,25 +448,11 @@ export function CheckoutPageClient() {
         const requirements: string[] = []
 
         if (Number(coupon.minCartValue || 0) > 0) {
-            requirements.push(`Pedido minimo de ${formatCurrency(Number(coupon.minCartValue || 0))}`)
+            requirements.push(`Pedido mínimo de ${formatCurrency(Number(coupon.minCartValue || 0))}`)
         }
 
         if (coupon.firstPurchaseOnly) {
             requirements.push("Somente na primeira compra")
-        }
-
-        if (coupon.applyScope === "products") {
-            requirements.push("Valido para produtos elegiveis")
-        } else if (coupon.applyScope === "categories") {
-            requirements.push("Valido para categorias elegiveis")
-        } else if (coupon.applyScope === "services") {
-            requirements.push("Valido para servicos elegiveis")
-        } else {
-            requirements.push("Valido para este pedido")
-        }
-
-        if (coupon.customerScope === "specific") {
-            requirements.push("Exclusivo para clientes elegiveis")
         }
 
         return requirements.join(" • ")
@@ -476,7 +554,7 @@ export function CheckoutPageClient() {
 
         try {
             if (paymentOption === "mercadopago") {
-                const amount = Math.max(0, totalAmount - couponDiscount)
+                const amount = checkoutBaseTotal
                 setPixPaymentData({
                     orderId: "temp-" + Date.now(),
                     amount,
@@ -507,6 +585,16 @@ export function CheckoutPageClient() {
                 setIsLoading(false)
                 return
             } else {
+                if (paymentPreviewLoading) {
+                    setPaymentError("Aguarde o cálculo do pagamento terminar antes de finalizar.")
+                    setIsLoading(false)
+                    return
+                }
+                if (!paymentPreview?.success) {
+                    setPaymentError("Não foi possível calcular o valor final desse meio de pagamento.")
+                    setIsLoading(false)
+                    return
+                }
                 const { token } = await fetch("/api/csrf-token").then((r) => r.json())
                 if (sessionData?.source === "cart") {
                     const items = sessionData.cartItems || []
@@ -517,7 +605,14 @@ export function CheckoutPageClient() {
                             variantId: item.variantId,
                             quantity: quantities[item.productId] || item.quantity
                         })),
-                        formData.deliveryType, formData.deliveryAddress, formData.paymentMethod, formData.notes, couponCode || null, false, token
+                        formData.deliveryType,
+                        formData.deliveryAddress,
+                        formData.paymentMethod,
+                        formData.installments,
+                        formData.notes,
+                        couponCode || null,
+                        false,
+                        token
                     )
                     if (result.error) throw new Error(result.error)
                     invalidateCartCache()
@@ -529,10 +624,11 @@ export function CheckoutPageClient() {
                         itemId: sessionData?.itemId || products[0]?.id,
                         itemType: sessionData?.itemType || "product",
                         quantity: quantities[products[0]?.id] || products[0]?.quantity || 1,
-                        totalAmount: Math.max(0, totalAmount - couponDiscount),
+                        totalAmount: checkoutBaseTotal,
                         deliveryType: formData.deliveryType,
                         deliveryAddress: formData.deliveryAddress,
                         paymentMethod: formData.paymentMethod,
+                        installments: formData.installments,
                         notes: formData.notes,
                         partnerId: partnerId,
                         csrf_token: token,
@@ -617,7 +713,7 @@ export function CheckoutPageClient() {
                                                 <div>
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                         <ListItem
-                                                            icon={HomeIcon}
+                                                            icon={TruckIcon}
                                                             title="Entrega"
                                                             description="Receba em casa"
                                                             className={`px-4 py-3 gap-4 ${formData.deliveryType === "delivery" ? "border-brand-green dark:border-brand-green" : ""}`}
@@ -632,7 +728,7 @@ export function CheckoutPageClient() {
                                                             }
                                                         />
                                                         <ListItem
-                                                            icon={TruckIcon}
+                                                            icon={StoreIcon}
                                                             title="Retirada no local"
                                                             description="Retire imediatamente"
                                                             className={`px-4 py-3 gap-4 ${isPickup ? "border-brand-green dark:border-brand-green" : ""}`}
@@ -714,7 +810,7 @@ export function CheckoutPageClient() {
                                                                 </div>
                                                             ) : (
                                                                 <div className="flex flex-col items-center border-t border-brand-border pt-6">
-                                                                    <div className="flex flex-col items-center border-t border-brand-border pt-6">
+                                                                    <div className="flex flex-col items-center border-brand-border pt-6">
                                                                         <IconPlaceholder
                                                                             icon={MapPinIcon}
                                                                             title="Nenhum endereço cadastrado"
@@ -806,6 +902,28 @@ export function CheckoutPageClient() {
                                                                             ))}
                                                                         </SelectContent>
                                                                     </Select>
+                                                                    {shouldShowInstallments && (
+                                                                        <div className="mt-4">
+                                                                            <Label className="mb-2 block">Parcelas</Label>
+                                                                            <Select
+                                                                                value={String(formData.installments)}
+                                                                                onValueChange={(value) => setFormData((prev) => ({ ...prev, installments: Number(value) }))}
+                                                                            >
+                                                                                <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                                                                                <SelectContent>
+                                                                                    {Array.from({ length: Number(paymentPreview?.maxInstallments || 1) }, (_, index) => {
+                                                                                        const installmentNumber = index + 1
+                                                                                        const installmentAmount = paymentPreview?.installmentAmounts?.[index]
+                                                                                        return (
+                                                                                            <SelectItem key={installmentNumber} value={String(installmentNumber)}>
+                                                                                                {installmentNumber}x{installmentAmount ? ` de ${formatCurrency(installmentAmount)}` : ""}
+                                                                                            </SelectItem>
+                                                                                        )
+                                                                                    })}
+                                                                                </SelectContent>
+                                                                            </Select>
+                                                                        </div>
+                                                                    )}
                                                                 </motion.div>
                                                             )}
                                                         </AnimatePresence>
@@ -826,6 +944,28 @@ export function CheckoutPageClient() {
                                                                     ))}
                                                                 </SelectContent>
                                                             </Select>
+                                                            {shouldShowInstallments && (
+                                                                <div className="mt-4">
+                                                                    <Label className="mb-2 block">Parcelas</Label>
+                                                                    <Select
+                                                                        value={String(formData.installments)}
+                                                                        onValueChange={(value) => setFormData((prev) => ({ ...prev, installments: Number(value) }))}
+                                                                    >
+                                                                        <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                                                                        <SelectContent>
+                                                                            {Array.from({ length: Number(paymentPreview?.maxInstallments || 1) }, (_, index) => {
+                                                                                const installmentNumber = index + 1
+                                                                                const installmentAmount = paymentPreview?.installmentAmounts?.[index]
+                                                                                return (
+                                                                                    <SelectItem key={installmentNumber} value={String(installmentNumber)}>
+                                                                                        {installmentNumber}x{installmentAmount ? ` de ${formatCurrency(installmentAmount)}` : ""}
+                                                                                    </SelectItem>
+                                                                                )
+                                                                            })}
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </>
                                                 )}
@@ -904,8 +1044,9 @@ export function CheckoutPageClient() {
 
                                     <div className="mb-4 space-y-2">
                                         <ListItem
-                                            title="Escolha um cupom"
-                                            description={couponListLoading ? "Verificando cupons disponiveis..." : getCouponCountLabel(availableCoupons.length)}
+                                            icon={TagIcon}
+                                            title={appliedCoupon ? getCouponTitle(appliedCoupon) : "Escolha um cupom"}
+                                            description={appliedCoupon ? "Cupom aplicado" : (couponListLoading ? "Verificando cupons disponíveis..." : getCouponCountLabel(availableCoupons.length))}
                                             className={`px-4 py-3 gap-4 ${appliedCoupon ? "border-brand-green dark:border-brand-green" : ""}`}
                                             onClick={() => {
                                                 if (!couponListLoading && availableCoupons.length > 0) {
@@ -913,35 +1054,32 @@ export function CheckoutPageClient() {
                                                     setShowCouponModal(true)
                                                 }
                                             }}
-                                            showChevron={!couponListLoading && availableCoupons.length > 0}
-                                            right={couponListLoading ? <Spinner size={18} /> : undefined}
+                                            showChevron={!couponListLoading && availableCoupons.length > 0 && !appliedCoupon}
+                                            right={
+                                                appliedCoupon ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            handleRemoveCoupon()
+                                                        }}
+                                                        className="text-xs font-semibold text-brand-red hover:text-red-600 flex items-center gap-1 shrink-0"
+                                                    >
+                                                        <XIcon size={12} /> Remover
+                                                    </button>
+                                                ) : couponListLoading ? (
+                                                    <Spinner size={18} />
+                                                ) : undefined
+                                            }
                                         />
-                                        {appliedCoupon && (
-                                            <div className="flex items-center justify-between gap-3 rounded-xl border border-brand-green/20 bg-green-50/40 px-4 py-3 dark:bg-green-900/10">
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-bold text-brand-green truncate">{getCouponTitle(appliedCoupon)}</p>
-                                                    <p className="text-xs text-brand-inactive-text truncate">{getCouponSubtitle(appliedCoupon)}</p>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={handleRemoveCoupon}
-                                                    className="text-xs font-semibold text-brand-red hover:text-red-600 flex items-center gap-1 shrink-0"
-                                                >
-                                                    <XIcon size={12} /> Remover
-                                                </button>
-                                            </div>
-                                        )}
                                         {couponError && (
                                             <p className="text-xs text-red-500">{couponError}</p>
-                                        )}
-                                        {couponDiscount > 0 && appliedCoupon && (
-                                            <p className="text-xs text-brand-green font-medium">Desconto de {formatCurrency(couponDiscount)} aplicado!</p>
                                         )}
                                     </div>
 
                                     <div className="space-y-3 mb-4">
                                         <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
-                                            <span>Total dos itens</span>
+                                            <span>Subtotal</span>
                                             <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
                                         </div>
                                         {couponDiscount > 0 && (
@@ -956,21 +1094,45 @@ export function CheckoutPageClient() {
                                                 {isPickup ? "Grátis" : "A combinar"}
                                             </span>
                                         </div>
+                                        {paymentOption === "traditional" && paymentPreviewLoading && (
+                                            <div className="flex items-center justify-between text-sm font-medium text-brand-inactive-text">
+                                                <span>Calculando pagamento</span>
+                                                <Spinner size={16} />
+                                            </div>
+                                        )}
+                                        {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.paymentMethodDiscountAmount || 0) > 0 && (
+                                            <div className="flex justify-between text-sm font-medium text-brand-green">
+                                                <span>Desconto do meio de pagamento</span>
+                                                <span>-{formatCurrency(paymentPreview.paymentMethodDiscountAmount)}</span>
+                                            </div>
+                                        )}
+                                        {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.interestAmount || 0) > 0 && (
+                                            <div className="flex justify-between text-sm font-medium text-brand-orange">
+                                                <span>Juros</span>
+                                                <span>+{formatCurrency(paymentPreview.interestAmount)}</span>
+                                            </div>
+                                        )}
+                                        {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.feeAmount || 0) > 0 && (
+                                            <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
+                                                <span>Taxas</span>
+                                                <span>{formatCurrency(paymentPreview.feeAmount)}</span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <Separator className="mb-4" />
 
                                     <div className="flex justify-between items-end mb-4">
-                                        <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">Total</span>
-                                        <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">{formatCurrency(Math.max(0, totalAmount - couponDiscount))}</span>
+                                        <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">Total a cobrar</span>
+                                        <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">{formatCurrency(checkoutTotalToCharge)}</span>
                                     </div>
 
                                     <Button
                                         onClick={(e) => handleSubmit(e as any)}
-                                        disabled={isLoading}
+                                        disabled={disableCheckoutSubmit}
                                         className="w-full h-[46px]"
                                     >
-                                        {isLoading ? "Processando..." : `Finalizar pedido • ${formatCurrency(Math.max(0, totalAmount - couponDiscount))}`}
+                                        {isLoading ? "Processando..." : paymentPreviewLoading ? "Calculando pagamento..." : `Finalizar pedido • ${formatCurrency(checkoutTotalToCharge)}`}
                                     </Button>
                                 </div>
                             </div>
@@ -990,10 +1152,10 @@ export function CheckoutPageClient() {
                         </Button>
                         <Button
                             onClick={(e) => handleSubmit(e as any)}
-                            disabled={isLoading}
+                            disabled={disableCheckoutSubmit}
                             className={`flex-2 h-12 ${isLoading ? "opacity-80" : ""}`}
                         >
-                            {isLoading ? "Processando..." : `Finalizar pedido • ${formatCurrency(Math.max(0, totalAmount - couponDiscount))}`}
+                            {isLoading ? "Processando..." : paymentPreviewLoading ? "Calculando pagamento..." : `Finalizar pedido • ${formatCurrency(checkoutTotalToCharge)}`}
                         </Button>
                     </div>
                 </div>
@@ -1019,6 +1181,7 @@ export function CheckoutPageClient() {
                     {availableCoupons.length > 0 ? (
                         availableCoupons.map((coupon) => (
                             <ListItem
+                                icon={TagIcon}
                                 key={coupon.id}
                                 title={getCouponTitle(coupon)}
                                 description={getCouponSubtitle(coupon)}
@@ -1035,7 +1198,7 @@ export function CheckoutPageClient() {
                             />
                         ))
                     ) : (
-                        <InfoCard message="Nenhum cupom disponivel para este pedido no momento." />
+                        <InfoCard message="Nenhum cupom disponível para este pedido no momento." />
                     )}
                 </div>
             </DefaultModal>

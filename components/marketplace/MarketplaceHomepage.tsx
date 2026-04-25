@@ -116,17 +116,17 @@ export default function MarketplaceHome({ products = [], user, userProfile, cart
         <div className="mx-auto max-w-[1300px] px-4 flex flex-col md:flex-row items-center gap-12 md:gap-24">
           <div className="flex-1 md:max-w-[500px]">
             <h1 className="text-4xl md:text-[3.5rem] font-black text-brand-dark mb-6 leading-[1.1] tracking-tight">
-              Sua Vitrine, Seu Lucro, Zero Taxas.
+              Pare de trabalhar para pagar comissão. Fique com o lucro.
             </h1>
             <p className="font-bold text-gray-800 text-lg mb-4">
-              Publique seus produtos, fale direto com seu cliente e mantenha o controle da sua venda.
+              Chega de dar 20% da sua venda pros aplicativos e depender de algoritmos.
             </p>
             <p className="text-gray-600 text-base md:text-lg mb-8 leading-relaxed">
-              A Dudit conecta você diretamente com lojas e vendedores da sua comunidade local. Sem intermediários. <br /><br />
-              O cliente é seu. A venda é sua. A Dudit só organiza e mostra.
+              Monte sua vitrine, organize seus clientes e venda direto, de graça. <br /><br />
+              Não somos um marketplace mercenário. Aqui não tem taxa e o cliente é seu do começo ao fim.
             </p>
             <button className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-colors">
-              Abra sua Vitrine Grátis
+              Criar Conta Grátis e Vender Mais
             </button>
           </div>
 

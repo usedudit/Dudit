@@ -22,10 +22,11 @@ import {
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Input, Button, Checkbox, MoneyInput, Badge } from '@/components/reusable';
-import { ReceiptContent, PaymentMethodCard, SplitPaymentCard } from './POSComponents';
+import { ReceiptContent, PaymentMethodCard, SplitPaymentCard, Numpad } from './POSComponents';
 import { calculatePaymentMethodAmountsAction, getPaymentMethodsAction, previewSplitPaymentBreakdownAction } from '@/app/actions/erp/payment-methods';
 import { useToast } from "@/components/ui/use-toast";
-import { formatCurrency, formatDate, formatTime } from '@/lib/utils';
+import { cn, formatCurrency, formatDate, formatNumber, formatTime } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const PAYMENT_METHODS_VERSION_PREFIX = "payment-methods-version:";
 const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated";
@@ -134,6 +135,54 @@ function PaymentPricingDetailBadge({ calculation, baseAllocated }: { calculation
     );
 }
 
+function PaymentPricingTooltipBadge({ calculation, baseAllocated }: { calculation: any; baseAllocated: number }) {
+    if (!calculation?.success) return null;
+    const base = Math.max(0, Number(baseAllocated || 0));
+    const disc = Number(calculation.paymentMethodDiscountAmount || 0);
+    const juros = Number(calculation.interestAmount || 0);
+    const taxa = Number(calculation.feeAmount || 0);
+    const final = Number(calculation.finalAmount || 0);
+
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button type="button" className="inline-flex shrink-0">
+                    <Badge variant="gray" icon={<InfoIcon className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body" />} className="cursor-help" />
+                </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" align="end" sideOffset={8} className="min-w-[240px] max-w-[280px] rounded-xl border border-brand-border bg-white p-3 text-left text-xs text-brand-dark shadow-xl dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading">
+                <div className="mb-2 font-bold">Detalhes do meio de pagamento</div>
+                <div className="space-y-1.5">
+                    <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Subtotal</span><span className="font-semibold">{formatCurrency(base)}</span></div>
+                    <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Desc. meio pagamento</span><span className="font-semibold">- {formatCurrency(disc)}</span></div>
+                    <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Juros</span><span className="font-semibold">+ {formatCurrency(juros)}</span></div>
+                    <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Taxa</span><span className="font-semibold">{formatCurrency(taxa)}</span></div>
+                    <div className="mt-2 flex justify-between gap-3 border-t border-brand-border pt-2 font-bold dark:border-dark-border"><span>Total a cobrar</span><span>{formatCurrency(final)}</span></div>
+                </div>
+            </TooltipContent>
+        </Tooltip>
+    );
+}
+
+function PaymentAmountLabel({
+    label,
+    calculation,
+    baseAllocated,
+}: {
+    label: string;
+    calculation: any;
+    baseAllocated: number;
+}) {
+    return (
+        <div className="mb-2 flex items-center gap-2">
+            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{label}</span>
+            {calculation?.success && baseAllocated > 0.009 ? (
+                <PaymentPricingTooltipBadge calculation={calculation} baseAllocated={baseAllocated} />
+            ) : null}
+        </div>
+    );
+}
+
 // --- MAIN COMPONENT ---
 
 type PartnerPaymentMethod = {
@@ -215,6 +264,7 @@ const PaymentModal = ({
     // Toggles
     const [isPendingPayment, setIsPendingPayment] = useState(false);
     const [isPendingDelivery, setIsPendingDelivery] = useState(false);
+    const [cashCalculatorInput, setCashCalculatorInput] = useState("");
 
     // Split: user-defined base amount per method (not weights / percentages)
     const [payments, setPayments] = useState<{
@@ -231,6 +281,8 @@ const PaymentModal = ({
     const [selectedMethodType, setSelectedMethodType] = useState<string | null>(null);
     const [editingPaymentIndex, setEditingPaymentIndex] = useState<number | null>(null);
     const [paymentCalculation, setPaymentCalculation] = useState<any | null>(null);
+    const [isPaymentCalculationLoading, setIsPaymentCalculationLoading] = useState(false);
+    const [isSplitPreviewLoading, setIsSplitPreviewLoading] = useState(false);
     const [splitPreview, setSplitPreview] = useState<
         { success: true; finalTotal: number; rows: any[] } | { success: false; error: string } | null
     >(null);
@@ -248,6 +300,9 @@ const PaymentModal = ({
         change: number
         isUnderpaid: boolean
         remainingPartial: number
+        paymentMethodDiscountAmount: number
+        interestAmount: number
+        feeAmount: number
         receiptCart: any[]
     } | null>(null)
 
@@ -255,6 +310,18 @@ const PaymentModal = ({
     const total = subTotal + shippingFee + otherCosts - discountAmount;
     const chargeTarget = Math.max(0, Number(amountDue ?? total));
     const itemCount = cart.reduce((acc: number, item: any) => acc + item.quantity, 0);
+
+    const formatCalculatorAmount = (value: number) => `R$ ${formatNumber(Math.max(0, Number(value || 0)))}`;
+    const parseCalculatorInput = (value: string) => {
+        const normalized = String(value || '').trim();
+        if (!normalized) return 0;
+        if (normalized.includes('.')) {
+            const parsed = Number(normalized);
+            return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+        }
+        const digits = normalized.replace(/\D/g, '');
+        return digits ? Number(digits) / 100 : 0;
+    };
 
     // Fetch Partner Payment Methods
     const [availableMethods, setAvailableMethods] = useState<PartnerPaymentMethod[]>([]);
@@ -356,13 +423,16 @@ const PaymentModal = ({
         let active = true;
         if (view !== 'split' || !partnerId) {
             if (view !== 'split') setSplitPreview(null);
+            setIsSplitPreviewLoading(false);
             return;
         }
         if (activeSplitLegs.length === 0) {
             setSplitPreview(null);
+            setIsSplitPreviewLoading(false);
             return;
         }
         const t = setTimeout(() => {
+            setIsSplitPreviewLoading(true);
             previewSplitPaymentBreakdownAction({
                 partnerId: String(partnerId),
                 baseTotal: Math.max(0, Number(chargeTarget || 0)),
@@ -385,6 +455,7 @@ const PaymentModal = ({
                 } else {
                     setSplitPreview(null);
                 }
+                setIsSplitPreviewLoading(false);
             });
         }, 200);
         return () => {
@@ -416,15 +487,27 @@ const PaymentModal = ({
     }, [view, editingPaymentIndex, chargeTarget, payments]);
 
     useEffect(() => {
+        if (view !== 'money') return;
+        const nextAmount = Math.max(0, Number(paymentBaseAmount || 0));
+        const nextInput = nextAmount > 0 ? String(Math.round(nextAmount * 100)) : "";
+        setCashCalculatorInput((current) => current === nextInput ? current : nextInput);
+    }, [view, paymentBaseAmount]);
+
+    useEffect(() => {
         let active = true;
         if (!selectedMethodId) {
             setPaymentCalculation(null);
+            setIsPaymentCalculationLoading(false);
             return;
         }
         const currentViewIsCardLike = view === "card" || view === "pix" || view === "money";
-        if (!currentViewIsCardLike) return;
+        if (!currentViewIsCardLike) {
+            setIsPaymentCalculationLoading(false);
+            return;
+        }
         const installmentNumber = Math.max(1, Number(installments || 1));
         const base = basisForMethodCalc;
+        setIsPaymentCalculationLoading(true);
         calculatePaymentMethodAmountsAction({
             originalAmount: base,
             paymentMethodId: selectedMethodId,
@@ -436,6 +519,7 @@ const PaymentModal = ({
             } else {
                 setPaymentCalculation(null);
             }
+            setIsPaymentCalculationLoading(false);
         });
         return () => {
             active = false;
@@ -443,7 +527,22 @@ const PaymentModal = ({
     }, [selectedMethodId, installments, chargeTarget, view, basisForMethodCalc]);
 
     const handleQuickDenomination = (val: number) => {
+        setCashCalculatorInput(val > 0 ? String(Math.round(val * 100)) : "");
         setPaymentBaseAmount(val);
+    };
+
+    const handleCashNumpadInput = (key: string) => {
+        const nextRaw = key === '.'
+            ? (cashCalculatorInput.includes('.') ? cashCalculatorInput : `${cashCalculatorInput || '0'}.`)
+            : `${cashCalculatorInput}${key}`;
+        setCashCalculatorInput(nextRaw);
+        setPaymentBaseAmount(parseCalculatorInput(nextRaw));
+    };
+
+    const handleCashNumpadDelete = () => {
+        const nextRaw = cashCalculatorInput.slice(0, -1);
+        setCashCalculatorInput(nextRaw);
+        setPaymentBaseAmount(parseCalculatorInput(nextRaw));
     };
 
     const splitBaseSum = useMemo(
@@ -508,6 +607,53 @@ const PaymentModal = ({
         return paymentBaseAmount;
     }, [view, splitPreview, splitBaseSum, editingPaymentIndex, payments, paymentBaseAmount, legFinalCharged]);
 
+    const currentPricingTotals = useMemo(() => {
+        if (view === 'split' && splitPreview && 'success' in splitPreview && splitPreview.success) {
+            const rows = splitPreview.rows || [];
+            return {
+                paymentMethodDiscountAmount: rows.reduce((acc: number, row: any) => acc + Number(row?.paymentMethodDiscountAmount || 0), 0),
+                interestAmount: rows.reduce((acc: number, row: any) => acc + Number(row?.interestAmount || 0), 0),
+                feeAmount: rows.reduce((acc: number, row: any) => acc + Number(row?.feeAmount || 0), 0),
+            };
+        }
+        if (paymentCalculation?.success) {
+            return {
+                paymentMethodDiscountAmount: Number(paymentCalculation.paymentMethodDiscountAmount || 0),
+                interestAmount: Number(paymentCalculation.interestAmount || 0),
+                feeAmount: Number(paymentCalculation.feeAmount || 0),
+            };
+        }
+        return {
+            paymentMethodDiscountAmount: 0,
+            interestAmount: 0,
+            feeAmount: 0,
+        };
+    }, [view, splitPreview, paymentCalculation]);
+
+    const displayTransactionTotal = paymentStatus === "success" && successSnapshot
+        ? successSnapshot.displayOrderTotal
+        : view === 'split' && splitPreview && 'success' in splitPreview && splitPreview.success
+            ? splitPreview.finalTotal
+            : (view === 'money' || view === 'card' || view === 'pix') && legFinalCharged != null
+                ? legFinalCharged
+                : total;
+
+    const receiptPricingDetails = useMemo(() => {
+        const source = paymentStatus === "success" && successSnapshot
+            ? {
+                paymentMethodDiscountAmount: successSnapshot.paymentMethodDiscountAmount,
+                interestAmount: successSnapshot.interestAmount,
+                feeAmount: successSnapshot.feeAmount,
+            }
+            : currentPricingTotals;
+
+        return [
+            source.paymentMethodDiscountAmount > 0 ? { label: 'Desc. meio pagamento', amount: source.paymentMethodDiscountAmount, prefix: '-', tone: 'positive' } : null,
+            source.interestAmount > 0 ? { label: 'Juros', amount: source.interestAmount, prefix: '+', tone: 'neutral' } : null,
+            source.feeAmount > 0 ? { label: 'Taxas', amount: source.feeAmount, tone: 'neutral' } : null,
+        ].filter(Boolean);
+    }, [paymentStatus, successSnapshot, currentPricingTotals]);
+
     const receiptView = successSnapshot
         ? {
             cart: successSnapshot.receiptCart,
@@ -516,9 +662,9 @@ const PaymentModal = ({
             shippingFee: successSnapshot.shippingFee,
             otherCosts: successSnapshot.otherCosts,
             discountAmount: successSnapshot.discountAmount,
-            total: successSnapshot.total,
+            total: successSnapshot.displayOrderTotal,
         }
-        : { cart, subTotal, itemCount, shippingFee, otherCosts, discountAmount, total };
+        : { cart, subTotal, itemCount, shippingFee, otherCosts, discountAmount, total: displayTransactionTotal };
 
     const getTitle = () => {
         const selectedTypeLabel =
@@ -677,6 +823,9 @@ const PaymentModal = ({
             change: changeAmount,
             isUnderpaid,
             remainingPartial,
+            paymentMethodDiscountAmount: Number(currentPricingTotals.paymentMethodDiscountAmount || 0),
+            interestAmount: Number(currentPricingTotals.interestAmount || 0),
+            feeAmount: Number(currentPricingTotals.feeAmount || 0),
             receiptCart: Array.isArray(cart) ? cart.map((row: any) => ({ ...row })) : [],
         })
         setPaymentStatus('processing');
@@ -721,14 +870,7 @@ const PaymentModal = ({
         exit: { opacity: 0, scale: 0.95, transition: standardTransition }
     };
 
-    const footerMobileTotal =
-        paymentStatus === "success" && successSnapshot
-            ? successSnapshot.displayOrderTotal
-            : view === 'split' && splitPreview && 'success' in splitPreview && splitPreview.success
-            ? splitPreview.finalTotal
-            : (view === 'money' || view === 'card' || view === 'pix') && legFinalCharged != null
-                ? legFinalCharged
-                : total;
+    const footerMobileTotal = displayTransactionTotal;
 
     if (!isOpen) return null;
     const isCloseLocked = paymentStatus === 'processing';
@@ -736,8 +878,13 @@ const PaymentModal = ({
         if (isCloseLocked) return;
         onClose();
     };
+    const isSinglePricingBusy =
+        (view === 'money' || view === 'card' || view === 'pix') &&
+        !!selectedMethodId &&
+        isPaymentCalculationLoading;
+    const isSplitPricingBusy = view === 'split' && activeSplitLegs.length > 0 && isSplitPreviewLoading;
 
-    const ActionFooter = ({ showConfirm = true, confirmText = "Registrar venda", disabled = false, buttonVariant = 'default', onCustomConfirm }: any) => (
+    const ActionFooter = ({ showConfirm = true, confirmText = "Registrar venda", disabled = false, disabledText = "Verifique os valores", buttonVariant = 'default', onCustomConfirm }: any) => (
         <div className="w-full bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-4 md:p-6 mt-auto shrink-0 relative z-30">
             <div
                 className="md:hidden flex items-center justify-between mb-4 cursor-pointer active:opacity-70 transition-opacity"
@@ -764,7 +911,7 @@ const PaymentModal = ({
                     }}
                     className="w-full h-[52px]"
                 >
-                    {disabled ? 'Verifique os valores' : confirmText}
+                    {disabled ? disabledText : confirmText}
                 </Button>
             )}
         </div>
@@ -823,6 +970,7 @@ const PaymentModal = ({
                             total={receiptView.total}
                             itemCount={receiptView.itemCount}
                             customerName={customer?.name}
+                            pricingDetails={receiptPricingDetails}
                         />
                     </div>
                 </div>
@@ -936,21 +1084,18 @@ const PaymentModal = ({
                                     )}
 
                                     {view === 'money' && (
-                                        <motion.div key="money" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="w-full h-full flex flex-col items-center px-2">
+                                        <motion.div key="money" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("w-full h-full flex flex-col items-center px-2", isSinglePricingBusy && "pointer-events-none opacity-60")}>
                                             <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
                                             <div className="w-full max-w-sm space-y-3">
-                                                <div className="flex items-end gap-2">
-                                                    <div className="min-w-0 flex-1">
-                                                        <MoneyInput
-                                                            label="Valor recebido (dinheiro)"
-                                                            value={paymentBaseAmount}
-                                                            onChange={setPaymentBaseAmount}
-                                                            className="font-bold text-lg"
-                                                        />
+                                                <div className="rounded-[28px] bg-white px-4 pt-2 pb-4 dark:bg-dark-surface">
+                                                    <PaymentAmountLabel
+                                                        label="Valor recebido (dinheiro)"
+                                                        calculation={paymentCalculation}
+                                                        baseAllocated={basisForMethodCalc}
+                                                    />
+                                                    <div className="text-center text-[42px] font-black tracking-tight text-brand-dark dark:text-dark-heading">
+                                                        {formatCalculatorAmount(paymentBaseAmount)}
                                                     </div>
-                                                    {paymentCalculation?.success && basisForMethodCalc > 0.009 && (
-                                                        <PaymentPricingDetailBadge calculation={paymentCalculation} baseAllocated={basisForMethodCalc} />
-                                                    )}
                                                 </div>
                                             </div>
                                             <div className="flex flex-wrap justify-center gap-3 mb-6 mt-4 w-full px-2">
@@ -965,26 +1110,38 @@ const PaymentModal = ({
                                                     </button>
                                                 ))}
                                             </div>
+                                            {isSinglePricingBusy && (
+                                                <div className="mb-4 flex items-center gap-2 text-sm font-medium text-brand-inactive-text">
+                                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-border border-t-brand-green" />
+                                                    Calculando valor a cobrar...
+                                                </div>
+                                            )}
+                                            <Numpad onInput={handleCashNumpadInput} onDelete={handleCashNumpadDelete} />
                                         </motion.div>
                                     )}
 
                                     {view === 'pix' && (
-                                        <motion.div key="pix" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="flex flex-col items-center justify-start pt-0 w-full">
+                                        <motion.div key="pix" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("flex flex-col items-center justify-start pt-0 w-full", isSinglePricingBusy && "pointer-events-none opacity-60")}>
                                             <div className="w-full max-w-sm space-y-4">
                                                 <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
-                                                <div className="flex items-end gap-2">
-                                                    <div className="min-w-0 flex-1">
-                                                        <MoneyInput
-                                                            label="Valor a receber"
-                                                            value={paymentBaseAmount}
-                                                            onChange={setPaymentBaseAmount}
-                                                            className="font-bold text-lg"
-                                                        />
-                                                    </div>
-                                                    {paymentCalculation?.success && basisForMethodCalc > 0.009 && (
-                                                        <PaymentPricingDetailBadge calculation={paymentCalculation} baseAllocated={basisForMethodCalc} />
-                                                    )}
+                                                <div className="min-w-0 flex-1">
+                                                    <PaymentAmountLabel
+                                                        label="Valor a receber"
+                                                        calculation={paymentCalculation}
+                                                        baseAllocated={basisForMethodCalc}
+                                                    />
+                                                    <MoneyInput
+                                                        value={paymentBaseAmount}
+                                                        onChange={setPaymentBaseAmount}
+                                                        className="font-bold text-lg"
+                                                    />
                                                 </div>
+                                                {isSinglePricingBusy && (
+                                                    <div className="flex items-center gap-2 text-sm font-medium text-brand-inactive-text">
+                                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-border border-t-brand-green" />
+                                                        Calculando valor a cobrar...
+                                                    </div>
+                                                )}
                                                 {!isPixGenerated ? (
                                                     <Button variant="filled" className="w-full h-12" onClick={() => setIsPixGenerated(true)}>Gerar QR Code</Button>
                                                 ) : (
@@ -1005,7 +1162,7 @@ const PaymentModal = ({
                                     )}
 
                                     {view === 'card' && (
-                                        <motion.div key="card" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="flex flex-col items-center justify-start pt-6 w-full max-w-sm mx-auto">
+                                        <motion.div key="card" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("flex flex-col items-center justify-start pt-6 w-full max-w-sm mx-auto", isSinglePricingBusy && "pointer-events-none opacity-60")}>
                                             <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
                                             <div className="mb-8 text-center">
                                                 <div className="w-24 h-24 bg-green-50 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-green-100 dark:border-green-900/30">
@@ -1017,28 +1174,39 @@ const PaymentModal = ({
                                                 <p className="text-brand-inactive-text">Aguardando leitura do cartão...</p>
                                             </div>
                                             <div className="w-full text-left space-y-4">
-                                                <div className="flex items-end gap-2">
-                                                    <div className="min-w-0 flex-1">
-                                                        <MoneyInput
-                                                            label="Valor a receber"
-                                                            value={paymentBaseAmount}
-                                                            onChange={setPaymentBaseAmount}
-                                                            className="font-bold text-lg"
-                                                        />
-                                                    </div>
-                                                    {paymentCalculation?.success && basisForMethodCalc > 0.009 && (
-                                                        <PaymentPricingDetailBadge calculation={paymentCalculation} baseAllocated={basisForMethodCalc} />
-                                                    )}
+                                                <div className="min-w-0 flex-1">
+                                                    <PaymentAmountLabel
+                                                        label="Valor a receber"
+                                                        calculation={paymentCalculation}
+                                                        baseAllocated={basisForMethodCalc}
+                                                    />
+                                                    <MoneyInput
+                                                        value={paymentBaseAmount}
+                                                        onChange={setPaymentBaseAmount}
+                                                        className="font-bold text-lg"
+                                                    />
                                                 </div>
                                                 <Input label="Parcelas" name="installments" type="number" value={installments} onChange={(e: any) => setInstallments(e.target.value)} min="1" className="w-full text-lg font-bold" />
+                                                {isSinglePricingBusy && (
+                                                    <div className="flex items-center gap-2 text-sm font-medium text-brand-inactive-text">
+                                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-border border-t-brand-green" />
+                                                        Calculando valor a cobrar...
+                                                    </div>
+                                                )}
                                             </div>
                                         </motion.div>
                                     )}
 
                                     {view === 'split' && (
-                                        <motion.div key="split" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="flex flex-col w-full h-full">
+                                        <motion.div key="split" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("flex flex-col w-full h-full", isSplitPricingBusy && "pointer-events-none opacity-60")}>
                                             <div className="flex-1 px-2 py-4">
                                                 <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
+                                                {isSplitPricingBusy && (
+                                                    <div className="mb-3 flex items-center gap-2 text-sm font-medium text-brand-inactive-text">
+                                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-border border-t-brand-green" />
+                                                        Calculando valores por meio de pagamento...
+                                                    </div>
+                                                )}
                                                 {splitPreview && !splitPreview.success && (
                                                     <p className="text-sm text-red-600 dark:text-red-400 mb-3" role="alert">
                                                         {splitPreview.error}
@@ -1265,12 +1433,15 @@ const PaymentModal = ({
                                 <ActionFooter
                                     showConfirm={true}
                                     confirmText={isUnderpaid ? "Registrar venda parcialmente" : "Registrar venda"}
+                                    disabledText={isSplitPricingBusy ? "Calculando valores..." : "Verifique os valores"}
                                     buttonVariant={isUnderpaid ? "outline" : "filled"}
                                     disabled={
-                                        activeSplitLegs.length > 0 &&
-                                        splitPreview != null &&
-                                        'success' in splitPreview &&
-                                        !splitPreview.success
+                                        isSplitPricingBusy || (
+                                            activeSplitLegs.length > 0 &&
+                                            splitPreview != null &&
+                                            'success' in splitPreview &&
+                                            !splitPreview.success
+                                        )
                                     }
                                 />
                             )}
@@ -1284,11 +1455,13 @@ const PaymentModal = ({
                                             ? "Salvar"
                                             : (isUnderpaid ? "Salvar Parcialmente" : "Registrar Venda")
                                     }
+                                    disabledText={isSinglePricingBusy ? "Calculando valores..." : "Verifique os valores"}
                                     buttonVariant={
                                         editingPaymentIndex !== null
                                             ? "filled"
                                             : (isUnderpaid ? "outline" : "default")
                                     }
+                                    disabled={isSinglePricingBusy}
                                     onCustomConfirm={editingPaymentIndex !== null ? () => handleSplitPaymentUpdate(Number(paymentBaseAmount || 0)) : undefined}
                                 />
                             )}
@@ -1355,6 +1528,7 @@ const PaymentModal = ({
                                         total={receiptView.total}
                                         itemCount={receiptView.itemCount}
                                         customerName={customer?.name}
+                                        pricingDetails={receiptPricingDetails}
                                     />
                                 </div>
                             </motion.div>

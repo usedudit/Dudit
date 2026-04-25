@@ -6,6 +6,27 @@ import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 import { Suspense } from "react"
 import { ThreeDotsLoader } from "@/components/reusable"
+import type { Metadata } from "next"
+
+export const metadata: Metadata = {
+    title: "Dudit: Pare de Perder Pedidos no WhatsApp | Venda na Cidade",
+    description: "Cansado do caos no WhatsApp? Na Dudit você organiza pedidos, não paga taxas abusivas e encontra produtos ou serviços na sua cidade em um só lugar.",
+    openGraph: {
+        title: "Dudit: Pare de Perder Pedidos no WhatsApp | Venda na Cidade",
+        description: "Cansado do caos no WhatsApp? Na Dudit você organiza pedidos, não paga taxas abusivas e encontra produtos ou serviços na sua cidade em um só lugar.",
+        url: "https://dudit.com.br",
+        siteName: "Dudit",
+        images: [
+            {
+                url: "https://img.dudit.com.br/static/Icon.png",
+                width: 512,
+                height: 512,
+            },
+        ],
+        locale: "pt_BR",
+        type: "website",
+    }
+}
 
 async function ProductFeedWrapper({ user, userProfile, cartCount }: any) {
   const t0 = performance.now()

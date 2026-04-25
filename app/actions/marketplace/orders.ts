@@ -29,6 +29,7 @@ export async function createOrderAction(data: {
   deliveryType: "delivery" | "pickup"
   deliveryAddress: string
   paymentMethod: string
+  installments?: number
   notes: string
   partnerId: string
   csrf_token?: string
@@ -217,7 +218,7 @@ export async function createOrderAction(data: {
       .eq("payment_method_id", bestMethodForPricing.id)
     const calc = calculatePaymentAmounts({
       originalAmount: finalTotal,
-      installmentNumber: 1,
+      installmentNumber: Math.max(1, Number(data.installments || 1)),
       paymentMethod: {
         feePercent: Number(bestMethodForPricing.fee_percent || bestMethodForPricing.percentage_rate || 0),
         feeFixed: Number(bestMethodForPricing.fee_fixed || bestMethodForPricing.fixed_amount || 0),
@@ -249,6 +250,14 @@ export async function createOrderAction(data: {
     delivery_type: data.deliveryType,
     delivery_address: data.deliveryAddress,
     payment_method: data.paymentMethod,
+    payment_breakdown: paymentIsMp || !bestMethodForPricing?.id
+      ? []
+      : [{
+        method: chosenType,
+        amount: paymentAwareTotal,
+        paymentMethodId: bestMethodForPricing.id,
+        installmentNumber: Math.max(1, Number(data.installments || 1)),
+      }],
     payment_provider: data.paymentMethod,
     situation: "pending",
     notes: data.notes || null,
