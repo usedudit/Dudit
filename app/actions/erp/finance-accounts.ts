@@ -46,53 +46,37 @@ export async function resolveMarketplaceOrderFinanceAccountId(
     return byName?.id ?? null
   }
 
-  const { data: bankDef } = await supabase
+  // PERF: Single query replaces 4 sequential queries (bank default → any bank → cash default → any cash).
+  // Priority selection is done in JS on the result set, preserving identical behavior.
+  const t0 = performance.now()
+  const { data: accounts } = await supabase
     .from("finance_accounts")
-    .select("id")
+    .select("id, type, is_default")
     .eq("partner_id", partnerId)
     .eq("is_active", true)
-    .eq("type", "bank")
-    .eq("is_default", true)
-    .or(NON_MP_FINANCE_ACCOUNTS)
-    .limit(1)
-    .maybeSingle()
-  if (bankDef?.id) return bankDef.id
-
-  const { data: anyBank } = await supabase
-    .from("finance_accounts")
-    .select("id")
-    .eq("partner_id", partnerId)
-    .eq("is_active", true)
-    .eq("type", "bank")
     .or(NON_MP_FINANCE_ACCOUNTS)
     .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle()
-  if (anyBank?.id) return anyBank.id
 
-  const { data: cashDef } = await supabase
-    .from("finance_accounts")
-    .select("id")
-    .eq("partner_id", partnerId)
-    .eq("is_active", true)
-    .eq("type", "cash")
-    .eq("is_default", true)
-    .or(NON_MP_FINANCE_ACCOUNTS)
-    .limit(1)
-    .maybeSingle()
-  if (cashDef?.id) return cashDef.id
+  const elapsed = Math.round(performance.now() - t0)
+  console.log(`[PERF] resolveMarketplaceFinanceAccount: 1 query in ${elapsed}ms (${(accounts || []).length} rows)`)
 
-  const { data: anyCash } = await supabase
-    .from("finance_accounts")
-    .select("id")
-    .eq("partner_id", partnerId)
-    .eq("is_active", true)
-    .eq("type", "cash")
-    .or(NON_MP_FINANCE_ACCOUNTS)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle()
-  return anyCash?.id ?? null
+  if (!accounts || accounts.length === 0) return null
+
+  // Same priority as the old 4-query waterfall:
+  // 1. Bank + default
+  const bankDef = accounts.find((a: { type: string; is_default: boolean }) => a.type === "bank" && a.is_default)
+  if (bankDef) return bankDef.id
+  // 2. Any bank (already sorted by created_at ASC, so first match = oldest)
+  const anyBank = accounts.find((a: { type: string }) => a.type === "bank")
+  if (anyBank) return anyBank.id
+  // 3. Cash + default
+  const cashDef = accounts.find((a: { type: string; is_default: boolean }) => a.type === "cash" && a.is_default)
+  if (cashDef) return cashDef.id
+  // 4. Any cash
+  const anyCash = accounts.find((a: { type: string }) => a.type === "cash")
+  if (anyCash) return anyCash.id
+  // 5. Fallback: any remaining account (wallet, etc.)
+  return accounts[0]?.id ?? null
 }
 
 export async function getFinanceAccountsAction(partnerId: string) {

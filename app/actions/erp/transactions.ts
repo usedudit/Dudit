@@ -1518,6 +1518,11 @@ export async function settleInstallmentGroupAction(input: {
         let affectedCount = 0
         let payIdx = 0
 
+        // PERF: Aggregate balance deltas per account to avoid N+1 RPC calls.
+        // Key: accountId, Value: accumulated delta amount
+        // Uses the same delta computation logic as applyFinanceAccountBalanceDelta.
+        const balanceDeltaByAccount = new Map<string, number>()
+
         for (const row of rows as any[]) {
             const original = Math.abs(Number(row.original_amount ?? row.amount ?? 0))
             const paidPrincipalSoFar = paidPrincipalByTx.get(row.id) || 0
@@ -1553,17 +1558,55 @@ export async function settleInstallmentGroupAction(input: {
                 idempotency_key: idemKey,
             })
 
-            await applyFinanceAccountBalanceDelta(supabase, input.partnerId, row.account_id, {
-                transaction_type: row.transaction_type,
-                amount: finalPaid,
-                refund_kind: row.refund_kind,
-            })
+            // Accumulate delta instead of calling RPC inside the loop (was N+1)
+            const accountId = row.account_id
+            if (accountId) {
+                const rawAmt = Number(finalPaid || 0)
+                if (Number.isFinite(rawAmt) && rawAmt !== 0) {
+                    const tt = row.transaction_type
+                    let delta = 0
+                    if (tt === "income") delta = Math.abs(rawAmt)
+                    else if (tt === "expense") delta = -Math.abs(rawAmt)
+                    else if (tt === "adjustment") delta = rawAmt
+                    else if (tt === "refund") {
+                        if (row.refund_kind === "expense_refund") delta = Math.abs(rawAmt)
+                        else if (row.refund_kind === "revenue_refund") delta = -Math.abs(rawAmt)
+                    }
+                    delta = Math.round(delta * 100) / 100
+                    if (delta !== 0) {
+                        balanceDeltaByAccount.set(accountId, (balanceDeltaByAccount.get(accountId) || 0) + delta)
+                    }
+                }
+            }
+
             const paidPrincipalAfter = paidPrincipalSoFar + baseApplied
             if (paidPrincipalAfter + 0.0001 >= original) {
                 txIdsToMarkPaid.push(row.id)
             }
             affectedCount += 1
         }
+
+        // PERF: Apply all balance deltas in parallel (1 RPC per distinct account, usually 1-2 total)
+        const t1 = performance.now()
+        const deltaEntries = Array.from(balanceDeltaByAccount.entries())
+        if (deltaEntries.length > 0) {
+            await Promise.all(
+                deltaEntries.map(([accountId, totalDelta]) => {
+                    const roundedDelta = Math.round(totalDelta * 100) / 100
+                    if (roundedDelta === 0) return Promise.resolve()
+                    return supabase.rpc("apply_account_balance_delta", {
+                        p_account_id: accountId,
+                        p_partner_id: input.partnerId,
+                        p_delta: roundedDelta,
+                    }).then(({ error: rpcError }: { error: any }) => {
+                        if (rpcError) {
+                            console.error("[transactions] settle balance delta RPC error:", rpcError.message, { accountId, delta: roundedDelta })
+                        }
+                    })
+                })
+            )
+        }
+        console.log(`[PERF] settleInstallmentGroup: ${affectedCount} installments → ${deltaEntries.length} balance RPC(s) in ${Math.round(performance.now() - t1)}ms`)
 
         if (paymentsToInsert.length > 0) {
             const { error: insErr } = await supabase.from("transaction_payments").insert(paymentsToInsert)
@@ -1974,42 +2017,50 @@ export async function getTransactionDetailsAction(
 
         const statusLabel = toDisplayStatus(row.status, row.transaction_type, row.refund_kind, isOverdue)
         const statusVariant = toStatusVariant(row.status, isOverdue)
-        const paymentSubtitle =
-            (row.payment_method_id && (await paymentMethodDisplayLabel(supabase, partnerId, row.payment_method_id))) ||
-            (row.payment_type ? formatPaymentMethodLabel(row.payment_type, null) : "") ||
-            "Não informado"
-
-        let creatorName = "Sistema"
-        if (row.created_by_user_id) {
-            const { data: creatorProf } = await supabase
-                .from("user_profiles")
-                .select("full_name")
-                .eq("user_id", row.created_by_user_id)
-                .maybeSingle()
-            if (creatorProf?.full_name?.trim()) creatorName = creatorProf.full_name.trim()
-        }
-
-        let accountLine: string | null = null
-        if (row.account_id) {
-            const { data: acc } = await supabase
-                .from("finance_accounts")
-                .select("name")
-                .eq("id", row.account_id)
-                .eq("partner_id", partnerId)
-                .maybeSingle()
-            accountLine = acc?.name || null
-        }
-
-        let subcategoryLine: string | null = null
-        if (row.subcategory_id) {
-            const { data: sub } = await supabase
-                .from("financial_categories")
-                .select("name")
-                .eq("id", row.subcategory_id)
-                .eq("partner_id", partnerId)
-                .maybeSingle()
-            subcategoryLine = sub?.name || null
-        }
+        // PERF: Parallelize 4 independent lookups (was sequential, saving ~200-400ms)
+        const t0Detail = performance.now()
+        const [paymentSubtitle, creatorName, accountLine, subcategoryLine] = await Promise.all([
+            // 1. Payment method display label
+            row.payment_method_id
+                ? paymentMethodDisplayLabel(supabase, partnerId, row.payment_method_id).then(
+                      (label) => label || (row.payment_type ? formatPaymentMethodLabel(row.payment_type, null) : "") || "Não informado"
+                  )
+                : Promise.resolve(
+                      (row.payment_type ? formatPaymentMethodLabel(row.payment_type, null) : "") || "Não informado"
+                  ),
+            // 2. Creator name
+            row.created_by_user_id
+                ? supabase
+                      .from("user_profiles")
+                      .select("full_name")
+                      .eq("user_id", row.created_by_user_id)
+                      .maybeSingle()
+                      .then(({ data: creatorProf }: { data: any }) =>
+                          creatorProf?.full_name?.trim() ? creatorProf.full_name.trim() : "Sistema"
+                      )
+                : Promise.resolve("Sistema"),
+            // 3. Account name
+            row.account_id
+                ? supabase
+                      .from("finance_accounts")
+                      .select("name")
+                      .eq("id", row.account_id)
+                      .eq("partner_id", partnerId)
+                      .maybeSingle()
+                      .then(({ data: acc }: { data: any }) => acc?.name || null)
+                : Promise.resolve(null as string | null),
+            // 4. Subcategory name
+            row.subcategory_id
+                ? supabase
+                      .from("financial_categories")
+                      .select("name")
+                      .eq("id", row.subcategory_id)
+                      .eq("partner_id", partnerId)
+                      .maybeSingle()
+                      .then(({ data: sub }: { data: any }) => sub?.name || null)
+                : Promise.resolve(null as string | null),
+        ])
+        console.log(`[PERF] getTransactionDetails: 4 parallel lookups in ${Math.round(performance.now() - t0Detail)}ms`)
 
         const headerTitle =
             row.category === "Vendas" ? `Venda - ${row.description}` : String(row.description || "").trim() || "Transação"

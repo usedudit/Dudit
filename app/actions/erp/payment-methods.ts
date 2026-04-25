@@ -122,7 +122,13 @@ export async function getPaymentMethodsAction(partnerId: string) {
 
     const { data: methods, error } = await supabase
         .from("payment_methods")
-        .select("*")
+        .select(
+            "id, name, payment_type, type, is_active, is_default, " +
+            "fee_percent, fee_fixed, fee_bearer, discount_percent, " +
+            "supports_installments, max_installments, card_brand, " +
+            "receiving_days, default_finance_account_id, priority, " +
+            "percentage_rate, fixed_amount, created_at, updated_at"
+        )
         .eq("partner_id", partnerId)
         .order("is_default", { ascending: false })
         .order("priority", { ascending: false })
