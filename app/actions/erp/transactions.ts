@@ -426,8 +426,8 @@ export async function getFinancialTransactionsAction(
                 const tid = String((p as { transaction_id?: string }).transaction_id || "")
                 const pBase = Number(
                     (p as { base_amount?: number | string | null; amount?: number | string | null }).base_amount ??
-                        (p as { amount?: number | string | null }).amount ??
-                        0,
+                    (p as { amount?: number | string | null }).amount ??
+                    0,
                 )
                 if (!tid) continue
                 installmentPaidSumByTxId.set(tid, (installmentPaidSumByTxId.get(tid) || 0) + pBase)
@@ -531,8 +531,8 @@ export async function getFinancialTransactionsAction(
                     t.category === "Vendas"
                         ? salesContactName
                         : t.customer_id
-                          ? manualCustomerName
-                          : fallbackContact,
+                            ? manualCustomerName
+                            : fallbackContact,
                 contactType: t.category === "Vendas" ? "customer" : (t.contact_type || t.transaction_contacts?.type || (t.customer_id ? "customer" : "other")),
                 dueDate: dueDateLabel,
                 dueDateShort: dueDateShortLabel,
@@ -577,11 +577,11 @@ export async function getFinancialTransactionsAction(
                     : null,
                 installmentGroupTotalAmount: t.installment_group_id
                     ? Math.abs(
-                          Number(
-                              (installmentGroupById.get(t.installment_group_id) as { total_amount?: number } | undefined)
-                                  ?.total_amount ?? 0,
-                          ) || 0,
-                      ) || null
+                        Number(
+                            (installmentGroupById.get(t.installment_group_id) as { total_amount?: number } | undefined)
+                                ?.total_amount ?? 0,
+                        ) || 0,
+                    ) || null
                     : null,
                 ...(installmentRemainingAmount !== undefined ? { installmentRemainingAmount } : {}),
             }
@@ -1282,40 +1282,40 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
                         payment_method_id: string | null
                         payment_type: string | null
                     }) => {
-                    const paid = String(row.status || "").toLowerCase() === "paid"
-                    const dueYmdRow = row.due_date ? String(row.due_date).slice(0, 10) : ""
-                    const overdue =
-                        !paid &&
-                        !!dueYmdRow &&
-                        /^\d{4}-\d{2}-\d{2}$/.test(dueYmdRow) &&
-                        diffCalendarDaysInSaoPaulo(dueYmdRow) < 0
-                    const original = Math.abs(Number(row.original_amount ?? row.amount ?? 0))
-                    const agg = paymentByTxId.get(row.id) || { base: 0, cash: 0, interest: 0, discount: 0 }
-                    const paidPrincipal = Math.max(0, Math.round(agg.base * 100) / 100)
-                    const remainingAmount = Math.max(0, Math.round((original - paidPrincipal) * 100) / 100)
-                    return {
-                        id: row.id,
-                        description: row.description,
-                        installmentNumber: row.installment_number,
-                        originalAmount: original,
-                        /** Valor pago (caixa) na parcela = base + juros - desconto em cada registro, soma em amount. */
-                        paidAmount: Math.max(0, Math.round(agg.cash * 100) / 100),
-                        interestAmount: Math.round(agg.interest * 100) / 100,
-                        discountAmount: Math.round(agg.discount * 100) / 100,
-                        principalCleared: paidPrincipal,
-                        remainingAmount,
-                        dueDate: row.due_date
-                            ? formatBrazilDateFromDbInput(String(row.due_date).slice(0, 10), "dayMonthYear")
-                            : "-",
-                        paymentDate: row.payment_date ? formatDateTime(row.payment_date) : null,
-                        paymentMethodId: row.payment_method_id || null,
-                        paymentType:
-                            (row.payment_method_id ? paymentMethodLabelById.get(String(row.payment_method_id)) : null) ||
-                            (row.payment_type ? formatPaymentMethodLabel(row.payment_type, null) : null) ||
-                            "Não informado",
-                        status: paid || remainingAmount <= 0 ? "paid" : overdue ? "overdue" : "pending",
-                    }
-                }),
+                        const paid = String(row.status || "").toLowerCase() === "paid"
+                        const dueYmdRow = row.due_date ? String(row.due_date).slice(0, 10) : ""
+                        const overdue =
+                            !paid &&
+                            !!dueYmdRow &&
+                            /^\d{4}-\d{2}-\d{2}$/.test(dueYmdRow) &&
+                            diffCalendarDaysInSaoPaulo(dueYmdRow) < 0
+                        const original = Math.abs(Number(row.original_amount ?? row.amount ?? 0))
+                        const agg = paymentByTxId.get(row.id) || { base: 0, cash: 0, interest: 0, discount: 0 }
+                        const paidPrincipal = Math.max(0, Math.round(agg.base * 100) / 100)
+                        const remainingAmount = Math.max(0, Math.round((original - paidPrincipal) * 100) / 100)
+                        return {
+                            id: row.id,
+                            description: row.description,
+                            installmentNumber: row.installment_number,
+                            originalAmount: original,
+                            /** Valor pago (caixa) na parcela = base + juros - desconto em cada registro, soma em amount. */
+                            paidAmount: Math.max(0, Math.round(agg.cash * 100) / 100),
+                            interestAmount: Math.round(agg.interest * 100) / 100,
+                            discountAmount: Math.round(agg.discount * 100) / 100,
+                            principalCleared: paidPrincipal,
+                            remainingAmount,
+                            dueDate: row.due_date
+                                ? formatBrazilDateFromDbInput(String(row.due_date).slice(0, 10), "dayMonthYear")
+                                : "-",
+                            paymentDate: row.payment_date ? formatDateTime(row.payment_date) : null,
+                            paymentMethodId: row.payment_method_id || null,
+                            paymentType:
+                                (row.payment_method_id ? paymentMethodLabelById.get(String(row.payment_method_id)) : null) ||
+                                (row.payment_type ? formatPaymentMethodLabel(row.payment_type, null) : null) ||
+                                "Não informado",
+                            status: paid || remainingAmount <= 0 ? "paid" : overdue ? "overdue" : "pending",
+                        }
+                    }),
             },
         }
     } catch (e: any) {
@@ -1486,162 +1486,60 @@ export async function settleInstallmentGroupAction(input: {
         const supabase = await getSupabaseServerClient()
         const nowIso = new Date().toISOString()
 
-        const { data: txRows, error: txErr } = await supabase
+        // Pre-fetch pending transactions to log audit events after successful settlement
+        const { data: pendingTxs } = await supabase
             .from("transactions")
-            .select("id, status, installment_number, description, category, category_id, subcategory_id, account_id, contact_id, customer_id, contact_type, payment_type, notes, due_date, amount, original_amount, transaction_type, refund_kind")
+            .select("id")
             .eq("partner_id", input.partnerId)
             .eq("installment_group_id", input.installmentGroupId)
-        if (txErr) throw txErr
-        const rows = txRows || []
-        if (rows.length === 0) throw new Error("Nenhuma parcela encontrada para este grupo.")
+            .neq("status", "paid")
 
-        const txIds = rows.map((r: any) => r.id)
-        const { data: paymentRows, error: paymentErr } = await supabase
-            .from("transaction_payments")
-            .select("transaction_id, amount, base_amount")
-            .eq("partner_id", input.partnerId)
-            .in("transaction_id", txIds)
-        if (paymentErr) throw paymentErr
+        const txIdsToLog = pendingTxs?.map((t: any) => t.id) || []
 
-        const paidPrincipalByTx = new Map<string, number>()
-        for (const payment of paymentRows || []) {
-            const txId = String((payment as any).transaction_id || "")
-            const pBase = Number((payment as any).base_amount ?? (payment as any).amount ?? 0)
-            paidPrincipalByTx.set(txId, (paidPrincipalByTx.get(txId) || 0) + pBase)
+        const t0 = performance.now()
+
+        // Execute the atomic settlement RPC
+        const { data, error } = await supabase.rpc("settle_installment_group", {
+            p_partner_id: input.partnerId,
+            p_installment_group_id: input.installmentGroupId,
+            p_user_id: userId,
+            p_custom_payments: input.installmentPayments || null
+        })
+
+        if (error) {
+            console.error("[transactions] settle_installment_group RPC failed:", error)
+            throw new Error(`Falha na transação atômica de liquidação: ${error.message}`)
         }
 
-        const paymentInputByTxId = new Map(
-            (input.installmentPayments || []).map((entry) => [entry.transactionId, entry])
-        )
-        const paymentsToInsert: Record<string, unknown>[] = []
-        const txIdsToMarkPaid: string[] = []
-        let affectedCount = 0
-        let payIdx = 0
+        console.log(`[PERF] settleInstallmentGroup RPC executed in ${Math.round(performance.now() - t0)}ms. Result:`, data)
 
-        // PERF: Aggregate balance deltas per account to avoid N+1 RPC calls.
-        // Key: accountId, Value: accumulated delta amount
-        // Uses the same delta computation logic as applyFinanceAccountBalanceDelta.
-        const balanceDeltaByAccount = new Map<string, number>()
-
-        for (const row of rows as any[]) {
-            const original = Math.abs(Number(row.original_amount ?? row.amount ?? 0))
-            const paidPrincipalSoFar = paidPrincipalByTx.get(row.id) || 0
-            const remainingPrincipal = Math.max(0, Math.round((original - paidPrincipalSoFar) * 100) / 100)
-            const alreadyPaid = String(row.status || "").toLowerCase() === "paid"
-
-            if (remainingPrincipal <= 0) {
-                if (!alreadyPaid) txIdsToMarkPaid.push(row.id)
-                continue
-            }
-
-            const custom = paymentInputByTxId.get(String(row.id))
-            const baseRequest = Math.max(0, Number(custom?.paymentAmount ?? remainingPrincipal))
-            const interest = Number(custom?.interestAmount || 0)
-            const discount = Number(custom?.discountAmount || 0)
-            const baseApplied = Math.round(Math.min(remainingPrincipal, baseRequest) * 100) / 100
-            let finalPaid = Math.round((baseApplied + interest - discount) * 100) / 100
-            if (finalPaid <= 0) continue
-            if (baseApplied < 0.0001) continue
-
-            const idemKey = `settle:${input.installmentGroupId}:${row.id}:${nowIso}:${payIdx++}`
-
-            paymentsToInsert.push({
-                partner_id: input.partnerId,
-                transaction_id: row.id,
-                amount: finalPaid,
-                base_amount: baseApplied,
-                interest_amount: interest,
-                discount_amount: discount,
-                payment_method_id: custom?.paymentMethodId || null,
-                created_by_user_id: userId,
-                created_at: nowIso,
-                idempotency_key: idemKey,
-            })
-
-            // Accumulate delta instead of calling RPC inside the loop (was N+1)
-            const accountId = row.account_id
-            if (accountId) {
-                const rawAmt = Number(finalPaid || 0)
-                if (Number.isFinite(rawAmt) && rawAmt !== 0) {
-                    const tt = row.transaction_type
-                    let delta = 0
-                    if (tt === "income") delta = Math.abs(rawAmt)
-                    else if (tt === "expense") delta = -Math.abs(rawAmt)
-                    else if (tt === "adjustment") delta = rawAmt
-                    else if (tt === "refund") {
-                        if (row.refund_kind === "expense_refund") delta = Math.abs(rawAmt)
-                        else if (row.refund_kind === "revenue_refund") delta = -Math.abs(rawAmt)
-                    }
-                    delta = Math.round(delta * 100) / 100
-                    if (delta !== 0) {
-                        balanceDeltaByAccount.set(accountId, (balanceDeltaByAccount.get(accountId) || 0) + delta)
-                    }
-                }
-            }
-
-            const paidPrincipalAfter = paidPrincipalSoFar + baseApplied
-            if (paidPrincipalAfter + 0.0001 >= original) {
-                txIdsToMarkPaid.push(row.id)
-            }
-            affectedCount += 1
-        }
-
-        // PERF: Apply all balance deltas in parallel (1 RPC per distinct account, usually 1-2 total)
-        const t1 = performance.now()
-        const deltaEntries = Array.from(balanceDeltaByAccount.entries())
-        if (deltaEntries.length > 0) {
-            await Promise.all(
-                deltaEntries.map(([accountId, totalDelta]) => {
-                    const roundedDelta = Math.round(totalDelta * 100) / 100
-                    if (roundedDelta === 0) return Promise.resolve()
-                    return supabase.rpc("apply_account_balance_delta", {
-                        p_account_id: accountId,
-                        p_partner_id: input.partnerId,
-                        p_delta: roundedDelta,
-                    }).then(({ error: rpcError }: { error: any }) => {
-                        if (rpcError) {
-                            console.error("[transactions] settle balance delta RPC error:", rpcError.message, { accountId, delta: roundedDelta })
-                        }
-                    })
-                })
+        // Log audit events for the transactions that were just settled
+        if (txIdsToLog.length > 0) {
+            await Promise.allSettled(
+                txIdsToLog.map((transactionId: string) =>
+                    logAuditEvent({
+                        partnerId: input.partnerId,
+                        actorUserId: userId,
+                        entityType: "transaction",
+                        entityId: transactionId,
+                        actionType: "settled",
+                        changeLines: ["quitou esta parcela pelo comando «Quitar tudo»."],
+                        source: "manual",
+                    }),
+                ),
             )
         }
-        console.log(`[PERF] settleInstallmentGroup: ${affectedCount} installments → ${deltaEntries.length} balance RPC(s) in ${Math.round(performance.now() - t1)}ms`)
-
-        if (paymentsToInsert.length > 0) {
-            const { error: insErr } = await supabase.from("transaction_payments").insert(paymentsToInsert)
-            if (insErr) throw insErr
-        }
-
-        if (txIdsToMarkPaid.length > 0) {
-            const { error: updErr } = await supabase
-                .from("transactions")
-                .update({
-                    status: "paid",
-                    payment_date: nowIso,
-                    updated_at: nowIso,
-                })
-                .eq("partner_id", input.partnerId)
-                .in("id", txIdsToMarkPaid)
-            if (updErr) throw updErr
-        }
-
-        await Promise.allSettled(
-            txIdsToMarkPaid.map((transactionId) =>
-                logAuditEvent({
-                    partnerId: input.partnerId,
-                    actorUserId: userId,
-                    entityType: "transaction",
-                    entityId: transactionId,
-                    actionType: "settled",
-                    changeLines: ["quitou esta parcela pelo comando «Quitar tudo»."],
-                    source: "manual",
-                }),
-            ),
-        )
 
         await revalidateTransactions(input.partnerId)
-        return { success: true as const, data: { settledCount: txIdsToMarkPaid.length, createdPayments: paymentsToInsert.length, affectedCount } }
+
+        return {
+            success: true as const,
+            data: {
+                settledCount: data?.settledCount || 0,
+                createdPayments: data?.createdPayments || 0,
+                affectedCount: data?.affectedCount || 0
+            }
+        }
     } catch (e: any) {
         return { success: false as const, error: e.message || "Erro ao quitar parcelado" }
     }
@@ -2023,41 +1921,41 @@ export async function getTransactionDetailsAction(
             // 1. Payment method display label
             row.payment_method_id
                 ? paymentMethodDisplayLabel(supabase, partnerId, row.payment_method_id).then(
-                      (label) => label || (row.payment_type ? formatPaymentMethodLabel(row.payment_type, null) : "") || "Não informado"
-                  )
+                    (label) => label || (row.payment_type ? formatPaymentMethodLabel(row.payment_type, null) : "") || "Não informado"
+                )
                 : Promise.resolve(
-                      (row.payment_type ? formatPaymentMethodLabel(row.payment_type, null) : "") || "Não informado"
-                  ),
+                    (row.payment_type ? formatPaymentMethodLabel(row.payment_type, null) : "") || "Não informado"
+                ),
             // 2. Creator name
             row.created_by_user_id
                 ? supabase
-                      .from("user_profiles")
-                      .select("full_name")
-                      .eq("user_id", row.created_by_user_id)
-                      .maybeSingle()
-                      .then(({ data: creatorProf }: { data: any }) =>
-                          creatorProf?.full_name?.trim() ? creatorProf.full_name.trim() : "Sistema"
-                      )
+                    .from("user_profiles")
+                    .select("full_name")
+                    .eq("user_id", row.created_by_user_id)
+                    .maybeSingle()
+                    .then(({ data: creatorProf }: { data: any }) =>
+                        creatorProf?.full_name?.trim() ? creatorProf.full_name.trim() : "Sistema"
+                    )
                 : Promise.resolve("Sistema"),
             // 3. Account name
             row.account_id
                 ? supabase
-                      .from("finance_accounts")
-                      .select("name")
-                      .eq("id", row.account_id)
-                      .eq("partner_id", partnerId)
-                      .maybeSingle()
-                      .then(({ data: acc }: { data: any }) => acc?.name || null)
+                    .from("finance_accounts")
+                    .select("name")
+                    .eq("id", row.account_id)
+                    .eq("partner_id", partnerId)
+                    .maybeSingle()
+                    .then(({ data: acc }: { data: any }) => acc?.name || null)
                 : Promise.resolve(null as string | null),
             // 4. Subcategory name
             row.subcategory_id
                 ? supabase
-                      .from("financial_categories")
-                      .select("name")
-                      .eq("id", row.subcategory_id)
-                      .eq("partner_id", partnerId)
-                      .maybeSingle()
-                      .then(({ data: sub }: { data: any }) => sub?.name || null)
+                    .from("financial_categories")
+                    .select("name")
+                    .eq("id", row.subcategory_id)
+                    .eq("partner_id", partnerId)
+                    .maybeSingle()
+                    .then(({ data: sub }: { data: any }) => sub?.name || null)
                 : Promise.resolve(null as string | null),
         ])
         console.log(`[PERF] getTransactionDetails: 4 parallel lookups in ${Math.round(performance.now() - t0Detail)}ms`)
@@ -2070,13 +1968,13 @@ export async function getTransactionDetailsAction(
         const step2Label = cancelled
             ? "Cancelado"
             : row.transaction_type === "refund"
-              ? "Reembolsado"
-            : paid
-              ? row.transaction_type === "income" ||
-                  (row.transaction_type === "refund" && row.refund_kind === "expense_refund")
-                ? "Recebido"
-                : "Pago"
-              : "Pendente"
+                ? "Reembolsado"
+                : paid
+                    ? row.transaction_type === "income" ||
+                        (row.transaction_type === "refund" && row.refund_kind === "expense_refund")
+                        ? "Recebido"
+                        : "Pago"
+                    : "Pendente"
 
         const timeline = {
             step1: {
@@ -2091,8 +1989,8 @@ export async function getTransactionDetailsAction(
                     cancelled || !paid
                         ? ""
                         : row.payment_date
-                          ? formatDayMonth(row.payment_date)
-                          : formatDayMonth(row.created_at),
+                            ? formatDayMonth(row.payment_date)
+                            : formatDayMonth(row.created_at),
                 time: paid && row.payment_date ? formatTime(row.payment_date) : "",
                 active: paid || cancelled,
                 danger: cancelled,
