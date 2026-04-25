@@ -8,13 +8,14 @@ import { useToast } from "@/components/ui/use-toast"
 import { useNotification } from "@/hooks/use-notification"
 import { createERPOrderAction, getOrderDetailsAction, updateERPOrderAction } from "@/app/actions/erp/orders"
 import { validateCouponAction } from "@/app/actions/shared/coupons"
+import { getPOSCustomerDetailsAction, createPOSCustomerAddressAction } from "@/app/actions/erp/pos"
 import SelectCustomerSheet from "../clientes/SelectCustomerSheet"
 import SelectVariantSheet from "../quotes/SelectVariantSheet"
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
 import { useProductBucket } from "../hooks"
 import { useRouter } from "next/navigation"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
-import PaymentModal from "./PaymentModal"
+import PaymentModal, { PAYMENT_MODAL_HEADER_SUBTITLE } from "./PaymentModal"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import {
     createFinanceAccountAction,
@@ -22,7 +23,10 @@ import {
 } from "@/app/actions/erp/finance-accounts"
 import { pickBankThenCashDefaultFinanceAccountId, type FinanceAccountType } from "@/lib/finance-utils"
 import DefaultModal from "@/components/reusable/DefaultModal"
-import { Input, MoneyInput, Combobox, Checkbox } from "@/components/reusable"
+import { Input, MoneyInput, Combobox, Checkbox, ListItem, RadioButton, InfoCard, PercentageInput, Button as ReusableButton } from "@/components/reusable"
+import { TagIcon, MoneyIcon, FileIcon } from "@/lib/icons"
+import SelectCouponSheet from "@/components/erp/pos/SelectCouponSheet"
+import POSShippingSheet from "@/components/erp/pos/POSShippingSheet"
 
 // Tabs
 import { OrderGeneralTab } from "./OrderGeneralTab"
@@ -57,6 +61,20 @@ const REQUIRED_FIELDS = [
     { field: "financeAccountId", tab: "general" },
 ]
 
+function formatLocalISODate(date: Date) {
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, "0")
+    const d = String(date.getDate()).padStart(2, "0")
+    return `${y}-${m}-${d}`
+}
+
+function parseMoneyInput(s: string): number {
+    const t = String(s || "").trim().replace(",", ".")
+    if (t === "") return 0
+    const n = Number(t)
+    return Number.isFinite(n) ? n : 0
+}
+
 export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOrderProps) {
     const { toast } = useToast()
     const { success: notifySuccess, error: notifyError } = useNotification()
@@ -81,7 +99,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
     // Form State
     const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
-    const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0])
+    const [orderDate, setOrderDate] = useState(formatLocalISODate(new Date()))
     const [salesChannel, setSalesChannel] = useState("Manual")
     const [deliveryMethod, setDeliveryMethod] = useState<'delivery' | 'pickup'>("pickup")
     const [paymentStatus, setPaymentStatus] = useState<'paid' | 'partially_paid' | 'unpaid'>("unpaid")
@@ -100,7 +118,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [shippingFee, setShippingFee] = useState("0")
     const [otherCosts, setOtherCosts] = useState("0")
     const [discountValue, setDiscountValue] = useState(0)
-    const [discountType, setDiscountType] = useState<'fixed' | 'percentage'>('fixed')
+    const [discountType, setDiscountType] = useState<'fixed' | 'percentage' | 'coupon'>('fixed')
     const [couponCode, setCouponCode] = useState("")
     const [couponId, setCouponId] = useState<string | null>(null)
     const [couponDiscountAmount, setCouponDiscountAmount] = useState(0)
@@ -133,7 +151,20 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [newAccountType, setNewAccountType] = useState<FinanceAccountType>("cash")
     const [newAccountInitialBalance, setNewAccountInitialBalance] = useState(0)
     const [newAccountIsDefault, setNewAccountIsDefault] = useState(false)
+    const [newAccountIsActive, setNewAccountIsActive] = useState(true)
     const isPaymentProcessing = isPaymentModalOpen && isSaving
+
+    // Fluxos idênticos ao PDV (desconto + frete)
+    const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false)
+    const [globalDiscountValue, setGlobalDiscountValue] = useState(0)
+    const [globalDiscountType, setGlobalDiscountType] = useState<"fixed" | "percentage" | "coupon">("fixed")
+    const [globalDiscountCouponCode, setGlobalDiscountCouponCode] = useState("")
+    const [isCouponSheetOpen, setIsCouponSheetOpen] = useState(false)
+    const [isApplyingCoupon, setIsApplyingCoupon] = useState(false)
+    const percentagePresets = [5, 10, 15, 20]
+    const [isShippingSheetOpen, setIsShippingSheetOpen] = useState(false)
+    const [shippingCustomerDetails, setShippingCustomerDetails] = useState<any | null>(null)
+    const [customerSelectIntent, setCustomerSelectIntent] = useState<"default" | "shipping-preflight">("default")
 
     // --- Calculations ---
     const subtotal = useMemo(() => {
@@ -144,6 +175,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         if (discountType === 'percentage') {
             return (subtotal * discountValue) / 100
         }
+        if (discountType === "coupon") return 0
         return discountValue
     }, [subtotal, discountValue, discountType])
 
@@ -255,6 +287,60 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         const defaultOrderAccountId = pickBankThenCashDefaultFinanceAccountId(financeAccounts)
         if (defaultOrderAccountId) setFinanceAccountId(defaultOrderAccountId)
     }, [editOrderId, financeAccountId, financeAccounts])
+
+    useEffect(() => {
+        if (!isDiscountModalOpen) return
+        setGlobalDiscountValue(discountValue)
+        setGlobalDiscountType(discountType === "coupon" ? "coupon" : (discountType as any))
+        setGlobalDiscountCouponCode(couponCode)
+    }, [isDiscountModalOpen, discountValue, discountType, couponCode])
+
+    const openShippingSheetWithCustomer = useCallback(async (customerId: string) => {
+        const details = await getPOSCustomerDetailsAction({ partnerId, customerId })
+        if (details.success && details.data) {
+            setShippingCustomerDetails(details.data)
+        } else {
+            setShippingCustomerDetails(null)
+        }
+        setIsShippingSheetOpen(true)
+    }, [partnerId])
+
+    const handleOpenShippingSheet = useCallback(async () => {
+        if (selectedCustomer?.id) {
+            await openShippingSheetWithCustomer(selectedCustomer.id)
+            return
+        }
+        setCustomerSelectIntent("shipping-preflight")
+        setIsCustomerSheetOpen(true)
+    }, [openShippingSheetWithCustomer, selectedCustomer?.id])
+
+    useEffect(() => {
+        let active = true
+        async function maybeAutoFillAddress() {
+            if (deliveryMethod !== "delivery") return
+            if (!selectedCustomer?.id) return
+
+            const details = await getPOSCustomerDetailsAction({ partnerId, customerId: selectedCustomer.id })
+            if (!active) return
+            if (!details.success || !details.data) return
+
+            const addr = details.data?.address || null
+            if (!addr) return
+
+            setCep((prev) => prev || String(addr.zipCode || ""))
+            setStreet((prev) => prev || String(addr.street || ""))
+            setNumber((prev) => prev || String(addr.number || ""))
+            setComplement((prev) => prev || String(addr.complement || ""))
+            setNeighborhood((prev) => prev || String(addr.neighborhood || ""))
+            setCity((prev) => prev || String(addr.city || ""))
+            setUf((prev) => prev || String(addr.state || "SP"))
+            setNoNumber((prev) => prev || !String(addr.number || "").trim())
+        }
+        void maybeAutoFillAddress()
+        return () => {
+            active = false
+        }
+    }, [deliveryMethod, selectedCustomer?.id, partnerId])
 
     // --- Handlers ---
     const handleScroll = useCallback(() => {
@@ -479,7 +565,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const resetForm = () => {
         setItems([])
         setSelectedCustomer(null)
-        setOrderDate(new Date().toISOString().split('T')[0])
+        setOrderDate(formatLocalISODate(new Date()))
         setNotes("")
         setShippingFee("0")
         setOtherCosts("0")
@@ -611,7 +697,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             paymentStatus: finalPaymentStatus,
             paymentMethod: paymentOverrides?.paymentMethod || (editOrderId ? originalPaymentMethod : "pendente"),
             paymentBreakdown: paymentOverrides?.paymentBreakdown || originalPaymentBreakdown,
-            deliveryStatus: finalDeliveryStatus as any,
+            deliveryStatus: deliveryMethod === "delivery" ? (finalDeliveryStatus as any) : undefined,
             paidAmount: paymentOverrides?.paidAmount,
             address: deliveryMethod === 'delivery' ? {
                 zipCode: cep,
@@ -650,6 +736,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             notifyError("Informe um código de cupom.")
             return
         }
+        if (isApplyingCoupon) return
+        setIsApplyingCoupon(true)
         const result = await validateCouponAction({
             partnerId,
             code,
@@ -658,15 +746,20 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             shippingCost: parseFloat(shippingFee || "0"),
             items: items.map((item) => ({ productId: item.productId || null })),
         })
-        if (!result.valid) {
-            setCouponId(null)
-            setCouponDiscountAmount(0)
-            notifyError(result.errorMessage || "Cupom inválido.")
-            return
+        try {
+            if (!result.valid) {
+                setCouponId(null)
+                setCouponDiscountAmount(0)
+                notifyError(result.errorMessage || "Cupom inválido.")
+                return
+            }
+            setCouponId(result.couponId || null)
+            setCouponDiscountAmount(Number(result.discountAmount || 0))
+            setDiscountType("coupon")
+            notifySuccess("Cupom aplicado com sucesso.")
+        } finally {
+            setIsApplyingCoupon(false)
         }
-        setCouponId(result.couponId || null)
-        setCouponDiscountAmount(Number(result.discountAmount || 0))
-        notifySuccess("Cupom aplicado com sucesso.")
     }
 
     const submitOrder = async (paymentOverrides?: {
@@ -892,6 +985,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                         setCouponCode={setCouponCode}
                                         couponDiscountAmount={couponDiscountAmount}
                                         onApplyCoupon={handleApplyCoupon}
+                                        onOpenDiscount={() => setIsDiscountModalOpen(true)}
+                                        onOpenShipping={handleOpenShippingSheet}
                                         setSelectedCustomer={setSelectedCustomer}
                                         setIsCustomerSheetOpen={setIsCustomerSheetOpen}
                                         setOrderDate={setOrderDate}
@@ -903,7 +998,14 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                             setNewAccountName("")
                                             setNewAccountType("cash")
                                             setNewAccountInitialBalance(0)
-                                            setNewAccountIsDefault(!financeAccounts.some((acc) => acc.integration_source !== "mercadopago"))
+                                            setNewAccountIsDefault(
+                                                !financeAccounts.some(
+                                                    (acc) =>
+                                                        acc.type === "cash" &&
+                                                        (!acc.integration_source || acc.integration_source !== "mercadopago"),
+                                                ),
+                                            )
+                                            setNewAccountIsActive(true)
                                             setIsAccountModalOpen(true)
                                         }}
                                         handleSaveOrder={handleOpenPaymentModal}
@@ -930,6 +1032,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                         uf={uf}
                                         noNumber={noNumber}
                                         selectedCustomer={selectedCustomer}
+                                        deliveryStatus={deliveryStatus}
+                                        setDeliveryStatus={setDeliveryStatus}
+                                        deliveryStatusOptions={deliveryStatusOptions}
                                         setCep={setCep}
                                         setStreet={setStreet}
                                         setNumber={setNumber}
@@ -959,10 +1064,32 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     onClose={() => {
                         if (isSaving) return
                         setIsCustomerSheetOpen(false)
+                        setCustomerSelectIntent("default")
                     }}
                     onSelect={(customer) => {
                         setSelectedCustomer(customer)
                         setIsCustomerSheetOpen(false)
+                        void (async () => {
+                            const details = await getPOSCustomerDetailsAction({ partnerId, customerId: customer.id })
+                            if (details.success && details.data) {
+                                setShippingCustomerDetails(details.data)
+                                if (deliveryMethod === "delivery" && details.data?.address) {
+                                    const addr = details.data.address
+                                    setCep(String(addr.zipCode || ""))
+                                    setStreet(String(addr.street || ""))
+                                    setNumber(String(addr.number || ""))
+                                    setComplement(String(addr.complement || ""))
+                                    setNeighborhood(String(addr.neighborhood || ""))
+                                    setCity(String(addr.city || ""))
+                                    setUf(String(addr.state || "SP"))
+                                    setNoNumber(!String(addr.number || "").trim())
+                                }
+                            }
+                        })()
+                        if (customerSelectIntent === "shipping-preflight") {
+                            setCustomerSelectIntent("default")
+                            void openShippingSheetWithCustomer(customer.id)
+                        }
                     }}
                     partnerId={partnerId}
                 />
@@ -1011,7 +1138,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             partnerId={partnerId}
                             shippingFee={parseFloat(shippingFee || "0")}
                             otherCosts={parseFloat(otherCosts || "0")}
-                            discountAmount={discountAmount}
+                            discountAmount={discountAmount + couponDiscountAmount}
+                            headerSubtitle={PAYMENT_MODAL_HEADER_SUBTITLE}
                             amountDue={editOrderId && remainingAmount > 0.009 ? remainingAmount : undefined}
                             existingPaidAmount={editOrderId ? originalPaidAmount : 0}
                             existingPaymentBreakdown={editOrderId ? originalPaymentBreakdown : []}
@@ -1042,11 +1170,12 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                     }
                                     setIsSavingAccount(true)
                                     try {
+                                        const initialBal = parseMoneyInput(String(newAccountInitialBalance ?? 0))
                                         const created = await createFinanceAccountAction({
                                             partnerId,
                                             name: newAccountName.trim(),
                                             type: newAccountType,
-                                            initialBalance: newAccountInitialBalance,
+                                            initialBalance: initialBal,
                                             isDefault: newAccountIsDefault,
                                         })
                                         if (!created.success || !created.data) {
@@ -1072,11 +1201,26 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     }
                 >
                     <div className="flex flex-col gap-4 p-4">
-                        <Input label="Nome" value={newAccountName} onChange={(e) => setNewAccountName(e.target.value)} />
+                        <Input
+                            label="Nome"
+                            placeholder="Ex: Caixa loja, Nubank, Banco Itaú"
+                            value={newAccountName}
+                            onChange={(e) => setNewAccountName(e.target.value)}
+                        />
                         <Combobox
                             label="Tipo"
                             value={newAccountType}
-                            onChange={(val) => setNewAccountType(val as FinanceAccountType)}
+                            onChange={(val) => {
+                                const nextType = val as FinanceAccountType
+                                setNewAccountType(nextType)
+                                setNewAccountIsDefault(
+                                    !financeAccounts.some(
+                                        (acc) =>
+                                            acc.type === nextType &&
+                                            (!acc.integration_source || acc.integration_source !== "mercadopago"),
+                                    ),
+                                )
+                            }}
                             options={[
                                 { value: "cash", label: "Caixa" },
                                 { value: "bank", label: "Conta bancária" },
@@ -1084,14 +1228,203 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             ]}
                         />
                         <MoneyInput label="Saldo inicial" value={newAccountInitialBalance} onChange={setNewAccountInitialBalance} />
+                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                            O saldo inicial aberto será registrado como transação de ajuste. Para alterar o saldo depois, use
+                            &quot;Ajustar saldo&quot; no menu da conta.
+                        </p>
                         <Checkbox
                             id="order_new_account_is_default"
-                            label="Conta padrão"
+                            label="Conta padrão deste tipo (caixa, banco ou carteira)"
                             checked={newAccountIsDefault}
                             onChange={setNewAccountIsDefault}
                         />
+                        <Checkbox
+                            id="order_new_account_is_active"
+                            label="Cadastro Ativo"
+                            checked={newAccountIsActive}
+                            onChange={setNewAccountIsActive}
+                            className="mt-2"
+                        />
                     </div>
                 </DefaultModal>
+
+                <DefaultModal
+                    isOpen={isDiscountModalOpen}
+                    onClose={() => setIsDiscountModalOpen(false)}
+                    title="Aplicar Desconto"
+                    footer={
+                        <div className="flex w-full items-center gap-3">
+                            <Button variant="outline" className="flex-1" onClick={() => setIsDiscountModalOpen(false)}>
+                                Cancelar
+                            </Button>
+                            <Button
+                                className="flex-1"
+                                isLoading={isApplyingCoupon}
+                                onClick={async () => {
+                                    if (globalDiscountType === "coupon") {
+                                        setIsDiscountModalOpen(false)
+                                        setIsCouponSheetOpen(true)
+                                        return
+                                    }
+                                    setDiscountType(globalDiscountType)
+                                    setDiscountValue(globalDiscountValue)
+                                    setCouponId(null)
+                                    setCouponDiscountAmount(0)
+                                    setCouponCode("")
+                                    setIsDiscountModalOpen(false)
+                                }}
+                            >
+                                Aplicar
+                            </Button>
+                        </div>
+                    }
+                >
+                    <div className="space-y-6 pt-2">
+                        <InfoCard color="green" title="Valor total de itens" message={formatCurrency(subtotal)} />
+                        <div className="grid grid-cols-1 gap-3">
+                            <ListItem
+                                onClick={() => setGlobalDiscountType("percentage")}
+                                icon={TagIcon}
+                                title="Porcentagem"
+                                description="Aplica um desconto percentual sobre o subtotal"
+                                className={`px-4 py-3 gap-4 ${globalDiscountType === "percentage" ? "border-brand-primary bg-brand-primary/5" : ""}`}
+                                right={
+                                    <RadioButton
+                                        name="globalDiscountType"
+                                        value="percentage"
+                                        checked={globalDiscountType === "percentage"}
+                                        onChange={() => setGlobalDiscountType("percentage")}
+                                    />
+                                }
+                            />
+                            <ListItem
+                                onClick={() => setGlobalDiscountType("fixed")}
+                                icon={MoneyIcon}
+                                title="Valor fixo"
+                                description="Aplica um valor fixo de desconto em reais"
+                                className={`px-4 py-3 gap-4 ${globalDiscountType === "fixed" ? "border-brand-primary bg-brand-primary/5" : ""}`}
+                                right={
+                                    <RadioButton
+                                        name="globalDiscountType"
+                                        value="fixed"
+                                        checked={globalDiscountType === "fixed"}
+                                        onChange={() => setGlobalDiscountType("fixed")}
+                                    />
+                                }
+                            />
+                            <ListItem
+                                onClick={() => setGlobalDiscountType("coupon")}
+                                icon={FileIcon}
+                                title="Cupom"
+                                description="Utiliza um cupom de desconto pré-cadastrado"
+                                className={`px-4 py-3 gap-4 ${globalDiscountType === "coupon" ? "border-brand-primary bg-brand-primary/5" : ""}`}
+                                right={
+                                    <RadioButton
+                                        name="globalDiscountType"
+                                        value="coupon"
+                                        checked={globalDiscountType === "coupon"}
+                                        onChange={() => setGlobalDiscountType("coupon")}
+                                    />
+                                }
+                            />
+                        </div>
+                        {globalDiscountType === "fixed" && (
+                            <MoneyInput
+                                label="Desconto do pedido"
+                                value={globalDiscountValue}
+                                onChange={(value: number) => setGlobalDiscountValue(value)}
+                            />
+                        )}
+                        {globalDiscountType === "percentage" && (
+                            <div className="space-y-3">
+                                <PercentageInput
+                                    label="Porcentagem a ser aplicada"
+                                    value={globalDiscountValue}
+                                    onChange={(value: number) => setGlobalDiscountValue(value)}
+                                />
+                                <div className="flex flex-wrap gap-3">
+                                    {percentagePresets.map((preset) => (
+                                        <button
+                                            key={preset}
+                                            type="button"
+                                            onClick={() => setGlobalDiscountValue(preset)}
+                                            className="h-12 min-w-[72px] rounded-xl border border-transparent bg-gray-100 px-5 text-sm font-bold text-brand-dark transition-colors hover:border-brand-border hover:bg-gray-200 dark:bg-dark-border/30 dark:text-dark-heading dark:hover:bg-dark-border/50"
+                                        >
+                                            {preset}%
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {globalDiscountType === "coupon" && (
+                            <div className="space-y-2">
+                                <InfoCard
+                                    color="gray"
+                                    title="Cupom de desconto"
+                                    message="Selecione um cupom na lista de cupons cadastrados."
+                                />
+                                <Button
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={() => {
+                                        setIsDiscountModalOpen(false)
+                                        setIsCouponSheetOpen(true)
+                                    }}
+                                >
+                                    Ver cupons cadastrados
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                </DefaultModal>
+
+                <SelectCouponSheet
+                    isOpen={isCouponSheetOpen}
+                    onClose={() => setIsCouponSheetOpen(false)}
+                    partnerId={partnerId}
+                    subtotal={subtotal}
+                    selectedCustomerId={selectedCustomer?.id || null}
+                    appliedCouponId={couponId}
+                    onApplyCoupon={async (coupon) => {
+                        setCouponCode(coupon.code)
+                        await handleApplyCoupon()
+                        setIsCouponSheetOpen(false)
+                    }}
+                    onRemoveCoupon={async () => {
+                        setCouponId(null)
+                        setCouponCode("")
+                        setCouponDiscountAmount(0)
+                        setDiscountType("fixed")
+                        setDiscountValue(0)
+                        notifySuccess("Cupom removido.")
+                    }}
+                />
+
+                <POSShippingSheet
+                    isOpen={isShippingSheetOpen}
+                    onClose={() => setIsShippingSheetOpen(false)}
+                    selectedCustomerId={selectedCustomer?.id || null}
+                    customerDetails={shippingCustomerDetails}
+                    currentShippingFee={parseFloat(shippingFee || "0")}
+                    onCreateAddress={async (payload: any) => {
+                        const result = await createPOSCustomerAddressAction({
+                            partnerId,
+                            customerId: payload.customerId,
+                            address: payload.address,
+                        })
+                        if (!result.success) {
+                            notifyError(result.error || "Não foi possível cadastrar o endereço.")
+                            throw new Error(result.error || "Não foi possível cadastrar o endereço.")
+                        }
+                        const details = await getPOSCustomerDetailsAction({ partnerId, customerId: payload.customerId })
+                        if (details.success && details.data) setShippingCustomerDetails(details.data)
+                        notifySuccess("Endereço cadastrado com sucesso.")
+                    }}
+                    onApply={({ shippingFee: fee }: any) => {
+                        setShippingFee(String(Math.max(0, Number(fee || 0))))
+                        setIsShippingSheetOpen(false)
+                    }}
+                />
 
                 {/* Mobile Bottom Action Bar */}
                 <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">

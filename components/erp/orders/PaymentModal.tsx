@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     XIcon,
     ChevronLeftIcon,
@@ -17,11 +17,12 @@ import {
     FileIcon,
     CheckCircleIcon,
     ChevronRightIcon,
-    CancelCircleIcon
+    CancelCircleIcon,
+    InfoIcon,
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Input, Button, Checkbox } from '@/components/reusable';
-import { ReceiptContent, PaymentMethodCard, Numpad, SplitPaymentCard } from './POSComponents';
+import { Input, Button, Checkbox, MoneyInput, Badge } from '@/components/reusable';
+import { ReceiptContent, PaymentMethodCard, SplitPaymentCard } from './POSComponents';
 import { calculatePaymentMethodAmountsAction, getPaymentMethodsAction, previewSplitPaymentBreakdownAction } from '@/app/actions/erp/payment-methods';
 import { useToast } from "@/components/ui/use-toast";
 import { formatCurrency, formatDate, formatTime } from '@/lib/utils';
@@ -109,6 +110,30 @@ const SuccessActionCard = ({ icon: Icon, label, onClick }: { icon: any, label: s
     </div>
 );
 
+function PaymentPricingDetailBadge({ calculation, baseAllocated }: { calculation: any; baseAllocated: number }) {
+    if (!calculation?.success) return null;
+    const base = Math.max(0, Number(baseAllocated || 0));
+    const disc = Number(calculation.paymentMethodDiscountAmount || 0);
+    const juros = Number(calculation.interestAmount || 0);
+    const taxa = Number(calculation.feeAmount || 0);
+    const final = Number(calculation.finalAmount || 0);
+    return (
+        <div className="relative group/payinfo inline-flex shrink-0">
+            <Badge variant="gray" icon={<InfoIcon className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body" />} className="cursor-help" />
+            <div className="pointer-events-none absolute bottom-full right-0 z-[120] mb-2 hidden min-w-[240px] max-w-[min(100vw,280px)] rounded-xl border border-brand-border bg-white p-3 text-left text-xs shadow-xl group-hover/payinfo:block dark:border-dark-border dark:bg-dark-surface">
+                <div className="mb-2 font-bold text-brand-dark dark:text-dark-heading">Detalhes do meio de pagamento</div>
+                <div className="space-y-1.5 text-brand-dark dark:text-dark-heading">
+                    <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Subtotal</span><span className="font-semibold">{formatCurrency(base)}</span></div>
+                    <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Desc. meio pagamento</span><span className="font-semibold">− {formatCurrency(disc)}</span></div>
+                    <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Juros</span><span className="font-semibold">+ {formatCurrency(juros)}</span></div>
+                    <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Taxa</span><span className="font-semibold">{formatCurrency(taxa)}</span></div>
+                    <div className="mt-2 flex justify-between gap-3 border-t border-brand-border pt-2 font-bold dark:border-dark-border"><span>Total a cobrar</span><span>{formatCurrency(final)}</span></div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // --- MAIN COMPONENT ---
 
 type PartnerPaymentMethod = {
@@ -131,6 +156,29 @@ const normalizeMethodType = (value?: string | null) => {
     return "other";
 };
 
+/** Props alinhadas entre PDV (`POSPage`) e venda manual (`CreateOrder`) — manter os mesmos significados. */
+export type PaymentModalProps = {
+    isOpen: boolean
+    onClose: () => void
+    cart: any[]
+    customer?: any
+    onConfirm: (payload: any) => Promise<any>
+    partnerId: string
+    shippingFee?: number
+    otherCosts?: number
+    /** Soma dos descontos do pedido na tela de origem (em venda manual: desconto manual + cupom). */
+    discountAmount?: number
+    amountDue?: number
+    existingPaidAmount?: number
+    existingPaymentBreakdown?: any[]
+    lockPaymentCompletion?: boolean
+    /** Texto abaixo do nome do cliente (desktop e mobile). */
+    headerSubtitle?: string
+}
+
+/** Mesmo texto em PDV e venda manual — importe nos pais para garantir paridade. */
+export const PAYMENT_MODAL_HEADER_SUBTITLE = "Venda de Itens"
+
 const PaymentModal = ({
     isOpen,
     onClose,
@@ -144,12 +192,14 @@ const PaymentModal = ({
     amountDue,
     existingPaidAmount = 0,
     existingPaymentBreakdown = [],
-    lockPaymentCompletion = false
-}: any) => {
+    lockPaymentCompletion = false,
+    headerSubtitle = PAYMENT_MODAL_HEADER_SUBTITLE,
+}: PaymentModalProps) => {
     const { toast } = useToast();
     // Views: methods (main) | method_type_select | money | card | pix | split | split_method_select
     const [view, setView] = useState<string>('methods');
-    const [amountPaid, setAmountPaid] = useState<string>('');
+    /** Valor base alocado ao pedido neste meio (antes de desconto/juros/taxa do método); servidor recalcula o líquido a cobrar. */
+    const [paymentBaseAmount, setPaymentBaseAmount] = useState<number>(0);
     const [installments, setInstallments] = useState<string>('1');
     const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
@@ -158,8 +208,6 @@ const PaymentModal = ({
     const [saleId, setSaleId] = useState<string>("");
     const [lastPaymentPayload, setLastPaymentPayload] = useState<any | null>(null);
     const [errorMessage, setErrorMessage] = useState("Não conseguimos concluir a venda agora.");
-
-    const inputRef = useRef<HTMLInputElement>(null);
 
     // Pix Generation State
     const [isPixGenerated, setIsPixGenerated] = useState(false);
@@ -186,6 +234,22 @@ const PaymentModal = ({
     const [splitPreview, setSplitPreview] = useState<
         { success: true; finalTotal: number; rows: any[] } | { success: false; error: string } | null
     >(null);
+
+    /** Valores e itens congelados no momento de confirmar o pagamento (o PDV pode limpar o carrinho antes do estado de sucesso). */
+    const [successSnapshot, setSuccessSnapshot] = useState<{
+        subTotal: number
+        itemCount: number
+        shippingFee: number
+        otherCosts: number
+        discountAmount: number
+        total: number
+        displayOrderTotal: number
+        totalPaid: number
+        change: number
+        isUnderpaid: boolean
+        remainingPartial: number
+        receiptCart: any[]
+    } | null>(null)
 
     const subTotal = cart.reduce((acc: number, item: any) => acc + (item.unitPrice * item.quantity), 0);
     const total = subTotal + shippingFee + otherCosts - discountAmount;
@@ -254,7 +318,7 @@ const PaymentModal = ({
     useEffect(() => {
         if (isOpen) {
             setView('methods');
-            setAmountPaid('');
+            setPaymentBaseAmount(0);
             setInstallments('1');
             setIsReceiptOpen(false);
             setIsPendingPayment(false);
@@ -271,13 +335,22 @@ const PaymentModal = ({
             ]);
             setSelectedMethodId(null);
             setSplitPreview(null);
+            setSuccessSnapshot(null);
         }
-    }, [isOpen, total]);
+        // Não depender de `total`: se o pai zerar o carrinho (ex.: PDV) o total cai e apagava a tela de sucesso.
+    }, [isOpen]);
 
     const activeSplitLegs = useMemo(
         () => payments.filter((p) => p.method && p.amount > 0.009),
         [payments],
     );
+
+    /** Base sobre a qual incidem taxas/desconto do método (troco em dinheiro não aumenta o pedido). */
+    const basisForMethodCalc = useMemo(() => {
+        const raw = Math.max(0, Number(paymentBaseAmount || 0));
+        if (view === 'split' || editingPaymentIndex !== null) return raw;
+        return Math.min(raw, Math.max(0, Number(chargeTarget || 0)));
+    }, [view, editingPaymentIndex, paymentBaseAmount, chargeTarget]);
 
     useEffect(() => {
         let active = true;
@@ -330,18 +403,15 @@ const PaymentModal = ({
                     setInstallments(String(currentSlot.installmentNumber));
                 }
                 if (currentSlot.amount > 0) {
-                    setAmountPaid(currentSlot.amount.toString());
+                    setPaymentBaseAmount(Number(currentSlot.amount));
                 } else {
                     const otherPaid = payments.reduce((acc, p, idx) => idx !== editingPaymentIndex ? acc + p.amount : acc, 0);
                     const needed = Math.max(0, chargeTarget - otherPaid);
-                    setAmountPaid(needed > 0 ? needed.toFixed(2) : '');
+                    setPaymentBaseAmount(needed > 0 ? needed : 0);
                 }
             } else {
-                setAmountPaid(chargeTarget.toFixed(2));
+                setPaymentBaseAmount(Math.max(0, chargeTarget));
             }
-            setTimeout(() => {
-                if (inputRef.current) inputRef.current.focus();
-            }, 100);
         }
     }, [view, editingPaymentIndex, chargeTarget, payments]);
 
@@ -354,17 +424,15 @@ const PaymentModal = ({
         const currentViewIsCardLike = view === "card" || view === "pix" || view === "money";
         if (!currentViewIsCardLike) return;
         const installmentNumber = Math.max(1, Number(installments || 1));
+        const base = basisForMethodCalc;
         calculatePaymentMethodAmountsAction({
-            originalAmount: Math.max(0, Number(chargeTarget || 0)),
+            originalAmount: base,
             paymentMethodId: selectedMethodId,
             installmentNumber,
         }).then((res: any) => {
             if (!active) return;
             if (res?.success) {
                 setPaymentCalculation(res);
-                if (view === "card") {
-                    setAmountPaid(String(Number(res.finalAmount || chargeTarget).toFixed(2)));
-                }
             } else {
                 setPaymentCalculation(null);
             }
@@ -372,53 +440,85 @@ const PaymentModal = ({
         return () => {
             active = false;
         };
-    }, [selectedMethodId, installments, chargeTarget, view]);
+    }, [selectedMethodId, installments, chargeTarget, view, basisForMethodCalc]);
 
-    const handleQuickAdd = (val: number) => {
-        setAmountPaid(val.toString());
-    }
+    const handleQuickDenomination = (val: number) => {
+        setPaymentBaseAmount(val);
+    };
 
-    const handleManualInput = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        const val = e.target.value;
-        if (/^\d*\.?\d{0,2}$/.test(val)) {
-            setAmountPaid(val);
+    const splitBaseSum = useMemo(
+        () => payments.reduce((acc, p) => acc + (p.method && p.amount > 0.009 ? p.amount : 0), 0),
+        [payments],
+    );
+
+    const legFinalCharged =
+        paymentCalculation?.success && basisForMethodCalc > 0.009
+            ? Number(paymentCalculation.finalAmount || 0)
+            : null;
+
+    const allocationTotal = useMemo(() => {
+        if (view === 'split') return splitBaseSum;
+        if (editingPaymentIndex !== null) {
+            const other = payments.reduce((acc, p, idx) => (idx !== editingPaymentIndex ? acc + p.amount : acc), 0);
+            return other + paymentBaseAmount;
         }
-    };
+        return paymentBaseAmount;
+    }, [view, splitBaseSum, editingPaymentIndex, payments, paymentBaseAmount]);
 
-    const handleNumpadInput = (key: string) => {
-        if (key === '.' && amountPaid.includes('.')) return;
-        if (amountPaid === '0' && key !== '.') {
-            setAmountPaid(key);
-            return;
-        }
-        setAmountPaid(prev => {
-            const newVal = prev + key;
-            if (/^\d*\.?\d{0,2}$/.test(newVal)) return newVal;
-            return prev;
-        });
-    };
+    const finalDueForLeg = legFinalCharged != null && Number.isFinite(legFinalCharged) ? legFinalCharged : chargeTarget;
 
-    const handleNumpadDelete = () => {
-        setAmountPaid(prev => prev.slice(0, -1));
-    };
-
-    const currentInputVal = parseFloat(amountPaid) || 0;
-
-    const totalPaidCalculated = useMemo(() => {
+    const { compactAlertPaid, compactAlertNeed } = useMemo(() => {
         if (view === 'split') {
-            return payments.reduce((acc, p) => acc + p.amount, 0);
+            return { compactAlertPaid: splitBaseSum, compactAlertNeed: chargeTarget };
         }
         if (editingPaymentIndex !== null) {
-            const otherPaid = payments.reduce((acc, p, idx) => idx !== editingPaymentIndex ? acc + p.amount : acc, 0);
-            return otherPaid + currentInputVal;
+            return { compactAlertPaid: allocationTotal, compactAlertNeed: chargeTarget };
         }
-        return currentInputVal;
-    }, [view, payments, editingPaymentIndex, currentInputVal]);
+        if (view === 'money') {
+            if (allocationTotal + 0.01 >= chargeTarget) {
+                return { compactAlertPaid: paymentBaseAmount, compactAlertNeed: finalDueForLeg };
+            }
+            return { compactAlertPaid: allocationTotal, compactAlertNeed: chargeTarget };
+        }
+        if (legFinalCharged != null) {
+            return { compactAlertPaid: legFinalCharged, compactAlertNeed: legFinalCharged };
+        }
+        return { compactAlertPaid: allocationTotal, compactAlertNeed: chargeTarget };
+    }, [view, splitBaseSum, chargeTarget, editingPaymentIndex, allocationTotal, paymentBaseAmount, finalDueForLeg, legFinalCharged]);
 
-    const diff = totalPaidCalculated - chargeTarget;
-    const isUnderpaid = diff < -0.01;
-    const isOverpaid = diff > 0.01;
-    const changeAmount = isOverpaid ? diff : 0;
+    const isAllocationUnderpaid = allocationTotal < chargeTarget - 0.01;
+    const isUnderpaid = isAllocationUnderpaid;
+    const isOverpaid = view === 'money' && !isAllocationUnderpaid && paymentBaseAmount > finalDueForLeg + 0.01;
+    const changeAmount = isOverpaid ? paymentBaseAmount - finalDueForLeg : 0;
+
+    /** Valor efetivo pago / a registrar (líquido do método quando houver cálculo). */
+    const totalPaidCalculated = useMemo(() => {
+        if (view === 'split' && splitPreview && 'success' in splitPreview && splitPreview.success) {
+            return splitPreview.finalTotal;
+        }
+        if (view === 'split') {
+            return splitBaseSum;
+        }
+        if (editingPaymentIndex !== null) {
+            const other = payments.reduce((acc, p, idx) => (idx !== editingPaymentIndex ? acc + p.amount : acc), 0);
+            return other + paymentBaseAmount;
+        }
+        if (view === 'money') return paymentBaseAmount;
+        if (legFinalCharged != null) return legFinalCharged;
+        return paymentBaseAmount;
+    }, [view, splitPreview, splitBaseSum, editingPaymentIndex, payments, paymentBaseAmount, legFinalCharged]);
+
+    const receiptView = successSnapshot
+        ? {
+            cart: successSnapshot.receiptCart,
+            subTotal: successSnapshot.subTotal,
+            itemCount: successSnapshot.itemCount,
+            shippingFee: successSnapshot.shippingFee,
+            otherCosts: successSnapshot.otherCosts,
+            discountAmount: successSnapshot.discountAmount,
+            total: successSnapshot.total,
+        }
+        : { cart, subTotal, itemCount, shippingFee, otherCosts, discountAmount, total };
 
     const getTitle = () => {
         const selectedTypeLabel =
@@ -529,7 +629,7 @@ const PaymentModal = ({
                     }))
                 : [{
                     method: normalizePaymentMethodLabel(activeMethods.find((method) => method.id === selectedMethodId)?.name || (view === 'money' ? 'dinheiro' : (view === 'pix' ? 'pix' : 'cartao'))),
-                    amount: Number(totalPaidCalculated || 0),
+                    amount: Number(paymentBaseAmount || 0),
                     paymentMethodId: selectedMethodId || null,
                     installmentNumber: Math.max(1, Number(installments || 1)),
                 }];
@@ -541,10 +641,17 @@ const PaymentModal = ({
             ? 'pendente'
             : Array.from(new Set(mergedPaymentBreakdown.map((entry: any) => normalizePaymentMethodLabel(entry.method)))).join(', ');
 
+        const singleRegisterAmount =
+            view !== 'split' && paymentCalculation?.success && legFinalCharged != null && Number.isFinite(legFinalCharged)
+                ? legFinalCharged
+                : view !== 'split'
+                    ? Number(paymentBaseAmount || 0)
+                    : 0;
+
         const paidToRegister =
             isPendingPayment
                 ? existingPaidAmount
-                : (existingPaidAmount + (splitFinalCharged != null ? splitFinalCharged : totalPaidCalculated));
+                : (existingPaidAmount + (splitFinalCharged != null ? splitFinalCharged : singleRegisterAmount));
 
         return {
             paymentMethod: paymentMethod || 'pendente',
@@ -557,6 +664,21 @@ const PaymentModal = ({
     };
 
     const handleStartProcessing = async (forcedPayload?: any) => {
+        const remainingPartial = Math.max(0, chargeTarget - allocationTotal)
+        setSuccessSnapshot({
+            subTotal,
+            itemCount,
+            shippingFee: Number(shippingFee || 0),
+            otherCosts: Number(otherCosts || 0),
+            discountAmount: Number(discountAmount || 0),
+            total,
+            displayOrderTotal: !isUnderpaid ? totalPaidCalculated : chargeTarget,
+            totalPaid: totalPaidCalculated,
+            change: changeAmount,
+            isUnderpaid,
+            remainingPartial,
+            receiptCart: Array.isArray(cart) ? cart.map((row: any) => ({ ...row })) : [],
+        })
         setPaymentStatus('processing');
         const payload = forcedPayload || buildConfirmPayload();
         setLastPaymentPayload(payload);
@@ -568,16 +690,19 @@ const PaymentModal = ({
                 setSaleId(result.orderNumber || "DDT000000");
                 setPaymentStatus('success');
             } else {
+                setSuccessSnapshot(null);
                 setErrorMessage(result?.error || "Ocorreu um problema ao concluir o pagamento. Você pode tentar novamente.");
                 setPaymentStatus('error');
             }
         } catch (error) {
+            setSuccessSnapshot(null);
             setErrorMessage("Ocorreu um problema inesperado ao concluir o pagamento. Você pode tentar novamente.");
             setPaymentStatus('error');
         }
     };
 
     const handleFinishSale = () => {
+        setSuccessSnapshot(null);
         onClose();
     };
 
@@ -595,6 +720,15 @@ const PaymentModal = ({
         animate: { opacity: 1, scale: 1, transition: standardTransition },
         exit: { opacity: 0, scale: 0.95, transition: standardTransition }
     };
+
+    const footerMobileTotal =
+        paymentStatus === "success" && successSnapshot
+            ? successSnapshot.displayOrderTotal
+            : view === 'split' && splitPreview && 'success' in splitPreview && splitPreview.success
+            ? splitPreview.finalTotal
+            : (view === 'money' || view === 'card' || view === 'pix') && legFinalCharged != null
+                ? legFinalCharged
+                : total;
 
     if (!isOpen) return null;
     const isCloseLocked = paymentStatus === 'processing';
@@ -615,7 +749,7 @@ const PaymentModal = ({
                     </div>
                     <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Ver Detalhes do Pedido</span>
                 </div>
-                <span className="font-black text-xl text-brand-dark dark:text-dark-heading">{formatCurrency(total)}</span>
+                <span className="font-black text-xl text-brand-dark dark:text-dark-heading">{formatCurrency(footerMobileTotal)}</span>
             </div>
 
             {showConfirm && (
@@ -669,7 +803,7 @@ const PaymentModal = ({
                             </div>
                             <div className="flex flex-col overflow-hidden">
                                 <span className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight truncate max-w-[180px]">{customer?.name || 'Consumidor Final'}</span>
-                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">Venda de Itens</span>
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">{headerSubtitle}</span>
                             </div>
                         </div>
                         <div className="flex flex-col items-end text-right">
@@ -681,13 +815,13 @@ const PaymentModal = ({
                     {/* Receipt Card */}
                     <div className="relative w-full flex-1 min-h-0 flex flex-col rounded-2xl">
                         <ReceiptContent
-                            cart={cart}
-                            subTotal={subTotal}
-                            shippingFee={shippingFee}
-                            otherCosts={otherCosts}
-                            discountAmount={discountAmount}
-                            total={total}
-                            itemCount={itemCount}
+                            cart={receiptView.cart}
+                            subTotal={receiptView.subTotal}
+                            shippingFee={receiptView.shippingFee}
+                            otherCosts={receiptView.otherCosts}
+                            discountAmount={receiptView.discountAmount}
+                            total={receiptView.total}
+                            itemCount={receiptView.itemCount}
                             customerName={customer?.name}
                         />
                     </div>
@@ -750,8 +884,8 @@ const PaymentModal = ({
                                                         {customer?.name?.substring(0, 2).toUpperCase() || 'CB'}
                                                     </div>
                                                     <div className="flex flex-col overflow-hidden">
-                                                        <span className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight truncate max-w-[150px]">{customer?.name || 'Consumidor final'}</span>
-                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">Order ERP / Presencial</span>
+                                                        <span className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight truncate max-w-[150px]">{customer?.name || 'Consumidor Final'}</span>
+                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">{headerSubtitle}</span>
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-col items-end text-right">
@@ -802,41 +936,55 @@ const PaymentModal = ({
                                     )}
 
                                     {view === 'money' && (
-                                        <motion.div key="money" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="w-full h-full flex flex-col items-center">
-                                            <CompactPaymentStatusAlert totalPaid={totalPaidCalculated} totalNeed={chargeTarget} />
-                                            <div className="flex justify-center items-baseline gap-1 mb-4 w-full cursor-text" onClick={() => inputRef.current?.focus()}>
-                                                <span className="text-5xl md:text-6xl font-bold text-brand-dark dark:text-dark-heading select-none">R$</span>
-                                                <input
-                                                    ref={inputRef}
-                                                    type="text"
-                                                    inputMode="decimal"
-                                                    value={amountPaid}
-                                                    onChange={(e: any) => handleManualInput(e)}
-                                                    placeholder="0.00"
-                                                    className="text-5xl md:text-6xl font-bold text-brand-dark dark:text-dark-heading bg-transparent outline-none p-0 m-0 placeholder:text-gray-200 dark:placeholder:text-gray-800"
-                                                    style={{ width: `${Math.max(1, amountPaid.length || 4)}ch` }}
-                                                />
+                                        <motion.div key="money" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="w-full h-full flex flex-col items-center px-2">
+                                            <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
+                                            <div className="w-full max-w-sm space-y-3">
+                                                <div className="flex items-end gap-2">
+                                                    <div className="min-w-0 flex-1">
+                                                        <MoneyInput
+                                                            label="Valor recebido (dinheiro)"
+                                                            value={paymentBaseAmount}
+                                                            onChange={setPaymentBaseAmount}
+                                                            className="font-bold text-lg"
+                                                        />
+                                                    </div>
+                                                    {paymentCalculation?.success && basisForMethodCalc > 0.009 && (
+                                                        <PaymentPricingDetailBadge calculation={paymentCalculation} baseAllocated={basisForMethodCalc} />
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div className="flex flex-wrap justify-center gap-3 mb-6 w-full px-2">
-                                                {[5, 10, 20, 50, 100].map(amt => (
+                                            <div className="flex flex-wrap justify-center gap-3 mb-6 mt-4 w-full px-2">
+                                                {[5, 10, 20, 50, 100].map((amt) => (
                                                     <button
                                                         key={amt}
-                                                        onClick={() => handleQuickAdd(amt)}
+                                                        type="button"
+                                                        onClick={() => handleQuickDenomination(amt)}
                                                         className="px-5 py-3 bg-gray-100 dark:bg-dark-border/30 rounded-xl text-sm font-bold text-brand-dark dark:text-dark-heading hover:bg-gray-200 dark:hover:bg-dark-border/50 transition-colors border border-transparent hover:border-brand-border flex-grow-0 min-w-[70px] h-auto"
                                                     >
                                                         R$ {amt}
                                                     </button>
                                                 ))}
                                             </div>
-                                            <Numpad onInput={handleNumpadInput} onDelete={handleNumpadDelete} />
                                         </motion.div>
                                     )}
 
                                     {view === 'pix' && (
                                         <motion.div key="pix" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="flex flex-col items-center justify-start pt-0 w-full">
                                             <div className="w-full max-w-sm space-y-4">
-                                                <CompactPaymentStatusAlert totalPaid={totalPaidCalculated} totalNeed={chargeTarget} />
-                                                <Input label="Valor a Receber" name="pixAmount" prefix="R$" value={amountPaid} onChange={handleManualInput} className="font-bold text-lg" />
+                                                <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
+                                                <div className="flex items-end gap-2">
+                                                    <div className="min-w-0 flex-1">
+                                                        <MoneyInput
+                                                            label="Valor a receber"
+                                                            value={paymentBaseAmount}
+                                                            onChange={setPaymentBaseAmount}
+                                                            className="font-bold text-lg"
+                                                        />
+                                                    </div>
+                                                    {paymentCalculation?.success && basisForMethodCalc > 0.009 && (
+                                                        <PaymentPricingDetailBadge calculation={paymentCalculation} baseAllocated={basisForMethodCalc} />
+                                                    )}
+                                                </div>
                                                 {!isPixGenerated ? (
                                                     <Button variant="filled" className="w-full h-12" onClick={() => setIsPixGenerated(true)}>Gerar QR Code</Button>
                                                 ) : (
@@ -858,28 +1006,31 @@ const PaymentModal = ({
 
                                     {view === 'card' && (
                                         <motion.div key="card" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="flex flex-col items-center justify-start pt-6 w-full max-w-sm mx-auto">
-                                            <CompactPaymentStatusAlert totalPaid={totalPaidCalculated} totalNeed={chargeTarget} />
+                                            <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
                                             <div className="mb-8 text-center">
                                                 <div className="w-24 h-24 bg-green-50 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-green-100 dark:border-green-900/30">
                                                     <CreditCardIcon size={40} className="text-green-600 dark:text-green-400" />
                                                 </div>
                                                 <div className="text-4xl font-bold text-brand-dark dark:text-dark-heading mb-2">
-                                                    {formatCurrency(total)}
+                                                    {formatCurrency(legFinalCharged != null ? legFinalCharged : chargeTarget)}
                                                 </div>
                                                 <p className="text-brand-inactive-text">Aguardando leitura do cartão...</p>
                                             </div>
                                             <div className="w-full text-left space-y-4">
-                                                <Input label="Valor a Cobrar" name="cardAmount" prefix="R$" value={amountPaid} onChange={(e: any) => handleManualInput(e)} className="font-bold text-lg" />
-                                                <Input label="Parcelas" name="installments" type="number" value={installments} onChange={(e: any) => setInstallments(e.target.value)} min="1" className="w-full text-lg font-bold" />
-                                                {paymentCalculation?.success && (
-                                                    <div className="rounded-xl border border-brand-border dark:border-dark-border p-4 bg-brand-gray/30 dark:bg-dark-border/20 space-y-1.5 text-sm">
-                                                        <div className="flex justify-between"><span className="text-brand-inactive-text">Subtotal</span><span className="font-semibold">{formatCurrency(chargeTarget)}</span></div>
-                                                        <div className="flex justify-between"><span className="text-brand-inactive-text">Desc. meio pagamento</span><span className="font-semibold">- {formatCurrency(Number(paymentCalculation.paymentMethodDiscountAmount || 0))}</span></div>
-                                                        <div className="flex justify-between"><span className="text-brand-inactive-text">Juros</span><span className="font-semibold">+ {formatCurrency(Number(paymentCalculation.interestAmount || 0))}</span></div>
-                                                        <div className="flex justify-between"><span className="text-brand-inactive-text">Taxa</span><span className="font-semibold">{formatCurrency(Number(paymentCalculation.feeAmount || 0))}</span></div>
-                                                        <div className="flex justify-between border-t border-brand-border dark:border-dark-border pt-2 mt-2"><span className="font-bold">Total final</span><span className="font-bold">{formatCurrency(Number(paymentCalculation.finalAmount || 0))}</span></div>
+                                                <div className="flex items-end gap-2">
+                                                    <div className="min-w-0 flex-1">
+                                                        <MoneyInput
+                                                            label="Valor a receber"
+                                                            value={paymentBaseAmount}
+                                                            onChange={setPaymentBaseAmount}
+                                                            className="font-bold text-lg"
+                                                        />
                                                     </div>
-                                                )}
+                                                    {paymentCalculation?.success && basisForMethodCalc > 0.009 && (
+                                                        <PaymentPricingDetailBadge calculation={paymentCalculation} baseAllocated={basisForMethodCalc} />
+                                                    )}
+                                                </div>
+                                                <Input label="Parcelas" name="installments" type="number" value={installments} onChange={(e: any) => setInstallments(e.target.value)} min="1" className="w-full text-lg font-bold" />
                                             </div>
                                         </motion.div>
                                     )}
@@ -887,7 +1038,7 @@ const PaymentModal = ({
                                     {view === 'split' && (
                                         <motion.div key="split" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="flex flex-col w-full h-full">
                                             <div className="flex-1 px-2 py-4">
-                                                <CompactPaymentStatusAlert totalPaid={totalPaidCalculated} totalNeed={chargeTarget} />
+                                                <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
                                                 {splitPreview && !splitPreview.success && (
                                                     <p className="text-sm text-red-600 dark:text-red-400 mb-3" role="alert">
                                                         {splitPreview.error}
@@ -1050,12 +1201,12 @@ const PaymentModal = ({
                                     </div>
 
                                     {/* Warning for Partial */}
-                                    {isUnderpaid && (
+                                    {successSnapshot?.isUnderpaid && (
                                         <div className="mb-6">
                                             <div className="w-full py-3 px-4 rounded-lg flex items-center gap-3 bg-yellow-50 dark:bg-yellow-900/20 transition-colors duration-300 border border-yellow-100 dark:border-yellow-900/30">
                                                 <div className="w-1 h-4 rounded-full bg-yellow-500"></div>
                                                 <span className="font-bold text-sm flex-1 text-yellow-700 dark:text-yellow-400">
-                                                    Venda paga parcialmente, restante a pagar: {formatCurrency(Math.abs(diff))}
+                                                    Venda paga parcialmente, restante a pagar: {formatCurrency(successSnapshot.remainingPartial)}
                                                 </span>
                                             </div>
                                         </div>
@@ -1065,16 +1216,16 @@ const PaymentModal = ({
                                     <div className="flex flex-col sm:flex-row gap-8 sm:gap-12 mb-10 mt-4 border-l-4 border-brand-dark dark:border-dark-heading pl-6">
                                         <div>
                                             <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">Total da venda</span>
-                                            <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(total)}</div>
+                                            <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(successSnapshot ? successSnapshot.displayOrderTotal : !isUnderpaid ? totalPaidCalculated : chargeTarget)}</div>
                                         </div>
                                         <div>
                                             <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">Total recebido</span>
-                                            <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(totalPaidCalculated)}</div>
+                                            <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(successSnapshot ? successSnapshot.totalPaid : totalPaidCalculated)}</div>
                                         </div>
-                                        {changeAmount > 0 && (
+                                        {(successSnapshot ? successSnapshot.change : changeAmount) > 0 && (
                                             <div>
                                                 <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">Troco</span>
-                                                <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(changeAmount)}</div>
+                                                <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(successSnapshot ? successSnapshot.change : changeAmount)}</div>
                                             </div>
                                         )}
                                     </div>
@@ -1138,7 +1289,7 @@ const PaymentModal = ({
                                             ? "filled"
                                             : (isUnderpaid ? "outline" : "default")
                                     }
-                                    onCustomConfirm={editingPaymentIndex !== null ? () => handleSplitPaymentUpdate(parseFloat(amountPaid) || 0) : undefined}
+                                    onCustomConfirm={editingPaymentIndex !== null ? () => handleSplitPaymentUpdate(Number(paymentBaseAmount || 0)) : undefined}
                                 />
                             )}
 
@@ -1196,13 +1347,13 @@ const PaymentModal = ({
                                 </div>
                                 <div className="flex-1 overflow-y-auto p-0 custom-scrollbar">
                                     <ReceiptContent
-                                        cart={cart}
-                                        subTotal={subTotal}
-                                        shippingFee={shippingFee}
-                                        otherCosts={otherCosts}
-                                        discountAmount={discountAmount}
-                                        total={total}
-                                        itemCount={itemCount}
+                                        cart={receiptView.cart}
+                                        subTotal={receiptView.subTotal}
+                                        shippingFee={receiptView.shippingFee}
+                                        otherCosts={receiptView.otherCosts}
+                                        discountAmount={receiptView.discountAmount}
+                                        total={receiptView.total}
+                                        itemCount={receiptView.itemCount}
                                         customerName={customer?.name}
                                     />
                                 </div>

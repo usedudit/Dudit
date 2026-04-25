@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useRef, useEffect } from "react"
+import React, { useMemo, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
@@ -8,7 +8,8 @@ import {
     CustomerCard, IconPlaceholder, DatePicker, Pagination,
     ThreeDotsLoader,
     MoneyInput,
-    InfoCard
+    InfoCard,
+    ListItem,
 } from "@/components/reusable"
 import {
     SearchIcon, PlusIcon, TagIcon, TrashIcon,
@@ -17,6 +18,13 @@ import {
 import QuantitySelector from "@/components/reusable/QuantitySelector"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency } from "@/lib/utils"
+
+function formatLocalISODate(date: Date) {
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, "0")
+    const d = String(date.getDate()).padStart(2, "0")
+    return `${y}-${m}-${d}`
+}
 
 interface OrderGeneralTabProps {
     // Items state
@@ -70,6 +78,8 @@ interface OrderGeneralTabProps {
     setDiscountType: (val: 'fixed' | 'percentage') => void
     setCouponCode?: (val: string) => void
     onApplyCoupon?: () => void
+    onOpenDiscount: () => void
+    onOpenShipping: () => void
     setSelectedCustomer: (val: any) => void
     setIsCustomerSheetOpen: (val: boolean) => void
     setOrderDate: (val: string) => void
@@ -100,7 +110,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     setSearchQuery, setIsProductSearchOpen, handleSearchProduct, onSearchFocus, addProductToOrder,
     updateItemField, updateItemPrice, updateItemQty, resolveItemQuantityMax, toggleItemEdit, removeItem, addBlankItem,
     setShippingFee, setOtherCosts, setDiscountValue, setDiscountType, setSelectedCustomer, setIsCustomerSheetOpen,
-    setCouponCode, onApplyCoupon,
+    setCouponCode, onApplyCoupon, onOpenDiscount, onOpenShipping,
     setOrderDate, setSalesChannel, setDeliveryMethod, setFinanceAccountId, setDeliveryStatus, onCreateAccount, handleSaveOrder,
     salesChannelOptions, deliveryMethodOptions, deliveryStatusOptions,
     fieldErrors, setFieldErrors
@@ -129,6 +139,8 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [setIsProductSearchOpen]);
+
+    const hasCoupon = useMemo(() => Number(couponDiscountAmount || 0) > 0, [couponDiscountAmount])
 
     return (
         <FadeIn>
@@ -491,63 +503,26 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             Pagamento
                         </h2>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="relative">
-                                <MoneyInput
-                                    label="Desconto"
-                                    value={discountValue}
-                                    onChange={(val) => setDiscountValue(val)}
-                                    prefix={discountType === 'fixed' ? "R$" : ""}
-                                    suffix={discountType === 'percentage' ? "%" : ""}
-                                />
-                                <div className="absolute top-0 right-0 flex gap-1 mt-1">
-                                    <button
-                                        onClick={() => setDiscountType('fixed')}
-                                        className={`text-[10px] px-1.5 py-0.5 rounded ${discountType === 'fixed' ? 'bg-brand-dark text-white' : 'bg-gray-100 text-gray-400'}`}
-                                    >
-                                        $
-                                    </button>
-                                    <button
-                                        onClick={() => setDiscountType('percentage')}
-                                        className={`text-[10px] px-1.5 py-0.5 rounded ${discountType === 'percentage' ? 'bg-brand-dark text-white' : 'bg-gray-100 text-gray-400'}`}
-                                    >
-                                        %
-                                    </button>
-                                </div>
-                            </div>
-                            <MoneyInput
-                                label="Frete"
-                                value={parseFloat(shippingFee || "0")}
-                                onChange={(val) => setShippingFee(val.toString())}
+                        <div className="grid grid-cols-1 gap-3">
+                            <ListItem
+                                icon={TagIcon}
+                                title="Aplicar desconto"
+                                description={hasCoupon ? "Desconto e/ou cupom aplicado" : "Escolha o tipo e aplique no pedido"}
+                                onClick={onOpenDiscount}
+                                className="px-4 py-3 gap-4"
+                            />
+                            <ListItem
+                                icon={TagIcon}
+                                title="Adicionar frete"
+                                description="Define o valor do frete do pedido"
+                                onClick={onOpenShipping}
+                                className="px-4 py-3 gap-4"
                             />
                             <MoneyInput
                                 label="Outros Custos"
                                 value={parseFloat(otherCosts || "0")}
                                 onChange={(val) => setOtherCosts(val.toString())}
                             />
-                        </div>
-
-                        <div className="p-3 bg-brand-gray/30 dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-xl flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-brand-dark dark:bg-dark-heading flex items-center justify-center text-white shrink-0">
-                                <TagIcon size={18} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Adicionar Promoção</span>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Input
-                                    label=""
-                                    placeholder="Código"
-                                    value={couponCode}
-                                    onChange={(e: any) => setCouponCode?.(e.target.value)}
-                                    className="mb-0 w-32"
-                                />
-                                <Button className="h-9 px-6" onClick={onApplyCoupon}>
-                                Adicionar
-                                </Button>
-                            </div>
                         </div>
 
                         <div className="flex flex-col gap-3 mt-4">
@@ -667,9 +642,9 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 value={orderDate}
                                 onChange={(date) => {
                                     if (date) {
-                                        // Adjust for timezone when converting to ISO string
-                                        const d = new Date(date);
-                                        setOrderDate(d.toISOString().split('T')[0]);
+                                        // Usar data local para evitar "amanhã" por timezone.
+                                        const d = new Date(date)
+                                        setOrderDate(formatLocalISODate(d))
                                     }
                                 }}
                             />
@@ -706,12 +681,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 error={fieldErrors?.has("financeAccountId")}
                             />
 
-                            <FormDropdown
-                                label="Status de Entrega"
-                                value={deliveryStatus}
-                                setValue={(val: any) => setDeliveryStatus(val)}
-                                options={deliveryStatusOptions}
-                            />
+                            {/* Status de entrega foi movido para a aba de Entrega */}
                         </div>
                     </div>
                 </div>

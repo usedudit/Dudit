@@ -28,7 +28,7 @@ import { getTeamMembers } from "@/app/actions/erp/team"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import SelectSellerSheet from "@/components/erp/pos/SelectSellerSheet"
 import SelectCouponSheet from "@/components/erp/pos/SelectCouponSheet"
-import PaymentModal from "@/components/erp/orders/PaymentModal"
+import PaymentModal, { PAYMENT_MODAL_HEADER_SUBTITLE } from "@/components/erp/orders/PaymentModal"
 import POSCartItemCard from "@/components/erp/pos/POSCartItemCard"
 import { POSMorePreSalesCard, POSPreSaleCard } from "@/components/erp/pos/POSPreSaleCard"
 import POSCashClosedView from "@/components/erp/pos/POSCashClosedView"
@@ -234,6 +234,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     }, [])
 
     const isFinalizingRef = useRef(false)
+    /** Igual venda manual: o carrinho só é limpo ao fechar o PaymentModal após venda concluída, para a tela de sucesso e o recibo exibirem os valores. */
+    const clearCartAfterPaymentModalClosesRef = useRef(false)
     const isSavingDraftRef = useRef(false)
     const defaultSellerPartnerUserIdRef = useRef<string | undefined>(undefined)
     const bypassBeforeUnloadRef = useRef(false)
@@ -688,6 +690,16 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         if (activePreSaleId === preSaleId) clearCurrentOrder()
     }
 
+    const closePaymentModal = useCallback(() => {
+        setIsPaymentModalOpen(false)
+        if (clearCartAfterPaymentModalClosesRef.current) {
+            clearCartAfterPaymentModalClosesRef.current = false
+            clearCurrentOrder()
+            setIsMobileSummarySheetOpen(false)
+            setIsMobileItemsSheetOpen(false)
+        }
+    }, [clearCurrentOrder])
+
     const handleOpenPaymentModal = useCallback(() => {
         if (cart.length === 0) {
             notifyError("Adicione itens para continuar.")
@@ -750,10 +762,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
 
             notifySuccess("Venda finalizada com sucesso.")
             setPreSales((prev) => prev.filter((draft) => draft.id !== preSaleIdToFinalize))
-            clearCurrentOrder()
-            setLastSavedOrderSignature(EMPTY_ORDER_SIGNATURE)
-            setIsMobileSummarySheetOpen(false)
-            setIsMobileItemsSheetOpen(false)
+            clearCartAfterPaymentModalClosesRef.current = true
             return { success: true, orderNumber: result.data?.saleId }
         } finally {
             setIsFinalizing(false)
@@ -1381,13 +1390,14 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                         {isPaymentModalOpen && (
                             <PaymentModal
                                 isOpen={isPaymentModalOpen}
-                                onClose={() => setIsPaymentModalOpen(false)}
+                                onClose={closePaymentModal}
                                 cart={paymentModalCart}
                                 customer={selectedCustomer}
                                 partnerId={partnerId}
                                 shippingFee={shippingFee}
                                 otherCosts={otherCosts}
                                 discountAmount={discountVal}
+                                headerSubtitle={PAYMENT_MODAL_HEADER_SUBTITLE}
                                 onConfirm={handleConfirmPayment}
                             />
                         )}

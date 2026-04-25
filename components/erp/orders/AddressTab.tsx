@@ -2,7 +2,7 @@
 
 import React from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { Input } from "@/components/reusable"
+import { Input, FormDropdown } from "@/components/reusable"
 import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { StateComboBox } from "@/components/reusable/Inputs/StateComboBox"
 import { NumberInputWithCheckbox } from "@/components/reusable/Inputs/NumberInputWithCheckbox"
@@ -17,6 +17,9 @@ interface AddressTabProps {
     uf: string
     noNumber: boolean
     selectedCustomer: any
+    deliveryStatus: string
+    setDeliveryStatus: (val: string) => void
+    deliveryStatusOptions: Array<{ value: string; label: string }>
     setCep: (val: string) => void
     setStreet: (val: string) => void
     setNumber: (val: string) => void
@@ -29,6 +32,7 @@ interface AddressTabProps {
 
 export const AddressTab: React.FC<AddressTabProps> = ({
     cep, street, number, complement, neighborhood, city, uf, noNumber, selectedCustomer,
+    deliveryStatus, setDeliveryStatus, deliveryStatusOptions,
     setCep, setStreet, setNumber, setComplement, setNeighborhood, setCity, setUf, setNoNumber
 }) => {
     return (
@@ -37,6 +41,14 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                 <div className="lg:col-span-8 flex flex-col gap-8">
                     <section>
                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Endereço de Entrega</h3>
+                        <div className="mb-6">
+                            <FormDropdown
+                                label="Status de Entrega"
+                                value={deliveryStatus}
+                                setValue={(val: any) => setDeliveryStatus(val)}
+                                options={deliveryStatusOptions}
+                            />
+                        </div>
                         <div className="space-y-4">
                             <CepInput
                                 label="CEP"
