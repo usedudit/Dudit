@@ -48,10 +48,10 @@ interface HeaderProps {
   simpleTitle?: string
 }
 
-const Header: React.FC<HeaderProps> = ({ 
-  setView, 
-  currentView, 
-  userProfile: serverUserProfile, 
+const Header: React.FC<HeaderProps> = ({
+  setView,
+  currentView,
+  userProfile: serverUserProfile,
   cartCount: serverCartCount,
   productName,
   onShare,
@@ -78,7 +78,7 @@ const Header: React.FC<HeaderProps> = ({
 
   const { setDirection } = useTransitionDirection()
   const isHome = useMemo(() => currentView === "home" || pathname === "/", [currentView, pathname])
-  const showDeliveryInfo = useMemo(() => isHome || ["/profile", "/my-orders", "/cart"].includes(pathname), [isHome, pathname])
+  const showDeliveryInfo = useMemo(() => isHome || ["/perfil", "/pedidos", "/cart"].includes(pathname), [isHome, pathname])
 
   const [searchValue, setSearchValue] = useState("")
   const [suggestionBucket, setSuggestionBucket] = useState<{ label: string; type: string }[]>([])
@@ -253,7 +253,7 @@ const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
         )}
-        
+
         <div className={`px-4 pb-3 transition-all duration-500 ${(isScrolled || !isHome || isProductDetail) ? "pt-3" : "pt-1"}`}>
           <div className="flex items-center gap-3 relative min-h-[40px]">
             {/* Back Button / User Icon */}
@@ -288,9 +288,9 @@ const Header: React.FC<HeaderProps> = ({
             <div className="flex-1 flex items-center justify-center min-w-0 transition-all duration-300">
               {isProductDetail ? (
                 <div className={`flex-1 flex items-center justify-center min-w-0 transition-all duration-300`}>
-                   <h1 className={`font-bold text-[15px] truncate text-center px-2 transition-all duration-300 ${isScrolled ? "text-white" : "text-brand-dark"}`}>
+                  <h1 className={`font-bold text-[15px] truncate text-center px-2 transition-all duration-300 ${isScrolled ? "text-white" : "text-brand-dark"}`}>
                     {productName}
-                   </h1>
+                  </h1>
                 </div>
               ) : (
                 <div className="bg-white h-[38px] rounded-full flex items-center px-4 w-full border border-gray-200">
@@ -338,7 +338,7 @@ const Header: React.FC<HeaderProps> = ({
               )}
             </div>
           </div>
-          
+
           {/* Delivery Info */}
           {(!isScrolled && showDeliveryInfo && !isProductDetail) && (
             <div className="flex items-center gap-1.5 px-1 mt-2.5 text-brand-inactive-text cursor-pointer w-full overflow-hidden">
@@ -357,7 +357,7 @@ const Header: React.FC<HeaderProps> = ({
   return (
     <>
       <div
-        className={`fixed inset-0 bg-black/60 z-90 transition-opacity duration-300 ease-in-out ${showOverlay ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+        className={`fixed inset-0 bg-black/60 z-[90] transition-opacity duration-300 ease-in-out ${showOverlay ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
       />
 
       {renderMobileHeader()}
@@ -373,8 +373,8 @@ const Header: React.FC<HeaderProps> = ({
 
           <div className="py-2">
             {[
-              { label: "Seu perfil", href: "/profile" },
-              { label: "Seus pedidos", href: "/my-orders" },
+              { label: "Seu perfil", href: "/perfil" },
+              { label: "Seus pedidos", href: "/pedidos" },
               { label: "Lojas favoritas", action: () => setView?.("vendor") },
               { label: "Central do Parceiro", href: "/erp/switch" },
             ].map((item, idx) => {
@@ -441,10 +441,10 @@ const Header: React.FC<HeaderProps> = ({
         </div>
       </BottomSheet>
 
-      <header className="hidden lg:flex flex-col w-full bg-brand-dark fixed top-0 left-0 right-0 z-100 shadow-md">
+      <header className="hidden lg:flex flex-col w-full bg-brand-dark fixed top-0 left-0 right-0 z-[100] shadow-md">
         <div className="w-full h-[68px] flex items-center justify-between max-w-[1300px] px-2 mx-auto gap-4">
 
-          <Link href="/" prefetch={false} className="cursor-pointer shrink-0 z-110 pt-1">
+          <Link href="/" prefetch={false} className="cursor-pointer shrink-0 z-[110] pt-1">
             <img
               src="https://img.dudit.com.br/static/Logo.png"
               alt="Dudit"
@@ -468,7 +468,7 @@ const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          <div className="flex-1 relative z-110 mx-4 h-[42px]" ref={searchContainerRef}>
+          <div className="flex-1 relative z-[110] mx-4 h-[42px]" ref={searchContainerRef}>
             <div className="relative flex items-center w-full h-full bg-white rounded-full transition-all duration-200 shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_2px_12px_rgba(0,0,0,0.12)]">
               <input
                 type="text"
@@ -489,7 +489,7 @@ const Header: React.FC<HeaderProps> = ({
             </div>
 
             {showSearchDropdown && (
-              <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white rounded-[16px] shadow-xl border border-gray-100 overflow-hidden animate-fade-in z-120">
+              <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white rounded-[16px] shadow-xl border border-gray-100 overflow-hidden animate-fade-in z-[120]">
                 {filteredSuggestions.map((suggestion, index) => (
                   <div
                     key={index}
@@ -507,7 +507,7 @@ const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-6 z-110 shrink-0">
+          <div className="flex items-center gap-6 z-[110] shrink-0">
 
             <div className="relative group" onMouseEnter={handleUserMouseEnter} onMouseLeave={handleUserMouseLeave}>
               {user ? (
@@ -554,8 +554,8 @@ const Header: React.FC<HeaderProps> = ({
 
                   <div className="py-2">
                     {[
-                      { label: "Seu perfil", href: "/profile" },
-                      { label: "Seus pedidos", href: "/my-orders" },
+                      { label: "Seu perfil", href: "/perfil" },
+                      { label: "Seus pedidos", href: "/pedidos" },
                       { label: "Lojas favoritas", action: () => setView?.("vendor") },
                       { label: "Central do Parceiro", href: "/erp/switch" },
                     ].map((item, idx) => {
@@ -592,7 +592,7 @@ const Header: React.FC<HeaderProps> = ({
               )}
             </div>
 
-            <Link href="/my-orders" prefetch={false} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
+            <Link href="/pedidos" prefetch={false} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
               <Package size={20} strokeWidth={2} />
               <span className="text-[13px] font-medium hidden xl:block">Pedidos</span>
             </Link>

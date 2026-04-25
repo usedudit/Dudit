@@ -9,7 +9,7 @@ export default function ExplorarLoading() {
         <>
             <MarketplaceHeader />
             <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] flex flex-col">
-                <div className="container mx-auto px-4 lg:px-6 max-w-[1300px] flex gap-8 items-start flex-grow pb-24 lg:pb-12 mt-6 lg:mt-8">
+                <div className="container mx-auto max-w-[1300px] flex gap-8 items-start flex-grow pb-24 lg:pb-12 mt-6 lg:mt-8">
                     <aside className="hidden lg:block w-[280px] shrink-0 pt-4">
                         <SkeletonLoader width={160} height={18} className="mb-6" />
                         <div className="space-y-3 mb-8">

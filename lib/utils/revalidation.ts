@@ -42,10 +42,10 @@ export async function revalidateOrders(partnerId: string) {
     safeRevalidateTag(`partner-${partnerId}-orders`)
   }
   safeRevalidateTag("orders")
-  
+
   // Clear router cache for relevant pages
   revalidatePath("/erp/orders")
-  revalidatePath("/my-orders")
+  revalidatePath("/pedidos")
   revalidatePath("/", "layout")
 }
 

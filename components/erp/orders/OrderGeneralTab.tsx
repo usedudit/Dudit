@@ -38,7 +38,7 @@ interface OrderGeneralTabProps {
     subtotal: number
     discountAmount: number
     discountValue: number
-    discountType: 'fixed' | 'percentage'
+    discountType: 'fixed' | 'percentage' | 'coupon'
     couponCode?: string
     couponDiscountAmount?: number
     shippingFee: string
@@ -75,7 +75,7 @@ interface OrderGeneralTabProps {
     setShippingFee: (val: string) => void
     setOtherCosts: (val: string) => void
     setDiscountValue: (val: number) => void
-    setDiscountType: (val: 'fixed' | 'percentage') => void
+    setDiscountType: (val: 'fixed' | 'percentage' | 'coupon') => void
     setCouponCode?: (val: string) => void
     onApplyCoupon?: () => void
     onOpenDiscount: () => void

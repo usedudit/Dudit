@@ -45,7 +45,7 @@ type ERPOrderPayload = {
     items: ERPItemPayload[]
     subtotal: number
     discountValue: number
-    discountType: 'fixed' | 'percentage'
+    discountType: 'fixed' | 'percentage' | 'coupon'
     couponCode?: string
     couponId?: string | null
     couponDiscountAmount?: number
@@ -1181,7 +1181,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         })),
         shippingCost: Number(data.shippingCost || 0),
         additionalCosts: Number(data.additionalCosts || 0),
-        manualDiscount: data.discountValue > 0 ? { type: data.discountType || "fixed", value: data.discountValue } : null,
+        manualDiscount: (data.discountValue > 0 && data.discountType !== "coupon") ? { type: data.discountType as "fixed" | "percentage", value: data.discountValue } : null,
         coupon: couponPricingData,
     })
 
@@ -1643,7 +1643,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         })),
         shippingCost: Number(data.shippingCost || 0),
         additionalCosts: Number(data.additionalCosts || 0),
-        manualDiscount: data.discountValue > 0 ? { type: data.discountType || "fixed", value: data.discountValue } : null,
+        manualDiscount: (data.discountValue > 0 && data.discountType !== "coupon") ? { type: data.discountType as "fixed" | "percentage", value: data.discountValue } : null,
         coupon: couponPricingData,
     })
 

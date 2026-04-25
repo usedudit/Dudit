@@ -316,7 +316,7 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
                     </div>
                 </div>
 
-                <div className="container mx-auto px-4 lg:px-6 max-w-[1300px] flex gap-8 items-start flex-grow pb-24 lg:pb-12 mt-6 lg:mt-8">
+                <div className="container mx-auto px-4 max-w-[1300px] flex gap-8 items-start flex-grow pb-24 lg:pb-12 mt-6 lg:mt-8">
                     <aside className="hidden lg:block w-[280px] shrink-0 pt-4">
                         <FiltersContent />
                     </aside>

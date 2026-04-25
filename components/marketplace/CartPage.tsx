@@ -9,9 +9,7 @@ import { MinusIcon, PlusIcon, TrashIcon, ChevronLeftIcon, ChevronUpIcon, Chevron
 import { AnimatePresence, motion } from "framer-motion"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
-import { updateCartQuantityAction, removeFromCartAction, toggleCartSelectionAction, checkoutCartAction, toggleCartPartnerSelectionAction } from "@/app/actions/marketplace/cart"
-import { CheckoutWrapper } from "@/components/marketplace/CheckoutWrapper"
-import { PaymentWrapper } from "@/components/PaymentWrapper"
+import { updateCartQuantityAction, removeFromCartAction, toggleCartSelectionAction, toggleCartPartnerSelectionAction } from "@/app/actions/marketplace/cart"
 import { Button, Checkbox, IconPlaceholder, AlertModal, DefaultModal } from "@/components/reusable"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { useNotification } from "@/hooks/use-notification"
@@ -31,9 +29,6 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
   const [isVendorExpanded, setIsVendorExpanded] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState<string | null>(null)
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; cartItemId: string | null }>({ open: false, cartItemId: null })
-  const [checkoutPartner, setCheckoutPartner] = useState<string | null>(null)
-  const [showPixModal, setShowPixModal] = useState(false)
-  const [pixPaymentData, setPixPaymentData] = useState<any>(null)
   const [showErrorModal, setShowErrorModal] = useState(false)
   const isActionInProgress = useRef(false)
 
@@ -169,7 +164,6 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
   const handleOpenCheckout = (partnerId: string) => {
     if (!userId) { router.push("/auth/login?next=/cart"); return }
 
-    // Check if any item is selected for this partner
     const partnerData = itemsByPartner[partnerId]
     const hasSelected = partnerData?.items.some((item: any) => getItemSelected(item))
 
@@ -178,79 +172,32 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
       return
     }
 
-    setCheckoutPartner(partnerId)
+    const partnerItems = partnerData.items.filter((item: any) => getItemSelected(item))
+
+    const checkoutData = {
+        source: "cart",
+        partnerId: partnerId,
+        products: getPartnerCheckoutProducts(partnerId),
+        partnerInfo: {
+            address: partnerData.partner?.addresses?.[0] || {},
+            paymentMethods: partnerData.paymentMethods || ["Dinheiro"],
+            mpConnected: !!partnerData.partner?.mp_user_id,
+            mpPublicKey: partnerData.partner?.mp_public_key,
+            store_name: partnerData.partner?.store_name,
+        },
+        cartItems: partnerItems.map((item: any) => ({
+            cartItemId: item.id,
+            productId: item.product_id,
+            variantId: item.variant_id || undefined,
+            quantity: getItemQuantity(item),
+        }))
+    }
+    
+    sessionStorage.setItem("checkout_session", JSON.stringify(checkoutData))
+    router.push("/checkout")
   }
 
   const { success: notifySuccess, error: notifyError } = useNotification()
-
-  const handleCheckout = async (data: any) => {
-    if (!checkoutPartner || isActionInProgress.current) return
-    isActionInProgress.current = true
-    const partnerData = itemsByPartner[checkoutPartner]
-    const partnerItems = partnerData.items.filter((item: any) => getItemSelected(item))
-
-    if (!partnerItems.length) {
-      notifyError("Erro", "Por favor, selecione pelo menos um item para finalizar o pedido")
-      isActionInProgress.current = false
-      return
-    }
-
-    if (data.useMercadoPago) {
-      const amount = partnerItems.reduce((total: number, item: any) => total + getItemPrice(item) * getItemQuantity(item), 0)
-      setPixPaymentData({
-        orderId: "temp-" + Date.now(),
-        amount,
-        orderDetails: {
-          items: partnerItems.map((item: any) => ({
-            id: item.product_id,
-            variant_id: item.variant_id || undefined,
-            name: getItemName(item),
-            price: getItemPrice(item),
-            quantity: getItemQuantity(item),
-            image: getItemImage(item),
-          })),
-          deliveryType: data.deliveryType,
-          deliveryAddress: data.deliveryAddress,
-          notes: data.notes,
-          cartItemIds: partnerItems.map((item: any) => item.id),
-        },
-        buyerId: userId,
-        useMercadoPago: true,
-        partnerId: checkoutPartner,
-        mpPublicKey: partnerData.partner?.mp_public_key,
-        userEmail: user?.email || "",
-        userName: user?.user_metadata?.full_name || user?.email?.split("@")[0] || "",
-      })
-      setShowPixModal(true)
-      setCheckoutPartner(null)
-      isActionInProgress.current = false
-      return
-    }
-
-    try {
-      const token = await getCsrfToken()
-      const result = await checkoutCartAction(
-        partnerItems.map((item: any) => ({
-          cartItemId: item.id,
-          productId: item.product_id,
-          variantId: item.variant_id || undefined,
-          quantity: getItemQuantity(item),
-        })),
-        data.deliveryType, data.deliveryAddress, data.paymentMethod, data.notes, false, token
-      )
-      if (result.error) {
-        notifyError("Erro ao finalizar pedido", result.error)
-        return
-      }
-      notifySuccess("Pedido realizado", "Seu pedido foi criado com sucesso!")
-      setCheckoutPartner(null)
-      router.push("/my-orders")
-    } catch {
-      notifyError("Erro", "Erro ao finalizar pedido.")
-    } finally {
-      isActionInProgress.current = false
-    }
-  }
 
   // Total only counts selected items (with optimistic overrides)
   const globalTotal = Object.values(itemsByPartner).reduce((acc: number, partner: any) =>
@@ -281,7 +228,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
     <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
       <MarketplaceHeader />
 
-      <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-6 max-w-[1300px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
+      <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1300px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
         <div className="flex items-center mb-8">
           <div>
             <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Minha sacola</h1>
@@ -596,41 +543,6 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         isDestructive={true}
         disabled={loading === deleteModal.cartItemId}
       />
-
-      {checkoutPartner && itemsByPartner[checkoutPartner] && (
-        <CheckoutWrapper
-          open={true}
-          onClose={() => setCheckoutPartner(null)}
-          partnerId={checkoutPartner}
-          products={getPartnerCheckoutProducts(checkoutPartner)}
-          partnerInfo={{
-            address: itemsByPartner[checkoutPartner].partner?.addresses?.[0] || {},
-            paymentMethods: itemsByPartner[checkoutPartner].paymentMethods || ["Dinheiro"],
-            mpConnected: !!itemsByPartner[checkoutPartner].partner?.mp_user_id,
-            mpPublicKey: itemsByPartner[checkoutPartner].partner?.mp_public_key,
-          }}
-          onSubmit={handleCheckout}
-        />
-      )}
-
-      {pixPaymentData && (
-        <PaymentWrapper
-          open={showPixModal}
-          onClose={() => { setShowPixModal(false); setPixPaymentData(null) }}
-          pixData={pixPaymentData.pixData}
-          orderId={pixPaymentData.orderId}
-          amount={pixPaymentData.amount}
-          orderDetails={pixPaymentData.orderDetails}
-          orderNumber={pixPaymentData.orderId}
-          sellerName={pixPaymentData.partnerId ? itemsByPartner[pixPaymentData.partnerId]?.partner?.store_name : undefined}
-          useMercadoPago={pixPaymentData.useMercadoPago}
-          partnerId={pixPaymentData.partnerId}
-          mpPublicKey={pixPaymentData.mpPublicKey}
-          userEmail={pixPaymentData.userEmail}
-          userName={pixPaymentData.userName}
-          buyerId={userId}
-        />
-      )}
 
       {/* Fallback Error Modal */}
       <DefaultModal

@@ -74,7 +74,7 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
     const activeOrder = orders?.find((o: any) => o.id === activeOrderId);
 
     return (
-        <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-6 max-w-[1300px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
+        <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1300px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
             <AnimatePresence mode="wait">
                 {activeOrderId && activeOrder ? (
                     <MyOrderDetailPage key="details" order={activeOrder} onBack={handleCloseDetails} />

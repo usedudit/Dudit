@@ -8,7 +8,7 @@ export default function Loading() {
       <MarketplaceHeader currentView="shop" />
 
       <main className="pt-[72px] lg:pt-[110px] flex-grow">
-        <div className="container mx-auto px-4 lg:px-6 max-w-[1300px] animate-fade-in mt-6">
+        <div className="container mx-auto px-4 max-w-[1300px] animate-fade-in mt-6">
           <div className="pt-[40px]">
             {/* Banner Skeleton */}
             <div className="w-full h-[220px] lg:mb-4 lg:rounded-[24px] overflow-hidden relative">

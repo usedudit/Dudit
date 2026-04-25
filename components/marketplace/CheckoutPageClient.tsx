@@ -18,6 +18,11 @@ import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import Link from "next/link"
 import { formatCurrency } from "@/lib/utils"
 import { validateMarketplaceCouponAction } from "@/app/actions/shared/coupons"
+import { useRouter } from "next/navigation"
+import { PaymentWrapper } from "@/components/PaymentWrapper"
+import { checkoutCartAction } from "@/app/actions/marketplace/cart"
+import { createOrderAction } from "@/app/actions/marketplace/orders"
+import { invalidateCartCache } from "@/hooks/use-cart"
 
 interface ProductItem {
     id: string
@@ -28,20 +33,12 @@ interface ProductItem {
     variant?: string
 }
 
-interface CheckoutWrapperProps {
-    open: boolean
-    onClose: () => void
+export interface CheckoutSessionData {
+    source: "cart" | "product" | "service"
     products: ProductItem[]
-    partnerId?: string
+    partnerId: string
     partnerInfo: {
-        address: string | {
-            street?: string
-            number?: string
-            neighborhood?: string
-            city?: string
-            state?: string
-            zipCode?: string
-        }
+        address: any
         paymentMethods: string[]
         installmentsWithoutInterest?: number
         interestRatePercent?: number
@@ -49,18 +46,11 @@ interface CheckoutWrapperProps {
         pixDiscountPercent?: number
         mpConnected?: boolean
         mpPublicKey?: string
+        store_name?: string
     }
-    onSubmit: (data: {
-        deliveryType: "delivery" | "pickup"
-        deliveryAddress: string
-        paymentMethod: string
-        notes: string
-        quantities: Record<string, number>
-        installments: number
-        useMercadoPago?: boolean
-        paymentFormData?: any
-        couponCode?: string | null
-    }) => Promise<void>
+    cartItems?: { cartItemId: string, productId: string, variantId?: string, quantity: number }[]
+    itemId?: string
+    itemType?: "product" | "service"
 }
 
 interface UserAddress {
@@ -159,12 +149,25 @@ function CouponInput({ onApply }: { onApply: (code: string) => void }) {
     )
 }
 
-export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInfo, onSubmit }: CheckoutWrapperProps) {
+export function CheckoutPageClient() {
     const { user, supabase } = useSupabase()
+    const router = useRouter()
+    const [sessionData, setSessionData] = useState<CheckoutSessionData | null>(null)
+    const [pageLoading, setPageLoading] = useState(true)
 
-    // FIX 4: Track closing animation state
-    const [isVisible, setIsVisible] = useState(false)
-    const [isAnimatingOut, setIsAnimatingOut] = useState(false)
+    useEffect(() => {
+        const stored = sessionStorage.getItem("checkout_session")
+        if (stored) {
+            try {
+                setSessionData(JSON.parse(stored))
+            } catch {
+                router.push("/")
+            }
+        } else {
+            router.push("/")
+        }
+        setPageLoading(false)
+    }, [router])
 
     const formatPartnerAddress = (addr: any) => {
         if (!addr) return "Endereço não informado"
@@ -172,10 +175,15 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
         return `${addr.street || ""}, ${addr.number || "S/N"} - ${addr.neighborhood || ""}, ${addr.city || ""} - ${addr.state || ""}`
     }
 
-    const { error: notifyError } = useNotification()
+    const { error: notifyError, success: notifySuccess } = useNotification()
     const [isLoading, setIsLoading] = useState(false)
     const [deliveryError, setDeliveryError] = useState<string | null>(null)
     const [paymentError, setPaymentError] = useState<string | null>(null)
+    
+    const products = sessionData?.products || []
+    const partnerId = sessionData?.partnerId || ""
+    const partnerInfo = sessionData?.partnerInfo || { paymentMethods: [] } as any
+
     const quantities = useMemo<Record<string, number>>(() => {
         const acc: Record<string, number> = {}
 
@@ -212,55 +220,34 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
         installments: 1,
     })
 
-    const [paymentOption, setPaymentOption] = useState<"traditional" | "mercadopago">(
-        partnerInfo.mpConnected ? "mercadopago" : "traditional",
-    )
+    const [paymentOption, setPaymentOption] = useState<"traditional" | "mercadopago">("traditional")
+
+    useEffect(() => {
+        if (sessionData) {
+            setFormData(prev => ({ ...prev, paymentMethod: partnerInfo.paymentMethods?.[0] || "cash" }))
+            setPaymentOption(partnerInfo.mpConnected ? "mercadopago" : "traditional")
+        }
+    }, [sessionData])
 
     const [openSections, setOpenSections] = useState({ delivery: true, payment: true, notes: false })
     const toggleSection = (key: keyof typeof openSections) =>
         setOpenSections(prev => ({ ...prev, [key]: !prev[key] }))
 
-    // FIX 4: Handle open/close with fade animation
-    useEffect(() => {
-        if (open) {
-            setIsVisible(true)
-            setIsAnimatingOut(false)
-        }
-    }, [open])
-
-    const handleClose = () => {
-        setIsAnimatingOut(true)
-        setTimeout(() => {
-            setIsVisible(false)
-            setIsAnimatingOut(false)
-            onClose()
-        }, 200)
-    }
+    // PIX modal state
+    const [showPixModal, setShowPixModal] = useState(false)
+    const [pixPaymentData, setPixPaymentData] = useState<any>(null)
 
     useEffect(() => {
-        if (!open) return
         if (user) {
             setUserId(user.id)
             setUserName(user.user_metadata?.full_name || user.email?.split("@")[0] || "Usuário")
             setUserEmail(user.email || "")
         }
-    }, [open, user])
+    }, [user])
 
     useEffect(() => {
-        if (open && userId) loadUserAddresses()
-    }, [open, userId])
-
-    useEffect(() => {
-        if (open) {
-            document.body.style.overflow = "hidden"
-        } else {
-            document.body.style.overflow = ""
-        }
-
-        return () => {
-            document.body.style.overflow = ""
-        }
-    }, [open])
+        if (userId) loadUserAddresses()
+    }, [userId])
 
     const loadUserAddresses = async () => {
         if (!userId) return
@@ -361,7 +348,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
         other: "Outros",
     }
     const paymentMethods = (partnerInfo.paymentMethods?.length ? partnerInfo.paymentMethods : ["cash", "pix"])
-        .map((method) => ({
+        .map((method: string) => ({
             value: method,
             label: paymentTypeLabelMap[method] || method,
         }))
@@ -388,9 +375,72 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
 
         try {
             if (paymentOption === "mercadopago") {
-                await onSubmit({ ...formData, quantities, useMercadoPago: true, couponCode: couponCode || null })
+                const amount = Math.max(0, totalAmount - couponDiscount)
+                setPixPaymentData({
+                    orderId: "temp-" + Date.now(),
+                    amount,
+                    orderDetails: {
+                        items: products.map(p => ({
+                            id: p.id,
+                            variant_id: p.variant, // variant maps to variant_id here if needed
+                            name: p.name,
+                            price: p.price,
+                            quantity: quantities[p.id] || p.quantity,
+                            image: p.image
+                        })),
+                        deliveryType: formData.deliveryType,
+                        deliveryAddress: formData.deliveryAddress,
+                        notes: formData.notes,
+                        cartItemIds: sessionData?.cartItems?.map(c => c.cartItemId),
+                        itemId: sessionData?.itemId,
+                        itemType: sessionData?.itemType,
+                        couponCode: couponCode || null
+                    },
+                    useMercadoPago: true,
+                    partnerId: partnerId,
+                    mpPublicKey: partnerInfo.mpPublicKey,
+                    userEmail: userEmail,
+                    userName: userName,
+                })
+                setShowPixModal(true)
+                setIsLoading(false)
+                return
             } else {
-                await onSubmit({ ...formData, quantities, useMercadoPago: false, couponCode: couponCode || null })
+                const { token } = await fetch("/api/csrf-token").then((r) => r.json())
+                if (sessionData?.source === "cart") {
+                    const items = sessionData.cartItems || []
+                    const result = await checkoutCartAction(
+                        items.map(item => ({
+                            cartItemId: item.cartItemId,
+                            productId: item.productId,
+                            variantId: item.variantId,
+                            quantity: quantities[item.productId] || item.quantity
+                        })),
+                        formData.deliveryType, formData.deliveryAddress, formData.paymentMethod, formData.notes, false, token
+                    )
+                    if (result.error) throw new Error(result.error)
+                    invalidateCartCache()
+                    sessionStorage.removeItem("checkout_session")
+                    notifySuccess("Pedido realizado", "Seu pedido foi criado com sucesso!")
+                    router.push("/my-orders")
+                } else {
+                    const result = await createOrderAction({
+                        itemId: sessionData?.itemId || products[0]?.id,
+                        itemType: sessionData?.itemType || "product",
+                        quantity: quantities[products[0]?.id] || products[0]?.quantity || 1,
+                        totalAmount: Math.max(0, totalAmount - couponDiscount),
+                        deliveryType: formData.deliveryType,
+                        deliveryAddress: formData.deliveryAddress,
+                        paymentMethod: formData.paymentMethod,
+                        notes: formData.notes,
+                        partnerId: partnerId,
+                        csrf_token: token,
+                    })
+                    if (result.error) throw new Error(result.error)
+                    sessionStorage.removeItem("checkout_session")
+                    notifySuccess("Pedido realizado", `Número: ${result.orderNumber}`)
+                    router.push("/my-orders")
+                }
             }
         } catch (err: any) {
             const msg = err.message || "Erro ao processar pedido"
@@ -410,21 +460,20 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
         }
     }
 
-    if (!isVisible && !open) return null
+    if (pageLoading || !sessionData) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-white dark:bg-dark-surface">
+                <Spinner size={32} />
+            </div>
+        )
+    }
 
     return (
         <>
-            {/* FIX 4: Fade in/out animation on the wrapper itself */}
-            <motion.div
-                key="checkout-overlay"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: isAnimatingOut ? 0 : 1 }}
-                transition={{ duration: 0.2 }}
-                className="fixed inset-0 z-[100] bg-white dark:bg-dark-surface overflow-y-auto custom-scrollbar"
-            >
+            <div className="min-h-screen flex flex-col bg-white dark:bg-dark-surface">
                 <header className="lg:flex flex-col w-full bg-brand-dark sticky top-0 z-50 shadow-md">
                     <div className="w-full h-[68px] flex items-center justify-between max-w-[1300px] px-2 mx-auto gap-4">
-                        <Link href="/" prefetch={true} className="cursor-pointer shrink-0 z-110 pt-1">
+                        <Link href="/" prefetch={true} className="cursor-pointer shrink-0 z-[110] pt-1">
                             <img
                                 src="https://img.dudit.com.br/static/Logo.png"
                                 alt="Dudit"
@@ -442,7 +491,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                 <div className="container mx-auto px-4 lg:px-6 max-w-[1300px] w-full pt-6 md:pt-10 pb-32 md:pb-20">
                     <div className="mb-8 flex flex-col md:flex-row md:items-center gap-4 w-full justify-start">
                         <div className="hidden md:flex">
-                            <Button variant="filled" onClick={handleClose} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
+                            <Button variant="filled" onClick={() => router.back()} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
                                 <XIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                             </Button>
                         </div>
@@ -655,7 +704,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                                                     <Select value={formData.paymentMethod} onValueChange={(value) => setFormData({ ...formData, paymentMethod: value, installments: 1 })}>
                                                                         <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                                                                         <SelectContent>
-                                                                            {paymentMethods.map((method) => (
+                                                                            {paymentMethods.map((method: any) => (
                                                                                 <SelectItem key={method.value} value={method.value}>{method.label}</SelectItem>
                                                                             ))}
                                                                         </SelectContent>
@@ -675,7 +724,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                                                             <Select value={formData.paymentMethod} onValueChange={(value) => setFormData({ ...formData, paymentMethod: value, installments: 1 })}>
                                                                 <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                                                                 <SelectContent>
-                                                                    {paymentMethods.map((method) => (
+                                                                    {paymentMethods.map((method: any) => (
                                                                         <SelectItem key={method.value} value={method.value}>{method.label}</SelectItem>
                                                                     ))}
                                                                 </SelectContent>
@@ -840,7 +889,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
 
                 <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-4 z-[110] lg:hidden">
                     <div className="flex gap-3">
-                        <Button type="button" variant="outline" onClick={handleClose} disabled={isLoading} className="flex-1 h-12 bg-transparent">
+                        <Button type="button" variant="outline" onClick={() => router.back()} disabled={isLoading} className="flex-1 h-12 bg-transparent">
                             Voltar
                         </Button>
                         <Button
@@ -852,7 +901,7 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                         </Button>
                     </div>
                 </div>
-            </motion.div>
+            </div>
 
             <DefaultModal
                 isOpen={showAddressForm}
@@ -933,6 +982,25 @@ export function CheckoutWrapper({ open, onClose, products, partnerId, partnerInf
                     </Button>
                 </div>
             </DefaultModal>
+
+            {pixPaymentData && (
+                <PaymentWrapper
+                    open={showPixModal}
+                    onClose={() => { setShowPixModal(false); setPixPaymentData(null) }}
+                    pixData={pixPaymentData.pixData}
+                    orderId={pixPaymentData.orderId}
+                    amount={pixPaymentData.amount}
+                    orderDetails={pixPaymentData.orderDetails}
+                    orderNumber={pixPaymentData.orderId}
+                    sellerName={partnerInfo.store_name}
+                    useMercadoPago={pixPaymentData.useMercadoPago}
+                    partnerId={pixPaymentData.partnerId}
+                    mpPublicKey={pixPaymentData.mpPublicKey}
+                    userEmail={pixPaymentData.userEmail}
+                    userName={pixPaymentData.userName}
+                    buyerId={userId!}
+                />
+            )}
         </>
     )
 }

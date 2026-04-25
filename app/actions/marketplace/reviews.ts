@@ -205,7 +205,7 @@ export async function createReviewAction(data: {
   }
   await updatePartnerRating(supabase, data.partnerId)
 
-  revalidatePath("/my-orders")
+  revalidatePath("/pedidos")
   revalidatePath("/marketplace")
   revalidatePath(`/marketplace/products/${data.productId}`)
 

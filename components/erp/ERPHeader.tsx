@@ -322,7 +322,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
 
               <div className="py-2">
                 <DropdownItem>
-                  <Link href="/profile" prefetch={true} className="flex items-center gap-3 w-full">
+                  <Link href="/perfil" prefetch={true} className="flex items-center gap-3 w-full">
                     <UserIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
                     <span className="text-[14px] font-normal text-brand-inactive-text hover:text-brand-dark">Meu perfil</span>
                   </Link>
@@ -400,7 +400,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
             </div>
 
             <Link
-              href="/profile"
+              href="/perfil"
               onClick={() => setIsProfileOpen(false)}
               prefetch={true}
               className="flex items-center gap-4 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-all w-full text-left"

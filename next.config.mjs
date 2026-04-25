@@ -90,7 +90,7 @@ const nextConfig = {
       },
       {
         // Private pages: never cached
-        source: '/(erp|account|auth|cart|profile|my-orders|dashboard|payment)(.*)',
+        source: '/(erp|account|auth|cart|profile|pedidos|dashboard|payment)(.*)',
         headers: [
           {
             key: 'Cache-Control',

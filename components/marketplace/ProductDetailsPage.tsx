@@ -21,9 +21,6 @@ import { getPartnerUrl } from "@/lib/utils/url-generator"
 import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
 
-const CheckoutWrapper = dynamic(() => import("@/components/marketplace/CheckoutWrapper").then(mod => mod.CheckoutWrapper), { ssr: false })
-const PaymentWrapper = dynamic(() => import("@/components/PaymentWrapper").then(mod => mod.PaymentWrapper), { ssr: false })
-
 interface ProductDetailsPageClientProps {
   product: any
   variants: any[]
@@ -100,11 +97,6 @@ export function ProductDetailsPageClient({
   const { user, supabase, isLoading } = useSupabase()
 
   const [userId, setUserId] = useState<string | null | undefined>(initialUserId || user?.id)
-  const [pixOrderId, setPixOrderId] = useState<string | null>(null)
-  const [pixAmount, setPixAmount] = useState<number>(0)
-  const [pixData, setPixData] = useState<any>({ qrCode: "", qrCodeBase64: "", ticketUrl: "" })
-  const [pixOrderDetails, setPixOrderDetails] = useState<any>(null)
-  const [showPixModal, setShowPixModal] = useState(false)
   const [activeImgIndex, setActiveImgIndex] = useState(product.primary_image_index || 0)
   const [slideDirection, setSlideDirection] = useState<1 | -1>(1)
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({})
@@ -114,7 +106,6 @@ export function ProductDetailsPageClient({
   const [shippingState, setShippingState] = useState<"initial" | "calculated">("initial")
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [showCheckoutModal, setShowCheckoutModal] = useState(false)
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)
   const [lightboxActiveImg, setLightboxActiveImg] = useState(0)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -312,57 +303,33 @@ export function ProductDetailsPageClient({
     }
   }, [userId, router, product.id, quantity, selectedVariant, notifySuccess, notifyError])
 
-  const handleCheckout = useCallback(async (data: any) => {
-    if (!userId) return
-    const itemId = selectedVariant?.id || product.id
-    if (data.useMercadoPago) {
-      try {
-        const tempOrderId = "temp-" + Date.now().toString()
-        const amount = (pricing.current * quantity)
-
-        setPixData({
-          orderId: tempOrderId,
-          amount,
-          orderDetails: {
-            items: [{
-              id: product.id,
-              variant_id: selectedVariant?.id,
-              name: product.name,
-              price: pricing.current,
-              quantity,
-              image: productImages[activeImgIndex]
-            }],
-            deliveryType: data.deliveryType,
-            deliveryAddress: data.deliveryAddress,
-            notes: data.notes
-          },
-          buyerId: userId,
-          useMercadoPago: true,
-          partnerId: partner.id,
-          mpPublicKey: partner.mp_public_key,
-          userEmail: user?.email || "",
-          userName: user?.user_metadata?.full_name || user?.email?.split("@")[0] || ""
-        })
-        setShowPixModal(true)
-        setShowCheckoutModal(false)
-        return
-      } catch (error) {
-        notifyError("Erro", "Erro ao inicializar pagamento no Mercado Pago")
-        return
-      }
+  const handleBuyNow = useCallback(() => {
+    if (!userId) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname))
+    const checkoutData = {
+        source: "product",
+        partnerId: partner.id,
+        products: [{
+            id: product.id,
+            name: `${product.name} ${selectedVariant?.variant_name || ""}`,
+            price: pricing.current,
+            quantity,
+            image: productImages[activeImgIndex],
+            variant: selectedVariant?.variant_name
+        }],
+        partnerInfo: {
+            address: partner.address || {},
+            paymentMethods: partner.paymentMethods || ["Dinheiro"],
+            mpConnected: !!partner.mp_user_id,
+            mpPublicKey: partner.mp_public_key,
+            store_name: partner.store_name,
+        },
+        itemId: selectedVariant?.id || product.id,
+        itemType: "product"
     }
-    const { token } = await fetch("/api/csrf-token").then((r) => r.json())
-    const result = await createOrderAction({
-      itemId, itemType: "product", quantity, totalAmount: pricing.total,
-      deliveryType: data.deliveryType, deliveryAddress: data.deliveryAddress,
-      paymentMethod: data.paymentMethod, notes: data.notes,
-      partnerId: partner.id, csrf_token: token,
-    })
-    if (result.error) return notifyError("Erro", result.error)
-    setShowCheckoutModal(false)
-    notifySuccess("Pedido realizado", `Número: ${result.orderNumber}`)
-    router.push("/my-orders")
-  }, [userId, selectedVariant, product, pricing, partner, quantity, router, user, activeImgIndex, productImages, notifySuccess, notifyError])
+    
+    sessionStorage.setItem("checkout_session", JSON.stringify(checkoutData))
+    router.push("/checkout")
+  }, [userId, router, partner, product, selectedVariant, pricing.current, quantity, productImages, activeImgIndex])
 
 
   const shareMessage = useMemo(() => {
@@ -502,7 +469,7 @@ export function ProductDetailsPageClient({
         />
       ) : (
         <div className="hidden lg:block">
-          <Button disabled={isOutOfStock || loading} onClick={() => setShowCheckoutModal(true)} className="w-full mb-4 h-[46px]">
+          <Button disabled={isOutOfStock || loading} onClick={handleBuyNow} className="w-full mb-4 h-[46px]">
             {isOutOfStock ? "Esgotado" : "Comprar Agora"}
           </Button>
           <Button variant="outline" className="w-full border-brand-green text-brand-green hover:bg-green-50 h-[46px] mb-8"
@@ -804,7 +771,7 @@ export function ProductDetailsPageClient({
 
         {isMounted && isLightboxOpen && createPortal(LightboxContent, document.body)}
 
-        <div className="container mx-auto px-4 lg:px-6 max-w-[1300px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
+        <div className="container mx-auto px-4 max-w-[1300px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
           {/* Breadcrumb */}
           <div className="hidden lg:flex items-center gap-2 text-sm text-brand-inactive-text mb-8">
             <Link href="/" prefetch={true} className="hover:text-brand-dark transition-colors">Início</Link>
@@ -1018,41 +985,13 @@ export function ProductDetailsPageClient({
                 disabled={isOutOfStock || loading} onClick={handleAddToCart}>
                 <ShoppingCartIcon size={20} />
               </Button>
-              <Button className="flex-1 rounded-full" disabled={isOutOfStock || loading} onClick={() => setShowCheckoutModal(true)}>
+              <Button className="flex-1 rounded-full" disabled={isOutOfStock || loading} onClick={handleBuyNow}>
                 {isOutOfStock ? "Esgotado" : "Comprar Agora"}
               </Button>
             </div>
           )}
 
 
-          {showCheckoutModal && (
-            <CheckoutWrapper
-              open={showCheckoutModal}
-              onClose={() => setShowCheckoutModal(false)}
-              products={[{ id: selectedVariant?.id || product.id, name: `${product.name} ${selectedVariant?.variant_name || ""}`, price: pricing.current, quantity, image: product.images?.[0] ? getR2ImageUrl(product.images[0]) : undefined, variant: selectedVariant?.variant_name }]}
-              partnerId={partner.id}
-              partnerInfo={partner}
-              onSubmit={handleCheckout}
-            />
-          )}
-          {showPixModal && (
-            <PaymentWrapper
-              open={showPixModal}
-              onClose={() => { setShowPixModal(false); setShowCheckoutModal(false); router.push("/my-orders"); }}
-              pixData={pixData.qrCode ? { qrCode: pixData.qrCode, qrCodeBase64: pixData.qrCodeBase64 } : undefined}
-              orderId={pixData.orderId || pixOrderId || ""}
-              amount={pixData.amount || pixAmount}
-              orderDetails={pixData.orderDetails || pixOrderDetails}
-              orderNumber={pixData.orderId || pixOrderId || ""}
-              sellerName={partner.store_name}
-              useMercadoPago={pixData.useMercadoPago}
-              partnerId={pixData.partnerId || partner.id}
-              mpPublicKey={pixData.mpPublicKey || partner.mp_public_key}
-              userEmail={pixData.userEmail}
-              userName={pixData.userName}
-              buyerId={pixData.buyerId || userId}
-            />
-          )}
         </div>
 
         {!hideHeaderAndFooter && <MarketplaceFooter />}

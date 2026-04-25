@@ -33,6 +33,7 @@ import { OrderGeneralTab } from "./OrderGeneralTab"
 import { AddressTab } from "./AddressTab"
 import { OrderObservationsTab } from "./OrderObservationsTab"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { formatCurrency } from "@/lib/utils"
 
 interface CreateOrderProps {
     onBack: () => void

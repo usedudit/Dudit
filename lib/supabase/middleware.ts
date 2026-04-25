@@ -199,7 +199,7 @@ export async function middleware(request: NextRequest) {
   // 4. CACHE-CONTROL HEADERS (Route-aware) - Must be set BEFORE auth block
   // Public marketplace pages: edge-cacheable with stale-while-revalidate
   // Private/auth pages: never cached
-  const PRIVATE_PREFIXES = ["/erp", "/account", "/auth", "/cart", "/profile", "/my-orders", "/api", "/dashboard", "/payment", "/ddt-admin"]
+  const PRIVATE_PREFIXES = ["/erp", "/account", "/auth", "/cart", "/perfil", "/pedidos", "/api", "/dashboard", "/payment", "/ddt-admin"]
   const PUBLIC_CACHEABLE_PATTERNS = ["/services", "/partners", "/produto"]
 
   const isPrivatePage = PRIVATE_PREFIXES.some(prefix => pathname.startsWith(prefix))
@@ -216,7 +216,7 @@ export async function middleware(request: NextRequest) {
   // 5. SUPABASE AUTH (ONLY for routes that need it)
   // CRITICAL: Skip auth for public cacheable pages to avoid Set-Cookie headers
   // that would prevent Cloudflare from caching the response.
-  const NEEDS_AUTH_CHECK = ["/erp", "/account", "/profile", "/my-orders", "/auth/login", "/select-erp", "/ddt-admin", "/cart"]
+  const NEEDS_AUTH_CHECK = ["/erp", "/account", "/perfil", "/pedidos", "/auth/login", "/select-erp", "/ddt-admin", "/cart"]
   const isPost = request.method === "POST"
   const isAction = request.headers.has("Next-Action")
   const needsAuthCheck = isPost || isAction || NEEDS_AUTH_CHECK.some(prefix => pathname === prefix || pathname.startsWith(prefix + "/"))
@@ -252,7 +252,7 @@ export async function middleware(request: NextRequest) {
 
       // Verifica usuário apenas para proteger rotas ERP
       try {
-        const protectedPrefixes = ["/erp", "/account", "/profile", "/my-orders", "/select-erp", "/ddt-admin"]
+        const protectedPrefixes = ["/erp", "/perfil", "/pedidos", "/select-erp", "/ddt-admin"]
         const isProtected = protectedPrefixes.some(prefix => pathname.startsWith(prefix))
 
         // FAST-FAIL: If it's a protected route and there are NO supabase cookies at all, 

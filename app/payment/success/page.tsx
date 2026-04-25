@@ -52,7 +52,7 @@ export default async function PaymentSuccessPage({
 
           <div className="flex gap-3 justify-center pt-4">
             <Button asChild>
-              <Link href="/my-orders" prefetch={false}>Ver Meus Pedidos</Link>
+              <Link href="/pedidos" prefetch={false}>Ver Meus Pedidos</Link>
             </Button>
             <Button asChild variant="outline">
               <Link href="/marketplace" prefetch={false}>Continuar Comprando</Link>

@@ -123,9 +123,9 @@ export function UserProfilePage({ userId, profile, initialFullName, email, hasPa
     setIsChangingSecEmail(false)
 
     if (view === "main") {
-      router.push("/profile")
+      router.push("/perfil")
     } else {
-      router.push(`/profile?tab=${view}`)
+      router.push(`/perfil?tab=${view}`)
     }
   }
 
@@ -337,7 +337,7 @@ export function UserProfilePage({ userId, profile, initialFullName, email, hasPa
       <MarketplaceHeader simpleTitle={getViewTitle()} />
       <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col">
         <style>{`.animate-fade-in{animation:fadeIn 0.4s ease-out forwards}@keyframes fadeIn{from{opacity:0}to{opacity:1}}`}</style>
-        <div className="container mx-auto px-4 lg:px-6 max-w-[1300px] mt-12 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
+        <div className="container mx-auto px-4 max-w-[1300px] mt-12 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
           <AnimatePresence mode="wait">
             {currentView === "main" && <MainView key="main" navigate={navigate} />}
             {currentView === "account" && (

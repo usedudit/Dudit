@@ -401,7 +401,7 @@ export function PaymentWrapper({
         >
             <header className="lg:flex flex-col w-full bg-brand-dark sticky top-0 z-50 shadow-md">
                 <div className="w-full h-[68px] flex items-center justify-between max-w-[1300px] px-2 mx-auto gap-4">
-                    <Link href="/" prefetch={false} className="cursor-pointer shrink-0 z-110 pt-1">
+                    <Link href="/" prefetch={false} className="cursor-pointer shrink-0 z-[110] pt-1">
                         <img
                             src="https://img.dudit.com.br/static/Logo.png"
                             alt="Dudit"
@@ -622,7 +622,7 @@ export function PaymentWrapper({
                                 />
 
                                 <Button asChild className="w-full h-12 flex items-center justify-center font-semibold text-base py-0 px-0">
-                                    <Link href="/my-orders" prefetch={false} className="w-full h-full flex items-center justify-center">
+                                    <Link href="/pedidos" prefetch={false} className="w-full h-full flex items-center justify-center">
                                         Ver Meus Pedidos
                                     </Link>
                                 </Button>
@@ -703,7 +703,7 @@ export function PaymentWrapper({
 
                             <div className="flex justify-center">
                                 <Button asChild size="lg" className="w-full sm:w-auto px-10">
-                                    <Link href="/my-orders" prefetch={false}>
+                                    <Link href="/pedidos" prefetch={false}>
                                         Ver Meus Pedidos
                                     </Link>
                                 </Button>
@@ -730,7 +730,7 @@ export function PaymentWrapper({
 
                             <div className="w-full max-w-md flex flex-col gap-4 mt-6">
                                 <Button asChild className="w-full h-12">
-                                    <Link href="/my-orders" prefetch={false}>
+                                    <Link href="/pedidos" prefetch={false}>
                                         Acompanhar meus Pedidos
                                     </Link>
                                 </Button>
