@@ -30,7 +30,7 @@ export type CouponValidationResult = {
 // Internal: Core validation logic (used by both validateCoupon and findBestAutomaticCoupon)
 // ---------------------------------------------------------------------------
 
-async function validateCouponRow(
+export async function validateCouponRow(
   supabase: any,
   coupon: any,
   input: {

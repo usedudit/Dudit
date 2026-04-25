@@ -15,6 +15,8 @@ import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finan
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
 import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
 import { calculatePaymentAmounts } from "@/lib/payments/calculation"
+import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
+import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 
 export async function getCartItemCountAction() {
   try {
@@ -400,6 +402,7 @@ export async function checkoutCartAction(
   deliveryAddress: string,
   paymentMethod: string,
   notes?: string,
+  couponCode?: string | null,
   useMercadoPago?: boolean,
   csrf_token?: string,
 ) {
@@ -464,8 +467,6 @@ export async function checkoutCartAction(
 
     let itemPrice: number
     let itemName: string
-    let itemId: string
-
     if (item.variantId) {
       const variant = variants.find((v: any) => v.id === item.variantId)
       if (!variant || !variant.is_active) return { error: `Variante inativa ou não encontrada.` }
@@ -473,7 +474,6 @@ export async function checkoutCartAction(
       // Variante: usar price_adjustment como preço (preço da variante)
       itemPrice = Number(variant.price_adjustment || product.price)
       itemName = `${product.name} - ${variant.variant_name}`
-      itemId = variant.id
     } else {
       if ((product.stock_available ?? 0) < item.quantity) return { error: `Estoque insuficiente para o produto: ${product.name}` }
       // Produto normal: usar preço promocional se disponível
@@ -481,7 +481,6 @@ export async function checkoutCartAction(
       const promoPrice = product.promotional_price ? Number(product.promotional_price) : 0
       itemPrice = (promoPrice > 0 && promoPrice < basePrice) ? promoPrice : basePrice
       itemName = product.name
-      itemId = product.id
     }
 
     const subtotal = itemPrice * item.quantity
@@ -498,6 +497,53 @@ export async function checkoutCartAction(
   }
 
   const partnerId = products[0].partner_id
+  let couponIdToSave: string | null = null
+  let couponDiscountAmount = 0
+  let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
+
+  if (couponCode?.trim()) {
+    const couponResult = await validateCoupon({
+      partnerId,
+      code: couponCode,
+      customerId: user.id,
+      subtotal: totalAmount,
+      items: partnerItems.map((item) => ({ productId: item.productId })),
+    })
+
+    if (couponResult.valid) {
+      couponIdToSave = couponResult.couponId || null
+      couponDiscountAmount = couponResult.discountAmount
+      couponPricingData = couponResult.pricingCoupon || null
+    }
+  } else {
+    const autoResult = await findBestAutomaticCoupon({
+      partnerId,
+      customerId: user.id,
+      subtotal: totalAmount,
+      items: partnerItems.map((item) => ({ productId: item.productId })),
+    })
+
+    if (autoResult.valid) {
+      couponIdToSave = autoResult.couponId || null
+      couponDiscountAmount = autoResult.discountAmount
+      couponPricingData = autoResult.pricingCoupon || null
+    }
+  }
+
+  const pricingResult = calculateOrderPricing({
+    items: orderItems.map((item: any) => ({
+      productId: item.product_id,
+      serviceId: null,
+      unitPrice: Number(item.product_price || 0),
+      quantity: Number(item.quantity || 0),
+    })),
+    shippingCost: 0,
+    coupon: couponPricingData,
+  })
+
+  totalAmount = pricingResult.finalTotal
+  couponDiscountAmount = pricingResult.couponDiscountAmount
+
   const chosenType = toCanonicalPaymentType(paymentMethod)
   const bestMethod = await pickBestPaymentMethod(supabase as any, chosenType, partnerId, { preferDefault: true })
   if (!bestMethod) {
@@ -559,6 +605,8 @@ export async function checkoutCartAction(
       situation: "pending",
       notes,
       finance_account_id: financeAccountId,
+      coupon_id: couponIdToSave,
+      discount_amount: couponDiscountAmount,
     })
     .select()
     .single()
@@ -618,6 +666,17 @@ export async function checkoutCartAction(
   const cartItemIds = partnerItems.map((item: any) => item.cartItemId)
   await supabase.from("cart_items").delete().in("id", cartItemIds).eq("user_id", user.id)
 
+  if (couponIdToSave) {
+    await supabase.from("coupon_usages").upsert(
+      {
+        coupon_id: couponIdToSave,
+        customer_id: user.id,
+        order_id: order.id,
+      },
+      { onConflict: "coupon_id,order_id", ignoreDuplicates: true }
+    )
+  }
+
   // Limpa Cache
   for (const productId of [...new Set(partnerItems.map((item: any) => item.productId))]) {
     await invalidateProductCache(productId, partnerId, "update", { silent: true })
@@ -630,5 +689,8 @@ export async function checkoutCartAction(
     orderId: order.id,
     orderNumber: order.order_number,
     useMercadoPago,
+    couponApplied: Boolean(couponIdToSave),
+    couponDiscount: couponDiscountAmount,
+    finalTotal: paymentAwareTotal,
   }
 }

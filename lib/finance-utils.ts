@@ -24,5 +24,11 @@ export function pickPreferredDefaultAccountId(
 export function pickBankThenCashDefaultFinanceAccountId(
   accounts: { id: string; type: string; is_active?: boolean | null; is_default?: boolean | null }[],
 ): string | undefined {
-  return pickDefaultAccountIdForType(accounts, "bank") ?? pickDefaultAccountIdForType(accounts, "cash")
+  const rows = accounts.filter((a) => a.is_active !== false)
+  return (
+    rows.find((a) => a.type === "bank" && a.is_default)?.id ??
+    rows.find((a) => a.type === "cash" && a.is_default)?.id ??
+    rows.find((a) => a.type === "bank")?.id ??
+    rows.find((a) => a.type === "cash")?.id
+  )
 }

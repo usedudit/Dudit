@@ -7,7 +7,7 @@ export default function ProfileLoading() {
     const rows = Array.from({ length: 3 })
 
     return (
-        <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
+        <div className="flex flex-col min-h-screen max-w-[1300px] mx-auto bg-white dark:bg-dark-surface transition-colors duration-300">
             <MarketplaceHeader />
 
             {/* Header */}

@@ -4,7 +4,7 @@ import React from "react"
 import { ChevronRightIcon } from "@/lib/icons"
 
 interface ListItemProps {
-    icon?: React.ComponentType<any>
+    icon?: React.ComponentType<any> | React.ReactNode
     title: string
     description?: string
     onClick?: () => void
@@ -17,7 +17,7 @@ interface ListItemProps {
 }
 
 export const ListItem: React.FC<ListItemProps> = ({
-    icon: Icon,
+    icon,
     title,
     description,
     onClick,
@@ -28,20 +28,28 @@ export const ListItem: React.FC<ListItemProps> = ({
     descriptionClassName = "",
     className = "",
 }) => {
+    const isComponent = typeof icon === "function"
+
     return (
         <div
             onClick={onClick}
-            className={`group flex items-center rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all cursor-pointer ${className}`}
+            className={`group flex items-center gap-3 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all cursor-pointer ${className}`}
         >
             {left && <div className="shrink-0">{left}</div>}
 
-            {Icon && (
+            {icon && (
                 <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
-                    <Icon className="text-brand-dark dark:text-dark-heading" />
+                    {isComponent ? (
+                        React.createElement(icon as React.ComponentType<any>, {
+                            className: "text-brand-dark dark:text-dark-heading",
+                        })
+                    ) : (
+                        icon
+                    )}
                 </div>
             )}
 
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
                 <h3
                     className={`text-base font-bold text-brand-dark dark:text-dark-heading truncate ${titleClassName}`}
                 >
@@ -60,7 +68,7 @@ export const ListItem: React.FC<ListItemProps> = ({
             {right ? (
                 right
             ) : showChevron ? (
-                <ChevronRightIcon className="text-brand-inactive-text group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors" />
+                <ChevronRightIcon className="text-brand-inactive-text group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors shrink-0" />
             ) : null}
         </div>
     )

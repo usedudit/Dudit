@@ -4,7 +4,10 @@ import type React from "react"
 import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-    MapPinIcon, PlusIcon, Package, TagIcon, XIcon, ChevronUpIcon, ChevronDownIcon,
+    MapPinIcon, PlusIcon, Package, XIcon, ChevronUpIcon, ChevronDownIcon,
+    HomeIcon,
+    TruckIcon,
+    MoneyIcon,
 } from "@/lib/icons"
 import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
@@ -17,7 +20,7 @@ import { useSupabase } from "@/providers/supabase-provider"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import Link from "next/link"
 import { formatCurrency } from "@/lib/utils"
-import { validateMarketplaceCouponAction } from "@/app/actions/shared/coupons"
+import { listApplicableMarketplaceCouponsAction } from "@/app/actions/shared/coupons"
 import { useRouter } from "next/navigation"
 import { PaymentWrapper } from "@/components/PaymentWrapper"
 import { checkoutCartAction } from "@/app/actions/marketplace/cart"
@@ -65,6 +68,24 @@ interface UserAddress {
     is_default: boolean
 }
 
+interface MarketplaceAvailableCoupon {
+    id: string
+    code: string
+    discountType: "percentage" | "fixed" | "free_shipping"
+    discountValue: number | null
+    applyScope: "all" | "categories" | "products" | "services"
+    minCartValue: number | null
+    maxDiscountValue: number | null
+    usageLimit: number | null
+    usagePerCustomer: number | null
+    firstPurchaseOnly: boolean | null
+    customerScope: "all" | "specific" | null
+    startsAt: string | null
+    endsAt: string | null
+    discountAmount: number
+    freeShipping?: boolean
+}
+
 const fadeVariants = {
     open: { opacity: 1, transition: { duration: 0.2 } },
     closed: { opacity: 0, transition: { duration: 0.2 } },
@@ -96,61 +117,8 @@ function SectionHeader({
     )
 }
 
-// FIX 3: Use the reusable Input component for coupon
-function CouponInput({ onApply }: { onApply: (code: string) => void }) {
-    const [value, setValue] = useState("")
-    const [applied, setApplied] = useState(false)
-
-    const handleApply = () => {
-        if (!value.trim()) return
-        onApply(value.trim())
-        setApplied(true)
-    }
-
-    const handleRemove = () => {
-        setValue("")
-        setApplied(false)
-        onApply("")
-    }
-
-    return (
-        <div>
-            <div className="flex items-center gap-1.5 mb-2">
-                <TagIcon size={13} className="text-brand-inactive-text" />
-                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Cupom de desconto</span>
-            </div>
-            <div className="flex items-center gap-2">
-                <div className="flex-1">
-                    <Input
-                        value={value}
-                        onChange={(e) => setValue(e.target.value.toUpperCase())}
-                        disabled={applied}
-                        placeholder="Digite seu cupom"
-                        onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === "Enter" && handleApply()}
-                        className={applied ? "border-brand-green bg-green-50/30 dark:bg-green-900/10" : ""}
-                    />
-                </div>
-                {applied ? (
-                    <button type="button" onClick={handleRemove} className="text-xs font-semibold text-brand-red hover:text-red-600 flex items-center gap-1 shrink-0 pb-0.5">
-                        <XIcon size={12} /> Remover
-                    </button>
-                ) : (
-                    <button
-                        type="button"
-                        onClick={handleApply}
-                        disabled={!value.trim()}
-                        className="text-xs font-bold text-brand-green hover:text-[#047857] disabled:opacity-40 transition-colors shrink-0 pb-0.5"
-                    >
-                        Aplicar
-                    </button>
-                )}
-            </div>
-        </div>
-    )
-}
-
 export function CheckoutPageClient() {
-    const { user, supabase } = useSupabase()
+    const { user } = useSupabase()
     const router = useRouter()
     const [sessionData, setSessionData] = useState<CheckoutSessionData | null>(null)
     const [pageLoading, setPageLoading] = useState(true)
@@ -179,7 +147,7 @@ export function CheckoutPageClient() {
     const [isLoading, setIsLoading] = useState(false)
     const [deliveryError, setDeliveryError] = useState<string | null>(null)
     const [paymentError, setPaymentError] = useState<string | null>(null)
-    
+
     const products = sessionData?.products || []
     const partnerId = sessionData?.partnerId || ""
     const partnerInfo = sessionData?.partnerInfo || { paymentMethods: [] } as any
@@ -209,7 +177,10 @@ export function CheckoutPageClient() {
 
     const [couponCode, setCouponCode] = useState("")
     const [couponDiscount, setCouponDiscount] = useState(0)
-    const [couponValidating, setCouponValidating] = useState(false)
+    const [availableCoupons, setAvailableCoupons] = useState<MarketplaceAvailableCoupon[]>([])
+    const [couponListLoading, setCouponListLoading] = useState(false)
+    const [showCouponModal, setShowCouponModal] = useState(false)
+    const [selectedCouponId, setSelectedCouponId] = useState<string>("")
     const [couponError, setCouponError] = useState<string | null>(null)
 
     const [formData, setFormData] = useState({
@@ -354,6 +325,136 @@ export function CheckoutPageClient() {
         }))
     const isPickup = formData.deliveryType === "pickup"
     const traditionalPaymentLabel = isPickup ? "Pagar na Retirada" : "Pagar na Entrega"
+    const couponItems = useMemo(
+        () =>
+            products.map((product) => (
+                sessionData?.itemType === "service" || sessionData?.source === "service"
+                    ? { serviceId: product.id }
+                    : { productId: product.id }
+            )),
+        [products, sessionData?.itemType, sessionData?.source]
+    )
+    const appliedCoupon = useMemo(
+        () => availableCoupons.find((coupon) => coupon.code === couponCode) || null,
+        [availableCoupons, couponCode]
+    )
+
+    const getCouponCountLabel = (count: number) => {
+        if (count === 1) return "1 cupom disponivel"
+        return `${count} cupons disponiveis`
+    }
+
+    const getCouponTitle = (coupon: MarketplaceAvailableCoupon) => {
+        if (coupon.freeShipping || coupon.discountType === "free_shipping") {
+            return `${coupon.code} - Entrega gratis`
+        }
+
+        return `${coupon.code} - ${formatCurrency(coupon.discountAmount)} OFF`
+    }
+
+    const getCouponSubtitle = (coupon: MarketplaceAvailableCoupon) => {
+        const requirements: string[] = []
+
+        if (Number(coupon.minCartValue || 0) > 0) {
+            requirements.push(`Pedido minimo de ${formatCurrency(Number(coupon.minCartValue || 0))}`)
+        }
+
+        if (coupon.firstPurchaseOnly) {
+            requirements.push("Somente na primeira compra")
+        }
+
+        if (coupon.applyScope === "products") {
+            requirements.push("Valido para produtos elegiveis")
+        } else if (coupon.applyScope === "categories") {
+            requirements.push("Valido para categorias elegiveis")
+        } else if (coupon.applyScope === "services") {
+            requirements.push("Valido para servicos elegiveis")
+        } else {
+            requirements.push("Valido para este pedido")
+        }
+
+        if (coupon.customerScope === "specific") {
+            requirements.push("Exclusivo para clientes elegiveis")
+        }
+
+        return requirements.join(" • ")
+    }
+
+    const loadApplicableCoupons = async () => {
+        if (!partnerId || !userId) {
+            setAvailableCoupons([])
+            return
+        }
+
+        setCouponListLoading(true)
+        setCouponError(null)
+
+        try {
+            const result = await listApplicableMarketplaceCouponsAction({
+                partnerId,
+                customerId: userId,
+                subtotal: totalAmount,
+                items: couponItems,
+            })
+
+            if (!result.success) {
+                setAvailableCoupons([])
+                setCouponError(result.error || "Nao foi possivel carregar os cupons.")
+                return
+            }
+
+            setAvailableCoupons(result.coupons)
+
+            if (couponCode) {
+                const stillApplicable = result.coupons.find((coupon) => coupon.code === couponCode)
+
+                if (stillApplicable) {
+                    setCouponDiscount(stillApplicable.discountAmount)
+                    setSelectedCouponId(stillApplicable.id)
+                    setCouponError(null)
+                } else {
+                    setCouponCode("")
+                    setCouponDiscount(0)
+                    setSelectedCouponId("")
+                    setCouponError("O cupom aplicado nao se encaixa mais neste pedido.")
+                }
+            }
+        } catch (error) {
+            console.error("Erro ao carregar cupons do marketplace:", error)
+            setAvailableCoupons([])
+            setCouponError("Nao foi possivel carregar os cupons.")
+        } finally {
+            setCouponListLoading(false)
+        }
+    }
+
+    useEffect(() => {
+        void loadApplicableCoupons()
+    }, [partnerId, userId, totalAmount, couponItems])
+
+    const handleApplySelectedCoupon = () => {
+        const selectedCoupon = availableCoupons.find((coupon) => coupon.id === selectedCouponId)
+
+        if (!selectedCoupon) {
+            setCouponCode("")
+            setCouponDiscount(0)
+            setCouponError(null)
+            setShowCouponModal(false)
+            return
+        }
+
+        setCouponCode(selectedCoupon.code)
+        setCouponDiscount(selectedCoupon.discountAmount)
+        setCouponError(null)
+        setShowCouponModal(false)
+    }
+
+    const handleRemoveCoupon = () => {
+        setCouponCode("")
+        setCouponDiscount(0)
+        setSelectedCouponId("")
+        setCouponError(null)
+    }
 
     const handleSubmit = async (e?: React.FormEvent) => {
         if (e) e.preventDefault()
@@ -416,7 +517,7 @@ export function CheckoutPageClient() {
                             variantId: item.variantId,
                             quantity: quantities[item.productId] || item.quantity
                         })),
-                        formData.deliveryType, formData.deliveryAddress, formData.paymentMethod, formData.notes, false, token
+                        formData.deliveryType, formData.deliveryAddress, formData.paymentMethod, formData.notes, couponCode || null, false, token
                     )
                     if (result.error) throw new Error(result.error)
                     invalidateCartCache()
@@ -435,6 +536,7 @@ export function CheckoutPageClient() {
                         notes: formData.notes,
                         partnerId: partnerId,
                         csrf_token: token,
+                        couponCode: couponCode || null,
                     })
                     if (result.error) throw new Error(result.error)
                     sessionStorage.removeItem("checkout_session")
@@ -515,13 +617,12 @@ export function CheckoutPageClient() {
                                                 <div>
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                         <ListItem
-                                                            className={`transition-all p-0 gap-0 h-[68px] ${formData.deliveryType === "delivery" ? "border-brand-green hover:border-brand-green" : "border-brand-border hover:border-brand-dark/30"}`}
+                                                            icon={HomeIcon}
                                                             title="Entrega"
-                                                            titleClassName="text-md font-bold text-brand-dark dark:text-dark-heading truncate"
                                                             description="Receba em casa"
-                                                            descriptionClassName="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate"
+                                                            className={`px-4 py-3 gap-4 ${formData.deliveryType === "delivery" ? "border-brand-green dark:border-brand-green" : ""}`}
                                                             onClick={() => setFormData({ ...formData, deliveryType: "delivery" })}
-                                                            left={
+                                                            right={
                                                                 <RadioButton
                                                                     name="deliveryType"
                                                                     value="delivery"
@@ -531,16 +632,15 @@ export function CheckoutPageClient() {
                                                             }
                                                         />
                                                         <ListItem
-                                                            className={`transition-all p-0 gap-0 h-[68px] ${isPickup ? "border-brand-green hover:border-brand-green" : "border-brand-border hover:border-brand-dark/30"}`}
+                                                            icon={TruckIcon}
                                                             title="Retirada no local"
-                                                            titleClassName="text-md font-bold text-brand-dark dark:text-dark-heading truncate"
                                                             description="Retire imediatamente"
-                                                            descriptionClassName="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate"
+                                                            className={`px-4 py-3 gap-4 ${isPickup ? "border-brand-green dark:border-brand-green" : ""}`}
                                                             onClick={() => {
                                                                 setFormData({ ...formData, deliveryType: "pickup" })
                                                                 if (partnerInfo.mpConnected) setPaymentOption("mercadopago")
                                                             }}
-                                                            left={
+                                                            right={
                                                                 <RadioButton
                                                                     name="deliveryType"
                                                                     value="pickup"
@@ -551,7 +651,6 @@ export function CheckoutPageClient() {
                                                                     }}
                                                                 />
                                                             }
-                                                            right={<span className="text-sm font-bold text-brand-green shrink-0 mr-4">Grátis</span>}
                                                         />
                                                     </div>
                                                 </div>
@@ -655,13 +754,12 @@ export function CheckoutPageClient() {
                                                     <>
                                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                                                             <ListItem
-                                                                className={`transition-all p-0 gap-0 h-[68px] ${paymentOption === "mercadopago" ? "border-brand-green hover:border-brand-green" : "border-brand-border hover:border-brand-dark/30"}`}
+                                                                icon={<img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-6 h-6" />}
                                                                 title="Mercado Pago"
-                                                                titleClassName="text-md font-bold text-brand-dark dark:text-dark-heading truncate"
                                                                 description="Pague com cartão, Pix ou saldo MP."
-                                                                descriptionClassName="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate"
+                                                                className={`px-4 py-3 gap-4 ${paymentOption === "mercadopago" ? "border-brand-green dark:border-brand-green" : ""}`}
                                                                 onClick={() => setPaymentOption("mercadopago")}
-                                                                left={
+                                                                right={
                                                                     <RadioButton
                                                                         name="paymentOption"
                                                                         value="mercadopago"
@@ -672,13 +770,12 @@ export function CheckoutPageClient() {
                                                             />
                                                             {(!isPickup || !partnerInfo.mpConnected) && (
                                                                 <ListItem
-                                                                    className={`transition-all p-0 gap-0 h-[68px] ${paymentOption === "traditional" ? "border-brand-green hover:border-brand-green" : "border-brand-border hover:border-brand-dark/30"}`}
+                                                                    icon={MoneyIcon}
                                                                     title={traditionalPaymentLabel}
-                                                                    titleClassName="text-md font-bold text-brand-dark dark:text-dark-heading truncate"
                                                                     description="Combine o pagamento na entrega ou retirada."
-                                                                    descriptionClassName="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate"
+                                                                    className={`px-4 py-3 gap-4 ${paymentOption === "traditional" ? "border-brand-green dark:border-brand-green" : ""}`}
                                                                     onClick={() => setPaymentOption("traditional")}
-                                                                    left={
+                                                                    right={
                                                                         <RadioButton
                                                                             name="paymentOption"
                                                                             value="traditional"
@@ -805,41 +902,40 @@ export function CheckoutPageClient() {
                                         ))}
                                     </div>
 
-                                    <div className="mb-4">
-                                        <CouponInput onApply={async (code) => {
-                                            if (!code) {
-                                                setCouponCode("")
-                                                setCouponDiscount(0)
-                                                setCouponError(null)
-                                                return
-                                            }
-                                            if (!partnerId) return
-                                            setCouponValidating(true)
-                                            setCouponError(null)
-                                            try {
-                                                const result = await validateMarketplaceCouponAction({
-                                                    partnerId,
-                                                    code,
-                                                    subtotal: totalAmount,
-                                                })
-                                                if (result.valid) {
-                                                    setCouponCode(code)
-                                                    setCouponDiscount(result.discountAmount)
-                                                    setCouponError(null)
-                                                } else {
-                                                    setCouponCode("")
-                                                    setCouponDiscount(0)
-                                                    setCouponError(result.errorMessage || "Cupom inválido.")
+                                    <div className="mb-4 space-y-2">
+                                        <ListItem
+                                            title="Escolha um cupom"
+                                            description={couponListLoading ? "Verificando cupons disponiveis..." : getCouponCountLabel(availableCoupons.length)}
+                                            className={`px-4 py-3 gap-4 ${appliedCoupon ? "border-brand-green dark:border-brand-green" : ""}`}
+                                            onClick={() => {
+                                                if (!couponListLoading && availableCoupons.length > 0) {
+                                                    setSelectedCouponId(appliedCoupon?.id || "")
+                                                    setShowCouponModal(true)
                                                 }
-                                            } finally {
-                                                setCouponValidating(false)
-                                            }
-                                        }} />
-                                        {couponError && (
-                                            <p className="text-xs text-red-500 mt-1">{couponError}</p>
+                                            }}
+                                            showChevron={!couponListLoading && availableCoupons.length > 0}
+                                            right={couponListLoading ? <Spinner size={18} /> : undefined}
+                                        />
+                                        {appliedCoupon && (
+                                            <div className="flex items-center justify-between gap-3 rounded-xl border border-brand-green/20 bg-green-50/40 px-4 py-3 dark:bg-green-900/10">
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-bold text-brand-green truncate">{getCouponTitle(appliedCoupon)}</p>
+                                                    <p className="text-xs text-brand-inactive-text truncate">{getCouponSubtitle(appliedCoupon)}</p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleRemoveCoupon}
+                                                    className="text-xs font-semibold text-brand-red hover:text-red-600 flex items-center gap-1 shrink-0"
+                                                >
+                                                    <XIcon size={12} /> Remover
+                                                </button>
+                                            </div>
                                         )}
-                                        {couponDiscount > 0 && (
-                                            <p className="text-xs text-brand-green mt-1 font-medium">Desconto de {formatCurrency(couponDiscount)} aplicado!</p>
+                                        {couponError && (
+                                            <p className="text-xs text-red-500">{couponError}</p>
+                                        )}
+                                        {couponDiscount > 0 && appliedCoupon && (
+                                            <p className="text-xs text-brand-green font-medium">Desconto de {formatCurrency(couponDiscount)} aplicado!</p>
                                         )}
                                     </div>
 
@@ -874,7 +970,7 @@ export function CheckoutPageClient() {
                                         disabled={isLoading}
                                         className="w-full h-[46px]"
                                     >
-                                        {isLoading ? "Processando..." : `Finalizar pedido • ${formatCurrency(totalAmount)}`}
+                                        {isLoading ? "Processando..." : `Finalizar pedido • ${formatCurrency(Math.max(0, totalAmount - couponDiscount))}`}
                                     </Button>
                                 </div>
                             </div>
@@ -897,11 +993,52 @@ export function CheckoutPageClient() {
                             disabled={isLoading}
                             className={`flex-2 h-12 ${isLoading ? "opacity-80" : ""}`}
                         >
-                            {isLoading ? "Processando..." : `Finalizar pedido • ${formatCurrency(totalAmount)}`}
+                            {isLoading ? "Processando..." : `Finalizar pedido • ${formatCurrency(Math.max(0, totalAmount - couponDiscount))}`}
                         </Button>
                     </div>
                 </div>
             </div>
+
+            <DefaultModal
+                isOpen={showCouponModal}
+                onClose={() => setShowCouponModal(false)}
+                title="Escolha um cupom"
+                maxWidth="lg"
+                footer={
+                    <>
+                        <Button variant="outline" onClick={() => setShowCouponModal(false)}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleApplySelectedCoupon} disabled={!selectedCouponId}>
+                            Aplicar
+                        </Button>
+                    </>
+                }
+            >
+                <div className="space-y-3">
+                    {availableCoupons.length > 0 ? (
+                        availableCoupons.map((coupon) => (
+                            <ListItem
+                                key={coupon.id}
+                                title={getCouponTitle(coupon)}
+                                description={getCouponSubtitle(coupon)}
+                                className={`px-4 py-3 gap-4 ${selectedCouponId === coupon.id ? "border-brand-green dark:border-brand-green" : ""}`}
+                                onClick={() => setSelectedCouponId(coupon.id)}
+                                right={
+                                    <RadioButton
+                                        name="marketplace-coupon"
+                                        value={coupon.id}
+                                        checked={selectedCouponId === coupon.id}
+                                        onChange={() => setSelectedCouponId(coupon.id)}
+                                    />
+                                }
+                            />
+                        ))
+                    ) : (
+                        <InfoCard message="Nenhum cupom disponivel para este pedido no momento." />
+                    )}
+                </div>
+            </DefaultModal>
 
             <DefaultModal
                 isOpen={showAddressForm}

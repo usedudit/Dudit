@@ -49,14 +49,14 @@ export const DisplayRow = ({
     onEdit: () => void
 }) => (
     <div className="flex items-center gap-4">
-        <div className="w-10 h-10 rounded-full bg-gray-50 dark:bg-zinc-800 flex items-center justify-center shrink-0">
+        <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0">
             <Icon size={18} className="text-brand-dark dark:text-dark-heading" />
         </div>
         <div className="flex-1">
-            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+            <p className="text-base font-semibold text-brand-dark dark:text-dark-heading">
                 {value || <span className="text-brand-inactive-text">Não informado</span>}
             </p>
-            <p className="text-xs text-brand-inactive-text">{description}</p>
+            <p className="text-sm text-brand-inactive-text">{description}</p>
         </div>
         <Button type="button" variant="outline" onClick={onEdit}>Alterar</Button>
     </div>

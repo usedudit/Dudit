@@ -499,7 +499,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                     title="Pessoa Jurídica"
                                                                     description="Usado para empresas"
                                                                     onClick={() => setPersonType("Pessoa Jurídica")}
-                                                                    className={`px-4 py-3 gap-4" ${personType === "Pessoa Jurídica" ? "border-brand-dark dark:border-dark-body bg-brand-slate/60 dark:bg-dark-border/40" : ""}`}
+                                                                    className={`px-4 py-3 gap-4 ${personType === "Pessoa Jurídica" ? "border-brand-green dark:border-brand-green" : ""}`}
                                                                     right={
                                                                         <RadioButton
                                                                             name="personType"

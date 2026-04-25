@@ -4,7 +4,7 @@ import { z } from "zod"
 import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { revalidateCoupons } from "@/lib/utils/revalidation"
-import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
+import { validateCoupon, findBestAutomaticCoupon, validateCouponRow } from "@/lib/services/coupons"
 
 const CouponSchema = z.object({
     partnerId: z.string().uuid(),
@@ -247,6 +247,78 @@ export async function validateMarketplaceCouponAction(input: {
     const { getAdminClient } = await import("@/lib/supabase/admin")
     const admin = getAdminClient()
     return validateCoupon(input, admin)
+}
+
+export async function listApplicableMarketplaceCouponsAction(input: {
+    partnerId: string
+    customerId?: string | null
+    subtotal: number
+    shippingCost?: number
+    items?: Array<{ productId?: string | null; serviceId?: string | null }>
+}) {
+    await requireUser()
+
+    const { getAdminClient } = await import("@/lib/supabase/admin")
+    const admin = getAdminClient()
+
+    const { data: coupons, error } = await admin
+        .from("coupons")
+        .select(`
+            id,
+            code,
+            discount_type,
+            discount_value,
+            apply_scope,
+            min_cart_value,
+            max_discount_value,
+            usage_limit,
+            usage_per_customer,
+            first_purchase_only,
+            starts_at,
+            ends_at,
+            customer_scope,
+            is_automatic,
+            is_active
+        `)
+        .eq("partner_id", input.partnerId)
+        .eq("is_active", true)
+        .eq("is_automatic", false)
+        .order("code")
+
+    if (error) {
+        return { success: false, error: error.message, coupons: [] }
+    }
+
+    const applicableCoupons = []
+
+    for (const coupon of coupons || []) {
+        const result = await validateCouponRow(admin, coupon, input)
+
+        if (!result.valid) continue
+
+        applicableCoupons.push({
+            id: coupon.id,
+            code: coupon.code,
+            discountType: coupon.discount_type,
+            discountValue: coupon.discount_value,
+            applyScope: coupon.apply_scope,
+            minCartValue: coupon.min_cart_value,
+            maxDiscountValue: coupon.max_discount_value,
+            usageLimit: coupon.usage_limit,
+            usagePerCustomer: coupon.usage_per_customer,
+            firstPurchaseOnly: coupon.first_purchase_only,
+            customerScope: coupon.customer_scope,
+            startsAt: coupon.starts_at,
+            endsAt: coupon.ends_at,
+            discountAmount: result.discountAmount,
+            freeShipping: result.freeShipping,
+        })
+    }
+
+    return {
+        success: true,
+        coupons: applicableCoupons,
+    }
 }
 
 // ---------------------------------------------------------------------------

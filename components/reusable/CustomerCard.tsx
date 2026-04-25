@@ -47,8 +47,8 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
         return [
             `${addr.street || ""}${addr.number ? `, ${addr.number}` : ""}${addr.complement ? ` (${addr.complement})` : ""}`,
             addr.neighborhood,
-            `${addr.city || ""}${addr.state ? ` - ${addr.state}` : ""}`,
-            addr.zipCode
+            `${addr.city || ""}${(addr.state || addr.uf) ? ` - ${addr.state || addr.uf}` : ""}`,
+            addr.zipCode || addr.zip_code
         ].filter(Boolean).join("\n");
     };
 

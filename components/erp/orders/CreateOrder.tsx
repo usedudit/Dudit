@@ -21,6 +21,7 @@ import {
     createFinanceAccountAction,
     getFinanceAccountsAction,
 } from "@/app/actions/erp/finance-accounts"
+import { createERPDeliveryAction, fetchDeliveryPeopleBucketAction } from "@/app/actions/erp/deliveries"
 import { pickBankThenCashDefaultFinanceAccountId, type FinanceAccountType } from "@/lib/finance-utils"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { Input, MoneyInput, Combobox, Checkbox, ListItem, RadioButton, InfoCard, PercentageInput, Button as ReusableButton } from "@/components/reusable"
@@ -55,11 +56,18 @@ type FinanceAccountOption = {
     integration_source?: string | null
 }
 
+type DeliveryPersonOption = {
+    id: string
+    fullName: string
+}
+
 const REQUIRED_FIELDS = [
     { field: "productSearch", tab: "general" },
     { field: "manualItemNames", tab: "general" },
     { field: "manualItemPrices", tab: "general" },
     { field: "financeAccountId", tab: "general" },
+    { field: "deliveryDate", tab: "delivery" },
+    { field: "deliveryTime", tab: "delivery" },
 ]
 
 function formatLocalISODate(date: Date) {
@@ -74,6 +82,41 @@ function parseMoneyInput(s: string): number {
     if (t === "") return 0
     const n = Number(t)
     return Number.isFinite(n) ? n : 0
+}
+
+function formatCurrentLocalTime(date = new Date()) {
+    return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
+}
+
+function normalizeCustomerForCard(customer: any) {
+    if (!customer) return null
+
+    const primaryAddress =
+        customer.address ||
+        customer.addresses?.find((address: any) => address?.address_type === "primary" || address?.is_default) ||
+        customer.addresses?.[0] ||
+        null
+
+    return {
+        id: customer.id,
+        name: customer.name,
+        email: customer.email || null,
+        phone: customer.phone || null,
+        addresses: primaryAddress
+            ? [{
+                address_type: "primary",
+                is_default: true,
+                zipCode: primaryAddress.zipCode || primaryAddress.zip_code || "",
+                street: primaryAddress.street || "",
+                number: primaryAddress.number || "",
+                complement: primaryAddress.complement || "",
+                neighborhood: primaryAddress.neighborhood || "",
+                city: primaryAddress.city || "",
+                state: primaryAddress.state || primaryAddress.uf || "",
+                country: primaryAddress.country || "BR",
+            }]
+            : [],
+    }
 }
 
 export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOrderProps) {
@@ -105,7 +148,11 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [deliveryMethod, setDeliveryMethod] = useState<'delivery' | 'pickup'>("pickup")
     const [paymentStatus, setPaymentStatus] = useState<'paid' | 'partially_paid' | 'unpaid'>("unpaid")
     const [deliveryStatus, setDeliveryStatus] = useState('not_sent')
+    const [selectedDeliveryPersonId, setSelectedDeliveryPersonId] = useState("")
+    const [deliveryDate, setDeliveryDate] = useState(formatLocalISODate(new Date()))
+    const [deliveryTime, setDeliveryTime] = useState(formatCurrentLocalTime())
     const [financeAccounts, setFinanceAccounts] = useState<FinanceAccountOption[]>([])
+    const [deliveryPeople, setDeliveryPeople] = useState<DeliveryPersonOption[]>([])
     const [financeAccountId, setFinanceAccountId] = useState("")
 
     // items
@@ -211,7 +258,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     onBack()
                     return
                 }
-                setSelectedCustomer(order.buyer_id ? { id: order.buyer_id, name: order.customer_name } : null)
+                setSelectedCustomer(order.customers ? normalizeCustomerForCard(order.customers) : (order.buyer_id ? { id: order.buyer_id, name: order.customer_name } : null))
                 setOrderDate(order.created_at.split('T')[0])
                 setSalesChannel(normalizeSalesChannel(order.order_source))
                 setDeliveryMethod(order.delivery_type as any || "pickup")
@@ -227,6 +274,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setOriginalPaymentMethod(order.payment_method || "Não informado")
                 setOriginalPaymentBreakdown(loadedPaymentBreakdown)
                 setDeliveryStatus(order.delivery_status || "not_sent")
+                setDeliveryDate(order.created_at.split('T')[0])
+                setDeliveryTime(formatCurrentLocalTime(new Date(order.created_at)))
                 setFinanceAccountId(order.finance_account_id || "")
                 setNotes(order.notes || "")
                 setShippingFee((order.shipping_cost || 0).toString())
@@ -284,6 +333,15 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     }, [partnerId])
 
     useEffect(() => {
+        if (deliveryMethod !== "delivery" || deliveryPeople.length > 0) return
+        async function loadDeliveryPeople() {
+            const list = await fetchDeliveryPeopleBucketAction(partnerId)
+            setDeliveryPeople((list || []) as DeliveryPersonOption[])
+        }
+        void loadDeliveryPeople()
+    }, [deliveryMethod, deliveryPeople.length, partnerId])
+
+    useEffect(() => {
         if (editOrderId || financeAccountId || financeAccounts.length === 0) return
         const defaultOrderAccountId = pickBankThenCashDefaultFinanceAccountId(financeAccounts)
         if (defaultOrderAccountId) setFinanceAccountId(defaultOrderAccountId)
@@ -324,6 +382,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             const details = await getPOSCustomerDetailsAction({ partnerId, customerId: selectedCustomer.id })
             if (!active) return
             if (!details.success || !details.data) return
+
+            setSelectedCustomer((prev: any) => normalizeCustomerForCard({ ...prev, ...details.data }))
 
             const addr = details.data?.address || null
             if (!addr) return
@@ -567,6 +627,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         setItems([])
         setSelectedCustomer(null)
         setOrderDate(formatLocalISODate(new Date()))
+        setDeliveryMethod("pickup")
         setNotes("")
         setShippingFee("0")
         setOtherCosts("0")
@@ -576,6 +637,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         setCouponDiscountAmount(0)
         setPaymentStatus("unpaid")
         setDeliveryStatus("not_sent")
+        setSelectedDeliveryPersonId("")
+        setDeliveryDate(formatLocalISODate(new Date()))
+        setDeliveryTime(formatCurrentLocalTime())
         setFinanceAccountId("")
         setOriginalPaidAmount(0)
         setOriginalPaymentMethod("Não informado")
@@ -644,6 +708,14 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             return false
         }
 
+        if (deliveryMethod === "delivery" && (!deliveryDate || !deliveryTime)) {
+            setFieldErrors(new Set(["deliveryDate", "deliveryTime"]))
+            setActiveTab("delivery")
+            setValidationMessage("Preencha a data e o horÃ¡rio de saÃ­da para criar a entrega automÃ¡tica.")
+            setShowValidationModal(true)
+            return false
+        }
+
         const stockValidationMessage = validateStockAvailability(items)
         if (stockValidationMessage) {
             setFieldErrors(new Set(["productSearch"]))
@@ -677,16 +749,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         deliveryStatus?: string
     }) => {
         const finalPaymentStatus = paymentOverrides?.paymentStatus || paymentStatus;
-        let finalDeliveryStatus = paymentOverrides?.deliveryStatus || deliveryStatus;
-        if (
-            !editOrderId &&
-            paymentOverrides?.deliveryStatus === undefined &&
-            finalPaymentStatus === 'paid' &&
-            deliveryMethod === 'pickup' &&
-            deliveryStatus === 'not_sent'
-        ) {
-            finalDeliveryStatus = 'delivered';
-        }
+        const finalDeliveryStatus = deliveryMethod === "pickup" ? "delivered" : deliveryStatus;
 
         return {
             partnerId,
@@ -698,7 +761,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             paymentStatus: finalPaymentStatus,
             paymentMethod: paymentOverrides?.paymentMethod || (editOrderId ? originalPaymentMethod : "pendente"),
             paymentBreakdown: paymentOverrides?.paymentBreakdown || originalPaymentBreakdown,
-            deliveryStatus: deliveryMethod === "delivery" ? (finalDeliveryStatus as any) : undefined,
+            deliveryStatus: finalDeliveryStatus as any,
             paidAmount: paymentOverrides?.paidAmount,
             address: deliveryMethod === 'delivery' ? {
                 zipCode: cep,
@@ -778,6 +841,22 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 : await createERPOrderAction(payload)
 
             if (result.success) {
+                const createdOrderId = 'orderId' in result ? result.orderId : undefined
+                if (!editOrderId && payload.deliveryMethod === "delivery" && createdOrderId) {
+                    const autoDeliveryResult = await createERPDeliveryAction({
+                        partnerId,
+                        orderIds: [createdOrderId],
+                        deliveryPersonId: selectedDeliveryPersonId || null,
+                        status: payload.deliveryStatus as any,
+                        startedAt: new Date(`${deliveryDate}T${deliveryTime}:00`).toISOString(),
+                        notes: notes?.trim() || undefined,
+                    })
+
+                    if (!autoDeliveryResult.success) {
+                        notifyError("Pedido criado, mas a entrega automÃ¡tica falhou", autoDeliveryResult.error)
+                    }
+                }
+
                 notifySuccess(editOrderId ? `Pedido atualizado com sucesso!` : `Pedido criado com sucesso!`)
                 debouncedRefresh()
                 if (editOrderId && !paymentOverrides?.paymentMethod) {
@@ -808,7 +887,6 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             paymentMethod: paymentData.paymentMethod,
             paymentBreakdown: paymentData.paymentBreakdown,
             paidAmount: paymentData.paidAmount,
-            deliveryStatus: paymentData.isPendingDelivery ? "not_sent" : undefined,
         })
     }
 
@@ -869,6 +947,11 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         { value: "pickup_available", label: "Disponível para retirada" },
         { value: "delivery_failed", label: "Entrega não realizada" }
     ]
+
+    const deliveryPeopleOptions = deliveryPeople.map((person) => ({
+        value: person.id,
+        label: person.fullName,
+    }))
 
     if (isLoadingData) {
         return (
@@ -1032,9 +1115,16 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                         city={city}
                                         uf={uf}
                                         noNumber={noNumber}
-                                        selectedCustomer={selectedCustomer}
+                                        deliveryMethod={deliveryMethod}
                                         deliveryStatus={deliveryStatus}
+                                        selectedDeliveryPersonId={selectedDeliveryPersonId}
+                                        deliveryDate={deliveryDate}
+                                        deliveryTime={deliveryTime}
+                                        deliveryPeopleOptions={deliveryPeopleOptions}
                                         setDeliveryStatus={setDeliveryStatus}
+                                        setSelectedDeliveryPersonId={setSelectedDeliveryPersonId}
+                                        setDeliveryDate={setDeliveryDate}
+                                        setDeliveryTime={setDeliveryTime}
                                         deliveryStatusOptions={deliveryStatusOptions}
                                         setCep={setCep}
                                         setStreet={setStreet}
@@ -1068,12 +1158,13 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         setCustomerSelectIntent("default")
                     }}
                     onSelect={(customer) => {
-                        setSelectedCustomer(customer)
+                        setSelectedCustomer(normalizeCustomerForCard(customer))
                         setIsCustomerSheetOpen(false)
                         void (async () => {
                             const details = await getPOSCustomerDetailsAction({ partnerId, customerId: customer.id })
                             if (details.success && details.data) {
                                 setShippingCustomerDetails(details.data)
+                                setSelectedCustomer(normalizeCustomerForCard(details.data))
                                 if (deliveryMethod === "delivery" && details.data?.address) {
                                     const addr = details.data.address
                                     setCep(String(addr.zipCode || ""))

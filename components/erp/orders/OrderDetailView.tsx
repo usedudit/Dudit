@@ -313,7 +313,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{paymentMethodLabel}</span>}
                                                     />
 
-                                                    {paymentBreakdown.length > 0 && (
+                                                    {paymentBreakdown.length > 1 && (
                                                         <PaymentRow
                                                             label="Valores por meio"
                                                             value={
