@@ -32,7 +32,7 @@ import {
   createSubscriptionAction,
   cancelSubscriptionAction,
   upgradeSubscriptionAction,
-} from "@/app/actions/subscriptions"
+} from "@/app/actions/erp/subscriptions"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { buildFeaturesDisplay, getHardcodedPlan } from "@/lib/subscription/feature-labels"

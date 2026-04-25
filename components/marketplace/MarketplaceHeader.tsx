@@ -13,13 +13,17 @@ import {
   ChevronLeftIcon,
   MenuIcon,
   Package,
+  HeartIcon,
+  ShareIcon,
 } from "@/lib/icons"
+import { motion, AnimatePresence } from "framer-motion"
 import { useSupabase } from "@/providers/supabase-provider"
 import { Button } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { getSearchSuggestionsBucket } from "@/app/actions/marketplace/suggestions"
 import { useUserSession } from "@/hooks/use-user-session"
+import { useTransitionDirection } from "@/providers/transition-provider"
 
 interface HeaderProps {
   setView?: (
@@ -37,9 +41,24 @@ interface HeaderProps {
   currentView?: string
   userProfile?: { full_name: string | null; address: string | null } | null
   cartCount?: number
+  productName?: string
+  onShare?: () => void
+  onFavorite?: () => void
+  isFavorite?: boolean
+  simpleTitle?: string
 }
 
-const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serverUserProfile, cartCount: serverCartCount }) => {
+const Header: React.FC<HeaderProps> = ({ 
+  setView, 
+  currentView, 
+  userProfile: serverUserProfile, 
+  cartCount: serverCartCount,
+  productName,
+  onShare,
+  onFavorite,
+  isFavorite,
+  simpleTitle
+}) => {
   const { user, supabase, isLoading: isSupabaseLoading } = useSupabase()
 
   const serverSessionData = useMemo(() => {
@@ -57,6 +76,7 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
   const router = useRouter()
   const pathname = usePathname()
 
+  const { setDirection } = useTransitionDirection()
   const isHome = useMemo(() => currentView === "home" || pathname === "/", [currentView, pathname])
   const showDeliveryInfo = useMemo(() => isHome || ["/profile", "/my-orders", "/cart"].includes(pathname), [isHome, pathname])
 
@@ -171,6 +191,7 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
     const trimmed = query.trim()
     if (!trimmed) return
     setIsSearchInputFocused(false)
+    setDirection("forward")
     startTransition(() => {
       router.push(`/explorar?q=${encodeURIComponent(trimmed)}`)
     })
@@ -184,17 +205,38 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
   }, [supabase, router])
 
   const handleGoBack = useCallback(() => {
+    setDirection("back")
     if (window.history.length > 1) {
       router.back()
     } else {
       router.push("/")
     }
-  }, [router])
+  }, [router, setDirection])
 
   const renderMobileHeader = () => {
+    const isProductDetail = !!productName
+
+    if (simpleTitle) {
+      return (
+        <header className="lg:hidden w-full fixed top-0 left-0 right-0 z-50 bg-brand-green">
+          <div className="px-4 py-3 flex items-center justify-between min-h-[50px]">
+            <button onClick={handleGoBack} className="shrink-0 text-white p-1 -ml-1">
+              <ChevronLeftIcon size={24} strokeWidth={2.5} />
+            </button>
+            <div className="flex-1 text-center min-w-0">
+              <h1 className="text-white font-bold text-[16px] truncate px-4">
+                {simpleTitle}
+              </h1>
+            </div>
+            <div className="w-8 shrink-0" /> {/* Spacer for centering */}
+          </div>
+        </header>
+      )
+    }
 
     return (
-      <header className="lg:hidden w-full bg-brand-dark fixed top-0 left-0 right-0 z-50 transition-all duration-300">
+      <header className={`lg:hidden w-full fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isProductDetail && !isScrolled ? "bg-transparent" : "bg-brand-green"}`}>
+        {/* standard logo header only if not product detail or if scrolled */}
         {isHome && (
           <div className={`flex items-center justify-between px-4 overflow-hidden transition-all duration-300 ease-in-out ${isScrolled ? "h-0 opacity-0" : "h-[50px] opacity-100 pt-3 pb-1"}`}>
             <Link href="/" prefetch={true} className="cursor-pointer">
@@ -211,20 +253,22 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
             </button>
           </div>
         )}
-        <div className={`px-4 pb-3 transition-all duration-300 ${(isScrolled || !isHome) ? "pt-3 bg-brand-dark" : "pt-1"}`}>
-          <div className="flex items-center gap-3">
+        
+        <div className={`px-4 pb-3 transition-all duration-500 ${(isScrolled || !isHome || isProductDetail) ? "pt-3" : "pt-1"}`}>
+          <div className="flex items-center gap-3 relative min-h-[40px]">
+            {/* Back Button / User Icon */}
             <div
-              className="shrink-0"
+              className={`shrink-0 z-10 transition-all duration-300 ${isProductDetail && !isScrolled ? "w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md" : "w-auto h-auto bg-transparent"}`}
               onClick={() => {
-                if (!isHome) {
+                if (!isHome || isProductDetail) {
                   handleGoBack()
                 } else {
                   user ? setIsMobileUserMenuOpen(true) : router.push("/auth/login")
                 }
               }}
             >
-              {!isHome ? (
-                <ChevronLeftIcon size={24} className="text-brand-green" strokeWidth={2.5} />
+              {(!isHome || isProductDetail) ? (
+                <ChevronLeftIcon size={24} className={`${isProductDetail && !isScrolled ? "text-brand-green" : "text-white"}`} strokeWidth={2.5} />
               ) : user ? (
                 <img
                   src="https://img.dudit.com.br/static/Placeholder.png"
@@ -239,29 +283,64 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, userProfile: serv
                 </div>
               )}
             </div>
-            <div className="flex-1 relative">
-              <div className="bg-white h-[38px] rounded-full flex items-center px-4 w-full border border-gray-200">
-                <SearchIcon size={18} className="text-brand-green mr-2" />
-                <input
-                  type="text"
-                  placeholder="Buscar na Dudit"
-                  className="bg-transparent border-none outline-none text-brand-dark text-[14px] w-full placeholder-gray-400 font-normal py-0"
-                  value={searchValue}
-                  onChange={(e) => setSearchValue(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                />
-              </div>
-            </div>
-            <Link href="/cart" prefetch={true} className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
-              <ShoppingBagIcon size={24} strokeWidth={2} />
-              {cartCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-brand-orange text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border border-brand-dark">
-                  {cartCount}
-                </span>
+
+            {/* Middle Section: Search or Product Name */}
+            <div className="flex-1 flex items-center justify-center min-w-0 transition-all duration-300">
+              {isProductDetail ? (
+                <div className={`w-full transition-all duration-500 ${isScrolled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
+                   <h1 className="text-white font-bold text-[15px] truncate text-center px-2">
+                    {productName}
+                   </h1>
+                </div>
+              ) : (
+                <div className="bg-white h-[38px] rounded-full flex items-center px-4 w-full border border-gray-200">
+                  <SearchIcon size={18} className="text-brand-green mr-2" />
+                  <input
+                    type="text"
+                    placeholder="Buscar na Dudit"
+                    className="bg-transparent border-none outline-none text-brand-dark text-[14px] w-full placeholder-gray-400 font-normal py-0"
+                    value={searchValue}
+                    onChange={(e) => setSearchValue(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  />
+                </div>
               )}
-            </Link>
+            </div>
+
+            {/* Right Section: Actions (Share/Favorite) or Cart */}
+            <div className="flex items-center gap-2 shrink-0 z-10">
+              {isProductDetail ? (
+                <>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onShare?.(); }}
+                    className={`transition-all duration-300 flex items-center justify-center ${!isScrolled ? "w-10 h-10 bg-white rounded-full shadow-md text-brand-green" : "w-8 h-8 text-white"}`}
+                  >
+                    <ShareIcon size={!isScrolled ? 20 : 22} />
+                  </button>
+                  {onFavorite && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onFavorite?.(); }}
+                      className={`transition-all duration-300 flex items-center justify-center ${!isScrolled ? "w-10 h-10 bg-white rounded-full shadow-md text-brand-green" : "w-8 h-8 text-white"}`}
+                    >
+                      <HeartIcon size={!isScrolled ? 20 : 22} className={isFavorite ? "fill-current" : ""} />
+                    </button>
+                  )}
+                </>
+              ) : (
+                <Link href="/cart" prefetch={true} className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
+                  <ShoppingBagIcon size={24} strokeWidth={2} />
+                  {cartCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-brand-orange text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border border-brand-dark">
+                      {cartCount}
+                    </span>
+                  )}
+                </Link>
+              )}
+            </div>
           </div>
-          {(!isScrolled && showDeliveryInfo) && (
+          
+          {/* Delivery Info */}
+          {(!isScrolled && showDeliveryInfo && !isProductDetail) && (
             <div className="flex items-center gap-1.5 px-1 mt-2.5 text-brand-inactive-text cursor-pointer w-full overflow-hidden">
               <MapPinIcon size={14} className="shrink-0 text-white" />
               <span className="text-[12px] font-normal truncate leading-tight ml-0.5 text-white">

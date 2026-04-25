@@ -13,7 +13,7 @@ import {
   getSubscriptionStatusAction,
   createSubscriptionAction,
   upgradeSubscriptionAction,
-} from "@/app/actions/subscriptions"
+} from "@/app/actions/erp/subscriptions"
 import { buildFeaturesDisplay, getHardcodedPlan } from "@/lib/subscription/feature-labels"
 import { PLAN_UPGRADE_ICONS, PLAN_UPGRADE_MASCOTS, type PlanTierSlug } from "@/lib/subscription/plan-tier"
 import { Input as FormInput } from "@/components/reusable/Input"
@@ -77,26 +77,26 @@ function PlanUpgradeModalInner({
   useEffect(() => {
     if (!isOpen || !target || target === "free") return
     let cancelled = false
-    ;(async () => {
-      setLoading(true)
-      try {
-        const [plansRes, statusRes] = await Promise.all([listPlansAction(), getSubscriptionStatusAction()])
-        if (cancelled) return
-        if (plansRes.success && plansRes.data) {
-          setPlans([...plansRes.data].sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)))
-        }
-        if (statusRes.success && statusRes.data) {
-          setSubData(statusRes.data)
-          if (statusRes.data.subscription?.billing_email) {
-            setBillingEmail(statusRes.data.subscription.billing_email)
+      ; (async () => {
+        setLoading(true)
+        try {
+          const [plansRes, statusRes] = await Promise.all([listPlansAction(), getSubscriptionStatusAction()])
+          if (cancelled) return
+          if (plansRes.success && plansRes.data) {
+            setPlans([...plansRes.data].sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)))
           }
+          if (statusRes.success && statusRes.data) {
+            setSubData(statusRes.data)
+            if (statusRes.data.subscription?.billing_email) {
+              setBillingEmail(statusRes.data.subscription.billing_email)
+            }
+          }
+        } catch {
+          toast.error("Não foi possível carregar os planos.")
+        } finally {
+          if (!cancelled) setLoading(false)
         }
-      } catch {
-        toast.error("Não foi possível carregar os planos.")
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    })()
+      })()
     return () => {
       cancelled = true
     }
@@ -265,9 +265,8 @@ function PlanUpgradeModalInner({
       <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
         <div className={`fixed inset-0 bg-black/60 transition-opacity duration-200 ${anim ? "opacity-100" : "opacity-0"}`} onClick={onClose} />
         <div
-          className={`relative z-10 flex w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl transition-all duration-200 ease-out bg-white dark:bg-dark-surface ${
-            anim ? "scale-100 opacity-100" : "scale-95 opacity-0"
-          }`}
+          className={`relative z-10 flex w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl transition-all duration-200 ease-out bg-white dark:bg-dark-surface ${anim ? "scale-100 opacity-100" : "scale-95 opacity-0"
+            }`}
         >
           <div className="flex flex-col md:flex-row w-full min-h-[480px]">{leftPanel}{rightPanel}</div>
         </div>
@@ -304,7 +303,7 @@ export function PlanUpgradeProvider({ children }: { children: React.ReactNode })
 export function usePlanUpgrade(): PlanUpgradeContextValue {
   const ctx = useContext(PlanUpgradeContext)
   if (!ctx) {
-    return { openPlanUpgrade: () => {} }
+    return { openPlanUpgrade: () => { } }
   }
   return ctx
 }

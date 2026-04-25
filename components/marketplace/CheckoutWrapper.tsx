@@ -17,7 +17,7 @@ import { useSupabase } from "@/providers/supabase-provider"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import Link from "next/link"
 import { formatCurrency } from "@/lib/utils"
-import { validateMarketplaceCouponAction } from "@/app/actions/erp/coupons"
+import { validateMarketplaceCouponAction } from "@/app/actions/shared/coupons"
 
 interface ProductItem {
     id: string

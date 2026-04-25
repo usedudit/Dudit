@@ -15,7 +15,7 @@ import { formatCurrency } from "@/lib/utils";
 import { ShareModal } from "./ShareModal"
 import dynamic from "next/dynamic"
 import { addToCartAction } from "@/app/actions/marketplace/cart"
-import { createOrderAction } from "@/app/actions/orders"
+import { createOrderAction } from "@/app/actions/marketplace/orders"
 import { InfoCard } from "@/components/reusable/InfoCard"
 import { getPartnerUrl } from "@/lib/utils/url-generator"
 import { useNotification } from "@/hooks/use-notification"
@@ -120,6 +120,7 @@ export function ProductDetailsPageClient({
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [showResponsibilityModal, setShowResponsibilityModal] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
+  const [isFavorite, setIsFavorite] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
 
   const galleryContainerRef = useRef<HTMLDivElement>(null)
@@ -784,7 +785,16 @@ export function ProductDetailsPageClient({
       />
 
 
-      {!hideHeaderAndFooter && <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />}
+      {!hideHeaderAndFooter && (
+        <MarketplaceHeader
+          userProfile={userProfile}
+          cartCount={cartCount}
+          productName={product.name}
+          onShare={() => setShowShareModal(true)}
+          onFavorite={() => setIsFavorite(!isFavorite)}
+          isFavorite={isFavorite}
+        />
+      )}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -883,19 +893,11 @@ export function ProductDetailsPageClient({
                           </button>
                         </>
                       )}
-                      <div className="absolute top-4 right-4 z-10">
-                        <ActionButtons onShareClick={() => setShowShareModal(true)} />
-                      </div>
+
                     </div>
                   </div>
 
-                  {/* Desktop action buttons */}
-                  <div className="hidden lg:flex flex-col gap-2 shrink-0 pt-1 pl-6">
-                    <ActionButtons
-                      className="flex-col"
-                      onShareClick={() => setShowShareModal(true)}
-                    />
-                  </div>
+
                 </div>
               </div>
 

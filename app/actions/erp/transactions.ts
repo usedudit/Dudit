@@ -2037,7 +2037,7 @@ export async function getTransactionDetailsAction(
                     status: String(g.status || "").toLowerCase() === "paid" ? "paid" : overdue ? "overdue" : "pending",
                 }
             })
-            const allInstallmentsPaid = installmentBreakdown.length > 0 && installmentBreakdown.every((i) => i.status === "paid")
+            const allInstallmentsPaid = (installmentBreakdown?.length ?? 0) > 0 && installmentBreakdown?.every((i) => i.status === "paid")
             if (allInstallmentsPaid) {
                 const latestPayment = (groupRows || [])
                     .map((g: any) => (g.payment_date ? new Date(String(g.payment_date)).getTime() : 0))

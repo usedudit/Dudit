@@ -68,11 +68,23 @@ export const PaymentMethodCard = ({ icon: Icon, label, onClick }: { icon: any, l
 export interface SplitPaymentCardProps {
     icon: any;
     label: string;
+    /** Valor base (antes de taxa/juros/desconto do meio) */
     amount: string;
     onClick: () => void;
+    /** Valor final após cálculo, quando disponível */
+    recalculatedAmount?: string;
+    /** Ex.: "Desc. 3% · + juros" */
+    subLabel?: string;
 }
 
-export const SplitPaymentCard: React.FC<SplitPaymentCardProps> = ({ icon: Icon, label, amount, onClick }) => (
+export const SplitPaymentCard: React.FC<SplitPaymentCardProps> = ({
+    icon: Icon,
+    label,
+    amount,
+    onClick,
+    recalculatedAmount,
+    subLabel,
+}) => (
     <div
         className="flex items-center gap-3 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20 cursor-pointer transition-colors group"
         onClick={onClick}
@@ -80,14 +92,27 @@ export const SplitPaymentCard: React.FC<SplitPaymentCardProps> = ({ icon: Icon, 
         <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center shrink-0 group-hover:bg-white dark:group-hover:bg-dark-surface">
             <Icon size={18} className="text-brand-dark dark:text-dark-heading" />
         </div>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
             <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block mb-0.5">{label}</span>
-            <span className="text-xs text-brand-inactive-text">Toque para editar</span>
+            {subLabel ? (
+                <span className="text-xs text-brand-inactive-text line-clamp-2">{subLabel}</span>
+            ) : (
+                <span className="text-xs text-brand-inactive-text">Toque para editar valor e método</span>
+            )}
         </div>
-        <div className="text-right">
-            <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block">{amount}</span>
+        <div className="text-right shrink-0 max-w-[50%]">
+            {recalculatedAmount ? (
+                <>
+                    <div className="text-[9px] uppercase font-semibold text-brand-inactive-text">Base</div>
+                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block">{amount}</span>
+                    <div className="text-[9px] uppercase font-semibold text-brand-inactive-text mt-0.5">A cobrar</div>
+                    <span className="font-bold text-sm text-brand-green dark:text-green-400 block">{recalculatedAmount}</span>
+                </>
+            ) : (
+                <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block">{amount}</span>
+            )}
         </div>
-        <ChevronRightIcon size={16} className="text-brand-inactive-text" />
+        <ChevronRightIcon size={16} className="text-brand-inactive-text shrink-0" />
     </div>
 );
 

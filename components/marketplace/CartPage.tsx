@@ -17,6 +17,7 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { formatCurrency } from "@/lib/utils"
+import { useTransitionDirection } from "@/providers/transition-provider"
 
 interface CartPageClientProps {
   itemsByPartner: any
@@ -26,6 +27,7 @@ interface CartPageClientProps {
 export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) {
   const router = useRouter()
   const { user } = useSupabase()
+  const { setDirection } = useTransitionDirection()
   const [isVendorExpanded, setIsVendorExpanded] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState<string | null>(null)
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; cartItemId: string | null }>({ open: false, cartItemId: null })
@@ -500,6 +502,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                 <Link
                                   href={getPartnerUrl(data.partner)}
                                   prefetch={false}
+                                  onClick={() => setDirection("back")}
                                   className="flex items-center gap-2 text-brand-green hover:underline font-medium text-[14px]"
                                 >
                                   <ChevronLeftIcon size={16} />Escolher mais itens
@@ -569,6 +572,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
               <Link
                 href="/"
                 prefetch={false}
+                onClick={() => setDirection("back")}
                 className="flex items-center gap-2 text-brand-green hover:underline font-medium text-[14px] mt-2 md:hidden"
               >
                 <ChevronLeftIcon size={18} />Voltar para as compras

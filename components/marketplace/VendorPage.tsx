@@ -8,6 +8,7 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getProductUrl } from "@/lib/utils/url-generator"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
 import { ShareModal } from "./ShareModal"
+import { MarketplaceHeader } from "./MarketplaceHeader"
 import { formatCurrency, formatDate, formatMonth, formatYear, formatNumber } from "@/lib/utils"
 
 // --- TYPES ---
@@ -445,7 +446,6 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
   const [isSortOpen, setIsSortOpen] = useState(false)
   const [mobileModalTab, setMobileModalTab] = useState<"reviews" | "info">("reviews")
   const [isAboutPageOpen, setIsAboutPageOpen] = useState(false)
-  const [isMobileHeaderVisible, setIsMobileHeaderVisible] = useState(false)
   const [searchValue, setSearchValue] = useState("")
   const [isDesktopSortOpen, setIsDesktopSortOpen] = useState(false)
   const [selectedSort, setSelectedSort] = useState("Mais recentes")
@@ -477,13 +477,6 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
       `*${partner.storeName}*\n` +
       `Confere aqui os produtos:`;
   }, [partner.storeName])
-
-  // Scroll para mostrar/esconder header sticky mobile
-  useEffect(() => {
-    const handleScroll = () => setIsMobileHeaderVisible(window.scrollY > 200)
-    window.addEventListener("scroll", handleScroll, { passive: true })
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
 
   // Lock scroll e z-index do header global quando modais estão abertos
   useEffect(() => {
@@ -565,46 +558,10 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
 
   return (
     <div className="container mx-auto px-4 lg:px-6 max-w-[1300px] animate-fade-in mt-6">
-      {/* Botões flutuantes mobile (voltar / share / heart) */}
-      <div className="lg:hidden">
-        <div className={`fixed top-0 left-0 right-0 z-[50] flex items-start justify-between px-4 pt-4 w-full transition-opacity duration-300 ${isMobileHeaderVisible ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"}`}>
-          <button onClick={() => router.back()} className="w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-brand-green">
-            <ArrowLeftIcon size={22} strokeWidth={2.5} />
-          </button>
-          <div className="flex flex-col gap-2">
-            <button className="w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-brand-green shadow-sm"><HeartIcon size={20} /></button>
-            <button onClick={() => setShowShareModal(true)} className="w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-brand-green shadow-sm"><ShareIcon size={20} /></button>
-          </div>
-        </div>
-
-        {/* Header sticky mobile com scroll */}
-        <div className={`fixed top-0 left-0 right-0 z-[49] bg-white border-b border-brand-border shadow-sm flex flex-col transition-transform duration-300 ${isMobileHeaderVisible ? "translate-y-0" : "-translate-y-full"}`}>
-          <div className="flex items-center justify-between px-4 h-[54px] border-b border-brand-border">
-            <div className="flex items-center gap-3">
-              <button onClick={() => router.back()} className="text-brand-green"><ArrowLeftIcon size={24} strokeWidth={2.5} /></button>
-              <div className="flex items-center gap-2">
-                <img src={partnerProfileImageUrl || "https://img.dudit.com.br/static/Placeholder.png"} className="w-8 h-8 rounded-full border border-brand-border object-cover" alt={partner.storeName} />
-                <span className="text-[16px] font-semibold text-brand-dark">{partner.storeName}</span>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center h-[48px]">
-            <button onClick={() => setIsContextModalOpen(true)} className="relative pl-4 pr-3 flex items-center shrink-0 font-bold text-brand-green text-[14px]">
-              {activeContext} <ChevronDownIcon size={14} />
-            </button>
-            <div className="w-[1px] h-[16px] bg-gray-200" />
-            <div className="flex-1 overflow-x-auto no-scrollbar h-full flex items-center px-3 gap-4">
-              {currentTags.map(tag => (
-                <button key={tag} onClick={() => handleTagSelect(tag)}
-                  className={`text-[14px] whitespace-nowrap relative h-full flex items-center ${activeTag === tag ? "font-semibold text-brand-green" : "font-normal text-brand-inactive-text"}`}>
-                  <span className="capitalize">{tag}</span>
-                  {activeTag === tag && <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-brand-green rounded-t-full" />}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+      <MarketplaceHeader 
+        productName={partner.storeName}
+        onShare={() => setShowShareModal(true)}
+      />
 
       {/* Banner - rounded a partir de md */}
       <div className="w-full h-[220px] md:rounded-[24px] md:mb-4 overflow-hidden relative">

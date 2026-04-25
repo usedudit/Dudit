@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ShoppingBag } from "lucide-react"
 import { CheckoutWrapper } from "@/components/marketplace/CheckoutWrapper"
-import { createOrderAction } from "@/app/actions/orders"
+import { createOrderAction } from "@/app/actions/marketplace/orders"
 import { useNotification } from "@/hooks/use-notification"
 import { formatCurrency } from "@/lib/utils"
 

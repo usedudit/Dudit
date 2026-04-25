@@ -38,7 +38,7 @@ import { getInstallmentGroupDetailsAction } from "@/app/actions/erp/transactions
 import { recordInstallmentPaymentAction } from "@/app/actions/erp/transactions"
 import { settleInstallmentGroupAction } from "@/app/actions/erp/transactions"
 import { getFinancialTransactionsAction } from "@/app/actions/erp/transactions"
-import { getPaymentMethodsAction } from "@/app/actions/payment-methods"
+import { getPaymentMethodsAction } from "@/app/actions/erp/payment-methods"
 import { useRouter } from "next/navigation"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import { useNotification } from "@/hooks/use-notification"
@@ -254,11 +254,11 @@ export default function TransactionsPage({
     useEffect(() => {
         let active = true
         if (paymentMethods?.length) return
-        ;(async () => {
-            const methods = await getPaymentMethodsAction(partnerId)
-            if (!active) return
-            setFallbackPaymentMethods(Array.isArray(methods) ? methods : [])
-        })()
+            ; (async () => {
+                const methods = await getPaymentMethodsAction(partnerId)
+                if (!active) return
+                setFallbackPaymentMethods(Array.isArray(methods) ? methods : [])
+            })()
         return () => {
             active = false
         }

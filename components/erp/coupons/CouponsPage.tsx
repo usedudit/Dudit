@@ -18,7 +18,7 @@ import {
     listCouponsAction,
     toggleCouponStatusAction,
     updateCouponAction,
-} from "@/app/actions/erp/coupons"
+} from "@/app/actions/shared/coupons"
 import CouponPageControls from "./CouponPageControls"
 import CouponGridCard from "./CouponGridCard"
 import CouponListItem from "./CouponListRow"

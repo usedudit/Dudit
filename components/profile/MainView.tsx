@@ -12,7 +12,7 @@ interface MainViewProps {
 export const MainView = ({ navigate }: MainViewProps) => (
   <motion.div key="main" {...fade}>
     {/* Header */}
-    <div className="flex items-center mb-8">
+    <div className="hidden lg:block items-center mb-8">
       <div>
         <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
           Meu perfil

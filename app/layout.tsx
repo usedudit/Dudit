@@ -25,6 +25,7 @@ export const metadata: Metadata = {
 import { SupabaseProvider } from "@/providers/supabase-provider"
 import { QueryProvider } from "@/providers/query-provider"
 import { getCurrentUser } from "@/lib/auth/server-user"
+import { TransitionProvider } from "@/providers/transition-provider"
 
 export default async function RootLayout({
   children,
@@ -85,7 +86,9 @@ export default async function RootLayout({
           <QueryProvider>
             <PreventSamePageNavigation />
             <NotificationProvider>
-              {children}
+              <TransitionProvider>
+                {children}
+              </TransitionProvider>
             </NotificationProvider>
           </QueryProvider>
         </SupabaseProvider>

@@ -2,7 +2,7 @@ import { AccessDenied } from "@/components/erp/access-denied"
 import CouponsPage from "@/components/erp/coupons/CouponsPage"
 import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { listCouponsAction } from "@/app/actions/erp/coupons"
+import { listCouponsAction } from "@/app/actions/shared/coupons"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
 

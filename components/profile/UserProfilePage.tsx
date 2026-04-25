@@ -3,8 +3,9 @@
 import { useState, useRef, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
 import { updateProfileAction, requestEmailChangeAction, verifyEmailChangeAction } from "@/app/actions/profile"
-import { changePasswordAction } from "@/app/actions/password"
+import { changePasswordAction } from "@/app/actions/shared/password"
 import { useNotification } from "@/hooks/use-notification"
+import { useRouter, useSearchParams } from "next/navigation"
 import { formatE164ToDisplay } from "@/lib/utils/phone-utils"
 import { MarketplaceHeader } from "../marketplace/MarketplaceHeader"
 import { MarketplaceFooter } from "../marketplace/MarketplaceFooter"
@@ -27,7 +28,19 @@ interface UserProfilePageProps {
 
 export function UserProfilePage({ userId, profile, initialFullName, email, hasPassword, authProvider }: UserProfilePageProps) {
   const { success: notifySuccess, error: notifyError } = useNotification()
-  const [currentView, setCurrentView] = useState<View>("main")
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const tab = searchParams.get("tab") as View | null
+
+  const [currentView, setCurrentView] = useState<View>(tab || "main")
+
+  useEffect(() => {
+    if (tab && tab !== currentView) {
+      setCurrentView(tab)
+    } else if (!tab && currentView !== "main") {
+      setCurrentView("main")
+    }
+  }, [tab])
 
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
@@ -108,7 +121,12 @@ export function UserProfilePage({ userId, profile, initialFullName, email, hasPa
     setEditing({ name: false, cpf: false, phone: false, password: false, address: false, secPhone: false, secEmail: false })
     setIsChangingEmail(false)
     setIsChangingSecEmail(false)
-    setCurrentView(view)
+
+    if (view === "main") {
+      router.push("/profile")
+    } else {
+      router.push(`/profile?tab=${view}`)
+    }
   }
 
   const startTimer = (
@@ -303,12 +321,23 @@ export function UserProfilePage({ userId, profile, initialFullName, email, hasPa
 
   // ── Render ───────────────────────────────────────────────────────────────
 
+  const getViewTitle = () => {
+    switch (currentView) {
+      case "main": return "Meu perfil"
+      case "account": return "Informações da conta"
+      case "address": return "Endereço"
+      case "password": return "Segurança"
+      case "two-factor": return "Autenticação 2FA"
+      default: return "Meu perfil"
+    }
+  }
+
   return (
     <>
-      <MarketplaceHeader />
-      <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans animate-fade-in flex flex-col">
+      <MarketplaceHeader simpleTitle={getViewTitle()} />
+      <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col">
         <style>{`.animate-fade-in{animation:fadeIn 0.4s ease-out forwards}@keyframes fadeIn{from{opacity:0}to{opacity:1}}`}</style>
-        <div className="container mx-auto px-4 lg:px-6 max-w-[1300px] mt-16 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
+        <div className="container mx-auto px-4 lg:px-6 max-w-[1300px] mt-12 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
           <AnimatePresence mode="wait">
             {currentView === "main" && <MainView key="main" navigate={navigate} />}
             {currentView === "account" && (

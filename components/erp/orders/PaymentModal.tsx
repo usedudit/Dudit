@@ -22,7 +22,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { Input, Button, Checkbox } from '@/components/reusable';
 import { ReceiptContent, PaymentMethodCard, Numpad, SplitPaymentCard } from './POSComponents';
-import { calculatePaymentMethodAmountsAction, getPaymentMethodsAction } from '@/app/actions/payment-methods';
+import { calculatePaymentMethodAmountsAction, getPaymentMethodsAction, previewSplitPaymentBreakdownAction } from '@/app/actions/erp/payment-methods';
 import { useToast } from "@/components/ui/use-toast";
 import { formatCurrency, formatDate, formatTime } from '@/lib/utils';
 
@@ -168,15 +168,24 @@ const PaymentModal = ({
     const [isPendingPayment, setIsPendingPayment] = useState(false);
     const [isPendingDelivery, setIsPendingDelivery] = useState(false);
 
-    // Split Payment Logic - LIMITED TO 2 AS REQUESTED
-    const [payments, setPayments] = useState<{ id: number, method: string | null, paymentMethodId: string | null, amount: number }[]>([
-        { id: 1, method: null, paymentMethodId: null, amount: 0 },
-        { id: 2, method: null, paymentMethodId: null, amount: 0 }
+    // Split: user-defined base amount per method (not weights / percentages)
+    const [payments, setPayments] = useState<{
+        id: number
+        method: string | null
+        paymentMethodId: string | null
+        amount: number
+        installmentNumber: number
+    }[]>([
+        { id: 1, method: null, paymentMethodId: null, amount: 0, installmentNumber: 1 },
+        { id: 2, method: null, paymentMethodId: null, amount: 0, installmentNumber: 1 }
     ]);
     const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
     const [selectedMethodType, setSelectedMethodType] = useState<string | null>(null);
     const [editingPaymentIndex, setEditingPaymentIndex] = useState<number | null>(null);
     const [paymentCalculation, setPaymentCalculation] = useState<any | null>(null);
+    const [splitPreview, setSplitPreview] = useState<
+        { success: true; finalTotal: number; rows: any[] } | { success: false; error: string } | null
+    >(null);
 
     const subTotal = cart.reduce((acc: number, item: any) => acc + (item.unitPrice * item.quantity), 0);
     const total = subTotal + shippingFee + otherCosts - discountAmount;
@@ -257,12 +266,59 @@ const PaymentModal = ({
             setErrorMessage("Não conseguimos concluir a venda agora.");
 
             setPayments([
-                { id: 1, method: null, paymentMethodId: null, amount: 0 },
-                { id: 2, method: null, paymentMethodId: null, amount: 0 }
+                { id: 1, method: null, paymentMethodId: null, amount: 0, installmentNumber: 1 },
+                { id: 2, method: null, paymentMethodId: null, amount: 0, installmentNumber: 1 }
             ]);
             setSelectedMethodId(null);
+            setSplitPreview(null);
         }
     }, [isOpen, total]);
+
+    const activeSplitLegs = useMemo(
+        () => payments.filter((p) => p.method && p.amount > 0.009),
+        [payments],
+    );
+
+    useEffect(() => {
+        let active = true;
+        if (view !== 'split' || !partnerId) {
+            if (view !== 'split') setSplitPreview(null);
+            return;
+        }
+        if (activeSplitLegs.length === 0) {
+            setSplitPreview(null);
+            return;
+        }
+        const t = setTimeout(() => {
+            previewSplitPaymentBreakdownAction({
+                partnerId: String(partnerId),
+                baseTotal: Math.max(0, Number(chargeTarget || 0)),
+                legs: activeSplitLegs.map((p) => ({
+                    method: p.method || '—',
+                    baseAmount: p.amount,
+                    paymentMethodId: p.paymentMethodId,
+                    installmentNumber: Math.max(1, p.installmentNumber || 1),
+                })),
+            }).then((res) => {
+                if (!active) return;
+                if (res && 'success' in res && res.success) {
+                    setSplitPreview({
+                        success: true,
+                        finalTotal: res.finalTotal,
+                        rows: res.rows || [],
+                    });
+                } else if (res && 'success' in res && !res.success) {
+                    setSplitPreview({ success: false, error: String((res as { error?: string }).error || 'Não foi possível calcular.') });
+                } else {
+                    setSplitPreview(null);
+                }
+            });
+        }, 200);
+        return () => {
+            active = false;
+            clearTimeout(t);
+        };
+    }, [view, partnerId, chargeTarget, activeSplitLegs, payments]);
 
     // Auto-fill amount logic
     useEffect(() => {
@@ -270,6 +326,9 @@ const PaymentModal = ({
             setIsPixGenerated(false);
             if (editingPaymentIndex !== null) {
                 const currentSlot = payments[editingPaymentIndex];
+                if (Number(currentSlot.installmentNumber) > 1) {
+                    setInstallments(String(currentSlot.installmentNumber));
+                }
                 if (currentSlot.amount > 0) {
                     setAmountPaid(currentSlot.amount.toString());
                 } else {
@@ -398,13 +457,14 @@ const PaymentModal = ({
         }
     };
 
-    const handleSplitPaymentUpdate = (newAmount: number, newMethod?: string) => {
+    const handleSplitPaymentUpdate = (newAmount: number) => {
         if (editingPaymentIndex !== null) {
+            const inst = view === 'card' ? Math.max(1, parseInt(String(installments), 10) || 1) : 1;
             const newPayments = [...payments];
             newPayments[editingPaymentIndex] = {
                 ...newPayments[editingPaymentIndex],
                 amount: newAmount,
-                method: newMethod || newPayments[editingPaymentIndex].method
+                installmentNumber: inst,
             };
             setPayments(newPayments);
             setView('split');
@@ -415,9 +475,14 @@ const PaymentModal = ({
     const handleMethodSelectionInSplit = (method: PartnerPaymentMethod) => {
         if (editingPaymentIndex !== null) {
             const newPayments = [...payments];
-            newPayments[editingPaymentIndex].method = method.name;
-            newPayments[editingPaymentIndex].paymentMethodId = method.id;
+            newPayments[editingPaymentIndex] = {
+                ...newPayments[editingPaymentIndex],
+                method: method.name,
+                paymentMethodId: method.id,
+            };
             setPayments(newPayments);
+            setSelectedMethodId(method.id);
+            setInstallments(String(newPayments[editingPaymentIndex]?.installmentNumber || 1));
             const normalizedType = normalizeMethodType(method.type);
             if (normalizedType === 'cash') setView('money');
             else if (normalizedType === 'pix') setView('pix');
@@ -446,6 +511,11 @@ const PaymentModal = ({
     };
 
     const buildConfirmPayload = () => {
+        const splitFinalCharged =
+            view === 'split' && splitPreview && 'success' in splitPreview && splitPreview.success
+                ? splitPreview.finalTotal
+                : null;
+
         const newPaymentBreakdown = isPendingPayment
             ? []
             : view === 'split'
@@ -455,6 +525,7 @@ const PaymentModal = ({
                         method: normalizePaymentMethodLabel(payment.method),
                         amount: Number(payment.amount || 0),
                         paymentMethodId: payment.paymentMethodId || null,
+                        installmentNumber: Math.max(1, Number(payment.installmentNumber || 1)),
                     }))
                 : [{
                     method: normalizePaymentMethodLabel(activeMethods.find((method) => method.id === selectedMethodId)?.name || (view === 'money' ? 'dinheiro' : (view === 'pix' ? 'pix' : 'cartao'))),
@@ -470,13 +541,18 @@ const PaymentModal = ({
             ? 'pendente'
             : Array.from(new Set(mergedPaymentBreakdown.map((entry: any) => normalizePaymentMethodLabel(entry.method)))).join(', ');
 
+        const paidToRegister =
+            isPendingPayment
+                ? existingPaidAmount
+                : (existingPaidAmount + (splitFinalCharged != null ? splitFinalCharged : totalPaidCalculated));
+
         return {
             paymentMethod: paymentMethod || 'pendente',
             paymentBreakdown: mergedPaymentBreakdown,
             splitPayments: view === 'split' ? payments : [],
             paymentStatus: isPendingPayment ? 'unpaid' : (isUnderpaid ? 'partially_paid' : 'paid'),
             isPendingDelivery,
-            paidAmount: isPendingPayment ? existingPaidAmount : (existingPaidAmount + totalPaidCalculated)
+            paidAmount: paidToRegister
         };
     };
 
@@ -812,17 +888,45 @@ const PaymentModal = ({
                                         <motion.div key="split" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="flex flex-col w-full h-full">
                                             <div className="flex-1 px-2 py-4">
                                                 <CompactPaymentStatusAlert totalPaid={totalPaidCalculated} totalNeed={chargeTarget} />
+                                                {splitPreview && !splitPreview.success && (
+                                                    <p className="text-sm text-red-600 dark:text-red-400 mb-3" role="alert">
+                                                        {splitPreview.error}
+                                                    </p>
+                                                )}
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    {payments.map((p, idx) => (
-                                                        <SplitPaymentCard
-                                                            key={p.id}
-                                                            icon={getIconForMethod(p.method, p.paymentMethodId)}
-                                                            label={p.method || "Selecionar método"}
-                                                            amount={formatCurrency(p.amount)}
-                                                            onClick={() => { setEditingPaymentIndex(idx); setView('split_method_select'); }}
-                                                        />
-                                                    ))}
+                                                    {payments.map((p, idx) => {
+                                                        const li = activeSplitLegs.findIndex((l) => l.id === p.id);
+                                                        const pr = splitPreview && 'success' in splitPreview && splitPreview.success && li >= 0
+                                                            ? (splitPreview.rows[li] as { finalAmount: number; paymentMethodDiscountAmount?: number; interestAmount?: number; feeAmount?: number })
+                                                            : null;
+                                                        const sub: string[] = [];
+                                                        if (pr) {
+                                                            if (Number(pr.paymentMethodDiscountAmount || 0) > 0) sub.push(`Desc. meio −${formatCurrency(pr.paymentMethodDiscountAmount || 0)}`);
+                                                            if (Number(pr.interestAmount || 0) > 0) sub.push(`+ juros ${formatCurrency(pr.interestAmount || 0)}`);
+                                                            if (Number(pr.feeAmount || 0) > 0) sub.push(`taxa (estim.) ${formatCurrency(pr.feeAmount || 0)}`);
+                                                        }
+                                                        const showFinal = pr != null && Math.abs(pr.finalAmount - p.amount) > 0.005;
+                                                        return (
+                                                            <SplitPaymentCard
+                                                                key={p.id}
+                                                                icon={getIconForMethod(p.method, p.paymentMethodId)}
+                                                                label={p.method || "Selecionar método"}
+                                                                amount={formatCurrency(p.amount)}
+                                                                recalculatedAmount={showFinal ? formatCurrency(pr!.finalAmount) : undefined}
+                                                                subLabel={sub.length ? sub.join(" · ") : undefined}
+                                                                onClick={() => { setEditingPaymentIndex(idx); setView('split_method_select'); }}
+                                                            />
+                                                        );
+                                                    })}
                                                 </div>
+                                                {splitPreview && 'success' in splitPreview && splitPreview.success && (
+                                                    <div className="mt-4 flex flex-col sm:flex-row sm:items-baseline sm:justify-end gap-1 sm:gap-2 border-t border-brand-border dark:border-dark-border pt-4 text-right">
+                                                        <span className="text-sm text-brand-inactive-text">Total base (pedido):</span>
+                                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(chargeTarget)}</span>
+                                                        <span className="text-sm text-brand-inactive-text sm:ml-2">Total a cobrar:</span>
+                                                        <span className="text-lg font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(splitPreview.finalTotal)}</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </motion.div>
                                     )}
@@ -1011,6 +1115,12 @@ const PaymentModal = ({
                                     showConfirm={true}
                                     confirmText={isUnderpaid ? "Registrar venda parcialmente" : "Registrar venda"}
                                     buttonVariant={isUnderpaid ? "outline" : "filled"}
+                                    disabled={
+                                        activeSplitLegs.length > 0 &&
+                                        splitPreview != null &&
+                                        'success' in splitPreview &&
+                                        !splitPreview.success
+                                    }
                                 />
                             )}
 

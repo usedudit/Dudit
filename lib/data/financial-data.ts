@@ -5,7 +5,7 @@ import type { FinancialTransactionCursor } from "@/lib/services/transactions.typ
 import { getFinancialCategoriesAction } from "@/app/actions/erp/financial-category-metadata"
 import { getFinanceAccountsAction } from "@/app/actions/erp/finance-accounts"
 import { generateRecurringOccurrencesAction, getRecurringTransactionsAction } from "@/app/actions/erp/recurring-transactions"
-import { getPaymentMethodsAction } from "@/app/actions/payment-methods"
+import { getPaymentMethodsAction } from "@/app/actions/erp/payment-methods"
 
 // ============================================================================
 // REQUEST-SCOPED DEDUPLICATION LAYER

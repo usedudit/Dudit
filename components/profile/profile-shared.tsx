@@ -96,7 +96,7 @@ export const PageHeader = ({
     subtitle: string
     onBack: () => void
 }) => (
-    <div className="mb-8 flex items-center gap-4">
+    <div className="hidden lg:flex mb-8 items-center gap-4">
         <div className="hidden md:flex">
             <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
                 <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />

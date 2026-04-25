@@ -19,7 +19,7 @@ import {
     getPaymentMethodDetailsAction,
     getPartnerFinanceAccountsForPaymentMethodsAction,
     updatePaymentMethodAction,
-} from "@/app/actions/payment-methods"
+} from "@/app/actions/erp/payment-methods"
 import { createFinanceAccountAction, getFinanceAccountsAction } from "@/app/actions/erp/finance-accounts"
 import { PlusIcon } from "@/lib/icons"
 

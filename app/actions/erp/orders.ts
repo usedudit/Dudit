@@ -16,7 +16,11 @@ import { revalidateStockMovements } from "@/lib/utils/revalidation"
 import { finalizeOrderInventory, releaseOrderInventory, reserveOrderInventory, shouldDeductInventory } from "@/lib/stock/reservations"
 import { validateCoupon, validateCouponById } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
-import { calculatePaymentAmounts } from "@/lib/payments/calculation"
+import {
+    recalculateSplitPaymentFromBaseAmounts,
+    toStoredBreakdownAmounts,
+    type SplitInputRow,
+} from "@/lib/payments/split-breakdown"
 
 type ERPItemPayload = {
     productId: string | null
@@ -183,34 +187,39 @@ function sanitizePaymentBreakdown(entries: ERPOrderPayload["paymentBreakdown"]) 
     return normalizedEntries
 }
 
+type ApplyPaymentMethodPricingResult =
+    | { ok: true; finalTotal: number; feeAmount: number; interestAmount: number; paymentMethodDiscountAmount: number; adjustedBreakdown: PaymentBreakdownEntry[] }
+    | { ok: false; error: string }
+
 async function applyPaymentMethodPricingToTotal(
     supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
     partnerId: string,
     baseTotal: number,
     paymentBreakdown: PaymentBreakdownEntry[],
-) {
+): Promise<ApplyPaymentMethodPricingResult> {
     const safeBase = Math.max(0, Math.round(Number(baseTotal || 0) * 100) / 100)
     const breakdown = paymentBreakdown || []
     if (breakdown.length === 0) {
-        return { finalTotal: safeBase, feeAmount: 0, interestAmount: 0, paymentMethodDiscountAmount: 0, adjustedBreakdown: [] as PaymentBreakdownEntry[] }
+        return { ok: true, finalTotal: safeBase, feeAmount: 0, interestAmount: 0, paymentMethodDiscountAmount: 0, adjustedBreakdown: [] as PaymentBreakdownEntry[] }
     }
 
     const methodIds = Array.from(new Set(breakdown.map((b) => b.paymentMethodId).filter(Boolean))) as string[]
-    if (methodIds.length === 0) {
-        return { finalTotal: safeBase, feeAmount: 0, interestAmount: 0, paymentMethodDiscountAmount: 0, adjustedBreakdown: breakdown }
-    }
 
     const [{ data: methods }, { data: fees }] = await Promise.all([
-        supabase
-            .from("payment_methods")
-            .select("id, fee_percent, fee_fixed, fee_bearer, discount_percent, max_installments")
-            .eq("partner_id", partnerId)
-            .eq("is_active", true)
-            .in("id", methodIds),
-        supabase
-            .from("payment_method_installment_fees")
-            .select("payment_method_id, installment_number, fee_percent")
-            .in("payment_method_id", methodIds),
+        methodIds.length > 0
+            ? supabase
+                .from("payment_methods")
+                .select("id, fee_percent, fee_fixed, fee_bearer, discount_percent, max_installments")
+                .eq("partner_id", partnerId)
+                .eq("is_active", true)
+                .in("id", methodIds)
+            : Promise.resolve({ data: [] as any[] }),
+        methodIds.length > 0
+            ? supabase
+                .from("payment_method_installment_fees")
+                .select("payment_method_id, installment_number, fee_percent")
+                .in("payment_method_id", methodIds)
+            : Promise.resolve({ data: [] as any[] }),
     ])
 
     const methodById = new Map<string, any>((methods || []).map((m: any) => [String(m.id), m]))
@@ -226,63 +235,37 @@ async function applyPaymentMethodPricingToTotal(
         feesByMethod.set(key, arr)
     }
 
-    const rawSum = breakdown.reduce((acc, row) => acc + Math.max(0, Number(row.amount || 0)), 0)
-    const baseCents = Math.round(safeBase * 100)
-    const tempBaseCents: number[] = []
-    let allocated = 0
-    for (let i = 0; i < breakdown.length; i += 1) {
-        if (i === breakdown.length - 1) {
-            tempBaseCents.push(baseCents - allocated)
-            break
-        }
-        const weight = rawSum > 0 ? Math.max(0, Number(breakdown[i].amount || 0)) / rawSum : 1 / breakdown.length
-        const cents = Math.max(0, Math.round(baseCents * weight))
-        tempBaseCents.push(cents)
-        allocated += cents
+    const splitRows: SplitInputRow[] = breakdown.map((row) => ({
+        method: row.method,
+        amount: Math.max(0, Math.round(Number(row.amount || 0) * 100) / 100),
+        paymentMethodId: row.paymentMethodId || null,
+        installmentNumber: Math.max(1, Math.floor(Number(row.installmentNumber || 1))),
+    }))
+
+    const recalculated = recalculateSplitPaymentFromBaseAmounts(
+        safeBase,
+        splitRows,
+        methodById,
+        feesByMethod,
+    )
+    if (!recalculated.ok) {
+        return { ok: false, error: recalculated.error }
     }
 
-    const adjustedBreakdown: PaymentBreakdownEntry[] = []
-    let finalTotal = 0
-    let feeAmount = 0
-    let interestAmount = 0
-    let paymentMethodDiscountAmount = 0
-
-    for (let i = 0; i < breakdown.length; i += 1) {
-        const row = breakdown[i]
-        const method = row.paymentMethodId ? methodById.get(String(row.paymentMethodId)) : null
-        const rowBase = Math.max(0, tempBaseCents[i] || 0) / 100
-        if (!method?.id) {
-            adjustedBreakdown.push({ ...row, amount: rowBase })
-            finalTotal += rowBase
-            continue
-        }
-        const calc = calculatePaymentAmounts({
-            originalAmount: rowBase,
-            installmentNumber: row.installmentNumber || 1,
-            paymentMethod: {
-                feePercent: Number(method.fee_percent || 0),
-                feeFixed: Number(method.fee_fixed || 0),
-                feeBearer: (method.fee_bearer || "merchant") as "merchant" | "customer",
-                discountPercent: Number(method.discount_percent || 0),
-                maxInstallments: Number(method.max_installments || 1),
-                installmentFees: feesByMethod.get(String(method.id)) || [],
-            },
-        })
-        adjustedBreakdown.push({
-            ...row,
-            amount: Number(calc.finalAmount || 0),
-        })
-        finalTotal += Number(calc.finalAmount || 0)
-        feeAmount += Number(calc.feeAmount || 0)
-        interestAmount += Number(calc.interestAmount || 0)
-        paymentMethodDiscountAmount += Number(calc.paymentMethodDiscountAmount || 0)
-    }
+    const stored = toStoredBreakdownAmounts(recalculated.adjustedRows)
+    const adjustedBreakdown: PaymentBreakdownEntry[] = stored.map((s, i) => ({
+        method: s.method,
+        amount: s.amount,
+        paymentMethodId: s.paymentMethodId,
+        installmentNumber: splitRows[i]?.installmentNumber || 1,
+    }))
 
     return {
-        finalTotal: Math.round(finalTotal * 100) / 100,
-        feeAmount: Math.round(feeAmount * 100) / 100,
-        interestAmount: Math.round(interestAmount * 100) / 100,
-        paymentMethodDiscountAmount: Math.round(paymentMethodDiscountAmount * 100) / 100,
+        ok: true,
+        finalTotal: recalculated.finalTotal,
+        feeAmount: recalculated.feeAmount,
+        interestAmount: recalculated.interestAmount,
+        paymentMethodDiscountAmount: recalculated.paymentMethodDiscountAmount,
         adjustedBreakdown,
     }
 }
@@ -1212,6 +1195,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         serverTotalAmount,
         sanitizedPaymentBreakdown,
     )
+    if (!paymentPricing.ok) return { error: paymentPricing.error }
     serverTotalAmount = paymentPricing.finalTotal
     const adjustedPaymentBreakdown =
         paymentPricing.adjustedBreakdown?.length > 0
@@ -1667,10 +1651,11 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     let updateServerTotal = updatePricingResult.finalTotal
     const updatePaymentPricing = await applyPaymentMethodPricingToTotal(
         supabase,
-        partnerId,
+        data.partnerId,
         updateServerTotal,
         sanitizedPaymentBreakdown,
     )
+    if (!updatePaymentPricing.ok) return { error: updatePaymentPricing.error }
     updateServerTotal = updatePaymentPricing.finalTotal
     const adjustedPaymentBreakdown =
         updatePaymentPricing.adjustedBreakdown?.length > 0

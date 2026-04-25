@@ -7,7 +7,7 @@ import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
 import { useToast } from "@/components/ui/use-toast"
 import { useNotification } from "@/hooks/use-notification"
 import { createERPOrderAction, getOrderDetailsAction, updateERPOrderAction } from "@/app/actions/erp/orders"
-import { validateCouponAction } from "@/app/actions/erp/coupons"
+import { validateCouponAction } from "@/app/actions/shared/coupons"
 import SelectCustomerSheet from "../clientes/SelectCustomerSheet"
 import SelectVariantSheet from "../quotes/SelectVariantSheet"
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
@@ -602,47 +602,47 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         }
 
         return {
-        partnerId,
-        customerId: selectedCustomer?.id,
-        customerName: selectedCustomer ? selectedCustomer.name : "Consumidor final",
-        salesChannel,
-        deliveryMethod,
-        financeAccountId,
-        paymentStatus: finalPaymentStatus,
-        paymentMethod: paymentOverrides?.paymentMethod || (editOrderId ? originalPaymentMethod : "pendente"),
-        paymentBreakdown: paymentOverrides?.paymentBreakdown || originalPaymentBreakdown,
-        deliveryStatus: finalDeliveryStatus as any,
-        paidAmount: paymentOverrides?.paidAmount,
-        address: deliveryMethod === 'delivery' ? {
-            zipCode: cep,
-            street,
-            number,
-            complement,
-            neighborhood,
-            city,
-            state: uf
-        } : undefined,
-        items: items.map((item, idx) => ({
-            productId: item.productId,
-            variantId: item.variantId,
-            customName: item.name,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            sortOrder: idx
-        })),
-        subtotal,
-        discountValue: discountAmount,
-        discountType: 'fixed' as const,
-        couponCode: couponCode || undefined,
-        couponId,
-        couponDiscountAmount,
-        shippingCost: parseFloat(shippingFee || "0"),
-        additionalCosts: parseFloat(otherCosts || "0"),
-        totalAmount,
-        notes,
-        csrf_token: csrfToken || undefined
+            partnerId,
+            customerId: selectedCustomer?.id,
+            customerName: selectedCustomer ? selectedCustomer.name : "Consumidor final",
+            salesChannel,
+            deliveryMethod,
+            financeAccountId,
+            paymentStatus: finalPaymentStatus,
+            paymentMethod: paymentOverrides?.paymentMethod || (editOrderId ? originalPaymentMethod : "pendente"),
+            paymentBreakdown: paymentOverrides?.paymentBreakdown || originalPaymentBreakdown,
+            deliveryStatus: finalDeliveryStatus as any,
+            paidAmount: paymentOverrides?.paidAmount,
+            address: deliveryMethod === 'delivery' ? {
+                zipCode: cep,
+                street,
+                number,
+                complement,
+                neighborhood,
+                city,
+                state: uf
+            } : undefined,
+            items: items.map((item, idx) => ({
+                productId: item.productId,
+                variantId: item.variantId,
+                customName: item.name,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                sortOrder: idx
+            })),
+            subtotal,
+            discountValue: discountAmount,
+            discountType: 'fixed' as const,
+            couponCode: couponCode || undefined,
+            couponId,
+            couponDiscountAmount,
+            shippingCost: parseFloat(shippingFee || "0"),
+            additionalCosts: parseFloat(otherCosts || "0"),
+            totalAmount,
+            notes,
+            csrf_token: csrfToken || undefined
+        }
     }
-}
 
     const handleApplyCoupon = async () => {
         const code = couponCode.trim()

@@ -16,7 +16,7 @@ import { Button, Spinner, AlertModal } from '@/components/reusable';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
 import { PaymentWrapper } from '@/components/PaymentWrapper';
-import { cancelBuyerOrderAction } from '@/app/actions/orders';
+import { cancelBuyerOrderAction } from '@/app/actions/marketplace/orders';
 import { getProductUrl, getPartnerUrl } from '@/lib/utils/url-generator';
 
 import { useRouter } from 'next/navigation';

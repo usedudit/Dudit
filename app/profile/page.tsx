@@ -1,6 +1,6 @@
 import { UserProfilePage } from "@/components/profile/UserProfilePage"
 import { requireUser } from "@/lib/auth/authorization"
-import { getPasswordSecurityInfo } from "@/app/actions/password"
+import { getPasswordSecurityInfo } from "@/app/actions/shared/password"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 
 export default async function ProfilePage() {
