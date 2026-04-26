@@ -18,6 +18,7 @@ import { calculatePaymentAmounts } from "@/lib/payments/calculation"
 import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
+import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 
 export async function getCartItemCountAction() {
   try {
@@ -538,6 +539,21 @@ export async function checkoutCartAction(
     }
   }
 
+  let deliveryFee = 0
+  let distanceKm: number | null = null
+  let deliveryBreakdown: Record<string, unknown> | null = null
+  if (deliveryType === "delivery") {
+    const quote = await quoteDeliveryFeeAction({
+      partnerId,
+      destinationAddress: deliveryAddress,
+      freeDeliveryCoupon: Boolean(couponPricingData?.freeShipping || couponPricingData?.discountType === "free_shipping"),
+    })
+    if (!quote.success) return { error: quote.error }
+    deliveryFee = Number(quote.fee || 0)
+    distanceKm = Number(quote.distanceKm || 0)
+    deliveryBreakdown = quote.breakdown
+  }
+
   const pricingResult = calculateOrderPricing({
     items: orderItems.map((item: any) => ({
       productId: item.product_id,
@@ -545,7 +561,7 @@ export async function checkoutCartAction(
       unitPrice: Number(item.product_price || 0),
       quantity: Number(item.quantity || 0),
     })),
-    shippingCost: 0,
+    shippingCost: deliveryFee,
     coupon: couponPricingData,
   })
 
@@ -618,6 +634,10 @@ export async function checkoutCartAction(
       customer_name: buyerProfile?.full_name || null,
       partner_id: partnerId,
       total_amount: paymentAwareTotal,
+      shipping_cost: deliveryFee,
+      delivery_fee: deliveryFee,
+      distance_km: distanceKm,
+      delivery_breakdown: deliveryBreakdown,
       delivery_type: deliveryType,
       delivery_address: deliveryAddress,
       payment_method: useMercadoPago ? "Mercado Pago" : paymentMethod,

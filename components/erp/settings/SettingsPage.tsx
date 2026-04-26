@@ -26,6 +26,7 @@ import { SubscriptionSubPage } from "./SubscriptionSubPage"
 import { PaymentMethodsSubPage } from "./payments/PaymentMethodsSubPage"
 import { SimpleSettingsSubPage } from "./SimpleSettingsSubPage"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { DeliverySettingsSubPage } from "./DeliverySettingsSubPage"
 
 interface SettingsTabsProps {
   partner: any
@@ -45,6 +46,7 @@ type ActivePage =
   | "vitrine"
   | "os"
   | "mensagens"
+  | "delivery"
 
 export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
   const searchParams = useSearchParams()
@@ -63,6 +65,7 @@ export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
     "vitrine": "vitrine",
     "os": "os",
     "mensagens": "modelos-de-mensagens",
+    "delivery": "entrega",
     "integrations": "integracoes",
   }
 
@@ -231,6 +234,12 @@ export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
                             onClick={() => setActivePage("mensagens")}
                           />
                           <SettingsCard
+                            icon={PackageReceiveIcon}
+                            title="Entrega"
+                            description="Configure taxas e regras de entrega."
+                            onClick={() => setActivePage("delivery")}
+                          />
+                          <SettingsCard
                             icon={LinkIcon}
                             title="Integrações"
                             description="Conecte-se com ferramentas externas, marketplaces e ERPs."
@@ -280,6 +289,7 @@ export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
           {activePage === "vitrine" && <SimpleSettingsSubPage key="vitrine" title="Minha Vitrine" onBack={() => setActivePage("home")} />}
           {activePage === "os" && <SimpleSettingsSubPage key="os" title="Configuração de O.S" onBack={() => setActivePage("home")} />}
           {activePage === "mensagens" && <SimpleSettingsSubPage key="mensagens" title="Modelos de Mensagens" onBack={() => setActivePage("home")} />}
+          {activePage === "delivery" && <DeliverySettingsSubPage key="delivery" partnerId={partner.id} onBack={() => setActivePage("home")} />}
         </AnimatePresence>
       </div>
     </FadeIn>

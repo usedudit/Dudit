@@ -136,6 +136,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     const [discountType, setDiscountType] = useState<"fixed" | "percentage" | "coupon">("fixed")
     const [discountCouponCode, setDiscountCouponCode] = useState("")
     const [shippingFee, setShippingFee] = useState(0)
+    const [deliveryDistanceKm, setDeliveryDistanceKm] = useState<number | null>(null)
+    const [deliveryBreakdown, setDeliveryBreakdown] = useState<Record<string, unknown> | null>(null)
     const [otherCosts] = useState(0)
     const [notes, setNotes] = useState("")
     const [cart, setCart] = useState<CartItem[]>([])
@@ -541,6 +543,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 discountAmount: discountVal,
                 totalAmount: total,
                 shippingFee,
+                distanceKm: deliveryDistanceKm,
+                deliveryBreakdown,
                 otherCosts,
                 items: cart.map((item) => ({
                     productId: item.productId,
@@ -621,6 +625,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         setDiscountCouponCode("")
         setNotes(preSale.notes || "")
         setShippingFee(Number(preSale.shipping_fee || 0))
+        setDeliveryDistanceKm(Number((preSale as any).distance_km || 0) || null)
+        setDeliveryBreakdown((preSale as any).delivery_breakdown || null)
         setCart(items)
         setLastSavedOrderSignature(buildOrderSignature({
             selectedCustomerId: preSale.customer_id || undefined,
@@ -642,6 +648,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         setDiscountCouponCode("")
         setNotes("")
         setShippingFee(0)
+        setDeliveryDistanceKm(null)
+        setDeliveryBreakdown(null)
         setCart([])
         setSelectedSellerId(defaultSellerPartnerUserIdRef.current)
         setLastSavedOrderSignature(EMPTY_ORDER_SIGNATURE)
@@ -1690,9 +1698,12 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                         selectedCustomerId={selectedCustomerId}
                         customerDetails={shippingCustomerDetails}
                         currentShippingFee={shippingFee}
+                        partnerId={partnerId}
                         onCreateAddress={handleCreateShippingAddress}
-                        onApply={({ shippingFee: fee }) => {
+                        onApply={({ shippingFee: fee, distanceKm, breakdown }) => {
                             setShippingFee(Math.max(0, Number(fee || 0)))
+                            setDeliveryDistanceKm(distanceKm ?? null)
+                            setDeliveryBreakdown((breakdown as Record<string, unknown>) || null)
                             setIsShippingSheetOpen(false)
                         }}
                     />

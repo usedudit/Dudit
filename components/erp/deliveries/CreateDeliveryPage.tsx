@@ -44,6 +44,9 @@ type OrderPickerItem = {
     status: string
     deliveryStatus: string
     shippingFee: number
+    deliveryFee?: number
+    distanceKm?: number | null
+    deliveryBreakdown?: Record<string, any> | null
     customer?: { id: string | null; name: string; email?: string | null; phone?: string | null } | null
     address?: string
     items?: Array<{
@@ -90,7 +93,7 @@ export default function CreateDeliveryPage({
     onBack: () => void
     onSuccess: () => void
 }) {
-    const [activeTab, setActiveTab] = useState("Geral")
+    const [activeTab, setActiveTab] = useState("Cliente")
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
     const [selectedDeliveryPersonId, setSelectedDeliveryPersonId] = useState<string>("")
     const [status, setStatus] = useState("preparing")
@@ -190,8 +193,11 @@ export default function CreateDeliveryPage({
 
                         <div className="w-full md:mt-4">
                             <TabsList className="w-full justify-start gap-6 border-b-0 bg-transparent p-0">
-                                <TabsTrigger value="Geral" className="px-0 pb-3">
-                                    Dados gerais
+                                <TabsTrigger value="Cliente" className="px-0 pb-3">
+                                    Cliente
+                                </TabsTrigger>
+                                <TabsTrigger value="Valores" className="px-0 pb-3">
+                                    Valores
                                 </TabsTrigger>
                                 <TabsTrigger value="Observacoes" className="px-0 pb-3">
                                     Observacoes
@@ -204,7 +210,7 @@ export default function CreateDeliveryPage({
                 <div className="mx-auto flex-1 w-full max-w-[1300px] overflow-y-auto px-4 py-6 pb-24 md:px-6 md:pb-8">
                     <AnimatePresence mode="wait">
                         <FadeIn key={activeTab}>
-                            <TabsContent value="Geral" className="mt-0">
+                            <TabsContent value="Cliente" className="mt-0">
                                 <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                     <div className="col-span-12 space-y-8 lg:col-span-8 lg:pr-12">
                                         <section className="space-y-4">
@@ -487,6 +493,21 @@ export default function CreateDeliveryPage({
                                                 Selecione um pedido para ver os dados do cliente aqui.
                                             </div>
                                         )}
+                                    </div>
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="Valores" className="mt-0">
+                                <div className="max-w-2xl space-y-4">
+                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Valores da Entrega</h3>
+                                    <div className="rounded-2xl border border-brand-border p-5 dark:border-dark-border">
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between"><span>Distância</span><span>{selectedOrder?.distanceKm == null ? "-" : `${Number(selectedOrder.distanceKm).toFixed(2)} km`}</span></div>
+                                            <div className="flex justify-between"><span>Taxa base</span><span>{formatCurrency(Number(selectedOrder?.deliveryBreakdown?.baseFee || selectedOrder?.deliveryFee || 0))}</span></div>
+                                            <div className="flex justify-between"><span>Taxa distância</span><span>{formatCurrency(Number(selectedOrder?.deliveryBreakdown?.distanceFee || 0))}</span></div>
+                                            <div className="flex justify-between"><span>Ajuste horário</span><span>{formatCurrency(Number(selectedOrder?.deliveryBreakdown?.timeAdjustmentTotal || 0))}</span></div>
+                                            <div className="flex justify-between border-t border-brand-border pt-2 font-bold dark:border-dark-border"><span>Taxa final</span><span>{formatCurrency(Number(selectedOrder?.deliveryFee || selectedOrder?.shippingFee || 0))}</span></div>
+                                        </div>
                                     </div>
                                 </div>
                             </TabsContent>

@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react"
 import { XIcon } from "@/lib/icons"
-import { Button, CepInput, CustomerCard, Checkbox, MoneyInput, Input } from "@/components/reusable"
+import { Button, CepInput, CustomerCard, Checkbox, MoneyInput, Input, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 
 type ShippingCustomerDetails = {
   id: string
@@ -31,6 +32,7 @@ interface POSShippingSheetProps {
   selectedCustomerId?: string
   customerDetails: ShippingCustomerDetails
   currentShippingFee: number
+  partnerId: string
   onCreateAddress: (payload: {
     customerId: string
     address: {
@@ -43,7 +45,7 @@ interface POSShippingSheetProps {
       state: string
     }
   }) => Promise<void> | void
-  onApply: (payload: { shippingFee: number }) => void
+  onApply: (payload: { shippingFee: number; distanceKm?: number | null; breakdown?: Record<string, unknown> | null }) => void
 }
 
 export default function POSShippingSheet({
@@ -52,6 +54,7 @@ export default function POSShippingSheet({
   selectedCustomerId,
   customerDetails,
   currentShippingFee,
+  partnerId,
   onCreateAddress,
   onApply,
 }: POSShippingSheetProps) {
@@ -60,6 +63,10 @@ export default function POSShippingSheet({
   const [shippingFree, setShippingFree] = useState(currentShippingFee <= 0)
   const [isAddressSheetOpen, setIsAddressSheetOpen] = useState(false)
   const [isSavingAddress, setIsSavingAddress] = useState(false)
+  const [activeTab, setActiveTab] = useState("cliente")
+  const [distanceKm, setDistanceKm] = useState<number | null>(null)
+  const [breakdown, setBreakdown] = useState<Record<string, unknown> | null>(null)
+  const [isQuoteLoading, setIsQuoteLoading] = useState(false)
 
   const [zipCode, setZipCode] = useState("")
   const [street, setStreet] = useState("")
@@ -90,6 +97,30 @@ export default function POSShippingSheet({
   const hasStreet = !!customerDetails?.address?.street?.trim()
   const shippingFeeValue = shippingFree ? 0 : Math.max(0, Number(shippingInput || 0))
 
+  useEffect(() => {
+    let active = true
+    if (!isOpen || !hasSelectedCustomer || !hasStreet) return
+    const destinationAddress = `${customerDetails?.address?.street || ""}, ${customerDetails?.address?.number || ""} - ${customerDetails?.address?.neighborhood || ""}, ${customerDetails?.address?.city || ""} - ${customerDetails?.address?.state || ""}, ${customerDetails?.address?.zipCode || ""}`
+    setIsQuoteLoading(true)
+    const timer = setTimeout(async () => {
+      const quote = await quoteDeliveryFeeAction({
+        partnerId,
+        destinationAddress,
+      })
+      if (!active) return
+      if (quote.success) {
+        setDistanceKm(Number(quote.distanceKm || 0))
+        setBreakdown(quote.breakdown as Record<string, unknown>)
+        if (!shippingFree) setShippingInput(Number(quote.fee || 0))
+      }
+      setIsQuoteLoading(false)
+    }, 250)
+    return () => {
+      active = false
+      clearTimeout(timer)
+    }
+  }, [isOpen, hasSelectedCustomer, hasStreet, customerDetails?.id, customerDetails?.address?.street, customerDetails?.address?.number, customerDetails?.address?.city, customerDetails?.address?.state, customerDetails?.address?.zipCode, customerDetails?.address?.neighborhood, partnerId, shippingFree])
+
   const content = (
     <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
       <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
@@ -100,6 +131,12 @@ export default function POSShippingSheet({
       </header>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="w-full">
+            <TabsTrigger value="cliente">Cliente</TabsTrigger>
+            <TabsTrigger value="valores">Valores</TabsTrigger>
+          </TabsList>
+          <TabsContent value="cliente" className="mt-4 space-y-4">
         {!hasSelectedCustomer && (
           <p className="text-sm text-brand-inactive-text">
             Selecione um cliente no PDV para configurar o envio.
@@ -141,6 +178,20 @@ export default function POSShippingSheet({
             Adicionar endereço
           </Button>
         )}
+          </TabsContent>
+          <TabsContent value="valores" className="mt-4 space-y-4">
+            <div className="rounded-xl border border-brand-border p-4 text-sm dark:border-dark-border">
+              <div className="flex justify-between"><span>Distância</span><span>{distanceKm == null ? "-" : `${distanceKm.toFixed(2)} km`}</span></div>
+              <div className="flex justify-between"><span>Taxa base</span><span>R$ {Number((breakdown as any)?.baseFee || 0).toFixed(2)}</span></div>
+              <div className="flex justify-between"><span>Taxa por distância</span><span>R$ {Number((breakdown as any)?.distanceFee || 0).toFixed(2)}</span></div>
+              <div className="flex justify-between"><span>Ajuste por horário</span><span>R$ {Number((breakdown as any)?.timeAdjustmentTotal || 0).toFixed(2)}</span></div>
+              <div className="mt-2 border-t border-brand-border pt-2 font-bold dark:border-dark-border flex justify-between">
+                <span>Taxa final</span><span>R$ {Number(shippingFeeValue || 0).toFixed(2)}</span>
+              </div>
+              {isQuoteLoading && <p className="mt-2 text-xs text-brand-inactive-text">Recalculando valores...</p>}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
       <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
@@ -151,7 +202,7 @@ export default function POSShippingSheet({
           <Button
             className="flex-1"
             disabled={!hasSelectedCustomer || !hasStreet}
-            onClick={() => onApply({ shippingFee: shippingFeeValue })}
+            onClick={() => onApply({ shippingFee: shippingFeeValue, distanceKm, breakdown })}
           >
             Aplicar envio
           </Button>

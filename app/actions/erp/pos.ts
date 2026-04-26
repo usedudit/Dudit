@@ -42,6 +42,8 @@ type DraftUpsertInput = {
     discountAmount: number
     totalAmount: number
     shippingFee?: number
+    distanceKm?: number | null
+    deliveryBreakdown?: Record<string, unknown> | null
     otherCosts?: number
     items: DraftItemInput[]
     couponId?: string | null
@@ -237,7 +239,7 @@ async function syncPosSaleToOrders(params: {
             .eq("sale_id", params.saleId),
         admin
             .from("pre_sales")
-            .select("id, seller_id, shipping_fee, other_costs, coupon_id")
+            .select("id, seller_id, shipping_fee, distance_km, delivery_breakdown, other_costs, coupon_id")
             .eq("id", params.preSaleId)
             .maybeSingle(),
     ])
@@ -266,6 +268,8 @@ async function syncPosSaleToOrders(params: {
     }
 
     const shippingFee = safeMoney(Number(draft?.shipping_fee || 0))
+    const distanceKm = draft?.distance_km == null ? null : Number(draft.distance_km || 0)
+    const deliveryBreakdown = (draft as any)?.delivery_breakdown || null
     const otherCosts = safeMoney(Number(draft?.other_costs || 0))
     const deliveryType = shippingFee > 0 ? "delivery" : "pickup"
     const deliveryStatus = shippingFee > 0 ? "preparing" : "delivered"
@@ -318,6 +322,9 @@ async function syncPosSaleToOrders(params: {
         discount_amount: safeMoney(Number(sale.discount_amount || 0)),
         coupon_id: draft?.coupon_id || null,
         shipping_cost: shippingFee,
+        delivery_fee: shippingFee,
+        distance_km: distanceKm,
+        delivery_breakdown: deliveryBreakdown,
         additional_costs: otherCosts,
         notes: sale.notes || null,
         payment_method: inputPaymentMethodLabel(params.defaultPaymentMethod),
@@ -499,6 +506,8 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
     }
 
     payload.shipping_fee = shippingFee
+    payload.distance_km = input.distanceKm == null ? null : Number(input.distanceKm)
+    payload.delivery_breakdown = input.deliveryBreakdown || null
     payload.other_costs = otherCosts
     payload.coupon_id = input.couponId || null
     payload.coupon_code = input.couponCode || null
@@ -670,7 +679,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
 
     const { data: finalizedPreSale } = await supabase
         .from("pre_sales")
-        .select("shipping_fee, coupon_id, coupon_code, coupon_discount_amount, customer_id")
+        .select("shipping_fee, distance_km, delivery_breakdown, coupon_id, coupon_code, coupon_discount_amount, customer_id")
         .eq("id", input.preSaleId)
         .eq("partner_id", input.partnerId)
         .limit(1)
@@ -682,6 +691,18 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         .update({ delivery_status: hasShipping ? "preparing" : "delivered" })
         .eq("id", saleId)
         .eq("partner_id", input.partnerId)
+
+    if (finalizedPreSale) {
+        await supabase
+            .from("sales")
+            .update({
+                delivery_fee: Number(finalizedPreSale.shipping_fee || 0),
+                distance_km: Number((finalizedPreSale as any).distance_km || 0),
+                delivery_breakdown: (finalizedPreSale as any).delivery_breakdown || null,
+            })
+            .eq("id", saleId)
+            .eq("partner_id", input.partnerId)
+    }
 
     const syncedOrderId = await syncPosSaleToOrders({
         partnerId: input.partnerId,

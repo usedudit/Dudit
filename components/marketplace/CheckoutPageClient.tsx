@@ -31,6 +31,7 @@ import { createOrderAction } from "@/app/actions/marketplace/orders"
 import { previewMarketplacePaymentAction } from "@/app/actions/marketplace/payment-preview"
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
+import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 
 interface ProductItem {
     id: string
@@ -216,6 +217,16 @@ export function CheckoutPageClient() {
     const [paymentOption, setPaymentOption] = useState<"traditional" | "mercadopago">("traditional")
     const [paymentPreview, setPaymentPreview] = useState<MarketplacePaymentPreview | null>(null)
     const [paymentPreviewLoading, setPaymentPreviewLoading] = useState(false)
+    const [deliveryQuoteLoading, setDeliveryQuoteLoading] = useState(false)
+    const [deliveryEnabled, setDeliveryEnabled] = useState(true)
+    const [deliveryPlanEnabled, setDeliveryPlanEnabled] = useState(true)
+    const [deliveryFee, setDeliveryFee] = useState(0)
+    const [deliveryDistanceKm, setDeliveryDistanceKm] = useState<number | null>(null)
+    const [deliveryBreakdown, setDeliveryBreakdown] = useState<{
+        baseFee: number
+        distanceFee: number
+        timeAdjustmentTotal: number
+    } | null>(null)
 
     useEffect(() => {
         if (sessionData) {
@@ -223,6 +234,21 @@ export function CheckoutPageClient() {
             setPaymentOption(partnerInfo.mpConnected ? "mercadopago" : "traditional")
         }
     }, [sessionData])
+
+    useEffect(() => {
+        let active = true
+        if (!partnerId) return
+        ;(async () => {
+            const config = await getPartnerDeliveryConfigAction(partnerId)
+            if (!active || !config.success) return
+            setDeliveryPlanEnabled(config.capability.deliveryEnabled)
+            setDeliveryEnabled(Boolean(config.settings.isDeliveryEnabled))
+            if (!config.capability.deliveryEnabled || !config.settings.isDeliveryEnabled) {
+                setFormData((prev) => ({ ...prev, deliveryType: "pickup" }))
+            }
+        })()
+        return () => { active = false }
+    }, [partnerId])
 
     const [openSections, setOpenSections] = useState({ delivery: true, payment: true, notes: false })
     const toggleSection = (key: keyof typeof openSections) =>
@@ -349,6 +375,7 @@ export function CheckoutPageClient() {
             label: paymentTypeLabelMap[method] || method,
         }))
     const isPickup = formData.deliveryType === "pickup"
+    const canUseDelivery = deliveryPlanEnabled && deliveryEnabled
     const traditionalPaymentLabel = isPickup ? "Pagar na Retirada" : "Pagar na Entrega"
     const shouldPreviewTraditionalPayment = Boolean(
         partnerId &&
@@ -368,6 +395,47 @@ export function CheckoutPageClient() {
         () => availableCoupons.find((coupon) => coupon.code === couponCode) || null,
         [availableCoupons, couponCode]
     )
+    const hasFreeDeliveryCoupon = Boolean(appliedCoupon?.freeShipping || appliedCoupon?.discountType === "free_shipping")
+
+    useEffect(() => {
+        let active = true
+        if (!partnerId || isPickup || !formData.deliveryAddress || !canUseDelivery) {
+            setDeliveryFee(0)
+            setDeliveryDistanceKm(null)
+            setDeliveryBreakdown(null)
+            setDeliveryQuoteLoading(false)
+            return
+        }
+        setDeliveryQuoteLoading(true)
+        const timer = window.setTimeout(async () => {
+            const quote = await quoteDeliveryFeeAction({
+                partnerId,
+                destinationAddress: formData.deliveryAddress,
+                freeDeliveryCoupon: hasFreeDeliveryCoupon,
+            })
+            if (!active) return
+            if (quote.success) {
+                setDeliveryError(null)
+                setDeliveryFee(Number(quote.fee || 0))
+                setDeliveryDistanceKm(Number(quote.distanceKm || 0))
+                setDeliveryBreakdown({
+                    baseFee: Number(quote.breakdown.baseFee || 0),
+                    distanceFee: Number(quote.breakdown.distanceFee || 0),
+                    timeAdjustmentTotal: Number(quote.breakdown.timeAdjustmentTotal || 0),
+                })
+            } else {
+                setDeliveryError(quote.error)
+                setDeliveryFee(0)
+                setDeliveryDistanceKm(null)
+                setDeliveryBreakdown(null)
+            }
+            setDeliveryQuoteLoading(false)
+        }, 250)
+        return () => {
+            active = false
+            window.clearTimeout(timer)
+        }
+    }, [partnerId, isPickup, formData.deliveryAddress, hasFreeDeliveryCoupon, canUseDelivery])
 
     useEffect(() => {
         let active = true
@@ -388,7 +456,7 @@ export function CheckoutPageClient() {
             const result = await previewMarketplacePaymentAction({
                 partnerId,
                 paymentMethod: formData.paymentMethod,
-                originalAmount: checkoutBaseTotal,
+                originalAmount: checkoutBaseTotal + (isPickup ? 0 : deliveryFee),
                 installmentNumber: Math.max(1, Number(formData.installments || 1)),
             })
 
@@ -416,6 +484,8 @@ export function CheckoutPageClient() {
         formData.paymentMethod,
         formData.installments,
         checkoutBaseTotal,
+        isPickup,
+        deliveryFee,
     ])
 
     useEffect(() => {
@@ -428,8 +498,8 @@ export function CheckoutPageClient() {
     }, [paymentPreview, formData.installments])
 
     const checkoutTotalToCharge = paymentOption === "traditional" && paymentPreview?.success
-        ? Number(paymentPreview.finalAmount || checkoutBaseTotal)
-        : checkoutBaseTotal
+        ? Number(paymentPreview.finalAmount || (checkoutBaseTotal + (isPickup ? 0 : deliveryFee)))
+        : (checkoutBaseTotal + (isPickup ? 0 : deliveryFee))
     const preparationEstimate = useMemo(() => computeOrderPreparationEstimate({
         products: products.map((product) => ({
             availability_value: Number(product.availabilityValue || 0),
@@ -494,6 +564,7 @@ export function CheckoutPageClient() {
         && Number(paymentPreview?.maxInstallments || 1) > 1
     const disableCheckoutSubmit = isLoading
         || (paymentOption === "traditional" && (paymentPreviewLoading || (!paymentPreview?.success && shouldPreviewTraditionalPayment)))
+        || (!isPickup && (deliveryQuoteLoading || !!deliveryError))
 
     const getCouponCountLabel = (count: number) => {
         if (count === 1) return "1 cupom disponível"
@@ -604,6 +675,11 @@ export function CheckoutPageClient() {
         setPaymentError(null)
         setIsLoading(true)
         if (formData.deliveryType === "delivery") {
+            if (!canUseDelivery) {
+                setDeliveryError("Entrega indisponível para este plano ou loja.")
+                setIsLoading(false)
+                return
+            }
             if (showAddressForm) {
                 setDeliveryError("Por favor, salve o endereço antes de finalizar o pedido")
                 setIsLoading(false)
@@ -776,21 +852,23 @@ export function CheckoutPageClient() {
                                             <div className="p-6 space-y-6">
                                                 <div>
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                        <ListItem
-                                                            icon={TruckIcon}
-                                                            title="Entrega"
-                                                            description="Receba em casa"
-                                                            className={`px-4 py-3 gap-4 ${formData.deliveryType === "delivery" ? "border-brand-green dark:border-brand-green" : ""}`}
-                                                            onClick={() => setFormData({ ...formData, deliveryType: "delivery" })}
-                                                            right={
-                                                                <RadioButton
-                                                                    name="deliveryType"
-                                                                    value="delivery"
-                                                                    checked={!isPickup}
-                                                                    onChange={() => setFormData({ ...formData, deliveryType: "delivery" })}
-                                                                />
-                                                            }
-                                                        />
+                                                        {canUseDelivery && (
+                                                            <ListItem
+                                                                icon={TruckIcon}
+                                                                title="Entrega"
+                                                                description="Receba em casa"
+                                                                className={`px-4 py-3 gap-4 ${formData.deliveryType === "delivery" ? "border-brand-green dark:border-brand-green" : ""}`}
+                                                                onClick={() => setFormData({ ...formData, deliveryType: "delivery" })}
+                                                                right={
+                                                                    <RadioButton
+                                                                        name="deliveryType"
+                                                                        value="delivery"
+                                                                        checked={!isPickup}
+                                                                        onChange={() => setFormData({ ...formData, deliveryType: "delivery" })}
+                                                                    />
+                                                                }
+                                                            />
+                                                        )}
                                                         <ListItem
                                                             icon={StoreIcon}
                                                             title="Retirada no local"
@@ -1160,9 +1238,16 @@ export function CheckoutPageClient() {
                                         <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
                                             <span>Entrega</span>
                                             <span className={isPickup ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
-                                                {isPickup ? "Grátis" : "A combinar"}
+                                                {isPickup ? "Grátis" : deliveryQuoteLoading ? "Calculando..." : formatCurrency(deliveryFee)}
                                             </span>
                                         </div>
+                                        {!isPickup && deliveryBreakdown && (
+                                            <div className="space-y-1 text-xs text-brand-inactive-text">
+                                                <div className="flex justify-between"><span>Taxa base</span><span>{formatCurrency(deliveryBreakdown.baseFee)}</span></div>
+                                                <div className="flex justify-between"><span>Distância {deliveryDistanceKm != null ? `(${deliveryDistanceKm.toFixed(2)} km)` : ""}</span><span>{formatCurrency(deliveryBreakdown.distanceFee)}</span></div>
+                                                <div className="flex justify-between"><span>Ajuste horário</span><span>{formatCurrency(deliveryBreakdown.timeAdjustmentTotal)}</span></div>
+                                            </div>
+                                        )}
                                         {isPickup && preparationEstimate && (
                                             <div className="text-xs text-brand-inactive-text">
                                                 Retirada entre {pickupStartLabel} e {pickupEndLabel}

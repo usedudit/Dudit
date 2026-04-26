@@ -18,6 +18,7 @@ import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
 import { calculatePaymentAmounts } from "@/lib/payments/calculation"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
+import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 
 // Single revalidation to minimize cache calls
 const revalidateOrdersCache = async () => await revalidateOrders("")
@@ -174,6 +175,21 @@ export async function createOrderAction(data: {
     }
   }
 
+  let deliveryFee = 0
+  let distanceKm: number | null = null
+  let deliveryBreakdown: Record<string, unknown> | null = null
+  if (data.deliveryType === "delivery") {
+    const quote = await quoteDeliveryFeeAction({
+      partnerId: data.partnerId,
+      destinationAddress: data.deliveryAddress,
+      freeDeliveryCoupon: Boolean(couponPricingData?.freeShipping || couponPricingData?.discountType === "free_shipping"),
+    })
+    if (!quote.success) return { error: quote.error }
+    deliveryFee = Number(quote.fee || 0)
+    distanceKm = Number(quote.distanceKm || 0)
+    deliveryBreakdown = quote.breakdown
+  }
+
   // Run through pricing engine for consistent calculation
   const pricingResult = calculateOrderPricing({
     items: [{
@@ -182,7 +198,7 @@ export async function createOrderAction(data: {
       unitPrice: serverPrice,
       quantity: data.quantity,
     }],
-    shippingCost: 0,
+    shippingCost: deliveryFee,
     coupon: couponPricingData,
   })
 
@@ -266,6 +282,10 @@ export async function createOrderAction(data: {
     customer_name: buyerProfile?.full_name || null,
     partner_id: data.partnerId,
     total_amount: paymentAwareTotal,
+    shipping_cost: deliveryFee,
+    delivery_fee: deliveryFee,
+    distance_km: distanceKm,
+    delivery_breakdown: deliveryBreakdown,
     delivery_type: data.deliveryType,
     delivery_address: data.deliveryAddress,
     payment_method: data.paymentMethod,
