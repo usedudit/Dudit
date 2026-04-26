@@ -12,6 +12,7 @@ import ImageCropperModal from "@/components/ImageCropperModal"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { NumberInputWithCheckbox } from "@/components/reusable/Inputs/NumberInputWithCheckbox"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 
 const SELLS_OPTIONS = [
     {
@@ -98,7 +99,7 @@ export const BusinessDataSubPage = ({
         inscricaoMunicipal: partner.inscricao_municipal || "",
     })
 
-    const [hours, setHours] = useState(partner.opening_hours || {})
+    const [hours, setHours] = useState(() => normalizeOpeningHours(partner.opening_hours))
 
 
     const [imagePreview, setImagePreview] = useState<string | null>(partner.store_image_url || null)
@@ -143,7 +144,7 @@ export const BusinessDataSubPage = ({
                     neighborhood: addresses.neighborhood,
                     city: addresses.city,
                     state: addresses.state,
-                    openingHours: hours,
+                    openingHours: normalizeOpeningHours(hours),
                     crt: fiscalInfo.crt,
                     contribuinte: fiscalInfo.contribuinte,
                     inscricaoEstadual: fiscalInfo.inscricaoEstadual || null,

@@ -10,6 +10,7 @@ import IconPlaceholder from "@/components/reusable/IconPlaceholder"
 import { ShareModal } from "./ShareModal"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { formatCurrency, formatDate, formatMonth, formatYear, formatNumber } from "@/lib/utils"
+import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 
 // --- TYPES ---
 interface VendorPageClientProps {
@@ -55,6 +56,7 @@ const formatOpeningHours = (hours: any) => {
   if (!hours || typeof hours !== 'object' || Object.keys(hours).length === 0) {
     return "Segunda a Sexta: 09:00 - 18:00";
   }
+  const normalizedHours = normalizeOpeningHours(hours)
 
   const daysMap: Record<string, string> = {
     monday: "Seg",
@@ -66,7 +68,7 @@ const formatOpeningHours = (hours: any) => {
     sunday: "Dom"
   };
 
-  const enabledDays = Object.entries(hours)
+  const enabledDays = Object.entries(normalizedHours)
     .filter(([_, value]: [string, any]) => value?.enabled)
     .sort((a, b) => {
       const order = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];

@@ -8,6 +8,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { UnosendService } from "@/lib/services/unosend.service"
 import { syncToExploreRedis } from "@/lib/redis-sync"
+import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 
 // --- Interfaces Atualizadas ---
 
@@ -252,7 +253,7 @@ export async function updatePartnerAction(
       updateData.cpf_encrypted = null
     }
   }
-  if (data.openingHours !== undefined) updateData.opening_hours = data.openingHours
+  if (data.openingHours !== undefined) updateData.opening_hours = normalizeOpeningHours(data.openingHours)
   if (data.storeImageUrl !== undefined) updateData.store_image_url = data.storeImageUrl
 
   if (data.offeringType !== undefined) updateData.offering_type = data.offeringType

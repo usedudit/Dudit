@@ -29,8 +29,6 @@ function mapRuleRow(row: any): DeliveryFeeRule {
 }
 
 export async function getPartnerDeliveryConfigAction(partnerId: string) {
-  await requireUser()
-  await requirePartnerAccess(partnerId)
   const supabase = await getSupabaseServerClient()
   const plan = await getPartnerPlan(partnerId)
   const capability = resolveDeliveryPlanCapability(plan.slug)
@@ -135,7 +133,6 @@ export async function quoteDeliveryFeeAction(input: {
   currentTimeIso?: string
   freeDeliveryCoupon?: boolean
 }) {
-  await requireUser()
   const supabase = await getSupabaseServerClient()
 
   const plan = await getPartnerPlan(input.partnerId)

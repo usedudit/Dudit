@@ -421,7 +421,7 @@ const Header: React.FC<HeaderProps> = ({
             <Link
               key={link.label}
               href={link.href}
-              prefetch={true}
+              prefetch={false}
               onClick={() => setIsMobileCategoryMenuOpen(false)}
               className="px-6 py-3 text-[15px] font-normal text-brand-inactive-text hover:bg-brand-gray hover:text-brand-dark transition-colors"
             >
@@ -431,7 +431,7 @@ const Header: React.FC<HeaderProps> = ({
           <div className="border-t border-gray-100 mt-2 pt-2">
             <Link
               href="/auth/login?mode=partner"
-              prefetch={true}
+              prefetch={false}
               onClick={() => setIsMobileCategoryMenuOpen(false)}
               className="px-6 py-3 font-bold text-brand-orange hover:bg-brand-gray cursor-pointer text-[15px] flex items-center gap-1 transition-colors"
             >
@@ -622,7 +622,7 @@ const Header: React.FC<HeaderProps> = ({
               <Link
                 key={link.label}
                 href={link.href}
-                prefetch={true}
+                prefetch={false}
                 className="px-3 py-1.5 whitespace-nowrap rounded-full hover:bg-white/10 transition-all font-normal"
               >
                 {link.label}

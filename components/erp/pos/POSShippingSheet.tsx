@@ -79,7 +79,8 @@ export default function POSShippingSheet({
   useEffect(() => {
     if (!isOpen) return
     setShippingInput(Number(currentShippingFee || 0))
-    setShippingFree(currentShippingFee <= 0)
+    // Keep auto-quote enabled on open; "Sem custo" should be an explicit user choice.
+    setShippingFree(false)
   }, [isOpen, currentShippingFee])
 
   useEffect(() => {

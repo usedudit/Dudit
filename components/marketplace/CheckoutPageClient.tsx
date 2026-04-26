@@ -1193,6 +1193,7 @@ export function CheckoutPageClient() {
                                         <ListItem
                                             icon={TagIcon}
                                             title={appliedCoupon ? getCouponTitle(appliedCoupon) : "Escolha um cupom"}
+                                            titleClassName="text-sm"
                                             description={appliedCoupon ? "Cupom aplicado" : (couponListLoading ? "Verificando cupons disponíveis..." : getCouponCountLabel(availableCoupons.length))}
                                             className={`px-4 py-3 gap-4 ${appliedCoupon ? "border-brand-green dark:border-brand-green" : ""}`}
                                             onClick={() => {

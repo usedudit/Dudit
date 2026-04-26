@@ -102,13 +102,15 @@ export function adjustToBusinessHours(
 ): Date {
   const inputDate = datetime instanceof Date ? datetime : new Date(datetime)
   if (Number.isNaN(inputDate.getTime())) return new Date()
+  const normalizedPreparationMinutes = clampPreparationMinutes(safeNumber(preparationTimeMinutes || 0))
 
   if (!openingHours || typeof openingHours !== "object") {
-    return new Date(inputDate)
+    // Fallback: when store hours are not configured, still honor preparation time.
+    return new Date(inputDate.getTime() + normalizedPreparationMinutes * 60000)
   }
 
   let current = new Date(inputDate)
-  let remaining = clampPreparationMinutes(safeNumber(preparationTimeMinutes || 0))
+  let remaining = normalizedPreparationMinutes
   let safety = 0
 
   while (safety < 31) {

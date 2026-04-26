@@ -129,7 +129,7 @@ export const CategoryList: React.FC = () => {
 
       <div className="flex overflow-x-auto gap-4 md:gap-8 px-4 lg:px-0 scrollbar-hide pb-4">
         {HOME_CATEGORIES.map((cat) => (
-          <Link href={`/explorar?q=${cat.name}`} key={cat.name} prefetch={true} className="flex flex-col gap-3 min-w-[100px] items-center text-center group">
+          <Link href={`/explorar?q=${cat.name}`} key={cat.name} prefetch={false} className="flex flex-col gap-3 min-w-[100px] items-center text-center group">
             <div className="w-[100px] h-[100px] md:w-[120px] md:h-[120px] rounded-full overflow-hidden border border-gray-100 shadow-sm group-hover:shadow-md transition-all">
               <img
                 src={cat.image || "https://img.dudit.com.br/static/Placeholder.png"}

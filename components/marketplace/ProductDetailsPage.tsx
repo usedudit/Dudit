@@ -576,10 +576,10 @@ export function ProductDetailsPageClient({
           </Link>
         </div>
         <div className="flex items-center gap-4 text-xs font-bold text-brand-dark mb-4 px-1">
-          <Link href={`/explorar?q=${partner.city}&type=lojas`} prefetch={true} className="flex items-center gap-1 cursor-pointer hover:text-brand-green transition-colors">
+          <Link href={`/explorar?q=${partner.city}&type=lojas`} prefetch={false} className="flex items-center gap-1 cursor-pointer hover:text-brand-green transition-colors">
             Lojas em {partner.city} <ChevronRightIcon size={10} />
           </Link>
-          <Link href={`/explorar?q=${partner.city}&type=produtos`} prefetch={true} className="flex items-center gap-1 cursor-pointer hover:text-brand-green transition-colors">
+          <Link href={`/explorar?q=${partner.city}&type=produtos`} prefetch={false} className="flex items-center gap-1 cursor-pointer hover:text-brand-green transition-colors">
             Produtos em {partner.city} <ChevronRightIcon size={10} />
           </Link>
         </div>

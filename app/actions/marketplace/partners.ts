@@ -10,6 +10,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { sanitizeInput, validatePhoneBR } from "@/lib/input-validator"
 import { normalizePhoneToE164 } from "@/lib/utils/phone-utils"
+import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 
 // --- CLIENTES ---
 
@@ -314,7 +315,7 @@ export async function updatePartnerAction(partnerId: string, data: any) {
     if (updateData.cnpj === "") updateData.cnpj = null
   }
   if (data.businessInfo !== undefined) updateData.business_info = data.businessInfo
-  if (data.openingHours !== undefined) updateData.opening_hours = data.openingHours
+  if (data.openingHours !== undefined) updateData.opening_hours = normalizeOpeningHours(data.openingHours)
   if (sanitizedPhone !== undefined) {
     if (sanitizedPhone) {
       if (!validatePhoneBR(sanitizedPhone)) {

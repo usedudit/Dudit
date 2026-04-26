@@ -7,6 +7,16 @@ export type OpeningHoursData = {
 }
 
 const DAYS_OF_WEEK = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+const DEFAULT_DAY_SCHEDULE = { enabled: false, from: "09:00", to: "18:00" }
+const DEFAULT_OPENING_HOURS: OpeningHoursData = {
+  monday: { enabled: true, from: "09:00", to: "18:00" },
+  tuesday: { enabled: true, from: "09:00", to: "18:00" },
+  wednesday: { enabled: true, from: "09:00", to: "18:00" },
+  thursday: { enabled: true, from: "09:00", to: "18:00" },
+  friday: { enabled: true, from: "09:00", to: "18:00" },
+  saturday: { enabled: false, from: "09:00", to: "13:00" },
+  sunday: { enabled: false, from: "09:00", to: "13:00" },
+}
 const DAY_NAMES: Record<string, string> = {
   sunday: "domingo",
   monday: "segunda-feira",
@@ -15,6 +25,28 @@ const DAY_NAMES: Record<string, string> = {
   thursday: "quinta-feira",
   friday: "sexta-feira",
   saturday: "sábado",
+}
+
+function isValidTimeString(value: unknown): value is string {
+  if (typeof value !== "string") return false
+  return /^\d{2}:\d{2}$/.test(value)
+}
+
+export function normalizeOpeningHours(input: unknown): OpeningHoursData {
+  const source = (input && typeof input === "object") ? (input as Record<string, any>) : {}
+  const normalized: OpeningHoursData = {}
+
+  for (const day of DAYS_OF_WEEK) {
+    const incoming = source[day]
+    const fallback = DEFAULT_OPENING_HOURS[day] || DEFAULT_DAY_SCHEDULE
+    normalized[day] = {
+      enabled: Boolean(incoming?.enabled ?? fallback.enabled),
+      from: isValidTimeString(incoming?.from) ? incoming.from : fallback.from,
+      to: isValidTimeString(incoming?.to) ? incoming.to : fallback.to,
+    }
+  }
+
+  return normalized
 }
 
 export function parseTimeToMinutes(timeStr: string): number {
