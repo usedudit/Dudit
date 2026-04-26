@@ -1396,7 +1396,30 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
             sellerName = sellerProfile?.full_name || null
         }
 
-        return { success: true, data: { ...data, customers, seller_name: sellerName } }
+        const subtotalValue = Number((data.order_items || []).reduce((acc: number, item: any) => {
+            return acc + Number(item?.subtotal ?? (Number(item?.quantity || 0) * Number(item?.product_price || 0)))
+        }, 0))
+        const manualDiscount = Math.max(0, Number((data as any).discount_value || 0))
+        const couponDiscount = Math.max(0, Number((data as any).discount_amount || 0))
+        const shippingCost = Math.max(0, Number((data as any).shipping_cost || 0))
+        const additionalCosts = Math.max(0, Number((data as any).additional_costs || 0))
+        const baseBeforePaymentMethod = Math.max(0, subtotalValue - manualDiscount - couponDiscount + shippingCost + additionalCosts)
+        const finalTotal = Math.max(0, Number((data as any).total_amount || 0))
+        const paymentMethodDiscountAmount = Math.max(0, Math.round((baseBeforePaymentMethod - finalTotal) * 100) / 100)
+        const paymentMethodExtraAmount = Math.max(0, Math.round((finalTotal - baseBeforePaymentMethod) * 100) / 100)
+
+        return {
+            success: true,
+            data: {
+                ...data,
+                customers,
+                seller_name: sellerName,
+                subtotal_value: subtotalValue,
+                coupon_discount_amount: couponDiscount,
+                payment_method_discount_amount: paymentMethodDiscountAmount,
+                payment_method_extra_amount: paymentMethodExtraAmount,
+            },
+        }
     }
 
     const { data: sale, error: saleError } = await supabase
@@ -1430,13 +1453,23 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
 
     const { data: saleDraft } = await supabase
         .from("pre_sales")
-        .select("shipping_fee")
+        .select("shipping_fee, other_costs, discount_amount, coupon_discount_amount")
         .eq("id", sale.pre_sale_id)
         .eq("partner_id", partnerId)
         .limit(1)
         .maybeSingle()
 
     const shippingCost = Number(saleDraft?.shipping_fee || 0)
+    const otherCosts = Number((saleDraft as any)?.other_costs || 0)
+    const manualDiscount = Number((saleDraft as any)?.discount_amount || sale.discount_amount || 0)
+    const couponDiscount = Number((saleDraft as any)?.coupon_discount_amount || 0)
+    const subtotalValue = Number((sale.sale_items || []).reduce((acc: number, it: any) => {
+        return acc + Number(it?.subtotal ?? Number(it?.quantity || 0) * Number(it?.unit_price || 0))
+    }, 0))
+    const baseBeforePaymentMethod = Math.max(0, subtotalValue - Math.max(0, manualDiscount) - Math.max(0, couponDiscount) + Math.max(0, shippingCost) + Math.max(0, otherCosts))
+    const finalTotal = Math.max(0, Number(sale.final_amount || 0))
+    const paymentMethodDiscountAmount = Math.max(0, Math.round((baseBeforePaymentMethod - finalTotal) * 100) / 100)
+    const paymentMethodExtraAmount = Math.max(0, Math.round((finalTotal - baseBeforePaymentMethod) * 100) / 100)
     const ref =
         (sale.sale_number && String(sale.sale_number).trim()) ||
         String(sale.id || "").replace(/-/g, "").slice(0, 8).toUpperCase()
@@ -1456,9 +1489,13 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         delivery_type: shippingCost > 0 ? "delivery" : "pickup",
         total_amount: Number(sale.final_amount || 0),
         paid_amount: Number(sale.paid_amount || 0),
-        discount_value: Number(sale.discount_amount || 0),
+        discount_value: Math.max(0, manualDiscount),
+        coupon_discount_amount: Math.max(0, couponDiscount),
         shipping_cost: shippingCost,
-        additional_costs: 0,
+        additional_costs: otherCosts,
+        subtotal_value: subtotalValue,
+        payment_method_discount_amount: paymentMethodDiscountAmount,
+        payment_method_extra_amount: paymentMethodExtraAmount,
         notes: sale.notes,
         created_at: sale.created_at,
         order_date: sale.created_at,

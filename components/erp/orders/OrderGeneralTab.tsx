@@ -13,7 +13,8 @@ import {
 } from "@/components/reusable"
 import {
     SearchIcon, PlusIcon, TagIcon, TrashIcon,
-    CheckCircleIcon, EditIcon, UserIcon
+    CheckCircleIcon, EditIcon, UserIcon,
+    TruckIcon
 } from "@/lib/icons"
 import QuantitySelector from "@/components/reusable/QuantitySelector"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -512,7 +513,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 className="px-4 py-3 gap-4"
                             />
                             <ListItem
-                                icon={TagIcon}
+                                icon={TruckIcon}
                                 title="Adicionar frete"
                                 description="Define o valor do frete do pedido"
                                 onClick={onOpenShipping}

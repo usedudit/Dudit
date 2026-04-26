@@ -102,6 +102,47 @@ async function resolveMercadoPagoAccountId(
     return data?.id || null
 }
 
+async function resolveDefaultSalesAccountId(
+    supabase: SupabaseClient,
+    partnerId: string,
+): Promise<string | null> {
+    const { data: accounts } = await supabase
+        .from("finance_accounts")
+        .select("id, type, is_default")
+        .eq("partner_id", partnerId)
+        .eq("is_active", true)
+        .or("integration_source.is.null,integration_source.neq.mercadopago")
+        .order("created_at", { ascending: true })
+
+    if (!accounts || accounts.length === 0) return null
+    const bankDefault = accounts.find((a: any) => a.type === "bank" && a.is_default)
+    if (bankDefault?.id) return bankDefault.id
+    const cashDefault = accounts.find((a: any) => a.type === "cash" && a.is_default)
+    if (cashDefault?.id) return cashDefault.id
+    const anyBank = accounts.find((a: any) => a.type === "bank")
+    if (anyBank?.id) return anyBank.id
+    const anyCash = accounts.find((a: any) => a.type === "cash")
+    if (anyCash?.id) return anyCash.id
+    return (accounts[0] as any)?.id || null
+}
+
+async function applyAccountBalanceDelta(
+    supabase: SupabaseClient,
+    partnerId: string,
+    accountId: string | null,
+    amount: number,
+) {
+    if (!accountId || !(amount > 0)) return
+    const { error } = await supabase.rpc("apply_account_balance_delta", {
+        p_account_id: accountId,
+        p_partner_id: partnerId,
+        p_delta: Math.round(amount * 100) / 100,
+    })
+    if (error) {
+        console.error("[TRANSACTION] Erro ao atualizar saldo da conta:", error.message)
+    }
+}
+
 function buildEntries(orderData: OrderDataForTransaction): Array<{ method: string; amount: number }> {
     const fromBreakdown = (orderData.payment_breakdown || [])
         .map((entry) => ({
@@ -127,7 +168,12 @@ export async function createTransactionFromOrder(
         const paymentDate = orderData.payment_date || now
         const entries = buildEntries(orderData)
         const contactId = await resolveTransactionContactId(supabase, orderData)
-        const accountId = orderData.finance_account_id || await resolveMercadoPagoAccountId(supabase, orderData.partner_id, orderData.payment_provider)
+        const explicitAccountId = orderData.finance_account_id || null
+        const mercadoPagoAccountId = await resolveMercadoPagoAccountId(supabase, orderData.partner_id, orderData.payment_provider)
+        const defaultSalesAccountId = explicitAccountId || mercadoPagoAccountId
+            ? null
+            : await resolveDefaultSalesAccountId(supabase, orderData.partner_id)
+        const accountId = explicitAccountId || mercadoPagoAccountId || defaultSalesAccountId
 
         for (const [index, entry] of entries.entries()) {
             const amount = Number(entry.amount || 0)
@@ -183,7 +229,9 @@ export async function createTransactionFromOrder(
             const { error } = await supabase.from("transactions").insert(transactionData)
             if (error) {
                 console.error(`[TRANSACTION] Erro ao criar transaction do pedido ${orderData.order_number}:`, error.message)
+                continue
             }
+            await applyAccountBalanceDelta(supabase, orderData.partner_id, accountId, calculated.finalAmount)
         }
     } catch (err: any) {
         console.error("[TRANSACTION] Erro inesperado ao criar transaction:", err.message)

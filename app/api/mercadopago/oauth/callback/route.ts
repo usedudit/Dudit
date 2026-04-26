@@ -197,13 +197,25 @@ export async function GET(request: NextRequest) {
     }
 
     // Ensure dedicated Mercado Pago finance account exists and is locked while connected.
-    const { data: existingMpAccount } = await supabase
+    let { data: existingMpAccount } = await supabase
       .from("finance_accounts")
       .select("id")
       .eq("partner_id", partnerId)
       .eq("integration_source", "mercadopago")
       .limit(1)
       .maybeSingle()
+
+    if (!existingMpAccount?.id) {
+      const { data: existingByName } = await supabase
+        .from("finance_accounts")
+        .select("id")
+        .eq("partner_id", partnerId)
+        .ilike("name", "Mercado Pago")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      existingMpAccount = existingByName || null
+    }
 
     if (existingMpAccount?.id) {
       await supabase

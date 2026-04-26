@@ -1860,6 +1860,21 @@ export type TransactionDetailPayload = {
     canEdit: boolean
     /** Quando false, a UI não exibe a linha "Data de vencimento" (ex.: vendas PDV/pedido sem vencimento). */
     showDueDateRow: boolean
+    transactionDetailKind?: "default" | "manual_entry" | "transfer"
+    transferAccounts?: {
+        from: { name: string; type: string } | null
+        to: { name: string; type: string } | null
+        amount: number
+    } | null
+    salesSummary?: {
+        subtotal: number
+        manualDiscount: number
+        couponDiscount: number
+        paymentMethodDiscount: number
+        paymentMethodExtra: number
+        shippingCost: number
+        additionalCosts: number
+    } | null
 }
 
 export async function getTransactionDetailsAction(
@@ -1920,7 +1935,7 @@ export async function getTransactionDetailsAction(
         const statusVariant = toStatusVariant(row.status, isOverdue)
         // PERF: Parallelize 4 independent lookups (was sequential, saving ~200-400ms)
         const t0Detail = performance.now()
-        const [paymentSubtitle, creatorName, accountLine, subcategoryLine] = await Promise.all([
+        const [paymentSubtitle, creatorName, accountData, subcategoryLine] = await Promise.all([
             // 1. Payment method display label
             row.payment_method_id
                 ? paymentMethodDisplayLabel(supabase, partnerId, row.payment_method_id).then(
@@ -1940,16 +1955,16 @@ export async function getTransactionDetailsAction(
                         creatorProf?.full_name?.trim() ? creatorProf.full_name.trim() : "Sistema"
                     )
                 : Promise.resolve("Sistema"),
-            // 3. Account name
+            // 3. Account data
             row.account_id
                 ? supabase
                     .from("finance_accounts")
-                    .select("name")
+                    .select("name, type")
                     .eq("id", row.account_id)
                     .eq("partner_id", partnerId)
                     .maybeSingle()
-                    .then(({ data: acc }: { data: any }) => acc?.name || null)
-                : Promise.resolve(null as string | null),
+                    .then(({ data: acc }: { data: any }) => ({ name: acc?.name || null, type: acc?.type || null }))
+                : Promise.resolve({ name: null as string | null, type: null as string | null }),
             // 4. Subcategory name
             row.subcategory_id
                 ? supabase
@@ -1962,6 +1977,7 @@ export async function getTransactionDetailsAction(
                 : Promise.resolve(null as string | null),
         ])
         console.log(`[PERF] getTransactionDetails: 4 parallel lookups in ${Math.round(performance.now() - t0Detail)}ms`)
+        const accountLine = accountData?.name || null
 
         const headerTitle =
             row.category === "Vendas" ? `Venda - ${row.description}` : String(row.description || "").trim() || "Transação"
@@ -2002,7 +2018,7 @@ export async function getTransactionDetailsAction(
 
         let installmentBreakdown: TransactionDetailPayload["installmentBreakdown"] | undefined = undefined
         let installmentGroupTotalAmount: number | null = null
-        let paymentDateRowLabel: TransactionDetailPayload["paymentDateRowLabel"] = "Data de pagamento"
+        let paymentDateRowLabel: TransactionDetailPayload["paymentDateRowLabel"] = "Data da transação"
         if (row.installment_group_id) {
             paymentDateRowLabel = "Data de finalização"
             const { data: igGroup } = await supabase
@@ -2090,6 +2106,7 @@ export async function getTransactionDetailsAction(
         }
 
         let items: TransactionDetailPayload["items"] = []
+        let salesSummary: TransactionDetailPayload["salesSummary"] = null
         let salesOrder: { buyer_id?: string | null; customer_name?: string | null } | null = null
         let posSaleCustomerId: string | null | undefined = undefined
 
@@ -2102,6 +2119,11 @@ export async function getTransactionDetailsAction(
           id,
           buyer_id,
           customer_name,
+          total_amount,
+          shipping_cost,
+          additional_costs,
+          discount_value,
+          discount_amount,
           order_items (
             id,
             quantity,
@@ -2139,6 +2161,26 @@ export async function getTransactionDetailsAction(
                     }
                 })
             }
+            if (ord) {
+                const subtotal = Number((oi || []).reduce((acc: number, item: any) => {
+                    return acc + Number(item?.subtotal ?? Number(item?.quantity || 0) * Number(item?.product_price || 0))
+                }, 0))
+                const manualDiscount = Math.max(0, Number((ord as any).discount_value || 0))
+                const couponDiscount = Math.max(0, Number((ord as any).discount_amount || 0))
+                const shippingCost = Math.max(0, Number((ord as any).shipping_cost || 0))
+                const additionalCosts = Math.max(0, Number((ord as any).additional_costs || 0))
+                const baseBeforePaymentMethod = Math.max(0, subtotal - manualDiscount - couponDiscount + shippingCost + additionalCosts)
+                const finalTotal = Math.max(0, Number((ord as any).total_amount || 0))
+                salesSummary = {
+                    subtotal,
+                    manualDiscount,
+                    couponDiscount,
+                    paymentMethodDiscount: Math.max(0, Math.round((baseBeforePaymentMethod - finalTotal) * 100) / 100),
+                    paymentMethodExtra: Math.max(0, Math.round((finalTotal - baseBeforePaymentMethod) * 100) / 100),
+                    shippingCost,
+                    additionalCosts,
+                }
+            }
 
             if (items.length === 0) {
                 let { data: sale } = await supabase
@@ -2148,6 +2190,9 @@ export async function getTransactionDetailsAction(
             id,
             customer_id,
             sale_number,
+            final_amount,
+            discount_amount,
+            pre_sale_id,
             sale_items (
               id,
               quantity,
@@ -2208,6 +2253,33 @@ export async function getTransactionDetailsAction(
                                 image: img,
                             }
                         })
+                    }
+                    const { data: preSale } = (sale as any).pre_sale_id
+                        ? await supabase
+                            .from("pre_sales")
+                            .select("shipping_fee, other_costs, discount_amount, coupon_discount_amount")
+                            .eq("id", (sale as any).pre_sale_id)
+                            .eq("partner_id", partnerId)
+                            .limit(1)
+                            .maybeSingle()
+                        : { data: null as any }
+                    const subtotal = Number((si || []).reduce((acc: number, item: any) => {
+                        return acc + Number(item?.subtotal ?? Number(item?.quantity || 0) * Number(item?.unit_price || 0))
+                    }, 0))
+                    const manualDiscount = Math.max(0, Number((preSale as any)?.discount_amount || (sale as any).discount_amount || 0))
+                    const couponDiscount = Math.max(0, Number((preSale as any)?.coupon_discount_amount || 0))
+                    const shippingCost = Math.max(0, Number((preSale as any)?.shipping_fee || 0))
+                    const additionalCosts = Math.max(0, Number((preSale as any)?.other_costs || 0))
+                    const baseBeforePaymentMethod = Math.max(0, subtotal - manualDiscount - couponDiscount + shippingCost + additionalCosts)
+                    const finalTotal = Math.max(0, Number((sale as any).final_amount || 0))
+                    salesSummary = {
+                        subtotal,
+                        manualDiscount,
+                        couponDiscount,
+                        paymentMethodDiscount: Math.max(0, Math.round((baseBeforePaymentMethod - finalTotal) * 100) / 100),
+                        paymentMethodExtra: Math.max(0, Math.round((finalTotal - baseBeforePaymentMethod) * 100) / 100),
+                        shippingCost,
+                        additionalCosts,
                     }
                 }
             }
@@ -2333,12 +2405,55 @@ export async function getTransactionDetailsAction(
         const lockedRecurring = !!row.recurring_id && systemGateway && !isStatusPaid(row.status)
         const canEdit = !lockedRecurring
 
-        const paymentDateSubtitle = row.payment_date ? formatDateTime(row.payment_date) : null
+        const isManualEntryType =
+            String(row.origin || "").toLowerCase() === "manual" &&
+            ["income", "expense", "refund", "adjustment"].includes(String(row.transaction_type || "").toLowerCase()) &&
+            String(row.category || "").trim() !== "Vendas"
+
+        let transferAccounts: TransactionDetailPayload["transferAccounts"] = null
+        if (row.transfer_group_id) {
+            const { data: transferRows } = await supabase
+                .from("transactions")
+                .select("id, account_id, transaction_type, amount")
+                .eq("partner_id", partnerId)
+                .eq("transfer_group_id", row.transfer_group_id)
+                .limit(4)
+            const rowByType = new Map<string, any>()
+            for (const tx of transferRows || []) {
+                const txType = String((tx as any).transaction_type || "").toLowerCase()
+                if (!rowByType.has(txType)) rowByType.set(txType, tx)
+            }
+            const fromTx = rowByType.get("expense") || null
+            const toTx = rowByType.get("income") || null
+            const accountIds = [fromTx?.account_id, toTx?.account_id].filter(Boolean)
+            const accountMetaById = new Map<string, { name: string; type: string }>()
+            if (accountIds.length > 0) {
+                const { data: transferAccountsMeta } = await supabase
+                    .from("finance_accounts")
+                    .select("id, name, type")
+                    .eq("partner_id", partnerId)
+                    .in("id", accountIds)
+                for (const acc of transferAccountsMeta || []) {
+                    accountMetaById.set(String((acc as any).id), {
+                        name: String((acc as any).name || "Conta"),
+                        type: String((acc as any).type || "cash"),
+                    })
+                }
+            }
+            transferAccounts = {
+                from: fromTx?.account_id ? (accountMetaById.get(String(fromTx.account_id)) || null) : null,
+                to: toTx?.account_id ? (accountMetaById.get(String(toTx.account_id)) || null) : null,
+                amount: Math.abs(Number((fromTx || toTx || row).amount || 0)),
+            }
+        }
+
+        const paymentDateSubtitle = formatDateTime(row.created_at)
 
         const showDueDateRow =
             !installmentBreakdown?.length &&
             (String(row.category || "").trim() !== "Vendas" || !!row.due_date) &&
-            !transactionItemsCompact
+            !transactionItemsCompact &&
+            !["adjustment", "transfer"].includes(String(row.transaction_type || "").toLowerCase())
 
         const detailAmount =
             installmentGroupTotalAmount != null && installmentGroupTotalAmount > 0
@@ -2361,19 +2476,22 @@ export async function getTransactionDetailsAction(
             items,
             transactionItemsCompact,
             installmentBreakdown,
-            paymentDateRowLabel: paymentDateRowLabel || "Data de pagamento",
+            paymentDateRowLabel: paymentDateRowLabel || "Data da transação",
             installmentGroupTotalAmount: installmentGroupTotalAmount ?? null,
             categoryLine: String(row.category || "").trim() || "-",
             subcategoryLine,
             accountLine,
             dueDateLine: row.due_date ? formatDateLabel(row.due_date) : null,
-            paymentDateLine: row.payment_date ? formatDateTime(row.payment_date) : null,
+            paymentDateLine: formatDateTime(row.created_at),
             notesLine: transactionItemsCompact ? null : row.notes ? String(row.notes) : null,
             amount: detailAmount,
             ledgerDirection: ledgerDirectionFromRow(row as DbTransaction),
             contactCard,
             canEdit,
             showDueDateRow,
+            transactionDetailKind: row.transfer_group_id ? "transfer" : isManualEntryType ? "manual_entry" : "default",
+            transferAccounts,
+            salesSummary,
         }
 
         return { success: true, data: payload }

@@ -65,7 +65,7 @@ const RadioButton: React.FC<RadioButtonProps> = ({ name, value, checked, onChang
           `}
                 >
                     <div
-                        className={`${dotClasses} w-2 h-2 rounded-full bg-white`}
+                        className={`${dotClasses} w-2 h-2 rounded-full bg-white dark:bg-dark-surface`}
                     />
                 </div>
             </div>

@@ -74,6 +74,11 @@ const FinancialAccountCard = React.memo(
                                         Mercado Pago
                                     </Badge>
                                 )}
+                                {item.integration_source === "mercadopago" && (
+                                    <Badge variant="blue" className="whitespace-nowrap scale-90 shrink-0">
+                                        Gateway
+                                    </Badge>
+                                )}
                                 <Badge
                                     variant={item.is_active ? "green" : "red"}
                                     className="whitespace-nowrap scale-90 shrink-0"

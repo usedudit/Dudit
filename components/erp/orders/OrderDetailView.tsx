@@ -100,7 +100,12 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
             : []
     const itemCount = Number(order.order_items?.length || 0)
     const itemsLabel = itemCount === 1 ? "1 item" : `${itemCount} itens`
-    const subtotalValue = Number(order.total_amount || 0) - Number(order.shipping_cost || 0) - Number(order.additional_costs || 0) + Number(order.discount_value || 0)
+    const subtotalValue = Number(order.subtotal_value || 0) > 0
+        ? Number(order.subtotal_value || 0)
+        : Number(order.total_amount || 0) - Number(order.shipping_cost || 0) - Number(order.additional_costs || 0) + Number(order.discount_value || 0)
+    const couponDiscountAmount = Math.max(0, Number(order.coupon_discount_amount || 0))
+    const paymentMethodDiscountAmount = Math.max(0, Number(order.payment_method_discount_amount || 0))
+    const paymentMethodExtraAmount = Math.max(0, Number(order.payment_method_extra_amount || 0))
     const cleanNotes = String(order.notes || "").replace(/\n*Pedido cancelado por:[\s\S]*$/, "").trim()
     const cancelNote = (String(order.notes || "").match(/Pedido cancelado por:[\s\S]*$/)?.[0] || "").trim()
     const changeAmount = Math.max(0, Number(order.paid_amount || 0) - Number(order.total_amount || 0))
@@ -350,6 +355,24 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         <PaymentRow
                                                             label="Desconto"
                                                             value={<span className="text-brand-red font-bold">- {formatCurrency(order.discount_value)}</span>}
+                                                        />
+                                                    )}
+                                                    {couponDiscountAmount > 0 && (
+                                                        <PaymentRow
+                                                            label="Desconto por cupom"
+                                                            value={<span className="text-brand-red font-bold">- {formatCurrency(couponDiscountAmount)}</span>}
+                                                        />
+                                                    )}
+                                                    {paymentMethodDiscountAmount > 0 && (
+                                                        <PaymentRow
+                                                            label="Desconto por método de pagamento"
+                                                            value={<span className="text-brand-red font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>}
+                                                        />
+                                                    )}
+                                                    {paymentMethodExtraAmount > 0 && (
+                                                        <PaymentRow
+                                                            label="Acréscimo do método de pagamento"
+                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>}
                                                         />
                                                     )}
                                                     {changeAmount > 0.009 && (

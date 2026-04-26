@@ -11,6 +11,8 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
 import InstallmentParcelsTable, { type InstallmentParcelRow } from "./InstallmentParcelsTable"
+import { ListItem } from "@/components/reusable"
+import { AdjustIcon, ArrowRightIcon, BankIcon, CashierIcon, DigitalWalletIcon, MoneyIcon, ReturnIcon } from "@/lib/icons"
 
 interface TransactionDetailViewProps {
     transactionId: string
@@ -98,6 +100,27 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
             <div className="text-right">{value}</div>
         </div>
     )
+
+    const transferAccountTypeLabel = (type?: string | null) => {
+        if (type === "bank") return "Conta bancária"
+        if (type === "wallet") return "Carteira digital"
+        return "Caixa"
+    }
+
+    const transferAccountIcon = (type?: string | null) => {
+        if (type === "bank") return <BankIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
+        if (type === "wallet") return <DigitalWalletIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
+        return <CashierIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
+    }
+
+    const manualEntryIcon =
+        detail.transactionType === "income"
+            ? MoneyIcon
+            : detail.transactionType === "expense"
+                ? ArrowRightIcon
+                : detail.transactionType === "refund"
+                    ? ReturnIcon
+                    : AdjustIcon
 
     return (
         <FadeIn>
@@ -249,6 +272,48 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                             )
                                                         }
                                                     />
+                                                ) : detail.transactionDetailKind === "transfer" && detail.transferAccounts ? (
+                                                    <div className="space-y-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <ListItem
+                                                                className="border-0 px-0 py-0 rounded-none bg-transparent hover:border-transparent hover:bg-transparent flex-1 cursor-default"
+                                                                icon={<div className="w-5 h-5">{transferAccountIcon(detail.transferAccounts.from?.type)}</div>}
+                                                                title={detail.transferAccounts.from?.name || "Conta de origem"}
+                                                                description={transferAccountTypeLabel(detail.transferAccounts.from?.type)}
+                                                                right={
+                                                                    <span className="font-bold text-sm text-brand-red shrink-0">
+                                                                        - {formatCurrency(detail.transferAccounts.amount)}
+                                                                    </span>
+                                                                }
+                                                            />
+                                                            <div className="h-10 border-r border-brand-border dark:border-dark-border" />
+                                                            <ListItem
+                                                                className="border-0 px-0 py-0 rounded-none bg-transparent hover:border-transparent hover:bg-transparent flex-1 cursor-default"
+                                                                icon={<div className="w-5 h-5">{transferAccountIcon(detail.transferAccounts.to?.type)}</div>}
+                                                                title={detail.transferAccounts.to?.name || "Conta de destino"}
+                                                                description={transferAccountTypeLabel(detail.transferAccounts.to?.type)}
+                                                                right={
+                                                                    <span className="font-bold text-sm text-brand-green shrink-0">
+                                                                        + {formatCurrency(detail.transferAccounts.amount)}
+                                                                    </span>
+                                                                }
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                ) : detail.transactionDetailKind === "manual_entry" ? (
+                                                    detail.items.map((item) => (
+                                                        <ListItem
+                                                            key={item.id}
+                                                            className="border-0 px-0 py-0 rounded-none bg-transparent hover:border-transparent hover:bg-transparent cursor-default"
+                                                            icon={manualEntryIcon}
+                                                            title={item.title}
+                                                            right={
+                                                                <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading shrink-0">
+                                                                    {formatCurrency(item.lineTotal)}
+                                                                </span>
+                                                            }
+                                                        />
+                                                    ))
                                                 ) : (
                                                     detail.items.map((item) => (
                                                         <div key={item.id} className="flex items-start gap-4">
@@ -305,6 +370,48 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                         <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.accountLine || "-"}</span>
                                                     }
                                                 />
+                                                {detail.salesSummary && (
+                                                    <PaymentRow
+                                                        label="Subtotal da venda"
+                                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.salesSummary.subtotal)}</span>}
+                                                    />
+                                                )}
+                                                {detail.salesSummary && detail.salesSummary.manualDiscount > 0 && (
+                                                    <PaymentRow
+                                                        label="Desconto"
+                                                        value={<span className="text-brand-red font-bold text-sm">- {formatCurrency(detail.salesSummary.manualDiscount)}</span>}
+                                                    />
+                                                )}
+                                                {detail.salesSummary && detail.salesSummary.couponDiscount > 0 && (
+                                                    <PaymentRow
+                                                        label="Desconto por cupom"
+                                                        value={<span className="text-brand-red font-bold text-sm">- {formatCurrency(detail.salesSummary.couponDiscount)}</span>}
+                                                    />
+                                                )}
+                                                {detail.salesSummary && detail.salesSummary.paymentMethodDiscount > 0 && (
+                                                    <PaymentRow
+                                                        label="Desconto por método"
+                                                        value={<span className="text-brand-red font-bold text-sm">- {formatCurrency(detail.salesSummary.paymentMethodDiscount)}</span>}
+                                                    />
+                                                )}
+                                                {detail.salesSummary && detail.salesSummary.paymentMethodExtra > 0 && (
+                                                    <PaymentRow
+                                                        label="Acréscimo do método"
+                                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detail.salesSummary.paymentMethodExtra)}</span>}
+                                                    />
+                                                )}
+                                                {detail.salesSummary && detail.salesSummary.shippingCost > 0 && (
+                                                    <PaymentRow
+                                                        label="Frete/entrega"
+                                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.salesSummary.shippingCost)}</span>}
+                                                    />
+                                                )}
+                                                {detail.salesSummary && detail.salesSummary.additionalCosts > 0 && (
+                                                    <PaymentRow
+                                                        label="Outros custos"
+                                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.salesSummary.additionalCosts)}</span>}
+                                                    />
+                                                )}
                                                 {detail.showDueDateRow && (
                                                     <PaymentRow
                                                         label="Data de vencimento"

@@ -93,7 +93,7 @@ export const AddressTab: React.FC<AddressTabProps> = ({
 
                             <div className="grid grid-cols-2 gap-3 flex-row items-center pt-1.5 pb-1.5">
                                 <NumberInputWithCheckbox
-                                    label="NÃºmero"
+                                    label="Número"
                                     number={number}
                                     noNumber={noNumber}
                                     onNumberChange={(val) => setNumber(val)}
@@ -121,13 +121,13 @@ export const AddressTab: React.FC<AddressTabProps> = ({
 
                 <div className="lg:col-span-4 flex flex-col gap-8 lg:border-l lg:border-brand-border lg:pl-12 dark:lg:border-dark-border">
                     <section>
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">InformaÃ§Ãµes da Entrega</h3>
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Informações da Entrega</h3>
                         <div className="grid grid-cols-1 gap-4">
                             <FormDropdown
                                 label="Carrier / Entregador"
                                 value={selectedDeliveryPersonId || "none"}
                                 setValue={(val: any) => setSelectedDeliveryPersonId(val === "none" ? "" : val)}
-                                options={[{ value: "none", label: "Sem entregador (nÃ£o atribuÃ­do)" }, ...deliveryPeopleOptions]}
+                                options={[{ value: "none", label: "Sem entregador (não atribuído)" }, ...deliveryPeopleOptions]}
                             />
                             <FormDropdown
                                 label="Status"
@@ -137,36 +137,22 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                 disabled={deliveryMethod === "pickup"}
                             />
                             <DatePicker
-                                label="Data de saÃ­da"
+                                label="Data de saída"
                                 value={deliveryDate}
                                 onChange={(value) => setDeliveryDate(value instanceof Date ? value.toISOString().slice(0, 10) : String(value || ""))}
                                 placeholder="Selecione a data"
                             />
                             <TimePicker
-                                label="HorÃ¡rio de saÃ­da"
+                                label="Horário de saída"
                                 value={deliveryTime}
                                 onChange={setDeliveryTime}
-                                placeholder="Selecione o horÃ¡rio"
+                                placeholder="Selecione o horário"
                             />
                         </div>
 
                         <div className="mt-4 rounded-2xl border border-brand-border p-4 dark:border-dark-border">
                             <span className="mr-2 text-sm font-medium text-brand-inactive-text">Status selecionado:</span>
                             <Badge variant={selectedStatusMeta.variant}>{selectedStatusMeta.label}</Badge>
-                        </div>
-                    </section>
-
-                    <section>
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Resumo do EndereÃ§o</h3>
-                        <div className="rounded-2xl border border-brand-border p-5 dark:border-dark-border">
-                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                {street ? `${street}, ${noNumber ? "S/N" : number || "S/N"}` : "EndereÃ§o nÃ£o informado"}
-                            </p>
-                            <p className="mt-2 whitespace-pre-line text-sm text-brand-inactive-text dark:text-dark-body">
-                                {street
-                                    ? `${neighborhood}\n${city} - ${uf}\n${cep || ""}`.trim()
-                                    : "Preencha o endereÃ§o de entrega para gerar a entrega automaticamente."}
-                            </p>
                         </div>
                     </section>
                 </div>

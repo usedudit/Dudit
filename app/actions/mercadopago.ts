@@ -38,8 +38,9 @@ export async function disconnectMercadoPagoAction() {
   await supabase
     .from("finance_accounts")
     .update({
-      is_system_managed: false,
-      integration_source: null,
+      is_system_managed: true,
+      integration_source: "mercadopago",
+      is_active: false,
       updated_at: new Date().toISOString(),
     })
     .eq("partner_id", partner.id)

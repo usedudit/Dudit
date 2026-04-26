@@ -28,7 +28,7 @@ import {
     Mail01Icon,
     WhatsappIcon as WhatsappIcon01,
     HelpCircleIcon as HelpCircle,
-    Archive03Icon,
+    Archive03Icon,  
     Location01Icon,
     InstagramIcon as InstagramIcon01,
     NewTwitterIcon,
@@ -38,6 +38,9 @@ import {
     Moon02Icon,
     Flag01Icon,
     Search01Icon,
+    BankIcon as BankIcon01,
+    Cashier02Icon,
+    BitcoinWalletIcon as BitcoinWalletIcon01,
     FilterIcon as CoreFilterIcon,
     ParagraphBulletsPoint01Icon,
     PlusSignIcon,
@@ -314,6 +317,11 @@ export const LinkedinIcon = CreateIcon(Linkedin02Icon)
 
 export const WrenchIcon = CreateIcon(Wrench01Icon)
 export const CalendarIcon = CreateIcon(Calendar03Icon)
+
+export const BankIcon = CreateIcon(BankIcon01)
+export const CashierIcon = CreateIcon(Cashier02Icon)
+export const DigitalWalletIcon = CreateIcon(BitcoinWalletIcon01)
+
 
 // ============================
 // BUSINESS / APP
