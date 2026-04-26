@@ -53,49 +53,53 @@ async function resolveSellerNameMap(partnerId: string) {
   return new Map<string, string>((profiles || []).map((p: any) => [String(p.user_id), String(p.full_name || "Vendedor")]))
 }
 
-export async function getSalesGoalsModuleAction(partnerId: string) {
-  await requireUser()
-  await requirePartnerAccess(partnerId)
-  const supabase = await getSupabaseServerClient()
-  const nowDate = new Date().toISOString().slice(0, 10)
+export async function getSalesGoalsModuleAction(partnerId: string): Promise<{ success: true; goals: any; sellers: { id: string; name: string }[] } | { success: false; error: string }> {
+  try {
+    await requireUser()
+    await requirePartnerAccess(partnerId)
+    const supabase = await getSupabaseServerClient()
+    const nowDate = new Date().toISOString().slice(0, 10)
 
-  const [{ data: goals }, { data: progressRows }, sellerNameMap] = await Promise.all([
-    supabase
-      .from("sales_goals")
-      .select("*")
-      .eq("partner_id", partnerId)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("sales_goal_progress")
-      .select("id, goal_id, user_id, current_amount, achieved, achieved_at"),
-    resolveSellerNameMap(partnerId),
-  ])
+    const [{ data: goals }, { data: progressRows }, sellerNameMap] = await Promise.all([
+      supabase
+        .from("sales_goals")
+        .select("*")
+        .eq("partner_id", partnerId)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("sales_goal_progress")
+        .select("id, goal_id, user_id, current_amount, achieved, achieved_at"),
+      resolveSellerNameMap(partnerId),
+    ])
 
-  const progressByGoal = new Map<string, any[]>()
-  for (const row of progressRows || []) {
-    const list = progressByGoal.get(String(row.goal_id)) || []
-    list.push(row)
-    progressByGoal.set(String(row.goal_id), list)
-  }
-
-  const goalsWithProgress = (goals || []).map((goal: any) => {
-    const rows = progressByGoal.get(String(goal.id)) || []
-    const currentAmount = money(rows.reduce((sum: number, row: any) => sum + Number(row.current_amount || 0), 0))
-    const percent = Number(goal.target_amount || 0) > 0 ? Math.min(100, (currentAmount / Number(goal.target_amount || 0)) * 100) : 0
-    const isAchieved = rows.some((row: any) => Boolean(row.achieved))
-    const isExpired = !isAchieved && nowDate > String(goal.end_date)
-    const status = isAchieved ? "Concluída" : isExpired ? "Expirada" : "Em andamento"
-
-    return {
-      ...goal,
-      current_amount: currentAmount,
-      progress_percent: Math.round(percent),
-      status,
-      scope_user_name: goal.user_id ? sellerNameMap.get(String(goal.user_id)) || "Vendedor" : null,
+    const progressByGoal = new Map<string, any[]>()
+    for (const row of progressRows || []) {
+      const list = progressByGoal.get(String(row.goal_id)) || []
+      list.push(row)
+      progressByGoal.set(String(row.goal_id), list)
     }
-  })
 
-  return { success: true as const, goals: goalsWithProgress, sellers: Array.from(sellerNameMap.entries()).map(([id, name]) => ({ id, name })) }
+    const goalsWithProgress = (goals || []).map((goal: any) => {
+      const rows = progressByGoal.get(String(goal.id)) || []
+      const currentAmount = money(rows.reduce((sum: number, row: any) => sum + Number(row.current_amount || 0), 0))
+      const percent = Number(goal.target_amount || 0) > 0 ? Math.min(100, (currentAmount / Number(goal.target_amount || 0)) * 100) : 0
+      const isAchieved = rows.some((row: any) => Boolean(row.achieved))
+      const isExpired = !isAchieved && nowDate > String(goal.end_date)
+      const status = isAchieved ? "Concluída" : isExpired ? "Expirada" : "Em andamento"
+
+      return {
+        ...goal,
+        current_amount: currentAmount,
+        progress_percent: Math.round(percent),
+        status,
+        scope_user_name: goal.user_id ? sellerNameMap.get(String(goal.user_id)) || "Vendedor" : null,
+      }
+    })
+
+    return { success: true as const, goals: goalsWithProgress, sellers: Array.from(sellerNameMap.entries()).map(([id, name]) => ({ id, name })) }
+  } catch (error: any) {
+    return { success: false, error: error.message || "Erro ao carregar metas." }
+  }
 }
 
 export async function upsertSalesGoalAction(input: GoalInput) {
@@ -120,13 +124,13 @@ export async function upsertSalesGoalAction(input: GoalInput) {
   if (input.id) {
     const { error } = await supabase.from("sales_goals").update(payload).eq("id", input.id).eq("partner_id", input.partnerId)
     if (error) return { success: false as const, error: error.message }
-    revalidateTag(`sales-goals-ranking:${input.partnerId}`)
+    revalidateTag(`sales-goals-ranking:${input.partnerId}`, "max")
     return { success: true as const }
   }
 
   const { error } = await supabase.from("sales_goals").insert(payload)
   if (error) return { success: false as const, error: error.message }
-  revalidateTag(`sales-goals-ranking:${input.partnerId}`)
+  revalidateTag(`sales-goals-ranking:${input.partnerId}`, "max")
   return { success: true as const }
 }
 
@@ -136,7 +140,7 @@ export async function deleteSalesGoalAction(partnerId: string, goalId: string) {
   const supabase = await getSupabaseServerClient()
   const { error } = await supabase.from("sales_goals").delete().eq("partner_id", partnerId).eq("id", goalId)
   if (error) return { success: false as const, error: error.message }
-  revalidateTag(`sales-goals-ranking:${partnerId}`)
+  revalidateTag(`sales-goals-ranking:${partnerId}`, "max")
   return { success: true as const }
 }
 

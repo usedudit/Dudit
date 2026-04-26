@@ -4,6 +4,7 @@ import { redis } from '@/lib/redis'
 import { syncToExploreRedis } from '@/lib/redis-sync'
 
 export async function GET(req: Request) {
+  const start = Date.now()
   try {
     const authHeader = req.headers.get('Authorization')
     const secret = process.env.CRON_SECRET
@@ -67,6 +68,7 @@ export async function GET(req: Request) {
       await Promise.allSettled(batches)
     }
 
+    const elapsed = Date.now() - start
     return NextResponse.json({
       status: 'success',
       audited: recentItems.length,

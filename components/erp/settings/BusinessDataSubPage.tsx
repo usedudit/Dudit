@@ -531,7 +531,7 @@ export const BusinessDataSubPage = ({
                                 <TabsContent value="hours" className="mt-0 focus-visible:outline-none">
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="relative overflow-hidden">
                                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Horários de Funcionamento</h3>
-                                        <BusinessHoursSelector value={hours} onChange={setHours} />
+                                        <BusinessHoursSelector value={hours as any} onChange={setHours} />
                                     </motion.div>
                                 </TabsContent>
 

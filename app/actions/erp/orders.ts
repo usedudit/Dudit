@@ -2327,7 +2327,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
         try {
             await Promise.all(
-                (currentOrders || []).map((order: { id: string; previous_situation_before_cancel?: string | null; stock_restored_on_cancel?: boolean | null; inventory_deducted?: boolean | null }) => {
+                (currentOrders || []).map((order: { id: string; situation: string | null; previous_situation_before_cancel?: string | null; stock_restored_on_cancel?: boolean | null; inventory_deducted?: boolean | null }) => {
                     const lines: string[] = []
 
                     if (payload.actionType === "cancel") {
