@@ -9,11 +9,8 @@ import { MarketplaceSearchType } from "@/lib/types/marketplace"
 // NO unstable_cache - Redis is the single source of truth.
 // searchMarketplaceDirect already uses react.cache() for per-request deduplication.
 export const getCachedHomeProducts = async () => {
-  const t0 = performance.now()
   const data = await searchMarketplaceDirect("", "produtos", { produtos: 24 })
-  const tEnd = performance.now()
 
-  console.log(`[Query Timing] home took ${(tEnd - t0).toFixed(2)}ms`)
   return data
 }
 

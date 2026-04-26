@@ -22,9 +22,7 @@ export function useFinanceAccounts(partnerId: string) {
     const { data, isLoading, error } = useQuery({
         queryKey: FINANCE_ACCOUNTS_KEY(partnerId),
         queryFn: async () => {
-            const t0 = performance.now()
-            const res = await getFinanceAccountsAction(partnerId)
-            console.log(`[PERF] useFinanceAccounts: fetched in ${Math.round(performance.now() - t0)}ms`)
+                const res = await getFinanceAccountsAction(partnerId)
             return res
         },
         staleTime: 60_000, // 1 minute — accounts rarely change mid-session

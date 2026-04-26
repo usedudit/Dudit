@@ -1,0 +1,253 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
+
+type GoalRow = {
+  id: string
+  partner_id: string
+  period_type: "monthly" | "weekly"
+  start_date: string
+  end_date: string
+  target_amount: number
+  bonus_type: "fixed" | "percentage"
+  bonus_value: number
+  applies_to: "all" | "user"
+  user_id: string | null
+}
+
+function money(value: number) {
+  if (!Number.isFinite(value)) return 0
+  return Math.round(value * 100) / 100
+}
+
+async function createGoalBonusExpense(params: {
+  supabase: SupabaseClient
+  partnerId: string
+  goalId: string
+  userId: string
+  amount: number
+  createdByUserId?: string | null
+  accountId?: string | null
+}) {
+  const bonusAmount = money(Math.max(0, Number(params.amount || 0)))
+  if (bonusAmount <= 0.009) return
+
+  const referenceNote = `goal-bonus:${params.goalId}:${params.userId}`
+  const { data: existing } = await params.supabase
+    .from("transactions")
+    .select("id")
+    .eq("partner_id", params.partnerId)
+    .eq("reference_note", referenceNote)
+    .limit(1)
+    .maybeSingle()
+  if (existing?.id) return
+
+  const now = new Date().toISOString()
+  const payload: Record<string, unknown> = {
+    partner_id: params.partnerId,
+    description: "Bônus por meta atingida",
+    category: "Comissões",
+    amount: bonusAmount,
+    original_amount: bonusAmount,
+    status: "paid",
+    payment_date: now,
+    transaction_date: now,
+    payment_type: "Bônus meta",
+    transaction_type: "expense",
+    origin: "system",
+    notes: `Bônus da meta ${params.goalId} para vendedor ${params.userId}.`,
+    reference_note: referenceNote,
+    account_id: params.accountId || null,
+    created_by_user_id: params.createdByUserId || null,
+  }
+
+  let insertRes = await params.supabase.from("transactions").insert(payload)
+  if (insertRes.error && String(insertRes.error.message || "").includes("created_by_user_id")) {
+    const fallbackPayload = { ...payload }
+    delete fallbackPayload.created_by_user_id
+    insertRes = await params.supabase.from("transactions").insert(fallbackPayload)
+  }
+}
+
+async function reverseGoalBonusExpense(params: {
+  supabase: SupabaseClient
+  partnerId: string
+  goalId: string
+  userId: string
+  createdByUserId?: string | null
+  accountId?: string | null
+}) {
+  const referenceNote = `goal-bonus:${params.goalId}:${params.userId}`
+  const { data: original } = await params.supabase
+    .from("transactions")
+    .select("id, amount")
+    .eq("partner_id", params.partnerId)
+    .eq("reference_note", referenceNote)
+    .eq("transaction_type", "expense")
+    .limit(1)
+    .maybeSingle()
+  if (!original?.id) return
+
+  const reverseReference = `goal-bonus-reversal:${original.id}`
+  const { data: existingReverse } = await params.supabase
+    .from("transactions")
+    .select("id")
+    .eq("partner_id", params.partnerId)
+    .eq("reference_note", reverseReference)
+    .limit(1)
+    .maybeSingle()
+  if (existingReverse?.id) return
+
+  const amount = money(Math.abs(Number(original.amount || 0)))
+  if (amount <= 0.009) return
+  const now = new Date().toISOString()
+  const payload: Record<string, unknown> = {
+    partner_id: params.partnerId,
+    description: "Estorno bônus por meta",
+    category: "Comissões",
+    amount,
+    original_amount: amount,
+    status: "paid",
+    payment_date: now,
+    transaction_date: now,
+    payment_type: "Bônus meta",
+    transaction_type: "refund",
+    refund_kind: "expense_refund",
+    origin: "system",
+    notes: `Estorno do bônus da meta ${params.goalId} para vendedor ${params.userId}.`,
+    reference_note: reverseReference,
+    account_id: params.accountId || null,
+    created_by_user_id: params.createdByUserId || null,
+  }
+
+  let insertRes = await params.supabase.from("transactions").insert(payload)
+  if (insertRes.error && String(insertRes.error.message || "").includes("created_by_user_id")) {
+    const fallbackPayload = { ...payload }
+    delete fallbackPayload.created_by_user_id
+    insertRes = await params.supabase.from("transactions").insert(fallbackPayload)
+  }
+}
+
+async function getActiveGoalsForSeller(params: {
+  supabase: SupabaseClient
+  partnerId: string
+  sellerUserId: string
+  saleDateIso?: string
+}) {
+  const day = new Date(params.saleDateIso || new Date().toISOString()).toISOString().slice(0, 10)
+  const { data } = await params.supabase
+    .from("sales_goals")
+    .select("*")
+    .eq("partner_id", params.partnerId)
+    .lte("start_date", day)
+    .gte("end_date", day)
+    .or(`applies_to.eq.all,and(applies_to.eq.user,user_id.eq.${params.sellerUserId})`)
+
+  return (data || []) as GoalRow[]
+}
+
+export async function applySaleToGoals(params: {
+  supabase: SupabaseClient
+  partnerId: string
+  sellerUserId: string
+  saleAmount: number
+  saleDateIso?: string
+  createdByUserId?: string | null
+  accountId?: string | null
+}) {
+  const amount = money(Math.max(0, Number(params.saleAmount || 0)))
+  if (amount <= 0.009) return
+  const goals = await getActiveGoalsForSeller(params)
+
+  for (const goal of goals) {
+    const { data: progress } = await params.supabase
+      .from("sales_goal_progress")
+      .select("id, current_amount, achieved")
+      .eq("goal_id", goal.id)
+      .eq("user_id", params.sellerUserId)
+      .maybeSingle()
+
+    const currentAmount = money(Number(progress?.current_amount || 0))
+    const nextAmount = money(currentAmount + amount)
+    const alreadyAchieved = Boolean(progress?.achieved)
+    const justAchieved = !alreadyAchieved && nextAmount >= Number(goal.target_amount || 0)
+    const achievedAt = justAchieved ? new Date().toISOString() : null
+
+    await params.supabase
+      .from("sales_goal_progress")
+      .upsert({
+        goal_id: goal.id,
+        user_id: params.sellerUserId,
+        current_amount: nextAmount,
+        achieved: alreadyAchieved || justAchieved,
+        achieved_at: justAchieved ? achievedAt : (progress as any)?.achieved_at || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "goal_id,user_id" })
+
+    if (justAchieved) {
+      const bonus =
+        goal.bonus_type === "fixed"
+          ? money(Number(goal.bonus_value || 0))
+          : money((nextAmount * Number(goal.bonus_value || 0)) / 100)
+
+      await createGoalBonusExpense({
+        supabase: params.supabase,
+        partnerId: params.partnerId,
+        goalId: goal.id,
+        userId: params.sellerUserId,
+        amount: bonus,
+        createdByUserId: params.createdByUserId || null,
+        accountId: params.accountId || null,
+      })
+    }
+  }
+}
+
+export async function reverseSaleFromGoals(params: {
+  supabase: SupabaseClient
+  partnerId: string
+  sellerUserId: string
+  saleAmount: number
+  saleDateIso?: string
+  createdByUserId?: string | null
+  accountId?: string | null
+}) {
+  const amount = money(Math.max(0, Number(params.saleAmount || 0)))
+  if (amount <= 0.009) return
+  const goals = await getActiveGoalsForSeller(params)
+
+  for (const goal of goals) {
+    const { data: progress } = await params.supabase
+      .from("sales_goal_progress")
+      .select("id, current_amount, achieved")
+      .eq("goal_id", goal.id)
+      .eq("user_id", params.sellerUserId)
+      .maybeSingle()
+    if (!progress?.id) continue
+
+    const prevAmount = money(Number(progress.current_amount || 0))
+    const nextAmount = money(Math.max(0, prevAmount - amount))
+    const target = Number(goal.target_amount || 0)
+    const wasAchieved = Boolean(progress.achieved)
+    const stillAchieved = nextAmount >= target
+
+    await params.supabase
+      .from("sales_goal_progress")
+      .update({
+        current_amount: nextAmount,
+        achieved: stillAchieved,
+        achieved_at: stillAchieved ? (progress as any).achieved_at || null : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", progress.id)
+
+    if (wasAchieved && !stillAchieved) {
+      await reverseGoalBonusExpense({
+        supabase: params.supabase,
+        partnerId: params.partnerId,
+        goalId: goal.id,
+        userId: params.sellerUserId,
+        createdByUserId: params.createdByUserId || null,
+        accountId: params.accountId || null,
+      })
+    }
+  }
+}

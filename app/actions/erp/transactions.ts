@@ -312,7 +312,6 @@ export async function getFinancialTransactionsAction(
     try {
         const authStart = performance.now()
         await requirePartnerAccessWithPermission(partnerId, "financial", "view")
-        console.log(`[PERF] transactions.auth ${Math.round(performance.now() - authStart)}ms`)
         const supabase = await getSupabaseServerClient()
 
         const cursor = options?.cursor ?? null
@@ -340,8 +339,6 @@ export async function getFinancialTransactionsAction(
         const lastRow = txs[txs.length - 1]
         const nextCursor: FinancialTransactionCursor | null =
             hasMore && lastRow ? { createdAt: lastRow.created_at, id: lastRow.id } : null
-
-        console.log(`[PERF] transactions.query ${Math.round(performance.now() - t1)}ms (${txs.length} rows, hasMore=${hasMore})`)
 
         // ── Step 2: Collect all IDs for secondary lookups ───────────────
         const salesOrderNumbers: string[] = []
@@ -477,8 +474,6 @@ export async function getFinancialTransactionsAction(
             installmentGroupById.set(g.id, g as InstallmentGroupRow)
         }
 
-        console.log(`[PERF] transactions.lookups ${Math.round(performance.now() - t2)}ms`)
-
         // ── Step 4: Map to ERPTransaction ───────────────────────────────
         const now = new Date()
         const mapped: ERPTransaction[] = txs.map((t) => {
@@ -588,7 +583,6 @@ export async function getFinancialTransactionsAction(
             }
         })
 
-        console.log(`[PERF] getFinancialTransactions took ${Math.round(performance.now() - actionStart)}ms (${txs.length} rows)`)
         return { success: true, items: mapped, nextCursor, hasMore }
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao carregar transações" }
@@ -1502,8 +1496,6 @@ export async function settleInstallmentGroupAction(input: {
 
         const txIdsToLog = pendingTxs?.map((t: any) => t.id) || []
 
-        const t0 = performance.now()
-
         // Execute the atomic settlement RPC
         const { data, error } = await supabase.rpc("settle_installment_group", {
             p_partner_id: input.partnerId,
@@ -1516,8 +1508,6 @@ export async function settleInstallmentGroupAction(input: {
             console.error("[transactions] settle_installment_group RPC failed:", error)
             throw new Error(`Falha na transação atômica de liquidação: ${error.message}`)
         }
-
-        console.log(`[PERF] settleInstallmentGroup RPC executed in ${Math.round(performance.now() - t0)}ms. Result:`, data)
 
         // Log audit events for the transactions that were just settled
         if (txIdsToLog.length > 0) {
@@ -1981,7 +1971,6 @@ export async function getTransactionDetailsAction(
                     .then(({ data: sub }: { data: any }) => sub?.name || null)
                 : Promise.resolve(null as string | null),
         ])
-        console.log(`[PERF] getTransactionDetails: 4 parallel lookups in ${Math.round(performance.now() - t0Detail)}ms`)
         const accountLine = accountData?.name || null
 
         const headerTitle =

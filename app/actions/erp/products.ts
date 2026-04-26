@@ -160,7 +160,6 @@ export async function deleteProductAction(productId: string) {
         // Synchronous revalidation and Redis sync to prevent stale data
         await invalidateProductCache(productId, product.partner_id, 'delete')
 
-        console.log(`[PERF] deleteProduct took ${Math.round(performance.now() - actionStart)}ms`)
         return { success: true }
     } catch (error: any) {
         return { error: error.message }
@@ -436,7 +435,6 @@ export async function createProductComprehensiveAction(data: {
             increment_usage_counter(finalPartnerId, "images_count", data.images.length).catch(console.error)
         }
 
-        console.log(`[PERF] createProduct took ${Math.round(performance.now() - actionStart)}ms`)
         return successResponse({ ...insertedProduct, ...fiscalData, ...logisticsData })
     } catch (error: any) {
         return errorResponse(error.message)
@@ -667,7 +665,6 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         // Synchronous revalidation and Redis sync to prevent stale data
         await invalidateProductCache(productId, product.partner_id, 'update')
 
-        console.log(`[PERF] updateProduct took ${Math.round(performance.now() - actionStart)}ms`)
         return successResponse({ ...updatedProduct, ...fiscalPayload, ...logisticsPayload })
     } catch (error: any) {
         return errorResponse(error.message)
@@ -1223,7 +1220,6 @@ export async function duplicateProductsAction(productIds: string[]) {
         if (insertError) return { success: false, error: insertError.message }
 
         Promise.resolve().then(() => revalidateProducts(products[0].partner_id)).catch(console.error)
-        console.log(`[PERF] duplicateProducts took ${Math.round(performance.now() - actionStart)}ms`)
         return { success: true, count: inserted?.length || 0, products: inserted }
     } catch (error: any) {
         return { success: false, error: error.message }

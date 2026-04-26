@@ -56,6 +56,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
         specificPermissions: ["can_discount", "can_cancel_sale"],
     },
     quotes: { key: "quotes", path: "/erp/quotes", label: "Orçamentos", category: "Vendas", legacyCategory: "quotes" },
+    goals: { key: "goals", path: "/erp/goals", label: "Metas", category: "Vendas", legacyCategory: "orders" },
 
     // ── Produtos
     products: {
@@ -192,6 +193,7 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
     invoices: full,
     pos: withSpecific(full, { can_discount: true, can_cancel_sale: true }),
     quotes: full,
+    goals: full,
     // Produtos
     products: withSpecific(full, { can_adjust_stock: true, can_import_products: true }),
     stock_movements: full,
@@ -255,6 +257,7 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     invoices: full,
     pos: withSpecific(full, { can_discount: true, can_cancel_sale: true }),
     quotes: full,
+    goals: full,
     // Produtos - full
     products: withSpecific(full, { can_adjust_stock: true, can_import_products: true }),
     stock_movements: full,
@@ -304,6 +307,7 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     invoices: viewOnly,
     pos: withSpecific(crud, { can_discount: false, can_cancel_sale: false }),
     quotes: crud,
+    goals: viewOnly,
     // Produtos - view only
     products: withSpecific(viewOnly, { can_adjust_stock: false, can_import_products: false }),
     stock_movements: viewOnly,
@@ -357,6 +361,7 @@ const DELIVERY_PERMISSIONS: PartnerRoutePermissions = {
     invoices: noAccess,
     pos: noAccess,
     quotes: noAccess,
+    goals: noAccess,
     // Produtos - no access
     products: noAccess,
     stock_movements: noAccess,
@@ -400,6 +405,7 @@ const VIEWER_PERMISSIONS: PartnerRoutePermissions = {
     // PDV visível para qualquer perfil com acesso a pedidos (operação no caixa não exige papel de editor).
     pos: viewOnly,
     quotes: viewOnly,
+    goals: viewOnly,
     products: viewOnly,
     stock_movements: viewOnly,
     import_notes: viewOnly,
@@ -539,7 +545,7 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
     const categoryRoutes: Record<keyof PartnerPermissions, RouteKey[]> = {
         products: ["products", "stock_movements", "import_notes", "cadastros_produtos"],
         services: ["appointments", "services", "cadastros_services"],
-        orders: ["orders", "returns", "logistics", "invoices", "pos"],
+        orders: ["orders", "returns", "logistics", "invoices", "pos", "goals"],
         financial: ["financial_transactions", "cash_register", "financial_dashboard", "financial_dre", "cadastros_financeiro"],
         customers: ["customers"],
         suppliers: ["suppliers"],

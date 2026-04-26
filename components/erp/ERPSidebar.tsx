@@ -58,6 +58,7 @@ const navItems: NavItem[] = [
         submenu: [
             { label: "Pedidos e Vendas", href: "/erp/orders" },
             { label: "Orçamentos", href: "/erp/quotes" },
+            { label: "Metas", href: "/erp/goals" },
             { label: "PDV (Frente de Caixa)", href: "/erp/pos" },
             { label: "Devoluções", href: "/" },
             { label: "Expedição e Entregas", href: "/erp/logistics" },

@@ -35,11 +35,7 @@ const getRequestId = cache(() => {
 // ── Transactions ────────────────────────────────────────────────────────────
 export const getTransactionsData = cache(
     async (partnerId: string, options?: { cursor?: FinancialTransactionCursor | null }) => {
-        const reqId = getRequestId()
-        console.log(`[DEDUP] req-${reqId} | getTransactionsData EXECUTE (partnerId=${partnerId.slice(0, 8)})`)
-        const t0 = performance.now()
         const result = await getFinancialTransactionsAction(partnerId, options)
-        console.log(`[DEDUP] req-${reqId} | getTransactionsData DONE in ${Math.round(performance.now() - t0)}ms`)
         return result
     }
 )
@@ -47,11 +43,7 @@ export const getTransactionsData = cache(
 // ── Financial Categories ────────────────────────────────────────────────────
 export const getCategoriesData = cache(
     async (partnerId: string) => {
-        const reqId = getRequestId()
-        console.log(`[DEDUP] req-${reqId} | getCategoriesData EXECUTE`)
-        const t0 = performance.now()
         const result = await getFinancialCategoriesAction(partnerId)
-        console.log(`[DEDUP] req-${reqId} | getCategoriesData DONE in ${Math.round(performance.now() - t0)}ms`)
         return result
     }
 )
@@ -59,11 +51,7 @@ export const getCategoriesData = cache(
 // ── Finance Accounts ────────────────────────────────────────────────────────
 export const getAccountsData = cache(
     async (partnerId: string) => {
-        const reqId = getRequestId()
-        console.log(`[DEDUP] req-${reqId} | getAccountsData EXECUTE`)
-        const t0 = performance.now()
         const result = await getFinanceAccountsAction(partnerId)
-        console.log(`[DEDUP] req-${reqId} | getAccountsData DONE in ${Math.round(performance.now() - t0)}ms`)
         return result
     }
 )
@@ -71,11 +59,7 @@ export const getAccountsData = cache(
 // ── Recurring Occurrences (expensive: bulk RPC) ─────────────────────────────
 export const getRecurringOccurrencesData = cache(
     async (partnerId: string) => {
-        const reqId = getRequestId()
-        console.log(`[DEDUP] req-${reqId} | getRecurringOccurrencesData EXECUTE`)
-        const t0 = performance.now()
         const result = await generateRecurringOccurrencesAction(partnerId)
-        console.log(`[DEDUP] req-${reqId} | getRecurringOccurrencesData DONE in ${Math.round(performance.now() - t0)}ms`)
         return result
     }
 )
@@ -83,11 +67,7 @@ export const getRecurringOccurrencesData = cache(
 // ── Recurring Templates ─────────────────────────────────────────────────────
 export const getRecurringTemplatesData = cache(
     async (partnerId: string) => {
-        const reqId = getRequestId()
-        console.log(`[DEDUP] req-${reqId} | getRecurringTemplatesData EXECUTE`)
-        const t0 = performance.now()
         const result = await getRecurringTransactionsAction(partnerId)
-        console.log(`[DEDUP] req-${reqId} | getRecurringTemplatesData DONE in ${Math.round(performance.now() - t0)}ms`)
         return result
     }
 )
@@ -95,11 +75,7 @@ export const getRecurringTemplatesData = cache(
 // ── Payment Methods ─────────────────────────────────────────────────────────
 export const getPaymentMethodsData = cache(
     async (partnerId: string) => {
-        const reqId = getRequestId()
-        console.log(`[DEDUP] req-${reqId} | getPaymentMethodsData EXECUTE`)
-        const t0 = performance.now()
         const result = await getPaymentMethodsAction(partnerId)
-        console.log(`[DEDUP] req-${reqId} | getPaymentMethodsData DONE in ${Math.round(performance.now() - t0)}ms`)
         return result
     }
 )

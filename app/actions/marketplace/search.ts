@@ -167,7 +167,6 @@ async function _searchMarketplaceInternal(
     type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' = 'tudo',
     limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string } = {}
 ): Promise<{ results: any[], filteredIds: string[] }> {
-    const t0 = performance.now()
     const { vitrines: vitLimit = 4, produtos: prodLimit = 20, servicos: servLimit = 20, geral = 40, cursor, lastId } = limits
 
     // ANTI-SCRAPING / DEPTH RESTRICTION
@@ -334,8 +333,6 @@ async function _searchMarketplaceInternal(
         const redisLatency = (tRedisKeys - tRedisZero).toFixed(1)
         const mgetLatency = (tFinal - tRedisKeys).toFixed(1)
         const source = missingIndices.length === 0 ? 'Redis' : (hits === 0 ? 'Postgres' : 'Mixed')
-
-        console.log(`[Search Metrics] Source: ${source} | Hit Rate: ${hitRate}% (${hits}/${totalRequested}) | Total: ${(tFinal - t0).toFixed(1)}ms | ZRANGE: ${redisLatency}ms | MGET: ${mgetLatency}ms | DB Fallbacks: ${missingIndices.length} | Type: ${type}`)
 
         return { results: cleanData, filteredIds: filteredIds }
 

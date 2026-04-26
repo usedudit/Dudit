@@ -48,7 +48,6 @@ export async function resolveMarketplaceOrderFinanceAccountId(
 
   // PERF: Single query replaces 4 sequential queries (bank default → any bank → cash default → any cash).
   // Priority selection is done in JS on the result set, preserving identical behavior.
-  const t0 = performance.now()
   const { data: accounts } = await supabase
     .from("finance_accounts")
     .select("id, type, is_default")
@@ -56,9 +55,6 @@ export async function resolveMarketplaceOrderFinanceAccountId(
     .eq("is_active", true)
     .or(NON_MP_FINANCE_ACCOUNTS)
     .order("created_at", { ascending: true })
-
-  const elapsed = Math.round(performance.now() - t0)
-  console.log(`[PERF] resolveMarketplaceFinanceAccount: 1 query in ${elapsed}ms (${(accounts || []).length} rows)`)
 
   if (!accounts || accounts.length === 0) return null
 

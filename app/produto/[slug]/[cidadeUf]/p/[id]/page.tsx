@@ -94,7 +94,6 @@ export default async function ProductDetailsPage({
   params: Promise<{ slug: string; cidadeUf: string; id: string }>
 }) {
   const { id, slug: currentSlug, cidadeUf: currentCidadeUf } = await params
-  const t0 = performance.now()
 
   // Parallelize ALL independent data fetching
   const [user, product] = await Promise.all([

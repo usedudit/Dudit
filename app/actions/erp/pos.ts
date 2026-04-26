@@ -19,6 +19,7 @@ import {
 } from "@/lib/payments/split-breakdown"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { createCommissionExpenseForEntity } from "@/lib/services/commission-ledger.service"
+import { applySaleToGoals } from "@/lib/services/sales-goals.service"
 
 type DraftItemInput = {
     productId?: string | null
@@ -717,6 +718,24 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             accountId: input.financeAccountId || null,
             createdByUserId: user.id,
         })
+
+        const { data: sellerPartnerUser } = await supabase
+            .from("partner_users")
+            .select("user_id")
+            .eq("id", String(finalizedPreSale.seller_id))
+            .eq("partner_id", input.partnerId)
+            .maybeSingle()
+
+        if (sellerPartnerUser?.user_id) {
+            await applySaleToGoals({
+                supabase,
+                partnerId: input.partnerId,
+                sellerUserId: String(sellerPartnerUser.user_id),
+                saleAmount: Number(paymentAware.totalAmount || 0),
+                createdByUserId: user.id,
+                accountId: input.financeAccountId || null,
+            })
+        }
     }
 
     const syncedOrderId = await syncPosSaleToOrders({

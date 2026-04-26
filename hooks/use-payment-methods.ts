@@ -22,9 +22,7 @@ export function usePaymentMethods(partnerId: string) {
     const { data, isLoading, error } = useQuery({
         queryKey: PAYMENT_METHODS_KEY(partnerId),
         queryFn: async () => {
-            const t0 = performance.now()
             const res = await getPaymentMethodsAction(partnerId)
-            console.log(`[PERF] usePaymentMethods: fetched in ${Math.round(performance.now() - t0)}ms`)
             return res
         },
         staleTime: 60_000, // 1 minute — payment methods rarely change mid-session

@@ -23,6 +23,7 @@ import {
 } from "@/lib/payments/split-breakdown"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { createCommissionExpenseForEntity, reverseCommissionForEntity } from "@/lib/services/commission-ledger.service"
+import { applySaleToGoals, reverseSaleFromGoals } from "@/lib/services/sales-goals.service"
 
 type ERPItemPayload = {
     productId: string | null
@@ -740,6 +741,17 @@ async function createSellerCommissionForPaidOrder(params: {
         accountId: params.accountId || null,
         createdByUserId: params.createdByUserId || null,
     })
+
+    if (params.sellerUserId) {
+        await applySaleToGoals({
+            supabase: params.supabase,
+            partnerId: params.partnerId,
+            sellerUserId: String(params.sellerUserId),
+            saleAmount: Number(params.saleAmount || 0),
+            createdByUserId: params.createdByUserId || null,
+            accountId: params.accountId || null,
+        })
+    }
 }
 
 async function createRefundTransactionForCancelledOrder(params: {
@@ -2228,6 +2240,17 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         partnerUserId: sellerPartnerUserId,
                         accountId: order.finance_account_id || null,
                         createdByUserId: user.id,
+                    })
+                }
+
+                if (order.created_by) {
+                    await reverseSaleFromGoals({
+                        supabase,
+                        partnerId: payload.partnerId,
+                        sellerUserId: String(order.created_by),
+                        saleAmount: Number(order.total_amount || 0),
+                        createdByUserId: user.id,
+                        accountId: order.finance_account_id || null,
                     })
                 }
             }

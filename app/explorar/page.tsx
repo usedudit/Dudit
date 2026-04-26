@@ -20,8 +20,6 @@ export default async function ExplorarPage({
 }: {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
-    const t0 = performance.now()
-
     const resolvedSearchParams = await searchParams
 
     const query = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : ""
@@ -47,9 +45,6 @@ export default async function ExplorarPage({
         : null
 
     const cartCount = sessionData?.cartCount || 0
-
-    const tEnd = performance.now()
-    console.log(`[SSR] Explorar | Time: ${(tEnd - t0).toFixed(2)}ms | Query: ${query} | Type: ${type}`)
 
     return (
         <div className="bg-white min-h-screen font-sans text-[#003d32] flex flex-col pt-[110px] lg:pt-[108px]">

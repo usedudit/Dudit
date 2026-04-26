@@ -493,7 +493,6 @@ export async function generateRecurringOccurrencesAction(partnerId: string) {
   try {
     const authStart = performance.now()
     await requirePartnerAccessWithPermission(partnerId, "financial", "view")
-    console.log(`[PERF] recurringOccurrences.auth ${Math.round(performance.now() - authStart)}ms`)
     const supabase = await getSupabaseServerClient()
 
     // ── Single bulk RPC call replaces N×400 serial round trips ─────────
@@ -508,10 +507,8 @@ export async function generateRecurringOccurrencesAction(partnerId: string) {
       },
     )
     if (rpcErr) throw rpcErr
-    console.log(`[PERF] recurringOccurrences.bulkRpc ${Math.round(performance.now() - t1)}ms (${(bulkRows || []).length} raw occurrences)`)
 
     if (!bulkRows || bulkRows.length === 0) {
-      console.log(`[PERF] generateRecurringOccurrences took ${Math.round(performance.now() - actionStart)}ms (0 occurrences)`)
       return { success: true, data: [] as RecurringOccurrence[] }
     }
 
@@ -536,7 +533,6 @@ export async function generateRecurringOccurrencesAction(partnerId: string) {
         ? supabase.from("payment_methods").select("id,name,payment_type").in("id", pmIds).eq("partner_id", partnerId)
         : Promise.resolve({ data: [] as { id: string; name: string; payment_type: string | null }[] }),
     ])
-    console.log(`[PERF] recurringOccurrences.lookups ${Math.round(performance.now() - t2)}ms`)
 
     const catById = new Map<string, string>((cats || []).map((c: { id: string; name: string }) => [c.id, c.name]))
     const contactById = new Map<string, string>(
@@ -596,7 +592,6 @@ export async function generateRecurringOccurrencesAction(partnerId: string) {
     })
 
     allOccurrences.sort((a, b) => a.occurrenceDate.localeCompare(b.occurrenceDate))
-    console.log(`[PERF] generateRecurringOccurrences took ${Math.round(performance.now() - actionStart)}ms (${allOccurrences.length} occurrences)`)
     logRecurring("occurrences_generated", { partnerId, count: allOccurrences.length })
     return { success: true, data: allOccurrences }
   } catch (e: any) {

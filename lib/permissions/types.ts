@@ -42,6 +42,7 @@ export type RouteKey =
     | "invoices"
     | "pos"
     | "quotes"
+    | "goals"
     // Produtos
     | "products"
     | "stock_movements"

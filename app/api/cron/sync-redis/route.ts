@@ -11,7 +11,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const t0 = performance.now()
     const supabase = getAdminClient()
     
     // Buscar itens modificados recentemente dos 3 tipos
@@ -67,9 +66,6 @@ export async function GET(req: Request) {
       
       await Promise.allSettled(batches)
     }
-
-    const elapsed = performance.now() - t0
-    console.log(`[Cron Reconciliation] Audited ${recentItems.length} items. Repaired ${synced} stale/missing keys. Took ${elapsed.toFixed(2)}ms`)
 
     return NextResponse.json({
       status: 'success',
