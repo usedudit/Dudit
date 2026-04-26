@@ -12,7 +12,6 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
-import { pickBestPaymentMethod, toPaymentMethodTypeFromLabel } from "@/lib/services/payment-method.service"
 import {
     recalculateSplitPaymentFromBaseAmounts,
     toStoredBreakdownAmounts,
@@ -563,12 +562,11 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     for (const entry of input.paymentBreakdown || []) {
         const amount = safeMoney(Number(entry.amount || 0))
         if (amount <= 0) continue
-        let paymentMethodId = entry.paymentMethodId || null
+        const paymentMethodId = entry.paymentMethodId || null
         if (!paymentMethodId) {
-            const inferredType = toPaymentMethodTypeFromLabel(entry.method)
-            if (inferredType) {
-                const method = await pickBestPaymentMethod(supabase as any, inferredType, input.partnerId, { preferDefault: true })
-                paymentMethodId = method?.id || null
+            return {
+                success: false as const,
+                error: `Método de pagamento inválido no PDV (${String(entry.method || "não informado")}). Selecione um método ativo e tente novamente.`,
             }
         }
         const methodLabel = String(entry.method || input.paymentMethod || "PDV").trim() || "PDV"

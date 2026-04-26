@@ -5,6 +5,8 @@ import { toCanonicalPaymentType, toLegacyPaymentType } from "@/lib/payments/paym
 type PaymentBreakdownEntry = {
     method?: string
     amount?: number
+    paymentMethodId?: string | null
+    installmentNumber?: number
 }
 
 interface OrderDataForTransaction {
@@ -43,18 +45,31 @@ async function resolvePaymentMethodConfig(
     supabase: SupabaseClient,
     partnerId: string,
     methodLabel: string,
+    paymentMethodId?: string | null,
 ) {
-    const normalized = normalizeMethod(methodLabel)
-    const canonical = toCanonicalPaymentType(normalized === "cartao" ? "credit_card" : normalized)
-    const legacy = toLegacyPaymentType(canonical)
-
-    const { data } = await supabase
-        .from("payment_methods")
-        .select("id, fee_percent, fee_fixed, fee_bearer")
-        .eq("partner_id", partnerId)
-        .or(`type.eq.${canonical},payment_type.eq.${legacy},name.ilike.%${methodLabel}%`)
-        .limit(1)
-        .maybeSingle()
+    let data: any = null
+    if (paymentMethodId) {
+        const byId = await supabase
+            .from("payment_methods")
+            .select("id, fee_percent, fee_fixed, fee_bearer")
+            .eq("partner_id", partnerId)
+            .eq("id", paymentMethodId)
+            .maybeSingle()
+        data = byId.data || null
+    }
+    if (!data) {
+        const normalized = normalizeMethod(methodLabel)
+        const canonical = toCanonicalPaymentType(normalized === "cartao" ? "credit_card" : normalized)
+        const legacy = toLegacyPaymentType(canonical)
+        const byLabel = await supabase
+            .from("payment_methods")
+            .select("id, fee_percent, fee_fixed, fee_bearer")
+            .eq("partner_id", partnerId)
+            .or(`type.eq.${canonical},payment_type.eq.${legacy},name.ilike.%${methodLabel}%`)
+            .limit(1)
+            .maybeSingle()
+        data = byLabel.data || null
+    }
 
     if (!data) return null
 
@@ -143,11 +158,13 @@ async function applyAccountBalanceDelta(
     }
 }
 
-function buildEntries(orderData: OrderDataForTransaction): Array<{ method: string; amount: number }> {
+function buildEntries(orderData: OrderDataForTransaction): Array<{ method: string; amount: number; paymentMethodId: string | null; installmentNumber: number }> {
     const fromBreakdown = (orderData.payment_breakdown || [])
         .map((entry) => ({
             method: normalizePaymentLabel(entry.method),
             amount: Number(entry.amount || 0),
+            paymentMethodId: entry.paymentMethodId || null,
+            installmentNumber: Math.max(1, Math.floor(Number(entry.installmentNumber || 1))),
         }))
         .filter((entry) => entry.amount > 0.009)
 
@@ -156,6 +173,8 @@ function buildEntries(orderData: OrderDataForTransaction): Array<{ method: strin
     return [{
         method: normalizePaymentLabel(orderData.payment_method),
         amount: Number(orderData.total_amount || 0),
+        paymentMethodId: null,
+        installmentNumber: 1,
     }]
 }
 
@@ -197,12 +216,17 @@ export async function createTransactionFromOrder(
                 continue
             }
 
-            const paymentConfig = await resolvePaymentMethodConfig(supabase, orderData.partner_id, entry.method)
+            const paymentConfig = await resolvePaymentMethodConfig(
+                supabase,
+                orderData.partner_id,
+                entry.method,
+                entry.paymentMethodId,
+            )
             const calculated = paymentConfig
                 ? calculatePaymentAmounts({
                     originalAmount: amount,
                     paymentMethod: paymentConfig,
-                    installmentNumber: entries.length > 1 ? (index + 1) : 1,
+                    installmentNumber: Math.max(1, Number(entry.installmentNumber || (entries.length > 1 ? (index + 1) : 1))),
                 })
                 : { finalAmount: amount, interestAmount: 0, feeAmount: 0 }
             const transactionData = {
@@ -222,6 +246,7 @@ export async function createTransactionFromOrder(
                 interest_amount: calculated.interestAmount,
                 fee_amount: calculated.feeAmount,
                 payment_type: entry.method,
+                payment_method_id: entry.paymentMethodId || null,
                 transaction_type: "income" as const,
                 account_id: accountId,
             }

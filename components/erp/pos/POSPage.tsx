@@ -46,7 +46,6 @@ import type {
     PDVPreSale as PreSale,
     PDVProduct as Product,
 } from "@/lib/types/pdv"
-import { normalizePDVPaymentMethodLabel, normalizePDVSearchTerm } from "@/lib/utils/pdv"
 import { FadeIn } from "@/components/animations/FadeIn"
 
 interface Props {
@@ -113,7 +112,6 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     const [products, setProducts] = useState<Product[]>(initialData.products || [])
     const [customers, setCustomers] = useState<Customer[]>(initialData.customers || [])
     const accounts = initialData.financeAccounts || []
-    const paymentMethods = initialData.paymentMethods || []
     const [preSales, setPreSales] = useState<PreSale[]>(initialData.preSales || [])
     const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
     const [activeCashSession, setActiveCashSession] = useState<any | null>(initialActiveSession || null)
@@ -353,37 +351,6 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     )
     const hasUnsavedOrderChanges = currentOrderSignature !== lastSavedOrderSignature
     const percentagePresets = [5, 10, 15, 20]
-
-    const getPaymentMethodId = useCallback((methodLabel?: string | null) => {
-        const normalizedLabel = normalizePDVSearchTerm(methodLabel)
-        if (!normalizedLabel) return null
-
-        const byType = paymentMethods.find((method) => {
-            const type = normalizePDVSearchTerm(method.type)
-            const name = normalizePDVSearchTerm(method.name)
-
-            if (normalizedLabel === "dinheiro") {
-                return type === "cash" || name.includes("dinheiro")
-            }
-
-            if (normalizedLabel === "pix") {
-                return type === "pix" || name.includes("pix")
-            }
-
-            if (normalizedLabel === "cartao" || normalizedLabel === "cartão") {
-                return ["card", "credit_card", "debit_card", "credito", "debito"].includes(type)
-                    || name.includes("cartao")
-                    || name.includes("cartão")
-            }
-
-            return false
-        })
-
-        if (byType?.id) return byType.id
-
-        const byName = paymentMethods.find((method) => normalizePDVSearchTerm(method.name) === normalizedLabel)
-        return byName?.id || null
-    }, [paymentMethods])
 
     const addToCart = useCallback((product: Product, variantId?: string | null, quantity: number = 1) => {
         const normalizedQty = Math.max(1, Number(quantity || 1))
@@ -740,9 +707,9 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         setIsFinalizing(true)
         try {
             const paymentBreakdown = (paymentData.paymentBreakdown || []).map((entry) => ({
-                method: normalizePDVPaymentMethodLabel(entry.method),
+                method: String(entry.method || "").trim(),
                 amount: Number(entry.amount || 0),
-                paymentMethodId: entry.paymentMethodId || getPaymentMethodId(entry.method),
+                paymentMethodId: entry.paymentMethodId || null,
                 installmentNumber: Math.max(1, Math.floor(Number((entry as { installmentNumber?: number }).installmentNumber || 1))),
             }))
 

@@ -203,6 +203,15 @@ async function applyPaymentMethodPricingToTotal(
         return { ok: true, finalTotal: safeBase, feeAmount: 0, interestAmount: 0, paymentMethodDiscountAmount: 0, adjustedBreakdown: [] as PaymentBreakdownEntry[] }
     }
 
+    for (const row of breakdown) {
+        if (!row.paymentMethodId) {
+            return {
+                ok: false,
+                error: `Método de pagamento inválido (${row.method || "não informado"}). Selecione um método ativo e tente novamente.`,
+            }
+        }
+    }
+
     const methodIds = Array.from(new Set(breakdown.map((b) => b.paymentMethodId).filter(Boolean))) as string[]
 
     const [{ data: methods }, { data: fees }] = await Promise.all([
@@ -661,7 +670,7 @@ async function createFinancialTransactionsForPaidOrder(supabase: Awaited<ReturnT
     totalAmount: number
     paymentMethod?: string | null
     paymentProvider?: string | null
-    paymentBreakdown?: Array<{ method: string; amount: number }> | null
+    paymentBreakdown?: Array<{ method: string; amount: number; paymentMethodId?: string | null; installmentNumber?: number }> | null
     customerId?: string | null
     customerName?: string | null
     paymentDate?: string | null
