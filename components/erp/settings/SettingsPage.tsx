@@ -47,9 +47,68 @@ type ActivePage =
   | "mensagens"
 
 export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
+  const searchParams = useSearchParams()
   const [activePage, setActivePage] = useState<ActivePage>("home")
   const [activeTab, setActiveTab] = useState("empresa")
   const [mpConnected] = useState(!!partner.mp_user_id)
+
+  const PAGE_TO_SLUG: Record<string, string> = {
+    "business-data": "dados-do-negocio",
+    "team": "equipe-e-acessos",
+    "subscription": "assinatura",
+    "payment-methods": "formas-de-pagamento",
+    "crediario": "crediario",
+    "comissao": "comissao",
+    "recibo": "recibo-devolucao",
+    "vitrine": "vitrine",
+    "os": "os",
+    "mensagens": "modelos-de-mensagens",
+    "integrations": "integracoes",
+  }
+
+  const SLUG_TO_PAGE: Record<string, ActivePage> = Object.entries(PAGE_TO_SLUG).reduce(
+    (acc, [page, slug]) => ({ ...acc, [slug]: page as ActivePage }),
+    {} as Record<string, ActivePage>
+  )
+
+  // Sync state from URL on mount
+  React.useEffect(() => {
+    const tab = searchParams.get("tab")
+    if (!tab) return
+
+    if (SLUG_TO_PAGE[tab]) {
+      setActivePage(SLUG_TO_PAGE[tab])
+      // Also set the correct category tab for when they go back
+      if (["business-data", "team", "subscription"].includes(SLUG_TO_PAGE[tab])) {
+        setActiveTab("empresa")
+      } else if (["payment-methods", "crediario", "comissao", "recibo"].includes(SLUG_TO_PAGE[tab])) {
+        setActiveTab("vendas")
+      } else {
+        setActiveTab("adicionais")
+      }
+    } else if (["empresa", "vendas", "adicionais"].includes(tab)) {
+      setActiveTab(tab)
+      setActivePage("home")
+    }
+  }, []) // Run once on mount
+
+  // Sync URL from state changes
+  React.useEffect(() => {
+    const currentTab = searchParams.get("tab")
+    let newTab = ""
+
+    if (activePage !== "home") {
+      newTab = PAGE_TO_SLUG[activePage] || activePage
+    } else {
+      newTab = activeTab
+    }
+
+    if (newTab !== currentTab) {
+      const url = new URL(window.location.href)
+      url.searchParams.set("tab", newTab)
+      window.history.replaceState(null, "", url.toString())
+    }
+  }, [activePage, activeTab, searchParams])
 
   const businessInfo = typeof partner.business_info === "string"
     ? JSON.parse(partner.business_info)

@@ -11,6 +11,7 @@ import { useStore } from "@/lib/store-context"
 import { useSidebar } from "@/lib/sidebar-context"
 import { createProductComprehensiveAction, updateProductComprehensiveAction, deleteProductAction, createProductVariantsBatchAction } from "@/app/actions/erp/products"
 import { createCategoryAction, createBrandAction, createLocationAction } from "@/app/actions/erp/product-metadata"
+import { generateSKUBase } from "@/lib/utils/code-generators"
 import { useProductMetadata } from "@/lib/product-metadata-context"
 import { detectMonophasicByNcm } from "@/lib/fiscal-utils"
 import { mapProductToFormData } from "@/lib/utils/product-mappers"
@@ -38,11 +39,11 @@ const NUMERIC_FIELDS = new Set([
     "preparation_days", "warranty_value", "availability_value",
 ])
 
-const BOOLEAN_FIELDS = new Set(["is_active", "allow_sell_without_stock", "show_in_marketplace", "is_highlighted"])
+const BOOLEAN_FIELDS = new Set(["is_active", "allow_sell_without_stock", "show_in_marketplace", "is_highlighted", "show_price_in_store"])
 
 const REQUIRED_FIELDS = [
     { field: "name", tab: "general", validate: (v: any) => !!v?.trim(), message: "Nome é obrigatório" },
-    { field: "price", tab: "general", validate: (v: any) => v > 0, message: "Preço inválido" },
+    { field: "price", tab: "general", validate: (v: any, data: any) => data.show_price_in_store === false || v > 0, message: "Preço inválido" },
 ]
 
 const getEmptyProduct = () => ({
@@ -50,7 +51,7 @@ const getEmptyProduct = () => ({
     price: 0, costPrice: 0, stock: 0, minStock: 0, maxStock: 0, promotional_price: null, promotionTypeId: null,
     condicao: "Novo", unidade: "UN", localizacao: "", location_id: "", productType: "Físico",
     images: [], primary_image_index: 0, video_url: "",
-    is_active: true, show_in_marketplace: true, allow_sell_without_stock: false, is_highlighted: false,
+    is_active: true, show_in_marketplace: true, allow_sell_without_stock: false, is_highlighted: false, show_price_in_store: true,
     marketplace_category_id: null, availability_value: 0, availability_unit: "Dias",
     warranty_value: 0, warranty_period: "Meses",
     attributes: [], related_products: [],
@@ -297,7 +298,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
     const validateProductData = useCallback(() =>
         REQUIRED_FIELDS
             // @ts-ignore
-            .filter((r) => !r.validate(productData[r.field]))
+            .filter((r) => !r.validate(productData[r.field], productData))
             .map((r) => ({ field: r.field, tab: r.tab, message: r.message })),
         [productData]
     )
@@ -517,7 +518,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 stockQuantity: Number(d.stock),
                 isActive: d.is_active,
                 isOnPromotion: !!d.promotional_price,
-                showPriceInStore: true,
+                showPriceInStore: !!d.show_price_in_store,
                 showInMarketplace: !!d.show_in_marketplace, // Ensure boolean
                 requiresManualModeration: needsManualModeration,
                 images: cleanedFinalImages,
@@ -606,6 +607,11 @@ const AddProductPage: FC<AddProductPageProps> = ({
             isSubmittingRef.current = false
         }
     }, [validateProductData, productData, partnerId, storeId, internalMode, initialProduct, productId, notifySuccess, notifyError, onClose, onSave, blockedImages])
+
+    const handleGenerateRandomCode = useCallback(() => {
+        const randomCode = generateSKUBase(productData.name)
+        setProductData((prev: any) => ({ ...prev, sku: randomCode }))
+    }, [productData.name])
 
     const handleSavePendingVariants = useCallback((variantsToSave: any[]) => {
         setProductData((prev: any) => ({ ...prev, pending_variants: variantsToSave }))
@@ -758,7 +764,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             uploadingImages={uploadingImages} mode={internalMode === "duplicate" ? "add" : internalMode}
                                             blockedImages={blockedImages} isSaving={isSavingProduct}
                                             sellsOnline={sellsOnline}
-                                            generateRandomCode={() => { }}
+                                            generateRandomCode={handleGenerateRandomCode}
                                             openAddItemModal={handleOpenMetadataModal}
                                         />
                                     </FadeIn>

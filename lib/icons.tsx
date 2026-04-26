@@ -26,9 +26,10 @@ import {
     Chart03Icon,
     ViewIcon,
     Mail01Icon,
+    DiceFaces03Icon,
     WhatsappIcon as WhatsappIcon01,
     HelpCircleIcon as HelpCircle,
-    Archive03Icon,  
+    Archive03Icon,
     Location01Icon,
     InstagramIcon as InstagramIcon01,
     NewTwitterIcon,
@@ -321,7 +322,7 @@ export const CalendarIcon = CreateIcon(Calendar03Icon)
 export const BankIcon = CreateIcon(BankIcon01)
 export const CashierIcon = CreateIcon(Cashier02Icon)
 export const DigitalWalletIcon = CreateIcon(BitcoinWalletIcon01)
-
+export const DiceIcon = CreateIcon(DiceFaces03Icon)
 
 // ============================
 // BUSINESS / APP

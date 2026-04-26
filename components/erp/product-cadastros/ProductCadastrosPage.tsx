@@ -1,6 +1,8 @@
 "use client"
 
 import React, { useState, useMemo, useCallback } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+
 import { motion, AnimatePresence } from "framer-motion"
 import { useNotification } from "@/hooks/use-notification"
 import { PlusIcon } from "@/lib/icons"
@@ -34,13 +36,23 @@ interface ProductCadastrosPageProps {
 
 export default function ProductCadastrosPage({ initialMetadata, partnerId }: ProductCadastrosPageProps) {
     const { success, error } = useNotification()
+    const router = useRouter()
+    const searchParams = useSearchParams()
 
     // State
     const [metadata, setMetadata] = useState(initialMetadata)
-    const [activeTab, setActiveTab] = useState<"categories" | "subcategories" | "brands" | "locations">("categories")
+    
+    // Initialize activeTab from URL parameter 'tab'
+    const tabFromUrl = searchParams.get("tab") as any
+    const validTabs = ["categories", "subcategories", "brands", "locations"]
+
+    const [activeTab, setActiveTab] = useState<"categories" | "subcategories" | "brands" | "locations">(
+        validTabs.includes(tabFromUrl) ? tabFromUrl : "categories"
+    )
     const [search, setSearch] = useState("")
     const [debouncedSearch, setDebouncedSearch] = useState("")
     const [page, setPage] = useState(1)
+
     const ITEMS_PER_PAGE = 8
 
     const [modal, setModal] = useState<{
@@ -100,7 +112,28 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
     const paginatedItems = filteredItems.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
 
     // Handlers
+    const handleTabChange = (tab: "categories" | "subcategories" | "brands" | "locations") => {
+        setActiveTab(tab)
+        setPage(1)
+        
+        // Update URL
+        const params = new URLSearchParams(searchParams.toString())
+        params.set("tab", tab)
+        router.push(`?${params.toString()}`, { scroll: false })
+    }
+
+    const getAddButtonLabel = () => {
+        switch (activeTab) {
+            case "categories": return "Nova Categoria"
+            case "subcategories": return "Nova Subcategoria"
+            case "brands": return "Nova Marca"
+            case "locations": return "Nova Localização"
+            default: return "Novo Cadastro"
+        }
+    }
+
     const handleAdd = () => {
+
         let type: typeof modal.type = "category"
         if (activeTab === "subcategories") type = "subcategory"
         else if (activeTab === "brands") type = "brand"
@@ -237,15 +270,17 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                     <div className="flex items-center gap-3">
                         <Button onClick={handleAdd} className="w-full">
                             <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
-                            Novo Cadastro
+                            {getAddButtonLabel()}
                         </Button>
+
                     </div>
                 </div>
 
                 {/* Controls - Exactly like ProductsPage Controls Position */}
                 <CadastrosPageControls
                     activeTab={activeTab}
-                    setActiveTab={(tab) => { setActiveTab(tab); setPage(1); }}
+                    setActiveTab={handleTabChange}
+
                     search={search}
                     onSearchChange={setSearch}
                     onAdd={handleAdd}

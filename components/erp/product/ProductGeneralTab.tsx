@@ -2,9 +2,9 @@
 
 import type React from "react"
 import { useState, useMemo } from "react"
-import { Input, FormDropdown, Checkbox, Accordion, MoneyInput } from "@/components/reusable"
+import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
-import { PlusIcon, ShoppingBagIcon } from "@/lib/icons"
+import { PlusIcon, ShoppingBagIcon, DiceIcon } from "@/lib/icons"
 import ProductImagesSection from "./ProductImagesSection"
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from "recharts"
 import { Combobox } from "@/components/reusable"
@@ -82,12 +82,12 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
     productData, handleInputChange, generateRandomCode, categories, subCategories, brands, locations, unidadesMedida, openAddItemModal, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", sellsOnline = true
 }) => {
     const handleFieldChange = (e: any) => { if (onFieldChange && e.target.name) onFieldChange(e.target.name); handleInputChange(e) }
-    const [showPrice, setShowPrice] = useState(true)
-
     const { salesPrice, profit, margin } = useMemo(() => {
         const p = Number(productData.price || 0), c = Number(productData.costPrice || 0)
         return { salesPrice: p, profit: p - c, margin: p > 0 ? ((p - c) / p * 100).toFixed(1) : "0.0" }
     }, [productData.price, productData.costPrice])
+
+    const showPrice = productData.show_price_in_store ?? true
 
     const showInMarketplaceValue = productData.show_in_marketplace === undefined ? "true" : String(productData.show_in_marketplace)
 
@@ -132,7 +132,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                         {sellsOnline && (
                             <div className="col-span-12 sm:col-span-6">
                                 <FormDropdown
-                                    label="Exibir no Marketplace"
+                                    label="Exibir na Vitrine"
                                     options={[{ value: "true", label: "Sim" }, { value: "false", label: "Não" }]}
                                     value={showInMarketplaceValue}
                                     setValue={(v) => handleFieldChange({ target: { name: "show_in_marketplace", value: v === "true" } })}
@@ -157,12 +157,21 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             value={productData.price || ""}
                             onChange={(val) => handleFieldChange({ target: { name: "price", value: val } })}
                             disabled={!isEditing || !showPrice}
-                            required
+                            required={showPrice}
                             error={fieldErrors?.has("price")}
                             errorMessage={fieldErrors?.has("price") ? "Preço de venda é obrigatório" : undefined}
                         />
                         <MoneyInput label="Preço Promocional" name="promotional_price" value={productData.promotional_price || ""} onChange={(val) => handleFieldChange({ target: { name: "promotional_price", value: val } })} disabled={!isEditing || !showPrice} />
                     </div>
+
+                    {!showPrice && (
+                        <div className="mb-6">
+                            <InfoCard
+                                color="orange"
+                                message="Ao não mostrar o preço, o produto será salvo com um valor de 0,00 e, na sua vitrine, será exibido o texto 'Valor sob consulta'"
+                            />
+                        </div>
+                    )}
 
                     {showPrice && (
                         <div className="border border-brand-border dark:border-dark-border rounded-xl p-4 md:p-6 mb-6 bg-white dark:bg-dark-surface">
@@ -175,7 +184,20 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                     )}
 
                     <div className="flex items-center gap-2 cursor-pointer w-fit mt-2">
-                        <Checkbox checked={showPrice} label="Exibir o preço na loja" onChange={setShowPrice} name="showPrice" disabled={!isEditing} />
+                        <Checkbox
+                            checked={showPrice}
+                            label="Exibir o preço na loja"
+                            onChange={(checked) => {
+                                handleFieldChange({ target: { name: "show_price_in_store", value: checked } })
+                                if (!checked) {
+                                    handleFieldChange({ target: { name: "price", value: 0 } })
+                                    handleFieldChange({ target: { name: "costPrice", value: 0 } })
+                                    handleFieldChange({ target: { name: "promotional_price", value: 0 } })
+                                }
+                            }}
+                            name="show_price_in_store"
+                            disabled={!isEditing}
+                        />
                     </div>
                 </div>
 
@@ -273,8 +295,10 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             suffix={
                                 <div
                                     onClick={generateRandomCode}
-                                    className="cursor-pointer p-1"
-                                />
+                                    className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                >
+                                    <DiceIcon size={20} />
+                                </div>
                             }
                         />
 

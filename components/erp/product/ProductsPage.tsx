@@ -8,7 +8,7 @@ import { useStore } from "@/lib/store-context"
 import { generateSKUBase } from "@/lib/utils/code-generators"
 import type { Product } from "@/lib/types/product"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { motion, AnimatePresence } from "framer-motion"
+import { AnimatePresence } from "framer-motion"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { UNITS } from "@/lib/constants/product-constants"
 import { useQueryClient } from "@tanstack/react-query"
@@ -40,11 +40,9 @@ import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/B
 
 // New Component Imports
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
-import Pagination from "@/components/reusable/Pagination"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import ProductGridCard from "./ProductGridCard"
 import ProductListItem from "./ProductListRow"
-import ProductMobileItem from "./ProductMobileItem"
 import ProductPageControls from "./ProductPageControls"
 import { getStockStatus } from "./product-utils"
 
@@ -472,9 +470,16 @@ export default function ProductsPage({
                 queryClient.invalidateQueries({ queryKey: productsQueryKey })
 
                 if (ui.formMode === "add" && res.data) {
-                    const nextProducts = [res.data, ...data.products]
-                    queryClient.setQueryData(productsQueryKey, nextProducts)
-                    setData((p) => ({ ...p, products: nextProducts }))
+                    const addedProduct = res.data
+                    queryClient.setQueryData(productsQueryKey, (oldData: any) => {
+                        if (!oldData || !oldData.pages) return oldData
+                        const newPages = [...oldData.pages]
+                        if (newPages.length > 0) {
+                            newPages[0] = { ...newPages[0], items: [addedProduct, ...newPages[0].items] }
+                        }
+                        return { ...oldData, pages: newPages }
+                    })
+                    setData((p) => ({ ...p, products: [addedProduct, ...p.products] }))
                 }
 
                 // Close form and return to list
@@ -786,7 +791,7 @@ export default function ProductsPage({
                                         <AnimatePresence mode="wait">
                                             <FadeIn key={effectiveViewMode} className="w-full">
                                                 {effectiveViewMode === "grid" ? (
-                                                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 md:gap-6 pb-6">
+                                                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                                         {paginated.map((product) => (
                                                             <ProductGridCard
                                                                 key={product.id}

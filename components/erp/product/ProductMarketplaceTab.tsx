@@ -272,9 +272,9 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
               <FormDropdown
                 label="Período"
                 options={[
+                  { value: "Minutos", label: "Minutos" },
+                  { value: "Horas", label: "Horas" },
                   { value: "Dias", label: "Dias" },
-                  { value: "Semanas", label: "Semanas" },
-                  { value: "Meses", label: "Meses" },
                 ]}
                 value={productData?.availability_unit || "Dias"}
                 setValue={(v) => manualChange("availability_unit", v)}

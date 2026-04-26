@@ -47,6 +47,7 @@ import type {
     PDVProduct as Product,
 } from "@/lib/types/pdv"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { normalizePDVSearchTerm } from "@/lib/utils/pdv"
 
 interface Props {
     partnerId: string
