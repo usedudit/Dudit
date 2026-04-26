@@ -84,14 +84,34 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
     })
 
     const normalizedInitialResults = useMemo(() => {
+        const normalizeItemType = (item: any) => {
+            const rawType = String(item?.itemType || "").toLowerCase()
+            if (rawType === "loja" || rawType === "vitrine" || rawType === "partner" || rawType === "parceiro") {
+                return "loja"
+            }
+            if (rawType === "produto" || rawType === "product") return "produto"
+            if (rawType === "servico" || rawType === "serviço" || rawType === "service") return "servico"
+
+            // Fallback resiliente para dados legados/inconsistentes.
+            if (item?.store_name || item?.partners?.store_name) return "loja"
+            return rawType
+        }
+
         return rawItems.map((item: any) => {
-            if (item.itemType === 'loja') return item
+            const itemType = normalizeItemType(item)
+            if (itemType === "loja") {
+                return {
+                    ...item,
+                    itemType,
+                }
+            }
             const hasOwnImages = item.images && item.images.length > 0
             const images = hasOwnImages ? item.images : (item.fallback_variant_image ? [item.fallback_variant_image] : item.images)
             const basePrice = Number(item.promotional_price || item.price)
             const price = (!item.promotional_price && item.fallback_variant_price) ? Number(item.fallback_variant_price) : basePrice
             return {
                 ...item,
+                itemType,
                 price,
                 originalPrice: item.promotional_price ? Number(item.price) : undefined,
                 images,

@@ -5,7 +5,7 @@ import { SkeletonLoader } from "@/components/reusable"
 export default function MyOrdersLoading() {
     return (
         <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
-            <MarketplaceHeader currentView="account-info" />
+            <MarketplaceHeader />
 
             <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-6 max-w-[1300px] w-full pt-6 md:pt-10 pb-20 mt-[68px] lg:mt-[108px]">
                 {/* Header Loading */}

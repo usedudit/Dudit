@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/server"
 import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
-import { requireUser, getCurrentUser } from "@/lib/auth/authorization"
+import { requireUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
 import { MyOrdersListClient } from "@/components/marketplace/MyOrdersListClient"
 import type { Metadata } from 'next';
@@ -16,20 +16,28 @@ export const metadata: Metadata = {
 export default async function MyOrdersPage() {
   const user = await requireUser()
   const adminClient = await createAdminClient()
+  const orderSelect = `
+    id, order_number, situation, total_amount, created_at, payment_method,
+    payment_provider, delivery_type, delivery_address, customer_name,
+    partner_id, buyer_id, mp_payment_id,
+    partners(id, store_name, store_image_url, slug),
+    order_items(id, product_id, product_name, product_price, quantity, subtotal,
+      product_variants(variant_name, variant_options),
+      products(id, name, images, slug))
+  `
+  const fallbackOrderSelect = `
+    id, order_number, situation, total_amount, created_at, payment_method,
+    payment_provider, delivery_type, delivery_address, customer_name,
+    partner_id, buyer_id, mp_payment_id,
+    partners(id, store_name, store_image_url, slug),
+    order_items(id, product_id, product_name, product_price, quantity, subtotal)
+  `
 
   // Parallelize all independent data fetches
   const [ordersResult, reviewsResult, sessionData] = await Promise.all([
     adminClient
       .from("orders")
-      .select(`
-        id, order_number, situation, total_amount, created_at, payment_method,
-        payment_provider, delivery_type, delivery_address, customer_name,
-        partner_id, buyer_id, mp_payment_id,
-        partners(id, store_name, store_image_url, slug, addresses(city, state)),
-        order_items(id, product_id, product_name, product_price, quantity, subtotal,
-          product_variants(variant_name, variant_options),
-          products(id, name, images, slug))
-      `)
+      .select(orderSelect)
       .eq("buyer_id", user.id)
       .order("created_at", { ascending: false })
       .limit(50),
@@ -37,7 +45,32 @@ export default async function MyOrdersPage() {
     getUserSessionData(user.id),
   ])
 
-  const orders = ordersResult.data || []
+  let orders = ordersResult.data || []
+  if (ordersResult.error) {
+    console.error("[MY_ORDERS_PAGE] failed full orders query, retrying simpler query", {
+      userId: user.id,
+      error: ordersResult.error.message,
+      code: ordersResult.error.code,
+    })
+
+    const fallbackResult = await adminClient
+      .from("orders")
+      .select(fallbackOrderSelect)
+      .eq("buyer_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(50)
+
+    if (fallbackResult.error) {
+      console.error("[MY_ORDERS_PAGE] fallback orders query failed", {
+        userId: user.id,
+        error: fallbackResult.error.message,
+        code: fallbackResult.error.code,
+      })
+    } else {
+      orders = fallbackResult.data || []
+    }
+  }
+
   const reviewedOrderIdsArray = reviewsResult.data?.map((r: any) => r.order_id) || []
 
   const userProfile = sessionData?.profile
