@@ -231,7 +231,8 @@ export async function createProductComprehensiveAction(data: {
     tags?: string[]
     // Marketplace & Novos Campos
     featured?: boolean
-    availability?: string
+    availability_value?: number
+    availability_unit?: string
     warranty?: string | null
     videoUrl?: string | null
     technicalSpecs?: any
@@ -334,7 +335,8 @@ export async function createProductComprehensiveAction(data: {
             images: data.images || [],
             // Marketplace enforced rules
             is_featured: data.featured || false,
-            availability: data.availability || "in_stock",
+            availability_value: data.availability_value || 0,
+            availability_unit: data.availability_unit || "Dias",
             warranty: data.warranty || null,
             video_url: data.videoUrl || null,
             technical_specs: data.technicalSpecs || {},
@@ -458,7 +460,8 @@ interface UpdateProductData {
     promotional_price?: number | null
     promotionalPrice?: number | null
     images?: string[]
-    availability?: string
+    availability_value?: number
+    availability_unit?: string
     warranty?: string
     unit?: string
     stock_quantity?: number
@@ -534,7 +537,7 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         const directMapFields = [
             'name', 'description', 'category', 'brand', 'sku', 'gtin', 'condition',
             'price', 'images',
-            'availability', 'warranty', 'unit',
+            'availability_value', 'availability_unit', 'warranty', 'unit',
             'category_id', 'brand_id', 'location_id', 'subcategory_id'
         ]
 

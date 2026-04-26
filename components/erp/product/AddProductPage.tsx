@@ -488,7 +488,6 @@ const AddProductPage: FC<AddProductPageProps> = ({
 
             const d = productData
             const warranty = d.warranty_value > 0 ? `${d.warranty_value} ${d.warranty_period}` : undefined
-            const availabilityStr = d.availability_value > 0 ? `${d.availability_value} ${d.availability_unit}` : "in_stock"
 
             const payload: any = {
                 partnerId,
@@ -553,7 +552,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 videoUrl: d.video_url,
                 technicalSpecs: d.attributes,
                 warranty,
-                availability: availabilityStr,
+                availability_value: Number(d.availability_value) || 0,
+                availability_unit: d.availability_unit || "Dias",
                 tags: d.tags || [],
             }
 

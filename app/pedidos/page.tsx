@@ -20,16 +20,16 @@ export default async function MyOrdersPage() {
     id, order_number, situation, total_amount, created_at, payment_method,
     payment_provider, delivery_type, delivery_address, customer_name,
     partner_id, buyer_id, mp_payment_id,
-    partners(id, store_name, store_image_url, slug),
+    partners(id, store_name, store_image_url),
     order_items(id, product_id, product_name, product_price, quantity, subtotal,
       product_variants(variant_name, variant_options),
-      products(id, name, images, slug))
+      products(id, name, images))
   `
   const fallbackOrderSelect = `
     id, order_number, situation, total_amount, created_at, payment_method,
     payment_provider, delivery_type, delivery_address, customer_name,
     partner_id, buyer_id, mp_payment_id,
-    partners(id, store_name, store_image_url, slug),
+    partners(id, store_name, store_image_url),
     order_items(id, product_id, product_name, product_price, quantity, subtotal)
   `
 

@@ -81,7 +81,7 @@ BEGIN
   END IF;
 
   INSERT INTO products (
-    id, partner_id, store_id, name, description, sku, gtin, brand, category, subcategory, subcategory_id, condition, unit, product_type, location, cost_price, price, promotional_price, min_stock, max_stock, stock_quantity, is_active, is_on_promotion, show_price_in_store, images, is_featured, availability, warranty, video_url, technical_specs, tags, moderation_status, created_at, updated_at
+    id, partner_id, store_id, name, description, sku, gtin, brand, category, subcategory, subcategory_id, condition, unit, product_type, location, cost_price, price, promotional_price, min_stock, max_stock, stock_quantity, is_active, is_on_promotion, show_price_in_store, images, is_featured, availability_value, availability_unit, warranty, video_url, technical_specs, tags, moderation_status, created_at, updated_at
   ) VALUES (
     COALESCE((p_product_data->>'id')::UUID, gen_random_uuid()),
     v_partner_id,
@@ -109,7 +109,8 @@ BEGIN
     (p_product_data->>'show_price_in_store')::BOOLEAN,
     COALESCE(p_product_data->'images', '[]'::JSONB),
     (p_product_data->>'is_featured')::BOOLEAN,
-    p_product_data->>'availability',
+    COALESCE((p_product_data->>'availability_value')::INTEGER, 0),
+    p_product_data->>'availability_unit',
     p_product_data->>'warranty',
     p_product_data->>'video_url',
     COALESCE(p_product_data->'technical_specs', '{}'::JSONB),
@@ -226,7 +227,8 @@ BEGIN
       show_price_in_store = CASE WHEN p_product_data ? 'show_price_in_store' THEN (p_product_data->>'show_price_in_store')::BOOLEAN ELSE show_price_in_store END,
       images = CASE WHEN p_product_data ? 'images' THEN p_product_data->'images' ELSE images END,
       is_featured = CASE WHEN p_product_data ? 'is_featured' THEN (p_product_data->>'is_featured')::BOOLEAN ELSE is_featured END,
-      availability = CASE WHEN p_product_data ? 'availability' THEN p_product_data->>'availability' ELSE availability END,
+      availability_value = CASE WHEN p_product_data ? 'availability_value' THEN (p_product_data->>'availability_value')::INTEGER ELSE availability_value END,
+      availability_unit = CASE WHEN p_product_data ? 'availability_unit' THEN p_product_data->>'availability_unit' ELSE availability_unit END,
       warranty = CASE WHEN p_product_data ? 'warranty' THEN p_product_data->>'warranty' ELSE warranty END,
       video_url = CASE WHEN p_product_data ? 'video_url' THEN p_product_data->>'video_url' ELSE video_url END,
       technical_specs = CASE WHEN p_product_data ? 'technical_specs' THEN p_product_data->'technical_specs' ELSE technical_specs END,

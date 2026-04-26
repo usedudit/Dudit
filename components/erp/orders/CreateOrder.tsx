@@ -1518,6 +1518,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 />
 
                 <POSShippingSheet
+                    partnerId={partnerId}
                     isOpen={isShippingSheetOpen}
                     onClose={() => setIsShippingSheetOpen(false)}
                     selectedCustomerId={selectedCustomer?.id || null}

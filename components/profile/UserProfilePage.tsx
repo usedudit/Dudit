@@ -122,10 +122,12 @@ export function UserProfilePage({ userId, profile, initialFullName, email, hasPa
         setIsChangingEmail(false)
         setIsChangingSecEmail(false)
 
+        setCurrentView(view)
+
         if (view === "main") {
-            router.push("/perfil")
+            router.push("/perfil", { scroll: false })
         } else {
-            router.push(`/perfil?tab=${view}`)
+            router.push(`/perfil?tab=${view}`, { scroll: false })
         }
     }
 
@@ -324,9 +326,9 @@ export function UserProfilePage({ userId, profile, initialFullName, email, hasPa
     const getViewTitle = () => {
         switch (currentView) {
             case "main": return "Meu perfil"
-            case "account": return "Informações da conta"
-            case "address": return "Endereço"
-            case "password": return "Segurança"
+            case "informacoes-da-conta": return "Informações da conta"
+            case "enderecos": return "Endereço"
+            case "seguranca": return "Segurança"
             case "two-factor": return "Autenticação 2FA"
             default: return "Meu perfil"
         }
@@ -340,7 +342,7 @@ export function UserProfilePage({ userId, profile, initialFullName, email, hasPa
                 <div className="container mx-auto px-4 max-w-[1300px] mt-12 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
                     <AnimatePresence mode="wait">
                         {currentView === "main" && <MainView key="main" navigate={navigate} />}
-                        {currentView === "account" && (
+                        {currentView === "informacoes-da-conta" && (
                             <AccountView
                                 key="account"
                                 navigate={navigate}
@@ -368,7 +370,7 @@ export function UserProfilePage({ userId, profile, initialFullName, email, hasPa
                                 clearMessages={clearMessages}
                             />
                         )}
-                        {currentView === "address" && (
+                        {currentView === "enderecos" && (
                             <AddressView
                                 key="address"
                                 navigate={navigate}
@@ -383,7 +385,7 @@ export function UserProfilePage({ userId, profile, initialFullName, email, hasPa
                                 formattedAddress={formattedAddress}
                             />
                         )}
-                        {currentView === "password" && (
+                        {currentView === "seguranca" && (
                             <SecurityView
                                 key="password"
                                 navigate={navigate}

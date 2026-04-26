@@ -35,7 +35,9 @@ export interface Product {
   fci_code: string | null
   show_in_marketplace?: boolean
   variants?: { count: number }[] | any[]
-  moderation_status?: 'approved' | 'pending_moderation' | 'rejected'
+  availability_value?: number | null
+  availability_unit?: string | null
+  moderation_status?: 'approved' | 'pending_moderation' | 'rejected' | null
 }
 
 export interface ProductDisplay extends Product {
@@ -101,6 +103,9 @@ export interface ProductInput {
   allow_sell_without_stock?: boolean
   max_stock?: number | null
   promotional_price?: number | null
+  availability_value?: number | null
+  availability_unit?: string | null
+  moderation_status?: 'approved' | 'pending_moderation' | 'rejected' | null
 }
 
 export interface ProductWithDetails extends Product {
