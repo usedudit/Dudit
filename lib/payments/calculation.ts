@@ -59,21 +59,25 @@ export function calculatePaymentAmounts(input: PaymentCalculationInput): Payment
     (entry) => Number(entry.installmentNumber) === clampedInstallments,
   )?.feePercent || 0
 
-  // Step: discount by payment method (cumulative with previous discounts)
-  const paymentMethodDiscountAmount = round2(originalAmount * (paymentMethodDiscountPercent / 100))
-  const amountBeforeInterest = toSafeMoney(originalAmount - paymentMethodDiscountAmount)
+  let currentTotal = originalAmount
 
-  // Step: installment interest (supports fixed + per-installment)
+  // Step 1: payment method discount over the running total
+  const paymentMethodDiscountAmount = round2(currentTotal * (paymentMethodDiscountPercent / 100))
+  currentTotal = toSafeMoney(currentTotal - paymentMethodDiscountAmount)
+  const amountBeforeInterest = currentTotal
+
+  // Step 2: installment interest over the discounted running total
   const totalInterestPercent = Math.max(0, fixedInterestPercent + Number(installmentFeePercent || 0))
-  const interestAmount = round2(amountBeforeInterest * (totalInterestPercent / 100))
-  const amountBeforeFee = toSafeMoney(amountBeforeInterest + interestAmount)
+  const interestAmount = round2(currentTotal * (totalInterestPercent / 100))
+  currentTotal = toSafeMoney(currentTotal + interestAmount)
+  const amountBeforeFee = currentTotal
 
-  // Step: payment method fee
-  const feeAmount = round2(((amountBeforeFee * feePercent) / 100) + feeFixed)
+  // Step 3: payment method fee over the running total after interest
+  const feeAmount = round2(((currentTotal * feePercent) / 100) + feeFixed)
   const finalAmount =
     input.paymentMethod.feeBearer === "customer"
-      ? toSafeMoney(amountBeforeFee + feeAmount)
-      : amountBeforeFee
+      ? toSafeMoney(currentTotal + feeAmount)
+      : currentTotal
 
   return {
     finalAmount,

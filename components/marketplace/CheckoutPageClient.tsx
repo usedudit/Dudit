@@ -10,8 +10,9 @@ import {
     MoneyIcon,
     TagIcon,
     StoreIcon,
+    InfoIcon,
 } from "@/lib/icons"
-import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator } from "@/components/reusable"
+import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { Input } from "@/components/reusable"
 import { Label } from "@/components/ui/label"
@@ -425,6 +426,50 @@ export function CheckoutPageClient() {
     const checkoutTotalToCharge = paymentOption === "traditional" && paymentPreview?.success
         ? Number(paymentPreview.finalAmount || checkoutBaseTotal)
         : checkoutBaseTotal
+    const paymentPreviewTooltipRows = paymentOption === "traditional" && paymentPreview?.success
+        ? [
+            { label: "Subtotal", value: formatCurrency(checkoutBaseTotal) },
+            Number(paymentPreview.paymentMethodDiscountAmount || 0) > 0
+                ? { label: "Desconto", value: `- ${formatCurrency(paymentPreview.paymentMethodDiscountAmount)}` }
+                : null,
+            Number(paymentPreview.interestAmount || 0) > 0
+                ? { label: "Juros", value: `+ ${formatCurrency(paymentPreview.interestAmount)}` }
+                : null,
+            Number(paymentPreview.feeAmount || 0) > 0
+                ? { label: "Taxa", value: `+ ${formatCurrency(paymentPreview.feeAmount)}` }
+                : null,
+            { label: "Total a cobrar", value: formatCurrency(checkoutTotalToCharge), isTotal: true },
+        ].filter(Boolean) as Array<{ label: string; value: string; isTotal?: boolean }>
+        : []
+    const paymentMethodPreviewBadge = paymentPreviewTooltipRows.length > 0 ? (
+        <Tooltip
+            text={(
+                <div className="min-w-[220px] text-left">
+                    <div className="mb-2 font-bold">Ajustes do método selecionado</div>
+                    <div className="space-y-1.5">
+                        {paymentPreviewTooltipRows.map((row) => (
+                            <div
+                                key={`${row.label}-${row.value}`}
+                                className={`flex justify-between gap-3 ${row.isTotal ? "mt-2 border-t border-white/20 pt-2 font-bold dark:border-black/10" : ""}`}
+                            >
+                                <span className={row.isTotal ? "" : "text-white/70 dark:text-black/60"}>{row.label}</span>
+                                <span className="font-semibold">{row.value}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="mt-2 text-[11px] text-white/70 dark:text-black/60">
+                        Valores configurados pelo vendedor para esse método.
+                    </div>
+                </div>
+            )}
+        >
+            <span className="inline-flex">
+                <Badge variant="gray" icon={<InfoIcon className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body" />} className="cursor-help">
+                    Método da loja
+                </Badge>
+            </span>
+        </Tooltip>
+    ) : null
     const shouldShowInstallments = paymentOption === "traditional"
         && formData.paymentMethod === "credit_card"
         && Number(paymentPreview?.maxInstallments || 1) > 1
@@ -1102,20 +1147,29 @@ export function CheckoutPageClient() {
                                         )}
                                         {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.paymentMethodDiscountAmount || 0) > 0 && (
                                             <div className="flex justify-between text-sm font-medium text-brand-green">
-                                                <span>Desconto do meio de pagamento</span>
+                                                <span className="flex items-center gap-2">
+                                                    <span>Desconto do meio de pagamento</span>
+                                                    {paymentMethodPreviewBadge}
+                                                </span>
                                                 <span>-{formatCurrency(paymentPreview.paymentMethodDiscountAmount)}</span>
                                             </div>
                                         )}
                                         {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.interestAmount || 0) > 0 && (
                                             <div className="flex justify-between text-sm font-medium text-brand-orange">
-                                                <span>Juros</span>
+                                                <span className="flex items-center gap-2">
+                                                    <span>Juros</span>
+                                                    {paymentMethodPreviewBadge}
+                                                </span>
                                                 <span>+{formatCurrency(paymentPreview.interestAmount)}</span>
                                             </div>
                                         )}
                                         {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.feeAmount || 0) > 0 && (
                                             <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
-                                                <span>Taxas</span>
-                                                <span>{formatCurrency(paymentPreview.feeAmount)}</span>
+                                                <span className="flex items-center gap-2">
+                                                    <span>Taxas</span>
+                                                    {paymentMethodPreviewBadge}
+                                                </span>
+                                                <span>+{formatCurrency(paymentPreview.feeAmount)}</span>
                                             </div>
                                         )}
                                     </div>

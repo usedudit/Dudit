@@ -257,9 +257,10 @@ const Header: React.FC<HeaderProps> = ({
         <div className={`px-4 pb-3 transition-all duration-500 ${(isScrolled || !isHome || isProductDetail) ? "pt-3" : "pt-1"}`}>
           <div className="flex items-center gap-3 relative min-h-[40px]">
             {/* Back Button / User Icon */}
-            <div
-              className={`shrink-0 z-10 transition-all duration-300 ${isProductDetail && !isScrolled ? "w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md" : "w-auto h-auto bg-transparent"}`}
-              onClick={() => {
+            <button
+              className={`shrink-0 z-10 w-10 h-10 flex items-center justify-center transition-all duration-300 ${isProductDetail ? "bg-white rounded-full shadow-md" : "bg-transparent"}`}
+              onClick={(e) => {
+                e.stopPropagation();
                 if (!isHome || isProductDetail) {
                   handleGoBack()
                 } else {
@@ -268,7 +269,7 @@ const Header: React.FC<HeaderProps> = ({
               }}
             >
               {(!isHome || isProductDetail) ? (
-                <ChevronLeftIcon size={24} className={`${isProductDetail && !isScrolled ? "text-brand-dark" : "text-white"}`} strokeWidth={2.5} />
+                <ChevronLeftIcon size={20} className={`${isProductDetail && !isScrolled ? "text-brand-dark" : isScrolled ? "text-brand-dark" : "text-white"}`} strokeWidth={2.5} />
               ) : user ? (
                 <img
                   src="https://img.dudit.com.br/static/Placeholder.png"
@@ -282,13 +283,13 @@ const Header: React.FC<HeaderProps> = ({
                   <span className="text-xs text-gray-500">?</span>
                 </div>
               )}
-            </div>
+            </button>
 
             {/* Middle Section: Search or Product Name */}
-            <div className="flex-1 flex items-center justify-center min-w-0 transition-all duration-300">
+            <div className="flex-1 flex items-center justify-start min-w-0 transition-all duration-300">
               {isProductDetail ? (
-                <div className={`flex-1 flex items-center justify-center min-w-0 transition-all duration-300`}>
-                  <h1 className={`font-bold text-[15px] truncate text-center px-2 transition-all duration-300 ${isScrolled ? "text-white" : "text-brand-dark"}`}>
+                <div className={`flex-1 flex items-center justify-start min-w-0 transition-all duration-300 ${isScrolled ? "opacity-100" : "opacity-0"}`}>
+                  <h1 className={`font-bold text-[15px] truncate text-left px-2 transition-all duration-300 ${isScrolled ? "text-white" : "text-brand-dark"}`}>
                     {productName}
                   </h1>
                 </div>
@@ -313,16 +314,16 @@ const Header: React.FC<HeaderProps> = ({
                 <>
                   <button
                     onClick={(e) => { e.stopPropagation(); onShare?.(); }}
-                    className={`transition-all duration-300 flex items-center justify-center ${!isScrolled ? "w-10 h-10 bg-white rounded-full shadow-md text-brand-dark" : "w-8 h-8 text-white"}`}
+                    className={`transition-all duration-300 flex items-center justify-center w-10 h-10 bg-white rounded-full shadow-md text-brand-dark`}
                   >
-                    <ShareIcon size={!isScrolled ? 20 : 22} />
+                    <ShareIcon size={20} />
                   </button>
                   {onFavorite && (
                     <button
                       onClick={(e) => { e.stopPropagation(); onFavorite?.(); }}
-                      className={`transition-all duration-300 flex items-center justify-center ${!isScrolled ? "w-10 h-10 bg-white rounded-full shadow-md text-brand-dark" : "w-8 h-8 text-white"}`}
+                      className={`transition-all duration-300 flex items-center justify-center w-10 h-10 bg-white rounded-full shadow-md text-brand-dark`}
                     >
-                      <HeartIcon size={!isScrolled ? 20 : 22} className={isFavorite ? "fill-current" : ""} />
+                      <HeartIcon size={20} className={isFavorite ? "fill-current" : ""} />
                     </button>
                   )}
                 </>

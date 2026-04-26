@@ -21,12 +21,11 @@ import {
     InfoIcon,
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Input, Button, Checkbox, MoneyInput, Badge } from '@/components/reusable';
+import { Input, Button, Checkbox, MoneyInput, Badge, Tooltip } from '@/components/reusable';
 import { ReceiptContent, PaymentMethodCard, SplitPaymentCard, Numpad } from './POSComponents';
 import { calculatePaymentMethodAmountsAction, getPaymentMethodsAction, previewSplitPaymentBreakdownAction } from '@/app/actions/erp/payment-methods';
 import { useToast } from "@/components/ui/use-toast";
 import { cn, formatCurrency, formatDate, formatNumber, formatTime } from '@/lib/utils';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const PAYMENT_METHODS_VERSION_PREFIX = "payment-methods-version:";
 const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated";
@@ -143,23 +142,39 @@ function PaymentPricingTooltipBadge({ calculation, baseAllocated }: { calculatio
     const taxa = Number(calculation.feeAmount || 0);
     const final = Number(calculation.finalAmount || 0);
 
+    const rows = [
+        { label: 'Subtotal', value: formatCurrency(base) },
+        disc > 0 ? { label: 'Desconto', value: `- ${formatCurrency(disc)}` } : null,
+        juros > 0 ? { label: 'Juros', value: `+ ${formatCurrency(juros)}` } : null,
+        taxa > 0 ? { label: 'Taxa', value: `+ ${formatCurrency(taxa)}` } : null,
+        { label: 'Total a cobrar', value: formatCurrency(final), isTotal: true },
+    ].filter(Boolean) as Array<{ label: string; value: string; isTotal?: boolean }>;
+
     return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <button type="button" className="inline-flex shrink-0">
-                    <Badge variant="gray" icon={<InfoIcon className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body" />} className="cursor-help" />
-                </button>
-            </TooltipTrigger>
-            <TooltipContent side="top" align="end" sideOffset={8} className="min-w-[240px] max-w-[280px] rounded-xl border border-brand-border bg-white p-3 text-left text-xs text-brand-dark shadow-xl dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading">
-                <div className="mb-2 font-bold">Detalhes do meio de pagamento</div>
-                <div className="space-y-1.5">
-                    <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Subtotal</span><span className="font-semibold">{formatCurrency(base)}</span></div>
-                    <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Desc. meio pagamento</span><span className="font-semibold">- {formatCurrency(disc)}</span></div>
-                    <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Juros</span><span className="font-semibold">+ {formatCurrency(juros)}</span></div>
-                    <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Taxa</span><span className="font-semibold">{formatCurrency(taxa)}</span></div>
-                    <div className="mt-2 flex justify-between gap-3 border-t border-brand-border pt-2 font-bold dark:border-dark-border"><span>Total a cobrar</span><span>{formatCurrency(final)}</span></div>
+        <Tooltip
+            text={(
+                <div className="min-w-[240px] text-left">
+                    <div className="mb-2 font-bold">Detalhes do meio de pagamento</div>
+                    <div className="space-y-1.5">
+                        {rows.map((row) => (
+                            <div
+                                key={`${row.label}-${row.value}`}
+                                className={cn(
+                                    "flex justify-between gap-3",
+                                    row.isTotal && "mt-2 border-t border-white/20 pt-2 font-bold dark:border-black/10",
+                                )}
+                            >
+                                <span className={cn(!row.isTotal && "text-white/70 dark:text-black/60")}>{row.label}</span>
+                                <span className="font-semibold">{row.value}</span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
-            </TooltipContent>
+            )}
+        >
+            <span className="inline-flex shrink-0">
+                <Badge variant="gray" icon={<InfoIcon className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body" />} className="cursor-help" />
+            </span>
         </Tooltip>
     );
 }
@@ -310,6 +325,18 @@ const PaymentModal = ({
     const total = subTotal + shippingFee + otherCosts - discountAmount;
     const chargeTarget = Math.max(0, Number(amountDue ?? total));
     const itemCount = cart.reduce((acc: number, item: any) => acc + item.quantity, 0);
+    const resetSelectedMethodPricing = (options?: { clearType?: boolean; resetInstallments?: boolean }) => {
+        setSelectedMethodId(null);
+        setPaymentCalculation(null);
+        setIsPaymentCalculationLoading(false);
+        setIsPixGenerated(false);
+        if (options?.clearType) {
+            setSelectedMethodType(null);
+        }
+        if (options?.resetInstallments !== false) {
+            setInstallments('1');
+        }
+    };
 
     const formatCalculatorAmount = (value: number) => `R$ ${formatNumber(Math.max(0, Number(value || 0)))}`;
     const parseCalculatorInput = (value: string) => {
@@ -401,6 +428,9 @@ const PaymentModal = ({
                 { id: 2, method: null, paymentMethodId: null, amount: 0, installmentNumber: 1 }
             ]);
             setSelectedMethodId(null);
+            setSelectedMethodType(null);
+            setPaymentCalculation(null);
+            setIsPaymentCalculationLoading(false);
             setSplitPreview(null);
             setSuccessSnapshot(null);
         }
@@ -416,6 +446,7 @@ const PaymentModal = ({
     const basisForMethodCalc = useMemo(() => {
         const raw = Math.max(0, Number(paymentBaseAmount || 0));
         if (view === 'split' || editingPaymentIndex !== null) return raw;
+        if (view === 'card' || view === 'pix') return Math.max(0, Number(chargeTarget || 0));
         return Math.min(raw, Math.max(0, Number(chargeTarget || 0)));
     }, [view, editingPaymentIndex, paymentBaseAmount, chargeTarget]);
 
@@ -502,6 +533,7 @@ const PaymentModal = ({
         }
         const currentViewIsCardLike = view === "card" || view === "pix" || view === "money";
         if (!currentViewIsCardLike) {
+            setPaymentCalculation(null);
             setIsPaymentCalculationLoading(false);
             return;
         }
@@ -525,6 +557,13 @@ const PaymentModal = ({
             active = false;
         };
     }, [selectedMethodId, installments, chargeTarget, view, basisForMethodCalc]);
+
+    useEffect(() => {
+        if (editingPaymentIndex !== null) return;
+        if ((view !== 'card' && view !== 'pix') || !paymentCalculation?.success) return;
+        const nextAmount = Number(paymentCalculation.finalAmount || chargeTarget || 0);
+        setPaymentBaseAmount((current) => (Math.abs(Number(current || 0) - nextAmount) < 0.01 ? current : nextAmount));
+    }, [view, editingPaymentIndex, paymentCalculation, chargeTarget]);
 
     const handleQuickDenomination = (val: number) => {
         setCashCalculatorInput(val > 0 ? String(Math.round(val * 100)) : "");
@@ -585,7 +624,10 @@ const PaymentModal = ({
         return { compactAlertPaid: allocationTotal, compactAlertNeed: chargeTarget };
     }, [view, splitBaseSum, chargeTarget, editingPaymentIndex, allocationTotal, paymentBaseAmount, finalDueForLeg, legFinalCharged]);
 
-    const isAllocationUnderpaid = allocationTotal < chargeTarget - 0.01;
+    const isAllocationUnderpaid =
+        (view === 'card' || view === 'pix') && editingPaymentIndex === null && legFinalCharged != null
+            ? legFinalCharged < finalDueForLeg - 0.01
+            : allocationTotal < chargeTarget - 0.01;
     const isUnderpaid = isAllocationUnderpaid;
     const isOverpaid = view === 'money' && !isAllocationUnderpaid && paymentBaseAmount > finalDueForLeg + 0.01;
     const changeAmount = isOverpaid ? paymentBaseAmount - finalDueForLeg : 0;
@@ -685,20 +727,24 @@ const PaymentModal = ({
 
     const handleGoBack = () => {
         if (view === 'money' || view === 'card' || view === 'pix') {
+            resetSelectedMethodPricing();
             if (editingPaymentIndex !== null) {
                 setView('split_method_select');
             } else {
                 setView('methods');
             }
         } else if (view === 'split_method_select') {
+            resetSelectedMethodPricing({ resetInstallments: false });
             setView('split');
             setEditingPaymentIndex(null);
         } else if (view === 'method_type_select') {
+            resetSelectedMethodPricing({ clearType: true });
             setView('methods');
-            setSelectedMethodType(null);
         } else if (view === 'split') {
+            resetSelectedMethodPricing({ clearType: true });
             setView('methods');
         } else {
+            resetSelectedMethodPricing({ clearType: true });
             setView('methods');
         }
     };
@@ -727,6 +773,7 @@ const PaymentModal = ({
                 paymentMethodId: method.id,
             };
             setPayments(newPayments);
+            setPaymentCalculation(null);
             setSelectedMethodId(method.id);
             setInstallments(String(newPayments[editingPaymentIndex]?.installmentNumber || 1));
             const normalizedType = normalizeMethodType(method.type);
@@ -737,6 +784,7 @@ const PaymentModal = ({
     };
 
     const openMethodTypeSelection = (methodType: "cash" | "pix" | "card") => {
+        resetSelectedMethodPricing({ clearType: false });
         const methodsOfType = activeMethods.filter((method) => normalizeMethodType(method.type) === methodType);
         if (methodsOfType.length === 0) {
             toast({
@@ -749,6 +797,7 @@ const PaymentModal = ({
         if (methodsOfType.length === 1) {
             const only = methodsOfType[0];
             setSelectedMethodId(only.id);
+            setPaymentCalculation(null);
             setView(methodType === "cash" ? "money" : methodType === "pix" ? "pix" : "card");
             return;
         }
@@ -810,7 +859,7 @@ const PaymentModal = ({
     };
 
     const handleStartProcessing = async (forcedPayload?: any) => {
-        const remainingPartial = Math.max(0, chargeTarget - allocationTotal)
+        const remainingPartial = Math.max(0, displayTransactionTotal - totalPaidCalculated)
         setSuccessSnapshot({
             subTotal,
             itemCount,
@@ -1046,7 +1095,7 @@ const PaymentModal = ({
                                                 <PaymentMethodCard icon={MoneyIcon} label="Dinheiro" onClick={() => openMethodTypeSelection("cash")} />
                                                 <PaymentMethodCard icon={QRCodeIcon} label="Pix" onClick={() => openMethodTypeSelection("pix")} />
                                                 <PaymentMethodCard icon={CreditCardIcon} label="Cartão" onClick={() => openMethodTypeSelection("card")} />
-                                                <PaymentMethodCard icon={SplitIcon} label="Dividir" onClick={() => setView('split')} />
+                                                <PaymentMethodCard icon={SplitIcon} label="Dividir" onClick={() => { resetSelectedMethodPricing({ clearType: true }); setView('split'); }} />
                                             </div>
 
                                             <div className="border-t border-brand-border dark:border-dark-border my-6"></div>
@@ -1296,6 +1345,7 @@ const PaymentModal = ({
                                                                 icon={MethodIcon}
                                                                 label={method.name}
                                                                 onClick={() => {
+                                                                    setPaymentCalculation(null);
                                                                     setSelectedMethodId(method.id);
                                                                     setView(targetView);
                                                                 }}

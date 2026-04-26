@@ -26,6 +26,13 @@ export type CouponValidationResult = {
   freeShipping?: boolean
 }
 
+const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100
+const safeMoney = (value: number) => {
+  const numeric = Number(value || 0)
+  if (!Number.isFinite(numeric)) return 0
+  return Math.max(0, round2(numeric))
+}
+
 // ---------------------------------------------------------------------------
 // Internal: Core validation logic (used by both validateCoupon and findBestAutomaticCoupon)
 // ---------------------------------------------------------------------------
@@ -152,17 +159,17 @@ export async function validateCouponRow(
   // Calculate discount amount
   let discountAmount = 0
   if (coupon.discount_type === "percentage") {
-    discountAmount = subtotal * (Number(coupon.discount_value || 0) / 100)
+    discountAmount = safeMoney(subtotal * (Number(coupon.discount_value || 0) / 100))
   } else if (coupon.discount_type === "fixed") {
-    discountAmount = Number(coupon.discount_value || 0)
+    discountAmount = safeMoney(Number(coupon.discount_value || 0))
   } else if (coupon.discount_type === "free_shipping") {
-    discountAmount = shippingCost
+    discountAmount = safeMoney(shippingCost)
   }
 
   if (coupon.max_discount_value !== null) {
-    discountAmount = Math.min(discountAmount, Number(coupon.max_discount_value || 0))
+    discountAmount = Math.min(discountAmount, safeMoney(Number(coupon.max_discount_value || 0)))
   }
-  discountAmount = Math.max(0, Math.min(discountAmount, subtotal + shippingCost))
+  discountAmount = safeMoney(Math.min(discountAmount, safeMoney(subtotal + shippingCost)))
 
   // Build PricingCoupon for the unified engine
   const isFreeShipping = coupon.discount_type === "free_shipping" || Boolean(coupon.free_shipping)

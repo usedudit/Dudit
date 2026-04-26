@@ -994,7 +994,7 @@ export function ProductDetailsPageClient({
 
         </div>
 
-        {!hideHeaderAndFooter && <MarketplaceFooter />}
+        {/* Redundant footer removed */}
       </motion.div>
     </>
   )

@@ -13,8 +13,8 @@
  *
  * ORDER OF OPERATIONS (fixed):
  *   1. Compute subtotal from items (using promotional price when lower)
- *   2. Apply manual discount (fixed or percentage)
- *   3. Apply coupon discount (percentage/fixed, capped by max_discount_value)
+ *   2. Apply manual discount sequentially
+ *   3. Apply coupon discount sequentially
  *   4. Add shipping (zeroed if coupon grants free shipping)
  *   5. Add additional costs
  *   6. Clamp final total to max(0, result)
@@ -133,6 +133,8 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
   subtotal = round2(subtotal)
   promotionSavings = round2(clampMin0(promotionSavings))
 
+  let currentTotal = subtotal
+
   // ── Step 2: Manual Discount ───────────────────────────────────────────
   let manualDiscountAmount = 0
 
@@ -141,16 +143,14 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
 
     if (type === "percentage") {
       const pct = Math.min(100, Math.max(0, value))
-      manualDiscountAmount = round2(subtotal * (pct / 100))
+      manualDiscountAmount = round2(currentTotal * (pct / 100))
     } else {
-      manualDiscountAmount = round2(Math.min(value, subtotal))
+      manualDiscountAmount = round2(Math.min(value, currentTotal))
     }
   }
 
   manualDiscountAmount = round2(clampMin0(manualDiscountAmount))
-
-  // Remaining after manual discount
-  const afterManual = round2(clampMin0(subtotal - manualDiscountAmount))
+  currentTotal = round2(clampMin0(currentTotal - manualDiscountAmount))
 
   // ── Step 3: Coupon Discount ───────────────────────────────────────────
   let couponDiscountAmount = 0
@@ -163,9 +163,9 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
 
     if (coupon.discountType === "percentage" && coupon.discountValue) {
       const pct = Math.min(100, Math.max(0, coupon.discountValue))
-      couponDiscountAmount = round2(afterManual * (pct / 100))
+      couponDiscountAmount = round2(currentTotal * (pct / 100))
     } else if (coupon.discountType === "fixed" && coupon.discountValue) {
-      couponDiscountAmount = round2(Math.min(coupon.discountValue, afterManual))
+      couponDiscountAmount = round2(Math.min(coupon.discountValue, currentTotal))
     }
     // free_shipping type: discount is 0 on items, but shipping is zeroed below
 
@@ -185,6 +185,7 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
   }
 
   couponDiscountAmount = round2(clampMin0(couponDiscountAmount))
+  currentTotal = round2(clampMin0(currentTotal - couponDiscountAmount))
 
   // ── Step 4: Shipping ──────────────────────────────────────────────────
   const shipping = freeShippingApplied ? 0 : round2(rawShipping)
@@ -194,9 +195,9 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
 
   // ── Step 6: Final Total (never negative) ──────────────────────────────
   const totalDiscounts = round2(manualDiscountAmount + couponDiscountAmount)
-  const finalTotal = round2(
-    clampMin0(subtotal - totalDiscounts + shipping + additionalCosts)
-  )
+  currentTotal = round2(clampMin0(currentTotal + shipping))
+  currentTotal = round2(clampMin0(currentTotal + additionalCosts))
+  const finalTotal = round2(clampMin0(currentTotal))
 
   return {
     subtotal,
