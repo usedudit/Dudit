@@ -78,6 +78,37 @@ function sanitizeChangeLines(lines: string[]): string[] {
     .slice(0, 10) // Limit to 10 lines
 }
 
+function resolveStatusTransitionLine(metadata?: Record<string, unknown> | null): string | null {
+  if (!metadata) return null
+  const oldStatus =
+    metadata.oldStatus ??
+    metadata.old_status ??
+    metadata.previousStatus ??
+    metadata.previous_status
+  const newStatus =
+    metadata.newStatus ??
+    metadata.new_status ??
+    metadata.nextStatus ??
+    metadata.next_status
+
+  const oldLabel = String(oldStatus || "").trim()
+  const newLabel = String(newStatus || "").trim()
+  if (!oldLabel || !newLabel) return null
+  if (oldLabel === newLabel) return null
+  return `alterou status: ${oldLabel} -> ${newLabel}`
+}
+
+function resolveDefaultLine(actionType: string): string {
+  const normalized = String(actionType || "").toLowerCase().trim()
+  if (normalized.includes("created")) return "criou registro."
+  if (normalized.includes("updated")) return "atualizou informações."
+  if (normalized.includes("deleted")) return "removeu registro."
+  if (normalized.includes("cancel")) return "cancelou registro."
+  if (normalized.includes("paid")) return "marcou como pago."
+  if (normalized.includes("received")) return "marcou como recebido."
+  return "ação registrada."
+}
+
 /**
  * Write a structured timeline event to `audit_logs`.
  *
@@ -93,11 +124,17 @@ export async function logAuditEvent(input: LogAuditEventInput): Promise<void> {
       .replace(/\./g, "_")
       .replace(/[^a-z0-9_]/g, "")
 
-    const changeLines = sanitizeChangeLines(input.changeLines || [])
-
-    // Empty or spam guards
-    if (changeLines.length === 0) return
-    if (changeLines.every(l => l === "nenhuma alteração relevante.")) return
+    let changeLines = sanitizeChangeLines(input.changeLines || [])
+    if (changeLines.every((l) => l.toLowerCase() === "nenhuma alteração relevante.")) {
+      changeLines = []
+    }
+    const statusTransitionLine = resolveStatusTransitionLine(input.metadata || null)
+    if (statusTransitionLine && !changeLines.some((line) => line.toLowerCase().includes("status"))) {
+      changeLines.unshift(statusTransitionLine)
+    }
+    if (changeLines.length === 0) {
+      changeLines = [resolveDefaultLine(actionType)]
+    }
 
     // Ensure metadata is flat and small
     let safeMetadata = input.metadata || null
@@ -130,7 +167,27 @@ export async function logAuditEvent(input: LogAuditEventInput): Promise<void> {
       }
     }
 
-    const { error } = await supabase.from("audit_logs").insert({
+    const legacyAction = actionType.toUpperCase()
+    const legacyTableName = String(input.entityType || "system").trim() || "system"
+    const nowIso = new Date().toISOString()
+
+    const fullPayload: Record<string, unknown> = {
+      // Legacy columns (required in older schemas)
+      table_name: legacyTableName,
+      action: legacyAction,
+      old_values: null,
+      new_values: {
+        entity_type: input.entityType || null,
+        entity_id: input.entityId || null,
+        action_type: actionType,
+        change_lines: changeLines,
+        metadata: safeMetadata,
+        source: input.source || "system",
+        actor_user_id: input.actorUserId || null,
+        created_at: nowIso,
+      },
+      user_id: input.actorUserId || null,
+      // Timeline columns (new schema)
       partner_id: input.partnerId || null,
       actor_user_id: input.actorUserId || null,
       entity_type: input.entityType || null,
@@ -139,15 +196,33 @@ export async function logAuditEvent(input: LogAuditEventInput): Promise<void> {
       change_lines: changeLines,
       metadata: safeMetadata,
       source: input.source || "system",
-      // Also write to legacy user_id column for backward compat
-      user_id: input.actorUserId || null,
-    })
+    }
 
-    if (error) {
+    let insertResult = await supabase.from("audit_logs").insert(fullPayload)
+
+    // Backward/forward schema compatibility:
+    // if some columns don't exist in this environment, retry after removing them.
+    if (insertResult.error && /column .* does not exist/i.test(insertResult.error.message || "")) {
+      const reducedPayload: Record<string, unknown> = { ...fullPayload }
+      const columnMissingRegex = /column "([^"]+)" does not exist/i
+      let message = String(insertResult.error.message || "")
+
+      while (columnMissingRegex.test(message)) {
+        const match = message.match(columnMissingRegex)
+        const missingColumn = match?.[1]
+        if (!missingColumn || !(missingColumn in reducedPayload)) break
+        delete reducedPayload[missingColumn]
+        insertResult = await supabase.from("audit_logs").insert(reducedPayload)
+        if (!insertResult.error) break
+        message = String(insertResult.error.message || "")
+      }
+    }
+
+    if (insertResult.error) {
       console.error("[timeline] Failed to write audit event:", {
         actionType,
         entityType: input.entityType,
-        error: error.message,
+        error: insertResult.error.message,
       })
     }
   } catch (error) {

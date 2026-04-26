@@ -872,6 +872,10 @@ export async function closeCashSessionAction(input: {
     changeLines: [
       `fechou o caixa. Valor informado (contagem): R$ ${informedTotal.toFixed(2)}; calculado: R$ ${calculated.toFixed(2)}; diferença: R$ ${difference.toFixed(2)}.`,
     ],
+    metadata: {
+      oldStatus: "Aberto",
+      newStatus: "Fechado",
+    },
     source: "manual",
   })
   await revalidateEntityTimeline("cash_session", input.cashSessionId)

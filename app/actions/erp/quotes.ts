@@ -667,6 +667,10 @@ export async function updateQuoteStatusAction(data: {
                 changeLines: [
                     `alterou o status de ${statusLabels[current.status] || current.status} para ${statusLabels[data.status] || data.status}`,
                 ],
+                metadata: {
+                    oldStatus: statusLabels[current.status] || current.status,
+                    newStatus: statusLabels[data.status] || data.status,
+                },
                 source: "manual",
             })
 

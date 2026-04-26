@@ -3,6 +3,7 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePartnerAccess, requireUser } from "@/lib/auth/authorization"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
+import { createCommissionExpenseForEntity, reverseCommissionForEntity } from "@/lib/services/commission-ledger.service"
 
 export type ERPDeliveryListCursor = { createdAt: string; id: string }
 
@@ -527,11 +528,19 @@ export async function updateERPDeliveryStatusAction(params: {
   deliveryId: string
   status: DeliveryStatusValue
 }) {
-  await requireUser()
+  const user = await requireUser()
   await requirePartnerAccess(params.partnerId)
   const planCheck = await enforcePlanOnExistingDelivery(params.partnerId, params.deliveryId)
   if (!planCheck.allowed) return { success: false as const, error: planCheck.error }
   const supabase = await getSupabaseServerClient()
+
+  const { data: currentDelivery } = await supabase
+    .from("deliveries")
+    .select("id, delivery_person_id")
+    .eq("id", params.deliveryId)
+    .eq("partner_id", params.partnerId)
+    .maybeSingle()
+  if (!currentDelivery?.id) return { success: false as const, error: "Entrega não encontrada." }
 
   const allowed = new Set<DeliveryStatusValue>([
     "not_sent",
@@ -564,6 +573,40 @@ export async function updateERPDeliveryStatusAction(params: {
     childPatch.delivered_at = new Date().toISOString()
   }
   await supabase.from("delivery_orders").update(childPatch).eq("delivery_id", params.deliveryId)
+
+  if (params.status === "delivered" && currentDelivery.delivery_person_id) {
+    const { data: deliveryOrders } = await supabase
+      .from("delivery_orders")
+      .select("orders(delivery_fee, shipping_cost)")
+      .eq("delivery_id", params.deliveryId)
+
+    const deliveryFeeTotal = (deliveryOrders || []).reduce((sum: number, row: any) => {
+      return sum + Number(row?.orders?.delivery_fee || row?.orders?.shipping_cost || 0)
+    }, 0)
+
+    await createCommissionExpenseForEntity({
+      supabase,
+      partnerId: params.partnerId,
+      partnerUserId: String(currentDelivery.delivery_person_id),
+      role: "delivery",
+      deliveryFee: deliveryFeeTotal,
+      entityType: "delivery",
+      entityId: params.deliveryId,
+      createdByUserId: user.id,
+    })
+  }
+
+  if (params.status === "cancelled" && currentDelivery.delivery_person_id) {
+    await reverseCommissionForEntity({
+      supabase,
+      partnerId: params.partnerId,
+      entityType: "delivery",
+      entityId: params.deliveryId,
+      partnerUserId: String(currentDelivery.delivery_person_id),
+      createdByUserId: user.id,
+    })
+  }
+
   return { success: true as const }
 }
 

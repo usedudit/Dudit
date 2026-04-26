@@ -1448,6 +1448,9 @@ export async function recordInstallmentPaymentAction(input: {
                     ? "registrou pagamento e quitou a parcela."
                     : "registrou pagamento parcial da parcela.",
             ],
+            metadata: fullyPaid
+                ? { oldStatus: "Pendente", newStatus: "Pago" }
+                : null,
             source: "manual",
         })
         await revalidateEntityTimeline("transaction", input.transactionId)
@@ -1527,6 +1530,7 @@ export async function settleInstallmentGroupAction(input: {
                         entityId: transactionId,
                         actionType: "settled",
                         changeLines: ["quitou esta parcela pelo comando «Quitar tudo»."],
+                        metadata: { oldStatus: "Pendente", newStatus: "Pago" },
                         source: "manual",
                     }),
                 ),
@@ -1652,6 +1656,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
                 entityId: pendingTx.id,
                 actionType: "paid",
                 changeLines: ["marcou esta ocorrência como paga."],
+                metadata: { oldStatus: "Pendente", newStatus: "Pago" },
                 source: "manual",
             })
             await revalidateEntityTimeline("transaction", pendingTx.id)

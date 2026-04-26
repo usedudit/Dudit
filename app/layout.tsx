@@ -12,7 +12,7 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-    title: "Dudit - Descubra o que tem por aqui",
+    title: "Dudit | Descubra o que tem por aqui",
     description:
         "Encontre produtos, serviços e negócios perto de você ou comece a vender online sem taxas. Organize pedidos, clientes e vendas em um só lugar com a Dudit.",
     keywords: [
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
         "divulgar serviços locais",
     ],
     openGraph: {
-        title: "Dudit — Descubra o que tem por aqui",
+        title: "Dudit | Descubra o que tem por aqui",
         description:
             "Compre de quem está perto ou venda online sem taxas. Produtos, serviços e negócios locais em um só lugar.",
         url: "https://dudit.com.br",

@@ -27,6 +27,7 @@ import { PaymentMethodsSubPage } from "./payments/PaymentMethodsSubPage"
 import { SimpleSettingsSubPage } from "./SimpleSettingsSubPage"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { DeliverySettingsSubPage } from "./DeliverySettingsSubPage"
+import { CommissionsSubPage } from "./CommissionsSubPage"
 
 interface SettingsTabsProps {
   partner: any
@@ -195,7 +196,7 @@ export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
                           <SettingsCard
                             icon={TagIcon}
                             title="Comissão"
-                            description="Defina as porcentagens de comissão para seus vendedores."
+                            description="Defina regras de comissão para vendedores e entregadores."
                             onClick={() => setActivePage("comissao")}
                           />
                           <SettingsCard
@@ -284,7 +285,7 @@ export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
           {activePage === "team" && <TeamSubPage key="team" partnerId={partner.id} onBack={() => setActivePage("home")} />}
           {activePage === "subscription" && <SubscriptionSubPage key="subscription" onBack={() => setActivePage("home")} />}
           {activePage === "crediario" && <SimpleSettingsSubPage key="crediario" title="Crediário" onBack={() => setActivePage("home")} />}
-          {activePage === "comissao" && <SimpleSettingsSubPage key="comissao" title="Comissão" onBack={() => setActivePage("home")} />}
+          {activePage === "comissao" && <CommissionsSubPage key="comissao" partnerId={partner.id} onBack={() => setActivePage("home")} />}
           {activePage === "recibo" && <SimpleSettingsSubPage key="recibo" title="Recibo/Devolução" onBack={() => setActivePage("home")} />}
           {activePage === "vitrine" && <SimpleSettingsSubPage key="vitrine" title="Minha Vitrine" onBack={() => setActivePage("home")} />}
           {activePage === "os" && <SimpleSettingsSubPage key="os" title="Configuração de O.S" onBack={() => setActivePage("home")} />}

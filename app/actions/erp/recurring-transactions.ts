@@ -208,6 +208,12 @@ export async function updateRecurringTransactionAction(
 
     await requirePartnerAccessWithPermission(partnerId, "financial", "edit")
     const supabase = await getSupabaseServerClient()
+    const { data: currentRecurring } = await supabase
+      .from("recurring_transactions")
+      .select("status")
+      .eq("id", id)
+      .eq("partner_id", partnerId)
+      .maybeSingle()
 
     const normalized: Record<string, unknown> = { ...patch }
     if ("intervalValue" in normalized) {
@@ -309,6 +315,13 @@ export async function updateRecurringTransactionAction(
       entityId: id,
       actionType: "recurring_updated",
       changeLines: [`atualizou recorrência (campos: ${Object.keys(payload).filter(k => k !== "updated_at" && k !== "effective_from_date").join(", ")}).`],
+      metadata:
+        payload.status !== undefined
+          ? {
+            oldStatus: String(currentRecurring?.status || "ativo"),
+            newStatus: String(payload.status || currentRecurring?.status || "ativo"),
+          }
+          : null,
       source: "manual",
     })
 
@@ -343,6 +356,12 @@ export async function cancelRecurringTransactionAction(id: string, partnerId: st
 
     await requirePartnerAccessWithPermission(partnerId, "financial", "edit")
     const supabase = await getSupabaseServerClient()
+    const { data: currentRecurring } = await supabase
+      .from("recurring_transactions")
+      .select("status")
+      .eq("id", id)
+      .eq("partner_id", partnerId)
+      .maybeSingle()
     const { data, error } = await supabase
       .from("recurring_transactions")
       .update({
@@ -364,6 +383,10 @@ export async function cancelRecurringTransactionAction(id: string, partnerId: st
       entityId: id,
       actionType: "recurring_cancelled",
       changeLines: ["cancelou esta recorrência."],
+      metadata: {
+        oldStatus: String(currentRecurring?.status || "active"),
+        newStatus: "cancelled",
+      },
       source: "manual",
     })
 

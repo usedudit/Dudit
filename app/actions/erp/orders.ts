@@ -22,6 +22,7 @@ import {
     type SplitInputRow,
 } from "@/lib/payments/split-breakdown"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
+import { createCommissionExpenseForEntity, reverseCommissionForEntity } from "@/lib/services/commission-ledger.service"
 
 type ERPItemPayload = {
     productId: string | null
@@ -694,6 +695,51 @@ async function createFinancialTransactionsForPaidOrder(supabase: Awaited<ReturnT
     } catch (error) {
         console.error("[orders_financial] createFinancialTransactionsForPaidOrder:", error)
     }
+}
+
+async function resolvePartnerUserIdFromUserId(
+    supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+    partnerId: string,
+    userId?: string | null,
+) {
+    if (!userId) return null
+    const { data } = await supabase
+        .from("partner_users")
+        .select("id")
+        .eq("partner_id", partnerId)
+        .eq("user_id", userId)
+        .limit(1)
+        .maybeSingle()
+    return data?.id ? String(data.id) : null
+}
+
+async function createSellerCommissionForPaidOrder(params: {
+    supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>
+    partnerId: string
+    orderId: string
+    sellerUserId?: string | null
+    saleAmount: number
+    accountId?: string | null
+    createdByUserId?: string | null
+}) {
+    const partnerUserId = await resolvePartnerUserIdFromUserId(
+        params.supabase,
+        params.partnerId,
+        params.sellerUserId || null,
+    )
+    if (!partnerUserId) return
+
+    await createCommissionExpenseForEntity({
+        supabase: params.supabase,
+        partnerId: params.partnerId,
+        partnerUserId,
+        role: "seller",
+        saleAmount: params.saleAmount,
+        entityType: "sale",
+        entityId: params.orderId,
+        accountId: params.accountId || null,
+        createdByUserId: params.createdByUserId || null,
+    })
 }
 
 async function createRefundTransactionForCancelledOrder(params: {
@@ -1410,6 +1456,15 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             paymentDate: new Date().toISOString(),
             financeAccountId: order.finance_account_id || data.financeAccountId,
         })
+        await createSellerCommissionForPaidOrder({
+            supabase,
+            partnerId,
+            orderId: order.id,
+            sellerUserId: user.id,
+            saleAmount: Number(order.total_amount || 0),
+            accountId: order.finance_account_id || data.financeAccountId,
+            createdByUserId: user.id,
+        })
     }
 
     await invalidateInventoryItems(partnerId, stockItems)
@@ -1818,6 +1873,15 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             paymentDate: new Date().toISOString(),
             financeAccountId: data.financeAccountId,
         })
+        await createSellerCommissionForPaidOrder({
+            supabase,
+            partnerId: data.partnerId,
+            orderId,
+            sellerUserId: currentOrder.created_by || null,
+            saleAmount: Number(updateServerTotal || 0),
+            accountId: data.financeAccountId,
+            createdByUserId: user.id,
+        })
     }
 
     await supabase.from("order_items").delete().eq("order_id", orderId)
@@ -1923,6 +1987,20 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         entityId: orderId,
         actionType: "updated",
         changeLines,
+        metadata:
+            currentOrder.situation !== paymentState.situation
+                ? {
+                    oldStatus: getPaymentStatusLabel(currentOrder.situation),
+                    newStatus: getPaymentStatusLabel(paymentState.situation),
+                    statusScope: "payment",
+                }
+                : currentOrder.delivery_status !== data.deliveryStatus
+                    ? {
+                        oldStatus: getDeliveryStatusLabel(currentOrder.delivery_status),
+                        newStatus: getDeliveryStatusLabel(data.deliveryStatus),
+                        statusScope: "delivery",
+                    }
+                    : null,
         source: "manual",
     })
 
@@ -2030,7 +2108,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
     const { data: currentOrders } = await supabase
         .from("orders")
-        .select("id, order_number, situation, delivery_status, notes, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, finance_account_id, buyer_id, customer_name, previous_situation_before_cancel, stock_restored_on_cancel, inventory_deducted, order_items(product_id, variant_id, quantity)")
+        .select("id, order_number, situation, delivery_status, notes, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, finance_account_id, buyer_id, customer_name, previous_situation_before_cancel, stock_restored_on_cancel, inventory_deducted, created_by, order_items(product_id, variant_id, quantity)")
         .in("id", payload.orderIds)
         .eq("partner_id", payload.partnerId)
     const overallWarnings: string[] = []
@@ -2134,6 +2212,23 @@ export async function updateOrdersStatusInBatchAction(payload: {
                             processingWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível gerar reembolso (${refundResult.error})`)
                         }
                     }
+                }
+
+                const sellerPartnerUserId = await resolvePartnerUserIdFromUserId(
+                    supabase,
+                    payload.partnerId,
+                    order.created_by || null,
+                )
+                if (sellerPartnerUserId) {
+                    await reverseCommissionForEntity({
+                        supabase,
+                        partnerId: payload.partnerId,
+                        entityType: "sale",
+                        entityId: order.id,
+                        partnerUserId: sellerPartnerUserId,
+                        accountId: order.finance_account_id || null,
+                        createdByUserId: user.id,
+                    })
                 }
             }
 
@@ -2243,6 +2338,11 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         entityId: order.id,
                         actionType: payload.actionType,
                         changeLines: lines,
+                        metadata: {
+                            oldStatus: getPaymentStatusLabel(order.situation),
+                            newStatus: "Cancelado",
+                            statusScope: "payment",
+                        },
                         source: "manual",
                     })
                 })
@@ -2324,6 +2424,15 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     customerName: order.customer_name || null,
                     paymentDate: new Date().toISOString(),
                     financeAccountId: order.finance_account_id || null,
+                })
+                await createSellerCommissionForPaidOrder({
+                    supabase,
+                    partnerId: payload.partnerId,
+                    orderId: order.id,
+                    sellerUserId: order.created_by || null,
+                    saleAmount: Number(order.total_amount || 0),
+                    accountId: order.finance_account_id || null,
+                    createdByUserId: user.id,
                 })
             }
         }
@@ -2426,6 +2535,35 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
                 if (lines.length === 0) return Promise.resolve()
 
+                const metadata =
+                    payload.actionType === "payment_status" && lines.length > 0
+                        ? (() => {
+                            const requestedStatus = paymentStatusMap[payload.statusValue || ""]
+                            if (!requestedStatus) return null
+                            const nextPaymentState = resolvePaymentState({
+                                requestedStatus,
+                                totalAmount: Number(order.total_amount || 0),
+                                fallbackPaidAmount:
+                                    requestedStatus === "paid"
+                                        ? Number(order.total_amount || 0)
+                                        : requestedStatus === "partially_paid"
+                                            ? Number(order.paid_amount || 0)
+                                            : 0,
+                            })
+                            return {
+                                oldStatus: getPaymentStatusLabel(order.situation),
+                                newStatus: getPaymentStatusLabel(nextPaymentState.situation),
+                                statusScope: "payment",
+                            }
+                        })()
+                        : payload.actionType === "delivery_status" && payload.statusValue
+                            ? {
+                                oldStatus: getDeliveryStatusLabel(order.delivery_status),
+                                newStatus: getDeliveryStatusLabel(payload.statusValue),
+                                statusScope: "delivery",
+                            }
+                            : null
+
                 return logAuditEvent({
                     partnerId: payload.partnerId,
                     actorUserId: user.id,
@@ -2433,6 +2571,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     entityId: order.id,
                     actionType: payload.actionType,
                     changeLines: lines,
+                    metadata,
                     source: "manual",
                 })
             })

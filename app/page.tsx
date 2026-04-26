@@ -9,10 +9,10 @@ import { ThreeDotsLoader } from "@/components/reusable"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-    title: "Dudit: Pare de Perder Pedidos no WhatsApp | Venda na Cidade",
+    title: "Dudit | Descubra o que tem por aqui",
     description: "Cansado do caos no WhatsApp? Na Dudit você organiza pedidos, não paga taxas abusivas e encontra produtos ou serviços na sua cidade em um só lugar.",
     openGraph: {
-        title: "Dudit: Pare de Perder Pedidos no WhatsApp | Venda na Cidade",
+        title: "Dudit | Descubra o que tem por aqui",
         description: "Cansado do caos no WhatsApp? Na Dudit você organiza pedidos, não paga taxas abusivas e encontra produtos ou serviços na sua cidade em um só lugar.",
         url: "https://dudit.com.br",
         siteName: "Dudit",

@@ -18,6 +18,7 @@ import {
     type SplitInputRow,
 } from "@/lib/payments/split-breakdown"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
+import { createCommissionExpenseForEntity } from "@/lib/services/commission-ledger.service"
 
 type DraftItemInput = {
     productId?: string | null
@@ -679,7 +680,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
 
     const { data: finalizedPreSale } = await supabase
         .from("pre_sales")
-        .select("shipping_fee, distance_km, delivery_breakdown, coupon_id, coupon_code, coupon_discount_amount, customer_id")
+        .select("shipping_fee, distance_km, delivery_breakdown, coupon_id, coupon_code, coupon_discount_amount, customer_id, seller_id")
         .eq("id", input.preSaleId)
         .eq("partner_id", input.partnerId)
         .limit(1)
@@ -702,6 +703,20 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             })
             .eq("id", saleId)
             .eq("partner_id", input.partnerId)
+    }
+
+    if (finalizedPreSale?.seller_id) {
+        await createCommissionExpenseForEntity({
+            supabase,
+            partnerId: input.partnerId,
+            partnerUserId: String(finalizedPreSale.seller_id),
+            role: "seller",
+            saleAmount: Number(paymentAware.totalAmount || 0),
+            entityType: "sale",
+            entityId: saleId,
+            accountId: input.financeAccountId || null,
+            createdByUserId: user.id,
+        })
     }
 
     const syncedOrderId = await syncPosSaleToOrders({
