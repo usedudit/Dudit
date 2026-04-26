@@ -151,6 +151,7 @@ export function ProductDetailsPageClient({
         state: address?.state, zipCode: address?.zip_code,
       },
       paymentMethods: p?.payment_methods || [],
+      openingHours: p?.opening_hours || null,
       max_installments: p?.max_installments || 12,
       rating: p?.rating || p?.average_rating || 0,
     }
@@ -314,7 +315,9 @@ export function ProductDetailsPageClient({
             price: pricing.current,
             quantity,
             image: productImages[activeImgIndex],
-            variant: selectedVariant?.variant_name
+            variant: selectedVariant?.variant_name,
+            availabilityValue: Number(product.availability_value || 0),
+            availabilityUnit: product.availability_unit || "Minutos",
         }],
         partnerInfo: {
             address: partner.address || {},
@@ -322,6 +325,7 @@ export function ProductDetailsPageClient({
             mpConnected: !!partner.mp_user_id,
             mpPublicKey: partner.mp_public_key,
             store_name: partner.store_name,
+            openingHours: partner.openingHours || null,
         },
         itemId: selectedVariant?.id || product.id,
         itemType: "product"

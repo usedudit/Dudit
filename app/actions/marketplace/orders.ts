@@ -17,6 +17,7 @@ import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finan
 import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
 import { calculatePaymentAmounts } from "@/lib/payments/calculation"
+import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 
 // Single revalidation to minimize cache calls
 const revalidateOrdersCache = async () => await revalidateOrders("")
@@ -84,11 +85,12 @@ export async function createOrderAction(data: {
   // ========================================================================
   let serverPrice: number
   let itemName: string = "Item"
+  let preparationProducts: Array<{ availability_value?: number | null; availability_unit?: string | null }> = []
 
   if (data.itemType === "product") {
     const { data: product, error: productError } = await supabase
       .from("products")
-      .select("price, promotional_price, name, is_active, stock_available")
+      .select("price, promotional_price, name, is_active, stock_available, availability_value, availability_unit")
       .eq("id", data.itemId)
       .single()
 
@@ -104,6 +106,10 @@ export async function createOrderAction(data: {
       ? product.promotional_price
       : product.price
     itemName = product.name || "Produto"
+    preparationProducts = [{
+      availability_value: Number(product.availability_value || 0),
+      availability_unit: product.availability_unit || "Minutos",
+    }]
 
     if ((product.stock_available ?? 0) < data.quantity) {
       return { error: "Estoque insuficiente para este produto" }
@@ -242,6 +248,19 @@ export async function createOrderAction(data: {
     }
   }
 
+  const { data: partner } = await supabase
+    .from("partners")
+    .select("opening_hours")
+    .eq("id", data.partnerId)
+    .maybeSingle()
+
+  const orderPreparation = computeOrderPreparationEstimate({
+    products: preparationProducts,
+    openingHours: (partner as any)?.opening_hours || null,
+    pickupWindowMinutes: 30,
+    deliveryTimeEstimateMinutes: 0,
+  })
+
   const orderData: any = {
     buyer_id: buyerId,
     customer_name: buyerProfile?.full_name || null,
@@ -264,6 +283,13 @@ export async function createOrderAction(data: {
     coupon_id: couponIdToSave,
     discount_amount: couponDiscountAmount,
     finance_account_id: financeAccountId,
+    ...(orderPreparation ? {
+      preparation_time_minutes: orderPreparation.preparationTimeMinutes,
+      estimated_ready_at: orderPreparation.readyAt.toISOString(),
+      pickup_window_start: orderPreparation.pickupWindowStart.toISOString(),
+      pickup_window_end: orderPreparation.pickupWindowEnd.toISOString(),
+      estimated_delivery_at: data.deliveryType === "delivery" ? orderPreparation.estimatedDeliveryAt.toISOString() : null,
+    } : {}),
   }
 
   const { data: order, error } = await supabase.from("orders").insert(orderData).select().single()

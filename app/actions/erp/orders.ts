@@ -21,6 +21,7 @@ import {
     toStoredBreakdownAmounts,
     type SplitInputRow,
 } from "@/lib/payments/split-breakdown"
+import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 
 type ERPItemPayload = {
     productId: string | null
@@ -1101,6 +1102,50 @@ async function invalidateInventoryItems(partnerId: string, items: Array<{ produc
     }
 }
 
+async function resolveOrderPreparationEstimate(params: {
+    supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>
+    partnerId: string
+    items: Array<{ productId?: string | null }>
+    deliveryMethod: "delivery" | "pickup"
+}) {
+    const productIds = Array.from(
+        new Set(params.items.map((item) => item.productId).filter(Boolean))
+    ) as string[]
+    if (productIds.length === 0) return null
+
+    const [{ data: products }, { data: partner }] = await Promise.all([
+        params.supabase
+            .from("products")
+            .select("id, availability_value, availability_unit")
+            .eq("partner_id", params.partnerId)
+            .in("id", productIds),
+        params.supabase
+            .from("partners")
+            .select("opening_hours")
+            .eq("id", params.partnerId)
+            .maybeSingle(),
+    ])
+
+    const estimate = computeOrderPreparationEstimate({
+        products: (products || []).map((product: any) => ({
+            availability_value: Number(product.availability_value || 0),
+            availability_unit: product.availability_unit || "Minutos",
+        })),
+        openingHours: (partner as any)?.opening_hours || null,
+        pickupWindowMinutes: 30,
+        deliveryTimeEstimateMinutes: 0,
+    })
+
+    if (!estimate) return null
+    return {
+        preparation_time_minutes: estimate.preparationTimeMinutes,
+        estimated_ready_at: estimate.readyAt.toISOString(),
+        pickup_window_start: estimate.pickupWindowStart.toISOString(),
+        pickup_window_end: estimate.pickupWindowEnd.toISOString(),
+        estimated_delivery_at: params.deliveryMethod === "delivery" ? estimate.estimatedDeliveryAt.toISOString() : null,
+    }
+}
+
 export async function createERPOrderAction(data: ERPOrderPayload) {
     await requireRateLimit(RateLimitCategory.ORDER_CREATE)
 
@@ -1223,6 +1268,13 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         deliveryAddressStr = `${street}, ${number}${complement ? ` (${complement})` : ""}, ${neighborhood}, ${city} - ${state}, ${zipCode}`
     }
 
+    const preparationEstimate = await resolveOrderPreparationEstimate({
+        supabase,
+        partnerId,
+        items: sanitizedItems,
+        deliveryMethod: data.deliveryMethod,
+    })
+
     const { data: order, error: orderError } = await supabase
         .from("orders")
         .insert({
@@ -1248,7 +1300,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             payment_provider: null,
             delivery_address: deliveryAddressStr || null,
             finance_account_id: data.financeAccountId,
-            created_by: user.id
+            created_by: user.id,
+            ...(preparationEstimate || {}),
         })
         .select()
         .single()
@@ -1635,6 +1688,12 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         const { street, number, neighborhood, city, state, zipCode, complement } = data.address
         deliveryAddressStr = `${street}, ${number}${complement ? ` (${complement})` : ""}, ${neighborhood}, ${city} - ${state}, ${zipCode}`
     }
+    const preparationEstimate = await resolveOrderPreparationEstimate({
+        supabase,
+        partnerId: data.partnerId,
+        items: sanitizedItems,
+        deliveryMethod: data.deliveryMethod,
+    })
 
     const changeLines = buildOrderChangeLines(currentOrder, { ...data, items: sanitizedItems })
     if (changeLines.length === 0) {
@@ -1738,7 +1797,8 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             payment_breakdown: adjustedPaymentBreakdown,
             finance_account_id: data.financeAccountId,
             payment_provider: null,
-            ...(deliveryAddressStr ? { delivery_address: deliveryAddressStr } : {})
+            ...(deliveryAddressStr ? { delivery_address: deliveryAddressStr } : {}),
+            ...(preparationEstimate || {}),
         })
         .eq("id", orderId)
         .eq("partner_id", data.partnerId)

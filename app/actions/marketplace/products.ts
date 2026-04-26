@@ -28,7 +28,7 @@ async function _getMarketplaceProductBase(id: string) {
   const { data, error } = await supabase
     .from("products")
     .select(`
-      id, name, description, price, promotional_price, stock_quantity, stock_available, 
+      id, name, description, price, promotional_price, stock_quantity, stock_available, availability_value, availability_unit,
       is_active, moderation_status,
       category, images, rating, partner_id, sku, 
       condition, brand, show_in_marketplace, technical_specs, created_at,
@@ -36,7 +36,7 @@ async function _getMarketplaceProductBase(id: string) {
       partners(
         id, store_name, store_description, rating, user_id, 
         store_image_url, max_installments, interest_rate_percent,
-        mp_user_id, mp_public_key,
+        mp_user_id, mp_public_key, opening_hours,
         addresses(city, state)
       )
     `)

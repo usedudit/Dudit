@@ -184,6 +184,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
             mpConnected: !!partnerData.partner?.mp_user_id,
             mpPublicKey: partnerData.partner?.mp_public_key,
             store_name: partnerData.partner?.store_name,
+            openingHours: partnerData.partner?.opening_hours || null,
         },
         cartItems: partnerItems.map((item: any) => ({
             cartItemId: item.id,
@@ -220,6 +221,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         price: getItemPrice(item),
         quantity: getItemQuantity(item),
         image: getItemImage(item),
+        availabilityValue: Number(item.products?.availability_value || 0),
+        availabilityUnit: item.products?.availability_unit || "Minutos",
       }))
 
   const multiplePartners = Object.keys(itemsByPartner).length > 1

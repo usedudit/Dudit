@@ -57,7 +57,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
 
     const chromeClass =
         chrome === "minimal"
-            ? "border-0 rounded-2xl"
+            ? "border-0"
             : "rounded-2xl border border-brand-border dark:border-dark-border"
 
     return (

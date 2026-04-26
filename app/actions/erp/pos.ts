@@ -17,6 +17,7 @@ import {
     toStoredBreakdownAmounts,
     type SplitInputRow,
 } from "@/lib/payments/split-breakdown"
+import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 
 type DraftItemInput = {
     productId?: string | null
@@ -274,6 +275,34 @@ async function syncPosSaleToOrders(params: {
             ? "partially_paid"
             : "pending"
 
+    const productIds = Array.from(
+        new Set((saleItems || []).map((item: any) => item.product_id).filter(Boolean))
+    ) as string[]
+    const [{ data: preparationProducts }, { data: partnerHours }] = await Promise.all([
+        productIds.length > 0
+            ? admin
+                .from("products")
+                .select("id, availability_value, availability_unit")
+                .eq("partner_id", params.partnerId)
+                .in("id", productIds)
+            : Promise.resolve({ data: [] as any[] }),
+        admin
+            .from("partners")
+            .select("opening_hours")
+            .eq("id", params.partnerId)
+            .maybeSingle(),
+    ])
+
+    const preparationEstimate = computeOrderPreparationEstimate({
+        products: (preparationProducts || []).map((product: any) => ({
+            availability_value: Number(product.availability_value || 0),
+            availability_unit: product.availability_unit || "Minutos",
+        })),
+        openingHours: (partnerHours as any)?.opening_hours || null,
+        pickupWindowMinutes: 30,
+        deliveryTimeEstimateMinutes: 0,
+    })
+
     const orderPayload: Record<string, unknown> = {
         partner_id: params.partnerId,
         buyer_id: sale.customer_id || null,
@@ -297,6 +326,13 @@ async function syncPosSaleToOrders(params: {
         created_by: params.actorUserId,
         inventory_deducted: true,
         order_number: finalOrderNumber,
+        ...(preparationEstimate ? {
+            preparation_time_minutes: preparationEstimate.preparationTimeMinutes,
+            estimated_ready_at: preparationEstimate.readyAt.toISOString(),
+            pickup_window_start: preparationEstimate.pickupWindowStart.toISOString(),
+            pickup_window_end: preparationEstimate.pickupWindowEnd.toISOString(),
+            estimated_delivery_at: deliveryType === "delivery" ? preparationEstimate.estimatedDeliveryAt.toISOString() : null,
+        } : {}),
     }
 
     const insertWithPosFlag = { ...orderPayload, is_pos_sale: true }

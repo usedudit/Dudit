@@ -30,6 +30,7 @@ import { checkoutCartAction } from "@/app/actions/marketplace/cart"
 import { createOrderAction } from "@/app/actions/marketplace/orders"
 import { previewMarketplacePaymentAction } from "@/app/actions/marketplace/payment-preview"
 import { invalidateCartCache } from "@/hooks/use-cart"
+import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 
 interface ProductItem {
     id: string
@@ -38,6 +39,8 @@ interface ProductItem {
     quantity: number
     image?: string
     variant?: string
+    availabilityValue?: number
+    availabilityUnit?: string
 }
 
 export interface CheckoutSessionData {
@@ -54,6 +57,7 @@ export interface CheckoutSessionData {
         mpConnected?: boolean
         mpPublicKey?: string
         store_name?: string
+        openingHours?: any
     }
     cartItems?: { cartItemId: string, productId: string, variantId?: string, quantity: number }[]
     itemId?: string
@@ -426,6 +430,21 @@ export function CheckoutPageClient() {
     const checkoutTotalToCharge = paymentOption === "traditional" && paymentPreview?.success
         ? Number(paymentPreview.finalAmount || checkoutBaseTotal)
         : checkoutBaseTotal
+    const preparationEstimate = useMemo(() => computeOrderPreparationEstimate({
+        products: products.map((product) => ({
+            availability_value: Number(product.availabilityValue || 0),
+            availability_unit: product.availabilityUnit || "Minutos",
+        })),
+        openingHours: partnerInfo.openingHours || null,
+        pickupWindowMinutes: 30,
+        deliveryTimeEstimateMinutes: 0,
+    }), [products, partnerInfo.openingHours])
+    const pickupStartLabel = preparationEstimate
+        ? preparationEstimate.readyAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+        : null
+    const pickupEndLabel = preparationEstimate
+        ? preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+        : null
     const paymentPreviewTooltipRows = paymentOption === "traditional" && paymentPreview?.success
         ? [
             { label: "Subtotal", value: formatCurrency(checkoutBaseTotal) },
@@ -809,6 +828,11 @@ export function CheckoutPageClient() {
                                                                 <div className="flex flex-col justify-center">
                                                                     <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
                                                                     <p className="text-sm text-brand-inactive-text">{formatPartnerAddress(partnerInfo.address)}</p>
+                                                                    {preparationEstimate && (
+                                                                        <p className="text-xs text-brand-inactive-text mt-1">
+                                                                            Pronto em {preparationEstimate.readyInMinutes} minutos • Retirar a partir de {pickupStartLabel}
+                                                                        </p>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         </motion.div>
@@ -1139,6 +1163,11 @@ export function CheckoutPageClient() {
                                                 {isPickup ? "Grátis" : "A combinar"}
                                             </span>
                                         </div>
+                                        {isPickup && preparationEstimate && (
+                                            <div className="text-xs text-brand-inactive-text">
+                                                Retirada entre {pickupStartLabel} e {pickupEndLabel}
+                                            </div>
+                                        )}
                                         {paymentOption === "traditional" && paymentPreviewLoading && (
                                             <div className="flex items-center justify-between text-sm font-medium text-brand-inactive-text">
                                                 <span>Calculando pagamento</span>

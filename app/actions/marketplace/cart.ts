@@ -17,6 +17,7 @@ import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
 import { calculatePaymentAmounts } from "@/lib/payments/calculation"
 import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
+import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 
 export async function getCartItemCountAction() {
   try {
@@ -45,12 +46,13 @@ export const getCachedCart = async (userId: string) => {
       quantity,
       selected,
       created_at,
-      products(id, name, price, promotional_price, images, stock_quantity, stock_available),
+      products(id, name, price, promotional_price, images, stock_quantity, stock_available, availability_value, availability_unit),
       product_variants(id, variant_name, variant_type, variant_value, price_adjustment, stock_quantity, stock_available, variant_options),
       partners(
         id, 
         store_name, 
         store_image_url,
+        opening_hours,
         user_id, 
         mp_user_id, 
         mp_public_key
@@ -498,6 +500,11 @@ export async function checkoutCartAction(
   }
 
   const partnerId = products[0].partner_id
+  const { data: partner } = await adminClient
+    .from("partners")
+    .select("opening_hours")
+    .eq("id", partnerId)
+    .maybeSingle()
   let couponIdToSave: string | null = null
   let couponDiscountAmount = 0
   let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
@@ -589,6 +596,21 @@ export async function checkoutCartAction(
     }
   }
 
+  const orderPreparation = computeOrderPreparationEstimate({
+    products,
+    openingHours: (partner as any)?.opening_hours || null,
+    pickupWindowMinutes: 30,
+    deliveryTimeEstimateMinutes: 0,
+  })
+
+  const preparationPayload = orderPreparation ? {
+    preparation_time_minutes: orderPreparation.preparationTimeMinutes,
+    estimated_ready_at: orderPreparation.readyAt.toISOString(),
+    pickup_window_start: orderPreparation.pickupWindowStart.toISOString(),
+    pickup_window_end: orderPreparation.pickupWindowEnd.toISOString(),
+    estimated_delivery_at: deliveryType === "delivery" ? orderPreparation.estimatedDeliveryAt.toISOString() : null,
+  } : {}
+
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .insert({
@@ -613,6 +635,7 @@ export async function checkoutCartAction(
       finance_account_id: financeAccountId,
       coupon_id: couponIdToSave,
       discount_amount: couponDiscountAmount,
+      ...preparationPayload,
     })
     .select()
     .single()
