@@ -1,3 +1,5 @@
+import { safeFetch, validateImageUrl, SSRFError } from "@/lib/security/ssrf-guard"
+
 export interface SightengineResult {
   moderation?: {
     nudity?: { confidence: number }
@@ -176,9 +178,11 @@ export async function moderateImageWithBase64(
 
     // 3. O Fetch gerencia o Content-Type automaticamente (boundary)
     // NÃO defina 'Content-Type': 'multipart/form-data' manualmente!
-    const response = await fetch('https://api.sightengine.com/1.0/check.json', {
+    const response = await safeFetch('https://api.sightengine.com/1.0/check.json', {
       method: 'POST',
       body: formData,
+      timeoutMs: 15_000,
+      maxResponseBytes: 1 * 1024 * 1024, // 1 MB — API response is JSON
     })
 
     console.log('[SIGHTENGINE] Response status:', response.status)
@@ -233,6 +237,21 @@ export async function moderateImageWithUrl(
   imageUrl: string
 ): Promise<ModerationAnalysis> {
   try {
+    // SSRF PROTECTION: Validate the image URL is from our CDN only.
+    // WHY: Sightengine fetches this URL server-side. An attacker could abuse
+    // this to make Sightengine hit internal targets (SSRF via 3rd-party proxy).
+    const urlCheck = validateImageUrl(imageUrl)
+    if (!urlCheck.valid) {
+      console.warn('[SIGHTENGINE] Blocked image URL:', urlCheck.error)
+      return {
+        riskLevel: 'low',
+        confidence: 0,
+        categories: [],
+        rawResponse: null,
+        error: `Image URL rejected: ${urlCheck.error}`,
+      }
+    }
+
     const apiUser = process.env.SIGHTENGINE_API_USER
     const apiSecret = process.env.SIGHTENGINE_API_SECRET
 
@@ -258,10 +277,12 @@ export async function moderateImageWithUrl(
 
     console.log('[SIGHTENGINE] Sending request to API')
 
-    const response = await fetch(
+    const response = await safeFetch(
       `https://api.sightengine.com/1.0/check.json?${params.toString()}`,
       {
         method: 'GET',
+        timeoutMs: 15_000,
+        maxResponseBytes: 1 * 1024 * 1024, // 1 MB — API response is JSON
       }
     )
 

@@ -1,6 +1,7 @@
 "use server"
 
 import { requireUser } from "@/lib/auth/authorization"
+import { safeFetch } from "@/lib/security/ssrf-guard"
 
 interface CNPjAResponse {
   taxId: string
@@ -104,10 +105,12 @@ export async function fetchCNPJDataAction(cnpj: string) {
   }
 
   try {
-    const response = await fetch(`https://open.cnpja.com/office/${cleanCNPJ}`, {
+    const response = await safeFetch(`https://open.cnpja.com/office/${cleanCNPJ}`, {
       headers: {
         Accept: "application/json",
       },
+      timeoutMs: 10_000,
+      maxResponseBytes: 1 * 1024 * 1024, // 1 MB
     })
 
     if (!response.ok) {

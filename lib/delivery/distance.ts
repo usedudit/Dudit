@@ -1,12 +1,16 @@
+import { safeFetch } from "@/lib/security/ssrf-guard"
+
 type Coordinate = { lat: number; lon: number }
 
 async function geocodeAddress(address: string): Promise<Coordinate | null> {
   const query = encodeURIComponent(address)
   const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${query}`
   try {
-    const response = await fetch(url, {
+    const response = await safeFetch(url, {
       headers: { "User-Agent": "DuditERP/1.0 (delivery-fee-system)" },
-      next: { revalidate: 1800 },
+      timeoutMs: 8_000,
+      maxResponseBytes: 512 * 1024, // 512 KB — geocoding responses are small JSON
+      maxRedirects: 2,
     })
     if (!response.ok) return null
     const data = await response.json()
@@ -27,12 +31,20 @@ export async function calculateRouteDistanceKm(originAddress: string, destinatio
   ])
   if (!origin || !destination) return null
 
-  const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${origin.lon},${origin.lat};${destination.lon},${destination.lat}?overview=false`
-  const response = await fetch(osrmUrl, { next: { revalidate: 60 } })
-  if (!response.ok) return null
-  const payload = await response.json()
-  const route = payload?.routes?.[0]
-  if (!route?.distance) return null
-  const km = Number(route.distance || 0) / 1000
-  return Math.round((km + Number.EPSILON) * 100) / 100
+  try {
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${origin.lon},${origin.lat};${destination.lon},${destination.lat}?overview=false`
+    const response = await safeFetch(osrmUrl, {
+      timeoutMs: 8_000,
+      maxResponseBytes: 512 * 1024, // 512 KB — routing responses are small JSON
+      maxRedirects: 2,
+    })
+    if (!response.ok) return null
+    const payload = await response.json()
+    const route = payload?.routes?.[0]
+    if (!route?.distance) return null
+    const km = Number(route.distance || 0) / 1000
+    return Math.round((km + Number.EPSILON) * 100) / 100
+  } catch {
+    return null
+  }
 }

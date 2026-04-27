@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getAdminClient } from "@/lib/supabase/admin"
+import { safeFetch } from "@/lib/security/ssrf-guard"
 
 export async function GET() {
   const supabase = getAdminClient()
@@ -30,7 +31,11 @@ export async function GET() {
       const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(addressString)}.json?access_token=${mapboxToken}&limit=1&country=BR`
       
       try {
-        const res = await fetch(geocodeUrl)
+        const res = await safeFetch(geocodeUrl, {
+          timeoutMs: 8_000,
+          maxResponseBytes: 512 * 1024, // 512 KB — geocoding responses are small JSON
+          maxRedirects: 2,
+        })
         const geocodeData: any = await res.json()
         
         if (geocodeData.features && geocodeData.features.length > 0) {

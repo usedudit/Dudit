@@ -1,6 +1,7 @@
 "use server"
 
 import { unstable_cache } from "next/cache"
+import { safeFetch } from "@/lib/security/ssrf-guard"
 
 // Nuvem Fiscal API integration
 const NUVEM_FISCAL_AUTH_URL = "https://auth.nuvemfiscal.com.br/oauth/token"
@@ -16,7 +17,11 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3,
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const response = await fetch(url, options)
+      const response = await safeFetch(url, {
+        ...options,
+        timeoutMs: 10_000,
+        maxResponseBytes: 1 * 1024 * 1024, // 1 MB
+      })
       if (response.status === 429) { // Rate limit
         const delay = baseDelay * Math.pow(2, attempt)
         await new Promise((resolve) => setTimeout(resolve, delay))
@@ -46,7 +51,7 @@ async function getAccessToken(): Promise<string> {
   if (!clientId || !clientSecret) throw new Error("Credenciais Nuvem Fiscal ausentes")
 
   try {
-    const response = await fetch(NUVEM_FISCAL_AUTH_URL, {
+    const response = await safeFetch(NUVEM_FISCAL_AUTH_URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -55,6 +60,8 @@ async function getAccessToken(): Promise<string> {
         client_secret: clientSecret,
         scope: "cep cnpj nfse nfe nfce",
       }),
+      timeoutMs: 10_000,
+      maxResponseBytes: 512 * 1024, // 512 KB
     })
 
     if (!response.ok) throw new Error(`Auth failed: ${response.status}`)

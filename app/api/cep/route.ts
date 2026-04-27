@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { consultarCEP } from "@/lib/nuvem-fiscal"
+import { safeFetch } from "@/lib/security/ssrf-guard"
 
 export const runtime = "edge"
 
@@ -30,7 +31,14 @@ export async function GET(request: NextRequest) {
 
     try {
       // 2. Fallback para ViaCEP
-      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`)
+      // 2. Fallback para ViaCEP — safeFetch enforces hostname allowlist + timeout
+      // CEP is already digits-only (line 8), safe from path injection
+      const response = await safeFetch(`https://viacep.com.br/ws/${cep}/json/`, {
+        timeoutMs: 8_000,
+        maxResponseBytes: 256 * 1024, // 256 KB — CEP responses are tiny JSON
+        maxRedirects: 2,
+        skipDnsCheck: true, // Edge runtime — dns module unavailable
+      })
       const viaCepData = await response.json()
 
       if (viaCepData.erro) {
