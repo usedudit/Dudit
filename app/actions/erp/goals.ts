@@ -2,7 +2,7 @@
 
 import { revalidateTag, unstable_cache } from "next/cache"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccess, requireUser } from "@/lib/auth/authorization"
+import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
 import { getAdminClient } from "@/lib/supabase/admin"
 
 type GoalInput = {
@@ -57,7 +57,7 @@ async function resolveSellerNameMap(partnerId: string) {
 export async function getSalesGoalsModuleAction(partnerId: string): Promise<{ success: true; goals: any; sellers: { id: string; name: string }[] } | { success: false; error: string }> {
   try {
     await requireUser()
-    await requirePartnerAccess(partnerId)
+    await requirePartnerAccessWithPermission(partnerId, "goals", "view")
     const supabase = await getSupabaseServerClient()
     const nowDate = new Date().toISOString().slice(0, 10)
 
@@ -113,7 +113,7 @@ export async function getSalesGoalsModuleAction(partnerId: string): Promise<{ su
 
 export async function upsertSalesGoalAction(input: GoalInput) {
   await requireUser()
-  await requirePartnerAccess(input.partnerId)
+  await requirePartnerAccessWithPermission(input.partnerId, "goals", input.id ? "edit" : "create")
   const supabase = await getSupabaseServerClient()
 
   const payload = {
@@ -146,7 +146,7 @@ export async function upsertSalesGoalAction(input: GoalInput) {
 
 export async function deleteSalesGoalAction(partnerId: string, goalId: string) {
   await requireUser()
-  await requirePartnerAccess(partnerId)
+  await requirePartnerAccessWithPermission(partnerId, "goals", "delete")
   const supabase = await getSupabaseServerClient()
   const { error } = await supabase.from("sales_goals").delete().eq("partner_id", partnerId).eq("id", goalId)
   if (error) return { success: false as const, error: error.message }
@@ -258,7 +258,7 @@ async function fetchRanking(partnerId: string, filter?: RankingPeriodFilter) {
 
 export async function getSalesGoalsRankingAction(partnerId: string, filter?: RankingPeriodFilter) {
   await requireUser()
-  await requirePartnerAccess(partnerId)
+  await requirePartnerAccessWithPermission(partnerId, "goals", "view")
   const normalizedFilter: RankingPeriodFilter = {
     mode: filter?.mode || "monthly",
     startDate: filter?.startDate || null,
@@ -277,7 +277,7 @@ export async function getSalesGoalsRankingAction(partnerId: string, filter?: Ran
 
 export async function getSalesGoalsSummaryAction(partnerId: string) {
   await requireUser()
-  await requirePartnerAccess(partnerId)
+  await requirePartnerAccessWithPermission(partnerId, "goals", "view")
   const supabase = await getSupabaseServerClient()
   const today = new Date().toISOString().slice(0, 10)
 

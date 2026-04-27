@@ -14,24 +14,30 @@ export interface OrdersPermissions {
     view: boolean
     create: boolean
     edit: boolean
-    delete_cancel: boolean
+    delete: boolean
+    cancel: boolean
+    can_apply_discount: boolean
+    can_add_delivery: boolean
+    // Backward compatibility alias
+    delete_cancel?: boolean
 }
 
 export interface PdvPermissions {
     view: boolean
     sell: boolean
-}
-
-export interface CashRegisterPermissions {
-    view: boolean
-    open_close: boolean
-    manage: boolean
+    open_pdv: boolean
+    close_pdv: boolean
+    sangria: boolean
+    reforco: boolean
+    can_apply_discount: boolean
+    can_add_delivery: boolean
 }
 
 export interface FinancialPermissions {
     view: boolean
     create: boolean
     edit: boolean
+    cancel: boolean
 }
 
 export interface ReportsPermissions {
@@ -48,14 +54,23 @@ export interface DeliveryPermissions {
 
 export interface SettingsPermissions {
     view: boolean
-    edit: boolean
+    settings_negocio: boolean
+    settings_team: boolean
+    settings_plan: boolean
+    settings_payments: boolean
+    settings_comissions: boolean
+    settings_returns: boolean
+    settings_vitrine: boolean
+    settings_os: boolean
+    settings_messages: boolean
+    settings_delivery: boolean
+    settings_integrations: boolean
 }
 
-export interface SpecificPermissions {
-    settings_plan: boolean
-    settings_comissions: boolean
-    settings_integrations: boolean
-    can_apply_discount: boolean
+export interface StockMovementsPermissions {
+    view: boolean
+    create: boolean
+    undo: boolean
 }
 
 // Canonical DB model for `partner_users.permissions` / `partner_invitations.permissions`
@@ -64,20 +79,29 @@ export interface PartnerPermissions {
     appointments: ResourcePermissions
     customers: ResourcePermissions
     products: ResourcePermissions
+    stock_movements: StockMovementsPermissions
     pdv: PdvPermissions
-    cash_register: CashRegisterPermissions
     services: ResourcePermissions
     quotes: ResourcePermissions
     financial: FinancialPermissions
-    cadastros_categories: ResourcePermissions
+    categories: ResourcePermissions
     coupons: ResourcePermissions
     goals: ResourcePermissions
     reports: ReportsPermissions
+    dashboard: { view: boolean }
     delivery: DeliveryPermissions
-    team: ResourcePermissions
     settings: SettingsPermissions
-    specific: SpecificPermissions
-    // Backward compatibility alias still used by old mappings/actions
+    // Backward compatibility aliases still used by old mappings/actions
+    cash_register?: { view: boolean; open_close: boolean; manage: boolean }
+    cadastros_categories?: ResourcePermissions
+    team?: ResourcePermissions
+    specific?: {
+        settings_plan: boolean
+        settings_comissions: boolean
+        settings_integrations: boolean
+        can_apply_discount: boolean
+        can_add_delivery?: boolean
+    }
     suppliers?: ResourcePermissions
 }
 

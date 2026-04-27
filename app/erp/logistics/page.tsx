@@ -14,7 +14,7 @@ export default async function LogisticsPage() {
 
   const partnerId = context.partnerId
   const [{ allowed }, page] = await Promise.all([
-    checkPartnerPermission(partnerId, "orders", "view"),
+    checkPartnerPermission(partnerId, "delivery", "view"),
     getERPDeliveriesPageAction(partnerId, { cursor: null, limit: 100 }),
   ])
 

@@ -14,7 +14,7 @@ export default async function CouponsPageServer() {
   const partnerId = context.partnerId
 
   const [{ allowed }, couponsRes] = await Promise.all([
-    checkPartnerPermission(partnerId, "orders", "view"),
+    checkPartnerPermission(partnerId, "coupons", "view"),
     listCouponsAction(partnerId, { page: 1, limit: 100 }),
   ])
   if (!allowed) return <AccessDenied />

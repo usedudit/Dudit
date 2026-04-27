@@ -13,6 +13,10 @@ AS $$
       'view', COALESCE((input->'orders'->>'view')::boolean, false),
       'create', COALESCE((input->'orders'->>'create')::boolean, false),
       'edit', COALESCE((input->'orders'->>'edit')::boolean, false),
+      'delete', COALESCE((input->'orders'->>'delete')::boolean, (input->'orders'->>'delete_cancel')::boolean, false),
+      'cancel', COALESCE((input->'orders'->>'cancel')::boolean, (input->'orders'->>'delete_cancel')::boolean, false),
+      'can_apply_discount', COALESCE((input->'orders'->>'can_apply_discount')::boolean, false),
+      'can_add_delivery', COALESCE((input->'orders'->>'can_add_delivery')::boolean, false),
       'delete_cancel', COALESCE((input->'orders'->>'delete_cancel')::boolean, (input->'orders'->>'delete')::boolean, false)
     ),
     'appointments', jsonb_build_object(
@@ -33,9 +37,20 @@ AS $$
       'edit', COALESCE((input->'products'->>'edit')::boolean, false),
       'delete', COALESCE((input->'products'->>'delete')::boolean, false)
     ),
+    'stock_movements', jsonb_build_object(
+      'view', COALESCE((input->'stock_movements'->>'view')::boolean, false),
+      'create', COALESCE((input->'stock_movements'->>'create')::boolean, false),
+      'undo', COALESCE((input->'stock_movements'->>'undo')::boolean, false)
+    ),
     'pdv', jsonb_build_object(
       'view', COALESCE((input->'pdv'->>'view')::boolean, (input->'orders'->>'view')::boolean, false),
-      'sell', COALESCE((input->'pdv'->>'sell')::boolean, (input->'orders'->>'create')::boolean, false)
+      'sell', COALESCE((input->'pdv'->>'sell')::boolean, (input->'orders'->>'create')::boolean, false),
+      'open_pdv', COALESCE((input->'pdv'->>'open_pdv')::boolean, false),
+      'close_pdv', COALESCE((input->'pdv'->>'close_pdv')::boolean, false),
+      'sangria', COALESCE((input->'pdv'->>'sangria')::boolean, false),
+      'reforco', COALESCE((input->'pdv'->>'reforco')::boolean, false),
+      'can_apply_discount', COALESCE((input->'pdv'->>'can_apply_discount')::boolean, false),
+      'can_add_delivery', COALESCE((input->'pdv'->>'can_add_delivery')::boolean, false)
     ),
     'cash_register', jsonb_build_object(
       'view', COALESCE((input->'cash_register'->>'view')::boolean, (input->'financial'->>'view')::boolean, false),
@@ -57,13 +72,17 @@ AS $$
     'financial', jsonb_build_object(
       'view', COALESCE((input->'financial'->>'view')::boolean, false),
       'create', COALESCE((input->'financial'->>'create')::boolean, false),
-      'edit', COALESCE((input->'financial'->>'edit')::boolean, false)
+      'edit', COALESCE((input->'financial'->>'edit')::boolean, false),
+      'cancel', COALESCE((input->'financial'->>'cancel')::boolean, false)
     ),
-    'cadastros_categories', jsonb_build_object(
-      'view', COALESCE((input->'cadastros_categories'->>'view')::boolean, (input->'products'->>'view')::boolean, false),
-      'create', COALESCE((input->'cadastros_categories'->>'create')::boolean, (input->'products'->>'create')::boolean, false),
-      'edit', COALESCE((input->'cadastros_categories'->>'edit')::boolean, (input->'products'->>'edit')::boolean, false),
-      'delete', COALESCE((input->'cadastros_categories'->>'delete')::boolean, (input->'products'->>'delete')::boolean, false)
+    'categories', jsonb_build_object(
+      'view', COALESCE((input->'categories'->>'view')::boolean, (input->'cadastros_categories'->>'view')::boolean, (input->'products'->>'view')::boolean, false),
+      'create', COALESCE((input->'categories'->>'create')::boolean, (input->'cadastros_categories'->>'create')::boolean, (input->'products'->>'create')::boolean, false),
+      'edit', COALESCE((input->'categories'->>'edit')::boolean, (input->'cadastros_categories'->>'edit')::boolean, (input->'products'->>'edit')::boolean, false),
+      'delete', COALESCE((input->'categories'->>'delete')::boolean, (input->'cadastros_categories'->>'delete')::boolean, (input->'products'->>'delete')::boolean, false)
+    ),
+    'dashboard', jsonb_build_object(
+      'view', COALESCE((input->'dashboard'->>'view')::boolean, false)
     ),
     'coupons', jsonb_build_object(
       'view', COALESCE((input->'coupons'->>'view')::boolean, false),
@@ -95,13 +114,24 @@ AS $$
     ),
     'settings', jsonb_build_object(
       'view', COALESCE((input->'settings'->>'view')::boolean, false),
-      'edit', COALESCE((input->'settings'->>'edit')::boolean, false)
+      'settings_negocio', COALESCE((input->'settings'->>'settings_negocio')::boolean, false),
+      'settings_team', COALESCE((input->'settings'->>'settings_team')::boolean, false),
+      'settings_plan', COALESCE((input->'settings'->>'settings_plan')::boolean, false),
+      'settings_payments', COALESCE((input->'settings'->>'settings_payments')::boolean, false),
+      'settings_comissions', COALESCE((input->'settings'->>'settings_comissions')::boolean, false),
+      'settings_returns', COALESCE((input->'settings'->>'settings_returns')::boolean, false),
+      'settings_vitrine', COALESCE((input->'settings'->>'settings_vitrine')::boolean, false),
+      'settings_os', COALESCE((input->'settings'->>'settings_os')::boolean, false),
+      'settings_messages', COALESCE((input->'settings'->>'settings_messages')::boolean, false),
+      'settings_delivery', COALESCE((input->'settings'->>'settings_delivery')::boolean, false),
+      'settings_integrations', COALESCE((input->'settings'->>'settings_integrations')::boolean, false)
     ),
     'specific', jsonb_build_object(
       'settings_plan', COALESCE((input->'specific'->>'settings_plan')::boolean, false),
       'settings_comissions', COALESCE((input->'specific'->>'settings_comissions')::boolean, false),
       'settings_integrations', COALESCE((input->'specific'->>'settings_integrations')::boolean, false),
-      'can_apply_discount', COALESCE((input->'specific'->>'can_apply_discount')::boolean, false)
+      'can_apply_discount', COALESCE((input->'specific'->>'can_apply_discount')::boolean, false),
+      'can_add_delivery', COALESCE((input->'specific'->>'can_add_delivery')::boolean, false)
     )
   );
 $$;

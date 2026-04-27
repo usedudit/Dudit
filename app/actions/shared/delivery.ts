@@ -1,6 +1,6 @@
 "use server"
 
-import { requirePartnerAccess, requireUser } from "@/lib/auth/authorization"
+import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { calculateDeliveryFee, type DeliveryFeeRule, type DeliverySettings } from "@/lib/delivery/fee"
@@ -54,7 +54,7 @@ export async function upsertPartnerDeliveryConfigAction(input: {
   settings: DeliverySettings
 }) {
   await requireUser()
-  await requirePartnerAccess(input.partnerId)
+  await requirePartnerAccessWithPermission(input.partnerId, "settings", "settings_delivery")
   const supabase = await getSupabaseServerClient()
   const plan = await getPartnerPlan(input.partnerId)
   const capability = resolveDeliveryPlanCapability(plan.slug)
@@ -95,7 +95,7 @@ export async function upsertDeliveryFeeRuleAction(input: {
   rule: Partial<DeliveryFeeRule> & Pick<DeliveryFeeRule, "startTime" | "endTime" | "type" | "value">
 }) {
   await requireUser()
-  await requirePartnerAccess(input.partnerId)
+  await requirePartnerAccessWithPermission(input.partnerId, "settings", "settings_delivery")
   const supabase = await getSupabaseServerClient()
   const plan = await getPartnerPlan(input.partnerId)
   const capability = resolveDeliveryPlanCapability(plan.slug)
@@ -120,7 +120,7 @@ export async function upsertDeliveryFeeRuleAction(input: {
 
 export async function deleteDeliveryFeeRuleAction(partnerId: string, ruleId: string) {
   await requireUser()
-  await requirePartnerAccess(partnerId)
+  await requirePartnerAccessWithPermission(partnerId, "settings", "settings_delivery")
   const supabase = await getSupabaseServerClient()
   const { error } = await supabase.from("delivery_fee_rules").delete().eq("partner_id", partnerId).eq("id", ruleId)
   if (error) return { success: false as const, error: error.message }

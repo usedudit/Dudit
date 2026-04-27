@@ -14,7 +14,7 @@ export default async function GoalsPageServer() {
   const partnerId = context.partnerId
 
   const [{ allowed }, goalsRes, rankingRes, summaryRes] = await Promise.all([
-    checkPartnerPermission(partnerId, "orders", "view"),
+    checkPartnerPermission(partnerId, "goals", "view"),
     getSalesGoalsModuleAction(partnerId),
     getSalesGoalsRankingAction(partnerId),
     getSalesGoalsSummaryAction(partnerId),

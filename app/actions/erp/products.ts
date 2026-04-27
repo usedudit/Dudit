@@ -66,8 +66,7 @@ const fetchProductAndVerifyOwnership = async (productId: string, requiredAction?
     if (requiredAction) {
         await requirePartnerAccessWithPermission(product.partner_id, "products", requiredAction, user)
     } else {
-        const { requirePartnerAccess } = await import("@/lib/auth/authorization")
-        await requirePartnerAccess(product.partner_id, user)
+        await requirePartnerAccessWithPermission(product.partner_id, "products", "view", user)
     }
 
     return product
@@ -95,8 +94,7 @@ const verifyBatchOwnership = async (productIds: string[], resolvedUser?: any) =>
     const partnerId = data[0]?.partner_id
     if (!partnerId || data.some((p: any) => p.partner_id !== partnerId)) throw new Error("Produtos de parceiros diferentes")
 
-    const { requirePartnerAccess } = await import("@/lib/auth/authorization")
-    await requirePartnerAccess(partnerId, user)
+    await requirePartnerAccessWithPermission(partnerId, "products", "view", user)
 
     return { sanitized, partnerId, user }
 }

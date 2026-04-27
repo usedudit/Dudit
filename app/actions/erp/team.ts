@@ -34,7 +34,7 @@ export async function getTeamMembers(): Promise<{ members: TeamMember[]; current
         // SECURITY: Verify the user actually has access to this partner.
         // getCurrentPartnerContext reads from a client-settable cookie,
         // so we must validate against partner_users to prevent enumeration.
-        await requirePartnerAccessWithPermission(context.partnerId, "customers", "view")
+        await requirePartnerAccessWithPermission(context.partnerId, "settings", "settings_team")
 
         const admin = getAdminClient()
         const partnerId = context.partnerId

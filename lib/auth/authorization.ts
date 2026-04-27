@@ -4,8 +4,8 @@ import { redirect } from "next/navigation"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import type { User } from "@supabase/supabase-js"
-import type { PartnerPermissions, PartnerRole, ResourcePermissions } from "@/lib/permissions/types"
-import { canAccessRoute, hasSpecificPermission, normalizeToRoutePermissions, routeToLegacyPermissions } from "@/lib/permissions/route-permissions"
+import type { PartnerPermissions, PartnerRole, ResourcePermissions, RouteKey } from "@/lib/permissions/types"
+import { canAccessRoute, canPerformAction, hasSpecificPermission, normalizeToRoutePermissions } from "@/lib/permissions/route-permissions"
 
 // ─── Auth Errors ────────────────────────────────────────────────────────────
 
@@ -467,7 +467,7 @@ export const getCurrentPartnerAccess = cache(async (): Promise<{
 export async function requirePartnerAccessWithPermission(
   partnerId: string,
   resource?: keyof PartnerPermissions,
-  action?: keyof ResourcePermissions,
+  action?: string,
   resolvedUser?: User | any
 ): Promise<{
   partnerId: string
@@ -483,13 +483,13 @@ export async function requirePartnerAccessWithPermission(
   }
 
   const permissions = access.permissions as PartnerPermissions
+  const role = String(access.role) as PartnerRole
 
-  // Check granular permission if resource and action are specified
-  // OWNERs always have full permissions (handled by checkPartnerAccess fallback)
+  // Check granular permission if resource and action are specified.
+  // IMPORTANT: always normalize DB JSON and evaluate server-side route/action guards.
   if (resource && action) {
-    const normalizedRoute = normalizeToRoutePermissions(String(access.role) as PartnerRole, permissions)
-    const legacyAdapter = routeToLegacyPermissions(normalizedRoute) as any
-    if (!legacyAdapter?.[resource]?.[action]) {
+    const normalizedRoute = normalizeToRoutePermissions(role, permissions)
+    if (!hasPermissionForResourceAction(normalizedRoute, resource, action)) {
       throw new ForbiddenError("Sem permissão para esta ação")
     }
   }
@@ -545,7 +545,7 @@ export const hasBusinessCapability = cache(async (
 export async function checkPartnerPermission(
   partnerId: string,
   resource: keyof PartnerPermissions,
-  action: keyof ResourcePermissions
+  action: string
 ): Promise<{ allowed: boolean }> {
   try {
     const user = await getCurrentUser()
@@ -554,11 +554,140 @@ export async function checkPartnerPermission(
     const access = await checkPartnerAccess(partnerId, user.id)
     if (!access) return { allowed: false }
 
-    const permissions = access.permissions as PartnerPermissions
-    return { allowed: !!(permissions as any)?.[resource]?.[action] }
+    const role = String(access.role) as PartnerRole
+    const routePermissions = normalizeToRoutePermissions(role, access.permissions)
+    return { allowed: hasPermissionForResourceAction(routePermissions, resource, action) }
   } catch {
     return { allowed: false }
   }
+}
+
+function hasPermissionForResourceAction(
+  routePermissions: ReturnType<typeof normalizeToRoutePermissions>,
+  resource: keyof PartnerPermissions,
+  action: string,
+): boolean {
+  const checks = RESOURCE_ACTION_ROUTE_CHECKS[resource]
+  if (!checks) return false
+  const checker = checks[action]
+  if (!checker) return false
+  return checker(routePermissions)
+}
+
+type RoutePermissionSet = ReturnType<typeof normalizeToRoutePermissions>
+
+const canRouteAccess = (routeKey: RouteKey) => (perms: RoutePermissionSet) => canAccessRoute(perms, routeKey)
+const canRouteAction = (routeKey: RouteKey, action: "create" | "edit" | "delete") => (perms: RoutePermissionSet) => canPerformAction(perms, routeKey, action)
+const canRouteSpecific = (routeKey: RouteKey, specificPermission: string) => (perms: RoutePermissionSet) => hasSpecificPermission(perms, routeKey, specificPermission)
+
+const RESOURCE_ACTION_ROUTE_CHECKS: Partial<
+  Record<keyof PartnerPermissions, Record<string, (perms: RoutePermissionSet) => boolean>>
+> = {
+  orders: {
+    view: canRouteAccess("orders"),
+    create: canRouteAction("orders", "create"),
+    edit: canRouteAction("orders", "edit"),
+    delete: canRouteAction("orders", "delete"),
+    cancel: canRouteSpecific("orders", "can_cancel_order"),
+    can_apply_discount: canRouteSpecific("pos", "can_discount"),
+    can_add_delivery: canRouteSpecific("orders", "can_assign_delivery"),
+  },
+  appointments: {
+    view: canRouteAccess("appointments"),
+    create: canRouteAction("appointments", "create"),
+    edit: canRouteAction("appointments", "edit"),
+    delete: canRouteAction("appointments", "delete"),
+  },
+  customers: {
+    view: canRouteAccess("customers"),
+    create: canRouteAction("customers", "create"),
+    edit: canRouteAction("customers", "edit"),
+    delete: canRouteAction("customers", "delete"),
+  },
+  products: {
+    view: canRouteAccess("products"),
+    create: canRouteAction("products", "create"),
+    edit: canRouteAction("products", "edit"),
+    delete: canRouteAction("products", "delete"),
+  },
+  suppliers: {
+    view: canRouteAccess("suppliers"),
+    create: canRouteAction("suppliers", "create"),
+    edit: canRouteAction("suppliers", "edit"),
+    delete: canRouteAction("suppliers", "delete"),
+  },
+  stock_movements: {
+    view: canRouteAccess("stock_movements"),
+    create: canRouteAction("stock_movements", "create"),
+    undo: canRouteAction("stock_movements", "delete"),
+  },
+  pdv: {
+    view: canRouteAccess("pos"),
+    sell: canRouteSpecific("pos", "can_sell"),
+    can_apply_discount: canRouteSpecific("pos", "can_discount"),
+    can_add_delivery: canRouteSpecific("pos", "can_add_delivery"),
+    open_pdv: canRouteSpecific("cash_register", "can_open_cash"),
+    close_pdv: canRouteSpecific("cash_register", "can_close_cash"),
+    sangria: canRouteSpecific("cash_register", "can_manage_cash"),
+    reforco: canRouteSpecific("cash_register", "can_manage_cash"),
+  },
+  services: {
+    view: canRouteAccess("services"),
+    create: canRouteAction("services", "create"),
+    edit: canRouteAction("services", "edit"),
+    delete: canRouteAction("services", "delete"),
+  },
+  quotes: {
+    view: canRouteAccess("quotes"),
+    create: canRouteAction("quotes", "create"),
+    edit: canRouteAction("quotes", "edit"),
+    delete: canRouteAction("quotes", "delete"),
+  },
+  financial: {
+    view: canRouteAccess("financial_transactions"),
+    create: canRouteAction("financial_transactions", "create"),
+    edit: canRouteAction("financial_transactions", "edit"),
+    delete: canRouteAction("financial_transactions", "delete"),
+    cancel: canRouteSpecific("financial_transactions", "can_cancel"),
+  },
+  categories: {
+    view: canRouteAccess("cadastros_produtos"),
+    create: canRouteAction("cadastros_produtos", "create"),
+    edit: canRouteAction("cadastros_produtos", "edit"),
+    delete: canRouteAction("cadastros_produtos", "delete"),
+  },
+  coupons: {
+    view: canRouteAccess("marketing_coupons"),
+    create: canRouteAction("marketing_coupons", "create"),
+    edit: canRouteAction("marketing_coupons", "edit"),
+    delete: canRouteAction("marketing_coupons", "delete"),
+  },
+  goals: {
+    view: canRouteAccess("goals"),
+    create: canRouteAction("goals", "create"),
+    edit: canRouteAction("goals", "edit"),
+    delete: canRouteAction("goals", "delete"),
+  },
+  delivery: {
+    view: canRouteAccess("logistics"),
+    create: canRouteAction("logistics", "create"),
+    edit: canRouteAction("logistics", "edit"),
+    update_status: canRouteSpecific("logistics", "can_update_delivery_status"),
+  },
+  settings: {
+    view: canRouteAccess("settings"),
+    settings_negocio: canRouteAccess("settings_business"),
+    settings_team: canRouteAccess("settings_team"),
+    settings_plan: canRouteAccess("settings_subscription"),
+    settings_payments: canRouteAccess("settings"),
+    settings_comissions: canRouteAccess("settings"),
+    settings_returns: canRouteAccess("returns"),
+    settings_vitrine: canRouteAccess("store_customize"),
+    settings_os: canRouteAccess("appointments"),
+    settings_messages: canRouteAccess("settings"),
+    settings_delivery: canRouteAccess("logistics"),
+    settings_integrations: canRouteAccess("settings_integrations"),
+  },
 }
 
 /**

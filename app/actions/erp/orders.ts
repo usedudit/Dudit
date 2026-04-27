@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { revalidateOrders } from "@/lib/utils/revalidation"
 import { formatDateTime } from "@/lib/utils/formatters"
 import { formatCurrency } from "@/lib/utils"
-import { requireUser, requirePartnerAccess } from "@/lib/auth/authorization"
+import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
@@ -1212,7 +1212,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     if (!user) return { error: "Não autenticado" }
 
     const partnerId = data.partnerId
-    await requirePartnerAccess(partnerId)
+    await requirePartnerAccessWithPermission(partnerId, "orders", "create")
 
     const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
     const csrfValidation = await requireCSRF(data.csrf_token)
@@ -1490,7 +1490,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
     const user = await requireUser()
     if (!user) return { error: "Não autenticado" }
 
-    await requirePartnerAccess(partnerId)
+    await requirePartnerAccessWithPermission(partnerId, "orders", "view")
     const supabase = createAdminClient()
 
     const { data, error } = await supabase
@@ -1657,7 +1657,7 @@ export async function getOrderHistoryAction(orderId: string, partnerId: string) 
     const user = await requireUser()
     if (!user) return { error: "Não autenticado" }
 
-    await requirePartnerAccess(partnerId)
+    await requirePartnerAccessWithPermission(partnerId, "orders", "view")
 
     const supabase = createAdminClient()
     const { data: saleRow } = await supabase
@@ -1678,7 +1678,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     const user = await requireUser()
     if (!user) return { error: "Não autenticado" }
 
-    await requirePartnerAccess(data.partnerId)
+    await requirePartnerAccessWithPermission(data.partnerId, "orders", "edit")
 
     const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
     const csrfValidation = await requireCSRF(data.csrf_token)
@@ -2026,7 +2026,7 @@ export async function deleteOrdersInBatchAction(orderIds: string[], partnerId: s
     const user = await requireUser()
     if (!user) return { error: "Não autenticado" }
 
-    await requirePartnerAccess(partnerId)
+    await requirePartnerAccessWithPermission(partnerId, "orders", "delete")
     const supabase = createAdminClient()
 
     await supabase.from("order_items").delete().in("order_id", orderIds)
@@ -2047,7 +2047,7 @@ export async function updateOrderNotesAction(input: {
     const user = await requireUser()
     if (!user) return { success: false as const, error: "NÃ£o autenticado" }
 
-    await requirePartnerAccess(input.partnerId)
+    await requirePartnerAccessWithPermission(input.partnerId, "orders", "edit")
     const supabase = createAdminClient()
 
     const { data: currentOrder, error: currentOrderError } = await supabase
@@ -2116,7 +2116,11 @@ export async function updateOrdersStatusInBatchAction(payload: {
         return { error: "Ação inválida para pedidos." }
     }
 
-    await requirePartnerAccess(payload.partnerId)
+    await requirePartnerAccessWithPermission(
+        payload.partnerId,
+        "orders",
+        payload.actionType === "cancel" ? "cancel" : "edit"
+    )
     const supabase = createAdminClient()
 
     const { data: currentOrders } = await supabase
@@ -2636,7 +2640,7 @@ export async function getERPOrdersPageAction(
     try {
         const user = await requireUser()
         if (!user) return { success: false, error: "Não autenticado" }
-        await requirePartnerAccess(partnerId)
+        await requirePartnerAccessWithPermission(partnerId, "orders", "view")
 
         const supabase = createAdminClient()
         const cursor = options?.cursor ?? null

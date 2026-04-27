@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccess, requireUser } from "@/lib/auth/authorization"
+import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
 import { calculateCommission, partnerRoleToCommissionRole, type CommissionRole, type CommissionType } from "@/lib/services/commission.service"
 
 export type CommissionSettingsRow = {
@@ -27,7 +27,7 @@ function canManageCommissions(role: string | null | undefined) {
 
 export async function listEmployeeCommissionsAction(partnerId: string) {
   await requireUser()
-  const access = await requirePartnerAccess(partnerId)
+  const access = await requirePartnerAccessWithPermission(partnerId, "settings", "settings_comissions")
   if (!canManageCommissions(access.role)) {
     return { success: false as const, error: "Acesso restrito para este módulo." }
   }
@@ -104,7 +104,7 @@ export async function upsertEmployeeCommissionAction(input: {
   metadata?: Record<string, unknown>
 }) {
   await requireUser()
-  const access = await requirePartnerAccess(input.partnerId)
+  const access = await requirePartnerAccessWithPermission(input.partnerId, "settings", "settings_comissions")
   if (!canManageCommissions(access.role)) {
     return { success: false as const, error: "Acesso restrito para este módulo." }
   }
@@ -137,7 +137,7 @@ export async function calculateCommissionAction(input: {
   deliveryFee?: number
 }) {
   await requireUser()
-  const access = await requirePartnerAccess(input.partnerId)
+  const access = await requirePartnerAccessWithPermission(input.partnerId, "settings", "settings_comissions")
   if (!canManageCommissions(access.role)) {
     return { success: false as const, error: "Acesso restrito para este módulo." }
   }

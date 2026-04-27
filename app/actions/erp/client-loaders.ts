@@ -62,6 +62,8 @@ export async function fetchPartnerProductsBucket() {
   const context = await getCurrentPartnerContext()
   if (!context) throw new Error("No context")
   const partnerId = context.partnerId
+  const { allowed } = await checkPartnerPermission(partnerId, "products", "view")
+  if (!allowed) throw new Error("Forbidden")
 
   const { getAdminClient } = await import("@/lib/supabase/admin")
   const supabase = getAdminClient()
@@ -119,7 +121,7 @@ export async function fetchPartnerCouponsBucket(): Promise<Array<{
   if (!context) throw new Error("No context")
   const partnerId = context.partnerId
 
-  const { allowed } = await checkPartnerPermission(partnerId, "orders", "view")
+  const { allowed } = await checkPartnerPermission(partnerId, "coupons", "view")
   if (!allowed) throw new Error("Forbidden")
 
   const { getAdminClient } = await import("@/lib/supabase/admin")
