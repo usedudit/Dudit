@@ -8,7 +8,7 @@ import DefaultModal from "@/components/reusable/DefaultModal"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { getTeamMembers, removeTeamMember, updateTeamMemberRole } from "@/app/actions/erp/team"
 import type { TeamMember } from "@/app/actions/erp/team"
-import { ROLE_LABELS, ROLE_DESCRIPTIONS, getAllowedInviteRoles } from "@/lib/permissions/partner-roles"
+import { ROLE_LABELS, ROLE_DESCRIPTIONS, getAllowedInviteRoles, canModifyUser } from "@/lib/permissions/partner-roles"
 import type { PartnerRole } from "@/lib/permissions/types"
 import { FadeIn } from "@/components/animations/FadeIn"
 
@@ -22,7 +22,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
     }, [])
 
     const [inviteEmail, setInviteEmail] = useState("")
-    const [inviteRole, setInviteRole] = useState<string>("VIEWER")
+    const [inviteRole, setInviteRole] = useState<string>("OPERATOR")
     const [isCreating, setIsCreating] = useState(false)
     const [inviteUrl, setInviteUrl] = useState<string | null>(null)
     const [inviteError, setInviteError] = useState<string | null>(null)
@@ -220,9 +220,11 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                                                         </button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
-                                                        {currentUserRole === "OWNER" && member.userId !== currentUserId && (
+                                                        {currentUserRole && member.userId !== currentUserId && (
                                                             <>
-                                                                {(Object.keys(ROLE_LABELS) as PartnerRole[]).map((role) => (
+                                                                {getAllowedInviteRoles(currentUserRole)
+                                                                    .filter((role) => canModifyUser(currentUserRole, member.role as PartnerRole))
+                                                                    .map((role) => (
                                                                     <DropdownMenuItem
                                                                         key={role}
                                                                         onClick={() => handleUpdateRole(member.userId, role)}

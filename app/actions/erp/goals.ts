@@ -40,7 +40,7 @@ async function resolveSellerNameMap(partnerId: string) {
   const sellerIds = Array.from(
     new Set(
       (partnerUsers || [])
-        .filter((row: any) => String(row.role || "").toUpperCase() !== "DELIVERY" && String(row.role || "").toUpperCase() !== "VIEWER")
+        .filter((row: any) => String(row.role || "").toUpperCase() !== "DELIVERY")
         .map((row: any) => row.user_id),
     ),
   )

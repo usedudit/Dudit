@@ -1,6 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { PaymentMethodSchema } from "@/lib/validation/schemas"
 import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
@@ -118,7 +119,8 @@ function sanitizeInstallmentFees(input: InstallmentFeeInput[] | undefined, maxIn
 export async function getPaymentMethodsAction(partnerId: string) {
     await requirePartnerAccessWithPermission(partnerId, "financial", "view")
 
-    const supabase = await getSupabaseServerClient()
+    // Use admin client after authz check so invited ERP users can read methods.
+    const supabase = createAdminClient()
 
     const { data: methods, error } = await supabase
         .from("payment_methods")

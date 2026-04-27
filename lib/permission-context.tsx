@@ -78,7 +78,7 @@ export function usePermissions(): PermissionContextValue {
         // Previously this returned OWNER permissions, which silently granted
         // full admin access to any component outside the PermissionProvider.
         return {
-            role: "VIEWER" as PartnerRole,
+            role: "DELIVERY" as PartnerRole,
             routePermissions: null,
             partnerId: "",
             businessInfo: { sells: ["products"], channels: ["online"] },

@@ -2,6 +2,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { createAdminClient } from "@/lib/supabase/server"
 
 interface MetadataResponse {
   categories: any[]
@@ -17,7 +18,8 @@ export async function getProductMetadataAction(partnerId: string) {
   try {
     await requirePartnerAccessWithPermission(partnerId, "products", "view")
 
-    const supabase = await getSupabaseServerClient()
+    // Use admin client after authz check so invited ERP users bypass owner-only RLS.
+    const supabase = createAdminClient()
 
     const [categoriesRes, brandsRes, locationsRes] = await Promise.all([
       supabase.from("product_categories").select("id, name, parent_id, is_active, created_at").eq("partner_id", partnerId).order("name"),

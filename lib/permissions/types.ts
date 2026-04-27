@@ -1,6 +1,6 @@
 // ─── Route-Based Permission Types ───────────────────────────────────────────
 
-export type PartnerRole = "OWNER" | "ADMIN" | "MANAGER" | "OPERATOR" | "DELIVERY" | "VIEWER"
+export type PartnerRole = "OWNER" | "ADMIN" | "MANAGER" | "OPERATOR" | "DELIVERY"
 
 // Legacy CRUD permissions (kept for backward compat with existing server actions)
 export interface ResourcePermissions {

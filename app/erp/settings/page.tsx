@@ -3,28 +3,42 @@ import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { SettingsTabs } from "@/components/erp/settings/SettingsPage"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { requireUser } from "@/lib/auth/authorization"
-import { getPartnerByUserIdCached, getPartnerPaymentMethodsCached } from "@/lib/data/partner"
+import { getPartnerPaymentMethodsCached } from "@/lib/data/partner"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { ROLE_HIERARCHY } from "@/lib/permissions/partner-roles"
 import { AccessDenied } from "@/components/erp/access-denied"
-import type { PartnerRole } from "@/lib/permissions/types"
+import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { ROLE_HIERARCHY } from "@/lib/permissions/partner-roles"
 
 export default async function SettingsPage() {
-  // Auth + partner via cached functions (deduplicated with layout)
-  const user = await requireUser()
-  const partner = await getPartnerByUserIdCached(user.id)
+  await requireUser()
 
-  if (!partner) {
-    redirect("/auth/login?mode=partner")
+  // SECURITY: restricted to management roles
+  const context = await getCurrentPartnerContext()
+  if (!context) {
+    redirect("/select-erp")
+  }
+  if (ROLE_HIERARCHY[context.role] < ROLE_HIERARCHY.MANAGER) {
+    return <AccessDenied />
   }
 
-  // SECURITY: Only MANAGER+ can access settings
-  const context = await getCurrentPartnerContext()
-  if (context) {
-    const userRole = context.role as PartnerRole
-    if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.MANAGER) {
-      return <AccessDenied />
-    }
+  const supabase = await getSupabaseServerClient()
+  const { data: partner } = await supabase
+    .from("partners")
+    .select("*, addresses(*)")
+    .eq("id", context.partnerId)
+    .maybeSingle()
+
+  if (!partner) return <AccessDenied />
+
+  if (partner.addresses && partner.addresses.length > 0) {
+    const defaultAddress = partner.addresses.find((a: any) => a.is_default) || partner.addresses[0]
+    partner.zip_code = defaultAddress.zip_code
+    partner.street = defaultAddress.street
+    partner.number = defaultAddress.number
+    partner.complement = defaultAddress.complement
+    partner.neighborhood = defaultAddress.neighborhood
+    partner.city = defaultAddress.city
+    partner.state = defaultAddress.state
   }
 
   const paymentMethods = await getPartnerPaymentMethodsCached(partner.id)

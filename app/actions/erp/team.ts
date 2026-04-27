@@ -112,11 +112,11 @@ export async function getTeamMembers(): Promise<{ members: TeamMember[]; current
         }))
 
         // Sort: owner first, then by role hierarchy
-        const roleOrder: Record<string, number> = { OWNER: 0, ADMIN: 1, MANAGER: 2, OPERATOR: 3, DELIVERY: 4, VIEWER: 5 }
+        const roleOrder: Record<string, number> = { OWNER: 0, ADMIN: 1, MANAGER: 2, OPERATOR: 3, DELIVERY: 4 }
         members.sort((a, b) => {
             if (a.isOwner && !b.isOwner) return -1
             if (!a.isOwner && b.isOwner) return 1
-            return (roleOrder[a.role] ?? 5) - (roleOrder[b.role] ?? 5)
+            return (roleOrder[a.role] ?? 4) - (roleOrder[b.role] ?? 4)
         })
 
         return { members, currentUserRole: context.role, currentUserId: context.userId }

@@ -3,34 +3,31 @@ import type { PartnerRole, PartnerPermissions } from "./types"
 // ─── Role Hierarchy (higher number = more privilege) ────────────────────────
 
 export const ROLE_HIERARCHY: Record<PartnerRole, number> = {
-    OWNER: 6,
-    ADMIN: 5,
-    MANAGER: 4,
-    OPERATOR: 3,
-    DELIVERY: 2,
-    VIEWER: 1,
+    OWNER: 5,
+    ADMIN: 4,
+    MANAGER: 3,
+    OPERATOR: 2,
+    DELIVERY: 1,
 }
 
-export const ALL_ROLES: PartnerRole[] = ["OWNER", "ADMIN", "MANAGER", "OPERATOR", "DELIVERY", "VIEWER"]
+export const ALL_ROLES: PartnerRole[] = ["OWNER", "ADMIN", "MANAGER", "OPERATOR", "DELIVERY"]
 
 // ─── Role Display Labels (pt-BR) ───────────────────────────────────────────
 
 export const ROLE_LABELS: Record<PartnerRole, string> = {
     OWNER: "Proprietário",
     ADMIN: "Administrador",
-    MANAGER: "Gerente",
-    OPERATOR: "Atendente",
+    MANAGER: "Gestor",
+    OPERATOR: "Operador",
     DELIVERY: "Entregador",
-    VIEWER: "Visualizador",
 }
 
 export const ROLE_DESCRIPTIONS: Record<PartnerRole, string> = {
     OWNER: "Controle absoluto do sistema. Pode excluir loja, transferir propriedade e alterar assinatura.",
-    ADMIN: "Braço direito do proprietário. Acesso operacional completo, exceto ações societárias.",
-    MANAGER: "Gestão operacional diária. Gerencia equipe, pedidos, produtos e serviços.",
-    OPERATOR: "Operação cotidiana. Cria pedidos, atende clientes e gerencia agendamentos.",
-    DELIVERY: "Perfil logístico restrito. Atualiza status de entrega dos pedidos atribuídos.",
-    VIEWER: "Acesso somente leitura a módulos autorizados.",
+    ADMIN: "Acesso operacional completo, exceto plano/assinatura e integrações.",
+    MANAGER: "Controla operação. Pode gerir equipe abaixo do próprio cargo.",
+    OPERATOR: "Executa o dia a dia: pedidos, agenda e atendimento.",
+    DELIVERY: "Atualiza entregas e acompanha rotas/pedidos atribuídos.",
 }
 
 // ─── Permission Presets (Legacy CRUD) ───────────────────────────────────────
@@ -63,7 +60,7 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
         products: fullAccess,
         services: fullAccess,
         orders: fullAccess,
-        financial: viewOnly,
+        financial: editAccess,
         customers: fullAccess,
         suppliers: fullAccess,
         quotes: fullAccess,
@@ -80,20 +77,11 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
     DELIVERY: {
         products: noAccess,
         services: noAccess,
-        orders: editAccess,
-        financial: noAccess,
-        customers: noAccess,
-        suppliers: noAccess,
-        quotes: noAccess,
-    },
-    VIEWER: {
-        products: viewOnly,
-        services: viewOnly,
         orders: viewOnly,
         financial: noAccess,
         customers: viewOnly,
-        suppliers: viewOnly,
-        quotes: viewOnly,
+        suppliers: noAccess,
+        quotes: noAccess,
     },
 }
 
@@ -103,25 +91,28 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
  * Determines if a user with `inviterRole` can invite someone as `targetRole`.
  *
  * Rules:
- * - OWNER → can invite anyone
- * - ADMIN → can invite ADMIN, MANAGER, OPERATOR, DELIVERY, VIEWER (not OWNER)
- * - MANAGER → can invite OPERATOR, DELIVERY, VIEWER only
- * - OPERATOR / DELIVERY / VIEWER → cannot invite anyone
+ * - OWNER → can invite ADMIN, MANAGER, OPERATOR, DELIVERY
+ * - ADMIN → can invite ADMIN, MANAGER, OPERATOR, DELIVERY (not OWNER)
+ * - MANAGER → can invite OPERATOR, DELIVERY only
+ * - OPERATOR / DELIVERY → cannot invite anyone
  */
 export function canUserInviteRole(inviterRole: PartnerRole, targetRole: PartnerRole): boolean {
+    // OWNER is exclusive, never invite-able
+    if (targetRole === "OWNER") return false
+
     const inviterLevel = ROLE_HIERARCHY[inviterRole]
     const targetLevel = ROLE_HIERARCHY[targetRole]
 
     // Only OWNER, ADMIN, MANAGER can invite
     if (inviterLevel < ROLE_HIERARCHY.MANAGER) return false
 
-    // OWNER can invite anyone
+    // OWNER can invite anyone except OWNER
     if (inviterRole === "OWNER") return true
 
-    // ADMIN cannot invite OWNER
-    if (inviterRole === "ADMIN") return targetRole !== "OWNER"
+    // ADMIN can invite ADMIN/MANAGER/OPERATOR/DELIVERY
+    if (inviterRole === "ADMIN") return true
 
-    // MANAGER can only invite OPERATOR, DELIVERY, or VIEWER
+    // MANAGER can only invite OPERATOR or DELIVERY
     if (inviterRole === "MANAGER") return targetLevel < ROLE_HIERARCHY.MANAGER
 
     return false

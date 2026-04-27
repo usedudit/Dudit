@@ -233,14 +233,15 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
 
 const ADMIN_PERMISSIONS: PartnerRoutePermissions = {
     ...OWNER_PERMISSIONS,
-    // ADMIN cannot change subscription
+    // Admin: tudo operacional, exceto assinatura e integrações
     settings: full,
-    settings_subscription: viewOnly,
-    // ADMIN cannot manage integrations estratégicas (optional, can be overridden)
-    settings_integrations: withSpecific(full, { can_manage_integrations: true }),
+    settings_business: full,
+    settings_integrations: noAccess,
+    settings_team: withSpecific(full, { can_invite: true, can_remove_member: true, can_manage_team: true }),
+    settings_subscription: noAccess,
 }
 
-// ─── MANAGER: Gestão Operacional ────────────────────────────────────────────
+// ─── MANAGER (Gestor): Gestão Operacional ───────────────────────────────────
 
 const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     dashboard: full,
@@ -273,27 +274,27 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     cadastros_services: full,
     // Clientes
     customers: full,
-    // Financeiro - view only, no approve/delete
-    financial_transactions: withSpecific(viewOnly, { can_approve_payment: false, can_view_reports: true }),
+    // Financeiro - pode visualizar e gerenciar pagamentos
+    financial_transactions: withSpecific(full, { can_approve_payment: true, can_view_reports: true }),
     cash_register: withSpecific(full, { can_open_cash: true, can_close_cash: true }),
     financial_dashboard: viewOnly,
     financial_dre: withSpecific(viewOnly, { can_view_dre: true }),
-    cadastros_financeiro: viewOnly,
+    cadastros_financeiro: full,
     // Vitrine
     store_customize: withSpecific(crud, { can_customize_store: true }),
     store_reviews: withSpecific(viewOnly, { can_respond_reviews: true }),
     // Marketing
     marketing_coupons: full,
     cadastros_marketing: full,
-    // Config - limited team management, no integrations/subscription
+    // Configurações (limitado): pode visualizar; sem assinatura/integrações
     settings: viewOnly,
-    settings_business: withSpecific(viewOnly, { can_edit_business_data: true }),
+    settings_business: viewOnly,
     settings_integrations: noAccess,
-    settings_team: withSpecific(viewOnly, { can_invite: true, can_remove_member: false, can_manage_team: true }),
+    settings_team: withSpecific(viewOnly, { can_invite: true, can_remove_member: true, can_manage_team: true }),
     settings_subscription: noAccess,
 }
 
-// ─── OPERATOR: Atendente / Vendedor ─────────────────────────────────────────
+// ─── OPERATOR: Operador ─────────────────────────────────────────────────────
 
 const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     dashboard: viewOnly,
@@ -322,11 +323,11 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     }),
     services: viewOnly,
     cadastros_services: viewOnly,
-    // Clientes - view/create (for POS/orders)
+    // Clientes - CRUD sem exclusão
     customers: crud,
     // Financeiro - no access
     financial_transactions: noAccess,
-    cash_register: withSpecific(crud, { can_open_cash: true, can_close_cash: true }),
+    cash_register: withSpecific(viewOnly, { can_open_cash: false, can_close_cash: false }),
     financial_dashboard: noAccess,
     financial_dre: noAccess,
     cadastros_financeiro: noAccess,
@@ -394,43 +395,6 @@ const DELIVERY_PERMISSIONS: PartnerRoutePermissions = {
     settings_subscription: noAccess,
 }
 
-// ─── VIEWER: Somente Leitura ────────────────────────────────────────────────
-
-const VIEWER_PERMISSIONS: PartnerRoutePermissions = {
-    dashboard: viewOnly,
-    orders: viewOnly,
-    returns: viewOnly,
-    logistics: viewOnly,
-    invoices: viewOnly,
-    // PDV visível para qualquer perfil com acesso a pedidos (operação no caixa não exige papel de editor).
-    pos: viewOnly,
-    quotes: viewOnly,
-    goals: viewOnly,
-    products: viewOnly,
-    stock_movements: viewOnly,
-    import_notes: viewOnly,
-    suppliers: viewOnly,
-    cadastros_produtos: viewOnly,
-    appointments: viewOnly,
-    services: viewOnly,
-    cadastros_services: viewOnly,
-    customers: viewOnly,
-    financial_transactions: noAccess,
-    cash_register: noAccess,
-    financial_dashboard: noAccess,
-    financial_dre: noAccess,
-    cadastros_financeiro: noAccess,
-    store_customize: noAccess,
-    store_reviews: noAccess,
-    marketing_coupons: noAccess,
-    cadastros_marketing: noAccess,
-    settings: noAccess,
-    settings_business: noAccess,
-    settings_integrations: noAccess,
-    settings_team: noAccess,
-    settings_subscription: noAccess,
-}
-
 // ─── Combined Presets ───────────────────────────────────────────────────────
 
 export const ROUTE_PERMISSION_PRESETS: Record<PartnerRole, PartnerRoutePermissions> = {
@@ -439,7 +403,6 @@ export const ROUTE_PERMISSION_PRESETS: Record<PartnerRole, PartnerRoutePermissio
     MANAGER: MANAGER_PERMISSIONS,
     OPERATOR: OPERATOR_PERMISSIONS,
     DELIVERY: DELIVERY_PERMISSIONS,
-    VIEWER: VIEWER_PERMISSIONS,
 }
 
 // ─── Permission Check Helpers ───────────────────────────────────────────────

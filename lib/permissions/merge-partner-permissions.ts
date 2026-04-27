@@ -16,7 +16,16 @@ const RESOURCE_KEYS: (keyof PartnerPermissions)[] = [
  * Fixes invited users with null/empty permissions (which previously denied all ERP pages).
  */
 export function mergePartnerPermissions(role: PartnerRole, stored: unknown): PartnerPermissions {
-  const base = PERMISSION_PRESETS[role] ?? PERMISSION_PRESETS.VIEWER
+  const noAccess: ResourcePermissions = { view: false, create: false, edit: false, delete: false }
+  const base = PERMISSION_PRESETS[role] ?? {
+    products: noAccess,
+    services: noAccess,
+    orders: noAccess,
+    financial: noAccess,
+    customers: noAccess,
+    suppliers: noAccess,
+    quotes: noAccess,
+  }
   if (!stored || typeof stored !== "object") return base
 
   const s = stored as Record<string, Partial<ResourcePermissions>>

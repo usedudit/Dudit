@@ -63,10 +63,9 @@ export async function listEmployeeCommissionsAction(partnerId: string) {
   const roleLabelMap: Record<string, string> = {
     OWNER: "Owner",
     ADMIN: "Admin",
-    MANAGER: "Gerente",
-    OPERATOR: "Vendedor",
+    MANAGER: "Gestor",
+    OPERATOR: "Operador",
     DELIVERY: "Entrega",
-    VIEWER: "Visualizador",
   }
 
   const items: CommissionSettingsRow[] = partnerUsers.map((row: any) => {

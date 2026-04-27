@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { createAdminClient } from "@/lib/supabase/server"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { createManualTransactionAction } from "@/app/actions/erp/transactions"
@@ -79,7 +80,8 @@ export async function getFinanceAccountsAction(partnerId: string) {
   try {
     await requirePartnerAccessWithPermission(partnerId, "financial", "view")
 
-    const supabase = await getSupabaseServerClient()
+    // Use admin client after authz check so invited ERP users can read accounts.
+    const supabase = createAdminClient()
     const { data, error } = await supabase
       .from("finance_accounts")
       .select(

@@ -459,7 +459,7 @@ export async function listPartnerInvitations(partnerId: string): Promise<{
             return { success: false, error: "Acesso negado." }
         }
 
-        // SECURITY: Only MANAGER+ can list invitations (prevent VIEWER/OPERATOR from seeing emails)
+        // SECURITY: Only MANAGER+ can list invitations.
         const memberRole = membership.role as PartnerRole
         if (ROLE_HIERARCHY[memberRole] < ROLE_HIERARCHY.MANAGER) {
             return { success: false, error: "Sem permissão para visualizar convites." }

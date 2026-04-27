@@ -405,7 +405,8 @@ function inputPaymentMethodLabel(paymentMethod?: string | null) {
 export async function getPOSInitialDataAction(partnerId: string) {
     await requireUser()
     await requirePartnerAccess(partnerId)
-    const supabase = await getSupabaseServerClient()
+    // Read with admin client after authz so invited users can load POS datasets.
+    const supabase = createAdminClient()
 
     const [productsRes, customersRes, accountsRes, draftsRes, paymentMethodsRes] = await Promise.all([
         supabase

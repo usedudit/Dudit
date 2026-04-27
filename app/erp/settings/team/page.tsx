@@ -12,7 +12,6 @@ const ROLE_COLORS: Record<PartnerRole, string> = {
     MANAGER: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
     OPERATOR: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
     DELIVERY: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400",
-    VIEWER: "bg-gray-100 text-gray-800 dark:bg-gray-700/30 dark:text-gray-400",
 }
 
 export default async function TeamPage() {
@@ -64,11 +63,11 @@ async function TeamList() {
                 </div>
                 <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">{members.filter(m => m.role === "MANAGER").length}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Gerentes</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Gestores</p>
                 </div>
                 <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{members.filter(m => m.role === "OPERATOR" || m.role === "DELIVERY" || m.role === "VIEWER").length}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Atendentes / Entregadores / Visualizadores</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{members.filter(m => m.role === "OPERATOR" || m.role === "DELIVERY").length}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Operadores / Entregadores</p>
                 </div>
             </div>
 

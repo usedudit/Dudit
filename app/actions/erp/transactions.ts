@@ -2,6 +2,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { createAdminClient } from "@/lib/supabase/server"
 import type { ERPTransaction, FinancialTransactionCursor, FinancialTransactionsPageSuccess } from "@/lib/services/transactions.types"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -312,7 +313,8 @@ export async function getFinancialTransactionsAction(
     try {
         const authStart = performance.now()
         await requirePartnerAccessWithPermission(partnerId, "financial", "view")
-        const supabase = await getSupabaseServerClient()
+        // Use admin client after authz check so invited ERP users can read transactions.
+        const supabase = createAdminClient()
 
         const cursor = options?.cursor ?? null
         const fetchLimit = FINANCIAL_TX_PAGE_SIZE + 1

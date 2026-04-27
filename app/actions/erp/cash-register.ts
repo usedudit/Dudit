@@ -2,6 +2,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePartnerAccess, requireUser } from "@/lib/auth/authorization"
+import { createAdminClient } from "@/lib/supabase/server"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { logAuditEvent } from "@/lib/services/timeline.service"
@@ -455,7 +456,8 @@ async function reverseCashMovementFallback(
 export async function getActiveCashSessionAction(partnerId: string) {
   const user = await requireUser()
   await requirePartnerAccess(partnerId)
-  const supabase = await getSupabaseServerClient()
+  // Read with admin client after authz so invited users can load session data.
+  const supabase = createAdminClient()
   const session = await getOpenSessionForUser(supabase, partnerId, user.id)
   return { success: true as const, data: session || null }
 }
@@ -994,7 +996,8 @@ export async function getCashSessionsHistoryPageAction(
   options?: { cursor?: ERPCashSessionListCursor | null; limit?: number },
 ) {
   await requirePartnerAccess(partnerId)
-  const supabase = await getSupabaseServerClient()
+  // Read with admin client after authz so invited users can load history.
+  const supabase = createAdminClient()
 
   const cursor = options?.cursor ?? null
   const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_CASH_SESSIONS_PAGE_SIZE))))

@@ -2,6 +2,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { createAdminClient } from "@/lib/supabase/server"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 
@@ -13,7 +14,8 @@ export async function getFinancialCategoriesAction(partnerId: string) {
   try {
     await requirePartnerAccessWithPermission(partnerId, "financial", "view")
 
-    const supabase = await getSupabaseServerClient()
+    // Use admin client after authz check so invited ERP users can read data.
+    const supabase = createAdminClient()
     const { data, error } = await supabase
       .from("financial_categories")
       .select("id, name, parent_id, is_active, created_at, category_type")
