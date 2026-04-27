@@ -90,7 +90,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
 
     const [formData, setFormData] = useState({
         name: "",
-        payment_type: "cash",
+        payment_type: "pix",
         is_active: true,
         fee_percent: 0,
         fee_fixed: 0,
@@ -127,7 +127,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
         if (!editingMethod) {
             const initial = {
                 name: "",
-                payment_type: "cash",
+                payment_type: "pix",
                 is_active: true,
                 fee_percent: 0,
                 fee_fixed: 0,
@@ -154,7 +154,7 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
         getPaymentMethodDetailsAction(editingMethod.id)
             .then((res: any) => {
                 const full = res?.method || editingMethod
-                const resolvedType = full.type || full.payment_type || "cash"
+                const resolvedType = full.type || full.payment_type || "pix"
                 const maxInstallments = Number(full.max_installments || 1)
                 const data = {
                     name: full.name || "",
@@ -442,7 +442,6 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                                         }
                                     }}
                                     options={[
-                                        { value: "cash", label: "Dinheiro" },
                                         { value: "pix", label: "PIX" },
                                         { value: "credit_card", label: "Cartão de Crédito" },
                                         { value: "debit_card", label: "Cartão de Débito" },

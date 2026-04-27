@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { ChevronLeftIcon, EditIcon, ThreeDotsIcon } from "@/lib/icons"
-import { Button, Badge, ActionsDropdown, ThreeDotsLoader, Tabs, TabsContent, TabsList, TabsTrigger, CustomerCard } from "@/components/reusable"
+import { Button, Badge, ActionsDropdown, ThreeDotsLoader, Tabs, TabsContent, TabsList, TabsTrigger, CustomerCard, InfoCard } from "@/components/reusable"
 import { getTransactionDetailsAction, getTransactionHistoryAction, type TransactionDetailPayload } from "@/app/actions/erp/transactions"
 import { TransactionHistoryTab } from "./TransactionHistoryTab"
 import { TransactionContactCard } from "./TransactionContactCard"
+import { TransactionGoalCard } from "./TransactionGoalCard"
 import { useNotification } from "@/hooks/use-notification"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency } from "@/lib/utils"
@@ -121,6 +122,8 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                 : detail.transactionType === "refund"
                     ? ReturnIcon
                     : AdjustIcon
+
+    const isCancelled = String(detail.statusLabel || "").toLowerCase().includes("cancel")
 
     return (
         <FadeIn>
@@ -304,9 +307,9 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                     detail.items.map((item) => (
                                                         <ListItem
                                                             key={item.id}
-                                                            className="border-0 px-0 py-0 rounded-none bg-transparent hover:border-transparent hover:bg-transparent cursor-default"
+                                                            className="cursor-default"
                                                             icon={manualEntryIcon}
-                                                            title={item.title}
+                                                            title={item.sku || item.title}
                                                             right={
                                                                 <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading shrink-0">
                                                                     {formatCurrency(item.lineTotal)}
@@ -428,6 +431,24 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                         value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.paymentDateLine}</span>}
                                                     />
                                                 )}
+                                                {detail.goalBonusDetails && (
+                                                    <>
+                                                        <PaymentRow
+                                                            label="Meta"
+                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.goalBonusDetails.goalName}</span>}
+                                                        />
+                                                        <PaymentRow
+                                                            label="Pago para"
+                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.goalBonusDetails.paidToUserNames.join(", ") || "-"}</span>}
+                                                        />
+                                                        {detail.goalBonusDetails.achievedAt && (
+                                                            <PaymentRow
+                                                                label="Meta batida em"
+                                                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.goalBonusDetails.achievedAt}</span>}
+                                                            />
+                                                        )}
+                                                    </>
+                                                )}
                                                 {detail.notesLine && (
                                                     <PaymentRow
                                                         label="Observações"
@@ -448,7 +469,21 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                     </div>
 
                                     <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                        {detail.contactCard.isCustomer ? (
+                                        {isCancelled && (
+                                            <InfoCard
+                                                title="Transação cancelada"
+                                                message={detail.notesLine || "Esta transação foi cancelada."}
+                                                color="orange"
+                                            />
+                                        )}
+                                        {detail.goalBonusDetails ? (
+                                            <TransactionGoalCard
+                                                goalName={detail.goalBonusDetails.goalName}
+                                                paidTo={detail.goalBonusDetails.paidToUserNames}
+                                                achievedAt={detail.goalBonusDetails.achievedAt}
+                                                amount={detail.amount}
+                                            />
+                                        ) : detail.contactCard.isCustomer ? (
                                             <CustomerCard
                                                 customer={{
                                                     name: detail.contactCard.name,

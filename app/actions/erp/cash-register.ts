@@ -658,12 +658,24 @@ export async function reverseCashMovementAction(input: {
   movementId: string
 }) {
   const user = await requireUser()
-  await requirePartnerAccessWithPermission(input.partnerId, "pdv", input.type === "withdrawal" ? "sangria" : "reforco")
+  const supabase = createAdminClient()
+
+  // Fetch movement first to know the type for permission check
+  const { data: movementInfo, error: movementInfoError } = await supabase
+    .from("cash_movements")
+    .select("type")
+    .eq("id", input.movementId)
+    .eq("partner_id", input.partnerId)
+    .maybeSingle()
+
+  if (movementInfoError || !movementInfo) {
+    return { success: false as const, error: movementInfoError?.message || "Movimentação não encontrada." }
+  }
+
+  await requirePartnerAccessWithPermission(input.partnerId, "pdv", movementInfo.type === "withdrawal" ? "sangria" : "reforco")
 
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
-
-  const supabase = createAdminClient()
 
   const { data: rpcData, error: rpcError } = await supabase.rpc("erp_reverse_cash_manual_movement", {
     p_partner_id: input.partnerId,

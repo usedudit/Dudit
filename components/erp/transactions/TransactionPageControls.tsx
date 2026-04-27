@@ -11,10 +11,8 @@ import {
     GridIcon,
     ListIcon,
     PlusIcon,
-    ArrowUpDownIcon,
     ArrowDownIcon,
     ArrowUpIcon,
-    ClockIcon,
     MoneyIcon,
     RepeatIcon,
     InstallmentIcon,
@@ -146,8 +144,11 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
                         <TabsTrigger value="Transações" icon={ListIcon}>
                             Transações
                         </TabsTrigger>
-                        <TabsTrigger value="Previstos" icon={ClockIcon}>
-                            Previstos
+                        <TabsTrigger value="A pagar" icon={ArrowDownIcon}>
+                            A pagar
+                        </TabsTrigger>
+                        <TabsTrigger value="A receber" icon={ArrowUpIcon}>
+                            A receber
                         </TabsTrigger>
                     </TabsList>
                 </Tabs>

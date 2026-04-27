@@ -307,6 +307,9 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
     await requirePartnerAccessWithPermission(data.partnerId, "financial", "create")
 
     const canonicalType = toCanonicalPaymentType(data.paymentType)
+    if (canonicalType === "cash") {
+        return { error: "O tipo Dinheiro já é criado automaticamente e não pode ser cadastrado manualmente." }
+    }
     if (!data.defaultFinanceAccountId) {
         return { error: "Selecione a conta financeira padrão para este método." }
     }
@@ -553,7 +556,7 @@ export async function deletePaymentMethodAction(methodId: string) {
     const supabase = createAdminClient()
     const { data: method } = await supabase
         .from("payment_methods")
-        .select("partner_id")
+        .select("partner_id, name, type, payment_type")
         .eq("id", methodId)
         .single()
 
@@ -562,6 +565,12 @@ export async function deletePaymentMethodAction(methodId: string) {
     }
 
     await requirePartnerAccessWithPermission(method.partner_id, "financial", "delete")
+
+    const normalizedType = toCanonicalPaymentType(String(method.type || method.payment_type || ""))
+    const normalizedName = String(method.name || "").trim().toLowerCase()
+    if (normalizedType === "cash" || normalizedName === "dinheiro") {
+        return { error: "O método Dinheiro é padrão do sistema e não pode ser excluído." }
+    }
 
     const { error } = await supabase.from("payment_methods").delete().eq("id", methodId)
 

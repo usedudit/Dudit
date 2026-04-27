@@ -23,6 +23,7 @@ interface TransactionListItemProps {
     onOpenDetail?: (transaction: ERPTransaction) => void
     onEdit?: (transaction: ERPTransaction) => void
     onMarkAsPaid?: (transaction: ERPTransaction) => void
+    onCancelPending?: (transaction: ERPTransaction) => void
     onSettleInstallmentGroup?: (transaction: ERPTransaction) => void
 }
 
@@ -35,7 +36,7 @@ const getPaymentIcon = (paymentType: string) => {
 }
 
 const TransactionListItem = React.memo(
-    ({ transaction, columns, selected, onSelect, onOpenDetail, onEdit, onMarkAsPaid, onSettleInstallmentGroup }: TransactionListItemProps) => {
+    ({ transaction, columns, selected, onSelect, onOpenDetail, onEdit, onMarkAsPaid, onCancelPending, onSettleInstallmentGroup }: TransactionListItemProps) => {
         const renderCellContent = (colId: string) => {
             switch (colId) {
                 case "transaction":
@@ -129,12 +130,16 @@ const TransactionListItem = React.memo(
                                 onCancel={
                                     transaction.isInstallmentGroup
                                         ? (onSettleInstallmentGroup ? () => onSettleInstallmentGroup(transaction) : undefined)
-                                        : (transaction.isRecurringOccurrence && onMarkAsPaid ? () => onMarkAsPaid(transaction) : undefined)
+                                        : (transaction.isRecurringOccurrence && onMarkAsPaid
+                                            ? () => onMarkAsPaid(transaction)
+                                            : (String(transaction.rawStatus || "").toLowerCase() === "pending" && !transaction.installmentGroupId && onCancelPending
+                                                ? () => onCancelPending(transaction)
+                                                : undefined))
                                 }
                                 cancelLabel={
                                     transaction.isInstallmentGroup
                                         ? "Quitar tudo"
-                                        : (transaction.isRecurringOccurrence ? "Marcar como pago" : undefined)
+                                        : (transaction.isRecurringOccurrence ? "Marcar como pago" : (String(transaction.rawStatus || "").toLowerCase() === "pending" && !transaction.installmentGroupId ? "Cancelar" : undefined))
                                 }
                             />
                         </div>

@@ -1,11 +1,11 @@
 "use client"
 
 import React, { useMemo, useState } from "react"
-import { Button, FormDropdown, Input, Pagination, Badge, IconPlaceholder } from "@/components/reusable"
+import { useRouter } from "next/navigation"
+import { Button, Input, Pagination, Badge, IconPlaceholder } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
-import DefaultModal from "@/components/reusable/DefaultModal"
 import GoalsPageControls from "./GoalsPageControls"
-import { deleteSalesGoalAction, getSalesGoalsModuleAction, getSalesGoalsRankingAction, getSalesGoalsSummaryAction, upsertSalesGoalAction } from "@/app/actions/erp/goals"
+import { deleteSalesGoalAction, getSalesGoalsModuleAction, getSalesGoalsRankingAction, getSalesGoalsSummaryAction } from "@/app/actions/erp/goals"
 import { formatCurrency } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 
@@ -24,6 +24,7 @@ type GoalRow = {
   user_id: string | null
   goal_type: "sales" | "service_orders" | "both"
   scope_user_name?: string | null
+  assigned_user_names?: string[]
   current_amount: number
   progress_percent: number
   status: "Em andamento" | "Concluída" | "Expirada"
@@ -54,6 +55,7 @@ export default function GoalsPage(props: {
   initialRanking: RankingRow[]
   initialSummary: Summary
 }) {
+  const router = useRouter()
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<Tab>("Metas")
   const [search, setSearch] = useState("")
@@ -65,22 +67,7 @@ export default function GoalsPage(props: {
   const [rankingStartDate, setRankingStartDate] = useState("")
   const [rankingEndDate, setRankingEndDate] = useState("")
   const [page, setPage] = useState(1)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editingGoal, setEditingGoal] = useState<GoalRow | null>(null)
-  const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [form, setForm] = useState({
-    name: "",
-    periodType: "monthly" as "monthly" | "weekly",
-    startDate: "",
-    endDate: "",
-    targetAmount: "0",
-    bonusType: "fixed" as "fixed" | "percentage",
-    bonusValue: "0",
-    appliesTo: "all" as "all" | "user",
-    userId: "",
-    goalType: "sales" as "sales" | "service_orders" | "both",
-  })
 
   async function refreshData() {
     const [goalsRes, rankingRes, summaryRes] = await Promise.all([
@@ -121,70 +108,6 @@ export default function GoalsPage(props: {
   const totalPages = Math.max(1, Math.ceil(filteredGoals.length / PAGE_SIZE))
   const paginatedGoals = filteredGoals.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  const openCreate = () => {
-    setEditingGoal(null)
-    setForm({
-      name: "",
-      periodType: "monthly",
-      startDate: "",
-      endDate: "",
-      targetAmount: "0",
-      bonusType: "fixed",
-      bonusValue: "0",
-      appliesTo: "all",
-      userId: "",
-      goalType: "sales",
-    })
-    setModalOpen(true)
-  }
-
-  const openEdit = (goal: GoalRow) => {
-    setEditingGoal(goal)
-    setForm({
-      name: goal.name,
-      periodType: goal.period_type,
-      startDate: goal.start_date,
-      endDate: goal.end_date,
-      targetAmount: String(goal.target_amount || 0),
-      bonusType: goal.bonus_type,
-      bonusValue: String(goal.bonus_value || 0),
-      appliesTo: goal.applies_to,
-      userId: goal.user_id || "",
-      goalType: goal.goal_type || "sales",
-    })
-    setModalOpen(true)
-  }
-
-  const saveGoal = async () => {
-    if (!form.name.trim()) return toast({ title: "Erro", description: "Informe o nome da meta.", variant: "destructive" })
-    if (Number(form.targetAmount) <= 0) return toast({ title: "Erro", description: "O valor da meta deve ser maior que zero.", variant: "destructive" })
-    if (!form.startDate || !form.endDate) return toast({ title: "Erro", description: "Informe as datas de início e fim.", variant: "destructive" })
-
-    setSaving(true)
-    const res = await upsertSalesGoalAction({
-      id: editingGoal?.id,
-      partnerId: props.partnerId,
-      name: form.name,
-      periodType: form.periodType,
-      startDate: form.startDate,
-      endDate: form.endDate,
-      targetAmount: Number(form.targetAmount || 0),
-      bonusType: form.bonusType,
-      bonusValue: Number(form.bonusValue || 0),
-      appliesTo: form.appliesTo,
-      userId: form.appliesTo === "user" ? form.userId || null : null,
-      goalType: form.goalType,
-    })
-    setSaving(false)
-    if (!res.success) {
-      toast({ title: "Erro", description: res.error, variant: "destructive" })
-      return
-    }
-    setModalOpen(false)
-    await refreshData()
-    toast({ title: "Sucesso", description: editingGoal ? "Meta atualizada." : "Meta criada." })
-  }
-
   const removeGoal = async (id: string) => {
     setDeletingId(id)
     const res = await deleteSalesGoalAction(props.partnerId, id)
@@ -214,7 +137,7 @@ export default function GoalsPage(props: {
           onTabChange={setActiveTab}
           search={search}
           onSearchChange={setSearch}
-          onCreate={openCreate}
+          onCreate={() => router.push("/erp/goals/new")}
           rankingPeriodMode={rankingPeriodMode}
           onRankingPeriodModeChange={setRankingPeriodMode}
           rankingStartDate={rankingStartDate}
@@ -236,7 +159,7 @@ export default function GoalsPage(props: {
                     imageAlt="Sem metas"
                     title="Nenhuma meta encontrada"
                     subtitle="Crie metas para acompanhar e premiar desempenho da equipe."
-                    itemButton={{ text: "Nova meta", action: openCreate }}
+                    itemButton={{ text: "Nova meta", action: () => router.push("/erp/goals/new") }}
                   />
                 </div>
               ) : (
@@ -252,6 +175,11 @@ export default function GoalsPage(props: {
                           <p className="text-xs text-brand-inactive-text mt-1">
                             Tipo: {goal.goal_type === "sales" ? "Vendas" : goal.goal_type === "service_orders" ? "Ordem de Serviço" : "Ambos"}
                           </p>
+                          {goal.assigned_user_names && goal.assigned_user_names.length > 0 && (
+                            <p className="text-xs text-brand-inactive-text mt-1">
+                              Vendedores: {goal.assigned_user_names.join(", ")}
+                            </p>
+                          )}
                         </div>
                         <Badge variant={goal.status === "Concluída" ? "green" : goal.status === "Expirada" ? "red" : "orange"}>
                           {goal.status}
@@ -271,7 +199,8 @@ export default function GoalsPage(props: {
                       </div>
 
                       <div className="flex items-center gap-2 mt-6">
-                        <Button variant="outline" className="flex-1 rounded-xl h-10 text-xs" onClick={() => openEdit(goal)}>Editar</Button>
+                        <Button variant="outline" className="flex-1 rounded-xl h-10 text-xs" onClick={() => router.push(`/erp/goals/${goal.id}/edit`)}>Editar</Button>
+                        <Button variant="outline" className="flex-1 rounded-xl h-10 text-xs" onClick={() => router.push(`/erp/goals/${goal.id}/duplicate`)}>Duplicar</Button>
                         <Button variant="ghost" className="flex-1 rounded-xl h-10 text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" disabled={deletingId === goal.id} onClick={() => removeGoal(goal.id)}>
                           {deletingId === goal.id ? "..." : "Excluir"}
                         </Button>
@@ -344,72 +273,6 @@ export default function GoalsPage(props: {
         </div>
       </div>
 
-      <DefaultModal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title={editingGoal ? "Editar meta" : "Nova meta"}
-        footer={
-          <div className="flex justify-end gap-3 w-full">
-            <Button variant="outline" className="rounded-xl" onClick={() => setModalOpen(false)}>Cancelar</Button>
-            <Button className="rounded-xl px-8" onClick={saveGoal} disabled={saving}>{saving ? "Salvando..." : "Salvar meta"}</Button>
-          </div>
-        }
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="md:col-span-2">
-            <Input label="Nome da meta" placeholder="Ex: Meta de Vendas Abril" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
-          </div>
-          
-          <FormDropdown
-            label="Tipo de Meta"
-            value={form.goalType}
-            setValue={(value) => setForm((p) => ({ ...p, goalType: value as any }))}
-            options={[
-              { value: "sales", label: "Apenas Vendas" },
-              { value: "service_orders", label: "Apenas Ordens de Serviço" },
-              { value: "both", label: "Vendas e Ordens de Serviço" }
-            ]}
-          />
-          
-          <FormDropdown
-            label="Recorrência"
-            value={form.periodType}
-            setValue={(value) => setForm((p) => ({ ...p, periodType: value as any }))}
-            options={[{ value: "monthly", label: "Mensal" }, { value: "weekly", label: "Semanal" }]}
-          />
-          
-          <Input label="Início" type="date" value={form.startDate} onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))} />
-          <Input label="Fim" type="date" value={form.endDate} onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))} />
-          
-          <Input label="Valor Alvo (R$)" placeholder="0,00" value={form.targetAmount} onChange={(e) => setForm((p) => ({ ...p, targetAmount: e.target.value }))} />
-          
-          <div className="grid grid-cols-2 gap-2">
-            <FormDropdown
-              label="Tipo bônus"
-              value={form.bonusType}
-              setValue={(value) => setForm((p) => ({ ...p, bonusType: value as any }))}
-              options={[{ value: "fixed", label: "Fixo (R$)" }, { value: "percentage", label: "Percentual (%)" }]}
-            />
-            <Input label="Valor bônus" value={form.bonusValue} onChange={(e) => setForm((p) => ({ ...p, bonusValue: e.target.value }))} />
-          </div>
-
-          <FormDropdown
-            label="Abrangência"
-            value={form.appliesTo}
-            setValue={(value) => setForm((p) => ({ ...p, appliesTo: value as any }))}
-            options={[{ value: "all", label: "Todos os vendedores" }, { value: "user", label: "Vendedor específico" }]}
-          />
-          
-          {form.appliesTo === "user" ? (
-            <FormDropdown
-              label="Vendedor"
-              value={form.userId}
-              setValue={(value) => setForm((p) => ({ ...p, userId: value }))}
-              options={props.sellers.map((s) => ({ value: s.id, label: s.name }))}
-            />
-          ) : <div />}
-        </div>
-      </DefaultModal>
     </FadeIn>
   )
 }

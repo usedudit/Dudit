@@ -1,6 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { calculatePaymentAmounts } from "@/lib/payments/calculation"
-import { toCanonicalPaymentType, toLegacyPaymentType } from "@/lib/payments/payment-method"
 
 type PaymentBreakdownEntry = {
     method?: string
@@ -39,54 +37,6 @@ function normalizePaymentLabel(value?: string | null) {
     if (normalized === "cartao") return "Cartão"
     if (normalized === "dinheiro") return "Dinheiro"
     return String(value || "Desconhecido")
-}
-
-async function resolvePaymentMethodConfig(
-    supabase: SupabaseClient,
-    partnerId: string,
-    methodLabel: string,
-    paymentMethodId?: string | null,
-) {
-    let data: any = null
-    if (paymentMethodId) {
-        const byId = await supabase
-            .from("payment_methods")
-            .select("id, fee_percent, fee_fixed, fee_bearer")
-            .eq("partner_id", partnerId)
-            .eq("id", paymentMethodId)
-            .maybeSingle()
-        data = byId.data || null
-    }
-    if (!data) {
-        const normalized = normalizeMethod(methodLabel)
-        const canonical = toCanonicalPaymentType(normalized === "cartao" ? "credit_card" : normalized)
-        const legacy = toLegacyPaymentType(canonical)
-        const byLabel = await supabase
-            .from("payment_methods")
-            .select("id, fee_percent, fee_fixed, fee_bearer")
-            .eq("partner_id", partnerId)
-            .or(`type.eq.${canonical},payment_type.eq.${legacy},name.ilike.%${methodLabel}%`)
-            .limit(1)
-            .maybeSingle()
-        data = byLabel.data || null
-    }
-
-    if (!data) return null
-
-    const { data: installmentRows } = await supabase
-        .from("payment_method_installment_fees")
-        .select("installment_number, fee_percent")
-        .eq("payment_method_id", data.id)
-
-    return {
-        feePercent: Number(data.fee_percent || 0),
-        feeFixed: Number(data.fee_fixed || 0),
-        feeBearer: (data.fee_bearer || "merchant") as "merchant" | "customer",
-        installmentFees: (installmentRows || []).map((row) => ({
-            installmentNumber: Number(row.installment_number || 1),
-            feePercent: Number(row.fee_percent || 0),
-        })),
-    }
 }
 
 async function resolveTransactionContactId(
@@ -216,19 +166,9 @@ export async function createTransactionFromOrder(
                 continue
             }
 
-            const paymentConfig = await resolvePaymentMethodConfig(
-                supabase,
-                orderData.partner_id,
-                entry.method,
-                entry.paymentMethodId,
-            )
-            const calculated = paymentConfig
-                ? calculatePaymentAmounts({
-                    originalAmount: amount,
-                    paymentMethod: paymentConfig,
-                    installmentNumber: Math.max(1, Number(entry.installmentNumber || (entries.length > 1 ? (index + 1) : 1))),
-                })
-                : { finalAmount: amount, interestAmount: 0, feeAmount: 0 }
+            // `payment_breakdown` already carries the net charged amount calculated by checkout.
+            // Reapplying payment-method pricing here causes double discount/fee.
+            const calculated = { finalAmount: amount, interestAmount: 0, feeAmount: 0 }
             const transactionData = {
                 partner_id: orderData.partner_id,
                 description: orderData.order_number,

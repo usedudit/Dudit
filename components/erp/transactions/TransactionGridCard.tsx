@@ -15,6 +15,7 @@ interface TransactionGridCardProps {
     onOpenDetail?: (transaction: ERPTransaction) => void
     onEdit?: (transaction: ERPTransaction) => void
     onMarkAsPaid?: (transaction: ERPTransaction) => void
+    onCancelPending?: (transaction: ERPTransaction) => void
     onSettleInstallmentGroup?: (transaction: ERPTransaction) => void
 }
 
@@ -27,7 +28,7 @@ const getPaymentIcon = (paymentType: string) => {
 }
 
 const TransactionGridCard = React.memo(
-    ({ transaction, selected, onSelect, onOpenDetail, onEdit, onMarkAsPaid, onSettleInstallmentGroup }: TransactionGridCardProps) => {
+    ({ transaction, selected, onSelect, onOpenDetail, onEdit, onMarkAsPaid, onCancelPending, onSettleInstallmentGroup }: TransactionGridCardProps) => {
         const PaymentIcon = getPaymentIcon(transaction.paymentType)
         const isRecurring = !!transaction.recurringId || !!transaction.isRecurringOccurrence
 
@@ -122,12 +123,16 @@ const TransactionGridCard = React.memo(
                                 onCancel={
                                     transaction.isInstallmentGroup
                                         ? (onSettleInstallmentGroup ? () => onSettleInstallmentGroup(transaction) : undefined)
-                                        : (transaction.isRecurringOccurrence && onMarkAsPaid ? () => onMarkAsPaid(transaction) : undefined)
+                                        : (transaction.isRecurringOccurrence && onMarkAsPaid
+                                            ? () => onMarkAsPaid(transaction)
+                                            : (String(transaction.rawStatus || "").toLowerCase() === "pending" && !transaction.installmentGroupId && onCancelPending
+                                                ? () => onCancelPending(transaction)
+                                                : undefined))
                                 }
                                 cancelLabel={
                                     transaction.isInstallmentGroup
                                         ? "Quitar tudo"
-                                        : (transaction.isRecurringOccurrence ? "Marcar como pago" : undefined)
+                                        : (transaction.isRecurringOccurrence ? "Marcar como pago" : (String(transaction.rawStatus || "").toLowerCase() === "pending" && !transaction.installmentGroupId ? "Cancelar" : undefined))
                                 }
                             />
                         </div>

@@ -557,8 +557,10 @@ export async function registerPartner(data: any) {
 
     // 4. Cria métodos de pagamento padrão
     await supabaseAdmin.from("payment_methods").insert([
-      { partner_id: newPartner.id, name: "Dinheiro", payment_type: "dinheiro", is_active: true },
-      { partner_id: newPartner.id, name: "PIX", payment_type: "pix", is_active: true }
+      { partner_id: newPartner.id, name: "Dinheiro", payment_type: "dinheiro", type: "cash", is_active: true },
+      { partner_id: newPartner.id, name: "Pix", payment_type: "pix", type: "pix", is_active: true },
+      { partner_id: newPartner.id, name: "Cartão de Credito", payment_type: "credito", type: "credit_card", is_active: true },
+      { partner_id: newPartner.id, name: "Cartao de Debito", payment_type: "debito", type: "debit_card", is_active: true },
     ])
 
     // 5. Categorias financeiras padrão

@@ -17,7 +17,10 @@ type GoalInput = {
   bonusValue: number
   appliesTo: "all" | "user"
   userId?: string | null
+  assignedUserIds?: string[]
   goalType: "sales" | "service_orders" | "both"
+  autoLaunchBonus?: boolean
+  bonusAccountId?: string | null
 }
 
 type RankingPeriodFilter = {
@@ -102,6 +105,11 @@ export async function getSalesGoalsModuleAction(partnerId: string): Promise<{ su
         progress_percent: Math.round(percent),
         status,
         scope_user_name: goal.user_id ? sellerNameMap.get(String(goal.user_id)) || "Vendedor" : null,
+        assigned_user_names: Array.isArray(goal.assigned_user_ids)
+          ? goal.assigned_user_ids
+              .map((id: string) => sellerNameMap.get(String(id)))
+              .filter(Boolean)
+          : [],
       }
     })
 
@@ -127,7 +135,13 @@ export async function upsertSalesGoalAction(input: GoalInput) {
     bonus_value: money(Number(input.bonusValue || 0)),
     applies_to: input.appliesTo,
     user_id: input.appliesTo === "user" ? (input.userId || null) : null,
+    assigned_user_ids:
+      input.appliesTo === "user"
+        ? Array.from(new Set((input.assignedUserIds || []).filter(Boolean)))
+        : [],
     goal_type: input.goalType || "sales",
+    auto_launch_bonus: Boolean(input.autoLaunchBonus),
+    bonus_account_id: input.autoLaunchBonus ? input.bonusAccountId || null : null,
     updated_at: new Date().toISOString(),
   }
 
@@ -284,7 +298,13 @@ export async function getSalesGoalsSummaryAction(partnerId: string) {
   const [{ data: sales }, { data: commissions }, { data: bonusPaid }, { data: goals }, { data: progress }] = await Promise.all([
     supabase.from("sales").select("final_amount").eq("partner_id", partnerId).in("payment_status", ["paid", "partially_paid"]),
     supabase.from("transactions").select("amount").eq("partner_id", partnerId).eq("category", "Comissões").eq("transaction_type", "expense"),
-    supabase.from("transactions").select("amount, description").eq("partner_id", partnerId).eq("transaction_type", "expense").ilike("description", "%Bônus por meta atingida%"),
+    supabase
+      .from("transactions")
+      .select("amount, description")
+      .eq("partner_id", partnerId)
+      .eq("transaction_type", "expense")
+      .eq("category", "Metas e Bônus")
+      .ilike("description", "%Bônus por meta atingida%"),
     supabase.from("sales_goals").select("id, start_date, end_date").eq("partner_id", partnerId),
     supabase.from("sales_goal_progress").select("goal_id, achieved"),
   ])
@@ -305,4 +325,43 @@ export async function getSalesGoalsSummaryAction(partnerId: string) {
       achieved_goals: achievedGoalIds.size,
     },
   }
+}
+
+export async function getGoalFormOptionsAction(partnerId: string) {
+  await requireUser()
+  await requirePartnerAccessWithPermission(partnerId, "goals", "view")
+  const supabase = await getSupabaseServerClient()
+  const sellerMap = await resolveSellerNameMap(partnerId)
+  const { data: accounts } = await supabase
+    .from("finance_accounts")
+    .select("id, name, type")
+    .eq("partner_id", partnerId)
+    .order("name", { ascending: true })
+
+  return {
+    success: true as const,
+    sellers: Array.from(sellerMap.entries()).map(([id, name]) => ({ id, name })),
+    accounts: (accounts || []).map((a: any) => ({
+      id: String(a.id),
+      name: String(a.name || "Conta"),
+      type: String(a.type || "cash"),
+    })),
+  }
+}
+
+export async function getSalesGoalByIdAction(partnerId: string, goalId: string) {
+  await requireUser()
+  await requirePartnerAccessWithPermission(partnerId, "goals", "view")
+  const supabase = await getSupabaseServerClient()
+  const { data, error } = await supabase
+    .from("sales_goals")
+    .select("*")
+    .eq("partner_id", partnerId)
+    .eq("id", goalId)
+    .maybeSingle()
+
+  if (error || !data) {
+    return { success: false as const, error: error?.message || "Meta não encontrada." }
+  }
+  return { success: true as const, goal: data as any }
 }

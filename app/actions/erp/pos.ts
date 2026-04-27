@@ -241,7 +241,7 @@ async function syncPosSaleToOrders(params: {
             .eq("sale_id", params.saleId),
         admin
             .from("pre_sales")
-            .select("id, seller_id, shipping_fee, distance_km, delivery_breakdown, other_costs, coupon_id")
+            .select("id, seller_id, shipping_fee, distance_km, delivery_breakdown, other_costs, discount_amount, coupon_discount_amount, coupon_id")
             .eq("id", params.preSaleId)
             .maybeSingle(),
     ])
@@ -273,6 +273,16 @@ async function syncPosSaleToOrders(params: {
     const distanceKm = draft?.distance_km == null ? null : Number(draft.distance_km || 0)
     const deliveryBreakdown = (draft as any)?.delivery_breakdown || null
     const otherCosts = safeMoney(Number(draft?.other_costs || 0))
+    const subtotalValue = safeMoney((saleItems || []).reduce((acc: number, item: any) => {
+        const lineSubtotal = Number(item?.subtotal ?? Number(item?.quantity || 0) * Number(item?.unit_price || 0))
+        return acc + lineSubtotal
+    }, 0))
+    const manualDiscount = safeMoney(Number((draft as any)?.discount_amount ?? sale.discount_amount ?? 0))
+    const couponDiscount = safeMoney(Number((draft as any)?.coupon_discount_amount ?? 0))
+    const baseBeforePaymentMethod = safeMoney(Math.max(0, subtotalValue - manualDiscount - couponDiscount + shippingFee + otherCosts))
+    const finalTotal = safeMoney(Number(sale.final_amount || 0))
+    const paymentMethodDiscountAmount = safeMoney(Math.max(0, baseBeforePaymentMethod - finalTotal))
+    const paymentMethodExtraAmount = safeMoney(Math.max(0, finalTotal - baseBeforePaymentMethod))
     const deliveryType = shippingFee > 0 ? "delivery" : "pickup"
     const deliveryStatus = shippingFee > 0 ? "preparing" : "delivered"
     const paymentSituation = sale.payment_status === "paid"
@@ -319,9 +329,11 @@ async function syncPosSaleToOrders(params: {
         situation: paymentSituation,
         total_amount: safeMoney(Number(sale.final_amount || 0)),
         paid_amount: safeMoney(Number(sale.paid_amount || 0)),
-        discount_value: safeMoney(Number(sale.discount_amount || 0)),
+        discount_value: manualDiscount,
         discount_type: "fixed",
-        discount_amount: safeMoney(Number(sale.discount_amount || 0)),
+        discount_amount: couponDiscount,
+        payment_method_discount_amount: paymentMethodDiscountAmount,
+        payment_method_extra_amount: paymentMethodExtraAmount,
         coupon_id: draft?.coupon_id || null,
         shipping_cost: shippingFee,
         delivery_fee: shippingFee,
@@ -353,15 +365,24 @@ async function syncPosSaleToOrders(params: {
         .single()
 
     if (insertError) {
-        const missingPosFlagColumn = String(insertError.message || "").toLowerCase().includes("is_pos_sale")
-        if (!missingPosFlagColumn) {
+        const insertErrorMessage = String(insertError.message || "").toLowerCase()
+        const missingPosFlagColumn = insertErrorMessage.includes("is_pos_sale")
+        const missingPaymentDeltaColumns =
+            insertErrorMessage.includes("payment_method_discount_amount") ||
+            insertErrorMessage.includes("payment_method_extra_amount")
+        if (!missingPosFlagColumn && !missingPaymentDeltaColumns) {
             console.error("[syncPosSaleToOrders] orders insert failed:", insertError.message, insertError)
             return null
         }
 
+        const fallbackOrderPayload = { ...orderPayload }
+        if (missingPaymentDeltaColumns) {
+            delete (fallbackOrderPayload as any).payment_method_discount_amount
+            delete (fallbackOrderPayload as any).payment_method_extra_amount
+        }
         const { data: insertedWithoutPosFlag, error: insertError2 } = await admin
             .from("orders")
-            .insert(orderPayload)
+            .insert(fallbackOrderPayload)
             .select("id")
             .single()
         if (insertError2) {
@@ -707,11 +728,20 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             .eq("partner_id", input.partnerId)
     }
 
-    if (finalizedPreSale?.seller_id) {
+    const sellerPartnerUserId = finalizedPreSale?.seller_id ? String(finalizedPreSale.seller_id) : null
+    const { data: sellerPartnerUser } = sellerPartnerUserId
+        ? await supabase
+            .from("partner_users")
+            .select("user_id")
+            .eq("id", sellerPartnerUserId)
+            .eq("partner_id", input.partnerId)
+            .maybeSingle()
+        : { data: null as { user_id?: string | null } | null }
+    if (sellerPartnerUserId) {
         await createCommissionExpenseForEntity({
             supabase,
             partnerId: input.partnerId,
-            partnerUserId: String(finalizedPreSale.seller_id),
+            partnerUserId: sellerPartnerUserId,
             role: "seller",
             saleAmount: Number(paymentAware.totalAmount || 0),
             entityType: "sale",
@@ -719,19 +749,20 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             accountId: input.financeAccountId || null,
             createdByUserId: user.id,
         })
+    }
 
-        const { data: sellerPartnerUser } = await supabase
-            .from("partner_users")
-            .select("user_id")
-            .eq("id", String(finalizedPreSale.seller_id))
-            .eq("partner_id", input.partnerId)
-            .maybeSingle()
+    {
+        const goalSellerUserId = (() => {
+            if (!sellerPartnerUserId) return user.id
+            const match = sellerPartnerUser?.user_id
+            return match ? String(match) : user.id
+        })()
 
-        if (sellerPartnerUser?.user_id) {
+        if (goalSellerUserId) {
             await applySaleToGoals({
                 supabase,
                 partnerId: input.partnerId,
-                sellerUserId: String(sellerPartnerUser.user_id),
+                sellerUserId: goalSellerUserId,
                 saleAmount: Number(paymentAware.totalAmount || 0),
                 createdByUserId: user.id,
                 accountId: input.financeAccountId || null,

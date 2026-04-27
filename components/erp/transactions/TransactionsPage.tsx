@@ -39,6 +39,7 @@ import { getInstallmentGroupDetailsAction } from "@/app/actions/erp/transactions
 import { recordInstallmentPaymentAction } from "@/app/actions/erp/transactions"
 import { settleInstallmentGroupAction } from "@/app/actions/erp/transactions"
 import { getFinancialTransactionsAction } from "@/app/actions/erp/transactions"
+import { cancelPendingTransactionAction } from "@/app/actions/erp/transactions"
 import { getPaymentMethodsAction } from "@/app/actions/erp/payment-methods"
 import { useRouter } from "next/navigation"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
@@ -54,6 +55,7 @@ import {
     type DatePeriodFilterValue,
 } from "@/lib/utils/filter-date-period"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { ChevronLeftIcon } from "@/lib/icons"
 
 function ymdFromRaw(raw: string | null | undefined): string | null {
     if (!raw) return null
@@ -76,9 +78,9 @@ function formatTimeFromRaw(raw: string | null | undefined): string | null {
     return dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
 }
 
-/** Previstos: vencimento/ocorrência. Transações: pagamento efetivo, senão vencimento. */
+/** A pagar/A receber: vencimento/ocorrência. Transações: pagamento efetivo, senão vencimento. */
 function transactionFilterYmd(item: ERPTransaction, tab: TransactionTab): string | null {
-    if (tab === "Previstos") {
+    if (tab !== "Transações") {
         if (item.occurrenceDate) return item.occurrenceDate.slice(0, 10)
         return ymdFromRaw(item.dueDateRaw)
     }
@@ -185,6 +187,9 @@ export default function TransactionsPage({
     const [fallbackPaymentMethods, setFallbackPaymentMethods] = useState<any[]>([])
     const [confirmRecurringPayment, setConfirmRecurringPayment] = useState<ERPTransaction | null>(null)
     const [confirmSettleGroup, setConfirmSettleGroup] = useState<ERPTransaction | null>(null)
+    const [confirmCancelTransaction, setConfirmCancelTransaction] = useState<ERPTransaction | null>(null)
+    const [cancelReason, setCancelReason] = useState("")
+    const [cancellingTransaction, setCancellingTransaction] = useState(false)
     const [settlingGroup, setSettlingGroup] = useState(false)
     const observerTarget = useRef<HTMLDivElement>(null)
 
@@ -319,7 +324,7 @@ export default function TransactionsPage({
             {
                 id: "datePeriod",
                 title:
-                    activeTab === "Previstos"
+                    activeTab !== "Transações"
                         ? "Período (vencimento / ocorrência)"
                         : "Período (data de pagamento)",
                 type: "date-period",
@@ -341,7 +346,7 @@ export default function TransactionsPage({
         const { startYmd, endYmd } = resolveDatePeriodBounds(filters.datePeriod)
         const dateBoundsActive = startYmd !== null || endYmd !== null
 
-        // Convert recurring occurrences to ERPTransaction shape for Previstos tab
+        // Convert recurring occurrences to ERPTransaction shape for A pagar / A receber tabs
         const virtualItems: ERPTransaction[] = recurringOccurrences.map((occ) => {
             const dateObj = new Date(`${occ.occurrenceDate}T12:00:00`)
             const daysUntilDue = diffCalendarDaysInSaoPaulo(occ.occurrenceDate)
@@ -398,6 +403,10 @@ export default function TransactionsPage({
 
             const isPrevisto = item.isRecurringOccurrence || item.status === "Pendente" || item.isOverdue || item.status === "Atrasado" || (item.transactionType !== 'adjustment' && item.transactionType !== 'transfer' && !['recebido', 'pago', 'paid'].includes(item.status.toLowerCase()))
 
+            const matchesLedgerByTab =
+                activeTab === "A pagar" ? item.ledgerDirection === "out" :
+                    activeTab === "A receber" ? item.ledgerDirection === "in" :
+                        true
             const matchesTab = activeTab === "Transações" ? (!isPrevisto && !item.isRecurringOccurrence) : isPrevisto
 
             const matchesStatus = filters.status.length === 0 || filters.status.includes(item.status)
@@ -413,6 +422,7 @@ export default function TransactionsPage({
             return (
                 matchesSearch &&
                 matchesTab &&
+                matchesLedgerByTab &&
                 matchesStatus &&
                 matchesCategory &&
                 matchesPayment &&
@@ -558,14 +568,14 @@ export default function TransactionsPage({
                         bVal = b.contactName
                         break
                     case "date": {
-                        const at = activeTab === "Previstos"
+                        const at = activeTab !== "Transações"
                             ? a.occurrenceDate
                                 ? new Date(`${a.occurrenceDate}T12:00:00`).getTime()
                                 : a.dueDateRaw
                                     ? new Date(a.dueDateRaw).getTime()
                                     : new Date(a.dueDate).getTime()
                             : transactionSortTime(a)
-                        const bt = activeTab === "Previstos"
+                        const bt = activeTab !== "Transações"
                             ? b.occurrenceDate
                                 ? new Date(`${b.occurrenceDate}T12:00:00`).getTime()
                                 : b.dueDateRaw
@@ -594,8 +604,8 @@ export default function TransactionsPage({
                 const comparison = aVal < bVal ? -1 : 1
                 return sortConfig.direction === "asc" ? comparison : -comparison
             })
-        } else if (activeTab === "Previstos") {
-            // ALWAYS sort previstos by due_date ASC
+        } else if (activeTab !== "Transações") {
+            // ALWAYS sort A pagar/A receber by due_date ASC
             result = [...result].sort((a, b) => {
                 // Use occurrenceDate for virtual items, dueDateRaw for real transactions
                 const aDate = a.occurrenceDate || a.dueDateRaw || a.dueDate
@@ -710,6 +720,42 @@ export default function TransactionsPage({
         if (!transaction.isRecurringOccurrence) return
         setConfirmRecurringPayment(transaction)
     }, [])
+
+    const handleRequestCancelPending = useCallback((transaction: ERPTransaction) => {
+        const status = String(transaction.rawStatus || "").toLowerCase()
+        if (transaction.isInstallmentGroup || transaction.installmentGroupId) {
+            notifyError("Parcelas não podem ser canceladas por aqui.")
+            return
+        }
+        if (status !== "pending") {
+            notifyError("Apenas transações pendentes podem ser canceladas.")
+            return
+        }
+        setCancelReason("")
+        setConfirmCancelTransaction(transaction)
+    }, [notifyError])
+
+    const handleConfirmCancelPending = useCallback(async () => {
+        if (!confirmCancelTransaction || cancellingTransaction) return
+        setCancellingTransaction(true)
+        try {
+            const res = await cancelPendingTransactionAction({
+                transactionId: confirmCancelTransaction.id,
+                partnerId,
+                reason: cancelReason.trim() || null,
+            })
+            if (!res.success) {
+                notifyError(res.error || "Erro ao cancelar transação.")
+                return
+            }
+            notifySuccess("Transação cancelada com sucesso.")
+            setConfirmCancelTransaction(null)
+            setCancelReason("")
+            void refreshTransactionsNow()
+        } finally {
+            setCancellingTransaction(false)
+        }
+    }, [confirmCancelTransaction, cancellingTransaction, partnerId, cancelReason, notifyError, notifySuccess, refreshTransactionsNow])
 
     const handleConfirmRecurringMarkAsPaid = useCallback(async () => {
         const transaction = confirmRecurringPayment
@@ -947,6 +993,101 @@ export default function TransactionsPage({
         )
     }
 
+    if (openInstallmentGroupId) {
+        return (
+            <motion.div
+                key={`installment-group-${openInstallmentGroupId}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="w-full h-full min-h-[70vh] bg-white dark:bg-dark-background"
+            >
+                <div className="max-w-[1300px] mx-auto p-4 md:p-6 space-y-6">
+                    <div className="flex items-center gap-3">
+                        <Button
+                            variant="filled"
+                            onClick={() => {
+                                setOpenInstallmentGroupId(null)
+                                setInstallmentDetail(null)
+                            }}
+                            className="w-10 h-10 p-0 flex items-center justify-center"
+                        >
+                            <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                        </Button>
+                        <div>
+                            <h2 className="text-xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading">Detalhe do parcelado</h2>
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Resumo completo e lista de parcelas</p>
+                        </div>
+                    </div>
+
+                    {installmentDetailLoading ? (
+                        <p className="text-sm text-brand-inactive-text">Carregando parcelas...</p>
+                    ) : installmentDetail ? (
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                {(() => {
+                                    const total = Number(installmentDetail.group?.total_amount || 0)
+                                    const rows = installmentDetail.installments || []
+                                    const paid = rows.reduce((acc: number, row: any) => acc + Number(row.paidAmount || 0), 0)
+                                    const overdue = rows
+                                        .filter((row: any) => row.status === "overdue")
+                                        .reduce((acc: number, row: any) => acc + Number(row.remainingAmount || 0), 0)
+                                    const pending = Math.max(0, total - paid)
+                                    const cells = [
+                                        { label: "Total", value: total },
+                                        { label: "Pago", value: paid },
+                                        { label: "Restante", value: pending },
+                                        { label: "Vencido", value: overdue },
+                                    ]
+                                    return cells.map((cell) => (
+                                        <div key={cell.label} className="rounded-xl border border-brand-border dark:border-dark-border p-3">
+                                            <p className="text-xs text-brand-inactive-text">{cell.label}</p>
+                                            <p className="text-base font-bold">{formatCurrency(cell.value)}</p>
+                                        </div>
+                                    ))
+                                })()}
+                            </div>
+                            <div className="mt-4 border-t border-brand-border dark:border-dark-border pt-2">
+                                <InstallmentParcelsTable
+                                    rows={
+                                        (installmentDetail.installments || []).map(
+                                            (row: any): InstallmentParcelRow => ({
+                                                id: row.id,
+                                                installmentNumber: row.installmentNumber,
+                                                totalCount: Number(installmentDetail.group?.installments_count) || 0,
+                                                status: row.status,
+                                                originalAmount: Number(row.originalAmount || 0),
+                                                paidAmount: Number(row.paidAmount || 0),
+                                                interestAmount: row.interestAmount != null ? Number(row.interestAmount) : undefined,
+                                                discountAmount: row.discountAmount != null ? Number(row.discountAmount) : undefined,
+                                                dueDate: row.dueDate ? String(row.dueDate) : null,
+                                                finalizationDate: row.paymentDate ? String(row.paymentDate) : null,
+                                                paymentType: row.paymentType ? String(row.paymentType) : null,
+                                                reason: String(installmentDetail.group?.description || "Parcela"),
+                                                reference: String(row.description || "—"),
+                                            }),
+                                        )
+                                    }
+                                    getActionsSlot={(row) =>
+                                        row.status === "paid" ? null : (
+                                            <>
+                                                <DropdownItem onClick={() => handleEditInstallment(row.id)}>Editar</DropdownItem>
+                                                <DropdownItem onClick={() => void handlePayInstallment(row.id)}>Registrar pagamento</DropdownItem>
+                                            </>
+                                        )
+                                    }
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="text-sm text-brand-inactive-text">Nenhum detalhe encontrado.</p>
+                    )}
+                </div>
+            </motion.div>
+        )
+    }
+
     if (showCreateTransaction || editingTransaction || editingRecurringTemplateId) {
         return (
             <motion.div
@@ -1147,6 +1288,7 @@ export default function TransactionsPage({
                                                 onOpenDetail={handleOpenTransactionDetail}
                                                 onEdit={handleEditTransaction}
                                                 onMarkAsPaid={handleMarkAsPaid}
+                                                onCancelPending={handleRequestCancelPending}
                                                 onSettleInstallmentGroup={handleSettleInstallmentGroup}
                                             />
                                         ))}
@@ -1218,6 +1360,7 @@ export default function TransactionsPage({
                                                             onOpenDetail={handleOpenTransactionDetail}
                                                             onEdit={handleEditTransaction}
                                                             onMarkAsPaid={handleMarkAsPaid}
+                                                            onCancelPending={handleRequestCancelPending}
                                                             onSettleInstallmentGroup={handleSettleInstallmentGroup}
                                                         />
                                                     ))}
@@ -1274,76 +1417,46 @@ export default function TransactionsPage({
             </FloatingActionBar>
 
             <DefaultModal
-                isOpen={!!openInstallmentGroupId}
+                isOpen={!!confirmCancelTransaction}
                 onClose={() => {
-                    setOpenInstallmentGroupId(null)
-                    setInstallmentDetail(null)
+                    if (cancellingTransaction) return
+                    setConfirmCancelTransaction(null)
+                    setCancelReason("")
                 }}
-                title="Detalhe do parcelado"
-                maxWidth="xl"
+                title="Cancelar transação pendente"
+                maxWidth="md"
             >
-                {installmentDetailLoading ? (
-                    <p className="text-sm text-brand-inactive-text">Carregando parcelas...</p>
-                ) : installmentDetail ? (
+                {confirmCancelTransaction ? (
                     <div className="space-y-4">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            {(() => {
-                                const total = Number(installmentDetail.group?.total_amount || 0)
-                                const rows = installmentDetail.installments || []
-                                const paid = rows.reduce((acc: number, row: any) => acc + Number(row.paidAmount || 0), 0)
-                                const overdue = rows
-                                    .filter((row: any) => row.status === "overdue")
-                                    .reduce((acc: number, row: any) => acc + Number(row.remainingAmount || 0), 0)
-                                const pending = Math.max(0, total - paid)
-                                const cells = [
-                                    { label: "Total", value: total },
-                                    { label: "Pago", value: paid },
-                                    { label: "Restante", value: pending },
-                                    { label: "Vencido", value: overdue },
-                                ]
-                                return cells.map((cell) => (
-                                    <div key={cell.label} className="rounded-xl border border-brand-border dark:border-dark-border p-3">
-                                        <p className="text-xs text-brand-inactive-text">{cell.label}</p>
-                                        <p className="text-base font-bold">{formatCurrency(cell.value)}</p>
-                                    </div>
-                                ))
-                            })()}
+                        <p className="text-sm text-brand-inactive-text">
+                            Esta ação marca a transação como cancelada e salva o histórico automaticamente.
+                        </p>
+                        <div className="rounded-lg border border-brand-red/30 bg-brand-red/5 p-3 text-sm">
+                            <p className="font-semibold text-brand-dark dark:text-dark-heading">{confirmCancelTransaction.description}</p>
+                            <p className="text-brand-inactive-text mt-1">
+                                Valor: {formatCurrency(confirmCancelTransaction.amount)} • Status atual: {confirmCancelTransaction.status}
+                            </p>
                         </div>
-                        <div className="mt-4 border-t border-brand-border dark:border-dark-border pt-2">
-                            <InstallmentParcelsTable
-                                rows={
-                                    (installmentDetail.installments || []).map(
-                                        (row: any): InstallmentParcelRow => ({
-                                            id: row.id,
-                                            installmentNumber: row.installmentNumber,
-                                            totalCount: Number(installmentDetail.group?.installments_count) || 0,
-                                            status: row.status,
-                                            originalAmount: Number(row.originalAmount || 0),
-                                            paidAmount: Number(row.paidAmount || 0),
-                                            interestAmount: row.interestAmount != null ? Number(row.interestAmount) : undefined,
-                                            discountAmount: row.discountAmount != null ? Number(row.discountAmount) : undefined,
-                                            dueDate: row.dueDate ? String(row.dueDate) : null,
-                                            finalizationDate: row.paymentDate ? String(row.paymentDate) : null,
-                                            paymentType: row.paymentType ? String(row.paymentType) : null,
-                                            reason: String(installmentDetail.group?.description || "Parcela"),
-                                            reference: String(row.description || "—"),
-                                        }),
-                                    )
-                                }
-                                getActionsSlot={(row) =>
-                                    row.status === "paid" ? null : (
-                                        <>
-                                            <DropdownItem onClick={() => handleEditInstallment(row.id)}>Editar</DropdownItem>
-                                            <DropdownItem onClick={() => void handlePayInstallment(row.id)}>Registrar pagamento</DropdownItem>
-                                        </>
-                                    )
-                                }
+                        <div className="space-y-1">
+                            <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Motivo (opcional)</label>
+                            <textarea
+                                value={cancelReason}
+                                onChange={(e) => setCancelReason(e.target.value)}
+                                rows={3}
+                                className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-white dark:bg-dark-surface/50 text-sm outline-none focus:border-brand-primary"
+                                placeholder="Ex: cobrança duplicada"
                             />
                         </div>
+                        <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setConfirmCancelTransaction(null)} disabled={cancellingTransaction}>
+                                Voltar
+                            </Button>
+                            <Button variant="danger" onClick={() => void handleConfirmCancelPending()} disabled={cancellingTransaction}>
+                                Confirmar cancelamento
+                            </Button>
+                        </div>
                     </div>
-                ) : (
-                    <p className="text-sm text-brand-inactive-text">Nenhum detalhe encontrado.</p>
-                )}
+                ) : null}
             </DefaultModal>
 
             <DefaultModal

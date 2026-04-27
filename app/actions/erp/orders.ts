@@ -95,6 +95,14 @@ function isMissingOrdersIsPosSaleColumnError(error: unknown): boolean {
     return message.includes("is_pos_sale") && message.includes("orders")
 }
 
+function isMissingOrdersPaymentMethodDeltaColumnsError(error: unknown): boolean {
+    const message = String((error as any)?.message || "").toLowerCase()
+    return (
+        (message.includes("payment_method_discount_amount") || message.includes("payment_method_extra_amount")) &&
+        message.includes("orders")
+    )
+}
+
 function buildOrderSource(salesChannel: string | undefined, deliveryMethod: 'delivery' | 'pickup') {
     const value = salesChannel?.trim()
     if (value) return value
@@ -1310,6 +1318,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     )
     if (!paymentPricing.ok) return { error: paymentPricing.error }
     serverTotalAmount = paymentPricing.finalTotal
+    const paymentMethodDiscountAmount = paymentPricing.paymentMethodDiscountAmount
+    const paymentMethodExtraAmount = Math.max(0, Math.round((paymentPricing.feeAmount + paymentPricing.interestAmount) * 100) / 100)
     const adjustedPaymentBreakdown =
         paymentPricing.adjustedBreakdown?.length > 0
             ? paymentPricing.adjustedBreakdown
@@ -1334,37 +1344,54 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         deliveryMethod: data.deliveryMethod,
     })
 
-    const { data: order, error: orderError } = await supabase
+    const orderInsertPayload: Record<string, unknown> = {
+        partner_id: partnerId,
+        buyer_id: data.customerId || null,
+        customer_name: data.customerName || null,
+        source_quote_id: data.sourceQuoteId || null,
+        order_source: buildOrderSource(data.salesChannel, data.deliveryMethod),
+        delivery_type: data.deliveryMethod,
+        situation: paymentState.situation,
+        delivery_status: data.deliveryStatus,
+        total_amount: serverTotalAmount,
+        paid_amount: paymentState.paidAmount,
+        discount_value: data.discountValue,
+        discount_type: data.discountType,
+        discount_amount: couponDiscountAmount,
+        payment_method_discount_amount: paymentMethodDiscountAmount,
+        payment_method_extra_amount: paymentMethodExtraAmount,
+        coupon_id: couponIdToSave,
+        shipping_cost: serverShippingCost,
+        additional_costs: data.additionalCosts,
+        notes: data.notes || null,
+        payment_method: paymentMethodSummary,
+        payment_breakdown: adjustedPaymentBreakdown,
+        payment_provider: null,
+        delivery_address: deliveryAddressStr || null,
+        finance_account_id: data.financeAccountId,
+        created_by: user.id,
+        ...(preparationEstimate || {}),
+    }
+
+    let orderInsertResult = await supabase
         .from("orders")
-        .insert({
-            partner_id: partnerId,
-            buyer_id: data.customerId || null,
-            customer_name: data.customerName || null,
-            source_quote_id: data.sourceQuoteId || null,
-            order_source: buildOrderSource(data.salesChannel, data.deliveryMethod),
-            delivery_type: data.deliveryMethod,
-            situation: paymentState.situation,
-            delivery_status: data.deliveryStatus,
-            total_amount: serverTotalAmount,
-            paid_amount: paymentState.paidAmount,
-            discount_value: data.discountValue,
-            discount_type: data.discountType,
-            coupon_id: couponIdToSave,
-            discount_amount: couponDiscountAmount,
-            shipping_cost: serverShippingCost,
-            additional_costs: data.additionalCosts,
-            notes: data.notes || null,
-            payment_method: paymentMethodSummary,
-            payment_breakdown: adjustedPaymentBreakdown,
-            payment_provider: null,
-            delivery_address: deliveryAddressStr || null,
-            finance_account_id: data.financeAccountId,
-            created_by: user.id,
-            ...(preparationEstimate || {}),
-        })
+        .insert(orderInsertPayload)
         .select()
         .single()
 
+    if (orderInsertResult.error && isMissingOrdersPaymentMethodDeltaColumnsError(orderInsertResult.error)) {
+        const fallbackInsertPayload = { ...orderInsertPayload }
+        delete (fallbackInsertPayload as any).payment_method_discount_amount
+        delete (fallbackInsertPayload as any).payment_method_extra_amount
+        orderInsertResult = await supabase
+            .from("orders")
+            .insert(fallbackInsertPayload)
+            .select()
+            .single()
+    }
+
+    const order = orderInsertResult.data
+    const orderError = orderInsertResult.error
     if (orderError) return { error: orderError.message }
 
     const itemsToInsert = sanitizedItems.map(item => ({
@@ -1830,6 +1857,8 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     )
     if (!updatePaymentPricing.ok) return { error: updatePaymentPricing.error }
     updateServerTotal = updatePaymentPricing.finalTotal
+    const updatePaymentMethodDiscountAmount = updatePaymentPricing.paymentMethodDiscountAmount
+    const updatePaymentMethodExtraAmount = Math.max(0, Math.round((updatePaymentPricing.feeAmount + updatePaymentPricing.interestAmount) * 100) / 100)
     const adjustedPaymentBreakdown =
         updatePaymentPricing.adjustedBreakdown?.length > 0
             ? updatePaymentPricing.adjustedBreakdown
@@ -1843,41 +1872,57 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     })
     const updateServerShipping = updatePricingResult.shipping
 
-    const { error: orderError } = await supabase
+    const orderUpdatePayload: Record<string, unknown> = {
+        buyer_id: data.customerId || null,
+        customer_name: data.customerName || null,
+        order_source: buildOrderSource(data.salesChannel, data.deliveryMethod),
+        delivery_type: data.deliveryMethod,
+        situation: paymentState.situation,
+        delivery_status: data.deliveryStatus,
+        total_amount: updateServerTotal,
+        paid_amount: paymentState.paidAmount,
+        discount_value: data.discountValue,
+        discount_type: data.discountType,
+        coupon_id: couponIdToSave,
+        discount_amount: couponDiscountAmount,
+        payment_method_discount_amount: updatePaymentMethodDiscountAmount,
+        payment_method_extra_amount: updatePaymentMethodExtraAmount,
+        shipping_cost: updateServerShipping,
+        additional_costs: data.additionalCosts,
+        notes: data.notes || null,
+        payment_method: paymentMethodSummary,
+        payment_breakdown: adjustedPaymentBreakdown,
+        finance_account_id: data.financeAccountId,
+        payment_provider: null,
+        ...(deliveryAddressStr ? { delivery_address: deliveryAddressStr } : {}),
+        ...(preparationEstimate || {}),
+    }
+
+    let orderUpdateResult = await supabase
         .from("orders")
-        .update({
-            buyer_id: data.customerId || null,
-            customer_name: data.customerName || null,
-            order_source: buildOrderSource(data.salesChannel, data.deliveryMethod),
-            delivery_type: data.deliveryMethod,
-            situation: paymentState.situation,
-            delivery_status: data.deliveryStatus,
-            total_amount: updateServerTotal,
-            paid_amount: paymentState.paidAmount,
-            discount_value: data.discountValue,
-            discount_type: data.discountType,
-            coupon_id: couponIdToSave,
-            discount_amount: couponDiscountAmount,
-            shipping_cost: updateServerShipping,
-            additional_costs: data.additionalCosts,
-            notes: data.notes || null,
-            payment_method: paymentMethodSummary,
-            payment_breakdown: adjustedPaymentBreakdown,
-            finance_account_id: data.financeAccountId,
-            payment_provider: null,
-            ...(deliveryAddressStr ? { delivery_address: deliveryAddressStr } : {}),
-            ...(preparationEstimate || {}),
-        })
+        .update(orderUpdatePayload)
         .eq("id", orderId)
         .eq("partner_id", data.partnerId)
 
+    if (orderUpdateResult.error && isMissingOrdersPaymentMethodDeltaColumnsError(orderUpdateResult.error)) {
+        const fallbackUpdatePayload = { ...orderUpdatePayload }
+        delete (fallbackUpdatePayload as any).payment_method_discount_amount
+        delete (fallbackUpdatePayload as any).payment_method_extra_amount
+        orderUpdateResult = await supabase
+            .from("orders")
+            .update(fallbackUpdatePayload)
+            .eq("id", orderId)
+            .eq("partner_id", data.partnerId)
+    }
+
+    const orderError = orderUpdateResult.error
     if (orderError) return { error: orderError.message }
 
     if (currentOrder.situation !== "paid" && paymentState.situation === "paid") {
         await createFinancialTransactionsForPaidOrder(supabase, {
             orderNumber: currentOrder.order_number || orderId,
             partnerId: data.partnerId,
-            totalAmount: Number(data.totalAmount || 0),
+            totalAmount: Number(updateServerTotal || 0),
             paymentMethod: paymentMethodSummary,
             paymentProvider: null,
             paymentBreakdown: adjustedPaymentBreakdown,

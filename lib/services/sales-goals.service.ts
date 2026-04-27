@@ -11,7 +11,11 @@ type GoalRow = {
   bonus_value: number
   applies_to: "all" | "user"
   user_id: string | null
+  assigned_user_ids?: string[] | null
   goal_type?: "sales" | "service_orders" | "both"
+  auto_launch_bonus?: boolean | null
+  bonus_account_id?: string | null
+  name?: string | null
 }
 
 function money(value: number) {
@@ -45,7 +49,7 @@ async function createGoalBonusExpense(params: {
   const payload: Record<string, unknown> = {
     partner_id: params.partnerId,
     description: "Bônus por meta atingida",
-    category: "Comissões",
+    category: "Metas e Bônus",
     amount: bonusAmount,
     original_amount: bonusAmount,
     status: "paid",
@@ -54,7 +58,7 @@ async function createGoalBonusExpense(params: {
     payment_type: "Bônus meta",
     transaction_type: "expense",
     origin: "system",
-    notes: `Bônus da meta ${params.goalId} para vendedor ${params.userId}.`,
+    notes: null,
     reference_note: referenceNote,
     account_id: params.accountId || null,
     created_by_user_id: params.createdByUserId || null,
@@ -103,7 +107,7 @@ async function reverseGoalBonusExpense(params: {
   const payload: Record<string, unknown> = {
     partner_id: params.partnerId,
     description: "Estorno bônus por meta",
-    category: "Comissões",
+    category: "Metas e Bônus",
     amount,
     original_amount: amount,
     status: "paid",
@@ -113,7 +117,7 @@ async function reverseGoalBonusExpense(params: {
     transaction_type: "refund",
     refund_kind: "expense_refund",
     origin: "system",
-    notes: `Estorno do bônus da meta ${params.goalId} para vendedor ${params.userId}.`,
+    notes: null,
     reference_note: reverseReference,
     account_id: params.accountId || null,
     created_by_user_id: params.createdByUserId || null,
@@ -144,7 +148,7 @@ async function getActiveGoalsForSeller(params: {
     .eq("partner_id", params.partnerId)
     .lte("start_date", day)
     .gte("end_date", day)
-    .or(`applies_to.eq.all,user_id.eq.${params.sellerUserId}`)
+    .or(`applies_to.eq.all,user_id.eq.${params.sellerUserId},assigned_user_ids.cs.{${params.sellerUserId}}`)
 
   if (params.activityType === "sales") {
     query = query.in("goal_type", ["sales", "both"])
@@ -201,6 +205,9 @@ export async function applySaleToGoals(params: {
           ? money(Number(goal.bonus_value || 0))
           : money((nextAmount * Number(goal.bonus_value || 0)) / 100)
 
+      const shouldLaunchBonus = Boolean(goal.auto_launch_bonus)
+      if (!shouldLaunchBonus) continue
+
       await createGoalBonusExpense({
         supabase: params.supabase,
         partnerId: params.partnerId,
@@ -208,7 +215,7 @@ export async function applySaleToGoals(params: {
         userId: params.sellerUserId,
         amount: bonus,
         createdByUserId: params.createdByUserId || null,
-        accountId: params.accountId || null,
+        accountId: goal.bonus_account_id || params.accountId || null,
       })
     }
   }
@@ -253,13 +260,16 @@ export async function reverseSaleFromGoals(params: {
       .eq("id", progress.id)
 
     if (wasAchieved && !stillAchieved) {
+      const shouldLaunchBonus = Boolean(goal.auto_launch_bonus)
+      if (!shouldLaunchBonus) continue
+
       await reverseGoalBonusExpense({
         supabase: params.supabase,
         partnerId: params.partnerId,
         goalId: goal.id,
         userId: params.sellerUserId,
         createdByUserId: params.createdByUserId || null,
-        accountId: params.accountId || null,
+        accountId: goal.bonus_account_id || params.accountId || null,
       })
     }
   }

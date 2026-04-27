@@ -521,7 +521,7 @@ export async function getFinancialTransactionsAction(
             return {
                 id: t.id,
                 displayId: `TRX-${t.id.slice(0, 8).toUpperCase()}`,
-                description: t.category === "Vendas" ? `Venda - ${t.description}` : t.description,
+                description: String(t.description || "").trim() || "Transação",
                 details: undefined,
                 category: String(t.category || "").trim() || "-",
                 contactName:
@@ -910,7 +910,7 @@ export async function updateManualTransactionAction(
             !!current.recurring_id && systemGateway && !paid
         if (isRecurringSystemPending) {
             throw new Error(
-                "Esta linha vem da recorrência. Edite o modelo em Previstos ou use «Marcar como pago» - não altere este lançamento pendente.",
+                "Esta linha vem da recorrência. Edite o modelo em A pagar/A receber ou use «Marcar como pago» - não altere este lançamento pendente.",
             )
         }
 
@@ -951,7 +951,10 @@ export async function updateManualTransactionAction(
             "contactId",
             "customerId",
             "contactType",
+            "paymentMethodId",
             "dueDate",
+            "paymentDate",
+            "status",
             "notes",
         ])
         const ALLOWED_PAID_KEYS = new Set<keyof CreateManualTransactionInput>([
@@ -971,6 +974,10 @@ export async function updateManualTransactionAction(
             if (!allowedKeys.has(key)) {
                 throw new Error(`Campo "${key}" não pode ser editado quando status é ${paid ? "paid" : "pending"}.`)
             }
+        }
+
+        if (isSalesTransaction && patch.paymentMethodId !== undefined) {
+            throw new Error("Não é permitido alterar o meio de pagamento de transações geradas por venda.")
         }
 
         if (isInstallmentTransaction) {
@@ -999,7 +1006,10 @@ export async function updateManualTransactionAction(
                 payload.contact_id = nextCustomerId ? null : nextContactIdRaw
                 payload.contact_type = nextCustomerId ? "customer" : nextContactType
             }
+            if (patch.paymentMethodId !== undefined) payload.payment_method_id = patch.paymentMethodId
             if (patch.dueDate !== undefined) payload.due_date = patch.dueDate
+            if (patch.paymentDate !== undefined) payload.payment_date = patch.paymentDate
+            if (patch.status !== undefined) payload.status = patch.status
             if (patch.notes !== undefined) payload.notes = patch.notes
         }
 
@@ -1038,6 +1048,73 @@ export async function updateManualTransactionAction(
         return { success: true, data }
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao atualizar transação" }
+    }
+}
+
+export async function cancelPendingTransactionAction(input: {
+    transactionId: string
+    partnerId: string
+    reason?: string | null
+}) {
+    try {
+        const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
+
+        const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const supabase = createAdminClient()
+
+        const { data: tx, error } = await supabase
+            .from("transactions")
+            .select("id, partner_id, status, installment_group_id, notes")
+            .eq("id", input.transactionId)
+            .eq("partner_id", input.partnerId)
+            .single()
+        if (error || !tx) throw new Error(error?.message || "Transação não encontrada.")
+
+        if (String(tx.status || "").toLowerCase() !== "pending") {
+            throw new Error("Apenas transações pendentes podem ser canceladas.")
+        }
+        if (tx.installment_group_id) {
+            throw new Error("Parcelas não podem ser canceladas por esta ação.")
+        }
+
+        const user = await getCurrentUser()
+        const actorName = user?.full_name?.trim() || user?.email?.trim() || "Usuário"
+        const now = new Date()
+        const cancelledAt = formatDateTime(now.toISOString()) || now.toLocaleString("pt-BR")
+        const reason = String(input.reason || "").trim()
+        const cancellationLine = `Cancelado por ${actorName} em ${cancelledAt}${reason ? ` - Motivo: ${reason}` : ""}`
+        const previousNotes = String(tx.notes || "").trim()
+        const nextNotes = previousNotes ? `${previousNotes}\n${cancellationLine}` : cancellationLine
+
+        const { data: updated, error: updateError } = await supabase
+            .from("transactions")
+            .update({
+                status: "cancelled",
+                notes: nextNotes,
+                updated_at: now.toISOString(),
+            })
+            .eq("id", input.transactionId)
+            .eq("partner_id", input.partnerId)
+            .select("*")
+            .single()
+        if (updateError) throw updateError
+
+        await logAuditEvent({
+            partnerId: input.partnerId,
+            actorUserId: userId,
+            entityType: "transaction",
+            entityId: input.transactionId,
+            actionType: "updated",
+            changeLines: [cancellationLine, "alterou o status para cancelado."],
+            source: "manual",
+        })
+        await revalidateEntityTimeline("transaction", input.transactionId)
+        await revalidateTransactions(input.partnerId)
+
+        return { success: true as const, data: updated }
+    } catch (e: any) {
+        return { success: false as const, error: e.message || "Erro ao cancelar transação" }
     }
 }
 
@@ -1851,6 +1928,13 @@ export type TransactionDetailPayload = {
     dueDateLine: string | null
     paymentDateLine: string | null
     notesLine: string | null
+    goalBonusDetails?: {
+        goalId: string
+        goalName: string
+        paidToUserIds: string[]
+        paidToUserNames: string[]
+        achievedAt: string | null
+    } | null
     amount: number
     ledgerDirection: ERPTransaction["ledgerDirection"]
     contactCard: { title: string; name: string; email: string | null; phone: string | null; isCustomer?: boolean }
@@ -1975,8 +2059,7 @@ export async function getTransactionDetailsAction(
         ])
         const accountLine = accountData?.name || null
 
-        const headerTitle =
-            row.category === "Vendas" ? `Venda - ${row.description}` : String(row.description || "").trim() || "Transação"
+        const headerTitle = String(row.description || "").trim() || "Transação"
 
         const paid = isStatusPaid(row.status)
         const cancelled = isCancelledStatus(row.status)
@@ -2444,6 +2527,39 @@ export async function getTransactionDetailsAction(
         }
 
         const paymentDateSubtitle = formatDateTime(row.created_at)
+        let goalBonusDetails: TransactionDetailPayload["goalBonusDetails"] = null
+        if (String(row.reference_note || "").startsWith("goal-bonus:")) {
+            const parts = String(row.reference_note || "").split(":")
+            const goalId = String(parts[1] || "")
+            const paidUserId = String(parts[2] || "")
+            if (goalId) {
+                const [{ data: goalRow }, { data: progressRows }, { data: users }] = await Promise.all([
+                    supabase
+                        .from("sales_goals")
+                        .select("id, name, assigned_user_ids")
+                        .eq("partner_id", partnerId)
+                        .eq("id", goalId)
+                        .maybeSingle(),
+                    supabase
+                        .from("sales_goal_progress")
+                        .select("user_id, achieved_at")
+                        .eq("goal_id", goalId)
+                        .eq("user_id", paidUserId)
+                        .limit(1),
+                    supabase
+                        .from("user_profiles")
+                        .select("user_id, full_name")
+                        .in("user_id", [paidUserId]),
+                ])
+                goalBonusDetails = {
+                    goalId,
+                    goalName: String((goalRow as any)?.name || "Meta"),
+                    paidToUserIds: paidUserId ? [paidUserId] : [],
+                    paidToUserNames: (users || []).map((u: any) => String(u.full_name || "Vendedor")),
+                    achievedAt: (progressRows?.[0] as any)?.achieved_at ? formatDateTime((progressRows?.[0] as any).achieved_at) : null,
+                }
+            }
+        }
 
         const showDueDateRow =
             !installmentBreakdown?.length &&
@@ -2480,6 +2596,7 @@ export async function getTransactionDetailsAction(
             dueDateLine: row.due_date ? formatDateLabel(row.due_date) : null,
             paymentDateLine: formatDateTime(row.created_at),
             notesLine: transactionItemsCompact ? null : row.notes ? String(row.notes) : null,
+            goalBonusDetails,
             amount: detailAmount,
             ledgerDirection: ledgerDirectionFromRow(row as DbTransaction),
             contactCard,

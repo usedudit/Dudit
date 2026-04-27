@@ -103,6 +103,12 @@ const getBrandsLabel = (method: PaymentMethodListItem) => {
         .join(", ")
 }
 
+const isSystemCashMethod = (method: PaymentMethodListItem) => {
+    const rawType = String(method.type || method.payment_type || "").toLowerCase()
+    const rawName = String(method.name || "").trim().toLowerCase()
+    return rawType === "cash" || rawType === "dinheiro" || rawName === "dinheiro"
+}
+
 const PaymentMethodListRow = React.memo(({
     method,
     columns,
@@ -186,7 +192,7 @@ const PaymentMethodListRow = React.memo(({
                         ) : (
                             <ActionsDropdown
                                 onEdit={() => onEdit(method)}
-                                onDelete={() => onDelete(method)}
+                                onDelete={isSystemCashMethod(method) ? undefined : () => onDelete(method)}
                                 trigger={
                                     <Button variant="outline" size="icon" className="w-9 h-9 bg-transparent border-opacity-50">
                                         <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
@@ -306,7 +312,7 @@ export function PaymentMethodMobileItem({
                                 ) : (
                                     <ActionsDropdown
                                         onEdit={() => onEdit(method)}
-                                        onDelete={() => onDelete(method)}
+                                        onDelete={isSystemCashMethod(method) ? undefined : () => onDelete(method)}
                                         trigger={
                                             <Button variant="ghost" size="icon" className="w-9 h-9">
                                                 <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />

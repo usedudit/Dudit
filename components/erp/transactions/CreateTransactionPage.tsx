@@ -816,6 +816,8 @@ export default function CreateTransactionPage({
                     if (!isPaidTransaction) {
                         patch.categoryId = categoryId || null
                         patch.subcategoryId = subcategoryId || null
+                        patch.status = status
+                        patch.paymentDate = status === "paid" ? paymentDate : null
                     }
 
                     // Only allow financial fields if NOT locked
@@ -1013,7 +1015,7 @@ export default function CreateTransactionPage({
                 success(
                     status === "paid"
                         ? "Recorrência criada e primeira ocorrência marcada como paga!"
-                        : "Recorrência criada! Próximas ocorrências aparecem em Previstos.",
+                        : "Recorrência criada! Próximas ocorrências aparecem em A pagar/A receber.",
                 )
                 onSuccess?.()
                 debouncedRefresh()
@@ -1385,7 +1387,7 @@ export default function CreateTransactionPage({
                                     <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
                                         {isRecurringTemplateEdit
                                             ? "Alterações passam a valer para ocorrências futuras. Pagamentos já confirmados não são alterados."
-                                            : "A data de vencimento acima é a primeira ocorrência. As próximas datas aparecem em Previstos e seguem a frequência abaixo."}
+                                            : "A data de vencimento acima é a primeira ocorrência. As próximas datas aparecem em A pagar/A receber e seguem a frequência abaixo."}
                                     </p>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <FormDropdown
@@ -1532,7 +1534,7 @@ export default function CreateTransactionPage({
                         </p>
                     ) : isRecurringTemplateEdit ? (
                         <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                            O pagamento de cada data é feito em Previstos («Marcar como pago»). Este formulário atualiza apenas o modelo da recorrência.
+                            O pagamento de cada data é feito em A pagar/A receber («Marcar como pago»). Este formulário atualiza apenas o modelo da recorrência.
                         </p>
                     ) : (
                         <div>
@@ -1540,13 +1542,13 @@ export default function CreateTransactionPage({
                                 Situação
                             </label>
                             <div className="grid grid-cols-2 gap-2 mt-2">
-                                <Button variant={status === "paid" ? "default" : "outline"} onClick={() => setStatus("paid")} disabled={lockFinancialFields || isEditMode}>
+                                <Button variant={status === "paid" ? "default" : "outline"} onClick={() => setStatus("paid")} disabled={lockFinancialFields || isPaidTransaction}>
                                     {paidLabel}
                                 </Button>
                                 <Button
                                     variant={status === "pending" ? "default" : "outline"}
                                     onClick={() => setStatus("pending")}
-                                    disabled={lockFinancialFields || isEditMode}
+                                    disabled={lockFinancialFields || isPaidTransaction}
                                 >
                                     Pendente
                                 </Button>
@@ -1568,16 +1570,26 @@ export default function CreateTransactionPage({
                     )}
 
                     {isIncomeExpense && (
-                        <FormCombobox
-                            label="Forma de pagamento"
-                            options={paymentMethods!.map(pm => ({ value: pm.id, label: pm.name }))}
-                            value={paymentMethodId || ""}
-                            onChange={(v) => {
-                                setPaymentMethodId(v)
-                                const pm = paymentMethods!.find(p => p.id === v)
-                                if (pm) setPaymentType(pm.payment_type || "Pix")
-                            }}
-                        />
+                        <>
+                            <FormCombobox
+                                label="Forma de pagamento"
+                                options={paymentMethods!.map(pm => ({ value: pm.id, label: pm.name }))}
+                                value={paymentMethodId || ""}
+                                onChange={(v) => {
+                                    setPaymentMethodId(v)
+                                    const pm = paymentMethods!.find(p => p.id === v)
+                                    if (pm) setPaymentType(pm.payment_type || "Pix")
+                                }}
+                                disabled={isSalesOrigin && isEditMode}
+                            />
+                            {isSalesOrigin && isEditMode && (
+                                <InfoCard
+                                    message="Transações de venda não permitem edição do meio de pagamento."
+                                    color="gray"
+                                    className="mt-2"
+                                />
+                            )}
+                        </>
                     )}
 
                     {txKind === "refund" && (
