@@ -129,7 +129,7 @@ export async function createFinanceAccountAction(data: {
     if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
     await requirePartnerAccessWithPermission(data.partnerId, "financial", "edit")
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
 
     if (!data.name?.trim()) throw new Error("O nome é obrigatório.")
     if (!["cash", "bank", "wallet"].includes(data.type)) throw new Error("Tipo de conta inválido.")
@@ -252,7 +252,7 @@ export async function updateFinanceAccountAction(
     if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
     await requirePartnerAccessWithPermission(partnerId, "financial", "edit")
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
 
     const { data: account, error: accErr } = await supabase
       .from("finance_accounts")
@@ -330,7 +330,7 @@ export async function updateFinanceAccountAction(
 export async function deleteFinanceAccountAction(id: string, partnerId: string) {
   try {
     await requirePartnerAccessWithPermission(partnerId, "financial", "edit")
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
 
     const { data: account, error: accErr } = await supabase
       .from("finance_accounts")

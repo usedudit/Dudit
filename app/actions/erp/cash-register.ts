@@ -474,7 +474,7 @@ export async function openCashSessionAction(input: {
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
-  const supabase = await getSupabaseServerClient()
+  const supabase = createAdminClient()
 
   const raw = Number(input.initialAmount ?? 0)
   if (!Number.isFinite(raw)) return { success: false as const, error: "Valor inicial inválido." }
@@ -535,7 +535,7 @@ export async function createCashMovementAction(input: {
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
-  const supabase = await getSupabaseServerClient()
+  const supabase = createAdminClient()
 
   let sessionId = input.cashSessionId || null
   if (!sessionId) {
@@ -663,7 +663,7 @@ export async function reverseCashMovementAction(input: {
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
-  const supabase = await getSupabaseServerClient()
+  const supabase = createAdminClient()
 
   const { data: rpcData, error: rpcError } = await supabase.rpc("erp_reverse_cash_manual_movement", {
     p_partner_id: input.partnerId,
@@ -734,7 +734,7 @@ export async function reverseCashMovementAction(input: {
 
 export async function getCashSessionCloseSummaryAction(partnerId: string, cashSessionId: string) {
   await requirePartnerAccess(partnerId)
-  const supabase = await getSupabaseServerClient()
+  const supabase = createAdminClient()
 
   const { data: session, error: sessionError } = await supabase
     .from("cash_sessions")
@@ -789,7 +789,7 @@ export async function closeCashSessionAction(input: {
   const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
   if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
-  const supabase = await getSupabaseServerClient()
+  const supabase = createAdminClient()
 
   const summary = await getCashSessionCloseSummaryAction(input.partnerId, input.cashSessionId)
   if (!summary.success) return summary
@@ -898,7 +898,7 @@ export async function closeCashSessionAction(input: {
 
 export async function getCashSessionsHistoryAction(partnerId: string) {
   await requirePartnerAccess(partnerId)
-  const supabase = await getSupabaseServerClient()
+  const supabase = createAdminClient()
 
   const { data: sessions, error: sessionError } = await supabase
     .from("cash_sessions")
@@ -1098,7 +1098,7 @@ export async function getCashSessionsHistoryPageAction(
 
 export async function getCashSessionDetailsAction(partnerId: string, cashSessionId: string) {
   await requirePartnerAccess(partnerId)
-  const supabase = await getSupabaseServerClient()
+  const supabase = createAdminClient()
 
   const { data: session, error: sessionError } = await supabase
     .from("cash_sessions")

@@ -1,8 +1,9 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireUser, requirePartner } from "@/lib/auth/authorization"
+import { requireUser, requirePartnerAccess } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -17,7 +18,8 @@ export async function searchProductsForMovement(query: string) {
         const ctx = await getCurrentPartnerContext()
         if (!ctx?.partnerId) return []
 
-        const supabase = await getSupabaseServerClient()
+        await requirePartnerAccess(ctx.partnerId)
+        const supabase = createAdminClient()
         const searchTerm = `%${query}%`
 
         const { data, error } = await supabase
@@ -58,15 +60,18 @@ export async function createStockMovementAction(data: {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
     try {
-        const partner = await requirePartner()
-        const partnerId = partner.id
-        const userId = partner.user_id
+        const user = await requireUser()
+        const ctx = await getCurrentPartnerContext()
+        if (!ctx?.partnerId) return errorResponse("ERP não selecionado")
+        const partnerId = ctx.partnerId
+        const userId = user.id
+        await requirePartnerAccess(partnerId)
 
         if (!data.productId) return errorResponse("Produto inválido")
         if (data.quantity <= 0) return errorResponse("Quantidade deve ser maior que zero")
         if (!data.reason) return errorResponse("Motivo é obrigatório")
 
-        const supabase = await getSupabaseServerClient()
+        const supabase = createAdminClient()
 
         const { data: movementRecord, error } = await supabase.rpc('create_manual_stock_movement', {
             p_partner_id: partnerId,
@@ -106,9 +111,12 @@ export async function createBatchStockMovementAction(data: {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
     try {
-        const partner = await requirePartner()
-        const partnerId = partner.id
-        const userId = partner.user_id
+        const user = await requireUser()
+        const ctx = await getCurrentPartnerContext()
+        if (!ctx?.partnerId) return errorResponse("ERP não selecionado")
+        const partnerId = ctx.partnerId
+        const userId = user.id
+        await requirePartnerAccess(partnerId)
 
         if (!data.items || data.items.length === 0) return errorResponse("Adicione pelo menos um item")
         if (!data.reason) return errorResponse("Motivo é obrigatório")
@@ -118,7 +126,7 @@ export async function createBatchStockMovementAction(data: {
             if (item.quantity <= 0) return errorResponse("Quantidade deve ser maior que zero em todos os itens")
         }
 
-        const supabase = await getSupabaseServerClient()
+        const supabase = createAdminClient()
 
         if (data.type === 'out') {
             const productIds = Array.from(new Set(data.items.map((item) => item.productId)))
@@ -199,7 +207,8 @@ export async function getStockMovementDetails(id: string) {
         const ctx = await getCurrentPartnerContext()
         if (!ctx?.partnerId) return errorResponse("Parceiro não encontrado")
 
-        const supabase = await getSupabaseServerClient()
+        await requirePartnerAccess(ctx.partnerId)
+        const supabase = createAdminClient()
 
         const { data, error } = await supabase
             .from("stock_movements")
@@ -330,7 +339,8 @@ export async function deleteStockMovementAction(id: string) {
         const ctx = await getCurrentPartnerContext()
         if (!ctx?.partnerId) return errorResponse("Parceiro não encontrado")
 
-        const supabase = await getSupabaseServerClient()
+        await requirePartnerAccess(ctx.partnerId)
+        const supabase = createAdminClient()
 
         const { error } = await supabase
             .from("stock_movements")
@@ -358,10 +368,13 @@ export async function undoStockMovementAction(id: string, customReason?: string)
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
     try {
-        const partner = await requirePartner()
-        const partnerId = partner.id
-        const userId = partner.user_id
-        const supabase = await getSupabaseServerClient()
+        const user = await requireUser()
+        const ctx = await getCurrentPartnerContext()
+        if (!ctx?.partnerId) return errorResponse("ERP não selecionado")
+        const partnerId = ctx.partnerId
+        const userId = user.id
+        await requirePartnerAccess(partnerId)
+        const supabase = createAdminClient()
 
         // 1. Fetch the original movement
         const { data: original, error: fetchError } = await supabase
@@ -432,8 +445,10 @@ export async function undoBatchStockMovementsAction(ids: string[], customReason?
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
     try {
-        const partner = await requirePartner()
-        const partnerId = partner.id
+        const ctx = await getCurrentPartnerContext()
+        if (!ctx?.partnerId) return errorResponse("ERP não selecionado")
+        const partnerId = ctx.partnerId
+        await requirePartnerAccess(partnerId)
 
         const results = []
         for (const id of ids) {
@@ -475,9 +490,8 @@ export async function getERPStockMovementsPageAction(
     try {
         const user = await requireUser()
         if (!user) return { success: false, error: "Não autenticado" }
-        await requirePartner()
-
-        const supabase = await getSupabaseServerClient()
+        await requirePartnerAccess(partnerId)
+        const supabase = createAdminClient()
         const cursor = options?.cursor ?? null
         const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_STOCK_MOVEMENTS_PAGE_SIZE))))
         const fetchLimit = limit + 1

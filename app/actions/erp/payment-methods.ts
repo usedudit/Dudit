@@ -42,7 +42,7 @@ async function resolvePixKeyFromPartner(
     pixKeyType: "cpf" | "cnpj" | "email" | "phone" | "random" | null | undefined,
 ) {
     if (!pixKeyType || pixKeyType === "random") return null
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
     const { data: partner } = await supabase
         .from("partners")
         .select("cpf, cpf_encrypted, cnpj, email, phone")
@@ -154,7 +154,7 @@ export async function getPaymentMethodsAction(partnerId: string) {
 
 export async function getPaymentMethodDetailsAction(methodId: string) {
     await requireUser()
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
     const { data: method } = await supabase.from("payment_methods").select("id, partner_id").eq("id", methodId).single()
     if (!method) return { error: "Método de pagamento não encontrado" }
 
@@ -190,7 +190,7 @@ export async function calculatePaymentMethodAmountsAction(input: {
     installmentNumber?: number
 }) {
     await requireUser()
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
 
     const { data: method } = await supabase
         .from("payment_methods")
@@ -240,7 +240,7 @@ export async function previewSplitPaymentBreakdownAction(input: {
 }) {
     await requireUser()
     await requirePartnerAccessWithPermission(input.partnerId, "financial", "view")
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
     const methodIds = Array.from(new Set(input.legs.map((l) => l.paymentMethodId).filter(Boolean))) as string[]
 
     const splitRows: SplitInputRow[] = input.legs.map((l) => ({
@@ -344,7 +344,7 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
         return { error: errorDetails }
     }
 
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
 
     const { data: financeAccount } = await supabase
         .from("finance_accounts")
@@ -427,7 +427,7 @@ export async function updatePaymentMethodAction(
 ) {
     await requireRateLimit(RateLimitCategory.PAYMENT)
 
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
     const { data: method } = await supabase
         .from("payment_methods")
         .select("partner_id, type, payment_type, default_finance_account_id")
@@ -550,7 +550,7 @@ export async function updatePaymentMethodAction(
 export async function deletePaymentMethodAction(methodId: string) {
     await requireRateLimit(RateLimitCategory.PAYMENT)
 
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
     const { data: method } = await supabase
         .from("payment_methods")
         .select("partner_id")
@@ -580,7 +580,7 @@ export async function pickBestPaymentMethodAction(input: {
     context?: { preferDefault?: boolean }
 }) {
     await requirePartnerAccessWithPermission(input.partnerId, "financial", "view")
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
     const method = await pickBestPaymentMethod(supabase as any, input.type, input.partnerId, input.context || {})
     if (!method) return { error: "Nenhum método ativo encontrado para este tipo." }
     return { success: true, method }
@@ -588,7 +588,7 @@ export async function pickBestPaymentMethodAction(input: {
 
 export async function getPartnerFinanceAccountsForPaymentMethodsAction(partnerId: string) {
     await requirePartnerAccessWithPermission(partnerId, "financial", "view")
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
     const { data, error } = await supabase
         .from("finance_accounts")
         .select("id, name, type, is_active")
