@@ -47,7 +47,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
         key: "logistics", path: "/erp/logistics", label: "Expedição e Entregas", category: "Vendas", legacyCategory: "orders",
         specificPermissions: [
             "can_update_delivery_status", "can_assign_driver",
-            "can_print_label", "can_generate_tracking",
+            "can_print_label", "can_generate_tracking", "can_view_delivery_details",
         ],
     },
     invoices: { key: "invoices", path: "/erp/invoices", label: "Notas Fiscais", category: "Vendas", legacyCategory: "orders" },
@@ -350,14 +350,14 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
 const DELIVERY_PERMISSIONS: PartnerRoutePermissions = {
     dashboard: noAccess,
     // Vendas - view assigned orders only, update delivery status
-    orders: withSpecific(viewOnly, {
-        can_cancel_order: false, can_refund: false, can_update_status: true,
+    orders: withSpecific(noAccess, {
+        can_cancel_order: false, can_refund: false, can_update_status: false,
         can_assign_delivery: false, can_view_values: false,
     }),
     returns: noAccess,
     logistics: withSpecific(viewOnly, {
         can_update_delivery_status: true, can_assign_driver: false,
-        can_print_label: false, can_generate_tracking: false,
+        can_print_label: false, can_generate_tracking: false, can_view_delivery_details: true,
     }),
     invoices: noAccess,
     pos: noAccess,
@@ -464,7 +464,7 @@ export function canAccessPath(permissions: PartnerRoutePermissions | null | unde
     return canAccessRoute(permissions, routeKey)
 }
 
-// ─── Legacy Compatibility ───────────────────────────────────────────────────
+// ─── Permission Model Compatibility ─────────────────────────────────────────
 
 /**
  * Convert route permissions to legacy PartnerPermissions structure.
@@ -478,14 +478,56 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
         delete: routePerms[key]?.delete ?? false,
     })
 
+    const orders = mapRoute("orders")
+    const financial = mapRoute("financial_transactions")
+    const cashRegister = mapRoute("cash_register")
+    const logistics = mapRoute("logistics")
+    const pos = mapRoute("pos")
+
     return {
-        products: mapRoute("products"),
-        services: mapRoute("services"),
-        orders: mapRoute("orders"),
-        financial: mapRoute("financial_transactions"),
+        orders: {
+            view: orders.view,
+            create: orders.create,
+            edit: orders.edit,
+            delete_cancel: orders.delete,
+        },
+        appointments: mapRoute("appointments"),
         customers: mapRoute("customers"),
-        suppliers: mapRoute("suppliers"),
+        products: mapRoute("products"),
+        pdv: { view: pos.view, sell: pos.create || pos.edit },
+        cash_register: {
+            view: cashRegister.view,
+            open_close: cashRegister.create || hasSpecificPermission(routePerms, "cash_register", "can_open_cash") || hasSpecificPermission(routePerms, "cash_register", "can_close_cash"),
+            manage: cashRegister.edit,
+        },
+        services: mapRoute("services"),
         quotes: mapRoute("quotes"),
+        financial: { view: financial.view, create: financial.create, edit: financial.edit },
+        cadastros_categories: mapRoute("cadastros_produtos"),
+        coupons: mapRoute("marketing_coupons"),
+        goals: mapRoute("goals"),
+        reports: {
+            view_basic: mapRoute("financial_dashboard").view,
+            view_advanced: mapRoute("financial_dre").view,
+        },
+        delivery: {
+            view: logistics.view,
+            create: logistics.create,
+            edit: logistics.edit,
+            update_status: hasSpecificPermission(routePerms, "logistics", "can_update_delivery_status"),
+        },
+        team: mapRoute("settings_team"),
+        settings: {
+            view: mapRoute("settings").view,
+            edit: mapRoute("settings_business").edit,
+        },
+        specific: {
+            settings_plan: mapRoute("settings_subscription").view,
+            settings_comissions: mapRoute("settings").view,
+            settings_integrations: mapRoute("settings_integrations").view,
+            can_apply_discount: hasSpecificPermission(routePerms, "pos", "can_discount"),
+        },
+        suppliers: mapRoute("suppliers"),
     }
 }
 
@@ -504,29 +546,189 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
         delete: res.delete,
     })
 
-    // Override from legacy categories
-    const categoryRoutes: Record<keyof PartnerPermissions, RouteKey[]> = {
-        products: ["products", "stock_movements", "import_notes", "cadastros_produtos"],
-        services: ["appointments", "services", "cadastros_services"],
-        orders: ["orders", "returns", "logistics", "invoices", "pos", "goals"],
-        financial: ["financial_transactions", "cash_register", "financial_dashboard", "financial_dre", "cadastros_financeiro"],
-        customers: ["customers"],
-        suppliers: ["suppliers"],
-        quotes: ["quotes"],
+    const apply = (routeKey: RouteKey, patch: Partial<RoutePermissions>) => {
+        base[routeKey] = {
+            ...base[routeKey],
+            ...patch,
+            specific: {
+                ...(base[routeKey]?.specific || {}),
+                ...(patch.specific || {}),
+            },
+        }
     }
 
-    for (const [cat, routes] of Object.entries(categoryRoutes)) {
-        const legacyPerm = legacy[cat as keyof PartnerPermissions]
-        if (legacyPerm) {
-            const mapped = mapLegacy(legacyPerm)
-            for (const routeKey of routes) {
-                // Merge: keep specific permissions from base, override CRUD from legacy
-                base[routeKey] = {
-                    ...mapped,
-                    specific: base[routeKey]?.specific,
-                }
+    if (legacy.products) {
+        const mapped = mapLegacy(legacy.products)
+        ;["products", "stock_movements", "import_notes", "cadastros_produtos", "suppliers"].forEach((routeKey) =>
+            apply(routeKey as RouteKey, mapped)
+        )
+    }
+
+    if (legacy.services) {
+        const mapped = mapLegacy(legacy.services)
+        ;["appointments", "services", "cadastros_services"].forEach((routeKey) =>
+            apply(routeKey as RouteKey, mapped)
+        )
+    }
+
+    if (legacy.orders) {
+        const mapped: RoutePermissions = {
+            access: legacy.orders.view,
+            create: legacy.orders.create,
+            edit: legacy.orders.edit,
+            delete: legacy.orders.delete_cancel,
+        }
+        ;["orders", "returns", "invoices"].forEach((routeKey) => apply(routeKey as RouteKey, mapped))
+    }
+
+    if (legacy.delivery) {
+        apply("logistics", {
+            access: legacy.delivery.view,
+            create: legacy.delivery.create,
+            edit: legacy.delivery.edit,
+            specific: {
+                can_update_delivery_status: legacy.delivery.update_status,
+                can_view_delivery_details: legacy.delivery.view,
+            },
+        })
+    }
+
+    if (legacy.pdv) {
+        apply("pos", {
+            access: legacy.pdv.view,
+            create: legacy.pdv.sell,
+            edit: legacy.pdv.sell,
+            specific: { can_discount: legacy.specific?.can_apply_discount ?? false },
+        })
+    }
+
+    if (legacy.quotes) apply("quotes", mapLegacy(legacy.quotes))
+    if (legacy.goals) apply("goals", mapLegacy(legacy.goals))
+    if (legacy.customers) apply("customers", mapLegacy(legacy.customers))
+
+    if (legacy.financial) {
+        const mapped: RoutePermissions = {
+            access: legacy.financial.view,
+            create: legacy.financial.create,
+            edit: legacy.financial.edit,
+            delete: false,
+        }
+        ;["financial_transactions", "cadastros_financeiro"].forEach((routeKey) => apply(routeKey as RouteKey, mapped))
+    }
+
+    if (legacy.cash_register) {
+        apply("cash_register", {
+            access: legacy.cash_register.view,
+            create: legacy.cash_register.open_close,
+            edit: legacy.cash_register.manage,
+            specific: {
+                can_open_cash: legacy.cash_register.open_close,
+                can_close_cash: legacy.cash_register.open_close,
+            },
+        })
+    }
+
+    if (legacy.coupons) apply("marketing_coupons", mapLegacy(legacy.coupons))
+    if (legacy.cadastros_categories) apply("cadastros_produtos", mapLegacy(legacy.cadastros_categories))
+
+    if (legacy.reports) {
+        apply("financial_dashboard", { access: legacy.reports.view_basic })
+        apply("financial_dre", { access: legacy.reports.view_advanced, specific: { can_view_dre: legacy.reports.view_advanced } })
+    }
+
+    if (legacy.team) {
+        apply("settings_team", {
+            access: legacy.team.view,
+            create: legacy.team.create,
+            edit: legacy.team.edit,
+            delete: legacy.team.delete,
+            specific: {
+                can_invite: legacy.team.create,
+                can_remove_member: legacy.team.delete,
+                can_manage_team: legacy.team.edit,
+            },
+        })
+    }
+
+    if (legacy.settings) {
+        apply("settings", { access: legacy.settings.view })
+        apply("settings_business", { access: legacy.settings.view, edit: legacy.settings.edit })
+    }
+
+    if (legacy.specific) {
+        apply("settings_subscription", { access: legacy.specific.settings_plan })
+        apply("settings_integrations", { access: legacy.specific.settings_integrations })
+    }
+
+    return base
+}
+
+function isRoutePermissionEntry(value: unknown): value is RoutePermissions {
+    if (!value || typeof value !== "object") return false
+    const maybe = value as Record<string, unknown>
+    return typeof maybe.access === "boolean"
+}
+
+function isLegacyResourceEntry(value: unknown): value is ResourcePermissions {
+    if (!value || typeof value !== "object") return false
+    const maybe = value as Record<string, unknown>
+    return (
+        typeof maybe.view === "boolean" &&
+        typeof maybe.create === "boolean" &&
+        typeof maybe.edit === "boolean" &&
+        typeof maybe.delete === "boolean"
+    )
+}
+
+export function isRoutePermissionsShape(value: unknown): value is Partial<PartnerRoutePermissions> {
+    if (!value || typeof value !== "object") return false
+    return (Object.keys(ROUTE_MAP) as RouteKey[]).some((key) => isRoutePermissionEntry((value as Record<string, unknown>)[key]))
+}
+
+export function isLegacyPermissionsShape(value: unknown): value is Partial<PartnerPermissions> {
+    if (!value || typeof value !== "object") return false
+    const v = value as Record<string, unknown>
+    return (
+        isLegacyResourceEntry(v.products) ||
+        isLegacyResourceEntry(v.services) ||
+        isLegacyResourceEntry(v.customers) ||
+        isLegacyResourceEntry(v.quotes) ||
+        isLegacyResourceEntry(v.coupons) ||
+        isLegacyResourceEntry(v.goals) ||
+        (typeof v.orders === "object" && v.orders !== null && typeof (v.orders as any).delete_cancel === "boolean") ||
+        (typeof v.pdv === "object" && v.pdv !== null && typeof (v.pdv as any).sell === "boolean") ||
+        (typeof v.delivery === "object" && v.delivery !== null && typeof (v.delivery as any).update_status === "boolean")
+    )
+}
+
+/**
+ * Normalize whatever is stored in DB (`partner_users.permissions`) into route permissions.
+ * Accepts route-based JSON, legacy category JSON, partial objects, or null.
+ */
+export function normalizeToRoutePermissions(role: PartnerRole, stored: unknown): PartnerRoutePermissions {
+    const base = { ...ROUTE_PERMISSION_PRESETS[role] }
+
+    if (!stored || typeof stored !== "object") return base
+
+    if (isRoutePermissionsShape(stored)) {
+        const patch = stored as Record<string, RoutePermissions>
+        for (const key of Object.keys(ROUTE_MAP) as RouteKey[]) {
+            const incoming = patch[key]
+            if (!incoming || typeof incoming.access !== "boolean") continue
+            base[key] = {
+                ...base[key],
+                ...incoming,
+                specific: {
+                    ...(base[key]?.specific || {}),
+                    ...(incoming.specific || {}),
+                },
             }
         }
+        return base
+    }
+
+    if (isLegacyPermissionsShape(stored)) {
+        return legacyToRoutePermissions(stored as PartnerPermissions, role)
     }
 
     return base

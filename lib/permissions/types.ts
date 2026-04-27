@@ -2,7 +2,7 @@
 
 export type PartnerRole = "OWNER" | "ADMIN" | "MANAGER" | "OPERATOR" | "DELIVERY"
 
-// Legacy CRUD permissions (kept for backward compat with existing server actions)
+// Generic CRUD permissions reused by several modules
 export interface ResourcePermissions {
     view: boolean
     create: boolean
@@ -10,15 +10,75 @@ export interface ResourcePermissions {
     delete: boolean
 }
 
-// Legacy category-based permissions (backward compat)
+export interface OrdersPermissions {
+    view: boolean
+    create: boolean
+    edit: boolean
+    delete_cancel: boolean
+}
+
+export interface PdvPermissions {
+    view: boolean
+    sell: boolean
+}
+
+export interface CashRegisterPermissions {
+    view: boolean
+    open_close: boolean
+    manage: boolean
+}
+
+export interface FinancialPermissions {
+    view: boolean
+    create: boolean
+    edit: boolean
+}
+
+export interface ReportsPermissions {
+    view_basic: boolean
+    view_advanced: boolean
+}
+
+export interface DeliveryPermissions {
+    view: boolean
+    create: boolean
+    edit: boolean
+    update_status: boolean
+}
+
+export interface SettingsPermissions {
+    view: boolean
+    edit: boolean
+}
+
+export interface SpecificPermissions {
+    settings_plan: boolean
+    settings_comissions: boolean
+    settings_integrations: boolean
+    can_apply_discount: boolean
+}
+
+// Canonical DB model for `partner_users.permissions` / `partner_invitations.permissions`
 export interface PartnerPermissions {
-    products: ResourcePermissions
-    services: ResourcePermissions
-    orders: ResourcePermissions
-    financial: ResourcePermissions
+    orders: OrdersPermissions
+    appointments: ResourcePermissions
     customers: ResourcePermissions
-    suppliers: ResourcePermissions
+    products: ResourcePermissions
+    pdv: PdvPermissions
+    cash_register: CashRegisterPermissions
+    services: ResourcePermissions
     quotes: ResourcePermissions
+    financial: FinancialPermissions
+    cadastros_categories: ResourcePermissions
+    coupons: ResourcePermissions
+    goals: ResourcePermissions
+    reports: ReportsPermissions
+    delivery: DeliveryPermissions
+    team: ResourcePermissions
+    settings: SettingsPermissions
+    specific: SpecificPermissions
+    // Backward compatibility alias still used by old mappings/actions
+    suppliers?: ResourcePermissions
 }
 
 // ─── New Route-Based Permissions ────────────────────────────────────────────
@@ -77,7 +137,7 @@ export type RouteKey =
 export type PartnerRoutePermissions = Record<RouteKey, RoutePermissions>
 
 // Legacy category names (used by existing server actions)
-export type LegacyCategory = keyof PartnerPermissions
+export type LegacyCategory = "products" | "services" | "orders" | "financial" | "customers" | "suppliers" | "quotes"
 
 export interface PartnerUserRecord {
     id: string

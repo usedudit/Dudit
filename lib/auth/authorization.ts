@@ -5,6 +5,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import type { User } from "@supabase/supabase-js"
 import type { PartnerPermissions, PartnerRole, ResourcePermissions } from "@/lib/permissions/types"
+import { canAccessRoute, hasSpecificPermission, normalizeToRoutePermissions, routeToLegacyPermissions } from "@/lib/permissions/route-permissions"
 
 // ─── Auth Errors ────────────────────────────────────────────────────────────
 
@@ -103,6 +104,7 @@ export async function requirePartner(resolvedUser?: User | any): Promise<{ id: s
 
 import { getAllUserPartnerAccess } from "@/lib/auth/partner-context"
 import { mergePartnerPermissions } from "@/lib/permissions/merge-partner-permissions"
+import { PERMISSION_PRESETS } from "@/lib/permissions/partner-roles"
 
 /**
  * Check if a user has access to a partner via partner_users OR as the legacy owner.
@@ -168,14 +170,7 @@ const checkPartnerAccess = async (
   if (ownedPartnerRes.data && ownedPartnerRes.data.user_id === userId) {
     return {
       role: "OWNER",
-      permissions: {
-        products: { view: true, create: true, edit: true, delete: true },
-        services: { view: true, create: true, edit: true, delete: true },
-        orders: { view: true, create: true, edit: true, delete: true },
-        financial: { view: true, create: true, edit: true, delete: true },
-        customers: { view: true, create: true, edit: true, delete: true },
-        quotes: { view: true, create: true, edit: true, delete: true },
-      }
+      permissions: PERMISSION_PRESETS.OWNER
     }
   }
 
@@ -492,7 +487,9 @@ export async function requirePartnerAccessWithPermission(
   // Check granular permission if resource and action are specified
   // OWNERs always have full permissions (handled by checkPartnerAccess fallback)
   if (resource && action) {
-    if (!permissions?.[resource]?.[action]) {
+    const normalizedRoute = normalizeToRoutePermissions(String(access.role) as PartnerRole, permissions)
+    const legacyAdapter = routeToLegacyPermissions(normalizedRoute) as any
+    if (!legacyAdapter?.[resource]?.[action]) {
       throw new ForbiddenError("Sem permissão para esta ação")
     }
   }
@@ -577,3 +574,37 @@ export const requirePartnerAccess = cache(async (partnerId: string, resolvedUser
 }> => {
   return requirePartnerAccessWithPermission(partnerId, undefined, undefined, resolvedUser)
 })
+
+/**
+ * Route-aware authorization sourced from DB permissions.
+ * This is the canonical backend guard for ERP route-level checks.
+ */
+export async function requirePartnerRouteAccess(
+  partnerId: string,
+  routeKey: import("@/lib/permissions/types").RouteKey,
+  options?: { specificPermission?: string; resolvedUser?: User | any }
+): Promise<{
+  partnerId: string
+  userId: string
+  role: PartnerRole
+  permissions: PartnerPermissions
+}> {
+  const access = await requirePartnerAccessWithPermission(partnerId, undefined, undefined, options?.resolvedUser)
+  const role = String(access.role) as PartnerRole
+  const routePermissions = normalizeToRoutePermissions(role, access.permissions)
+
+  if (!canAccessRoute(routePermissions, routeKey)) {
+    throw new ForbiddenError("Sem permissão para acessar este módulo")
+  }
+
+  if (options?.specificPermission && !hasSpecificPermission(routePermissions, routeKey, options.specificPermission)) {
+    throw new ForbiddenError("Sem permissão para esta ação")
+  }
+
+  return {
+    partnerId: access.partnerId,
+    userId: access.userId,
+    role,
+    permissions: access.permissions as PartnerPermissions,
+  }
+}

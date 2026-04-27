@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccess, requireUser } from "@/lib/auth/authorization"
+import { requirePartnerRouteAccess, requireUser } from "@/lib/auth/authorization"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { createCommissionExpenseForEntity, reverseCommissionForEntity } from "@/lib/services/commission-ledger.service"
 
@@ -30,6 +30,23 @@ type Coordinate = { lat: number; lon: number }
 
 const DEFAULT_PAGE_SIZE = 100
 const ACTIVE_DELIVERY_STATUSES = ["pending", "not_sent", "preparing", "sent", "pickup_available"] as const
+
+async function getDeliveryActorScope(partnerId: string) {
+  const access = await requirePartnerRouteAccess(partnerId, "logistics")
+  if (access.role !== "DELIVERY") {
+    return { role: access.role, partnerUserId: null as string | null }
+  }
+
+  const supabase = await getSupabaseServerClient()
+  const { data: partnerUser } = await supabase
+    .from("partner_users")
+    .select("id")
+    .eq("partner_id", partnerId)
+    .eq("user_id", access.userId)
+    .maybeSingle()
+
+  return { role: access.role, partnerUserId: partnerUser?.id ? String(partnerUser.id) : null }
+}
 
 async function getPartnerUserNameByIdMap(
   supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
@@ -173,7 +190,8 @@ async function resolveRouteEstimate(origin: Coordinate, destination: Coordinate)
 
 export async function fetchDeliveryOrderBucketAction(partnerId: string) {
   await requireUser()
-  await requirePartnerAccess(partnerId)
+  const actor = await getDeliveryActorScope(partnerId)
+  if (actor.role === "DELIVERY") return []
   const planCheck = await enforceDeliveryPlanAccess(partnerId, 1)
   if (!planCheck.allowed) return []
   const supabase = await getSupabaseServerClient()
@@ -240,7 +258,8 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
 
 export async function fetchDeliveryPeopleBucketAction(partnerId: string) {
   await requireUser()
-  await requirePartnerAccess(partnerId)
+  const actor = await getDeliveryActorScope(partnerId)
+  if (actor.role === "DELIVERY") return []
   const supabase = await getSupabaseServerClient()
 
   const { data, error } = await supabase
@@ -276,7 +295,10 @@ export async function fetchDeliveryPeopleBucketAction(partnerId: string) {
 
 export async function createERPDeliveryAction(payload: CreateDeliveryPayload) {
   await requireUser()
-  await requirePartnerAccess(payload.partnerId)
+  const actor = await getDeliveryActorScope(payload.partnerId)
+  if (actor.role === "DELIVERY") {
+    return { success: false as const, error: "Sem permissão para criar entregas." }
+  }
   const supabase = await getSupabaseServerClient()
 
   const orderIds = Array.from(new Set(payload.orderIds || [])).filter(Boolean)
@@ -400,7 +422,7 @@ export async function getERPDeliveriesPageAction(
 > {
   try {
     await requireUser()
-    await requirePartnerAccess(partnerId)
+    const actor = await getDeliveryActorScope(partnerId)
     const planCheck = await enforceDeliveryPlanAccess(partnerId, 1)
     if (!planCheck.allowed) {
       const slug = String(planCheck.planSlug || "").toLowerCase()
@@ -445,6 +467,11 @@ export async function getERPDeliveriesPageAction(
       `)
       .eq("partner_id", partnerId)
 
+    if (actor.role === "DELIVERY") {
+      if (!actor.partnerUserId) return { success: true, items: [], nextCursor: null, hasMore: false }
+      q = q.eq("delivery_person_id", actor.partnerUserId)
+    }
+
     if (cursor) q = q.or(buildKeysetFilter(cursor))
 
     const { data, error } = await q
@@ -476,7 +503,8 @@ export async function getERPDeliveriesPageAction(
 
 export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId: string) {
   await requireUser()
-  await requirePartnerAccess(partnerId)
+  const actor = await getDeliveryActorScope(partnerId)
+  await requirePartnerRouteAccess(partnerId, "logistics", { specificPermission: "can_view_delivery_details" })
   const planCheck = await enforceDeliveryPlanAccess(partnerId, 1)
   if (!planCheck.allowed) return { success: false as const, error: planCheck.error }
   const supabase = await getSupabaseServerClient()
@@ -506,6 +534,10 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
     .eq("partner_id", partnerId)
     .single()
 
+  if (actor.role === "DELIVERY" && actor.partnerUserId && String(data?.delivery_person_id || "") !== actor.partnerUserId) {
+    return { success: false as const, error: "Sem permissão para visualizar esta entrega." }
+  }
+
   if (error) return { success: false as const, error: error.message }
 
   const deliveryPersonNameById = await getPartnerUserNameByIdMap(
@@ -529,7 +561,8 @@ export async function updateERPDeliveryStatusAction(params: {
   status: DeliveryStatusValue
 }) {
   const user = await requireUser()
-  await requirePartnerAccess(params.partnerId)
+  const actor = await getDeliveryActorScope(params.partnerId)
+  await requirePartnerRouteAccess(params.partnerId, "logistics", { specificPermission: "can_update_delivery_status" })
   const planCheck = await enforcePlanOnExistingDelivery(params.partnerId, params.deliveryId)
   if (!planCheck.allowed) return { success: false as const, error: planCheck.error }
   const supabase = await getSupabaseServerClient()
@@ -541,6 +574,9 @@ export async function updateERPDeliveryStatusAction(params: {
     .eq("partner_id", params.partnerId)
     .maybeSingle()
   if (!currentDelivery?.id) return { success: false as const, error: "Entrega não encontrada." }
+  if (actor.role === "DELIVERY" && actor.partnerUserId && String(currentDelivery.delivery_person_id || "") !== actor.partnerUserId) {
+    return { success: false as const, error: "Sem permissão para alterar esta entrega." }
+  }
 
   const allowed = new Set<DeliveryStatusValue>([
     "not_sent",
@@ -618,7 +654,10 @@ export async function updateERPDeliveryAction(payload: {
   notes?: string
 }) {
   await requireUser()
-  await requirePartnerAccess(payload.partnerId)
+  const actor = await getDeliveryActorScope(payload.partnerId)
+  if (actor.role === "DELIVERY") {
+    return { success: false as const, error: "Sem permissão para editar entregas." }
+  }
   const supabase = await getSupabaseServerClient()
 
   const orderIds = Array.from(new Set(payload.orderIds || [])).filter(Boolean)

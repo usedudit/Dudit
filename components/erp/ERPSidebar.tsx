@@ -38,6 +38,7 @@ interface NavItem {
     label: string
     href?: string
     submenu?: SubMenuItem[]
+    directAccess?: boolean
 }
 
 const navItems: NavItem[] = [
@@ -267,7 +268,11 @@ export function ERPSidebar() {
                 if (newItem.submenu) {
                     const filteredSub = newItem.submenu.filter((sub) => canAccess(sub.href) || Boolean(PLAN_GATED_MINIMUM[sub.href]))
                     if (filteredSub.length === 0) return null
-                    return { ...newItem, submenu: filteredSub }
+                    return {
+                        ...newItem,
+                        submenu: filteredSub,
+                        directAccess: newItem.href ? canAccess(newItem.href) : false,
+                    }
                 }
 
                 return newItem
@@ -413,6 +418,7 @@ export function ERPSidebar() {
                         {filteredNavItems.map((item) => {
                             const Icon = item.icon
                             const hasSubmenu = item.submenu && item.submenu.length > 0
+                            const canOpenDirectPage = item.directAccess !== false
                             const isMenuExpanded = openSubmenu === item.label
 
                             const isDirectActive = item.href ? isActivePath(item.href) : false
@@ -427,7 +433,7 @@ export function ERPSidebar() {
                                     onMouseLeave={handleMouseLeave}
                                 >
                                     <div className="w-full">
-                                        {item.href ? (
+                                        {item.href && canOpenDirectPage ? (
                                             <Link
                                                 href={item.href}
                                                 prefetch={false}

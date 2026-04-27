@@ -158,14 +158,29 @@ export async function quoteDeliveryFeeAction(input: {
     return { success: false as const, error: "Entrega desativada para esta loja." }
   }
 
-  const originAddress = [
-    [store?.street, store?.number].filter(Boolean).join(", "),
-    [store?.city, store?.state].filter(Boolean).join(", "),
-    store?.zip_code || "",
-  ].filter(Boolean).join(" ")
+  const shouldCalculateDistance = capability.advancedEnabled && (
+    settings.maxDeliveryKm != null ||
+    settings.extraKmPrice > 0
+  )
 
-  const distanceKm = await calculateRouteDistanceKm(originAddress, input.destinationAddress)
-  if (distanceKm == null) return { success: false as const, error: "Não foi possível calcular a distância de entrega." }
+  let distanceKm = 0
+  if (shouldCalculateDistance) {
+    const originAddress = [
+      [store?.street, store?.number].filter(Boolean).join(", "),
+      [store?.city, store?.state].filter(Boolean).join(", "),
+      store?.zip_code || "",
+    ].filter(Boolean).join(" ")
+
+    if (!originAddress) {
+      return { success: false as const, error: "Endereço da loja incompleto para calcular entrega por distância." }
+    }
+
+    const calculatedDistance = await calculateRouteDistanceKm(originAddress, input.destinationAddress)
+    if (calculatedDistance == null) {
+      return { success: false as const, error: "Não foi possível calcular a distância de entrega." }
+    }
+    distanceKm = calculatedDistance
+  }
 
   const rules = capability.advancedEnabled ? (rulesRows || []).map(mapRuleRow) : []
   const priced = calculateDeliveryFee({

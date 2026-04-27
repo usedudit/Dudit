@@ -27,7 +27,7 @@ import {
   getActivePartnerId,
 } from "@/lib/auth/partner-context"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
-import { ROUTE_PERMISSION_PRESETS, legacyToRoutePermissions } from "@/lib/permissions/route-permissions"
+import { normalizeToRoutePermissions } from "@/lib/permissions/route-permissions"
 import type { PartnerRole, PartnerRoutePermissions } from "@/lib/permissions/types"
 
 export default async function ERPLayout({
@@ -85,14 +85,7 @@ export default async function ERPLayout({
 
   // ── Resolve route permissions ──
   const role = (context.role || "OWNER") as PartnerRole
-  let routePermissions: PartnerRoutePermissions
-
-  // If the user has legacy-format permissions, convert them; otherwise use role preset
-  if (context.permissions && typeof context.permissions === "object") {
-    routePermissions = legacyToRoutePermissions(context.permissions, role)
-  } else {
-    routePermissions = ROUTE_PERMISSION_PRESETS[role]
-  }
+  const routePermissions: PartnerRoutePermissions = normalizeToRoutePermissions(role, context.permissions)
 
   // Read sidebar cookie
   const cookieStore = await cookies()
