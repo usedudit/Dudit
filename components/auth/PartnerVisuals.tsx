@@ -36,18 +36,35 @@ const BlobGreenLight = ({ className }: { className?: string }) => (
 
 const slides = [
   {
-    title: "Tudo no lugar, do seu jeito",
-    subtitle: "Dê tchau para a bagunça. Gerencie produtos, serviços e pedidos em um só lugar, sem complicação.",
+    title: "Chega de bagunça nas vendas",
+    subtitle: "Organize pedidos, clientes e produtos em um só lugar.",
     image: "/images/dino-gerente.png", // Dino com Crachá
   },
   {
-    title: "O controle total na sua mão",
-    subtitle: "Saiba quanto vendeu e o que tem no estoque em segundos. Chega de quebrar a cabeça com contas.",
+    title: "Simples de usar, de verdade",
+    subtitle: "Funciona junto com seu WhatsApp. Sem complicação.",
     image: "/images/dino-sucesso.png", // Dino com Joinha
   },
   {
-    title: "Sua loja na vitrine do bairro",
-    subtitle: "Seus vizinhos vão te achar online! Venda na Vitrine da Dudit com taxa zero e comissão zero.",
+    title: "Venda sem pagar taxa",
+    subtitle: "Fique com todo o lucro do que você vende, sem comissão.",
+    image: "/images/dino-vitrine.png", // Dino Acenando
+  },
+
+  // Modo anuncio rapido
+  {
+    title: "Anuncie em minutos",
+    subtitle: "Crie seu anúncio rápido e comece a receber mensagens.",
+    image: "/images/dino-vitrine.png", // Dino Acenando
+  },
+  {
+    title: "Sem complicação",
+    subtitle: "Sem sistema, sem burocracia. Só anunciar e pronto.",
+    image: "/images/dino-vitrine.png", // Dino Acenando
+  },
+  {
+    title: "Totalmente grátis",
+    subtitle: "Divulgue o que quiser sem pagar nada.",
     image: "/images/dino-vitrine.png", // Dino Acenando
   },
 ]

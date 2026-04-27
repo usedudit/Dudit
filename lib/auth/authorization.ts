@@ -555,7 +555,7 @@ export async function checkPartnerPermission(
     if (!access) return { allowed: false }
 
     const permissions = access.permissions as PartnerPermissions
-    return { allowed: !!permissions?.[resource]?.[action] }
+    return { allowed: !!(permissions as any)?.[resource]?.[action] }
   } catch {
     return { allowed: false }
   }

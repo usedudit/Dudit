@@ -16,7 +16,7 @@ export function mergePartnerPermissions(role: PartnerRole, stored: unknown): Par
     const baseEntry = base[key]
     const patch = raw[key]
     if (!patch || typeof patch !== "object" || !baseEntry || typeof baseEntry !== "object") continue
-    out[key] = { ...(baseEntry as Record<string, unknown>), ...(patch as Record<string, unknown>) } as any
+    out[key] = { ...(baseEntry as any), ...(patch as any) } as any
   }
 
   return out
