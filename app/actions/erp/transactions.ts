@@ -1079,7 +1079,7 @@ export async function cancelPendingTransactionAction(input: {
         }
 
         const user = await getCurrentUser()
-        const actorName = user?.full_name?.trim() || user?.email?.trim() || "Usuário"
+        const actorName = user?.user_metadata?.full_name?.trim() || user?.email?.trim() || "Usuário"
         const now = new Date()
         const cancelledAt = formatDateTime(now.toISOString()) || now.toLocaleString("pt-BR")
         const reason = String(input.reason || "").trim()

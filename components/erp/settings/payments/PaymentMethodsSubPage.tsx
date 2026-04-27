@@ -13,7 +13,8 @@ import { useNotification } from "@/hooks/use-notification"
 import { deletePaymentMethodAction, getPaymentMethodsAction, updatePaymentMethodAction } from "@/app/actions/erp/payment-methods"
 import { BlockedIcon, CheckCircleIcon, ChevronLeftIcon, TrashIcon } from "@/lib/icons"
 import PaymentMethodPageControls from "./PaymentMethodPageControls"
-import PaymentMethodListRow, { getPaymentTypeLabel, PaymentMethodListItem, PaymentMethodMobileItem } from "./PaymentMethodListRow"
+import PaymentMethodListRow, { getPaymentTypeLabel, PaymentMethodListItem } from "./PaymentMethodListRow"
+import PaymentMethodMobileItem from "./PaymentMethodMobileItem"
 
 const PAYMENT_METHODS_VERSION_PREFIX = "payment-methods-version:"
 const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated"
@@ -449,10 +450,6 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                                 setPaymentModalOpen(true)
                             }}
                             onDelete={(current) => setMethodToDelete(current)}
-                            onToggleStatus={togglePaymentStatus}
-                            isToggling={isTogglingStatus.has(method.id)}
-                            isDeleting={isDeletingMethod.has(method.id)}
-                            showSeparator={index < paginatedMethods.length - 1}
                         />
                     ))}
                 </div>
@@ -492,9 +489,6 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                                         setPaymentModalOpen(true)
                                     }}
                                     onDelete={(current) => setMethodToDelete(current)}
-                                    onToggleStatus={togglePaymentStatus}
-                                    isToggling={isTogglingStatus.has(method.id)}
-                                    isDeleting={isDeletingMethod.has(method.id)}
                                 />
                             ))}
                         </tbody>

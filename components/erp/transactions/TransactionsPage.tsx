@@ -1451,7 +1451,7 @@ export default function TransactionsPage({
                             <Button variant="outline" onClick={() => setConfirmCancelTransaction(null)} disabled={cancellingTransaction}>
                                 Voltar
                             </Button>
-                            <Button variant="danger" onClick={() => void handleConfirmCancelPending()} disabled={cancellingTransaction}>
+                            <Button variant="destructive" onClick={() => void handleConfirmCancelPending()} disabled={cancellingTransaction}>
                                 Confirmar cancelamento
                             </Button>
                         </div>

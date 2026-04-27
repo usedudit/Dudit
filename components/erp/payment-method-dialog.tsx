@@ -472,11 +472,11 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                                 <div className="space-y-2">
                                     <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Bandeiras aceitas</p>
                                     <div className="relative">
-                                        <div className="pointer-events-none absolute left-0 top-0 h-full w-10 bg-gradient-to-r from-white dark:from-dark-surface to-transparent z-10" />
-                                        <div className="pointer-events-none absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-white dark:from-dark-surface to-transparent z-10" />
+                                        <div className="pointer-events-none absolute left-0 top-0 h-full w-4 bg-gradient-to-r from-white dark:from-dark-surface to-transparent z-10" />
+                                        <div className="pointer-events-none absolute right-0 top-0 h-full w-4 bg-gradient-to-l from-white dark:from-dark-surface to-transparent z-10" />
                                         <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
                                             {selectedBrands.map((brand) => (
-                                                <div key={brand.id} className="h-14 md:h-16 rounded-2xl text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading bg-gray-50 dark:bg-dark-border/30 hover:bg-gray-100 dark:hover:bg-dark-border/50 transition-colors border border-transparent hover:border-brand-border dark:hover:border-dark-border active:scale-95 transform duration-100">
+                                                <div key={brand.id} className="h-14 h-auto rounded-2xl text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading bg-gray-50 dark:bg-dark-border/30 hover:bg-gray-100 dark:hover:bg-dark-border/50 px-2 py-1 transition-colors border border-transparent hover:border-brand-border dark:hover:border-dark-border">
                                                     <div className="flex items-center gap-2">
                                                         {renderBrandAvatar(brand)}
                                                         <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading truncate">{brand.label}</span>
@@ -564,8 +564,8 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                                                 <div className="space-y-2">
                                                     <label className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Parcelas e taxas</label>
                                                     <div className="relative">
-                                                        <div className="pointer-events-none absolute left-0 top-0 h-full w-10 bg-gradient-to-r from-brand-gray/10 dark:from-dark-border/10 to-transparent z-10" />
-                                                        <div className="pointer-events-none absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-brand-gray/10 dark:from-dark-border/10 to-transparent z-10" />
+                                                        <div className="pointer-events-none absolute left-0 top-0 h-full w-4 bg-gradient-to-r from-white dark:from-dark-surface to-transparent z-10" />
+                                                        <div className="pointer-events-none absolute right-0 top-0 h-full w-4 bg-gradient-to-l from-white dark:from-dark-surface to-transparent z-10" />
                                                         <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
                                                             {selectedInstallments.map((row) => (
                                                                 <div key={row.installment_number} className="shrink-0 rounded-xl bg-gray-50 dark:bg-dark-border/30 hover:bg-gray-100 dark:hover:bg-dark-border/50 transition-colors border border-transparent hover:border-brand-border dark:hover:border-dark-border duration-100 px-3 py-2">

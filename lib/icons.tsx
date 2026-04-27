@@ -110,7 +110,8 @@ import {
     ArrowTurnBackwardIcon as ArrowTurnBackwardIcon01,
     DeliverySent01Icon,
     DeliveryTracking01Icon,
-    SplitIcon
+    SplitIcon,
+    Target02Icon
 } from "@hugeicons/core-free-icons"
 
 interface IconProps {
@@ -285,6 +286,7 @@ export const MoreHorizontal = CreateIcon(MoreVerticalCircle01Icon)
 export const MoreHorizontalIcon = CreateIcon(MoreVerticalCircle01Icon)
 export const ThreeDotsIcon = CreateIcon(MoreVerticalCircle01Icon)
 export const ChartIcon = CreateIcon(Chart03Icon)
+export const TargetIcon = CreateIcon(Target02Icon)
 
 export const BoldIcon = CreateIcon(TextBoldIcon)
 export const ItalicIcon = CreateIcon(TextItalicIcon)
