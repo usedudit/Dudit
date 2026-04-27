@@ -27,6 +27,8 @@ import {
     ViewIcon,
     Mail01Icon,
     DiceFaces03Icon,
+    StarAward01Icon,
+    RankingIcon as RankingIcon01,
     WhatsappIcon as WhatsappIcon01,
     HelpCircleIcon as HelpCircle,
     Archive03Icon,
@@ -264,6 +266,8 @@ export const TruckIcon = CreateIcon(ShippingTruck01Icon)
 export const DeliverySentIcon = CreateIcon(DeliverySent01Icon)
 export const DeliveryPickupIcon = CreateIcon(DeliveryTracking01Icon)
 export const DeliveryFailedIcon = CreateIcon(RouteBlockIcon01)
+export const AwardIcon = CreateIcon(StarAward01Icon)
+export const RankingIcon = CreateIcon(RankingIcon01)
 
 
 // ============================

@@ -22,6 +22,7 @@ type GoalRow = {
   bonus_value: number
   applies_to: "all" | "user"
   user_id: string | null
+  goal_type: "sales" | "service_orders" | "both"
   scope_user_name?: string | null
   current_amount: number
   progress_percent: number
@@ -78,6 +79,7 @@ export default function GoalsPage(props: {
     bonusValue: "0",
     appliesTo: "all" as "all" | "user",
     userId: "",
+    goalType: "sales" as "sales" | "service_orders" | "both",
   })
 
   async function refreshData() {
@@ -131,6 +133,7 @@ export default function GoalsPage(props: {
       bonusValue: "0",
       appliesTo: "all",
       userId: "",
+      goalType: "sales",
     })
     setModalOpen(true)
   }
@@ -147,11 +150,16 @@ export default function GoalsPage(props: {
       bonusValue: String(goal.bonus_value || 0),
       appliesTo: goal.applies_to,
       userId: goal.user_id || "",
+      goalType: goal.goal_type || "sales",
     })
     setModalOpen(true)
   }
 
   const saveGoal = async () => {
+    if (!form.name.trim()) return toast({ title: "Erro", description: "Informe o nome da meta.", variant: "destructive" })
+    if (Number(form.targetAmount) <= 0) return toast({ title: "Erro", description: "O valor da meta deve ser maior que zero.", variant: "destructive" })
+    if (!form.startDate || !form.endDate) return toast({ title: "Erro", description: "Informe as datas de início e fim.", variant: "destructive" })
+
     setSaving(true)
     const res = await upsertSalesGoalAction({
       id: editingGoal?.id,
@@ -165,6 +173,7 @@ export default function GoalsPage(props: {
       bonusValue: Number(form.bonusValue || 0),
       appliesTo: form.appliesTo,
       userId: form.appliesTo === "user" ? form.userId || null : null,
+      goalType: form.goalType,
     })
     setSaving(false)
     if (!res.success) {
@@ -206,6 +215,14 @@ export default function GoalsPage(props: {
           search={search}
           onSearchChange={setSearch}
           onCreate={openCreate}
+          rankingPeriodMode={rankingPeriodMode}
+          onRankingPeriodModeChange={setRankingPeriodMode}
+          rankingStartDate={rankingStartDate}
+          onRankingStartDateChange={setRankingStartDate}
+          rankingEndDate={rankingEndDate}
+          onRankingEndDateChange={setRankingEndDate}
+          onApplyRankingFilter={refreshRanking}
+          rankingLoading={rankingLoading}
         />
 
         <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-10">
@@ -232,13 +249,16 @@ export default function GoalsPage(props: {
                           <p className="text-sm text-brand-inactive-text dark:text-dark-body">
                             {goal.period_type === "monthly" ? "Mensal" : "Semanal"} • {goal.start_date} a {goal.end_date}
                           </p>
+                          <p className="text-xs text-brand-inactive-text mt-1">
+                            Tipo: {goal.goal_type === "sales" ? "Vendas" : goal.goal_type === "service_orders" ? "Ordem de Serviço" : "Ambos"}
+                          </p>
                         </div>
                         <Badge variant={goal.status === "Concluída" ? "green" : goal.status === "Expirada" ? "red" : "orange"}>
                           {goal.status}
                         </Badge>
                       </div>
 
-                      <div className="space-y-2">
+                      <div className="space-y-2 mt-4">
                         <div className="text-sm text-brand-dark dark:text-dark-heading">
                           Meta: <strong>{formatCurrency(goal.target_amount)}</strong>
                         </div>
@@ -250,11 +270,10 @@ export default function GoalsPage(props: {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 mt-4">
-                        <Button variant="outline" onClick={() => openEdit(goal)}>Editar</Button>
-                        <Button variant="outline" onClick={() => openEdit(goal)}>Ver detalhes</Button>
-                        <Button variant="ghost" disabled={deletingId === goal.id} onClick={() => removeGoal(goal.id)}>
-                          {deletingId === goal.id ? "Excluindo..." : "Excluir"}
+                      <div className="flex items-center gap-2 mt-6">
+                        <Button variant="outline" className="flex-1 rounded-xl h-10 text-xs" onClick={() => openEdit(goal)}>Editar</Button>
+                        <Button variant="ghost" className="flex-1 rounded-xl h-10 text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" disabled={deletingId === goal.id} onClick={() => removeGoal(goal.id)}>
+                          {deletingId === goal.id ? "..." : "Excluir"}
                         </Button>
                       </div>
                     </div>
@@ -267,33 +286,9 @@ export default function GoalsPage(props: {
           )}
 
           {activeTab === "Ranking" && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-2">
-                <FormDropdown
-                  label="Período"
-                  value={rankingPeriodMode}
-                  setValue={(value) => setRankingPeriodMode(value as "monthly" | "weekly" | "custom")}
-                  options={[
-                    { value: "monthly", label: "Mensal" },
-                    { value: "weekly", label: "Semanal" },
-                    { value: "custom", label: "Personalizado" },
-                  ]}
-                />
-                {rankingPeriodMode === "custom" && (
-                  <>
-                    <Input label="Data início" type="date" value={rankingStartDate} onChange={(e) => setRankingStartDate(e.target.value)} />
-                    <Input label="Data fim" type="date" value={rankingEndDate} onChange={(e) => setRankingEndDate(e.target.value)} />
-                  </>
-                )}
-                <div className="flex items-end">
-                  <Button onClick={refreshRanking} disabled={rankingLoading || (rankingPeriodMode === "custom" && (!rankingStartDate || !rankingEndDate))}>
-                    {rankingLoading ? "Carregando..." : "Aplicar filtro"}
-                  </Button>
-                </div>
-              </div>
-
+            <div className="space-y-4">
               {ranking.length === 0 && !rankingLoading ? (
-                <div className="min-h-[260px] flex items-center justify-center">
+                <div className="min-h-[320px] flex items-center justify-center">
                   <IconPlaceholder
                     placeholderType="image"
                     imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
@@ -302,49 +297,48 @@ export default function GoalsPage(props: {
                     subtitle="Ajuste o período para visualizar o ranking de vendedores."
                   />
                 </div>
-              ) : null}
-
-              {ranking.map((row) => {
-                const medal = row.position === 1 ? "🥇" : row.position === 2 ? "🥈" : row.position === 3 ? "🥉" : ""
-                return (
-                  <div key={row.user_id} className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-bold text-brand-dark dark:text-dark-heading">
-                        #{row.position} {medal} {row.seller_name}
-                      </p>
-                      <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                        Total vendido: {formatCurrency(row.total_amount)}
-                      </p>
-                    </div>
-                    <Badge variant={row.position <= 3 ? "green" : "gray"}>{row.progress_percent}% meta</Badge>
-                  </div>
-                )
-              })}
+              ) : (
+                <div className="grid grid-cols-1 gap-3">
+                  {ranking.map((row) => {
+                    const medal = row.position === 1 ? "🥇" : row.position === 2 ? "🥈" : row.position === 3 ? "🥉" : ""
+                    const isTop3 = row.position <= 3
+                    return (
+                      <div 
+                        key={row.user_id} 
+                        className={`rounded-2xl border ${isTop3 ? 'border-brand-green bg-brand-green/5' : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface'} p-5 flex items-center justify-between gap-4 transition-all hover:shadow-sm`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${isTop3 ? 'bg-brand-green text-white' : 'bg-brand-gray text-brand-dark'}`}>
+                            {row.position}
+                          </div>
+                          <div>
+                            <p className="font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2 text-lg">
+                              {row.seller_name} {medal}
+                            </p>
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                              Total vendido: <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(row.total_amount)}</span>
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-brand-inactive-text mb-1 font-medium">Atingimento da meta</p>
+                          <Badge variant={isTop3 ? "green" : "gray"} className="text-sm px-3 py-1">{row.progress_percent}%</Badge>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )}
 
           {activeTab === "Resumo" && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="rounded-2xl border border-brand-border dark:border-dark-border p-4">
-                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Total vendido</p>
-                <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(summary.total_sold)}</p>
-              </div>
-              <div className="rounded-2xl border border-brand-border dark:border-dark-border p-4">
-                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Total em comissões</p>
-                <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(summary.total_commissions)}</p>
-              </div>
-              <div className="rounded-2xl border border-brand-border dark:border-dark-border p-4">
-                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Total em bônus pagos</p>
-                <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(summary.total_bonus_paid)}</p>
-              </div>
-              <div className="rounded-2xl border border-brand-border dark:border-dark-border p-4">
-                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Metas ativas</p>
-                <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{summary.active_goals}</p>
-              </div>
-              <div className="rounded-2xl border border-brand-border dark:border-dark-border p-4">
-                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Metas concluídas</p>
-                <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{summary.achieved_goals}</p>
-              </div>
+              <SummaryCard title="Total vendido" value={formatCurrency(summary.total_sold)} />
+              <SummaryCard title="Total em comissões" value={formatCurrency(summary.total_commissions)} />
+              <SummaryCard title="Total em bônus pagos" value={formatCurrency(summary.total_bonus_paid)} />
+              <SummaryCard title="Metas ativas" value={String(summary.active_goals)} />
+              <SummaryCard title="Metas concluídas" value={String(summary.achieved_goals)} />
             </div>
           )}
         </div>
@@ -356,45 +350,76 @@ export default function GoalsPage(props: {
         title={editingGoal ? "Editar meta" : "Nova meta"}
         footer={
           <div className="flex justify-end gap-3 w-full">
-            <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
-            <Button onClick={saveGoal} disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
+            <Button variant="outline" className="rounded-xl" onClick={() => setModalOpen(false)}>Cancelar</Button>
+            <Button className="rounded-xl px-8" onClick={saveGoal} disabled={saving}>{saving ? "Salvando..." : "Salvar meta"}</Button>
           </div>
         }
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <Input label="Nome" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="md:col-span-2">
+            <Input label="Nome da meta" placeholder="Ex: Meta de Vendas Abril" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+          </div>
+          
           <FormDropdown
-            label="Período"
+            label="Tipo de Meta"
+            value={form.goalType}
+            setValue={(value) => setForm((p) => ({ ...p, goalType: value as any }))}
+            options={[
+              { value: "sales", label: "Apenas Vendas" },
+              { value: "service_orders", label: "Apenas Ordens de Serviço" },
+              { value: "both", label: "Vendas e Ordens de Serviço" }
+            ]}
+          />
+          
+          <FormDropdown
+            label="Recorrência"
             value={form.periodType}
             setValue={(value) => setForm((p) => ({ ...p, periodType: value as any }))}
             options={[{ value: "monthly", label: "Mensal" }, { value: "weekly", label: "Semanal" }]}
           />
-          <Input label="Data início" type="date" value={form.startDate} onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))} />
-          <Input label="Data fim" type="date" value={form.endDate} onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))} />
-          <Input label="Valor meta" value={form.targetAmount} onChange={(e) => setForm((p) => ({ ...p, targetAmount: e.target.value }))} />
+          
+          <Input label="Início" type="date" value={form.startDate} onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))} />
+          <Input label="Fim" type="date" value={form.endDate} onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))} />
+          
+          <Input label="Valor Alvo (R$)" placeholder="0,00" value={form.targetAmount} onChange={(e) => setForm((p) => ({ ...p, targetAmount: e.target.value }))} />
+          
+          <div className="grid grid-cols-2 gap-2">
+            <FormDropdown
+              label="Tipo bônus"
+              value={form.bonusType}
+              setValue={(value) => setForm((p) => ({ ...p, bonusType: value as any }))}
+              options={[{ value: "fixed", label: "Fixo (R$)" }, { value: "percentage", label: "Percentual (%)" }]}
+            />
+            <Input label="Valor bônus" value={form.bonusValue} onChange={(e) => setForm((p) => ({ ...p, bonusValue: e.target.value }))} />
+          </div>
+
           <FormDropdown
-            label="Tipo bônus"
-            value={form.bonusType}
-            setValue={(value) => setForm((p) => ({ ...p, bonusType: value as any }))}
-            options={[{ value: "fixed", label: "Fixo (R$)" }, { value: "percentage", label: "Percentual (%)" }]}
-          />
-          <Input label="Valor bônus" value={form.bonusValue} onChange={(e) => setForm((p) => ({ ...p, bonusValue: e.target.value }))} />
-          <FormDropdown
-            label="Aplicação"
+            label="Abrangência"
             value={form.appliesTo}
             setValue={(value) => setForm((p) => ({ ...p, appliesTo: value as any }))}
-            options={[{ value: "all", label: "Todos vendedores" }, { value: "user", label: "Vendedor específico" }]}
+            options={[{ value: "all", label: "Todos os vendedores" }, { value: "user", label: "Vendedor específico" }]}
           />
-          {form.appliesTo === "user" && (
+          
+          {form.appliesTo === "user" ? (
             <FormDropdown
               label="Vendedor"
               value={form.userId}
               setValue={(value) => setForm((p) => ({ ...p, userId: value }))}
               options={props.sellers.map((s) => ({ value: s.id, label: s.name }))}
             />
-          )}
+          ) : <div />}
         </div>
       </DefaultModal>
     </FadeIn>
   )
 }
+
+function SummaryCard({ title, value }: { title: string, value: string }) {
+  return (
+    <div className="rounded-2xl border border-brand-border dark:border-dark-border p-6 bg-white dark:bg-dark-surface shadow-sm">
+      <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-2 uppercase tracking-wider">{title}</p>
+      <p className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{value}</p>
+    </div>
+  )
+}
+

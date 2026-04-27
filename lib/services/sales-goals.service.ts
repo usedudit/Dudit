@@ -11,6 +11,7 @@ type GoalRow = {
   bonus_value: number
   applies_to: "all" | "user"
   user_id: string | null
+  goal_type?: "sales" | "service_orders" | "both"
 }
 
 function money(value: number) {
@@ -131,16 +132,27 @@ async function getActiveGoalsForSeller(params: {
   partnerId: string
   sellerUserId: string
   saleDateIso?: string
+  activityType: "sales" | "service_orders"
 }) {
+  if (!params.sellerUserId || params.sellerUserId === "null") return []
+  
   const day = new Date(params.saleDateIso || new Date().toISOString()).toISOString().slice(0, 10)
-  const { data } = await params.supabase
+  
+  let query = params.supabase
     .from("sales_goals")
     .select("*")
     .eq("partner_id", params.partnerId)
     .lte("start_date", day)
     .gte("end_date", day)
-    .or(`applies_to.eq.all,and(applies_to.eq.user,user_id.eq.${params.sellerUserId})`)
+    .or(`applies_to.eq.all,user_id.eq.${params.sellerUserId}`)
 
+  if (params.activityType === "sales") {
+    query = query.in("goal_type", ["sales", "both"])
+  } else if (params.activityType === "service_orders") {
+    query = query.in("goal_type", ["service_orders", "both"])
+  }
+
+  const { data } = await query
   return (data || []) as GoalRow[]
 }
 
@@ -155,9 +167,10 @@ export async function applySaleToGoals(params: {
 }) {
   const amount = money(Math.max(0, Number(params.saleAmount || 0)))
   if (amount <= 0.009) return
-  const goals = await getActiveGoalsForSeller(params)
+  const goals = await getActiveGoalsForSeller({ ...params, activityType: "sales" })
 
   for (const goal of goals) {
+
     const { data: progress } = await params.supabase
       .from("sales_goal_progress")
       .select("id, current_amount, achieved")
@@ -212,7 +225,7 @@ export async function reverseSaleFromGoals(params: {
 }) {
   const amount = money(Math.max(0, Number(params.saleAmount || 0)))
   if (amount <= 0.009) return
-  const goals = await getActiveGoalsForSeller(params)
+  const goals = await getActiveGoalsForSeller({ ...params, activityType: "sales" })
 
   for (const goal of goals) {
     const { data: progress } = await params.supabase

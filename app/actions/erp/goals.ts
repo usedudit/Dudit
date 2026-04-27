@@ -17,6 +17,7 @@ type GoalInput = {
   bonusValue: number
   appliesTo: "all" | "user"
   userId?: string | null
+  goalType: "sales" | "service_orders" | "both"
 }
 
 type RankingPeriodFilter = {
@@ -60,17 +61,25 @@ export async function getSalesGoalsModuleAction(partnerId: string): Promise<{ su
     const supabase = await getSupabaseServerClient()
     const nowDate = new Date().toISOString().slice(0, 10)
 
-    const [{ data: goals }, { data: progressRows }, sellerNameMap] = await Promise.all([
-      supabase
-        .from("sales_goals")
-        .select("*")
-        .eq("partner_id", partnerId)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("sales_goal_progress")
-        .select("id, goal_id, user_id, current_amount, achieved, achieved_at"),
+    const { data: goals } = await supabase
+      .from("sales_goals")
+      .select("*")
+      .eq("partner_id", partnerId)
+      .order("created_at", { ascending: false })
+
+    const goalIds = (goals || []).map((g: any) => g.id)
+    
+    const [progressRowsRes, sellerNameMap] = await Promise.all([
+      goalIds.length > 0 
+        ? supabase
+            .from("sales_goal_progress")
+            .select("id, goal_id, user_id, current_amount, achieved, achieved_at")
+            .in("goal_id", goalIds)
+        : Promise.resolve({ data: [] }),
       resolveSellerNameMap(partnerId),
     ])
+    const progressRows = progressRowsRes.data
+
 
     const progressByGoal = new Map<string, any[]>()
     for (const row of progressRows || []) {
@@ -118,6 +127,7 @@ export async function upsertSalesGoalAction(input: GoalInput) {
     bonus_value: money(Number(input.bonusValue || 0)),
     applies_to: input.appliesTo,
     user_id: input.appliesTo === "user" ? (input.userId || null) : null,
+    goal_type: input.goalType || "sales",
     updated_at: new Date().toISOString(),
   }
 
