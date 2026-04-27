@@ -47,6 +47,7 @@ export default async function ERPLayout({
 
   // Single call to get all partner access (cached for child pages via React cache)
   const allAccess = await getAllUserPartnerAccess()
+  const hasOwnPartner = allAccess.some((a: typeof allAccess[number]) => a.role === "OWNER")
 
   // No ERP access at all → redirect to partner login/registration
   if (allAccess.length === 0) {
@@ -55,6 +56,11 @@ export default async function ERPLayout({
 
   // Check if user has the active_partner_id cookie set
   const activePartnerId = await getActivePartnerId()
+
+  // If user has no own ERP, force explicit selection before entering ERP.
+  if (!hasOwnPartner && !activePartnerId) {
+    redirect("/select-erp")
+  }
 
   let context: { partnerId: string; role: PartnerRole; permissions: any; businessInfo: any } | null = null
 
@@ -66,8 +72,8 @@ export default async function ERPLayout({
     }
   }
 
-  // If no valid cookie, auto-resolve if exactly 1 ERP
-  if (!context && (allAccess.length === 1)) {
+  // If no valid cookie, auto-resolve if exactly 1 ERP (only for users with own ERP).
+  if (!context && (allAccess.length === 1) && hasOwnPartner) {
     const match = allAccess[0]
     context = { partnerId: match.partnerId, role: match.role, permissions: match.permissions, businessInfo: match.businessInfo }
   }

@@ -6,8 +6,9 @@ import { requireUser } from "@/lib/auth/authorization"
 import { getPartnerPaymentMethodsCached } from "@/lib/data/partner"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { AccessDenied } from "@/components/erp/access-denied"
-import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { createAdminClient } from "@/lib/supabase/server"
 import { ROLE_HIERARCHY } from "@/lib/permissions/partner-roles"
+import type { PartnerRole } from "@/lib/permissions/types"
 
 export default async function SettingsPage() {
   await requireUser()
@@ -17,11 +18,12 @@ export default async function SettingsPage() {
   if (!context) {
     redirect("/select-erp")
   }
-  if (ROLE_HIERARCHY[context.role] < ROLE_HIERARCHY.MANAGER) {
+  const userRole = context.role as PartnerRole
+  if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.MANAGER) {
     return <AccessDenied />
   }
 
-  const supabase = await getSupabaseServerClient()
+  const supabase = createAdminClient()
   const { data: partner } = await supabase
     .from("partners")
     .select("*, addresses(*)")
@@ -47,7 +49,7 @@ export default async function SettingsPage() {
     <>
       <ERPPageHeader title="Configurações" />
       <FadeIn className="p-4">
-        <SettingsTabs partner={partner} paymentMethods={paymentMethods || []} />
+        <SettingsTabs partner={partner} paymentMethods={paymentMethods || []} role={context.role} />
       </FadeIn>
     </>
   )

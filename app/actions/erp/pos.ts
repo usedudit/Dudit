@@ -467,7 +467,7 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
 
     const normalizedItemsResult = normalizeDraftItems(input.items)
     if ("error" in normalizedItemsResult) return { success: false as const, error: normalizedItemsResult.error }
@@ -542,7 +542,7 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
 export async function deletePreSaleDraftAction(partnerId: string, preSaleId: string) {
     await requireUser()
     await requirePartnerAccess(partnerId)
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
 
     const { error } = await supabase
         .from("pre_sales")
@@ -572,7 +572,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
 
     // Pre-validate inputs before calling RPC
     if (!input.preSaleId) return { success: false as const, error: "ID da pré-venda é obrigatório." }
@@ -814,7 +814,7 @@ export async function createPOSQuickProductAction(input: {
     if (price < 0) return { success: false as const, error: "Preço inválido." }
     if (stockQuantity < 0) return { success: false as const, error: "Estoque inválido." }
 
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
     const { data: store } = await supabase
         .from("stores")
         .select("id")
@@ -878,7 +878,7 @@ export async function createPOSCustomerQuickAction(input: {
 
     if (!name) return { success: false as const, error: "Informe o nome do cliente." }
 
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
 
     if (email) {
         const { data: existingEmail } = await supabase
@@ -971,7 +971,7 @@ export async function getPOSCustomerDetailsAction(input: {
     await requireUser()
     await requirePartnerAccess(input.partnerId)
 
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
     const [{ data: customer, error: customerError }, { data: address }] = await Promise.all([
         supabase
             .from("customers")
@@ -1043,7 +1043,7 @@ export async function createPOSCustomerAddressAction(input: {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
 
     const { data: customer, error: customerError } = await supabase
         .from("customers")
@@ -1146,7 +1146,7 @@ export async function applyCouponToPreSaleAction(input: {
         return { success: false as const, error: result.errorMessage || "Cupom inválido." }
     }
 
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
     const { error } = await supabase
         .from("pre_sales")
         .update({
@@ -1180,7 +1180,7 @@ export async function removeCouponFromPreSaleAction(input: {
     await requireUser()
     await requirePartnerAccess(input.partnerId)
 
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
     const { error } = await supabase
         .from("pre_sales")
         .update({

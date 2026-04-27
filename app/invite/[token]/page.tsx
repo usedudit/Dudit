@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/authorization"
 import { acceptInvitation, validateInvitation } from "@/app/actions/invitations"
 import { setPendingInviteToken } from "@/lib/auth/partner-context"
 import InviteView from "@/components/InviteView"
+import { clearActivePartner } from "@/lib/auth/partner-context"
 
 export default async function InvitePage({
     params,
@@ -29,7 +30,9 @@ export default async function InvitePage({
         "use server"
         const result = await acceptInvitation(token)
         if (result.success) {
-            redirect("/erp/dashboard")
+            // Force ERP selection after accepting an invite to avoid stale active_partner_id.
+            await clearActivePartner()
+            redirect("/select-erp")
         } else {
             redirect(`/invite/error?message=${encodeURIComponent(result.error || "Erro ao aceitar convite.")}`)
         }

@@ -1,6 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { createAdminClient } from "@/lib/supabase/server"
 import { revalidateOrders } from "@/lib/utils/revalidation"
 import { formatDateTime } from "@/lib/utils/formatters"
 import { formatCurrency } from "@/lib/utils"
@@ -1220,7 +1221,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const limitCheck = await checkLimit(partnerId, "orders_per_month")
     if (!limitCheck.allowed) return { error: limitCheck.message || "Limite mensal atingido." }
 
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
     const sanitizedItemsResult = sanitizeERPItems(data.items)
     if ("error" in sanitizedItemsResult) return { error: sanitizedItemsResult.error }
     const sanitizedItems = sanitizedItemsResult.items
@@ -1490,7 +1491,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
     if (!user) return { error: "Não autenticado" }
 
     await requirePartnerAccess(partnerId)
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
 
     const { data, error } = await supabase
         .from("orders")
@@ -1658,7 +1659,7 @@ export async function getOrderHistoryAction(orderId: string, partnerId: string) 
 
     await requirePartnerAccess(partnerId)
 
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
     const { data: saleRow } = await supabase
         .from("sales")
         .select("id")
@@ -1683,7 +1684,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     const csrfValidation = await requireCSRF(data.csrf_token)
     if (!csrfValidation.valid) return { error: csrfValidation.error || "Token CSRF inválido" }
 
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
     const sanitizedItemsResult = sanitizeERPItems(data.items)
     if ("error" in sanitizedItemsResult) return { error: sanitizedItemsResult.error }
     const sanitizedItems = sanitizedItemsResult.items
@@ -2026,7 +2027,7 @@ export async function deleteOrdersInBatchAction(orderIds: string[], partnerId: s
     if (!user) return { error: "Não autenticado" }
 
     await requirePartnerAccess(partnerId)
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
 
     await supabase.from("order_items").delete().in("order_id", orderIds)
 
@@ -2047,7 +2048,7 @@ export async function updateOrderNotesAction(input: {
     if (!user) return { success: false as const, error: "NÃ£o autenticado" }
 
     await requirePartnerAccess(input.partnerId)
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
 
     const { data: currentOrder, error: currentOrderError } = await supabase
         .from("orders")
@@ -2116,7 +2117,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
     }
 
     await requirePartnerAccess(payload.partnerId)
-    const supabase = await getSupabaseServerClient()
+    const supabase = createAdminClient()
 
     const { data: currentOrders } = await supabase
         .from("orders")
@@ -2637,7 +2638,7 @@ export async function getERPOrdersPageAction(
         if (!user) return { success: false, error: "Não autenticado" }
         await requirePartnerAccess(partnerId)
 
-        const supabase = await getSupabaseServerClient()
+        const supabase = createAdminClient()
         const cursor = options?.cursor ?? null
         const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_ORDERS_PAGE_SIZE))))
         const fetchLimit = limit + 1

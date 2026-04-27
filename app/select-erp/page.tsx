@@ -21,8 +21,9 @@ export default async function SelectErpPage() {
     const ownPartner = await getPartnerStatus(user.id)
     const hasOwnPartner = !!ownPartner
 
-    // If only one ERP, redirect directly (server-side) to avoid the selection screen
-    if (partnerAccess.length === 1) {
+    // If only one ERP and user owns an ERP, redirect directly.
+    // Invited-only users must explicitly select.
+    if (partnerAccess.length === 1 && hasOwnPartner) {
         redirect("/erp/dashboard")
     }
 

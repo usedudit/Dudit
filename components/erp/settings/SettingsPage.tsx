@@ -28,10 +28,12 @@ import { SimpleSettingsSubPage } from "./SimpleSettingsSubPage"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { DeliverySettingsSubPage } from "./DeliverySettingsSubPage"
 import { CommissionsSubPage } from "./CommissionsSubPage"
+import type { PartnerRole } from "@/lib/permissions/types"
 
 interface SettingsTabsProps {
   partner: any
   paymentMethods: any[]
+  role: PartnerRole
 }
 
 type ActivePage =
@@ -49,7 +51,7 @@ type ActivePage =
   | "mensagens"
   | "delivery"
 
-export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
+export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProps) {
   const searchParams = useSearchParams()
   const [activePage, setActivePage] = useState<ActivePage>("home")
   const [activeTab, setActiveTab] = useState("empresa")
@@ -120,6 +122,15 @@ export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
 
   const showOS = businessInfo?.sells?.includes("services")
   const showVitrine = businessInfo?.channels?.includes("online")
+  const canAccessSubscription = role === "OWNER"
+  const canAccessIntegrations = role === "OWNER"
+  const canAccessCommissions = role === "OWNER" || role === "ADMIN"
+
+  React.useEffect(() => {
+    if (activePage === "subscription" && !canAccessSubscription) setActivePage("home")
+    if (activePage === "integrations" && !canAccessIntegrations) setActivePage("home")
+    if (activePage === "comissao" && !canAccessCommissions) setActivePage("home")
+  }, [activePage, canAccessSubscription, canAccessIntegrations, canAccessCommissions])
 
   return (
     <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -168,12 +179,14 @@ export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
                             description="Convide membros, defina funções e gerencie permissões de acesso."
                             onClick={() => setActivePage("team")}
                           />
-                          <SettingsCard
-                            icon={CreditCardIcon}
-                            title="Minha Assinatura"
-                            description="Visualize seu plano atual, faturas e métodos de pagamento."
-                            onClick={() => setActivePage("subscription")}
-                          />
+                          {canAccessSubscription && (
+                            <SettingsCard
+                              icon={CreditCardIcon}
+                              title="Minha Assinatura"
+                              description="Visualize seu plano atual, faturas e métodos de pagamento."
+                              onClick={() => setActivePage("subscription")}
+                            />
+                          )}
                         </FadeIn>
                       )}
                     </TabsContent>
@@ -193,12 +206,14 @@ export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
                             description="Gerencie as regras de parcelamento e limites para vendas no fiado."
                             onClick={() => setActivePage("crediario")}
                           />
-                          <SettingsCard
-                            icon={TagIcon}
-                            title="Comissão"
-                            description="Defina regras de comissão para vendedores e entregadores."
-                            onClick={() => setActivePage("comissao")}
-                          />
+                          {canAccessCommissions && (
+                            <SettingsCard
+                              icon={TagIcon}
+                              title="Comissão"
+                              description="Defina regras de comissão para vendedores e entregadores."
+                              onClick={() => setActivePage("comissao")}
+                            />
+                          )}
                           <SettingsCard
                             icon={PackageReceiveIcon}
                             title="Recibo/Devolução"
@@ -240,12 +255,14 @@ export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
                             description="Configure taxas e regras de entrega."
                             onClick={() => setActivePage("delivery")}
                           />
-                          <SettingsCard
-                            icon={LinkIcon}
-                            title="Integrações"
-                            description="Conecte-se com ferramentas externas, marketplaces e ERPs."
-                            onClick={() => setActivePage("integrations")}
-                          />
+                          {canAccessIntegrations && (
+                            <SettingsCard
+                              icon={LinkIcon}
+                              title="Integrações"
+                              description="Conecte-se com ferramentas externas, marketplaces e ERPs."
+                              onClick={() => setActivePage("integrations")}
+                            />
+                          )}
                         </FadeIn>
                       )}
                     </TabsContent>
@@ -273,7 +290,7 @@ export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
             />
           )}
 
-          {activePage === "integrations" && (
+          {activePage === "integrations" && canAccessIntegrations && (
             <IntegrationsSubPage
               key="integrations"
               partner={partner}
@@ -283,9 +300,9 @@ export function SettingsTabs({ partner, paymentMethods }: SettingsTabsProps) {
           )}
 
           {activePage === "team" && <TeamSubPage key="team" partnerId={partner.id} onBack={() => setActivePage("home")} />}
-          {activePage === "subscription" && <SubscriptionSubPage key="subscription" onBack={() => setActivePage("home")} />}
+          {activePage === "subscription" && canAccessSubscription && <SubscriptionSubPage key="subscription" onBack={() => setActivePage("home")} />}
           {activePage === "crediario" && <SimpleSettingsSubPage key="crediario" title="Crediário" onBack={() => setActivePage("home")} />}
-          {activePage === "comissao" && <CommissionsSubPage key="comissao" partnerId={partner.id} onBack={() => setActivePage("home")} />}
+          {activePage === "comissao" && canAccessCommissions && <CommissionsSubPage key="comissao" partnerId={partner.id} onBack={() => setActivePage("home")} />}
           {activePage === "recibo" && <SimpleSettingsSubPage key="recibo" title="Recibo/Devolução" onBack={() => setActivePage("home")} />}
           {activePage === "vitrine" && <SimpleSettingsSubPage key="vitrine" title="Minha Vitrine" onBack={() => setActivePage("home")} />}
           {activePage === "os" && <SimpleSettingsSubPage key="os" title="Configuração de O.S" onBack={() => setActivePage("home")} />}

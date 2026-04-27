@@ -20,9 +20,17 @@ const DEFAULT_TYPE_BY_ROLE: Record<CommissionRole, CommissionType> = {
   delivery: "fixed_per_delivery",
 }
 
+function canManageCommissions(role: string | null | undefined) {
+  const normalized = String(role || "").toUpperCase()
+  return normalized === "OWNER" || normalized === "ADMIN"
+}
+
 export async function listEmployeeCommissionsAction(partnerId: string) {
   await requireUser()
-  await requirePartnerAccess(partnerId)
+  const access = await requirePartnerAccess(partnerId)
+  if (!canManageCommissions(access.role)) {
+    return { success: false as const, error: "Acesso restrito para este módulo." }
+  }
   const supabase = await getSupabaseServerClient()
 
   const { data: partnerUsers, error: partnerUsersError } = await supabase
@@ -96,7 +104,10 @@ export async function upsertEmployeeCommissionAction(input: {
   metadata?: Record<string, unknown>
 }) {
   await requireUser()
-  await requirePartnerAccess(input.partnerId)
+  const access = await requirePartnerAccess(input.partnerId)
+  if (!canManageCommissions(access.role)) {
+    return { success: false as const, error: "Acesso restrito para este módulo." }
+  }
   const supabase = await getSupabaseServerClient()
 
   const normalizedValue = Math.max(0, Number(input.value || 0))
@@ -126,7 +137,10 @@ export async function calculateCommissionAction(input: {
   deliveryFee?: number
 }) {
   await requireUser()
-  await requirePartnerAccess(input.partnerId)
+  const access = await requirePartnerAccess(input.partnerId)
+  if (!canManageCommissions(access.role)) {
+    return { success: false as const, error: "Acesso restrito para este módulo." }
+  }
   const supabase = await getSupabaseServerClient()
 
   const { data } = await supabase
