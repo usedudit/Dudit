@@ -73,7 +73,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
 
     // ── Serviços
     appointments: {
-        key: "appointments", path: "/erp/appointments", label: "Agendamentos", category: "Serviços", legacyCategory: "services",
+        key: "appointments", path: "/erp/agendamentos", label: "Agendamentos", category: "Serviços", legacyCategory: "services",
         specificPermissions: [
             "can_assign_technician", "can_cancel_appointment",
             "can_update_appointment_status",
@@ -115,7 +115,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
     },
 
     // ── Marketing
-    marketing_coupons: { key: "marketing_coupons", path: "/erp/marketing/coupons", label: "Cupons de Desconto", category: "Marketing" },
+    marketing_coupons: { key: "marketing_coupons", path: "/erp/coupons", label: "Cupons de Desconto", category: "Marketing" },
     cadastros_marketing: { key: "cadastros_marketing", path: "/erp/cadastros-marketing", label: "Cadastros", category: "Marketing" },
 
     // ── Configurações
@@ -225,7 +225,7 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
     settings: full,
     settings_business: withSpecific(full, { can_edit_business_data: true }),
     settings_integrations: withSpecific(full, { can_manage_integrations: true }),
-    settings_team: withSpecific(full, { can_invite: true, can_remove_member: true, can_manage_team: true }),
+    settings_team: withSpecific(full, { can_invite: true, can_remove_member: true, can_revoke_invite: true, can_manage_team: true }),
     settings_subscription: withSpecific(full, { can_change_subscription: true }),
 }
 
@@ -237,7 +237,7 @@ const ADMIN_PERMISSIONS: PartnerRoutePermissions = {
     settings: full,
     settings_business: full,
     settings_integrations: noAccess,
-    settings_team: withSpecific(full, { can_invite: true, can_remove_member: true, can_manage_team: true }),
+    settings_team: withSpecific(full, { can_invite: true, can_remove_member: true, can_revoke_invite: true, can_manage_team: true }),
     settings_subscription: noAccess,
 }
 
@@ -290,7 +290,7 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     settings: viewOnly,
     settings_business: viewOnly,
     settings_integrations: noAccess,
-    settings_team: withSpecific(viewOnly, { can_invite: true, can_remove_member: true, can_manage_team: true }),
+    settings_team: withSpecific(viewOnly, { can_invite: false, can_remove_member: false, can_revoke_invite: false, can_manage_team: true }),
     settings_subscription: noAccess,
 }
 
@@ -495,7 +495,13 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
             can_add_delivery: hasSpecificPermission(routePerms, "pos", "can_add_delivery") || hasSpecificPermission(routePerms, "orders", "can_assign_delivery"),
             delete_cancel: orders.delete,
         },
-        appointments: mapRoute("appointments"),
+        appointments: {
+            view: routePerms.appointments?.access ?? false,
+            create: routePerms.appointments?.create ?? false,
+            edit: routePerms.appointments?.edit ?? false,
+            delete: routePerms.appointments?.delete ?? false,
+            can_apply_discount: hasSpecificPermission(routePerms, "pos", "can_discount") || hasSpecificPermission(routePerms, "orders", "can_view_values"),
+        },
         customers: mapRoute("customers"),
         products: mapRoute("products"),
         pdv: {
@@ -558,6 +564,20 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
             can_apply_discount: hasSpecificPermission(routePerms, "pos", "can_discount"),
             can_add_delivery: hasSpecificPermission(routePerms, "pos", "can_add_delivery"),
         },
+        settings_negocio: { edit: hasSpecificPermission(routePerms, "settings_business", "can_edit_business_data") },
+        settings_team: {
+            invite: hasSpecificPermission(routePerms, "settings_team", "can_invite"),
+            edit: hasSpecificPermission(routePerms, "settings_team", "can_manage_team"),
+            remove: hasSpecificPermission(routePerms, "settings_team", "can_remove_member"),
+            revoke_invite: hasSpecificPermission(routePerms, "settings_team", "can_revoke_invite"),
+        },
+        settings_plans: { change_plan: hasSpecificPermission(routePerms, "settings_subscription", "can_change_subscription") },
+        payment_methods: {
+            create: routePerms.settings?.create ?? false,
+            edit: routePerms.settings?.edit ?? false,
+            delete: routePerms.settings?.delete ?? false,
+        },
+        settings_comissions: { edit: routePerms.settings?.edit ?? false },
         suppliers: mapRoute("suppliers"),
     }
 }

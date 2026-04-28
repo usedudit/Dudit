@@ -14,7 +14,8 @@ import { deletePaymentMethodAction, getPaymentMethodsAction, updatePaymentMethod
 import { BlockedIcon, CheckCircleIcon, ChevronLeftIcon, TrashIcon } from "@/lib/icons"
 import PaymentMethodPageControls from "./PaymentMethodPageControls"
 import PaymentMethodListRow, { getPaymentTypeLabel, PaymentMethodListItem } from "./PaymentMethodListRow"
-import PaymentMethodMobileItem from "./PaymentMethodMobileItem"
+import PaymentMethodGridCard from "./PaymentMethodGridCard"
+import { GridIcon, ListIcon } from "@/lib/icons"
 
 const PAYMENT_METHODS_VERSION_PREFIX = "payment-methods-version:"
 const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated"
@@ -24,8 +25,6 @@ interface PaymentMethodsSubPageProps {
     paymentMethods: any[]
     onBack: () => void
 }
-
-type PaymentTab = "all" | "active" | "inactive"
 
 type PaymentFilters = {
     type: string[]
@@ -53,7 +52,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
     const [methods, setMethods] = useState<PaymentMethodListItem[]>(paymentMethods || [])
     const [search, setSearch] = useState("")
     const [debouncedSearch, setDebouncedSearch] = useState("")
-    const [activeTab, setActiveTab] = useState<PaymentTab>("all")
+    const [viewMode, setViewMode] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const [filters, setFilters] = useState<PaymentFilters>(INITIAL_FILTERS)
     const [page, setPage] = useState(1)
     const [selection, setSelection] = useState<{ ids: Set<string> }>({ ids: new Set() })
@@ -67,8 +66,14 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
     const [isTogglingStatus, setIsTogglingStatus] = useState<Set<string>>(new Set())
     const [isDeletingMethod, setIsDeletingMethod] = useState<Set<string>>(new Set())
     const [isScrolled, setIsScrolled] = useState(false)
-
     const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+    const handleScroll = useCallback(() => {
+        if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
+    }, [])
+
+    const tableContainerRef = useRef<HTMLDivElement>(null)
+    const [scrollState, setScrollState] = useState({ left: false, right: false })
 
     const notifyPaymentMethodsChanged = useCallback((nextMethods: PaymentMethodListItem[]) => {
         if (typeof window === "undefined") return
@@ -86,12 +91,6 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
         window.dispatchEvent(new CustomEvent(PAYMENT_METHODS_UPDATED_EVENT))
     }, [partner.id])
 
-    const handleScroll = useCallback(() => {
-        if (scrollContainerRef.current) {
-            setIsScrolled(scrollContainerRef.current.scrollTop > 5)
-        }
-    }, [])
-
     useEffect(() => {
         const handler = setTimeout(() => setDebouncedSearch(search), 350)
         return () => clearTimeout(handler)
@@ -99,7 +98,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
 
     useEffect(() => {
         setPage(1)
-    }, [debouncedSearch, activeTab, filters])
+    }, [debouncedSearch, filters])
 
     useEffect(() => {
         setMethods(paymentMethods || [])
@@ -140,11 +139,6 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
             const brands = String(method.card_brand || "").toLowerCase().replaceAll("_", " ")
             const statusLabel = method.is_active ? "Ativo" : "Inativo"
 
-            const tabMatch =
-                activeTab === "all" ||
-                (activeTab === "active" && Boolean(method.is_active)) ||
-                (activeTab === "inactive" && !method.is_active)
-
             const searchMatch =
                 !term ||
                 String(method.name || "").toLowerCase().includes(term) ||
@@ -155,9 +149,9 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
             const typeMatch = filters.type.length === 0 || filters.type.includes(typeLabel)
             const statusMatch = filters.status.length === 0 || filters.status.includes(statusLabel)
 
-            return tabMatch && searchMatch && typeMatch && statusMatch
+            return searchMatch && typeMatch && statusMatch
         })
-    }, [activeTab, debouncedSearch, filters.status, filters.type, methods])
+    }, [debouncedSearch, filters.status, filters.type, methods])
 
     const itemsPerPage = isMobile ? 6 : 8
     const totalPages = Math.max(1, Math.ceil(filteredMethods.length / itemsPerPage))
@@ -398,7 +392,6 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                 setSearch("")
                 setDebouncedSearch("")
                 setFilters(INITIAL_FILTERS)
-                setActiveTab("all")
             },
         }
 
@@ -433,18 +426,37 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
         </FadeIn>
     )
 
+    const checkScroll = useCallback(() => {
+        if (!tableContainerRef.current) return
+        const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
+        setScrollState((prev) => {
+            const next = {
+                left: scrollLeft > 0,
+                right: scrollLeft < scrollWidth - clientWidth - 2,
+            }
+            if (prev.left === next.left && prev.right === next.right) return prev
+            return next
+        })
+    }, [])
+
+    useEffect(() => {
+        checkScroll()
+        window.addEventListener("resize", checkScroll)
+        return () => window.removeEventListener("resize", checkScroll)
+    }, [checkScroll, viewMode, methods])
+
     const renderListContent = () => {
         if (paginatedMethods.length === 0) return renderEmptyState()
 
-        if (isMobile) {
+        if (viewMode === "grid") {
             return (
-                <div className="rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface overflow-hidden">
-                    {paginatedMethods.map((method, index) => (
-                        <PaymentMethodMobileItem
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                    {paginatedMethods.map((method) => (
+                        <PaymentMethodGridCard
                             key={method.id}
                             method={method}
                             selected={selection.ids.has(method.id)}
-                            onSelect={handleSelectRow}
+                            onSelect={() => handleSelectRow(method.id)}
                             onEdit={(current) => {
                                 setEditingPayment(current)
                                 setPaymentModalOpen(true)
@@ -457,22 +469,28 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
         }
 
         return (
-            <div className="rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface overflow-hidden">
-                <div className="overflow-x-auto no-scrollbar">
-                    <table className="w-full text-left border-collapse">
+            <div className="relative">
+                <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                <div className="overflow-x-auto pb-4 no-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                    <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                         <thead>
-                            <tr className="border-b border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-border/10">
-                                <th className="p-4 pl-6 w-12">
+                            <tr className="bg-brand-gray/50 dark:bg-dark-border/10">
+                                <th className="py-3 px-2 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body bg-brand-gray/50 dark:bg-dark-border/10 rounded-l-lg pl-6 w-12">
                                     <Checkbox checked={allVisibleSelected} onChange={handleSelectAllVisible} />
                                 </th>
-                                {LIST_COLUMNS.map((column) => (
-                                    <th
-                                        key={column.id}
-                                        className={`p-4 text-xs font-bold text-brand-inactive-text uppercase tracking-wider ${column.align === "center" ? "text-center" : "text-left"}`}
-                                    >
-                                        {column.label}
-                                    </th>
-                                ))}
+                                {LIST_COLUMNS.map((column, index) => {
+                                    const isLast = index === LIST_COLUMNS.length - 1
+                                    return (
+                                        <th
+                                            key={column.id}
+                                            className={`py-3 px-2 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body bg-brand-gray/50 dark:bg-dark-border/10 ${column.align === "center" ? "text-center" : "text-left"} ${isLast ? "rounded-r-lg pr-6" : ""}`}
+                                        >
+                                            {column.label}
+                                        </th>
+                                    )
+                                })}
                             </tr>
                         </thead>
 
@@ -500,22 +518,23 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
 
     return (
         <>
-            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
-                <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-28 md:pb-10 scroll-smooth no-scrollbar">
-                    <div className={`sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out ${isScrolled ? "py-2 md:py-3 shadow-sm" : ""}`}>
-                        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
-                            <div className={`absolute -left-12 top-1/2 -translate-y-1/2 h-full hidden xl:flex items-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
-                                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                </Button>
-                            </div>
+            <FadeIn>
+                <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
-                            <div className="flex items-start justify-between py-6 gap-3">
-                                <div className="flex items-start gap-3 min-w-0">
-                                    <Button variant="filled" onClick={onBack} className="xl:hidden w-10 h-10 p-0 flex items-center justify-center shrink-0">
+                        {/* Sticky Header */}
+                        <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+
+                                {/* Back button - desktop only */}
+                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                    <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
+                                </div>
 
+                                {/* Title row */}
+                                <div className="hidden md:flex items-start justify-between">
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                         <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                             <span className="truncate">Formas de Pagamento</span>
@@ -525,60 +544,65 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                                             Gerencie os metodos aceitos em sua loja com a mesma experiencia das outras listas.
                                         </div>
                                     </div>
-                                </div>
 
-                                <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                    <Button
-                                        onClick={() => {
-                                            setEditingPayment(null)
-                                            setPaymentModalOpen(true)
-                                        }}
-                                    >
-                                        Novo metodo
-                                    </Button>
+                                    {/* Desktop action buttons */}
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                        <Button
+                                            onClick={() => {
+                                                setEditingPayment(null)
+                                                setPaymentModalOpen(true)
+                                            }}
+                                        >
+                                            Novo metodo
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="px-3 md:px-0 py-2 max-w-[1300px] mx-auto w-full">
+                                <PaymentMethodPageControls
+                                    search={search}
+                                    onSearchChange={setSearch}
+                                    onOpenFilter={() => setModals({ filter: true })}
+                                    onAddMethod={() => {
+                                        setEditingPayment(null)
+                                        setPaymentModalOpen(true)
+                                    }}
+                                    filters={filters}
+                                    setFilters={setFilters}
+                                    viewMode={viewMode}
+                                    onViewModeChange={setViewMode}
+                                    hasActiveFilters={hasActiveFilters}
+                                />
+
+                                <div className="mt-4 px-4 md:px-8">
+                                    <AnimatePresence mode="wait">
+                                        <motion.div
+                                            key={`${viewMode}-${debouncedSearch}-${filters.type.join(",")}-${filters.status.join(",")}-${page}`}
+                                            initial={{ opacity: 0, scale: 0.95 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
+                                            transition={{ duration: 0.2 }}
+                                        >
+                                            {renderListContent()}
+
+                                            {totalPages > 1 ? (
+                                                <div className="mt-6">
+                                                    <Pagination
+                                                        currentPage={page}
+                                                        totalPages={totalPages}
+                                                        onPageChange={setPage}
+                                                    />
+                                                </div>
+                                            ) : null}
+                                        </motion.div>
+                                    </AnimatePresence>
                                 </div>
                             </div>
                         </div>
                     </div>
-
-                    <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                        <PaymentMethodPageControls
-                            activeTab={activeTab}
-                            setActiveTab={setActiveTab}
-                            search={search}
-                            onSearchChange={setSearch}
-                            onOpenFilter={() => setModals({ filter: true })}
-                            onAddMethod={() => {
-                                setEditingPayment(null)
-                                setPaymentModalOpen(true)
-                            }}
-                            filters={filters}
-                            setFilters={setFilters}
-                            hasActiveFilters={hasActiveFilters}
-                        />
-
-                        <AnimatePresence mode="wait">
-                            <motion.div
-                                key={`${activeTab}-${debouncedSearch}-${filters.type.join(",")}-${filters.status.join(",")}-${page}`}
-                                initial={{ opacity: 0, y: 8 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -8 }}
-                                transition={{ duration: 0.2 }}
-                            >
-                                {renderListContent()}
-
-                                {totalPages > 1 ? (
-                                    <Pagination
-                                        currentPage={page}
-                                        totalPages={totalPages}
-                                        onPageChange={setPage}
-                                    />
-                                ) : null}
-                            </motion.div>
-                        </AnimatePresence>
-                    </div>
                 </div>
-            </div>
+            </FadeIn>
 
             <PaymentMethodDialog
                 open={paymentModalOpen}

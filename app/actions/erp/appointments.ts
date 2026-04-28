@@ -11,6 +11,7 @@ import { TAGS } from "@/lib/utils/revalidation-tags"
 import { applyServiceOrderToGoals } from "@/lib/services/sales-goals.service"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
 import { getAdminTimeline } from "@/lib/services/timeline.service"
+import { increment_usage_counter } from "@/lib/services/subscription.service"
 
 export type AppointmentStatus =
   | "Reservado"
@@ -370,6 +371,9 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
       })
       await revalidateEntityTimeline("appointment", row.id)
     }
+
+    // Increment usage counter for each created appointment
+    increment_usage_counter(partnerId, "appointments_month_count", data.length).catch(console.error)
 
     safeRevalidateTag(TAGS.entityTimeline("appointment-list", partnerId))
     revalidatePath("/erp/services")

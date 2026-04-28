@@ -8,6 +8,13 @@ import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import type { ScopeCategory } from "@/lib/types/coupon"
 
+const Div = (props: any) => React.createElement("div", props)
+const Header = (props: any) => React.createElement("header", props)
+const Footer = (props: any) => React.createElement("footer", props)
+const H2 = (props: any) => React.createElement("h2", props)
+const Span = (props: any) => React.createElement("span", props)
+const P = (props: any) => React.createElement("p", props)
+
 interface SelectCouponCategoriesSheetProps {
   isOpen: boolean
   onClose: () => void
@@ -19,13 +26,13 @@ interface SelectCouponCategoriesSheetProps {
 
 function CategoryRowSkeleton() {
   return (
-    <div className="flex animate-pulse items-center gap-4 border-b border-brand-border p-3.5 last:border-0 dark:border-dark-border">
-      <div className="h-12 w-12 shrink-0 rounded-full bg-gray-100 dark:bg-dark-border" />
-      <div className="min-w-0 flex-1 space-y-2">
-        <div className="h-4 w-2/3 rounded bg-gray-100 dark:bg-dark-border" />
-        <div className="h-3 w-1/2 rounded bg-gray-100 dark:bg-dark-border" />
-      </div>
-    </div>
+    <Div className="flex animate-pulse items-center gap-4 border-b border-brand-border p-3.5 last:border-0 dark:border-dark-border">
+      <Div className="h-12 w-12 shrink-0 rounded-full bg-gray-100 dark:bg-dark-border" />
+      <Div className="min-w-0 flex-1 space-y-2">
+        <Div className="h-4 w-2/3 rounded bg-gray-100 dark:bg-dark-border" />
+        <Div className="h-3 w-1/2 rounded bg-gray-100 dark:bg-dark-border" />
+      </Div>
+    </Div>
   )
 }
 
@@ -54,15 +61,15 @@ export default function SelectCouponCategoriesSheet({
   }, [categories, search])
 
   const content = (
-    <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
-      <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-        <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar Categorias</h2>
+    <Div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+      <Header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+        <H2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar Categorias</H2>
         <Button variant="ghost" onClick={onClose} size="icon">
           <XIcon className="h-5 w-5" />
         </Button>
-      </header>
+      </Header>
 
-      <div className="z-10 shrink-0 border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+      <Div className="z-10 shrink-0 border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <Input
           label=""
           name="couponCategorySearch"
@@ -73,22 +80,22 @@ export default function SelectCouponCategoriesSheet({
           className="mb-0"
           variant="full-rounded"
         />
-      </div>
+      </Div>
 
-      <div className="custom-scrollbar flex-1 overflow-y-auto p-0">
+      <Div className="custom-scrollbar flex-1 overflow-y-auto p-0">
         {isLoading ? (
-          <div className="flex flex-col">
+          <Div className="flex flex-col">
             {Array.from({ length: 8 }).map((_, i) => (
               <CategoryRowSkeleton key={i} />
             ))}
-          </div>
+          </Div>
         ) : filteredCategories.length > 0 ? (
-          <div className="flex flex-col px-2 pb-2">
+          <Div className="flex flex-col px-2 pb-2">
             {filteredCategories.map((category) => {
               const disabled = category.isActive === false
               const isSelected = selectedIds.includes(category.id)
               return (
-                <div
+                <Div
                   key={category.id}
                   role={disabled ? undefined : "button"}
                   tabIndex={disabled ? undefined : 0}
@@ -111,14 +118,14 @@ export default function SelectCouponCategoriesSheet({
                         : "cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40"
                   }`}
                 >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-brand-border bg-brand-gray text-brand-inactive-text dark:border-dark-border dark:bg-dark-border">
+                  <Div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-brand-border bg-brand-gray text-brand-inactive-text dark:border-dark-border dark:bg-dark-border">
                     <TagIcon size={20} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <span className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
+                  </Div>
+                  <Div className="min-w-0 flex-1">
+                    <Div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <Span className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
                         {category.name}
-                      </span>
+                      </Span>
                       <Badge variant={category.isActive === false ? "gray" : "green"} className="whitespace-nowrap scale-90 shrink-0">
                         {category.isActive === false ? "Inativo" : "Ativo"}
                       </Badge>
@@ -127,43 +134,43 @@ export default function SelectCouponCategoriesSheet({
                           Selecionado
                         </Badge>
                       )}
-                    </div>
-                    <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                    </Div>
+                    <P className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                       {category.isActive === false ? "Categoria inativa" : "Categoria disponivel para uso"}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
+                    </P>
+                  </Div>
+                  <Div className="flex shrink-0 items-center gap-2">
                     {!disabled && isSelected ? (
-                      <div className="flex h-8 w-8 items-center justify-center text-brand-green">
+                      <Div className="flex h-8 w-8 items-center justify-center text-brand-green">
                         <CheckCircleIcon size={18} />
-                      </div>
+                      </Div>
                     ) : !disabled ? (
-                      <div className="flex h-8 w-8 items-center justify-center text-brand-inactive-text opacity-0 transition-opacity group-hover:opacity-100">
+                      <Div className="flex h-8 w-8 items-center justify-center text-brand-inactive-text opacity-0 transition-opacity group-hover:opacity-100">
                         <PlusIcon size={18} />
-                      </div>
+                      </Div>
                     ) : null}
-                  </div>
-                </div>
+                  </Div>
+                </Div>
               )
             })}
-          </div>
+          </Div>
         ) : (
-          <div className="px-4 py-12">
+          <Div className="px-4 py-12">
             <IconPlaceholder
               icon={TagIcon}
               title="Nenhuma categoria encontrada"
               subtitle="Tente outro termo de busca."
             />
-          </div>
+          </Div>
         )}
-      </div>
+      </Div>
 
-      <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+      <Footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <Button variant="outline" className="h-12 w-full" onClick={onClose}>
           Fechar
         </Button>
-      </footer>
-    </div>
+      </Footer>
+    </Div>
   )
 
   if (isMobile) {
@@ -176,17 +183,17 @@ export default function SelectCouponCategoriesSheet({
 
   return (
     <Portal>
-      <div
+      <Div
         className={`fixed inset-0 z-[80] bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
         onClick={onClose}
       >
-        <div
+        <Div
           className={`fixed right-4 top-4 bottom-4 z-[81] w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
           onClick={(e) => e.stopPropagation()}
         >
           {content}
-        </div>
-      </div>
+        </Div>
+      </Div>
     </Portal>
   )
 }

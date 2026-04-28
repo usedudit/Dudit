@@ -60,9 +60,9 @@ const FinancialCadastrosPageControls: React.FC<FinancialCadastrosPageControlsPro
                     <div className="flex-none flex items-center gap-2">
                         <Button
                             onClick={onAdd}
-                            className="w-[42px] h-[42px] p-0 flex items-center justify-center rounded-full bg-brand-green hover:bg-brand-green/90 text-white shadow-sm shadow-brand-green/20"
+                            leftIcon={<PlusIcon size={18} />}
+                            className="w-[42px] h-[42px] p-0 flex items-center justify-center"
                         >
-                            <PlusIcon className="w-5 h-5" strokeWidth={3} />
                         </Button>
                     </div>
                 </div>

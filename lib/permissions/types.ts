@@ -10,6 +10,10 @@ export interface ResourcePermissions {
     delete: boolean
 }
 
+export interface AppointmentsPermissions extends ResourcePermissions {
+    can_apply_discount: boolean
+}
+
 export interface OrdersPermissions {
     view: boolean
     create: boolean
@@ -67,6 +71,31 @@ export interface SettingsPermissions {
     settings_integrations: boolean
 }
 
+export interface SettingsNegocioPermissions {
+    edit: boolean
+}
+
+export interface SettingsTeamPermissions {
+    invite: boolean
+    edit: boolean
+    remove: boolean
+    revoke_invite: boolean
+}
+
+export interface SettingsPlansPermissions {
+    change_plan: boolean
+}
+
+export interface PaymentMethodsPermissions {
+    create: boolean
+    edit: boolean
+    delete: boolean
+}
+
+export interface SettingsComissionsPermissions {
+    edit: boolean
+}
+
 export interface StockMovementsPermissions {
     view: boolean
     create: boolean
@@ -76,7 +105,7 @@ export interface StockMovementsPermissions {
 // Canonical DB model for `partner_users.permissions` / `partner_invitations.permissions`
 export interface PartnerPermissions {
     orders: OrdersPermissions
-    appointments: ResourcePermissions
+    appointments: AppointmentsPermissions
     customers: ResourcePermissions
     products: ResourcePermissions
     stock_movements: StockMovementsPermissions
@@ -91,6 +120,11 @@ export interface PartnerPermissions {
     dashboard: { view: boolean }
     delivery: DeliveryPermissions
     settings: SettingsPermissions
+    settings_negocio: SettingsNegocioPermissions
+    settings_team: SettingsTeamPermissions
+    settings_plans: SettingsPlansPermissions
+    payment_methods: PaymentMethodsPermissions
+    settings_comissions: SettingsComissionsPermissions
     // Backward compatibility aliases still used by old mappings/actions
     cash_register?: { view: boolean; open_close: boolean; manage: boolean }
     cadastros_categories?: ResourcePermissions

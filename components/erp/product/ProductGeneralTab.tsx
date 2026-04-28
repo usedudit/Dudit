@@ -216,7 +216,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             onChange={(v) => handleFieldChange({ target: { name: "location_id", value: v } })}
                             disabled={!isEditing}
                             width="w-full"
-                            actionItem={{ label: "Criar novo local", icon: <PlusIcon className="w-3 h-3" />, onClick: () => openAddItemModal("location") }}
+                            actionItem={{ label: "Criar novo local", icon: <PlusIcon size={18} />, onClick: () => openAddItemModal("location") }}
                         />
                     </div>
 

@@ -11,6 +11,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { reserveOrderInventory } from "@/lib/stock/reservations"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
+import { validateCoupon } from "@/lib/services/coupons"
 
 const isDev = process.env.NODE_ENV === "development"
 
@@ -23,6 +24,7 @@ interface ProcessPaymentRequest {
   deliveryAddress?: string
   notes?: string
   cartItemIds?: string[]
+  couponCode?: string | null
 }
 
 /**
@@ -49,7 +51,7 @@ async function handler(request: NextRequest) {
     }
 
     const body: ProcessPaymentRequest = await request.json()
-    const { paymentFormData, items, partnerId, buyerId, deliveryType, deliveryAddress, notes, cartItemIds } = body
+    const { paymentFormData, items, partnerId, buyerId, deliveryType, deliveryAddress, notes, cartItemIds, couponCode } = body
 
     // SEGURANÃ‡A: Validação de campos obrigatórios ANTES de qualquer operação
     if (!paymentFormData?.payment_method_id) {
@@ -198,6 +200,27 @@ async function handler(request: NextRequest) {
     }
 
     if (isDev) console.log("[v0] All items validated. Total amount:", totalAmount)
+
+    // SEGURANÃ‡A: Validar cupom se fornecido
+    let couponIdToSave: string | null = null
+    let couponDiscountAmount = 0
+
+    if (couponCode) {
+      const couponResult = await validateCoupon({
+        partnerId,
+        code: couponCode,
+        customerId: buyerId,
+        subtotal: totalAmount,
+        items: validatedItems.map(i => ({ productId: i.product_id }))
+      })
+
+      if (couponResult.valid) {
+        couponIdToSave = couponResult.couponId || null
+        couponDiscountAmount = couponResult.discountAmount
+        totalAmount = Math.max(0, totalAmount - couponDiscountAmount)
+        if (isDev) console.log("[v0] Coupon applied:", couponCode, "Discount:", couponDiscountAmount, "New total:", totalAmount)
+      }
+    }
 
     // SEGURANÃ‡A: Validar que o total é positivo e razoável
     if (totalAmount <= 0 || totalAmount > 999999) {
@@ -421,6 +444,8 @@ async function handler(request: NextRequest) {
         payment_method: paymentMethodDisplayName,
         payment_provider: "Mercado Pago",
         mp_payment_id: mpPaymentId.toString(),
+        coupon_id: couponIdToSave,
+        discount_amount: couponDiscountAmount,
       })
       .select()
       .single()
@@ -502,11 +527,6 @@ async function handler(request: NextRequest) {
     }
     revalidateMarketplace()
 
-    // 3. Revalidar carrinho do usuário (SEMPRE, independente do status)
-    // Isso garante que o carrinho limpe visualmente
-    await revalidateCart(buyerId)
-
-    // REMOVER ITENS DO CARRINHO se foi uma compra de carrinho
     if (cartItemIds && cartItemIds.length > 0) {
       const { error: deleteError } = await adminClient.from("cart_items").delete().in("id", cartItemIds).eq("user_id", buyerId)
 
@@ -516,6 +536,9 @@ async function handler(request: NextRequest) {
         if (isDev) console.log("[v0] Cart items removed successfully")
       }
     }
+
+    // 3. Revalidar carrinho do usuário (SEMPRE, após possível deleção)
+    await revalidateCart(buyerId)
 
     // Retornar sucesso (sem informações internas)
     const successResponse = {

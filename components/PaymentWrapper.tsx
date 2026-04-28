@@ -39,6 +39,8 @@ interface PixPaymentWrapperProps {
         deliveryType: "delivery" | "pickup"
         notes?: string
         cartItemIds?: string[]
+        couponCode?: string | null
+        couponDiscount?: number
     }
     orderNumber?: string
     sellerName?: string
@@ -88,7 +90,15 @@ export function PaymentWrapper({
         setIsClosing(true)
         setTimeout(() => {
             setIsClosing(false)
-            onClose()
+            // If we have an orderId that is not temp, or we are in a success/pending state, redirect to orders
+            const isOrderCreated = orderId && !orderId.startsWith("temp-")
+            const isPaymentStarted = ["pix", "boleto", "success", "mp_redirect"].includes(step)
+            
+            if (isOrderCreated || isPaymentStarted || paymentConfirmed) {
+                window.location.href = "/pedidos"
+            } else {
+                onClose()
+            }
         }, 300)
     }
 
@@ -177,6 +187,7 @@ export function PaymentWrapper({
                             id: p.id, name: p.name, price: p.price, quantity: p.quantity, variant_id: p.variant_id,
                         })),
                         partnerId,
+                        couponCode: orderDetails.couponCode,
                     },
                 })
             } catch (err: any) {
@@ -278,7 +289,8 @@ export function PaymentWrapper({
                     deliveryType: orderDetails.deliveryType,
                     deliveryAddress: orderDetails.deliveryAddress,
                     notes: orderDetails.notes,
-                    cartItemIds: orderDetails.cartItemIds
+                    cartItemIds: orderDetails.cartItemIds,
+                    couponCode: orderDetails.couponCode
                 },
             })
 

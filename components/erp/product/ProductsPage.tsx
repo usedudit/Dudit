@@ -743,7 +743,7 @@ export default function ProductsPage({
                                         onClick={handleAddFirstProduct}
                                         className="w-full"
                                     >
-                                        <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
+                                        <PlusIcon size={16} />
                                         Novo Produto
                                     </Button>
                                 </div>

@@ -4,10 +4,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
-import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
-import AlertModal from "@/components/reusable/AlertModal"
+import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, AlertModal } from "@/components/reusable"
 import { ArrowUpDownIcon, ExportFileIcon, PlusIcon } from "@/lib/icons"
-import { useMediaQuery } from "../hooks"
+import { useMediaQuery } from "@/components/erp/hooks"
 import { useToast } from "@/hooks/use-toast"
 import {
     createCouponAction,
@@ -38,6 +37,7 @@ import {
     mapCouponToForm,
 } from "@/lib/types/coupon"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { usePermissions } from "@/lib/permission-context"
 
 type FilterState = {
     discountType: string[]
@@ -68,7 +68,6 @@ const COLUMNS: { id: SortKey | "actions"; label: string; align: "left" | "center
     { id: "status", label: "Status", align: "right", width: "240px" },
     { id: "actions", label: "Acoes", align: "right", width: "220px" },
 ]
-
 export default function CouponsPage({
     partnerId,
     initialCoupons,
@@ -79,7 +78,12 @@ export default function CouponsPage({
     initialTotal: number
 }) {
     const { toast } = useToast()
+    const { canCreate, canEdit, canDelete } = usePermissions()
     const isMobile = useMediaQuery("(max-width: 767px)")
+
+    const canCreateCoupons = canCreate("marketing_coupons")
+    const canEditCoupons = canEdit("marketing_coupons")
+    const canDeleteCoupons = canDelete("marketing_coupons")
 
     const [coupons, setCoupons] = useState<CouponRow[]>(initialCoupons || [])
     const [search, setSearch] = useState("")
@@ -615,9 +619,11 @@ export default function CouponsPage({
                                     </div>
 
                                     <div className="flex items-center gap-3">
-                                        <Button variant="outline"><ExportFileIcon className="w-[18px] h-[18px]" /> Exportar</Button>
-                                        <Button onClick={openCreate}>
-                                            <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} /> Novo Cupom
+                                        <Button variant="outline" leftIcon={<ExportFileIcon size={18} />}>
+                                            Exportar
+                                        </Button>
+                                        <Button onClick={openCreate} leftIcon={<PlusIcon size={18} />}>
+                                            Novo Cupom
                                         </Button>
                                     </div>
                                 </div>
@@ -633,7 +639,7 @@ export default function CouponsPage({
                                     viewMode={effectiveViewMode}
                                     onViewModeChange={setViewModeState}
                                     hasActiveFilters={hasActiveFilters}
-                                    onAddCoupon={openCreate}
+                                    onAddCoupon={canCreateCoupons ? openCreate : undefined}
                                 />
 
                                 <div className="flex-1 min-h-[420px]">
@@ -650,7 +656,7 @@ export default function CouponsPage({
                                                     imageAlt="Nenhum cupom encontrado"
                                                     title={hasActiveFilters ? "Nenhum cupom encontrado" : "Nenhum cupom cadastrado"}
                                                     subtitle={hasActiveFilters ? "Tente ajustar seus filtros ou termos de busca." : "Comece criando seu primeiro cupom promocional."}
-                                                    itemButton={{ text: "Criar cupom", action: openCreate }}
+                                                    itemButton={canCreateCoupons ? { text: "Criar cupom", action: openCreate } : undefined}
                                                 />
                                             </FadeIn>
                                         ) : (
@@ -669,9 +675,9 @@ export default function CouponsPage({
                                                                         selected={selection.ids.has(coupon.id)}
                                                                         onSelect={() => handleSelectRow(coupon.id)}
                                                                         onDetails={openDetails}
-                                                                        onEdit={openEdit}
-                                                                        onToggleStatus={handleToggleStatus}
-                                                                        onDelete={handleDelete}
+                                                                        onEdit={canEditCoupons ? openEdit : undefined}
+                                                                        onToggleStatus={canEditCoupons ? handleToggleStatus : undefined}
+                                                                        onDelete={canDeleteCoupons ? handleDelete : undefined}
                                                                     />
                                                                 ))}
                                                             </AnimatePresence>
@@ -747,9 +753,9 @@ export default function CouponsPage({
                                                                                 selected={selection.ids.has(coupon.id)}
                                                                                 onSelect={handleSelectRow}
                                                                                 onDetails={openDetails}
-                                                                                onEdit={openEdit}
-                                                                                onToggleStatus={handleToggleStatus}
-                                                                                onDelete={handleDelete}
+                                                                                onEdit={canEditCoupons ? openEdit : undefined}
+                                                                                onToggleStatus={canEditCoupons ? handleToggleStatus : undefined}
+                                                                                onDelete={canDeleteCoupons ? handleDelete : undefined}
                                                                             />
                                                                         ))}
                                                                     </tbody>

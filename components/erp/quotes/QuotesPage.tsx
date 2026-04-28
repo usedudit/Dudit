@@ -513,12 +513,11 @@ export default function QuotesPage({
                                 </div>
 
                                 <div className="flex items-center gap-3">
-                                    <Button variant="outline" onClick={() => { }}>
-                                        <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
+                                    <Button variant="outline" leftIcon={<ExportFileIcon size={18} />}>
+                                        Exportar
                                     </Button>
 
-                                    <Button onClick={handleAddQuote}>
-                                        <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
+                                    <Button leftIcon={<PlusIcon size={18} />} onClick={handleAddQuote}>
                                         Novo Orçamento
                                     </Button>
                                 </div>

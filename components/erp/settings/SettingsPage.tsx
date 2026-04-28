@@ -2,9 +2,8 @@
 
 import React, { useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { AnimatePresence, motion } from "framer-motion"
-import Link from "next/link"
-import { Button, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
+import { AnimatePresence } from "framer-motion"
+import { Tabs, TabsList, TabsTrigger, TabsContent, ListItem } from "@/components/reusable"
 import {
   Store,
   LinkIcon,
@@ -15,10 +14,8 @@ import {
   PackageReceiveIcon,
   WrenchIcon,
   MailIcon,
-  ChevronLeftIcon
 } from "@/lib/icons"
 
-import { SettingsCard } from "./SettingsCard"
 import { BusinessDataSubPage } from "./BusinessDataSubPage"
 import { IntegrationsSubPage } from "./IntegrationsSubPage"
 import { TeamSubPage } from "./TeamSubPage"
@@ -120,17 +117,36 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     ? JSON.parse(partner.business_info)
     : (partner.business_info || { sells: ["products"], channels: ["online"] })
 
-  const showOS = businessInfo?.sells?.includes("services")
-  const showVitrine = businessInfo?.channels?.includes("online")
-  const canAccessSubscription = role === "OWNER"
-  const canAccessIntegrations = role === "OWNER"
-  const canAccessCommissions = role === "OWNER" || role === "ADMIN"
+  const isOwner = role === "OWNER"
+  const isAdmin = role === "ADMIN"
+  const isManager = role === "MANAGER"
+  const isOwnerOrAdmin = isOwner || isAdmin
+  const isOwnerAdminOrManager = isOwner || isAdmin || isManager
+
+  const canAccessOS = businessInfo?.sells?.includes("services") && isOwnerAdminOrManager
+  const showOS = canAccessOS
+  const showVitrine = businessInfo?.channels?.includes("online") && isOwnerOrAdmin
+  const canAccessSubscription = isOwner
+  const canAccessIntegrations = isOwner
+  const canAccessCommissions = isOwnerOrAdmin
+  const canAccessTeam = isOwnerOrAdmin
+  const canAccessPayments = isOwnerOrAdmin
+  const canAccessReturns = isOwnerAdminOrManager
+  const canAccessMessages = isOwnerAdminOrManager
+  const canAccessDelivery = isOwnerOrAdmin
+  const canAccessBusinessData = isOwnerAdminOrManager
 
   React.useEffect(() => {
     if (activePage === "subscription" && !canAccessSubscription) setActivePage("home")
     if (activePage === "integrations" && !canAccessIntegrations) setActivePage("home")
     if (activePage === "comissao" && !canAccessCommissions) setActivePage("home")
-  }, [activePage, canAccessSubscription, canAccessIntegrations, canAccessCommissions])
+    if (activePage === "team" && !canAccessTeam) setActivePage("home")
+    if (activePage === "payment-methods" && !canAccessPayments) setActivePage("home")
+    if (activePage === "recibo" && !canAccessReturns) setActivePage("home")
+    if (activePage === "os" && !canAccessOS) setActivePage("home")
+    if (activePage === "mensagens" && !canAccessMessages) setActivePage("home")
+    if (activePage === "business-data" && !canAccessBusinessData) setActivePage("home")
+  }, [activePage, canAccessSubscription, canAccessIntegrations, canAccessCommissions, canAccessTeam, canAccessPayments, canAccessReturns, showOS, canAccessMessages, canAccessBusinessData])
 
   return (
     <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -167,24 +183,31 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                     <TabsContent value="empresa" key="empresa" className="mt-0 focus-visible:outline-none">
                       {activeTab === "empresa" && (
                         <FadeIn className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                          <SettingsCard
-                            icon={Store}
-                            title="Dados do Negócio"
-                            description="Gerencie informações da empresa, endereço e contatos comerciais."
-                            onClick={() => setActivePage("business-data")}
-                          />
-                          <SettingsCard
-                            icon={Users}
-                            title="Equipe e Acessos"
-                            description="Convide membros, defina funções e gerencie permissões de acesso."
-                            onClick={() => setActivePage("team")}
-                          />
+                          {canAccessBusinessData && (
+                            <ListItem
+                              icon={Store}
+                              title="Dados do Negócio"
+                              description="Gerencie informações da empresa, endereço e contatos comerciais."
+                              onClick={() => setActivePage("business-data")}
+                              showChevron
+                            />
+                          )}
+                          {canAccessTeam && (
+                            <ListItem
+                              icon={Users}
+                              title="Equipe e Acessos"
+                              description="Convide membros, defina funções e gerencie permissões de acesso."
+                              onClick={() => setActivePage("team")}
+                              showChevron
+                            />
+                          )}
                           {canAccessSubscription && (
-                            <SettingsCard
+                            <ListItem
                               icon={CreditCardIcon}
                               title="Minha Assinatura"
                               description="Visualize seu plano atual, faturas e métodos de pagamento."
                               onClick={() => setActivePage("subscription")}
+                              showChevron
                             />
                           )}
                         </FadeIn>
@@ -194,32 +217,40 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                     <TabsContent value="vendas" key="vendas" className="mt-0 focus-visible:outline-none">
                       {activeTab === "vendas" && (
                         <FadeIn className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                          <SettingsCard
-                            icon={MoneyIcon}
-                            title="Formas de Pagamentos"
-                            description="Configure os métodos de pagamento aceitos e as taxas de operadoras."
-                            onClick={() => setActivePage("payment-methods")}
-                          />
-                          <SettingsCard
+                          {canAccessPayments && (
+                            <ListItem
+                              icon={MoneyIcon}
+                              title="Formas de Pagamentos"
+                              description="Configure os métodos de pagamento aceitos e as taxas de operadoras."
+                              onClick={() => setActivePage("payment-methods")}
+                              showChevron
+                            />
+                          )}
+                          <ListItem
                             icon={CreditCardIcon}
                             title="Crediário"
                             description="Gerencie as regras de parcelamento e limites para vendas no fiado."
                             onClick={() => setActivePage("crediario")}
+                            showChevron
                           />
                           {canAccessCommissions && (
-                            <SettingsCard
+                            <ListItem
                               icon={TagIcon}
                               title="Comissão"
                               description="Defina regras de comissão para vendedores e entregadores."
                               onClick={() => setActivePage("comissao")}
+                              showChevron
                             />
                           )}
-                          <SettingsCard
-                            icon={PackageReceiveIcon}
-                            title="Recibo/Devolução"
-                            description="Personalize o cabeçalho do recibo e políticas de trocas."
-                            onClick={() => setActivePage("recibo")}
-                          />
+                          {canAccessReturns && (
+                            <ListItem
+                              icon={PackageReceiveIcon}
+                              title="Recibo/Devolução"
+                              description="Personalize o cabeçalho do recibo e políticas de trocas."
+                              onClick={() => setActivePage("recibo")}
+                              showChevron
+                            />
+                          )}
                         </FadeIn>
                       )}
                     </TabsContent>
@@ -228,39 +259,48 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                       {activeTab === "adicionais" && (
                         <FadeIn className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                           {showVitrine && (
-                            <SettingsCard
+                            <ListItem
                               icon={Store}
                               title="Minha Vitrine"
                               description="Configure o link, cores e produtos visíveis no seu catálogo online."
                               onClick={() => setActivePage("vitrine")}
+                              showChevron
                             />
                           )}
                           {showOS && (
-                            <SettingsCard
+                            <ListItem
                               icon={WrenchIcon}
                               title="Configurar O.S"
                               description="Personalize campos, status e o layout das ordens de serviço."
                               onClick={() => setActivePage("os")}
+                              showChevron
                             />
                           )}
-                          <SettingsCard
-                            icon={MailIcon}
-                            title="Modelos de Mensagens"
-                            description="Crie templates automáticos para envio via WhatsApp ou E-mail."
-                            onClick={() => setActivePage("mensagens")}
-                          />
-                          <SettingsCard
-                            icon={PackageReceiveIcon}
-                            title="Entrega"
-                            description="Configure taxas e regras de entrega."
-                            onClick={() => setActivePage("delivery")}
-                          />
+                          {canAccessMessages && (
+                            <ListItem
+                              icon={MailIcon}
+                              title="Mensagens e Alertas"
+                              description="Configure mensagens automáticas de WhatsApp e e-mail."
+                              onClick={() => setActivePage("mensagens")}
+                              showChevron
+                            />
+                          )}
+                          {canAccessDelivery && (
+                            <ListItem
+                              icon={PackageReceiveIcon}
+                              title="Logística e Entrega"
+                              description="Configure taxas de entrega, raios de atendimento e horários."
+                              onClick={() => setActivePage("delivery")}
+                              showChevron
+                            />
+                          )}
                           {canAccessIntegrations && (
-                            <SettingsCard
+                            <ListItem
                               icon={LinkIcon}
                               title="Integrações"
-                              description="Conecte-se com ferramentas externas, marketplaces e ERPs."
+                              description="Conecte-se com plataformas externas e APIs de terceiros."
                               onClick={() => setActivePage("integrations")}
+                              showChevron
                             />
                           )}
                         </FadeIn>

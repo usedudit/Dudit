@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useTransition, useRef, useCallback } from "react"
 import cn from "classnames"
 import { Button, IconPlaceholder, InfoCard, Input, ThreeDotsLoader } from "@/components/reusable"
-import { TrashIcon, MailIcon, MoreHorizontalIcon, CheckCircleIcon, ChevronLeftIcon } from "@/lib/icons"
+import { TrashIcon, MailIcon, MoreHorizontalIcon, CheckCircleIcon, ChevronLeftIcon, PlusIcon } from "@/lib/icons"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { getTeamMembers, removeTeamMember, updateTeamMemberRole } from "@/app/actions/erp/team"
@@ -129,7 +129,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
                 <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
                     {/* Sticky Header */}
-                    <div className={`sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out ${isScrolled ? "py-2 md:py-3 shadow-sm" : ""}`}>
+                    <div className={`sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out ${isScrolled ? "py-2 md:py-3" : ""}`}>
                         <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
 
                             {/* Back button - desktop only */}
@@ -153,7 +153,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
 
                                 {/* Primary Action - Desktop */}
                                 <div className={`hidden md:flex transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                    <Button onClick={() => setShowInviteModal(true)}>
+                                    <Button leftIcon={<PlusIcon size={18} />} onClick={() => setShowInviteModal(true)}>
                                         Convidar Membro
                                     </Button>
                                 </div>
@@ -225,14 +225,14 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                                                                 {getAllowedInviteRoles(currentUserRole)
                                                                     .filter((role) => canModifyUser(currentUserRole, member.role as PartnerRole))
                                                                     .map((role) => (
-                                                                    <DropdownMenuItem
-                                                                        key={role}
-                                                                        onClick={() => handleUpdateRole(member.userId, role)}
-                                                                        className={member.role === role ? "bg-brand-gray font-bold" : ""}
-                                                                    >
-                                                                        Alterar para {ROLE_LABELS[role]}
-                                                                    </DropdownMenuItem>
-                                                                ))}
+                                                                        <DropdownMenuItem
+                                                                            key={role}
+                                                                            onClick={() => handleUpdateRole(member.userId, role)}
+                                                                            className={member.role === role ? "bg-brand-gray font-bold" : ""}
+                                                                        >
+                                                                            Alterar para {ROLE_LABELS[role]}
+                                                                        </DropdownMenuItem>
+                                                                    ))}
                                                                 <div className="h-px bg-gray-100 my-1" />
                                                             </>
                                                         )}

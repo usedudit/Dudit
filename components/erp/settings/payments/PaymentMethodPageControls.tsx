@@ -3,20 +3,15 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { AnimatePresence } from "framer-motion"
 import { Button, Input } from "@/components/reusable"
-import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
 import FilterChip from "@/components/reusable/FilterChip"
-import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import {
-    CancelCircleIcon,
-    CheckCircleIcon,
     CreditCardIcon,
-    ExportFileIcon,
     FilterIcon,
+    GridIcon,
     InfoIcon,
+    ListIcon,
     PlusIcon,
     SearchIcon,
-    Settings2Icon,
-    Users,
 } from "@/lib/icons"
 
 interface FilterState {
@@ -25,26 +20,26 @@ interface FilterState {
 }
 
 interface PaymentMethodPageControlsProps {
-    activeTab: "all" | "active" | "inactive"
-    setActiveTab: (tab: "all" | "active" | "inactive") => void
     search: string
     onSearchChange: (value: string) => void
     onOpenFilter: () => void
     onAddMethod: () => void
     filters: FilterState
     setFilters: React.Dispatch<React.SetStateAction<FilterState>>
+    viewMode: "list" | "grid"
+    onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
 }
 
 export default function PaymentMethodPageControls({
-    activeTab,
-    setActiveTab,
     search,
     onSearchChange,
     onOpenFilter,
     onAddMethod,
     filters,
     setFilters,
+    viewMode,
+    onViewModeChange,
     hasActiveFilters,
 }: PaymentMethodPageControlsProps) {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
@@ -94,22 +89,6 @@ export default function PaymentMethodPageControls({
 
     return (
         <>
-            <div className="mb-6 px-4 md:px-8">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "all" | "active" | "inactive")}>
-                    <TabsList className="px-0">
-                        <TabsTrigger value="all" icon={Users}>
-                            Todos
-                        </TabsTrigger>
-                        <TabsTrigger value="active" icon={CheckCircleIcon}>
-                            Ativos
-                        </TabsTrigger>
-                        <TabsTrigger value="inactive" icon={CancelCircleIcon}>
-                            Inativos
-                        </TabsTrigger>
-                    </TabsList>
-                </Tabs>
-            </div>
-
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
                 <div className="md:hidden flex items-center gap-2 w-full">
                     <div className="flex-1 min-w-0">
@@ -126,27 +105,21 @@ export default function PaymentMethodPageControls({
                     </div>
 
                     <div className="flex-none flex items-center gap-2">
-                        <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] p-0">
-                            <FilterIcon className="w-4 h-4" />
+                        <Button
+                            onClick={onOpenFilter}
+                            leftIcon={<FilterIcon size={18} />}
+                            className="h-[42px]"
+                        >
+                            Filtros
                         </Button>
 
-                        <Dropdown
-                            trigger={
-                                <Button variant="outline" className="w-[42px] h-[42px] p-0">
-                                    <Settings2Icon className="w-4 h-4" />
-                                </Button>
-                            }
-                            align="right"
-                            showChevron={false}
-                            fullWidth={false}
+                        <Button
+                            onClick={onAddMethod}
+                            leftIcon={<PlusIcon size={18} />}
+                            className="h-[42px]"
                         >
-                            <DropdownItem onClick={onAddMethod}>
-                                <PlusIcon size={14} /> Novo metodo
-                            </DropdownItem>
-                            <DropdownItem onClick={() => {}}>
-                                <ExportFileIcon size={14} /> Exportar
-                            </DropdownItem>
-                        </Dropdown>
+                            Novo método
+                        </Button>
                     </div>
                 </div>
 
@@ -194,10 +167,20 @@ export default function PaymentMethodPageControls({
                         />
                     </div>
 
-                    <Button onClick={onAddMethod} className="h-[42px] shrink-0">
-                        <PlusIcon className="w-5 h-5 mr-2" />
-                        Novo metodo
-                    </Button>
+                    <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
+                        <button
+                            onClick={() => onViewModeChange("list")}
+                            className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
+                        >
+                            <ListIcon className="w-[18px] h-[18px]" />
+                        </button>
+                        <button
+                            onClick={() => onViewModeChange("grid")}
+                            className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
+                        >
+                            <GridIcon className="w-[18px] h-[18px]" />
+                        </button>
+                    </div>
                 </div>
             </div>
 

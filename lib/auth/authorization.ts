@@ -597,6 +597,7 @@ const RESOURCE_ACTION_ROUTE_CHECKS: Partial<
     create: canRouteAction("appointments", "create"),
     edit: canRouteAction("appointments", "edit"),
     delete: canRouteAction("appointments", "delete"),
+    can_apply_discount: (perms) => canRouteSpecific("pos", "can_discount")(perms) || canRouteSpecific("orders", "can_view_values")(perms),
   },
   customers: {
     view: canRouteAccess("customers"),
@@ -687,6 +688,26 @@ const RESOURCE_ACTION_ROUTE_CHECKS: Partial<
     settings_messages: canRouteAccess("settings"),
     settings_delivery: canRouteAccess("logistics"),
     settings_integrations: canRouteAccess("settings_integrations"),
+  },
+  settings_negocio: {
+    edit: canRouteSpecific("settings_business", "can_edit_business_data"),
+  },
+  settings_team: {
+    invite: canRouteSpecific("settings_team", "can_invite"),
+    edit: canRouteSpecific("settings_team", "can_manage_team"),
+    remove: canRouteSpecific("settings_team", "can_remove_member"),
+    revoke_invite: canRouteSpecific("settings_team", "can_revoke_invite"),
+  },
+  settings_plans: {
+    change_plan: canRouteSpecific("settings_subscription", "can_change_subscription"),
+  },
+  payment_methods: {
+    create: canRouteAction("settings", "create"),
+    edit: canRouteAction("settings", "edit"),
+    delete: canRouteAction("settings", "delete"),
+  },
+  settings_comissions: {
+    edit: canRouteAction("settings", "edit"),
   },
 }
 

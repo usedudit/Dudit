@@ -161,13 +161,13 @@ const CashRegisterPageControls: React.FC<CashRegisterPageControlsProps> = ({
                     </div>
                     <div className="flex-none flex items-center gap-2">
                         <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] p-0">
-                            <FilterIcon className="w-4 h-4" />
+                            <FilterIcon size={18} />
                         </Button>
                         <Button
                             onClick={onOpenSession}
-                            className="w-[42px] h-[42px] p-0 flex items-center justify-center rounded-full bg-brand-green text-white shadow-sm"
+                            leftIcon={<PlusIcon size={18} />}
+                            className="w-[42px] h-[42px] p-0 flex items-center justify-center"
                         >
-                            <PlusIcon className="w-5 h-5" strokeWidth={3} />
                         </Button>
                     </div>
                 </div>

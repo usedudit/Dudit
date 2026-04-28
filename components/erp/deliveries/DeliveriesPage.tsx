@@ -207,9 +207,11 @@ export default function DeliveriesPage({
                 <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">Gerencie as entregas vinculadas aos pedidos.</p>
               </div>
               <div className="flex items-center gap-3">
-                <Button variant="outline"><ExportFileIcon className="w-[18px] h-[18px]" /> Exportar</Button>
-                <Button onClick={() => setWrapper("create")} disabled={!!planGate}>
-                  <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} /> Nova Entrega
+                <Button variant="outline" leftIcon={<ExportFileIcon size={18} />}>
+                  Exportar
+                </Button>
+                <Button onClick={() => setWrapper("create")} disabled={!!planGate} leftIcon={<PlusIcon size={18} />}>
+                  Nova Entrega
                 </Button>
               </div>
             </div>

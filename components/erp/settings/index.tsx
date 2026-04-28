@@ -1,5 +1,4 @@
 export * from "./SettingsPage"
-export * from "./SettingsCard"
 export * from "./BusinessDataSubPage"
 export * from "./IntegrationsSubPage"
 export * from "./TeamSubPage"

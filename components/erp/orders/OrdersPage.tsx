@@ -672,8 +672,7 @@ export default function OrdersPage({
                                         <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
                                     </Button>
 
-                                    <Button onClick={handleAddOrder}>
-                                        <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
+                                    <Button onClick={handleAddOrder} leftIcon={<PlusIcon size={18} />} >
                                         Novo Pedido
                                     </Button>
                                 </div>

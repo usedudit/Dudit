@@ -419,12 +419,11 @@ export default function CustomersPage({
                                 </div>
 
                                 <div className="flex items-center gap-3">
-                                    <Button variant="outline" onClick={() => { }}>
-                                        <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
+                                    <Button variant="outline" onClick={() => { }} leftIcon={<ExportFileIcon size={18} />}>
+                                        Exportar
                                     </Button>
 
-                                    <Button onClick={handleAddCustomer}>
-                                        <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
+                                    <Button onClick={handleAddCustomer} leftIcon={<PlusIcon size={18} />}>
                                         Novo Cliente
                                     </Button>
                                 </div>

@@ -82,7 +82,7 @@ const navItems: NavItem[] = [
         label: "Serviços",
         href: "/erp/services",
         submenu: [
-            { label: "Agendamentos", href: "/" },
+            { label: "Agendamentos", href: "/erp/agendamentos" },
             { label: "Ordens de Serviço", href: "/" },
             { label: "Catálogo de Serviços", href: "/" },
             { label: "Categorias de Serviços", href: "/" },

@@ -136,9 +136,9 @@ const CustomerPageControls: React.FC<CustomerPageControlsProps> = ({
                         </Button>
                         <Button
                             onClick={onAddCustomer}
-                            className="w-[42px] h-[42px] p-0 flex items-center justify-center rounded-full bg-brand-green text-white shadow-sm shadow-brand-green/20"
+                            className="w-[42px] h-[42px] p-0 flex items-center justify-center"
+                            leftIcon={<PlusIcon size={18} />}
                         >
-                            <PlusIcon className="w-5 h-5" strokeWidth={3} />
                         </Button>
                     </div>
                 </div>

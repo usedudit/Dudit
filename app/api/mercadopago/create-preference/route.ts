@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth/authorization"
 import { SecureLogger } from "@/lib/secure-logger"
 import { withCSRFProtection } from "@/lib/security/csrf-middleware"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
+import { validateCoupon } from "@/lib/services/coupons"
 
 interface PreferenceRequest {
   items?: Array<{
@@ -23,6 +24,7 @@ interface PreferenceRequest {
   }>
   partnerId?: string
   buyerId?: string
+  couponCode?: string | null
 }
 
 async function handler(request: NextRequest) {
@@ -180,6 +182,33 @@ async function handler(request: NextRequest) {
         quantity: item.quantity,
         currency_id: "BRL",
       })
+    }
+
+    // COUPON VALIDATION
+    let couponDiscount = 0
+    if (body.couponCode) {
+      const couponResult = await validateCoupon({
+        partnerId,
+        code: body.couponCode,
+        customerId: user.id,
+        subtotal: totalAmount,
+        items: items.map(i => ({ productId: i.id })) // simplified
+      })
+
+      if (couponResult.valid) {
+        couponDiscount = couponResult.discountAmount
+        
+        // Add discount as a separate item in MP preference
+        if (couponDiscount > 0) {
+          preferenceItems.push({
+            title: `Desconto: ${body.couponCode}`,
+            unit_price: -couponDiscount,
+            quantity: 1,
+            currency_id: "BRL",
+          })
+          totalAmount -= couponDiscount
+        }
+      }
     }
 
     // SEGURANÃ‡A: Validar total
