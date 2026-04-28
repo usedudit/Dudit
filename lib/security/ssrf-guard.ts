@@ -106,6 +106,7 @@ function isPrivateIPv4(ip: string): boolean {
   if (a === 0) return true                             // 0.0.0.0/8
   if (a === 10) return true                            // 10.0.0.0/8
   if (a === 127) return true                           // 127.0.0.0/8
+  if (a === 100 && b >= 64 && b <= 127) return true    // 100.64.0.0/10 (CGNAT, cloud internal)
   if (a === 169 && b === 254) return true              // 169.254.0.0/16
   if (a === 172 && b >= 16 && b <= 31) return true     // 172.16.0.0/12
   if (a === 192 && b === 168) return true              // 192.168.0.0/16
@@ -125,7 +126,9 @@ function isPrivateIPv4(ip: string): boolean {
  * - ::ffff:x.x.x.x  — IPv4-mapped (checked recursively)
  */
 function isPrivateIPv6(ip: string): boolean {
-  const normalized = ip.toLowerCase().trim()
+  // Strip zone ID (%25... or %...) before analysis
+  // WHY: IPv6 zone IDs like "::1%25lo" would bypass exact "::1" match
+  const normalized = ip.toLowerCase().trim().replace(/%.*$/, "")
 
   if (normalized === "::1") return true
   if (normalized === "::") return true
@@ -239,8 +242,9 @@ function validateUrl(
     }
   }
 
-  // 4. Hostname must be present
-  const hostname = parsed.hostname.toLowerCase()
+  // 4. Hostname must be present and normalized
+  // Strip trailing dot (FQDN notation) to prevent bypass via "api.example.com."
+  const hostname = parsed.hostname.toLowerCase().replace(/\.$/, "")
   if (!hostname) {
     return { valid: false, error: "Missing hostname" }
   }

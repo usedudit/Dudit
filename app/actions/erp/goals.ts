@@ -34,7 +34,7 @@ function money(value: number) {
   return Math.round(value * 100) / 100
 }
 
-async function resolveSellerNameMap(partnerId: string) {
+async function _fetchSellerNameMap(partnerId: string) {
   const admin = getAdminClient()
   const { data: partnerUsers } = await admin
     .from("partner_users")
@@ -48,13 +48,27 @@ async function resolveSellerNameMap(partnerId: string) {
         .map((row: any) => row.user_id),
     ),
   )
-  if (sellerIds.length === 0) return new Map<string, string>()
+  if (sellerIds.length === 0) return Object.create(null) as Record<string, string>
 
   const { data: profiles } = await admin
     .from("user_profiles")
     .select("user_id, full_name")
     .in("user_id", sellerIds)
-  return new Map<string, string>((profiles || []).map((p: any) => [String(p.user_id), String(p.full_name || "Vendedor")]))
+  return Object.fromEntries((profiles || []).map((p: any) => [String(p.user_id), String(p.full_name || "Vendedor")]))
+}
+
+/**
+ * Cached seller name resolver — avoids 2 DB queries per call.
+ * TTL: 5 minutes, scoped by partner_id.
+ * Invalidated when goals are revalidated.
+ */
+async function resolveSellerNameMap(partnerId: string): Promise<Map<string, string>> {
+  const cached = await unstable_cache(
+    () => _fetchSellerNameMap(partnerId),
+    ["seller-names", partnerId],
+    { revalidate: 300, tags: [`sales-goals-ranking:${partnerId}`] }
+  )()
+  return new Map(Object.entries(cached || {}))
 }
 
 export async function getSalesGoalsModuleAction(partnerId: string): Promise<{ success: true; goals: any; sellers: { id: string; name: string }[] } | { success: false; error: string }> {
@@ -222,14 +236,21 @@ async function fetchRanking(partnerId: string, filter?: RankingPeriodFilter) {
       .gte("end_date", startDate)
   if (periodType) goalsQuery = goalsQuery.eq("period_type", periodType)
 
-  const [{ data: sales }, sellerNameMap, { data: activeGoals }, { data: goalProgress }] = await Promise.all([
+  const [{ data: sales }, sellerNameMap, { data: activeGoals }] = await Promise.all([
     salesQuery,
     resolveSellerNameMap(partnerId),
     goalsQuery,
-    admin
-      .from("sales_goal_progress")
-      .select("goal_id, user_id, current_amount"),
   ])
+
+  // Fetch progress only for retrieved goals (avoids full-table scan on sales_goal_progress)
+  const goalIds = (activeGoals || []).map((g: any) => String(g.id))
+  const goalProgress = goalIds.length > 0
+    ? (await admin
+        .from("sales_goal_progress")
+        .select("goal_id, user_id, current_amount")
+        .in("goal_id", goalIds)
+      ).data
+    : []
 
   const totalByUser = new Map<string, number>()
   for (const sale of sales || []) {
@@ -293,9 +314,33 @@ export async function getSalesGoalsSummaryAction(partnerId: string) {
   await requireUser()
   await requirePartnerAccessWithPermission(partnerId, "goals", "view")
   const supabase = await getSupabaseServerClient()
+
+  // Try RPC first (single server-side aggregation — much faster)
+  try {
+    const { data: rpcResult, error: rpcError } = await supabase.rpc("get_sales_goals_summary", {
+      p_partner_id: partnerId,
+    })
+
+    if (!rpcError && rpcResult) {
+      return {
+        success: true as const,
+        summary: {
+          total_sold: money(Number(rpcResult.total_sold || 0)),
+          total_commissions: money(Number(rpcResult.total_commissions || 0)),
+          total_bonus_paid: money(Number(rpcResult.total_bonus_paid || 0)),
+          active_goals: Number(rpcResult.active_goals || 0),
+          achieved_goals: Number(rpcResult.achieved_goals || 0),
+        },
+      }
+    }
+  } catch {
+    // RPC not deployed yet — fall through to legacy multi-query
+  }
+
+  // Fallback: original multi-query approach (removed once RPC is deployed)
   const today = new Date().toISOString().slice(0, 10)
 
-  const [{ data: sales }, { data: commissions }, { data: bonusPaid }, { data: goals }, { data: progress }] = await Promise.all([
+  const [{ data: sales }, { data: commissions }, { data: bonusPaid }, { data: goals }] = await Promise.all([
     supabase.from("sales").select("final_amount").eq("partner_id", partnerId).in("payment_status", ["paid", "partially_paid"]),
     supabase.from("transactions").select("amount").eq("partner_id", partnerId).eq("category", "Comissões").eq("transaction_type", "expense"),
     supabase
@@ -306,8 +351,12 @@ export async function getSalesGoalsSummaryAction(partnerId: string) {
       .eq("category", "Metas e Bônus")
       .ilike("description", "%Bônus por meta atingida%"),
     supabase.from("sales_goals").select("id, start_date, end_date").eq("partner_id", partnerId),
-    supabase.from("sales_goal_progress").select("goal_id, achieved"),
   ])
+
+  const goalIds = (goals || []).map((g: any) => String(g.id))
+  const progress = goalIds.length > 0
+    ? (await supabase.from("sales_goal_progress").select("goal_id, achieved").in("goal_id", goalIds)).data
+    : []
 
   const totalSold = money((sales || []).reduce((sum: number, row: any) => sum + Number(row.final_amount || 0), 0))
   const totalCommissions = money((commissions || []).reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0))

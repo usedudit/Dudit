@@ -172,19 +172,27 @@ export async function applySaleToGoals(params: {
   const amount = money(Math.max(0, Number(params.saleAmount || 0)))
   if (amount <= 0.009) return
   const goals = await getActiveGoalsForSeller({ ...params, activityType: "sales" })
+  if (goals.length === 0) return
+
+  // Batch-fetch all progress rows for this seller's active goals (eliminates N+1)
+  const goalIds = goals.map(g => g.id)
+  const { data: allProgress } = await params.supabase
+    .from("sales_goal_progress")
+    .select("id, goal_id, current_amount, achieved, achieved_at")
+    .in("goal_id", goalIds)
+    .eq("user_id", params.sellerUserId)
+
+  const progressMap = new Map(
+    (allProgress || []).map((p: any) => [String(p.goal_id), p])
+  )
 
   for (const goal of goals) {
 
-    const { data: progress } = await params.supabase
-      .from("sales_goal_progress")
-      .select("id, current_amount, achieved")
-      .eq("goal_id", goal.id)
-      .eq("user_id", params.sellerUserId)
-      .maybeSingle()
+    const existingProgress = progressMap.get(goal.id) || null
 
-    const currentAmount = money(Number(progress?.current_amount || 0))
+    const currentAmount = money(Number(existingProgress?.current_amount || 0))
     const nextAmount = money(currentAmount + amount)
-    const alreadyAchieved = Boolean(progress?.achieved)
+    const alreadyAchieved = Boolean(existingProgress?.achieved)
     const justAchieved = !alreadyAchieved && nextAmount >= Number(goal.target_amount || 0)
     const achievedAt = justAchieved ? new Date().toISOString() : null
 
@@ -195,7 +203,7 @@ export async function applySaleToGoals(params: {
         user_id: params.sellerUserId,
         current_amount: nextAmount,
         achieved: alreadyAchieved || justAchieved,
-        achieved_at: justAchieved ? achievedAt : (progress as any)?.achieved_at || null,
+        achieved_at: justAchieved ? achievedAt : (existingProgress as any)?.achieved_at || null,
         updated_at: new Date().toISOString(),
       }, { onConflict: "goal_id,user_id" })
 
@@ -233,14 +241,22 @@ export async function reverseSaleFromGoals(params: {
   const amount = money(Math.max(0, Number(params.saleAmount || 0)))
   if (amount <= 0.009) return
   const goals = await getActiveGoalsForSeller({ ...params, activityType: "sales" })
+  if (goals.length === 0) return
+
+  // Batch-fetch all progress rows for this seller's active goals (eliminates N+1)
+  const goalIds = goals.map(g => g.id)
+  const { data: allProgress } = await params.supabase
+    .from("sales_goal_progress")
+    .select("id, goal_id, current_amount, achieved, achieved_at")
+    .in("goal_id", goalIds)
+    .eq("user_id", params.sellerUserId)
+
+  const progressMap = new Map(
+    (allProgress || []).map((p: any) => [String(p.goal_id), p])
+  )
 
   for (const goal of goals) {
-    const { data: progress } = await params.supabase
-      .from("sales_goal_progress")
-      .select("id, current_amount, achieved")
-      .eq("goal_id", goal.id)
-      .eq("user_id", params.sellerUserId)
-      .maybeSingle()
+    const progress = progressMap.get(goal.id) || null
     if (!progress?.id) continue
 
     const prevAmount = money(Number(progress.current_amount || 0))

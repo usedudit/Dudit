@@ -144,27 +144,31 @@ export async function createTransactionFromOrder(
             : await resolveDefaultSalesAccountId(supabase, orderData.partner_id)
         const accountId = explicitAccountId || mercadoPagoAccountId || defaultSalesAccountId
 
-        for (const [index, entry] of entries.entries()) {
+        // Build deterministic reference_note keys for each entry.
+        // Format: "sale-tx:{order_number}:{index}" — unique per entry, stable across retries.
+        const entriesWithRef = entries.map((entry, index) => ({
+            ...entry,
+            referenceNote: `sale-tx:${orderData.order_number}:${index}`,
+        }))
+
+        // Batch dedup: single query to find all already-created transactions for this order
+        const refNotes = entriesWithRef.map(e => e.referenceNote)
+        const { data: existingTxs } = await supabase
+            .from("transactions")
+            .select("reference_note")
+            .eq("partner_id", orderData.partner_id)
+            .in("reference_note", refNotes)
+
+        const existingRefs = new Set(
+            (existingTxs || []).map((t: any) => String(t.reference_note))
+        )
+
+        for (const [index, entry] of entriesWithRef.entries()) {
             const amount = Number(entry.amount || 0)
             if (!(amount > 0.009)) continue
 
-            // Deduplicação por payload principal para evitar repetição em webhook + sync.
-            const { data: existing } = await supabase
-                .from("transactions")
-                .select("id")
-                .eq("partner_id", orderData.partner_id)
-                .eq("description", orderData.order_number)
-                .eq("category", "Vendas")
-                .eq("transaction_type", "income")
-                .eq("payment_type", entry.method)
-                .eq("amount", amount)
-                .eq("payment_date", paymentDate)
-                .limit(1)
-                .maybeSingle()
-
-            if (existing) {
-                continue
-            }
+            // Skip if this exact entry was already created (retry/webhook dedup)
+            if (existingRefs.has(entry.referenceNote)) continue
 
             // `payment_breakdown` already carries the net charged amount calculated by checkout.
             // Reapplying payment-method pricing here causes double discount/fee.
@@ -189,6 +193,7 @@ export async function createTransactionFromOrder(
                 payment_method_id: entry.paymentMethodId || null,
                 transaction_type: "income" as const,
                 account_id: accountId,
+                reference_note: entry.referenceNote,
             }
 
             const { error } = await supabase.from("transactions").insert(transactionData)
