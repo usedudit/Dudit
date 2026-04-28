@@ -2,11 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, MoreHorizontal, Edit3, Utensils, Briefcase, Plus, ChevronDown, ChevronLeft, ChevronRight, Minus, Check, User, Info, AlertCircle, AlertTriangle, ArrowRight, Trash2 } from 'lucide-react';
-import Button from '../../Button';
-import { FormInput } from '../../FormInput';
-import { FormCheckbox } from '../../FormCheckbox';
-import Dropdown, { DropdownItem } from '../../Dropdown';
-import { Badge } from '../../Badge';
+import { Button, Input as FormInput, Checkbox as FormCheckbox, Dropdown, DropdownItem, Badge } from '../../../reusable';
 import { Appointment } from '../types';
 import { AppointmentListCard } from '../AppointmentListCard';
 import { getEndTime } from '../utils';
@@ -213,6 +209,7 @@ export const AddUnavailableSheet = ({ onClose, onSave, appointment }: { onClose:
                         <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Data</label>
                         <Dropdown 
                             width="w-auto" 
+                            showChevron={false}
                             trigger={
                                 <button className="flex items-center justify-between w-full h-[42px] px-3 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-sm font-medium text-brand-dark dark:text-dark-heading">
                                     {date} <ChevronDown size={16} className="text-brand-inactive-text" />
@@ -227,7 +224,7 @@ export const AddUnavailableSheet = ({ onClose, onSave, appointment }: { onClose:
                     <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col gap-1.5">
                             <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Horário de início</label>
-                            <Dropdown width="w-full" trigger={<button className="flex items-center justify-between w-full h-[42px] px-3 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-sm font-medium text-brand-dark dark:text-dark-heading">{startTime} <ChevronDown size={16} className="text-brand-inactive-text" /></button>}>
+                            <Dropdown width="w-full" showChevron={false} trigger={<button className="flex items-center justify-between w-full h-[42px] px-3 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-sm font-medium text-brand-dark dark:text-dark-heading">{startTime} <ChevronDown size={16} className="text-brand-inactive-text" /></button>}>
                                 <DropdownItem onClick={() => setStartTime('11:00')}>11:00</DropdownItem>
                                 <DropdownItem onClick={() => setStartTime('12:00')}>12:00</DropdownItem>
                                 <DropdownItem onClick={() => setStartTime('13:00')}>13:00</DropdownItem>
@@ -235,7 +232,7 @@ export const AddUnavailableSheet = ({ onClose, onSave, appointment }: { onClose:
                         </div>
                         <div className="flex flex-col gap-1.5">
                             <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Horário de término</label>
-                            <Dropdown width="w-full" trigger={<button className="flex items-center justify-between w-full h-[42px] px-3 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-sm font-medium text-brand-dark dark:text-dark-heading">{endTime} <ChevronDown size={16} className="text-brand-inactive-text" /></button>}>
+                            <Dropdown width="w-full" showChevron={false} trigger={<button className="flex items-center justify-between w-full h-[42px] px-3 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-sm font-medium text-brand-dark dark:text-dark-heading">{endTime} <ChevronDown size={16} className="text-brand-inactive-text" /></button>}>
                                 <DropdownItem onClick={() => setEndTime('12:00')}>12:00</DropdownItem>
                                 <DropdownItem onClick={() => setEndTime('13:00')}>13:00</DropdownItem>
                                 <DropdownItem onClick={() => setEndTime('14:00')}>14:00</DropdownItem>
@@ -247,7 +244,7 @@ export const AddUnavailableSheet = ({ onClose, onSave, appointment }: { onClose:
                     {/* Collaborator */}
                     <div className="flex flex-col gap-1.5">
                         <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Colaboradores</label>
-                        <Dropdown width="w-full" trigger={
+                        <Dropdown width="w-full" showChevron={false} trigger={
                             <button className="flex items-center justify-between w-full h-[42px] px-3 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-sm font-medium text-brand-dark dark:text-dark-heading">
                                 <div className="flex items-center gap-2">
                                     <img src="https://i.pravatar.cc/150?u=20" className="w-5 h-5 rounded-full" />
@@ -264,7 +261,7 @@ export const AddUnavailableSheet = ({ onClose, onSave, appointment }: { onClose:
                     {/* Frequency */}
                     <div className="flex flex-col gap-1.5">
                         <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Frequência</label>
-                        <Dropdown width="w-full" trigger={<button className="flex items-center justify-between w-full h-[42px] px-3 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-sm font-medium text-brand-dark dark:text-dark-heading">{frequency} <ChevronDown size={16} className="text-brand-inactive-text" /></button>}>
+                        <Dropdown width="w-full" showChevron={false} trigger={<button className="flex items-center justify-between w-full h-[42px] px-3 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-sm font-medium text-brand-dark dark:text-dark-heading">{frequency} <ChevronDown size={16} className="text-brand-inactive-text" /></button>}>
                             <DropdownItem onClick={() => setFrequency('Não se repete')}>Não se repete</DropdownItem>
                             <DropdownItem onClick={() => setFrequency('Diariamente')}>Diariamente</DropdownItem>
                             <DropdownItem onClick={() => setFrequency('Semanalmente')}>Semanalmente</DropdownItem>
@@ -346,13 +343,15 @@ export const StatusActionSheet = ({ type, appointment, onClose, onConfirm }: { t
                         <span className="text-sm text-brand-dark dark:text-dark-body">Nenhuma política de cancelamento foi aplicada a este agendamento</span>
                     </div>
                     <div className="flex items-start gap-3 p-4 border border-brand-border dark:border-dark-border rounded-xl">
-                        <div className="flex items-center justify-center w-5 h-5 mt-0.5"><input type="checkbox" defaultChecked className="w-5 h-5 rounded border-gray-300 text-[#7c3aed] focus:ring-[#7c3aed]" /></div>
+                        <div className="flex items-center justify-center w-5 h-5 mt-0.5">
+                            <FormCheckbox checked={true} onChange={() => {}} />
+                        </div>
                         <div><span className="block text-sm font-bold text-brand-dark dark:text-dark-heading">Enviar notificação</span><span className="block text-xs text-brand-inactive-text mt-1">Enviar uma mensagem informando ao cliente sobre a atualização do agendamento.</span></div>
                     </div>
                     {isCancel && (
                         <div>
                             <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Motivo do cancelamento</label>
-                            <Dropdown width="w-full" trigger={<button className="flex items-center justify-between w-full px-4 py-3 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl text-sm font-medium text-brand-inactive-text dark:text-dark-body">{reason}<ChevronDown size={16} /></button>}>
+                            <Dropdown width="w-full" showChevron={false} trigger={<button className="flex items-center justify-between w-full px-4 py-3 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl text-sm font-medium text-brand-inactive-text dark:text-dark-body">{reason}<ChevronDown size={16} /></button>}>
                                 <DropdownItem onClick={() => setReason('Nenhum motivo informado')}>Nenhum motivo informado</DropdownItem>
                                 <DropdownItem onClick={() => setReason('Agendamento duplicado')}>Agendamento duplicado</DropdownItem>
                                 <DropdownItem onClick={() => setReason('Agendamento feito por engano')}>Agendamento feito por engano</DropdownItem>

@@ -1,10 +1,7 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Check, MoreHorizontal, RefreshCcw, Edit3, FileText, Mail, Printer, User, X } from 'lucide-react';
-import Button from '../../Button';
-import { Badge } from '../../Badge';
-import Dropdown, { DropdownItem } from '../../Dropdown';
+import { Button, Badge, Dropdown, DropdownItem } from '../../../reusable';
 import { Appointment } from '../types';
 
 interface SaleDetailSheetProps {
@@ -59,6 +56,7 @@ const SaleDetailSheet = ({ onClose, appointment }: SaleDetailSheetProps) => {
                                   <Dropdown 
                                     width="w-56" 
                                     align="right" 
+                                    showChevron={false}
                                     trigger={
                                         <button className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                                             <MoreHorizontal size={18} className="text-brand-dark dark:text-dark-heading" />

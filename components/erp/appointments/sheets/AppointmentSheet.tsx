@@ -2,9 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, X, Search, CheckCircle2, ChevronRight, Plus, ChevronDown, User, Calendar as CalendarIcon, Check, MoreHorizontal, Edit3, Clock, Repeat, CalendarPlus, RotateCcw, CalendarOff, Save, Trash2, ThumbsUp, MapPin, Play, AlertTriangle, XCircle, ShoppingBag, ArrowRight, FileText, AlertOctagon } from 'lucide-react';
-import Button from '../../Button';
-import { FormInput } from '../../FormInput';
-import Dropdown, { DropdownItem } from '../../Dropdown';
+import { Button, Input as FormInput, Dropdown, DropdownItem } from '../../../reusable';
 import { RecurrenceView, ActivityLog } from '../Shared';
 import { mockServices, mockClients, staffMembers } from '../data';
 import { Appointment } from '../types';
@@ -105,7 +103,7 @@ export const AppointmentSheet = ({
                  // Try to find the service in mock data to get individual price/duration
                  let catalogService: any = null;
                  for (const category of servicesSource) {
-                     const found = category.items.find(i => i.name === name);
+                     const found = category.items.find((i: any) => i.name === name);
                      if (found) {
                          catalogService = { ...found, colorClass: category.colorClass };
                          break;
@@ -646,7 +644,7 @@ export const AppointmentSheet = ({
                                     <div key={idx}>
                                         <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">{group.category}</h3>
                                         <div className="space-y-3">
-                                            {group.items.map(item => {
+                                            {group.items.map((item: any) => {
                                                 const isSelected = selectedServices.some(s => s.id === item.id);
                                                 const isEditingMode = editingServiceIndex !== null; 
 
@@ -996,6 +994,7 @@ export const AppointmentSheet = ({
                                         <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Profissional</label>
                                         <Dropdown 
                                             width="w-full" 
+                                            showChevron={false}
                                             trigger={
                                                 <button className="flex items-center justify-between w-full h-[42px] px-3 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-sm font-medium text-brand-dark dark:text-dark-heading">
                                                     <div className="flex items-center gap-2">

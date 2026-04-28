@@ -2,10 +2,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MoreHorizontal, Trash2, Plus, Minus, ChevronRight, Banknote, Check, Gift, Split, DollarSign, RefreshCcw, Edit3, FileText, Mail, Printer, ChevronLeft, X, User } from 'lucide-react';
-import Button from '../../Button';
-import { Badge } from '../../Badge';
+import { Button, Badge, Dropdown, DropdownItem } from '../../../reusable';
 import { NumpadModal, PaymentOptionCard } from '../Shared';
-import Dropdown, { DropdownItem } from '../../Dropdown';
 import { ServiceItemCard } from '../ServiceItemCard';
 
 const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess }: { onClose: () => void, onComplete: () => void, initialData: any, onPaymentSuccess?: () => void }) => {
@@ -266,6 +264,7 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess }: {
                                                   <Dropdown 
                                                     width="w-56" 
                                                     align="right" 
+                                                    showChevron={false}
                                                     trigger={
                                                         <button className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50">
                                                             <MoreHorizontal size={18} className="text-brand-dark" />

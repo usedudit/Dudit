@@ -13,8 +13,7 @@ import {
   Plus,
   Calendar as CalendarIcon
 } from 'lucide-react';
-import Button from '../Button';
-import Dropdown, { DropdownItem } from '../Dropdown';
+import { Button, Dropdown, DropdownItem, Checkbox } from '../../reusable';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { 
@@ -464,8 +463,7 @@ const AppointmentsPage = () => {
                               {realStaffMembers.slice(0,2).map(staff => (
                                   <label key={staff.id} className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/50 p-1.5 rounded-lg -mx-1.5 transition-colors">
                                       <div className="relative flex items-center justify-center">
-                                          <input type="checkbox" defaultChecked className="peer appearance-none w-5 h-5 border border-gray-300 rounded bg-white checked:bg-brand-green checked:border-brand-green" />
-                                          <Check size={12} className="absolute text-white opacity-0 peer-checked:opacity-100 pointer-events-none" />
+                                          <Checkbox checked={true} onChange={() => {}} />
                                       </div>
                                       <img src={staff.avatar} className="w-6 h-6 rounded-full" />
                                       <span className="text-sm text-brand-dark dark:text-dark-body">{staff.name}</span>
