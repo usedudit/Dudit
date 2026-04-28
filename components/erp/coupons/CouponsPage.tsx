@@ -189,7 +189,7 @@ export default function CouponsPage({
             const nextScopeData: CouponScopeData = {
                 products: result.products || [],
                 services: result.services || [],
-                categories: (result.categories || []) as string[],
+                categories: result.categories || [],
                 customers: result.customers || [],
             }
             setScopeData(nextScopeData)
@@ -223,7 +223,7 @@ export default function CouponsPage({
                     productIds,
                     serviceIds,
                     customerIds,
-                    categories: availableScope.categories.filter((item) => categoryIds.includes(item)),
+                    categories: availableScope.categories.filter((item) => categoryIds.includes(item.id)),
                     products: availableScope.products.filter((item) => productIds.includes(item.id)),
                     services: availableScope.services.filter((item) => serviceIds.includes(item.id)),
                     customers: availableScope.customers.filter((item) => customerIds.includes(item.id)),
@@ -381,7 +381,7 @@ export default function CouponsPage({
     const setSelectedCategoryIds = useCallback((value: React.SetStateAction<string[]>) => {
         setRelations((prev) => {
             const categoryIds = typeof value === "function" ? value(prev.categoryIds) : value
-            return { ...prev, categoryIds, categories: scopeData.categories.filter((item) => categoryIds.includes(item)) }
+            return { ...prev, categoryIds, categories: scopeData.categories.filter((item) => categoryIds.includes(item.id)) }
         })
     }, [scopeData.categories])
 
@@ -410,10 +410,10 @@ export default function CouponsPage({
             isActive: Boolean(form.isActive),
             customerScope: form.customerScope,
             isAutomatic: Boolean(form.isAutomatic),
-            productIds: relations.productIds,
-            categoryIds: relations.categoryIds,
-            serviceIds: relations.serviceIds,
-            customerIds: relations.customerIds,
+            productIds: form.applyScope === "products" ? relations.productIds : [],
+            categoryIds: form.applyScope === "categories" ? relations.categoryIds : [],
+            serviceIds: form.applyScope === "services" ? relations.serviceIds : [],
+            customerIds: form.customerScope === "specific" ? relations.customerIds : [],
         }
 
         if (!payload.code) {
@@ -646,7 +646,7 @@ export default function CouponsPage({
                                             <FadeIn key="empty" className="h-[600px] flex items-center justify-center px-4 md:px-8">
                                                 <IconPlaceholder
                                                     placeholderType="image"
-                                                    imageSrc={hasActiveFilters ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png" : "https://img.dudit.com.br/static/mascots/Aguarde.png"}
+                                                    imageSrc={hasActiveFilters ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png" : "https://img.dudit.com.br/static/mascots/Cupons.png"}
                                                     imageAlt="Nenhum cupom encontrado"
                                                     title={hasActiveFilters ? "Nenhum cupom encontrado" : "Nenhum cupom cadastrado"}
                                                     subtitle={hasActiveFilters ? "Tente ajustar seus filtros ou termos de busca." : "Comece criando seu primeiro cupom promocional."}

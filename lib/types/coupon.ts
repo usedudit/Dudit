@@ -35,7 +35,11 @@ export type ScopeItem = {
   id: string
   name: string
   category?: string | null
+  categoryId?: string | null
   price?: number | null
+  sku?: string | null
+  image?: string | null
+  isActive?: boolean
 }
 
 export type ScopeCustomer = {
@@ -43,6 +47,14 @@ export type ScopeCustomer = {
   name: string
   email?: string | null
   phone?: string | null
+  avatarUrl?: string | null
+  status?: "ativo" | "inativo" | "bloqueado" | null
+}
+
+export type ScopeCategory = {
+  id: string
+  name: string
+  isActive: boolean
 }
 
 export type CouponFormState = {
@@ -70,7 +82,7 @@ export type CouponFormState = {
 export type CouponScopeData = {
   products: ScopeItem[]
   services: ScopeItem[]
-  categories: string[]
+  categories: ScopeCategory[]
   customers: ScopeCustomer[]
 }
 
@@ -81,7 +93,7 @@ export type CouponRelations = {
   customerIds: string[]
   products: ScopeItem[]
   services: ScopeItem[]
-  categories: string[]
+  categories: ScopeCategory[]
   customers: ScopeCustomer[]
 }
 

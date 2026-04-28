@@ -562,9 +562,10 @@ export async function getPartnerCustomersAction(partnerId: string, currentStoreI
 
     const { data: customers, error } = await supabase
       .from("customers")
-      .select("*")
+      .select("id, name, email, phone, cpf, status, store_credit, created_at, store_id, partner_id, person_type")
       .eq("partner_id", partnerId)
       .order("created_at", { ascending: false })
+      .limit(500)
 
     if (error) {
       console.error("[getPartnerCustomersAction] Error:", error)
@@ -572,17 +573,6 @@ export async function getPartnerCustomersAction(partnerId: string, currentStoreI
     }
 
     let result = customers || []
-
-    const { decryptCPF } = await import("@/lib/crypto")
-    for (const c of result) {
-      if (c.cpf && c.cpf.startsWith("v")) {
-        try {
-          c.cpf = await decryptCPF(c.cpf)
-        } catch (e) {
-          // Ignore if decryption fails
-        }
-      }
-    }
 
     // Prioritize: current store customers first, then others
     if (currentStoreId) {

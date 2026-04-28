@@ -242,7 +242,7 @@ const SelectCustomerSheet = ({
                       )}
                     </div>
                     <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                      ID {customer.id || "-"}
+                      ID #{customer.id ? customer.id.substring(0, 5).toUpperCase() : "-"}
                     </p>
                     <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                       {customer.email || "Sem e-mail"}

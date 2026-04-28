@@ -26,7 +26,7 @@ import { usePermissions } from "@/lib/permission-context"
 import { useSidebar } from "@/lib/sidebar-context"
 import { Drawer } from "vaul"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
-import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/plan-upgrade-context"
+import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 
 interface SubMenuItem {
     label: string
@@ -183,9 +183,9 @@ function ErpPlanGatedNavItem({
     }
 
     return (
-        <Link 
-            href={href} 
-            prefetch={false} 
+        <Link
+            href={href}
+            prefetch={false}
             onClick={(e) => {
                 if (typeof window !== "undefined" && window.location.pathname === href) {
                     e.preventDefault()
@@ -194,7 +194,7 @@ function ErpPlanGatedNavItem({
                 setTimeout(() => {
                     onNavigate?.()
                 }, 0)
-            }} 
+            }}
             className={itemClass}>
             {labelRow}
         </Link>

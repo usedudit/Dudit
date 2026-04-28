@@ -16,7 +16,7 @@ import DeliveryListItem from "./DeliveryListRow"
 import DeliveryGridCard from "./DeliveryGridCard"
 import CreateDeliveryPage from "./CreateDeliveryPage"
 import DeliveryDetailPage from "./DeliveryDetailPage"
-import { usePlanUpgrade } from "@/components/erp/subscription/plan-upgrade-context"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 
 type SortKey = "order_id" | "delivery_fee" | "status" | "delivery_person" | "estimated_time" | "dates" | "delivered_at"
 type SortDirection = "asc" | "desc"

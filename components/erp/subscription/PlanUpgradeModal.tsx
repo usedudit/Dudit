@@ -47,18 +47,21 @@ function PlanUpgradeModalInner({
   target,
   isOpen,
   onClose,
+  plans,
+  subData,
+  loading,
 }: {
   target: UpgradeTarget | null
   isOpen: boolean
   onClose: () => void
+  plans: any[]
+  subData: any
+  loading: boolean
 }) {
   const isMobile = useMediaQuery("(max-width: 768px)")
   const [anim, setAnim] = useState(false)
   const [visible, setVisible] = useState(false)
 
-  const [plans, setPlans] = useState<any[]>([])
-  const [subData, setSubData] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
   const [billingEmail, setBillingEmail] = useState("")
   const [emailError, setEmailError] = useState("")
@@ -75,32 +78,11 @@ function PlanUpgradeModalInner({
   }, [isOpen])
 
   useEffect(() => {
-    if (!isOpen || !target || target === "free") return
-    let cancelled = false
-      ; (async () => {
-        setLoading(true)
-        try {
-          const [plansRes, statusRes] = await Promise.all([listPlansAction(), getSubscriptionStatusAction()])
-          if (cancelled) return
-          if (plansRes.success && plansRes.data) {
-            setPlans([...plansRes.data].sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)))
-          }
-          if (statusRes.success && statusRes.data) {
-            setSubData(statusRes.data)
-            if (statusRes.data.subscription?.billing_email) {
-              setBillingEmail(statusRes.data.subscription.billing_email)
-            }
-          }
-        } catch {
-          toast.error("Não foi possível carregar os planos.")
-        } finally {
-          if (!cancelled) setLoading(false)
-        }
-      })()
-    return () => {
-      cancelled = true
+    if (subData?.subscription?.billing_email && !billingEmail) {
+      setBillingEmail(subData.subscription.billing_email)
     }
-  }, [isOpen, target])
+  }, [subData, billingEmail])
+
 
   const targetPlan = useMemo(() => {
     if (!target || !plans.length) return null
@@ -171,27 +153,26 @@ function PlanUpgradeModalInner({
         )}
       </p>
 
-      {loading ? (
-        <div className="flex items-center gap-2 text-brand-inactive-text py-8">
-          <Loader2 className="w-5 h-5 animate-spin" />
-          Carregando detalhes…
-        </div>
-      ) : (
-        <>
-          <p className="text-xs font-bold uppercase text-brand-green mb-3">O que está incluso</p>
-          <ul className="space-y-3 mb-8">
-            {featureLines.slice(0, 12).map((line) => (
-              <li key={line} className="flex gap-3 text-sm text-brand-dark dark:text-dark-heading">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-brand-dark text-white text-xs font-bold">✓</span>
-                <span>{line}</span>
-              </li>
-            ))}
-          </ul>
+      <p className="text-sm text-brand-dark dark:text-dark-heading mb-3">O que está incluso</p>
+      <ul className="space-y-3 mb-8">
+        {featureLines.slice(0, 12).map((line) => (
+          <li key={line} className="flex gap-3 text-sm text-brand-dark dark:text-dark-heading">
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-brand-dark text-white text-xs font-bold">✓</span>
+            <span>{line}</span>
+          </li>
+        ))}
+      </ul>
 
-          <div className="mt-auto space-y-3">
-            <label className="text-xs font-medium text-brand-inactive-text">Email de faturamento</label>
+      <div className="mt-auto space-y-3">
+        {loading ? (
+          <div className="flex items-center gap-2 text-brand-inactive-text py-4">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-xs">Carregando detalhes do faturamento…</span>
+          </div>
+        ) : (
+          <>
             <FormInput
-              label=""
+              label="Email de faturamento"
               type="email"
               value={billingEmail}
               onChange={(e) => setBillingEmail(e.target.value)}
@@ -202,22 +183,22 @@ function PlanUpgradeModalInner({
             <p className="text-xs text-brand-inactive-text">
               Mesmo fluxo da página Minha Assinatura: você será redirecionado ao Mercado Pago quando necessário.
             </p>
-            <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
-              <Button variant="outline" className="flex-1 rounded-full" onClick={onClose} disabled={actionLoading}>
-                Agora não
-              </Button>
-              <Button className="flex-1 rounded-full bg-brand-primary hover:bg-brand-primary/90 text-white" onClick={handleSubscribe} disabled={actionLoading || loading}>
-                {actionLoading ? "Processando…" : "Assinar plano"}
-              </Button>
-            </div>
-          </div>
-        </>
-      )}
+          </>
+        )}
+        <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
+          <Button variant="outline" className="flex-1 rounded-full" onClick={onClose} disabled={actionLoading}>
+            Agora não
+          </Button>
+          <Button className="flex-1 rounded-full bg-brand-primary hover:bg-brand-primary/90 text-white" onClick={handleSubscribe} disabled={actionLoading || loading}>
+            {actionLoading ? "Processando…" : "Assinar plano"}
+          </Button>
+        </div>
+      </div>
     </div>
   )
 
   const rightPanel = (
-    <div className="relative flex flex-col items-center justify-between bg-[#0f172a] text-white p-8 min-h-[280px] md:min-h-0 md:w-[46%] shrink-0">
+    <div className="relative flex flex-col items-center justify-between bg-brand-gray dark:bg-dark-border/50 text-white p-8 min-h-[280px] md:min-h-0 md:w-[46%] shrink-0">
       <button
         type="button"
         onClick={onClose}
@@ -279,6 +260,31 @@ export function PlanUpgradeProvider({ children }: { children: React.ReactNode })
   const [target, setTarget] = useState<UpgradeTarget | null>(null)
   const [open, setOpen] = useState(false)
 
+  const [plans, setPlans] = useState<any[]>([])
+  const [subData, setSubData] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+
+  const fetchPlansAndStatus = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [plansRes, statusRes] = await Promise.all([listPlansAction(), getSubscriptionStatusAction()])
+      if (plansRes.success && plansRes.data) {
+        setPlans([...plansRes.data].sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)))
+      }
+      if (statusRes.success && statusRes.data) {
+        setSubData(statusRes.data)
+      }
+    } catch {
+      // toast.error("Não foi possível carregar os planos.")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchPlansAndStatus()
+  }, [fetchPlansAndStatus])
+
   const openPlanUpgrade = useCallback((t: UpgradeTarget) => {
     if (t === "free") return
     setTarget(t)
@@ -295,7 +301,14 @@ export function PlanUpgradeProvider({ children }: { children: React.ReactNode })
   return (
     <PlanUpgradeContext.Provider value={value}>
       {children}
-      <PlanUpgradeModalInner target={target} isOpen={open} onClose={close} />
+      <PlanUpgradeModalInner
+        target={target}
+        isOpen={open}
+        onClose={close}
+        plans={plans}
+        subData={subData}
+        loading={loading}
+      />
     </PlanUpgradeContext.Provider>
   )
 }

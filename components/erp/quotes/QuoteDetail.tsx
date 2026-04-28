@@ -97,6 +97,13 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
     }, []);
 
     useEffect(() => {
+        if (initialQuote && initialQuote.items) {
+             setQuote(initialQuote);
+             setPendingStatus(initialQuote.status || 'draft');
+             setLoading(false);
+             setIsLoadingQuoteItems(false);
+             return;
+        }
         async function load() {
             setIsLoadingQuoteItems(true);
             if (!initialQuote) setLoading(true);

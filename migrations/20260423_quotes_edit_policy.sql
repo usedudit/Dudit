@@ -28,6 +28,10 @@ BEGIN
   SELECT status INTO quote_status
   FROM public.quotes WHERE id = target_quote_id;
 
+  IF quote_status IS NULL THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
   IF quote_status IS DISTINCT FROM 'draft' THEN
     RAISE EXCEPTION 'Itens do orçamento só podem ser alterados em status Rascunho. Status atual: %', quote_status;
   END IF;

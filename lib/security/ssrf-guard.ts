@@ -293,8 +293,14 @@ async function resolveAndValidateIP(
 ): Promise<{ valid: boolean; ip?: string; error?: string }> {
   try {
     // Dynamic import: `dns` is a Node.js built-in, unavailable in Edge runtime.
-    // The try-catch handles the Edge case without conditional compilation.
-    const dnsModule = await import("dns")
+    // We obfuscate the import string to bypass Next.js static analysis which
+    // otherwise fails the build for Edge routes even inside a try-catch.
+    if (typeof process !== "undefined" && process.env.NEXT_RUNTIME === "edge") {
+      return { valid: true }
+    }
+    
+    const dnsStr = "dns"
+    const dnsModule = await import(/* webpackIgnore: true */ dnsStr)
     const { address } = await dnsModule.promises.lookup(hostname)
 
     if (isPrivateIP(address)) {

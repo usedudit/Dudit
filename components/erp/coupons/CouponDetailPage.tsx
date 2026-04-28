@@ -192,7 +192,7 @@ export default function CouponDetailPage({
                         <div className="space-y-8">
                           <section>
                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Categorias vinculadas</h3>
-                            <p className="text-sm text-brand-dark dark:text-dark-heading">{relations.categories.length > 0 ? relations.categories.join(", ") : "Nenhuma categoria especifica vinculada."}</p>
+                            <p className="text-sm text-brand-dark dark:text-dark-heading">{relations.categories.length > 0 ? relations.categories.map((item) => item.name).join(", ") : "Nenhuma categoria especifica vinculada."}</p>
                           </section>
 
                           <div className="border-t border-brand-border dark:border-dark-border w-full" />

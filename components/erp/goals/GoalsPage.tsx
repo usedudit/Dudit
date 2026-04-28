@@ -1,11 +1,17 @@
 "use client"
 
-import React, { useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Button, Input, Pagination, Badge, IconPlaceholder } from "@/components/reusable"
+import { AlertModal, Badge, IconPlaceholder, Pagination } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import GoalsPageControls from "./GoalsPageControls"
-import { deleteSalesGoalAction, getSalesGoalsModuleAction, getSalesGoalsRankingAction, getSalesGoalsSummaryAction } from "@/app/actions/erp/goals"
+import GoalGridCard from "./GoalGridCard"
+import {
+  deleteSalesGoalAction,
+  getSalesGoalsModuleAction,
+  getSalesGoalsRankingAction,
+  getSalesGoalsSummaryAction,
+} from "@/app/actions/erp/goals"
 import { formatCurrency } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 
@@ -46,7 +52,8 @@ type Summary = {
   achieved_goals: number
 }
 
-const PAGE_SIZE = 8
+const GOALS_PAGE_SIZE = 8
+const RANKING_PAGE_SIZE = 8
 
 export default function GoalsPage(props: {
   partnerId: string
@@ -66,8 +73,10 @@ export default function GoalsPage(props: {
   const [rankingPeriodMode, setRankingPeriodMode] = useState<"monthly" | "weekly" | "custom">("monthly")
   const [rankingStartDate, setRankingStartDate] = useState("")
   const [rankingEndDate, setRankingEndDate] = useState("")
-  const [page, setPage] = useState(1)
+  const [goalsPage, setGoalsPage] = useState(1)
+  const [rankingPage, setRankingPage] = useState(1)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [goalToDelete, setGoalToDelete] = useState<GoalRow | null>(null)
 
   async function refreshData() {
     const [goalsRes, rankingRes, summaryRes] = await Promise.all([
@@ -79,9 +88,10 @@ export default function GoalsPage(props: {
       }),
       getSalesGoalsSummaryAction(props.partnerId),
     ])
-    if (goalsRes.success) setGoals(goalsRes.goals as any)
+
+    if (goalsRes.success) setGoals(goalsRes.goals as GoalRow[])
     if (rankingRes.success) setRanking(rankingRes.ranking)
-    if (summaryRes.success) setSummary(summaryRes.summary as any)
+    if (summaryRes.success) setSummary(summaryRes.summary as Summary)
   }
 
   const refreshRanking = async () => {
@@ -92,31 +102,53 @@ export default function GoalsPage(props: {
       endDate: rankingPeriodMode === "custom" ? rankingEndDate || null : null,
     })
     setRankingLoading(false)
+
     if (rankingRes.success) {
       setRanking(rankingRes.ranking)
       return
     }
+
     toast({ title: "Erro", description: "Não foi possível carregar o ranking.", variant: "destructive" })
   }
 
   const filteredGoals = useMemo(() => {
     const term = search.trim().toLowerCase()
-    const list = goals.filter((g) => !term || g.name.toLowerCase().includes(term))
-    return list
+    return goals.filter((goal) => !term || goal.name.toLowerCase().includes(term))
   }, [goals, search])
 
-  const totalPages = Math.max(1, Math.ceil(filteredGoals.length / PAGE_SIZE))
-  const paginatedGoals = filteredGoals.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const totalGoalPages = Math.max(1, Math.ceil(filteredGoals.length / GOALS_PAGE_SIZE))
+  const paginatedGoals = filteredGoals.slice((goalsPage - 1) * GOALS_PAGE_SIZE, goalsPage * GOALS_PAGE_SIZE)
+  const totalRankingPages = Math.max(1, Math.ceil(ranking.length / RANKING_PAGE_SIZE))
+  const paginatedRanking = ranking.slice((rankingPage - 1) * RANKING_PAGE_SIZE, rankingPage * RANKING_PAGE_SIZE)
 
-  const removeGoal = async (id: string) => {
-    setDeletingId(id)
-    const res = await deleteSalesGoalAction(props.partnerId, id)
+  useEffect(() => {
+    setGoalsPage(1)
+  }, [search])
+
+  useEffect(() => {
+    setRankingPage(1)
+  }, [ranking, rankingPeriodMode, rankingStartDate, rankingEndDate])
+
+  useEffect(() => {
+    if (goalsPage > totalGoalPages) setGoalsPage(totalGoalPages)
+  }, [goalsPage, totalGoalPages])
+
+  useEffect(() => {
+    if (rankingPage > totalRankingPages) setRankingPage(totalRankingPages)
+  }, [rankingPage, totalRankingPages])
+
+  const removeGoal = async (goalId: string) => {
+    setDeletingId(goalId)
+    const res = await deleteSalesGoalAction(props.partnerId, goalId)
     setDeletingId(null)
+
     if (!res.success) {
       toast({ title: "Erro", description: res.error, variant: "destructive" })
       return
     }
+
     await refreshData()
+    setGoalToDelete(null)
     toast({ title: "Sucesso", description: "Meta excluída." })
   }
 
@@ -127,7 +159,7 @@ export default function GoalsPage(props: {
           <div className="flex flex-col gap-2 pt-1">
             <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">Metas</h1>
             <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-              Acompanhe desempenho, bônus e ranking de vendedores
+              Acompanhe desempenho, bônus e ranking de vendedores.
             </p>
           </div>
         </div>
@@ -158,59 +190,27 @@ export default function GoalsPage(props: {
                     imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
                     imageAlt="Sem metas"
                     title="Nenhuma meta encontrada"
-                    subtitle="Crie metas para acompanhar e premiar desempenho da equipe."
+                    subtitle="Crie metas para acompanhar e premiar o desempenho da equipe."
                     itemButton={{ text: "Nova meta", action: () => router.push("/erp/goals/new") }}
                   />
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-4">
                   {paginatedGoals.map((goal) => (
-                    <div key={goal.id} className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface">
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        <div>
-                          <h3 className="font-bold text-brand-dark dark:text-dark-heading">{goal.name}</h3>
-                          <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                            {goal.period_type === "monthly" ? "Mensal" : "Semanal"} • {goal.start_date} a {goal.end_date}
-                          </p>
-                          <p className="text-xs text-brand-inactive-text mt-1">
-                            Tipo: {goal.goal_type === "sales" ? "Vendas" : goal.goal_type === "service_orders" ? "Ordem de Serviço" : "Ambos"}
-                          </p>
-                          {goal.assigned_user_names && goal.assigned_user_names.length > 0 && (
-                            <p className="text-xs text-brand-inactive-text mt-1">
-                              Vendedores: {goal.assigned_user_names.join(", ")}
-                            </p>
-                          )}
-                        </div>
-                        <Badge variant={goal.status === "Concluída" ? "green" : goal.status === "Expirada" ? "red" : "orange"}>
-                          {goal.status}
-                        </Badge>
-                      </div>
-
-                      <div className="space-y-2 mt-4">
-                        <div className="text-sm text-brand-dark dark:text-dark-heading">
-                          Meta: <strong>{formatCurrency(goal.target_amount)}</strong>
-                        </div>
-                        <div className="text-sm text-brand-dark dark:text-dark-heading">
-                          Progresso: <strong>{formatCurrency(goal.current_amount)}</strong> ({goal.progress_percent}%)
-                        </div>
-                        <div className="h-2 rounded-full bg-brand-gray dark:bg-dark-border overflow-hidden">
-                          <div className="h-full bg-brand-green transition-all duration-300" style={{ width: `${Math.min(100, goal.progress_percent)}%` }} />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 mt-6">
-                        <Button variant="outline" className="flex-1 rounded-xl h-10 text-xs" onClick={() => router.push(`/erp/goals/${goal.id}/edit`)}>Editar</Button>
-                        <Button variant="outline" className="flex-1 rounded-xl h-10 text-xs" onClick={() => router.push(`/erp/goals/${goal.id}/duplicate`)}>Duplicar</Button>
-                        <Button variant="ghost" className="flex-1 rounded-xl h-10 text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" disabled={deletingId === goal.id} onClick={() => removeGoal(goal.id)}>
-                          {deletingId === goal.id ? "..." : "Excluir"}
-                        </Button>
-                      </div>
-                    </div>
+                    <GoalGridCard
+                      key={goal.id}
+                      goal={goal}
+                      onEdit={() => router.push(`/erp/goals/${goal.id}/edit`)}
+                      onDuplicate={() => router.push(`/erp/goals/${goal.id}/duplicate`)}
+                      onDelete={() => setGoalToDelete(goal)}
+                    />
                   ))}
                 </div>
               )}
 
-              <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+              {filteredGoals.length > 0 && (
+                <Pagination currentPage={goalsPage} totalPages={totalGoalPages} onPageChange={setGoalsPage} />
+              )}
             </>
           )}
 
@@ -228,16 +228,25 @@ export default function GoalsPage(props: {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-3">
-                  {ranking.map((row) => {
+                  {paginatedRanking.map((row) => {
                     const medal = row.position === 1 ? "🥇" : row.position === 2 ? "🥈" : row.position === 3 ? "🥉" : ""
                     const isTop3 = row.position <= 3
+
                     return (
-                      <div 
-                        key={row.user_id} 
-                        className={`rounded-2xl border ${isTop3 ? 'border-brand-green bg-brand-green/5' : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface'} p-5 flex items-center justify-between gap-4 transition-all hover:shadow-sm`}
+                      <div
+                        key={row.user_id}
+                        className={`rounded-2xl border ${
+                          isTop3
+                            ? "border-brand-green bg-brand-green/5"
+                            : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
+                        } p-5 flex items-center justify-between gap-4 transition-all hover:shadow-sm`}
                       >
                         <div className="flex items-center gap-4">
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${isTop3 ? 'bg-brand-green text-white' : 'bg-brand-gray text-brand-dark'}`}>
+                          <div
+                            className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${
+                              isTop3 ? "bg-brand-green text-white" : "bg-brand-gray text-brand-dark"
+                            }`}
+                          >
                             {row.position}
                           </div>
                           <div>
@@ -245,18 +254,27 @@ export default function GoalsPage(props: {
                               {row.seller_name} {medal}
                             </p>
                             <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                              Total vendido: <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(row.total_amount)}</span>
+                              Total vendido:{" "}
+                              <span className="font-semibold text-brand-dark dark:text-dark-heading">
+                                {formatCurrency(row.total_amount)}
+                              </span>
                             </p>
                           </div>
                         </div>
                         <div className="text-right">
                           <p className="text-xs text-brand-inactive-text mb-1 font-medium">Atingimento da meta</p>
-                          <Badge variant={isTop3 ? "green" : "gray"} className="text-sm px-3 py-1">{row.progress_percent}%</Badge>
+                          <Badge variant={isTop3 ? "green" : "gray"} className="text-sm px-3 py-1">
+                            {row.progress_percent}%
+                          </Badge>
                         </div>
                       </div>
                     )
                   })}
                 </div>
+              )}
+
+              {ranking.length > 0 && (
+                <Pagination currentPage={rankingPage} totalPages={totalRankingPages} onPageChange={setRankingPage} />
               )}
             </div>
           )}
@@ -273,11 +291,25 @@ export default function GoalsPage(props: {
         </div>
       </div>
 
+      <AlertModal
+        isOpen={!!goalToDelete}
+        onClose={() => {
+          if (!deletingId) setGoalToDelete(null)
+        }}
+        onConfirm={() => {
+          if (goalToDelete) void removeGoal(goalToDelete.id)
+        }}
+        title="Excluir meta?"
+        description={`Tem certeza que deseja excluir ${goalToDelete?.name || "esta meta"}? Esta ação não pode ser desfeita.`}
+        confirmText={deletingId ? "Excluindo..." : "Excluir"}
+        variant="danger"
+        isLoading={Boolean(deletingId)}
+      />
     </FadeIn>
   )
 }
 
-function SummaryCard({ title, value }: { title: string, value: string }) {
+function SummaryCard({ title, value }: { title: string; value: string }) {
   return (
     <div className="rounded-2xl border border-brand-border dark:border-dark-border p-6 bg-white dark:bg-dark-surface shadow-sm">
       <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-2 uppercase tracking-wider">{title}</p>
@@ -285,4 +317,3 @@ function SummaryCard({ title, value }: { title: string, value: string }) {
     </div>
   )
 }
-

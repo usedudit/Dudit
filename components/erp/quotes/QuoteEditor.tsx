@@ -16,6 +16,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import QuantitySelector from '@/components/reusable/QuantitySelector';
 import { Button, Input, TabsContent, FormDropdown, MoneyInput, PercentageInput, DatePicker, ThreeDotsLoader, IconPlaceholder, Pagination, InfoCard } from '@/components/reusable';
+import { UserProfileImage } from "@/lib/utils/UserProfileImage";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { formatCurrency } from "@/lib/utils";
 import { QUOTE_DEFAULT_CUSTOMER_LABEL, type QuoteEditCaps } from "@/lib/quotes/quote-edit-rules";
@@ -60,6 +61,7 @@ interface QuoteEditorProps {
     setInternalNote: (val: string) => void;
     staffInternalNotes: string;
     setStaffInternalNotes: (val: string) => void;
+    mode: 'create' | 'edit' | 'duplicate' | 'view';
     editCaps?: QuoteEditCaps | null;
     onReopenQuote?: () => void;
     onDuplicateQuote?: () => void;
@@ -595,13 +597,11 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                             <div className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
                                 <div className="flex gap-4 items-center">
                                     <div className="relative">
-                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-gray-800 flex items-center justify-center text-lg font-bold text-brand-dark dark:text-dark-heading border border-white dark:border-dark-border shadow-sm overflow-hidden text-brand-inactive-text">
-                                            {props.selectedCustomer.avatar && props.selectedCustomer.avatar.length > 2 ? (
-                                                <img src={`https://i.pravatar.cc/150?u=${props.selectedCustomer.id}`} className="w-full h-full object-cover" alt="avatar" />
-                                            ) : (
-                                                props.selectedCustomer.name.charAt(0)
-                                            )}
-                                        </div>
+                                        <UserProfileImage
+                                            fullName={props.selectedCustomer.name || "Cliente"}
+                                            imageUrl={props.selectedCustomer.avatar_url || props.selectedCustomer.avatar}
+                                            className="w-12 h-12 text-lg border border-white dark:border-dark-border"
+                                        />
                                     </div>
                                     <div>
                                         <h4 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight">{props.selectedCustomer.name}</h4>
@@ -666,7 +666,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                     label="Status"
                                     value={props.status}
                                     setValue={props.setStatus}
-                                    options={statusOptions.map(o => ({ value: o.value, label: o.label }))}
+                                    options={(props.mode === 'create' || props.mode === 'duplicate' ? statusOptions.filter(o => o.value === 'draft') : statusOptions).map(o => ({ value: o.value, label: o.label }))}
                                     disabled={statusLocked}
                                 />
                             </div>

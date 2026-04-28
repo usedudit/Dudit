@@ -333,43 +333,61 @@ export async function getCouponScopeDataAction(partnerId: string) {
     const [{ data: products }, { data: services }, { data: categories }, { data: customers }] = await Promise.all([
         supabase
             .from("products")
-            .select("id, name, category, price")
+            .select("id, name, category, category_id, price, sku, images, is_active")
             .eq("partner_id", partnerId)
-            .eq("is_active", true)
             .order("name")
             .limit(200),
         supabase
             .from("services")
-            .select("id, name, price")
+            .select("id, name, price, is_active")
             .eq("partner_id", partnerId)
-            .eq("is_active", true)
             .order("name")
             .limit(200),
         supabase
-            .from("products")
-            .select("category")
+            .from("product_categories")
+            .select("id, name, is_active")
             .eq("partner_id", partnerId)
-            .eq("is_active", true)
-            .not("category", "is", null),
+            .is("parent_id", null)
+            .order("name"),
         supabase
             .from("customers")
-            .select("id, name, email, phone")
+            .select("id, name, email, phone, avatar_url, status")
             .eq("partner_id", partnerId)
             .order("name")
             .limit(300),
     ])
 
-    // Deduplicate categories from products
-    const uniqueCategories = Array.from(
-        new Set((categories || []).map((r: any) => r.category).filter(Boolean))
-    ).sort()
-
     return {
         success: true,
-        products: (products || []).map((p: any) => ({ id: p.id, name: p.name, category: p.category, price: p.price })),
-        services: (services || []).map((s: any) => ({ id: s.id, name: s.name, price: s.price })),
-        categories: uniqueCategories,
-        customers: (customers || []).map((c: any) => ({ id: c.id, name: c.name, email: c.email, phone: c.phone })),
+        products: (products || []).map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            category: p.category,
+            categoryId: p.category_id,
+            price: p.price,
+            sku: p.sku,
+            image: Array.isArray(p.images) ? p.images[0] || null : null,
+            isActive: Boolean(p.is_active),
+        })),
+        services: (services || []).map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            price: s.price,
+            isActive: Boolean(s.is_active),
+        })),
+        categories: (categories || []).map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            isActive: Boolean(c.is_active),
+        })),
+        customers: (customers || []).map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            email: c.email,
+            phone: c.phone,
+            avatarUrl: c.avatar_url,
+            status: c.status,
+        })),
     }
 }
 

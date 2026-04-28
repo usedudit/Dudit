@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 import { ThemeProvider } from "@/components/theme-provider"
-import { PlanUpgradeProvider } from "@/components/erp/subscription/plan-upgrade-context"
+import { PlanUpgradeProvider } from "@/components/erp/subscription/PlanUpgradeModal"
 import { StoreProvider } from "@/lib/store-context"
 import { PermissionProvider } from "@/lib/permission-context"
 import { ProductMetadataProvider } from "@/lib/product-metadata-context"

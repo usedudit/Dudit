@@ -180,10 +180,10 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     // 1. Fetch Full Quote Details if existingQuote is provided
     useEffect(() => {
         const fetchDetails = async () => {
-            if (mode === 'create') {
+            if (mode === 'create' || mode === 'duplicate') {
                 const res = await getNextQuoteNumberAction(partnerId);
                 if (res.success) setRealQuoteNumber(res.data);
-                return;
+                if (mode === 'create') return;
             }
             if (!existingQuote?.id) return;
 
@@ -918,7 +918,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                     </div>
                                 )}
                                 <div className={`flex-1 pt-4 pb-12 px-4 md:px-6 ${activeTab === 'Visualização' ? 'hidden lg:block' : 'block'}`}>
-                                    <QuoteEditor
+                                    <QuoteEditor mode={mode}
                                         searchQuery={productBucket.searchQuery}
                                         setSearchQuery={productBucket.setSearchQuery}
                                         isProductSearchOpen={isProductSearchOpen}

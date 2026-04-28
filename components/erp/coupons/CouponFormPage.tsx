@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useMemo, useState } from "react"
-import { AnimatePresence, motion } from "framer-motion"
+import { AnimatePresence } from "framer-motion"
 import {
   Badge,
   Button,
@@ -17,8 +17,12 @@ import {
   TabsTrigger,
   ThreeDotsLoader,
 } from "@/components/reusable"
-import { ChevronLeftIcon, EditIcon, SaveIcon, TagIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { formatCurrency } from "@/lib/utils/formatters"
+import { BoxIcon, ChevronLeftIcon, EditIcon, SaveIcon, SearchIcon, TagIcon, UserIcon } from "@/lib/icons"
+import SelectCouponProductsSheet from "./SelectCouponProductsSheet"
+import SelectCouponCategoriesSheet from "./SelectCouponCategoriesSheet"
 import {
   CouponFormState,
   CouponRelations,
@@ -46,6 +50,8 @@ interface CouponFormPageProps {
   isLoadingScope: boolean
 }
 
+type PickerMode = "products" | "services" | "categories" | "customers" | null
+
 const SidebarCard = ({
   children,
   hasTopStrip = true,
@@ -59,47 +65,153 @@ const SidebarCard = ({
   </div>
 )
 
-function SelectionList<T extends ScopeItem | ScopeCustomer | string>({
+function ScopeField({
+  label,
+  actionLabel,
+  onAction,
+  children,
+}: {
+  label: string
+  actionLabel?: string | null
+  onAction?: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{label}</span>
+        {actionLabel && onAction ? (
+          <Button type="button" variant="link" className="h-auto p-0 text-sm" onClick={onAction}>
+            {actionLabel}
+          </Button>
+        ) : null}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function LinkedItemsSection<T>({
+  title,
   items,
-  selectedIds,
-  onToggle,
   getId,
   getTitle,
   getDescription,
-  emptyText,
+  onRemove,
 }: {
+  title: string
   items: T[]
-  selectedIds: string[]
-  onToggle: (id: string) => void
   getId: (item: T) => string
   getTitle: (item: T) => string
   getDescription?: (item: T) => string | undefined
-  emptyText: string
+  onRemove: (id: string) => void
 }) {
-  if (items.length === 0) {
-    return <p className="text-sm text-brand-inactive-text dark:text-dark-body">{emptyText}</p>
-  }
+  if (items.length === 0) return null
 
   return (
-    <div className="space-y-3">
-      {items.map((item) => {
-        const id = getId(item)
-        return (
-          <ListItem
-            key={id}
-            title={getTitle(item)}
-            description={getDescription?.(item)}
-            left={
-              <div className="pl-4 pr-1" onClick={(event) => event.stopPropagation()}>
-                <Checkbox checked={selectedIds.includes(id)} onChange={() => onToggle(id)} />
-              </div>
-            }
-            onClick={() => onToggle(id)}
-            className="p-0 min-h-[68px]"
+    <section className="space-y-4">
+      <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">{title}</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {items.map((item) => {
+          const id = getId(item)
+          return (
+            <ListItem
+              key={id}
+              title={getTitle(item)}
+              description={getDescription?.(item)}
+              right={
+                <Button
+                  type="button"
+                  variant="link"
+                  className="shrink-0 pr-4"
+                  onClick={() => onRemove(id)}
+                >
+                  Remover
+                </Button>
+              }
+              className="min-h-[72px] px-4"
+            />
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+function getCustomerStatusLabel(status?: ScopeCustomer["status"] | null) {
+  if (status === "inativo") return "Inativo"
+  if (status === "bloqueado") return "Bloqueado"
+  return "Ativo"
+}
+
+function getCustomerStatusVariant(status?: ScopeCustomer["status"] | null) {
+  if (status === "inativo") return "gray" as const
+  if (status === "bloqueado") return "red" as const
+  return "green" as const
+}
+
+function getItemStatusLabel(isActive?: boolean) {
+  return isActive === false ? "Inativo" : "Ativo"
+}
+
+function getItemStatusVariant(isActive?: boolean) {
+  return isActive === false ? "gray" as const : "green" as const
+}
+
+function SelectionSheet({
+  isOpen,
+  onOpenChange,
+  title,
+  description,
+  searchValue,
+  onSearchChange,
+  searchPlaceholder,
+  children,
+  footer,
+}: {
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+  title: string
+  description: string
+  searchValue: string
+  onSearchChange: (value: string) => void
+  searchPlaceholder: string
+  children: React.ReactNode
+  footer?: React.ReactNode
+}) {
+  return (
+    <Sheet open={isOpen} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-[560px] p-0 bg-white dark:bg-dark-surface border-brand-border dark:border-dark-border">
+        <SheetHeader className="border-b border-brand-border dark:border-dark-border px-6 py-5 text-left">
+          <SheetTitle className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</SheetTitle>
+          <SheetDescription className="text-sm text-brand-inactive-text dark:text-dark-body">{description}</SheetDescription>
+        </SheetHeader>
+
+        <div className="border-b border-brand-border dark:border-dark-border px-6 py-4">
+          <Input
+            label=""
+            placeholder={searchPlaceholder}
+            value={searchValue}
+            onChange={(event) => onSearchChange(event.target.value)}
+            prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+            variant="full-rounded"
+            className="mb-0"
           />
-        )
-      })}
-    </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 py-4">{children}</div>
+
+        <div className="border-t border-brand-border dark:border-dark-border px-6 py-4">
+          {footer || (
+            <div className="flex justify-end">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Fechar
+              </Button>
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
   )
 }
 
@@ -120,15 +232,13 @@ export default function CouponFormPage({
   isLoadingScope,
 }: CouponFormPageProps) {
   const [activeTab, setActiveTab] = useState("general")
+  const [pickerMode, setPickerMode] = useState<PickerMode>(null)
   const [scopeSearch, setScopeSearch] = useState("")
   const [customerSearch, setCustomerSearch] = useState("")
 
   const pageTitle = mode === "edit" ? "Editar cupom" : "Novo cupom"
-
-  const filteredProducts = useMemo(() => {
-    const term = scopeSearch.trim().toLowerCase()
-    return scopeData.products.filter((item) => !term || item.name.toLowerCase().includes(term) || String(item.category || "").toLowerCase().includes(term))
-  }, [scopeData.products, scopeSearch])
+  const dateFromValue = form.startsAt ? new Date(`${form.startsAt}T12:00:00`) : undefined
+  const dateToValue = form.endsAt ? new Date(`${form.endsAt}T12:00:00`) : undefined
 
   const filteredServices = useMemo(() => {
     const term = scopeSearch.trim().toLowerCase()
@@ -137,11 +247,41 @@ export default function CouponFormPage({
 
   const filteredCustomers = useMemo(() => {
     const term = customerSearch.trim().toLowerCase()
-    return scopeData.customers.filter((item) => !term || item.name.toLowerCase().includes(term) || String(item.email || "").toLowerCase().includes(term))
+    return scopeData.customers.filter((item) => {
+      if (!term) return true
+      return (
+        item.name.toLowerCase().includes(term) ||
+        String(item.email || "").toLowerCase().includes(term) ||
+        String(item.phone || "").toLowerCase().includes(term)
+      )
+    })
   }, [scopeData.customers, customerSearch])
 
-  const dateFromValue = form.startsAt ? new Date(`${form.startsAt}T12:00:00`) : undefined
-  const dateToValue = form.endsAt ? new Date(`${form.endsAt}T12:00:00`) : undefined
+  const applyScopeActionLabel = form.applyScope === "products"
+    ? "Selecionar produtos"
+    : form.applyScope === "categories"
+      ? "Selecionar categorias"
+      : form.applyScope === "services"
+        ? "Selecionar servicos"
+        : null
+
+  const scopeSummary = form.applyScope === "all"
+    ? "Catalogo completo"
+    : form.applyScope === "categories"
+      ? `${relations.categoryIds.length} categoria(s)`
+      : form.applyScope === "products"
+        ? `${relations.productIds.length} produto(s)`
+        : `${relations.serviceIds.length} servico(s)`
+
+  const customerSummary = form.customerScope === "specific" ? `${relations.customerIds.length} cliente(s)` : "Todos os clientes"
+
+  const linkedScopeItems = form.applyScope === "products"
+    ? relations.products
+    : form.applyScope === "categories"
+      ? relations.categories
+      : form.applyScope === "services"
+        ? relations.services
+        : []
 
   return (
     <FadeIn>
@@ -159,7 +299,11 @@ export default function CouponFormPage({
                 <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                   <h1 className="font-bold text-xl md:text-3xl text-brand-dark dark:text-dark-heading flex items-center gap-3">
                     <span className="truncate">{pageTitle}</span>
-                    {mode === "edit" && <Badge variant="orange" icon={<EditIcon />} className="text-sm font-normal h-fit whitespace-nowrap px-2 py-0.5">Editando</Badge>}
+                    {mode === "edit" && (
+                      <Badge variant="orange" icon={<EditIcon />} className="text-sm font-normal h-fit whitespace-nowrap px-2 py-0.5">
+                        Editando
+                      </Badge>
+                    )}
                   </h1>
                   <div className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
                     {mode === "edit" && coupon ? getCouponPrimaryMeta(coupon) : "Preencha as regras promocionais e o publico do cupom."}
@@ -181,7 +325,6 @@ export default function CouponFormPage({
                 <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                   <TabsTrigger value="general">Dados gerais</TabsTrigger>
                   <TabsTrigger value="scope">Escopo</TabsTrigger>
-                  <TabsTrigger value="rules">Regras</TabsTrigger>
                 </TabsList>
               </div>
             </div>
@@ -252,30 +395,6 @@ export default function CouponFormPage({
                                 onChange={(value) => setForm((prev) => ({ ...prev, minCartValue: value }))}
                               />
                             </div>
-                            <div className="col-span-12 md:col-span-6 mt-[1px]">
-                              <FormDropdown
-                                label="Aplicar a"
-                                value={form.applyScope}
-                                setValue={(value) => setForm((prev) => ({ ...prev, applyScope: value as CouponFormState["applyScope"] }))}
-                                options={[
-                                  { value: "all", label: "Todos os produtos e servicos" },
-                                  { value: "categories", label: "Categorias especificas" },
-                                  { value: "products", label: "Produtos especificos" },
-                                  { value: "services", label: "Servicos especificos" },
-                                ]}
-                              />
-                            </div>
-                            <div className="col-span-12 md:col-span-6 mt-[1px]">
-                              <FormDropdown
-                                label="Escopo de clientes"
-                                value={form.customerScope}
-                                setValue={(value) => setForm((prev) => ({ ...prev, customerScope: value as CouponFormState["customerScope"] }))}
-                                options={[
-                                  { value: "all", label: "Todos os clientes" },
-                                  { value: "specific", label: "Clientes especificos" },
-                                ]}
-                              />
-                            </div>
                           </div>
                         </section>
 
@@ -306,179 +425,97 @@ export default function CouponFormPage({
                     <TabsContent value="scope" className="mt-0">
                       <FadeIn key="scope" className="space-y-8">
                         <section>
-                          <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Itens vinculados</h3>
-                            {isLoadingScope && <ThreeDotsLoader />}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <ScopeField
+                              label="Aplicar a"
+                              actionLabel={applyScopeActionLabel}
+                              onAction={
+                                applyScopeActionLabel
+                                  ? () => {
+                                    setScopeSearch("")
+                                    if (form.applyScope !== "all") setPickerMode(form.applyScope)
+                                  }
+                                  : undefined
+                              }
+                            >
+                              <FormDropdown
+                                label=""
+                                value={form.applyScope}
+                                setValue={(value) => setForm((prev) => ({ ...prev, applyScope: value as CouponFormState["applyScope"] }))}
+                                options={[
+                                  { value: "all", label: "Todos os produtos e servicos" },
+                                  { value: "categories", label: "Categorias especificas" },
+                                  { value: "products", label: "Produtos especificos" },
+                                  { value: "services", label: "Servicos especificos" },
+                                ]}
+                              />
+                            </ScopeField>
+
+                            <ScopeField
+                              label="Escopo de clientes"
+                              actionLabel={form.customerScope === "specific" ? "Selecionar clientes" : null}
+                              onAction={
+                                form.customerScope === "specific"
+                                  ? () => {
+                                    setCustomerSearch("")
+                                    setPickerMode("customers")
+                                  }
+                                  : undefined
+                              }
+                            >
+                              <FormDropdown
+                                label=""
+                                value={form.customerScope}
+                                setValue={(value) => setForm((prev) => ({ ...prev, customerScope: value as CouponFormState["customerScope"] }))}
+                                options={[
+                                  { value: "all", label: "Todos os clientes" },
+                                  { value: "specific", label: "Clientes especificos" },
+                                ]}
+                              />
+                            </ScopeField>
                           </div>
-
-                          {(form.applyScope === "products" || form.applyScope === "services") && (
-                            <div className="mb-5">
-                              <Input label="" placeholder="Buscar..." value={scopeSearch} onChange={(event) => setScopeSearch(event.target.value)} />
-                            </div>
-                          )}
-
-                          {form.applyScope === "all" && (
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">O cupom vale para todo o catalogo. Troque o escopo acima para restringir por categoria, produto ou servico.</p>
-                          )}
-
-                          {form.applyScope === "categories" && (
-                            <SelectionList
-                              items={scopeData.categories}
-                              selectedIds={relations.categoryIds}
-                              onToggle={(id) => setSelectedCategoryIds((prev) => prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id])}
-                              getId={(item) => item}
-                              getTitle={(item) => item}
-                              emptyText="Nenhuma categoria encontrada."
-                            />
-                          )}
-
-                          {form.applyScope === "products" && (
-                            <SelectionList
-                              items={filteredProducts}
-                              selectedIds={relations.productIds}
-                              onToggle={(id) => setSelectedProductIds((prev) => prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id])}
-                              getId={(item) => item.id}
-                              getTitle={(item) => item.name}
-                              getDescription={(item) => [item.category, item.price != null ? `R$ ${Number(item.price).toFixed(2)}` : ""].filter(Boolean).join(" • ")}
-                              emptyText="Nenhum produto encontrado."
-                            />
-                          )}
-
-                          {form.applyScope === "services" && (
-                            <SelectionList
-                              items={filteredServices}
-                              selectedIds={relations.serviceIds}
-                              onToggle={(id) => setSelectedServiceIds((prev) => prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id])}
-                              getId={(item) => item.id}
-                              getTitle={(item) => item.name}
-                              getDescription={(item) => item.price != null ? `R$ ${Number(item.price).toFixed(2)}` : undefined}
-                              emptyText="Nenhum servico encontrado."
-                            />
-                          )}
                         </section>
+
+                        {form.applyScope !== "all" && (
+                          <LinkedItemsSection
+                            title="Itens vinculados"
+                            items={linkedScopeItems}
+                            getId={(item) => item.id}
+                            getTitle={(item) => item.name}
+                            getDescription={(item) => {
+                              if ("sku" in item || "price" in item) {
+                                const scopedItem = item as ScopeItem
+                                if (form.applyScope === "products") {
+                                  return [scopedItem.sku ? `SKU: ${scopedItem.sku}` : "Sem SKU", scopedItem.price != null ? formatCurrency(scopedItem.price) : null]
+                                    .filter(Boolean)
+                                    .join(" • ")
+                                }
+                                return scopedItem.price != null ? formatCurrency(scopedItem.price) : undefined
+                              }
+                              return undefined
+                            }}
+                            onRemove={(id) => {
+                              if (form.applyScope === "products") {
+                                setSelectedProductIds((prev) => prev.filter((item) => item !== id))
+                              } else if (form.applyScope === "categories") {
+                                setSelectedCategoryIds((prev) => prev.filter((item) => item !== id))
+                              } else if (form.applyScope === "services") {
+                                setSelectedServiceIds((prev) => prev.filter((item) => item !== id))
+                              }
+                            }}
+                          />
+                        )}
 
                         {form.customerScope === "specific" && (
-                          <>
-                            <div className="border-t border-brand-border dark:border-dark-border w-full" />
-                            <section>
-                              <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Clientes vinculados</h3>
-                              <div className="mb-5">
-                                <Input label="" placeholder="Buscar cliente..." value={customerSearch} onChange={(event) => setCustomerSearch(event.target.value)} />
-                              </div>
-                              <SelectionList
-                                items={filteredCustomers}
-                                selectedIds={relations.customerIds}
-                                onToggle={(id) => setSelectedCustomerIds((prev) => prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id])}
-                                getId={(item) => item.id}
-                                getTitle={(item) => item.name}
-                                getDescription={(item) => item.email || item.phone || undefined}
-                                emptyText="Nenhum cliente encontrado."
-                              />
-                            </section>
-                          </>
+                          <LinkedItemsSection
+                            title="Clientes vinculados"
+                            items={relations.customers}
+                            getId={(item) => item.id}
+                            getTitle={(item) => item.name}
+                            getDescription={(item) => item.email || item.phone || undefined}
+                            onRemove={(id) => setSelectedCustomerIds((prev) => prev.filter((item) => item !== id))}
+                          />
                         )}
-                      </FadeIn>
-                    </TabsContent>
-
-                    <TabsContent value="rules" className="mt-0">
-                      <FadeIn key="rules" className="space-y-8">
-                        <section>
-                          <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Limites de uso</h3>
-                          <div className="space-y-5">
-                            <div>
-                              <label className="flex items-start gap-3 mb-3">
-                                <Checkbox checked={form.usageLimitEnabled} onChange={(value) => setForm((prev) => ({ ...prev, usageLimitEnabled: Boolean(value) }))} />
-                                <div>
-                                  <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Limitar uso total do cupom</p>
-                                  <p className="text-sm text-brand-inactive-text dark:text-dark-body">Define um teto global de utilizacoes.</p>
-                                </div>
-                              </label>
-                              {form.usageLimitEnabled && (
-                                <div className="max-w-xs">
-                                  <Input label="Limite total" type="number" value={String(form.usageLimit)} onChange={(event) => setForm((prev) => ({ ...prev, usageLimit: Number(event.target.value) }))} />
-                                </div>
-                              )}
-                            </div>
-
-                            <div>
-                              <label className="flex items-start gap-3 mb-3">
-                                <Checkbox checked={form.usagePerCustomerEnabled} onChange={(value) => setForm((prev) => ({ ...prev, usagePerCustomerEnabled: Boolean(value), firstPurchaseOnly: false }))} />
-                                <div>
-                                  <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Limitar por cliente</p>
-                                  <p className="text-sm text-brand-inactive-text dark:text-dark-body">Controla quantas vezes cada cliente pode usar.</p>
-                                </div>
-                              </label>
-                              {form.usagePerCustomerEnabled ? (
-                                <div className="max-w-xs">
-                                  <Input label="Usos por cliente" type="number" value={String(form.usagePerCustomer)} onChange={(event) => setForm((prev) => ({ ...prev, usagePerCustomer: Number(event.target.value) }))} />
-                                </div>
-                              ) : (
-                                <label className="flex items-start gap-3">
-                                  <Checkbox checked={form.firstPurchaseOnly} onChange={(value) => setForm((prev) => ({ ...prev, firstPurchaseOnly: Boolean(value) }))} />
-                                  <div>
-                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Apenas primeira compra</p>
-                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">Restringe o uso para clientes na primeira compra.</p>
-                                  </div>
-                                </label>
-                              )}
-                            </div>
-
-                            <div>
-                              <label className="flex items-start gap-3 mb-3">
-                                <Checkbox checked={form.maxDiscountEnabled} onChange={(value) => setForm((prev) => ({ ...prev, maxDiscountEnabled: Boolean(value) }))} />
-                                <div>
-                                  <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Definir desconto maximo</p>
-                                  <p className="text-sm text-brand-inactive-text dark:text-dark-body">Usado principalmente em regras percentuais.</p>
-                                </div>
-                              </label>
-                              {form.maxDiscountEnabled && (
-                                <div className="max-w-xs">
-                                  <MoneyInput label="Valor maximo" value={Number(form.maxDiscountValue || 0)} onChange={(value) => setForm((prev) => ({ ...prev, maxDiscountValue: value }))} />
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </section>
-
-                        <div className="border-t border-brand-border dark:border-dark-border w-full" />
-
-                        <section>
-                          <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Validade</h3>
-                          <div className="space-y-4">
-                            <label className="flex items-start gap-3">
-                              <Checkbox checked={form.unlimitedDate} onChange={(value) => setForm((prev) => ({ ...prev, unlimitedDate: Boolean(value) }))} />
-                              <div>
-                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Sem limite de data</p>
-                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Desmarque para definir inicio e fim da campanha.</p>
-                              </div>
-                            </label>
-
-                            {!form.unlimitedDate && (
-                              <div className="grid grid-cols-12 gap-5">
-                                <div className="col-span-12 md:col-span-6">
-                                  <DatePicker
-                                    label="Inicio"
-                                    value={dateFromValue}
-                                    onChange={(date: Date | undefined) => {
-                                      const next = date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}` : ""
-                                      setForm((prev) => ({ ...prev, startsAt: next }))
-                                    }}
-                                  />
-                                </div>
-                                <div className="col-span-12 md:col-span-6">
-                                  <DatePicker
-                                    label="Fim"
-                                    value={dateToValue}
-                                    onChange={(date: Date | undefined) => {
-                                      const next = date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}` : ""
-                                      setForm((prev) => ({ ...prev, endsAt: next }))
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </section>
                       </FadeIn>
                     </TabsContent>
                   </AnimatePresence>
@@ -502,23 +539,104 @@ export default function CouponFormPage({
                       </div>
                       <div className="flex items-center justify-between gap-3">
                         <span className="text-brand-inactive-text dark:text-dark-body">Escopo</span>
-                        <span className="font-bold text-brand-dark dark:text-dark-heading">
-                          {form.applyScope === "all" ? "Catalogo completo" : form.applyScope === "categories" ? `${relations.categoryIds.length} categoria(s)` : form.applyScope === "products" ? `${relations.productIds.length} produto(s)` : `${relations.serviceIds.length} servico(s)`}
-                        </span>
+                        <span className="font-bold text-brand-dark dark:text-dark-heading">{scopeSummary}</span>
                       </div>
                       <div className="flex items-center justify-between gap-3">
                         <span className="text-brand-inactive-text dark:text-dark-body">Clientes</span>
-                        <span className="font-bold text-brand-dark dark:text-dark-heading">{form.customerScope === "specific" ? `${relations.customerIds.length} selecionado(s)` : "Todos"}</span>
+                        <span className="font-bold text-brand-dark dark:text-dark-heading">{customerSummary}</span>
                       </div>
                     </div>
                   </SidebarCard>
 
                   <SidebarCard>
-                    <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-4">Regras ativas</h3>
-                    <div className="space-y-3 text-sm">
-                      <p className="text-brand-dark dark:text-dark-heading font-medium">{form.allowCombination ? "Permite combinacao com outras regras." : "Nao permite combinacao com outras regras."}</p>
-                      <p className="text-brand-dark dark:text-dark-heading font-medium">{form.usageLimitEnabled ? `Limite total: ${form.usageLimit}.` : "Uso total ilimitado."}</p>
-                      <p className="text-brand-dark dark:text-dark-heading font-medium">{form.usagePerCustomerEnabled ? `Limite por cliente: ${form.usagePerCustomer}.` : form.firstPurchaseOnly ? "Somente primeira compra." : "Sem limite por cliente."}</p>
+                    <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-6">Limites de uso</h3>
+                    <div className="space-y-5">
+                      <div>
+                        <label className="flex items-start gap-3 mb-3">
+                          <Checkbox checked={form.usageLimitEnabled} onChange={(value) => setForm((prev) => ({ ...prev, usageLimitEnabled: Boolean(value) }))} />
+                          <div>
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Limitar uso total do cupom</p>
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Define um teto global de utilizacoes.</p>
+                          </div>
+                        </label>
+                        {form.usageLimitEnabled && (
+                          <div className="max-w-xs">
+                            <Input label="Limite total" type="number" value={String(form.usageLimit)} onChange={(event) => setForm((prev) => ({ ...prev, usageLimit: Number(event.target.value) }))} />
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="flex items-start gap-3 mb-3">
+                          <Checkbox checked={form.usagePerCustomerEnabled} onChange={(value) => setForm((prev) => ({ ...prev, usagePerCustomerEnabled: Boolean(value), firstPurchaseOnly: false }))} />
+                          <div>
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Limitar por cliente</p>
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Controla quantas vezes cada cliente pode usar.</p>
+                          </div>
+                        </label>
+                        {form.usagePerCustomerEnabled ? (
+                          <div className="max-w-xs">
+                            <Input label="Usos por cliente" type="number" value={String(form.usagePerCustomer)} onChange={(event) => setForm((prev) => ({ ...prev, usagePerCustomer: Number(event.target.value) }))} />
+                          </div>
+                        ) : (
+                          <label className="flex items-start gap-3">
+                            <Checkbox checked={form.firstPurchaseOnly} onChange={(value) => setForm((prev) => ({ ...prev, firstPurchaseOnly: Boolean(value) }))} />
+                            <div>
+                              <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Apenas primeira compra</p>
+                              <p className="text-sm text-brand-inactive-text dark:text-dark-body">Restringe o uso para clientes na primeira compra.</p>
+                            </div>
+                          </label>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="flex items-start gap-3 mb-3">
+                          <Checkbox checked={form.maxDiscountEnabled} onChange={(value) => setForm((prev) => ({ ...prev, maxDiscountEnabled: Boolean(value) }))} />
+                          <div>
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Definir desconto maximo</p>
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Usado principalmente em regras percentuais.</p>
+                          </div>
+                        </label>
+                        {form.maxDiscountEnabled && (
+                          <div className="max-w-xs">
+                            <MoneyInput label="Valor maximo" value={Number(form.maxDiscountValue || 0)} onChange={(value) => setForm((prev) => ({ ...prev, maxDiscountValue: value }))} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </SidebarCard>
+
+                  <SidebarCard>
+                    <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-6">Validade</h3>
+                    <div className="space-y-4">
+                      <label className="flex items-start gap-3">
+                        <Checkbox checked={form.unlimitedDate} onChange={(value) => setForm((prev) => ({ ...prev, unlimitedDate: Boolean(value) }))} />
+                        <div>
+                          <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Sem limite de data</p>
+                          <p className="text-sm text-brand-inactive-text dark:text-dark-body">Desmarque para definir inicio e fim da campanha.</p>
+                        </div>
+                      </label>
+
+                      {!form.unlimitedDate && (
+                        <div className="grid grid-cols-1 gap-5">
+                          <DatePicker
+                            label="Inicio"
+                            value={dateFromValue}
+                            onChange={(date: Date | undefined) => {
+                              const next = date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}` : ""
+                              setForm((prev) => ({ ...prev, startsAt: next }))
+                            }}
+                          />
+                          <DatePicker
+                            label="Fim"
+                            value={dateToValue}
+                            onChange={(date: Date | undefined) => {
+                              const next = date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}` : ""
+                              setForm((prev) => ({ ...prev, endsAt: next }))
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   </SidebarCard>
                 </div>
@@ -535,6 +653,120 @@ export default function CouponFormPage({
             {isSaving ? "Salvando..." : "Salvar"}
           </Button>
         </div>
+
+        <SelectCouponProductsSheet
+          isOpen={pickerMode === "products"}
+          onClose={() => setPickerMode(null)}
+          products={scopeData.products}
+          selectedIds={relations.productIds}
+          onToggle={(id) => setSelectedProductIds((prev) => prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id])}
+          isLoading={isLoadingScope}
+        />
+
+        <SelectionSheet
+          isOpen={pickerMode === "services"}
+          onOpenChange={(open) => {
+            if (!open) setPickerMode(null)
+          }}
+          title="Selecionar servicos"
+          description="Escolha os servicos que esse cupom pode atingir."
+          searchValue={scopeSearch}
+          onSearchChange={setScopeSearch}
+          searchPlaceholder="Buscar servico..."
+        >
+          <div className="space-y-3">
+            {isLoadingScope ? <ThreeDotsLoader /> : null}
+            {filteredServices.map((item) => {
+              const disabled = item.isActive === false
+              const selected = relations.serviceIds.includes(item.id)
+              return (
+                <ListItem
+                  key={item.id}
+                  title={item.name}
+                  description={item.price != null ? formatCurrency(item.price) : undefined}
+                  left={
+                    <div className="pl-4">
+                      <Checkbox
+                        checked={selected}
+                        disabled={disabled}
+                        onChange={() => {
+                          if (disabled) return
+                          setSelectedServiceIds((prev) => prev.includes(item.id) ? prev.filter((value) => value !== item.id) : [...prev, item.id])
+                        }}
+                      />
+                    </div>
+                  }
+                  icon={<BoxIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />}
+                  right={<Badge variant={getItemStatusVariant(item.isActive)}>{getItemStatusLabel(item.isActive)}</Badge>}
+                  onClick={disabled ? undefined : () => setSelectedServiceIds((prev) => prev.includes(item.id) ? prev.filter((value) => value !== item.id) : [...prev, item.id])}
+                  className={`p-3 ${disabled ? "opacity-55 cursor-not-allowed hover:border-brand-border dark:hover:border-dark-border" : ""}`}
+                />
+              )
+            })}
+          </div>
+        </SelectionSheet>
+
+        <SelectCouponCategoriesSheet
+          isOpen={pickerMode === "categories"}
+          onClose={() => setPickerMode(null)}
+          categories={scopeData.categories}
+          selectedIds={relations.categoryIds}
+          onToggle={(id) => setSelectedCategoryIds((prev) => prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id])}
+          isLoading={isLoadingScope}
+        />
+
+        <SelectionSheet
+          isOpen={pickerMode === "customers"}
+          onOpenChange={(open) => {
+            if (!open) setPickerMode(null)
+          }}
+          title="Selecionar clientes"
+          description="Escolha os clientes especificos que podem usar esse cupom."
+          searchValue={customerSearch}
+          onSearchChange={setCustomerSearch}
+          searchPlaceholder="Buscar por nome, e-mail ou telefone..."
+        >
+          <div className="space-y-3">
+            {isLoadingScope ? <ThreeDotsLoader /> : null}
+            {filteredCustomers.map((item) => {
+              const disabled = item.status === "inativo" || item.status === "bloqueado"
+              const selected = relations.customerIds.includes(item.id)
+              return (
+                <ListItem
+                  key={item.id}
+                  title={item.name}
+                  description={item.email || item.phone || "Sem contato"}
+                  left={
+                    <div className="pl-4">
+                      <Checkbox
+                        checked={selected}
+                        disabled={disabled}
+                        onChange={() => {
+                          if (disabled) return
+                          setSelectedCustomerIds((prev) => prev.includes(item.id) ? prev.filter((value) => value !== item.id) : [...prev, item.id])
+                        }}
+                      />
+                    </div>
+                  }
+                  icon={
+                    item.avatarUrl ? (
+                      <img
+                        src={item.avatarUrl}
+                        alt={item.name}
+                        className="w-12 h-12 rounded-full object-cover border border-brand-border dark:border-dark-border"
+                      />
+                    ) : (
+                      <UserIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
+                    )
+                  }
+                  right={<Badge variant={getCustomerStatusVariant(item.status)}>{getCustomerStatusLabel(item.status)}</Badge>}
+                  onClick={disabled ? undefined : () => setSelectedCustomerIds((prev) => prev.includes(item.id) ? prev.filter((value) => value !== item.id) : [...prev, item.id])}
+                  className={`p-3 ${disabled ? "opacity-55 cursor-not-allowed hover:border-brand-border dark:hover:border-dark-border" : ""}`}
+                />
+              )
+            })}
+          </div>
+        </SelectionSheet>
       </div>
     </FadeIn>
   )

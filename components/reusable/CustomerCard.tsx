@@ -38,7 +38,17 @@ interface CustomerCardProps {
 }
 
 const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingAddress, showMap = true, className = "", onRemove, chrome = "default" }) => {
-    const hasAddress = !!address?.street || !!address?.city;
+    const addressToUse = address || (customer ? {
+        street: (customer as any).address_street,
+        number: (customer as any).address_number,
+        complement: (customer as any).address_complement,
+        neighborhood: (customer as any).address_neighborhood,
+        city: (customer as any).address_city,
+        state: (customer as any).address_state || (customer as any).address_uf,
+        zipCode: (customer as any).address_zip_code,
+    } : null);
+
+    const hasAddress = !!addressToUse?.street || !!addressToUse?.city;
     const hasBillingAddress = !!billingAddress?.street || !!billingAddress?.city;
     const hasContact = !!customer?.email || !!customer?.phone;
 
@@ -52,7 +62,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
         ].filter(Boolean).join("\n");
     };
 
-    const formattedAddress = formatAddress(address);
+    const formattedAddress = formatAddress(addressToUse);
     const formattedBillingAddress = formatAddress(billingAddress);
 
     const chromeClass =
@@ -80,8 +90,13 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
                                 className="w-10 h-10 text-base border border-white dark:border-dark-border"
                             />
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex flex-col justify-center">
                             <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{customer?.name || "Consumidor Final"}</h4>
+                            {(customer as any)?.id && (
+                                <p className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body leading-none mt-0.5">
+                                    ID #{(customer as any).id.substring(0, 5).toUpperCase()}
+                                </p>
+                            )}
                         </div>
                     </div>
 
