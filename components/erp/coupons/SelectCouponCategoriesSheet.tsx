@@ -103,20 +103,19 @@ export default function SelectCouponCategoriesSheet({
                   onKeyDown={
                     disabled
                       ? undefined
-                      : (e) => {
+                      : (e: React.KeyboardEvent) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault()
                           onToggle(category.id)
                         }
                       }
                   }
-                  className={`group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border ${
-                    disabled
+                  className={`group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border ${disabled
                       ? "cursor-not-allowed opacity-55"
                       : isSelected
                         ? "bg-brand-primary/5 dark:bg-brand-primary/10"
                         : "cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40"
-                  }`}
+                    }`}
                 >
                   <Div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-brand-border bg-brand-gray text-brand-inactive-text dark:border-dark-border dark:bg-dark-border">
                     <TagIcon size={20} />
@@ -189,7 +188,7 @@ export default function SelectCouponCategoriesSheet({
       >
         <Div
           className={`fixed right-4 top-4 bottom-4 z-[81] w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e: { stopPropagation: () => any }) => e.stopPropagation()}
         >
           {content}
         </Div>
