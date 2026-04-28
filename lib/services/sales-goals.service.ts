@@ -229,6 +229,69 @@ export async function applySaleToGoals(params: {
   }
 }
 
+export async function applyServiceOrderToGoals(params: {
+  supabase: SupabaseClient
+  partnerId: string
+  sellerUserId: string
+  saleAmount: number
+  saleDateIso?: string
+  createdByUserId?: string | null
+  accountId?: string | null
+}) {
+  const amount = money(Math.max(0, Number(params.saleAmount || 0)))
+  if (amount <= 0.009) return
+  const goals = await getActiveGoalsForSeller({ ...params, activityType: "service_orders" })
+  if (goals.length === 0) return
+
+  const goalIds = goals.map(g => g.id)
+  const { data: allProgress } = await params.supabase
+    .from("sales_goal_progress")
+    .select("id, goal_id, current_amount, achieved, achieved_at")
+    .in("goal_id", goalIds)
+    .eq("user_id", params.sellerUserId)
+
+  const progressMap = new Map(
+    (allProgress || []).map((p: any) => [String(p.goal_id), p])
+  )
+
+  for (const goal of goals) {
+    const existingProgress = progressMap.get(goal.id) || null
+    const currentAmount = money(Number(existingProgress?.current_amount || 0))
+    const nextAmount = money(currentAmount + amount)
+    const alreadyAchieved = Boolean(existingProgress?.achieved)
+    const justAchieved = !alreadyAchieved && nextAmount >= Number(goal.target_amount || 0)
+    const achievedAt = justAchieved ? new Date().toISOString() : null
+
+    await params.supabase
+      .from("sales_goal_progress")
+      .upsert({
+        goal_id: goal.id,
+        user_id: params.sellerUserId,
+        current_amount: nextAmount,
+        achieved: alreadyAchieved || justAchieved,
+        achieved_at: justAchieved ? achievedAt : (existingProgress as any)?.achieved_at || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "goal_id,user_id" })
+
+    if (!justAchieved || !Boolean(goal.auto_launch_bonus)) continue
+
+    const bonus =
+      goal.bonus_type === "fixed"
+        ? money(Number(goal.bonus_value || 0))
+        : money((nextAmount * Number(goal.bonus_value || 0)) / 100)
+
+    await createGoalBonusExpense({
+      supabase: params.supabase,
+      partnerId: params.partnerId,
+      goalId: goal.id,
+      userId: params.sellerUserId,
+      amount: bonus,
+      createdByUserId: params.createdByUserId || null,
+      accountId: goal.bonus_account_id || params.accountId || null,
+    })
+  }
+}
+
 export async function reverseSaleFromGoals(params: {
   supabase: SupabaseClient
   partnerId: string
