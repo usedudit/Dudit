@@ -11,6 +11,7 @@ interface FinancialCadastrosPageControlsProps {
     search: string
     onSearchChange: (value: string) => void
     onAdd: () => void
+    addDisabled?: boolean
 }
 
 const FinancialCadastrosPageControls: React.FC<FinancialCadastrosPageControlsProps> = ({
@@ -19,6 +20,7 @@ const FinancialCadastrosPageControls: React.FC<FinancialCadastrosPageControlsPro
     search,
     onSearchChange,
     onAdd,
+    addDisabled = false,
 }) => {
     return (
         <>
@@ -60,6 +62,7 @@ const FinancialCadastrosPageControls: React.FC<FinancialCadastrosPageControlsPro
                     <div className="flex-none flex items-center gap-2">
                         <Button
                             onClick={onAdd}
+                            disabled={addDisabled}
                             leftIcon={<PlusIcon size={18} />}
                             className="w-[42px] h-[42px] p-0 flex items-center justify-center"
                         >

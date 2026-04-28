@@ -24,6 +24,7 @@ import {
     createLocationAction, updateLocationAction, deleteLocationAction,
     getProductMetadataAction
 } from "@/app/actions/erp/product-metadata"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 
 interface ProductCadastrosPageProps {
     initialMetadata: {
@@ -32,13 +33,14 @@ interface ProductCadastrosPageProps {
         locations: any[]
     }
     partnerId: string
+    planGate?: { requiredPlanSlug: "vendedor"; message: string }
 }
 
-export default function ProductCadastrosPage({ initialMetadata, partnerId }: ProductCadastrosPageProps) {
+export default function ProductCadastrosPage({ initialMetadata, partnerId, planGate }: ProductCadastrosPageProps) {
     const { success, error } = useNotification()
     const router = useRouter()
     const searchParams = useSearchParams()
-
+    const { openPlanUpgrade } = usePlanUpgrade()
     // State
     const [metadata, setMetadata] = useState(initialMetadata)
     
@@ -268,7 +270,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <Button onClick={handleAdd} className="w-full">
+                        <Button onClick={handleAdd} disabled={!!planGate} className="w-full">
                             <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
                             {getAddButtonLabel()}
                         </Button>
@@ -284,6 +286,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                     search={search}
                     onSearchChange={setSearch}
                     onAdd={handleAdd}
+                    addDisabled={!!planGate}
                 />
 
                 {/* Content Area - Scrollable with exactly same padding and scrollbar behavior */}
@@ -296,9 +299,23 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId }: Pro
                             >
                                 <IconPlaceholder
                                     placeholderType="image"
-                                    title="Nenhum item encontrado"
-                                    subtitle="Ajuste os filtros ou adicione um novo cadastro."
-                                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                    imageSrc={
+                                        planGate
+                                            ? "https://img.dudit.com.br/static/mascots/PlanoVender.png"
+                                            : "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                    }
+                                    title={planGate ? "Plano necessário" : "Nenhum item encontrado"}
+                                    subtitle={
+                                        planGate
+                                            ? planGate.message
+                                            : "Ajuste os filtros ou adicione um novo cadastro."
+                                    }
+                                    itemButton={
+                                        planGate ? {
+                                            text: "Ver Plano Vender",
+                                            action: () => openPlanUpgrade("vendedor"),
+                                        } : undefined
+                                    }
                                 />
                             </FadeIn>
                         ) : (

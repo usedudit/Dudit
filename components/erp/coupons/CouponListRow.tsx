@@ -26,9 +26,9 @@ interface CouponListItemProps {
   selected: boolean
   onSelect: (id: string) => void
   onDetails: (coupon: CouponRow) => void
-  onEdit: (coupon: CouponRow) => void
-  onToggleStatus: (coupon: CouponRow) => void
-  onDelete: (coupon: CouponRow) => void
+  onEdit?: (coupon: CouponRow) => void
+  onToggleStatus?: (coupon: CouponRow) => void
+  onDelete?: (coupon: CouponRow) => void
 }
 
 const CouponListItem = React.memo(
@@ -102,10 +102,10 @@ const CouponListItem = React.memo(
             <div className="flex justify-center action-btn" onClick={(event) => event.stopPropagation()}>
               <ActionsDropdown
                 onView={() => onDetails(coupon)}
-                onEdit={() => onEdit(coupon)}
-                onCancel={() => onToggleStatus(coupon)}
+                onEdit={onEdit ? () => onEdit(coupon) : undefined}
+                onCancel={onToggleStatus ? () => onToggleStatus(coupon) : undefined}
                 cancelLabel={coupon.is_active ? "Desativar" : "Ativar"}
-                onDelete={() => onDelete(coupon)}
+                onDelete={onDelete ? () => onDelete(coupon) : undefined}
               />
             </div>
           )

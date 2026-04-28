@@ -35,7 +35,7 @@ interface CouponPageControlsProps {
     viewMode: "list" | "grid"
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
-    onAddCoupon: () => void
+    onAddCoupon?: () => void
 }
 
 const CouponPageControls: React.FC<CouponPageControlsProps> = ({
@@ -146,6 +146,7 @@ const CouponPageControls: React.FC<CouponPageControlsProps> = ({
                         </Button>
                         <Button
                             onClick={onAddCoupon}
+                            disabled={!onAddCoupon}
                             className="w-[42px] h-[42px] p-0 flex items-center justify-center"
                             leftIcon={<PlusIcon size={18} />}
                         >

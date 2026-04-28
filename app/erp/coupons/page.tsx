@@ -1,24 +1,40 @@
-import { AccessDenied } from "@/components/erp/access-denied"
-import CouponsPage from "@/components/erp/coupons/CouponsPage"
-import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { listCouponsAction } from "@/app/actions/shared/coupons"
+import CouponsPage from "@/components/erp/coupons/CouponsPage"
+import { redirect } from "next/navigation"
+import { getCurrentUser } from "@/lib/auth/authorization"
+import { AccessDenied } from "@/components/erp/access-denied"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { getPartnerPlan } from "@/lib/services/subscription.service"
 
 export const dynamic = "force-dynamic"
+export const revalidate = 0
 
-export default async function CouponsPageServer() {
+export default async function CouponsRoute() {
+  const user = await getCurrentUser()
+  if (!user) return <AccessDenied />
+
   const context = await getCurrentPartnerContext()
-  if (!context) return <AccessDenied />
+  if (!context) {
+    redirect("/select-erp")
+  }
   const partnerId = context.partnerId
 
-  const [{ allowed }, couponsRes] = await Promise.all([
-    checkPartnerPermission(partnerId, "coupons", "view"),
+  const [result, plan] = await Promise.all([
     listCouponsAction(partnerId, { page: 1, limit: 100 }),
+    getPartnerPlan(partnerId)
   ])
-  if (!allowed) return <AccessDenied />
-  if (!couponsRes.success) throw new Error(couponsRes.error || "Erro ao carregar cupons.")
+
+  if (!result.success) {
+    throw new Error(result.error || "Erro ao carregar cupons")
+  }
+
+  const isFreePlan = plan.slug.toLowerCase() === "free"
+  const planGate = isFreePlan ? { 
+    requiredPlanSlug: "vendedor" as const, 
+    message: "O acesso aos cupons promocionais requer o plano Vendedor ou superior." 
+  } : undefined
 
   return (
     <>
@@ -26,8 +42,9 @@ export default async function CouponsPageServer() {
       <FadeIn className="p-4">
         <CouponsPage
           partnerId={partnerId}
-          initialCoupons={couponsRes.data}
-          initialTotal={couponsRes.total ?? 0}
+          initialCoupons={isFreePlan ? [] : (result.data || [])}
+          initialTotal={isFreePlan ? 0 : (result.total || 0)}
+          planGate={planGate}
         />
       </FadeIn>
     </>

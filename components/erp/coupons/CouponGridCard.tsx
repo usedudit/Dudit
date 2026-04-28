@@ -19,9 +19,9 @@ interface CouponGridCardProps {
   selected: boolean
   onSelect: () => void
   onDetails: (coupon: CouponRow) => void
-  onEdit: (coupon: CouponRow) => void
-  onToggleStatus: (coupon: CouponRow) => void
-  onDelete: (coupon: CouponRow) => void
+  onEdit?: (coupon: CouponRow) => void
+  onToggleStatus?: (coupon: CouponRow) => void
+  onDelete?: (coupon: CouponRow) => void
 }
 
 const CouponGridCard = React.memo(
@@ -103,10 +103,10 @@ const CouponGridCard = React.memo(
             <div className="shrink-0" onClick={(event) => event.stopPropagation()}>
               <ActionsDropdown
                 onView={() => onDetails(coupon)}
-                onEdit={() => onEdit(coupon)}
-                onCancel={() => onToggleStatus(coupon)}
+                onEdit={onEdit ? () => onEdit(coupon) : undefined}
+                onCancel={onToggleStatus ? () => onToggleStatus(coupon) : undefined}
                 cancelLabel={coupon.is_active ? "Desativar" : "Ativar"}
-                onDelete={() => onDelete(coupon)}
+                onDelete={onDelete ? () => onDelete(coupon) : undefined}
               />
             </div>
           </div>

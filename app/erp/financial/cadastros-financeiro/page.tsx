@@ -5,6 +5,7 @@ import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { getPartnerPlan } from "@/lib/services/subscription.service"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -17,9 +18,10 @@ export default async function FinancialCategoriesRoute() {
   const { allowed } = await checkPartnerPermission(partnerId, "financial", "view")
   if (!allowed) return <AccessDenied />
 
-  const [catResult, accResult] = await Promise.all([
+  const [catResult, accResult, plan] = await Promise.all([
     getCategoriesData(partnerId),
     getAccountsData(partnerId),
+    getPartnerPlan(partnerId)
   ])
 
   if (!catResult.success || !catResult.data) {
@@ -29,14 +31,21 @@ export default async function FinancialCategoriesRoute() {
     throw new Error(accResult.error || "Erro ao carregar contas")
   }
 
+  const isFreePlan = plan.slug.toLowerCase() === "free"
+  const planGate = isFreePlan ? { 
+    requiredPlanSlug: "vendedor" as const, 
+    message: "O acesso aos cadastros financeiros de categorias, contas e contatos requer o plano Vendedor ou superior." 
+  } : undefined
+
   return (
     <>
       <ERPPageHeader title="Cadastros financeiros" />
       <FadeIn className="p-4">
         <FinancialCategoriesPage
-          initialCategories={catResult.data.categories}
-          initialAccounts={accResult.data.accounts}
+          initialCategories={isFreePlan ? [] : catResult.data.categories}
+          initialAccounts={isFreePlan ? [] : accResult.data.accounts}
           partnerId={partnerId}
+          planGate={planGate}
         />
       </FadeIn>
     </>

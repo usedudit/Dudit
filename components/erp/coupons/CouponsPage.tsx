@@ -38,6 +38,7 @@ import {
 } from "@/lib/types/coupon"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { usePermissions } from "@/lib/permission-context"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 
 type FilterState = {
     discountType: string[]
@@ -72,12 +73,15 @@ export default function CouponsPage({
     partnerId,
     initialCoupons,
     initialTotal,
+    planGate,
 }: {
     partnerId: string
     initialCoupons: CouponRow[]
     initialTotal: number
+    planGate?: { requiredPlanSlug: "vendedor"; message: string }
 }) {
     const { toast } = useToast()
+    const { openPlanUpgrade } = usePlanUpgrade()
     const { canCreate, canEdit, canDelete } = usePermissions()
     const isMobile = useMediaQuery("(max-width: 767px)")
 
@@ -622,7 +626,7 @@ export default function CouponsPage({
                                         <Button variant="outline" leftIcon={<ExportFileIcon size={18} />}>
                                             Exportar
                                         </Button>
-                                        <Button onClick={openCreate} leftIcon={<PlusIcon size={18} />}>
+                                        <Button onClick={openCreate} disabled={!!planGate} leftIcon={<PlusIcon size={18} />}>
                                             Novo Cupom
                                         </Button>
                                     </div>
@@ -639,7 +643,7 @@ export default function CouponsPage({
                                     viewMode={effectiveViewMode}
                                     onViewModeChange={setViewModeState}
                                     hasActiveFilters={hasActiveFilters}
-                                    onAddCoupon={canCreateCoupons ? openCreate : undefined}
+                                    onAddCoupon={canCreateCoupons && !planGate ? openCreate : undefined}
                                 />
 
                                 <div className="flex-1 min-h-[420px]">
@@ -652,11 +656,24 @@ export default function CouponsPage({
                                             <FadeIn key="empty" className="h-[600px] flex items-center justify-center px-4 md:px-8">
                                                 <IconPlaceholder
                                                     placeholderType="image"
-                                                    imageSrc={hasActiveFilters ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png" : "https://img.dudit.com.br/static/mascots/Cupons.png"}
+                                                    imageSrc={
+                                                        planGate
+                                                            ? "https://img.dudit.com.br/static/mascots/PlanoVender.png"
+                                                            : (hasActiveFilters ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png" : "https://img.dudit.com.br/static/mascots/Cupons.png")
+                                                    }
                                                     imageAlt="Nenhum cupom encontrado"
-                                                    title={hasActiveFilters ? "Nenhum cupom encontrado" : "Nenhum cupom cadastrado"}
-                                                    subtitle={hasActiveFilters ? "Tente ajustar seus filtros ou termos de busca." : "Comece criando seu primeiro cupom promocional."}
-                                                    itemButton={canCreateCoupons ? { text: "Criar cupom", action: openCreate } : undefined}
+                                                    title={planGate ? "Plano necessário" : (hasActiveFilters ? "Nenhum cupom encontrado" : "Nenhum cupom cadastrado")}
+                                                    subtitle={
+                                                        planGate
+                                                            ? planGate.message
+                                                            : (hasActiveFilters ? "Tente ajustar seus filtros ou termos de busca." : "Comece criando seu primeiro cupom promocional.")
+                                                    }
+                                                    itemButton={
+                                                        planGate ? {
+                                                            text: "Ver Plano Vender",
+                                                            action: () => openPlanUpgrade("vendedor"),
+                                                        } : (canCreateCoupons ? { text: "Criar cupom", action: openCreate } : undefined)
+                                                    }
                                                 />
                                             </FadeIn>
                                         ) : (

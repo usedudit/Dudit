@@ -31,9 +31,11 @@ export default async function TeamPage() {
 }
 
 import { InfoCard } from "@/components/reusable"
+import TeamMemberGridCard from "@/components/erp/settings/team/TeamMemberGridCard"
+import { canModifyUser } from "@/lib/permissions/partner-roles"
 
 async function TeamList() {
-    const { members, error } = await getTeamMembers()
+    const { members, error, currentUserRole } = await getTeamMembers()
 
     if (error) {
         return (
@@ -50,76 +52,37 @@ async function TeamList() {
     }
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-6">
             {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{members.length}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Total de membros</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-5 shadow-sm transition-all duration-300">
+                    <p className="text-3xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">{members.length}</p>
+                    <p className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body mt-1 uppercase tracking-wider">Total de membros</p>
                 </div>
-                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{members.filter(m => m.role === "ADMIN" || m.role === "OWNER").length}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Administradores</p>
+                <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-5 shadow-sm transition-all duration-300">
+                    <p className="text-3xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">{members.filter(m => m.role === "ADMIN" || m.role === "OWNER").length}</p>
+                    <p className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body mt-1 uppercase tracking-wider">Administradores</p>
                 </div>
-                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{members.filter(m => m.role === "MANAGER").length}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Gestores</p>
+                <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-5 shadow-sm transition-all duration-300">
+                    <p className="text-3xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">{members.filter(m => m.role === "MANAGER").length}</p>
+                    <p className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body mt-1 uppercase tracking-wider">Gestores</p>
                 </div>
-                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{members.filter(m => m.role === "OPERATOR" || m.role === "DELIVERY").length}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Operadores / Entregadores</p>
+                <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-5 shadow-sm transition-all duration-300">
+                    <p className="text-3xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">{members.filter(m => m.role === "OPERATOR" || m.role === "DELIVERY").length}</p>
+                    <p className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body mt-1 uppercase tracking-wider">Operadores / Entregadores</p>
                 </div>
             </div>
 
-            {/* Member List */}
-            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">Membros do ERP</h2>
-                </div>
-
-                <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                    {members.map((member) => (
-                        <div key={member.id} className="px-6 py-4 flex items-center gap-4">
-                            {/* Avatar */}
-                            <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center shrink-0 overflow-hidden">
-                                {member.avatarUrl ? (
-                                    <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" />
-                                ) : (
-                                    <span className="text-sm font-bold text-gray-500 dark:text-gray-400">
-                                        {(member.fullName || member.email || "?").charAt(0).toUpperCase()}
-                                    </span>
-                                )}
-                            </div>
-
-                            {/* Info */}
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                                        {member.fullName || "Sem nome"}
-                                    </p>
-                                    {member.isOwner && (
-                                        <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                                            DONO
-                                        </span>
-                                    )}
-                                </div>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                                    {member.email}
-                                </p>
-                            </div>
-
-                            {/* Role Badge */}
-                            <span className={`inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full shrink-0 ${ROLE_COLORS[member.role]}`}>
-                                {ROLE_LABELS[member.role] || member.role}
-                            </span>
-
-                            {/* Join Date */}
-                            <span className="text-xs text-gray-400 dark:text-gray-500 hidden md:block shrink-0">
-                                {new Date(member.createdAt).toLocaleDateString("pt-BR")}
-                            </span>
-                        </div>
-                    ))}
-                </div>
+            {/* Member Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {members.map((member) => (
+                    <TeamMemberGridCard
+                        key={member.id}
+                        member={member}
+                        roleColors={ROLE_COLORS}
+                        canModify={currentUserRole ? canModifyUser(currentUserRole, member.role) : false}
+                    />
+                ))}
             </div>
         </div>
     )

@@ -16,6 +16,7 @@ interface CadastrosPageControlsProps {
     search: string
     onSearchChange: (value: string) => void
     onAdd: () => void
+    addDisabled?: boolean
 }
 
 const CadastrosPageControls: React.FC<CadastrosPageControlsProps> = ({
@@ -24,6 +25,7 @@ const CadastrosPageControls: React.FC<CadastrosPageControlsProps> = ({
     search,
     onSearchChange,
     onAdd,
+    addDisabled = false,
 }) => {
     // Exact layout from ProductPageControls
     return (
@@ -76,6 +78,7 @@ const CadastrosPageControls: React.FC<CadastrosPageControlsProps> = ({
                     <div className="flex-none flex items-center gap-2">
                         <Button
                             onClick={onAdd}
+                            disabled={addDisabled}
                             className="w-[42px] h-[42px] p-0 flex items-center justify-center rounded-full bg-brand-green hover:bg-brand-green/90 text-white shadow-sm shadow-brand-green/20"
                         >
                             <PlusIcon size={18} />

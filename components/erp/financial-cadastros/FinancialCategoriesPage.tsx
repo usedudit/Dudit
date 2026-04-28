@@ -38,6 +38,7 @@ import {
 import { adjustAccountBalanceViaTransactionAction } from "@/app/actions/erp/transactions"
 import { formatCurrency } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 
 interface FinancialCategoriesPageProps {
     initialCategories: {
@@ -50,6 +51,7 @@ interface FinancialCategoriesPageProps {
     }[]
     initialAccounts: FinanceAccountRow[]
     partnerId: string
+    planGate?: { requiredPlanSlug: "vendedor"; message: string }
 }
 
 const ACCOUNT_TYPE_OPTIONS: { value: FinanceAccountType; label: string }[] = [
@@ -82,8 +84,10 @@ export default function FinancialCategoriesPage({
     initialCategories,
     initialAccounts,
     partnerId,
+    planGate,
 }: FinancialCategoriesPageProps) {
     const { success, error } = useNotification()
+    const { openPlanUpgrade } = usePlanUpgrade()
     const router = useRouter()
     const debouncedRefresh = useDebouncedRefresh()
 
@@ -543,7 +547,7 @@ export default function FinancialCategoriesPage({
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <Button onClick={handleAdd} className="w-full">
+                        <Button onClick={handleAdd} disabled={!!planGate} className="w-full">
                             <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
                             Novo Cadastro
                         </Button>
@@ -559,6 +563,7 @@ export default function FinancialCategoriesPage({
                     search={search}
                     onSearchChange={setSearch}
                     onAdd={handleAdd}
+                    addDisabled={!!planGate}
                 />
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-0 px-4 md:px-8">
@@ -570,9 +575,23 @@ export default function FinancialCategoriesPage({
                             >
                                 <IconPlaceholder
                                     placeholderType="image"
-                                    title="Nenhum item encontrado"
-                                    subtitle="Ajuste os filtros ou adicione um novo cadastro."
-                                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                    imageSrc={
+                                        planGate
+                                            ? "https://img.dudit.com.br/static/mascots/PlanoVender.png"
+                                            : "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                    }
+                                    title={planGate ? "Plano necessário" : "Nenhum item encontrado"}
+                                    subtitle={
+                                        planGate
+                                            ? planGate.message
+                                            : "Ajuste os filtros ou adicione um novo cadastro."
+                                    }
+                                    itemButton={
+                                        planGate ? {
+                                            text: "Ver Plano Vender",
+                                            action: () => openPlanUpgrade("vendedor"),
+                                        } : undefined
+                                    }
                                 />
                             </FadeIn>
                         ) : activeTab === "accounts" ? (
