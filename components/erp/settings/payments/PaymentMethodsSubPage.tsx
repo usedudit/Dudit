@@ -37,12 +37,12 @@ const INITIAL_FILTERS: PaymentFilters = {
 }
 
 const LIST_COLUMNS = [
-    { id: "name", label: "Metodo", align: "left" as const },
+    { id: "name", label: "Método", align: "left" as const },
     { id: "type", label: "Tipo", align: "left" as const },
     { id: "discount", label: "Desconto", align: "left" as const },
     { id: "fees", label: "Taxas", align: "left" as const },
     { id: "status", label: "Status", align: "center" as const },
-    { id: "actions", label: "Acoes", align: "center" as const },
+    { id: "actions", label: "Ações", align: "center" as const },
 ]
 
 export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: PaymentMethodsSubPageProps) {
@@ -523,7 +523,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                     <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
                         {/* Sticky Header */}
-                        <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                        <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
                             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
 
                                 {/* Back button - desktop only */}
@@ -541,7 +541,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                                         </h1>
 
                                         <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                            Gerencie os metodos aceitos em sua loja com a mesma experiencia das outras listas.
+                                            Gerencie os métodos de pagamento aceitos em seu negócio.
                                         </div>
                                     </div>
 
@@ -575,7 +575,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                                     hasActiveFilters={hasActiveFilters}
                                 />
 
-                                <div className="mt-4 px-4 md:px-8">
+                                <div className="mt-4">
                                     <AnimatePresence mode="wait">
                                         <motion.div
                                             key={`${viewMode}-${debouncedSearch}-${filters.type.join(",")}-${filters.status.join(",")}-${page}`}

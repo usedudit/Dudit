@@ -43,8 +43,8 @@ export function ServiceForm({ partnerId }: ServiceFormProps) {
     try {
       const result = await createServiceAction({ ...formData, partnerId })
 
-      if (result.error) {
-        setError(result.error)
+      if ((result as any).error) {
+        setError((result as any).error)
       } else {
         router.push("/erp/services")
         // No router.refresh() needed - push already navigates
