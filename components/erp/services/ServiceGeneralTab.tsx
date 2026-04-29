@@ -86,7 +86,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                             />
                         </div>
 
-                        <div className={`col-span-12 sm:col-span-6`}>
+                        <div className={`col-span-12 sm:col-span-4`}>
                             <FormDropdown
                                 label="Status"
                                 options={[{ value: "true", label: "Ativo" }, { value: "false", label: "Inativo" }]}
@@ -97,7 +97,18 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                             />
                         </div>
 
-                        <div className="col-span-12 sm:col-span-6">
+                        <div className={`col-span-12 sm:col-span-4`}>
+                            <FormDropdown
+                                label="Exibir na Vitrine"
+                                options={[{ value: "true", label: "Sim" }, { value: "false", label: "Não" }]}
+                                value={String(serviceData.show_in_marketplace)}
+                                setValue={(v) => handleFieldChange({ target: { name: "show_in_marketplace", value: v === "true" } })}
+                                disabled={!isEditing}
+                                width="w-full"
+                            />
+                        </div>
+
+                        <div className="col-span-12 sm:col-span-4">
                             <FormDropdown
                                 label="Tipo de Serviço"
                                 options={[
@@ -109,17 +120,6 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                 setValue={(v) => handleFieldChange({ target: { name: "service_type", value: v } })}
                                 disabled={!isEditing}
                                 width="w-full"
-                            />
-                        </div>
-
-                        <div className="col-span-12">
-                            <FormTextarea
-                                label="Descrição do Serviço"
-                                name="description"
-                                value={serviceData.description}
-                                onChange={handleFieldChange}
-                                disabled={!isEditing}
-                                className="min-h-[100px]"
                             />
                         </div>
                     </div>

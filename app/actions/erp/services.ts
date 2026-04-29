@@ -44,7 +44,7 @@ export async function getERPServicesPageAction(
 
         let q = supabase
             .from("services")
-            .select("id, name, category, price, cost_price, is_active, sku, images, unit, duration_minutes, created_at, description")
+            .select("id, name, category_id, subcategory_id, price, cost_price, is_active, sku, images, unit, duration_minutes, created_at, description, service_categories!category_id(name)")
             .eq("partner_id", partnerId)
 
         if (cursor) {
@@ -124,8 +124,8 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             description: data.description || null,
             sku,
             brand: data.brand || null,
-            category: data.category || null,
-            subcategory: data.subcategory || null,
+            category_id: data.category_id || data.categoryId || null,
+            subcategory_id: data.subcategory_id || data.subcategoryId || null,
             unit: data.unit || 'Sessão',
             cost_price: data.costPrice || data.cost_price || 0,
             price: data.price || 0,
@@ -200,8 +200,10 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         if (data.description !== undefined) payload.description = data.description
         if (data.sku !== undefined) payload.sku = data.sku
         if (data.brand !== undefined) payload.brand = data.brand
-        if (data.category !== undefined) payload.category = data.category
-        if (data.subcategory !== undefined) payload.subcategory = data.subcategory
+        if (data.category_id !== undefined) payload.category_id = data.category_id
+        if (data.categoryId !== undefined) payload.category_id = data.categoryId
+        if (data.subcategory_id !== undefined) payload.subcategory_id = data.subcategory_id
+        if (data.subcategoryId !== undefined) payload.subcategory_id = data.subcategoryId
         if (data.unit !== undefined) payload.unit = data.unit
         if (data.costPrice !== undefined) payload.cost_price = data.costPrice
         if (data.cost_price !== undefined) payload.cost_price = data.cost_price

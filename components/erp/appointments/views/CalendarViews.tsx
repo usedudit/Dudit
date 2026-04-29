@@ -2,9 +2,10 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarX, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Users, RotateCcw, X, CalendarPlus, CalendarOff, User, MoreHorizontal, LayoutList, LayoutGrid, Clock, ArrowUpDown, Plus, Edit3, Utensils, Briefcase } from 'lucide-react';
-import { Button, Dropdown, DropdownItem, Badge, Checkbox as FormCheckbox } from '../../../reusable';
+import { Button, Dropdown, DropdownItem, Badge, Checkbox as FormCheckbox, Pagination } from '../../../reusable';
 import { Appointment, LayoutAppointment, StaffMember, PopoverState } from '../types';
 import { getAppointmentStyle, getEndTime, formatDateStr, getWeekDays, arrangeAppointments, formatDuration, isMultiDay, getMultiDayStyle, parseLocalDate } from '../utils';
+import { AppointmentListRow } from '../AppointmentListRow';
 
 // --- HELPER COMPONENTS ---
 
@@ -594,95 +595,54 @@ export const MonthView = ({ appointments, currentDate, handleGenericCellClick, a
 };
 
 export const ListView = ({ appointments, onOpenView, currentPage, setCurrentPage, itemsPerPage }: any) => {
+    const totalItems = appointments.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const visibleItems = appointments.slice(startIndex, startIndex + itemsPerPage);
 
-    // UPDATED BADGE LOGIC
-    const getStatusBadge = (status: string) => {
-        const s = status.toLowerCase();
-
-        if (s === 'ausência' || s === 'absent' || s === 'ausencia') return <Badge variant="red">Ausência</Badge>;
-        if (s === 'canceled' || s === 'cancelado' || s === 'cancelar') return <Badge variant="red">Cancelado</Badge>;
-
-        // Paid -> Green
-        if (s === 'paid' || s === 'pago') return <Badge variant="green">Pago</Badge>;
-
-        // Confirmed -> Green
-        if (s === 'confirmed' || s === 'confirmado') return <Badge variant="green">Confirmado</Badge>;
-
-        if (s === 'pending' || s === 'aguardando') return <Badge variant="orange">Aguardando</Badge>;
-        if (s === 'reservado' || s === 'reserved') return <Badge variant="blue">Reservado</Badge>;
-
-        if (s === 'iniciado' || s === 'in progress') return <Badge variant="blue">Iniciado</Badge>;
-
-        // Finished -> Gray
-        if (s === 'finalizado' || s === 'finished' || s === 'completed' || s === 'concluído') return <Badge variant="gray">Concluído</Badge>;
-
-        return <Badge variant="gray">{status}</Badge>;
-    };
-
-    const getPaymentBadge = (status: string) => {
-        const s = status.toLowerCase();
-        // Payment badge logic if needed separate from status, currently integrated above for 'Paid'
-        if (s === 'partially paid' || s === 'pago parcialmente') return <Badge variant="orange">Parcial</Badge>;
-        return null;
-    }
-
     return (
-        <div className="overflow-x-auto pb-4 custom-scrollbar">
-            <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
-                <thead>
-                    <tr className="bg-[#f3f5f9] dark:bg-dark-surface transition-colors">
-                        <th className="py-2 px-4 w-12 pl-6 rounded-l-xl"><FormCheckbox checked={false} onChange={() => { }} name="select-all" /></th>
-                        <SortableHeader label="Cliente" />
-                        <SortableHeader label="Serviço" />
-                        <SortableHeader label="Data & Hora" />
-                        <SortableHeader label="Profissional" />
-                        <SortableHeader label="Status" />
-                        <SortableHeader label="Valor" right />
-                        <th className="py-2 px-4 w-16 rounded-r-xl relative text-center text-[13px] font-medium text-brand-inactive-text dark:text-dark-body"><div className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-px bg-gray-300 dark:bg-gray-700"></div>Ações</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <AnimatePresence mode='popLayout'>
-                        {visibleItems.length > 0 ? (
-                            visibleItems.map((apt: Appointment) => {
-                                // Format Date Range if needed
-                                let dateDisplay = `${apt.date}`;
-                                let timeDisplay = `${apt.time}`;
-
-                                if (isMultiDay(apt)) {
-                                    const endD = apt.endDate || apt.date;
-                                    dateDisplay += ` - ${endD}`;
-                                    timeDisplay = formatDuration(apt.duration);
-                                } else {
-                                    timeDisplay += ` - ${getEndTime(apt.time, apt.duration)}`;
-                                }
-
-                                return (
-                                    <motion.tr key={apt.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="group hover:bg-gray-50 dark:hover:bg-dark-border/50 transition-colors cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0" onClick={() => onOpenView(apt)}>
-                                        <td className="p-4 pl-6 border-b border-brand-border dark:border-dark-border"><div onClick={(e) => e.stopPropagation()}><FormCheckbox checked={false} onChange={() => { }} name={`select-${apt.id}`} /></div></td>
-                                        <td className="p-4 border-b border-brand-border dark:border-dark-border"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-[#f3f5f9] dark:bg-gray-800 flex items-center justify-center text-xs font-bold text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border">{apt.customer.charAt(0)}</div><span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{apt.customer}</span></div></td>
-                                        <td className="p-4 border-b border-brand-border dark:border-dark-border"><span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">{apt.service}</span><div className="text-[11px] text-brand-inactive-text">{formatDuration(apt.duration)}</div></td>
-                                        <td className="p-4 border-b border-brand-border dark:border-dark-border"><div className="flex flex-col"><div className="flex items-center gap-1.5 text-[13px] font-medium text-brand-dark dark:text-dark-heading"><CalendarIcon size={14} className="text-brand-inactive-text" /> {dateDisplay}</div><div className="flex items-center gap-1.5 text-[11px] text-brand-inactive-text mt-0.5 ml-0.5"><Clock size={12} /> {timeDisplay}</div></div></td>
-                                        <td className="p-4 border-b border-brand-border dark:border-dark-border"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border"><span className="text-[10px] font-bold text-brand-inactive-text">{apt.staff.charAt(0)}</span></div><span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">{apt.staff}</span></div></td>
-                                        <td className="p-4 border-b border-brand-border dark:border-dark-border"><div className="flex gap-2">{getStatusBadge(apt.status)}{getPaymentBadge(apt.status)}</div></td>
-                                        <td className="p-4 text-right border-b border-brand-border dark:border-dark-border"><span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">R$ {apt.price.toFixed(2)}</span></td>
-                                        <td className="p-4 text-center border-b border-brand-border dark:border-dark-border"><div className="flex justify-center"><button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-dark-border text-brand-inactive-text"><MoreHorizontal size={16} /></button></div></td>
-                                    </motion.tr>
-                                )
-                            })
-                        ) : (<tr><td colSpan={8} className="p-8 text-center text-brand-inactive-text">Nenhum agendamento encontrado para este período.</td></tr>)}
-                    </AnimatePresence>
-                </tbody>
-            </table>
-            <div className="flex justify-center mt-6">
-                <div className="flex items-center gap-2">
-                    <Button className="w-8 h-8 flex items-center justify-center" onClick={() => setCurrentPage((p: number) => Math.max(1, p - 1))} disabled={currentPage === 1}><ChevronLeft size={18} /></Button>
-                    {[1, 2].map(p => (<button key={p} onClick={() => setCurrentPage(p)} className={`w-8 h-8 flex items-center justify-center ${currentPage === p ? 'bg-[#f3f5f9] dark:bg-gray-800 text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border shadow-sm' : 'text-brand-inactive-text dark:text-dark-body hover:bg-gray-100 dark:hover:bg-gray-800'}`}>{p}</button>))}
-                    <Button className="w-8 h-8 flex items-center justify-center" onClick={() => setCurrentPage((p: number) => Math.min(2, p + 1))} disabled={currentPage === 2}><ChevronRight size={18} /></Button>
-                </div>
+        <div className="flex flex-col h-full bg-white dark:bg-dark-surface rounded-2xl overflow-hidden shadow-sm border border-brand-border dark:border-dark-border">
+            <div className="flex-1 overflow-y-auto no-scrollbar">
+                <AnimatePresence mode='popLayout'>
+                    {visibleItems.length > 0 ? (
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="flex flex-col"
+                        >
+                            {visibleItems.map((apt: Appointment) => (
+                                <AppointmentListRow 
+                                    key={apt.id} 
+                                    appointment={apt} 
+                                    onView={onOpenView} 
+                                />
+                            ))}
+                        </motion.div>
+                    ) : (
+                        <div className="p-20 text-center">
+                            <div className="w-16 h-16 bg-gray-50 dark:bg-zinc-900 rounded-full flex items-center justify-center mb-4 text-brand-inactive-text mx-auto">
+                                <CalendarX size={24} />
+                            </div>
+                            <h3 className="text-brand-dark dark:text-dark-heading font-bold mb-1">
+                                Nenhum agendamento encontrado
+                            </h3>
+                            <p className="text-sm text-brand-inactive-text">
+                                Não há agendamentos para este período ou filtros.
+                            </p>
+                        </div>
+                    )}
+                </AnimatePresence>
             </div>
+            
+            {totalPages > 1 && (
+                <div className="p-4 border-t border-brand-border dark:border-dark-border bg-gray-50/50 dark:bg-zinc-900/30">
+                    <Pagination 
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={setCurrentPage}
+                    />
+                </div>
+            )}
         </div>
     )
 }

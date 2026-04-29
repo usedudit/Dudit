@@ -69,7 +69,7 @@ const ServiceListItem = React.memo(
                 case "category":
                     return (
                         <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                            {service.category || "-"}
+                            {service.service_categories?.name || "-"}
                         </span>
                     )
 

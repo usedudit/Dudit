@@ -84,10 +84,10 @@ const ServiceGridCard = React.memo(
                         {/* Linha 2: SKU • Categoria */}
                         <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate mt-1 flex items-center">
                             <span>SKU: {service.sku || "N/A"}</span>
-                            {service.category && (
+                            {service.service_categories?.name && (
                                 <>
                                     <span className="mx-1.5">•</span>
-                                    <span className="truncate">{service.category}</span>
+                                    <span className="truncate">{service.service_categories.name}</span>
                                 </>
                             )}
                         </div>

@@ -10,9 +10,12 @@ import {
     Users,
     Plus,
     Calendar as CalendarIcon,
-    PlusIcon
+    PlusIcon,
+    Search,
+    Filter
 } from 'lucide-react';
-import { Button, Dropdown, DropdownItem, Checkbox } from '@/components/reusable';
+import { Button, Dropdown, DropdownItem, Checkbox, Tabs, TabsList, TabsTrigger, Input as FormInput } from '@/components/reusable';
+import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import {
@@ -94,6 +97,7 @@ const AppointmentsPage = () => {
         price: Number(row.price || 0),
         pricingUnit: row.pricing_unit || 'Por Serviço',
         notes: row.notes || undefined,
+        partnerId: row.partner_id,
     }), []);
 
     useEffect(() => {
@@ -436,94 +440,106 @@ const AppointmentsPage = () => {
                                 </div>
                             </div>
 
-                            {/* Header Controls (Desktop) */}
-                            <div className="hidden md:block">
-                                <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-6">
-                                    <div className="flex items-center gap-3 w-full lg:w-auto overflow-x-auto no-scrollbar pb-2 lg:pb-0">
-                                        <Button variant="outline" className="rounded-full h-[40px] px-4" onClick={() => setCurrentDate(new Date())}>
-                                            Hoje
-                                        </Button>
+                            {/* Standard ERP Header Controls */}
+                            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 px-4 md:px-8">
+                                <div className="flex items-center gap-2 w-full md:w-auto">
+                                    <Button 
+                                        variant="outline" 
+                                        className="rounded-full h-10 px-4" 
+                                        onClick={() => setCurrentDate(new Date())}
+                                    >
+                                        Hoje
+                                    </Button>
 
-                                        <div className="flex items-center border border-brand-border dark:border-dark-border rounded-full bg-white dark:bg-dark-surface h-[40px] shadow-sm">
-                                            <button
-                                                onClick={() => navigateDate('prev')}
-                                                className="w-10 h-full flex items-center justify-center border-r border-brand-border dark:border-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                            >
-                                                <ChevronLeft size={18} />
-                                            </button>
-                                            <div className="px-4 text-sm font-bold text-brand-dark dark:text-dark-heading capitalize whitespace-nowrap min-w-[160px] text-center">
-                                                {getViewLabel()}
-                                            </div>
-                                            <button
-                                                onClick={() => navigateDate('next')}
-                                                className="w-10 h-full flex items-center justify-center border-l border-brand-border dark:border-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                            >
-                                                <ChevronRight size={18} />
-                                            </button>
-                                        </div>
-
-                                        <Dropdown
-                                            width="w-72"
-                                            trigger={
-                                                <button className="flex items-center gap-2 px-4 h-[40px] border border-brand-border dark:border-dark-border rounded-full bg-white dark:bg-dark-surface text-sm font-bold text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors whitespace-nowrap shadow-sm">
-                                                    Toda a equipe
-                                                    <ChevronDown size={14} className="text-brand-inactive-text" />
-                                                </button>
-                                            }
+                                    <div className="flex items-center border border-brand-border dark:border-dark-border rounded-full bg-white dark:bg-dark-surface h-10 shadow-sm overflow-hidden">
+                                        <button
+                                            onClick={() => navigateDate('prev')}
+                                            className="w-10 h-full flex items-center justify-center border-r border-brand-border dark:border-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors hover:bg-gray-50 dark:hover:bg-zinc-900"
                                         >
-                                            <div className="p-1">
-                                                <DropdownItem className="rounded-lg font-medium bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300"><Users size={16} className="text-purple-600 dark:text-purple-400" /> Toda a equipe</DropdownItem>
-                                                <div className="my-2 border-t border-brand-border dark:border-dark-border"></div>
-                                                <div className="space-y-2 px-3 py-2">
-                                                    {realStaffMembers.slice(0, 2).map(staff => (
-                                                        <label key={staff.id} className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/50 p-1.5 rounded-lg -mx-1.5 transition-colors">
-                                                            <div className="relative flex items-center justify-center">
-                                                                <Checkbox checked={true} onChange={() => { }} />
-                                                            </div>
-                                                            <img src={staff.avatar} className="w-6 h-6 rounded-full" />
-                                                            <span className="text-sm text-brand-dark dark:text-dark-body">{staff.name}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </Dropdown>
+                                            <ChevronLeft size={18} />
+                                        </button>
+                                        <div className="px-4 text-sm font-bold text-brand-dark dark:text-dark-heading capitalize whitespace-nowrap min-w-[140px] text-center">
+                                            {getViewLabel()}
+                                        </div>
+                                        <button
+                                            onClick={() => navigateDate('next')}
+                                            className="w-10 h-full flex items-center justify-center border-l border-brand-border dark:border-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors hover:bg-gray-50 dark:hover:bg-zinc-900"
+                                        >
+                                            <ChevronRight size={18} />
+                                        </button>
                                     </div>
 
-                                    <div className="flex items-center gap-3 w-full lg:w-auto justify-end">
-                                        <div className="flex items-center bg-gray-100 dark:bg-zinc-900 rounded-full p-1 h-[40px]">
-                                            <button
-                                                onClick={() => setViewMode('calendar')}
-                                                className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === 'calendar' ? 'bg-white dark:bg-gray-700 text-brand-dark dark:text-white shadow-sm' : 'text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading'}`}
-                                            >
-                                                <CalendarIcon size={16} />
+                                    <Dropdown
+                                        width="w-72"
+                                        trigger={
+                                            <button className="flex items-center gap-2 px-4 h-10 border border-brand-border dark:border-dark-border rounded-full bg-white dark:bg-dark-surface text-sm font-bold text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors whitespace-nowrap shadow-sm">
+                                                <Users size={16} className="text-brand-inactive-text" />
+                                                Toda a equipe
+                                                <ChevronDown size={14} className="text-brand-inactive-text" />
                                             </button>
-                                            <button
-                                                onClick={() => setViewMode('list')}
-                                                className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === 'list' ? 'bg-white dark:bg-gray-700 text-brand-dark dark:text-white shadow-sm' : 'text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading'}`}
-                                            >
-                                                <LayoutList size={16} />
-                                            </button>
+                                        }
+                                    >
+                                        <div className="p-1">
+                                            <DropdownItem className="rounded-lg font-medium bg-brand-dark/5 dark:bg-white/5 text-brand-dark dark:text-dark-heading">
+                                                <Users size={16} /> Toda a equipe
+                                            </DropdownItem>
+                                            <div className="my-2 border-t border-brand-border dark:border-dark-border"></div>
+                                            <div className="space-y-1 px-1">
+                                                {realStaffMembers.map(staff => (
+                                                    <DropdownItem key={staff.id} className="gap-3">
+                                                        <UserProfileImage fullName={staff.name} imageUrl={staff.avatar} className="w-6 h-6" />
+                                                        <span className="text-sm">{staff.name}</span>
+                                                    </DropdownItem>
+                                                ))}
+                                            </div>
                                         </div>
+                                    </Dropdown>
+                                </div>
 
-                                        <Button variant="outline" className="rounded-full h-[40px] w-[40px] p-0 flex items-center justify-center border-brand-border dark:border-dark-border shadow-sm" onClick={() => setCalendarView('day')}>
-                                            <RotateCcw size={16} className="text-brand-inactive-text" />
-                                        </Button>
-
-                                        <Dropdown
-                                            width="w-32"
-                                            align="right"
-                                            trigger={
-                                                <button className="flex items-center gap-2 px-4 h-[40px] border border-brand-border dark:border-dark-border rounded-full bg-white dark:bg-dark-surface text-sm font-bold text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors whitespace-nowrap shadow-sm">
-                                                    {calendarView === 'day' ? 'Dia' : calendarView === 'week' ? 'Semana' : 'Mês'}
-                                                    <ChevronDown size={14} className="text-brand-inactive-text" />
-                                                </button>
-                                            }
-                                        >
-                                            <DropdownItem onClick={() => setCalendarView('day')} className="font-medium gap-2"><LayoutList size={16} /> Dia</DropdownItem>
-                                            <DropdownItem onClick={() => setCalendarView('week')} className="font-medium gap-2"><LayoutGrid size={16} /> Semana</DropdownItem>
-                                            <DropdownItem onClick={() => setCalendarView('month')} className="font-medium gap-2"><CalendarIcon size={16} /> Mês</DropdownItem>
-                                        </Dropdown>
+                                <div className="flex items-center gap-3 w-full md:w-auto">
+                                    <div className="flex-1 md:w-64">
+                                        <FormInput 
+                                            placeholder="Buscar agendamentos..." 
+                                            prefix={<Search size={18} className="text-brand-inactive-text" />}
+                                            className="h-10 rounded-full"
+                                        />
                                     </div>
+                                    
+                                    <Tabs 
+                                        value={viewMode}
+                                        onValueChange={(val: any) => setViewMode(val as ModeType)}
+                                        className="w-auto"
+                                    >
+                                        <TabsList className="bg-gray-100 dark:bg-zinc-900 p-1 rounded-full h-10 border-0 gap-1 flex">
+                                            <TabsTrigger 
+                                                value="calendar" 
+                                                className="rounded-full px-4 data-[state=active]:bg-white dark:data-[state=active]:bg-dark-surface data-[state=active]:text-brand-dark dark:data-[state=active]:text-white shadow-sm h-full flex items-center gap-2 pb-0"
+                                            >
+                                                <CalendarIcon size={16} /> Calendário
+                                            </TabsTrigger>
+                                            <TabsTrigger 
+                                                value="list" 
+                                                className="rounded-full px-4 data-[state=active]:bg-white dark:data-[state=active]:bg-dark-surface data-[state=active]:text-brand-dark dark:data-[state=active]:text-white shadow-sm h-full flex items-center gap-2 pb-0"
+                                            >
+                                                <LayoutList size={16} /> Lista
+                                            </TabsTrigger>
+                                        </TabsList>
+                                    </Tabs>
+
+                                    <Dropdown
+                                        width="w-32"
+                                        align="right"
+                                        trigger={
+                                            <button className="flex items-center gap-2 px-4 h-10 border border-brand-border dark:border-dark-border rounded-full bg-white dark:bg-dark-surface text-sm font-bold text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors whitespace-nowrap shadow-sm">
+                                                {calendarView === 'day' ? 'Dia' : calendarView === 'week' ? 'Semana' : 'Mês'}
+                                                <ChevronDown size={14} className="text-brand-inactive-text" />
+                                            </button>
+                                        }
+                                    >
+                                        <DropdownItem onClick={() => setCalendarView('day')} className="font-medium gap-2"><LayoutList size={16} /> Dia</DropdownItem>
+                                        <DropdownItem onClick={() => setCalendarView('week')} className="font-medium gap-2"><LayoutGrid size={16} /> Semana</DropdownItem>
+                                        <DropdownItem onClick={() => setCalendarView('month')} className="font-medium gap-2"><CalendarIcon size={16} /> Mês</DropdownItem>
+                                    </Dropdown>
                                 </div>
                             </div>
 

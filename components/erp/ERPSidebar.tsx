@@ -85,7 +85,7 @@ const navItems: NavItem[] = [
             { label: "Agendamentos", href: "/erp/agendamentos" },
             { label: "Ordens de Serviço", href: "/" },
             { label: "Catálogo de Serviços", href: "/erp/services" },
-            { label: "Categorias de Serviços", href: "/" },
+            { label: "Categorias de Serviços", href: "/erp/services/categorias" },
         ],
     },
     {
@@ -137,6 +137,7 @@ const navItems: NavItem[] = [
 const PLAN_GATED_MINIMUM: Record<string, "vendedor"> = {
     "/erp/logistics": "vendedor",
     "/erp/products/cadastros": "vendedor",
+    "/erp/services/categorias": "vendedor",
     "/erp/financial/cadastros-financeiro": "vendedor",
 }
 

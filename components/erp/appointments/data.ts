@@ -30,8 +30,8 @@ export const mockClients = [
 ];
 
 export const initialAppointments: Appointment[] = [
-    { id: '1', customer: 'Bagus Fikri', service: 'Consultoria Financeira', date: '2024-02-24', time: '10:00', duration: 60, status: 'Confirmed', staff: 'Ana Silva', staffId: '1', price: 150, notes: 'Cliente prefere sala silenciosa', pricingUnit: 'Por Serviço' },
-    { id: '2', customer: 'Sarah Connor', service: 'Manutenção Preventiva', date: '2024-02-24', time: '14:30', duration: 120, status: 'Pending', staff: 'Carlos Lima', staffId: '2', price: 300, pricingUnit: 'Por Serviço' },
-    { id: '3', customer: 'John Wick', service: 'Câmera DSLR (Diária)', date: '2024-02-25', time: '09:00', endDate: '2024-02-27', endTime: '18:00', duration: 3420, status: 'Confirmed', staff: 'Roberto Souza', staffId: '3', price: 300, pricingUnit: 'Por Dia' },
-    { id: '4', customer: 'Horário Indisponível', service: 'Almoço', date: '2024-02-24', time: '12:00', duration: 60, status: 'Indisponível', staff: 'Ana Silva', staffId: '1', price: 0, pricingUnit: 'Por Serviço' },
+    { id: '1', partnerId: 'mock-partner', customer: 'Bagus Fikri', service: 'Consultoria Financeira', date: '2024-02-24', time: '10:00', duration: 60, status: 'Confirmed', staff: 'Ana Silva', staffId: '1', price: 150, notes: 'Cliente prefere sala silenciosa', pricingUnit: 'Por Serviço' },
+    { id: '2', partnerId: 'mock-partner', customer: 'Sarah Connor', service: 'Manutenção Preventiva', date: '2024-02-24', time: '14:30', duration: 120, status: 'Pending', staff: 'Carlos Lima', staffId: '2', price: 300, pricingUnit: 'Por Serviço' },
+    { id: '3', partnerId: 'mock-partner', customer: 'John Wick', service: 'Câmera DSLR (Diária)', date: '2024-02-25', time: '09:00', endDate: '2024-02-27', endTime: '18:00', duration: 3420, status: 'Confirmed', staff: 'Roberto Souza', staffId: '3', price: 300, pricingUnit: 'Por Dia' },
+    { id: '4', partnerId: 'mock-partner', customer: 'Horário Indisponível', service: 'Almoço', date: '2024-02-24', time: '12:00', duration: 60, status: 'Indisponível', staff: 'Ana Silva', staffId: '1', price: 0, pricingUnit: 'Por Serviço' },
 ];

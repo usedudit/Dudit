@@ -244,7 +244,7 @@ export default function ServicesPage({
                 tabMatch &&
                 statusMatch &&
                 (s.name.toLowerCase().includes(term) || s.sku?.toLowerCase().includes(term)) &&
-                (filters.categories.length === 0 || filters.categories.includes((s.category || "") as any)) &&
+                (filters.categories.length === 0 || filters.categories.includes((s.service_categories?.name || "") as any)) &&
                 s.price >= minPrice &&
                 s.price <= maxPrice
             )

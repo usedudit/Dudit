@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { Checkbox } from "@/components/reusable"
-import { createClient } from "@/lib/supabase/client"
+import { getTeamMembers } from "@/app/actions/erp/team"
 
 interface ServiceStaffTabProps {
     serviceData: any
@@ -24,15 +24,9 @@ export const ServiceStaffTab: React.FC<ServiceStaffTabProps> = ({
         const fetchStaff = async () => {
             if (!partnerId) return
             try {
-                const supabase = createClient()
-                const { data, error } = await supabase
-                    .from("user_profiles")
-                    .select("id, full_name, display_name")
-                    .eq("partner_id", partnerId)
-                    .eq("is_active", true)
-
-                if (data && !error) {
-                    setStaffList(data)
+                const res = await getTeamMembers()
+                if (res.members) {
+                    setStaffList(res.members)
                 }
             } catch (err) {
                 console.error("Failed to fetch staff", err)
@@ -107,7 +101,8 @@ export const ServiceStaffTab: React.FC<ServiceStaffTabProps> = ({
                                         />
                                         <div>
                                             <p className="font-medium text-brand-dark dark:text-dark-heading text-sm">
-                                                {staff.display_name || staff.full_name || "Sem Nome"}
+                                                {staff.fullName || staff.email || "Sem Nome"}
+                                                {staff.isOwner && " (Proprietário)"}
                                             </p>
                                         </div>
                                     </div>

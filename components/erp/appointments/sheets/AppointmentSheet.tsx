@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, ChevronDownIcon, CalendarIcon, CheckIcon, MoreHorizontalIcon, EditIcon, ClockIcon, RepeatIcon, SaveIcon, ShoppingBagIcon, ArrowRightIcon, FileIcon } from '@/lib/icons';
 import { Button, Input as FormInput, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea } from '@/components/reusable';
@@ -9,6 +9,10 @@ import { Appointment } from '../types';
 import { ServiceItemCard } from '../ServiceItemCard';
 import { formatDateStr, formatDuration, getEndTime, parseLocalDate } from '../utils';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
+import { useMediaQuery } from '@/components/erp/hooks';
+import BottomSheet from '@/components/BottomSheet';
+import SelectCustomerSheet from '@/components/erp/clientes/SelectCustomerSheet';
+import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 
 export const AppointmentSheet = ({
     onClose,
@@ -57,6 +61,9 @@ export const AppointmentSheet = ({
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [serviceToDeleteIndex, setServiceToDeleteIndex] = useState<number | null>(null);
     const [isUnsavedModalOpen, setIsUnsavedModalOpen] = useState(false);
+    const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false);
+    
+    const isMobile = useMediaQuery("(max-width: 768px)");
 
     // Status & Notes State
     const [status, setStatus] = useState(appointment?.status || 'Reservado');
@@ -486,6 +493,29 @@ export const AppointmentSheet = ({
         }
     }
 
+    const renderHeader = () => {
+        const title = getHeaderTitle();
+        
+        return (
+            <div className="p-6 border-b border-brand-border dark:border-dark-border flex justify-between items-center bg-white dark:bg-dark-surface z-20">
+                <div className="flex items-center gap-3">
+                    {currentView !== 'summary' && (
+                        <button onClick={handleBack} className="p-2 -ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-dark-border transition-colors">
+                            <ChevronLeftIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                        </button>
+                    )}
+                    <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
+                        {title}
+                    </h2>
+                </div>
+
+                <button onClick={handleCloseAttempt} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-dark-border transition-colors">
+                    <XIcon size={24} className="text-brand-inactive-text dark:text-dark-body" />
+                </button>
+            </div>
+        );
+    }
+
     const getHeaderBgColor = () => {
         const s = status.toLowerCase();
         if (s === 'confirmed' || s === 'confirmado') return 'bg-emerald-600';
@@ -622,6 +652,536 @@ export const AppointmentSheet = ({
     const headerDateObj = parseLocalDate(finalDateForHeader);
     const formattedHeaderDate = formatDate(headerDateObj);
 
+    const SheetContent = (
+        <div className={`relative w-full ${isMobile ? '' : 'max-w-md'} bg-white dark:bg-dark-surface shadow-2xl flex flex-col h-full overflow-hidden`}>
+            {renderHeader()}
+
+            {/* Content Area */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-32 relative">
+                <AnimatePresence mode='wait'>
+                    {/* SERVICE SELECTION */}
+                    {currentView === 'services' && (
+                        <motion.div key="services" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+                            {/* ... Service Selection UI ... */}
+                            <div className="relative">
+                                <SearchIcon size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-inactive-text" />
+                                <input type="text" placeholder="Buscar serviço" className="w-full h-[42px] pl-10 pr-4 rounded-lg border border-brand-border dark:border-dark-border bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-brand-dark dark:focus:ring-dark-heading transition-all" />
+                            </div>
+                            {servicesSource.map((group, idx) => (
+                                <div key={idx}>
+                                    {group.category_display && <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">{group.category}</h3>}
+                                    <div className="space-y-3">
+                                        {group.items.map((item: any) => {
+                                            const isSelected = selectedServices.some(s => s.id === item.id);
+                                            const isEditingMode = editingServiceIndex !== null;
+
+                                            return (
+                                                <div
+                                                    key={item.id}
+                                                    onClick={() => handleServiceSwap({ ...item, colorClass: group.colorClass })}
+                                                    className={`relative flex justify-between items-center p-4 rounded-xl cursor-pointer border bg-transparent transition-all ${isSelected && !isEditingMode ? 'border-brand-green' : 'border-brand-border dark:border-dark-border hover:border-gray-300 dark:hover:border-gray-600'}`}
+                                                >
+                                                    <div className={`absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full ${group.colorClass}`}></div>
+                                                    <div className="pl-4">
+                                                        <div className="font-bold text-brand-dark dark:text-dark-heading text-[15px] mb-1">{item.name}</div>
+                                                        <div className="text-xs text-brand-inactive-text">
+                                                            {item.pricingUnit === 'Por Serviço' ? `${item.duration} min` : item.pricingUnit}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-col items-end gap-2">
+                                                        {!isEditingMode && (
+                                                            <div className={`w-5 h-5 rounded-full border transition-colors flex items-center justify-center ${isSelected ? 'bg-brand-green border-brand-green' : 'border-gray-300 dark:border-gray-600'}`}>
+                                                                {isSelected && <CheckIcon size={12} className="text-white" strokeWidth={3} />}
+                                                            </div>
+                                                        )}
+                                                        <div className="font-bold text-brand-dark dark:text-dark-heading mt-2">R$ {item.price}</div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </motion.div>
+                    )}
+
+                    {/* CLIENT SELECTION (PLACEHOLDER FOR SelectCustomerSheet integration if needed here too) */}
+                    {currentView === 'client' && (
+                        <motion.div key="client" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
+                            <div className="flex flex-col gap-4">
+                                <Button
+                                    variant="outline"
+                                    className="h-16 w-full justify-between px-6 rounded-2xl border-dashed border-2"
+                                    onClick={() => setIsCustomerSheetOpen(true)}
+                                >
+                                    {selectedClient ? (
+                                        <div className="flex items-center gap-4">
+                                            <UserProfileImage
+                                                fullName={selectedClient.name}
+                                                imageUrl={selectedClient.avatar_url}
+                                                className="w-10 h-10"
+                                            />
+                                            <div className="text-left">
+                                                <p className="font-bold text-brand-dark dark:text-dark-heading">{selectedClient.name}</p>
+                                                <p className="text-xs text-brand-inactive-text">{selectedClient.email || 'Sem e-mail'}</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border flex items-center justify-center text-brand-inactive-text">
+                                                <PlusIcon size={20} />
+                                            </div>
+                                            <span className="font-bold text-brand-inactive-text">Selecionar Cliente</span>
+                                        </div>
+                                    )}
+                                    <ChevronRightIcon size={20} className="text-brand-inactive-text" />
+                                </Button>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* DATETIME SELECTION */}
+                    {currentView === 'datetime' && (
+                        <motion.div key="datetime" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
+                            {/* Staff Selection */}
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-sm font-bold text-brand-dark dark:text-dark-heading ml-1">Profissional</label>
+                                <Dropdown
+                                    width="w-full"
+                                    trigger={
+                                        <Button
+                                            variant="outline"
+                                            className="w-full h-14 rounded-xl"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <UserProfileImage
+                                                    fullName={getSelectedStaffName()}
+                                                    imageUrl={getSelectedStaffAvatar()}
+                                                    className="w-8 h-8"
+                                                />
+                                                <div className="text-left">
+                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{getSelectedStaffName()}</p>
+                                                    <p className="text-[10px] uppercase tracking-wider text-brand-inactive-text font-bold leading-tight">Membro da Equipe</p>
+                                                </div>
+                                            </div>
+                                        </Button>
+                                    }
+                                >
+                                    {staffSource.map(staff => (
+                                        <DropdownItem key={staff.id} onClick={() => setSelectedStaffId(staff.id)} className="gap-3">
+                                            <UserProfileImage fullName={staff.name} imageUrl={staff.avatar} className="w-6 h-6" />
+                                            <span className="font-medium">{staff.name}</span>
+                                        </DropdownItem>
+                                    ))}
+                                </Dropdown>
+                            </div>
+
+                            {needsRangePicker ? (
+                                /* RANGE PICKER FOR MULTI-DAY / HOURLY RENTALS */
+                                <div className="space-y-6">
+                                    <div className="p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl flex items-start gap-3">
+                                        <div className="mt-0.5"><ClockIcon size={16} className="text-blue-600 dark:text-blue-400" /></div>
+                                        <div>
+                                            <h4 className="text-sm font-bold text-blue-800 dark:text-blue-300 mb-1">Duração Variável</h4>
+                                            <p className="text-xs text-blue-700/80 dark:text-blue-300/80">Este serviço é cobrado por {selectedServices[0].pricingUnit.toLowerCase()}. Selecione o início e fim.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <div className="grid grid-cols-5 gap-2 items-end">
+                                            <div className="col-span-3">
+                                                <DatePicker
+                                                    label="Início"
+                                                    value={startDateRange}
+                                                    onChange={(date) => {
+                                                        const dateStr = formatDateStr(date);
+                                                        setStartDateRange(dateStr);
+                                                        if (endDateRange < dateStr) setEndDateRange(dateStr);
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="col-span-2">
+                                                <TimePicker
+                                                    value={startTimeRange}
+                                                    onChange={setStartTimeRange}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="flex justify-center -my-1 text-brand-inactive-text">
+                                            <ArrowRightIcon size={16} className="rotate-90 opacity-50" />
+                                        </div>
+
+                                        <div className="grid grid-cols-5 gap-2 items-end">
+                                            <div className="col-span-3">
+                                                <DatePicker
+                                                    label="Término"
+                                                    value={endDateRange}
+                                                    onChange={(date) => setEndDateRange(formatDateStr(date))}
+                                                />
+                                            </div>
+                                            <div className="col-span-2">
+                                                <TimePicker
+                                                    value={endTimeRange}
+                                                    onChange={setEndTimeRange}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border flex justify-between items-center bg-gray-50 dark:bg-zinc-900/50">
+                                        <span className="text-sm text-brand-inactive-text font-medium">Preço Estimado</span>
+                                        <span className="text-lg font-bold text-brand-dark dark:text-dark-heading">R$ {calculatedPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <div>
+                                        <div className="flex justify-between items-center mb-4 px-1">
+                                            <h3 className="font-bold text-brand-dark dark:text-dark-heading">Janeiro 2026</h3>
+                                            <div className="flex gap-4">
+                                                <button onClick={() => handleDateNav('prev')} className="text-brand-inactive-text hover:text-brand-dark"><ChevronLeftIcon size={16} /></button>
+                                                <button onClick={() => handleDateNav('next')} className="text-brand-dark dark:text-dark-heading"><ChevronRightIcon size={16} /></button>
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-between items-center text-center">
+                                            {dates.map((d, i) => (
+                                                <div key={i} className="flex flex-col gap-2 cursor-pointer group items-center" onClick={() => { }}>
+                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${d.active ? 'bg-brand-dark text-white' : 'text-brand-dark dark:text-dark-heading border border-gray-200 dark:border-gray-700 hover:border-brand-dark'}`}>
+                                                        {d.num}
+                                                    </div>
+                                                    <span className={`text-xs font-medium ${d.active ? 'text-brand-dark dark:text-dark-heading' : 'text-brand-inactive-text'}`}>{d.day}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <div className="flex justify-between items-center mb-4 px-1">
+                                            <h3 className="font-bold text-brand-dark dark:text-dark-heading">Horários disponíveis</h3>
+                                            <Button
+                                                variant="outline"
+                                                className="h-8"
+                                                leftIcon={<CalendarIcon size={12} />}
+                                                onClick={handleEnterSelectionMode}
+                                            >
+                                                Escolha no calendário
+                                            </Button>
+                                        </div>
+                                        <div className="space-y-3">
+                                            {timeSlots.map((slot, i) => (
+                                                <button
+                                                    key={i}
+                                                    onClick={() => setSelectedTimeSlot(slot)}
+                                                    className={`w-full p-3 rounded-xl border text-sm font-bold transition-all flex justify-between items-center ${selectedTimeSlot === slot ? 'border-brand-dark bg-brand-dark text-white' : 'border-brand-border dark:border-dark-border hover:border-gray-300 text-brand-dark dark:text-dark-heading'}`}
+                                                >
+                                                    {slot}
+                                                    {selectedTimeSlot === slot && <CheckIcon size={16} />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </motion.div>
+                    )}
+
+                    {/* VIEW: SUMMARY */}
+                    {currentView === 'summary' && (
+                        <motion.div key="summary" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+
+                            {/* Info Header Card - Adjusted for Ranges */}
+                            {headerDateObj && (
+                                <div className={`${getHeaderBgColor()} text-white rounded-2xl p-5 shadow-sm relative overflow-hidden transition-colors duration-300`}>
+                                    <div className="relative z-10 flex justify-between items-start">
+                                        <div>
+                                            <h2 className="text-xl font-bold mb-1">
+                                                {headerDateObj.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                            </h2>
+
+                                            <div className="text-sm opacity-90 font-medium">
+                                                {needsRangePicker ? (
+                                                    <span>{startTimeRange} - {endTimeRange} <span className="text-xs opacity-75">({formatDuration(calculatedDuration)})</span></span>
+                                                ) : (
+                                                    <span>{editTime || selectedTimeSlot} • {formatDuration(calculatedDuration)}</span>
+                                                )}
+                                            </div>
+
+                                            {/* Recurrence Indicator */}
+                                            {recurrenceText && (
+                                                <div className="flex items-center gap-2 text-xs opacity-90 mt-2 font-medium bg-white/20 w-fit px-2 py-1 rounded-lg backdrop-blur-sm">
+                                                    <RepeatIcon size={12} /> {recurrenceText}
+                                                </div>
+                                            )}
+                                        </div>
+                                        {/* Status Badge Dropdown */}
+                                        <Dropdown
+                                            width="w-40"
+                                            align="right"
+                                            showChevron={false}
+                                            trigger={
+                                                <button className="px-3 py-1.5 rounded-full border border-white/30 text-xs font-bold flex items-center gap-2 cursor-pointer bg-white/10 hover:bg-white/20 transition-colors">
+                                                    {status} <ChevronDownIcon size={12} />
+                                                </button>
+                                            }
+                                        >
+                                            <DropdownItem onClick={() => handleStatusChange('Reservado')}>Reservado</DropdownItem>
+                                            <DropdownItem onClick={() => handleStatusChange('Confirmado')}>Confirmado</DropdownItem>
+                                            <DropdownItem onClick={() => handleStatusChange('Aguardando')}>Aguardando</DropdownItem>
+                                            <DropdownItem onClick={() => handleStatusChange('Iniciado')}>Iniciado</DropdownItem>
+                                            <div className="h-px bg-gray-100 dark:bg-dark-border my-1"></div>
+                                            <DropdownItem onClick={() => handleStatusChange('Pago')}>Pago</DropdownItem>
+                                            <DropdownItem onClick={() => handleStatusChange('Pago Parcialmente')}>Pago Parcialmente</DropdownItem>
+                                            <DropdownItem onClick={() => handleStatusChange('Ausência')}>Ausência</DropdownItem>
+                                            <DropdownItem onClick={() => handleStatusChange('Cancelado')}>Cancelado</DropdownItem>
+                                        </Dropdown>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Client Section */}
+                            <div>
+                                <div className="flex justify-between items-center mb-3 px-1">
+                                    <h3 className="font-bold text-brand-dark dark:text-dark-heading">Cliente</h3>
+                                </div>
+                                {selectedClient && (
+                                    <div className="flex items-center justify-between py-2 px-1">
+                                        <div className="flex items-center gap-4">
+                                            <UserProfileImage
+                                                fullName={selectedClient.name}
+                                                imageUrl={selectedClient.avatar_url}
+                                                className="w-12 h-12"
+                                            />
+                                            <div>
+                                                <div className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">{selectedClient.name}</div>
+                                                <div className="text-xs text-brand-inactive-text">{selectedClient.email || 'Cliente'}</div>
+                                            </div>
+                                        </div>
+                                        <Button variant="link" className="font-bold" onClick={() => setIsCustomerSheetOpen(true)}>Alterar</Button>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="border-t border-brand-border dark:border-dark-border"></div>
+
+                            {/* Services Section */}
+                            <div>
+                                <div className="flex justify-between items-center mb-3 px-1">
+                                    <h3 className="font-bold text-brand-dark dark:text-dark-heading">Serviços</h3>
+                                </div>
+                                <div className="space-y-3">
+                                    {selectedServices.map((service, idx) => (
+                                        <ServiceItemCard
+                                            key={idx}
+                                            // Pass individual service start time for display
+                                            service={{ ...service, startTime: getServiceTimeRange(idx).split(' - ')[0] }}
+                                            onEdit={() => handleServiceEdit(idx)}
+                                            onRemove={() => handleRemoveServiceRequest(idx)}
+                                            // Pass formatted time range
+                                            timeRange={getServiceTimeRange(idx)}
+                                        />
+                                    ))}
+                                </div>
+                                <button
+                                    onClick={handleAddMoreService}
+                                    className="mt-4 text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2 hover:opacity-70 ml-1"
+                                >
+                                    <PlusIcon size={18} /> Adicionar serviço
+                                </button>
+                            </div>
+
+                            {/* Total Row */}
+                            <div className="flex justify-between items-end border-t border-brand-border dark:border-dark-border pt-4 px-1">
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-bold text-brand-inactive-text uppercase tracking-wider">Duração Total</span>
+                                    <span className="text-lg font-bold text-brand-dark dark:text-dark-heading">{formatDuration(calculatedDuration)}</span>
+                                </div>
+                                <div className="flex flex-col text-right">
+                                    <span className="text-[10px] font-bold text-brand-inactive-text uppercase tracking-wider">Valor Total</span>
+                                    <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(calculatedPrice)}</span>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {currentView === 'edit-service' && editingServiceIndex !== null && (
+                        <motion.div key="edit-service" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
+                            {/* Edit Service Content */}
+                            <div
+                                className="relative flex justify-between items-center p-4 rounded-xl border border-brand-border dark:border-dark-border bg-transparent cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+                                onClick={() => setCurrentView('services')}
+                            >
+                                <div className={`absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full ${selectedServices[editingServiceIndex].colorClass || 'bg-blue-500'}`}></div>
+                                <div className="pl-4 w-full">
+                                    <div className="flex justify-between items-center">
+                                        <h4 className="font-bold text-brand-dark dark:text-dark-heading text-[15px]">
+                                            {selectedServices[editingServiceIndex].name}
+                                        </h4>
+                                        <ChevronRightIcon size={16} className="text-brand-inactive-text" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <FormInput
+                                    label="Preço do serviço"
+                                    name="price"
+                                    prefix="BRL"
+                                    value={selectedServices[editingServiceIndex].price}
+                                    onChange={(e) => updateEditingService('price', Number(e.target.value))}
+                                />
+
+                                <FormInput
+                                    label="Duração (minutos)"
+                                    name="duration"
+                                    type="number"
+                                    value={selectedServices[editingServiceIndex].duration}
+                                    onChange={(e) => updateEditingService('duration', e.target.value)}
+                                />
+
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-sm font-bold text-brand-dark dark:text-dark-heading ml-1">Profissional</label>
+                                    <Dropdown
+                                        width="w-full"
+                                        showChevron={false}
+                                        trigger={
+                                            <Button
+                                                variant="outline"
+                                                className="w-full h-12 rounded-xl"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <UserProfileImage
+                                                        fullName={selectedServices[editingServiceIndex].staff}
+                                                        imageUrl={staffSource.find(s => s.id === selectedServices[editingServiceIndex].staffId)?.avatar}
+                                                        className="w-6 h-6"
+                                                    />
+                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{selectedServices[editingServiceIndex].staff}</span>
+                                                </div>
+                                            </Button>
+                                        }
+                                    >
+                                        {staffSource.map(staff => (
+                                            <DropdownItem key={staff.id} onClick={() => updateEditingService('staffId', staff.id)} className="gap-3">
+                                                <UserProfileImage fullName={staff.name} imageUrl={staff.avatar} className="w-6 h-6" />
+                                                <span className="font-medium">{staff.name}</span>
+                                            </DropdownItem>
+                                        ))}
+                                    </Dropdown>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* RECURRENCE VIEW */}
+                    {currentView === 'recurrence' && (
+                        <motion.div key="recurrence" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+                            <RecurrenceView
+                                frequency={recurrenceFreq}
+                                setFrequency={setRecurrenceFreq}
+                                termination={recurrenceTerm}
+                                setTermination={setRecurrenceTerm}
+                                endDate={recurrenceEndDate}
+                                setEndDate={setRecurrenceEndDate}
+                            />
+                            <div className="mt-8 flex justify-end">
+                                <Button variant="default" onClick={() => setCurrentView('summary')}>
+                                    Salvar Repetição
+                                </Button>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* ACTIVITY VIEW */}
+                    {currentView === 'activity' && (
+                        <motion.div key="activity" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+                            <ActivityLog activity={appointment?.activityLog} />
+                        </motion.div>
+                    )}
+
+                    {/* NOTES VIEW */}
+                    {currentView === 'notes' && (
+                        <motion.div key="notes" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+                            <div className="space-y-4">
+                                <FormTextarea
+                                    label="Notas Internas"
+                                    name="notes"
+                                    rows={8}
+                                    placeholder="Adicione notas sobre o agendamento..."
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                />
+                                <div className="flex justify-end">
+                                    <Button variant="default" className="px-6" onClick={() => setCurrentView('summary')}>
+                                        Salvar Nota
+                                    </Button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+
+                </AnimatePresence>
+            </div>
+
+            {/* Footer Actions */}
+            {currentView !== 'activity' && currentView !== 'recurrence' && currentView !== 'notes' && (
+                !(currentView === 'services' && editingServiceIndex !== null) && (
+                    <div className="absolute bottom-0 left-0 w-full bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-6 z-20">
+                        {mode === 'create' || currentView === 'edit-service' ? (
+                            <div className="flex gap-3">
+                                {currentView !== 'services' && (
+                                    <Button variant="outline" className="flex-1 h-[48px] rounded-xl" onClick={handleBack}>
+                                        Voltar
+                                    </Button>
+                                )}
+                                <Button
+                                    variant="default"
+                                    className={`flex-1 h-[48px] rounded-xl font-bold ${currentView === 'services' && selectedServices.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    onClick={currentView === 'edit-service' ? () => setCurrentView('summary') : handleNext}
+                                    disabled={currentView === 'services' && selectedServices.length === 0}
+                                >
+                                    {currentView === 'summary' || (currentView === 'datetime' && (selectedTimeSlot || needsRangePicker)) ? <span className="flex items-center gap-2">Agendar <CheckCircleIcon size={18} /></span> : currentView === 'edit-service' ? 'Aplicar' : 'Próximo'}
+                                </Button>
+                            </div>
+                        ) : (
+                            /* VIEW MODE FOOTER */
+                            <div className="flex gap-3">
+                                <Dropdown
+                                    align="left"
+                                    width="w-56"
+                                    showChevron={false}
+                                    trigger={
+                                        <Button variant="outline" className="h-[48px] w-12 p-0 rounded-xl">
+                                            <MoreHorizontalIcon size={20} />
+                                        </Button>
+                                    }
+                                >
+                                    <DropdownItem onClick={() => setCurrentView('notes')} className="gap-3 font-medium"><FileIcon size={16} /> Notas</DropdownItem>
+                                    <DropdownItem onClick={() => setCurrentView('recurrence')} className="gap-3 font-medium"><RepeatIcon size={16} /> Editar repetição</DropdownItem>
+                                    <DropdownItem onClick={() => setCurrentView('activity')} className="gap-3 font-medium"><ClockIcon size={16} /> Ver histórico</DropdownItem>
+                                    <div className="h-px bg-gray-100 dark:bg-dark-border my-1"></div>
+                                    {isPaid && (
+                                        <DropdownItem onClick={onViewSale} className="gap-3 font-medium"><ShoppingBagIcon size={16} /> Ver venda</DropdownItem>
+                                    )}
+                                    <DropdownItem className="gap-3 font-medium"><EditIcon size={16} /> Editar</DropdownItem>
+                                    <div className="h-px bg-gray-100 dark:bg-dark-border my-1"></div>
+                                    <DropdownItem onClick={() => handleStatusChange('Cancelado')} className="gap-3 font-medium text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"><XIcon size={16} /> Cancelar</DropdownItem>
+                                </Dropdown>
+
+                                <Button
+                                    variant="default"
+                                    className="flex-1 h-[48px] rounded-xl font-bold"
+                                    onClick={handleSaveChanges}
+                                >
+                                    <SaveIcon size={18} className="mr-2" /> Salvar Alterações
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                )
+            )}
+        </div>
+    );
+
     return (
         <>
             <AlertModal
@@ -645,523 +1205,32 @@ export const AppointmentSheet = ({
                 variant="danger"
                 isDestructive
             />
-            <div className="fixed inset-0 z-[60] flex justify-end">
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCloseAttempt} />
-                <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className="relative w-full max-w-md bg-white dark:bg-dark-surface shadow-2xl flex flex-col h-full overflow-hidden">
-                    <div className="p-6 border-b border-brand-border dark:border-dark-border flex justify-between items-center bg-white dark:bg-dark-surface z-20">
-                        <div className="flex items-center gap-3">
-                            <button onClick={handleBack} className="p-2 -ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-dark-border transition-colors">
-                                {currentView === 'summary' && mode === 'view' ? <XIcon size={20} className="text-brand-dark dark:text-dark-heading" /> : <ChevronLeftIcon size={20} className="text-brand-dark dark:text-dark-heading" />}
-                            </button>
-                            <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
-                                {getHeaderTitle()}
-                            </h2>
-                            <span className="text-sm font-medium text-brand-inactive-text">{formattedHeaderDate}</span>
-                        </div>
 
-                        <button onClick={handleCloseAttempt} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-dark-border transition-colors">
-                            <XIcon size={24} className="text-brand-inactive-text dark:text-dark-body" />
-                        </button>
-                    </div>
+            <SelectCustomerSheet
+                isOpen={isCustomerSheetOpen}
+                onClose={() => setIsCustomerSheetOpen(false)}
+                onSelect={(customer) => {
+                    setSelectedClient(customer);
+                    setIsCustomerSheetOpen(false);
+                    if (currentView === 'client') handleNext();
+                }}
+                partnerId={appointment?.partnerId || ""}
+                selectedCustomerId={selectedClient?.id}
+                title="Selecionar Cliente"
+            />
 
-                    {/* Content Area */}
-                    <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-32 relative">
-                        <AnimatePresence mode='wait'>
-                            {/* SERVICE SELECTION */}
-                            {currentView === 'services' && (
-                                <motion.div key="services" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
-                                    {/* ... Service Selection UI ... */}
-                                    <div className="relative">
-                                        <SearchIcon size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-inactive-text" />
-                                        <input type="text" placeholder="Buscar serviço" className="w-full h-[42px] pl-10 pr-4 rounded-lg border border-brand-border dark:border-dark-border bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-brand-dark dark:focus:ring-dark-heading transition-all" />
-                                    </div>
-                                    {servicesSource.map((group, idx) => (
-                                        <div key={idx}>
-                                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">{group.category}</h3>
-                                            <div className="space-y-3">
-                                                {group.items.map((item: any) => {
-                                                    const isSelected = selectedServices.some(s => s.id === item.id);
-                                                    const isEditingMode = editingServiceIndex !== null;
-
-                                                    return (
-                                                        <div
-                                                            key={item.id}
-                                                            onClick={() => handleServiceSwap({ ...item, colorClass: group.colorClass })}
-                                                            className={`relative flex justify-between items-center p-4 rounded-xl cursor-pointer border bg-transparent transition-all ${isSelected && !isEditingMode ? 'border-brand-green' : 'border-brand-border dark:border-dark-border hover:border-gray-300 dark:hover:border-gray-600'}`}
-                                                        >
-                                                            <div className={`absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full ${group.colorClass}`}></div>
-                                                            <div className="pl-4">
-                                                                <div className="font-bold text-brand-dark dark:text-dark-heading text-[15px] mb-1">{item.name}</div>
-                                                                <div className="text-xs text-brand-inactive-text">
-                                                                    {item.pricingUnit === 'Por Serviço' ? `${item.duration} min` : item.pricingUnit}
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex flex-col items-end gap-2">
-                                                                {!isEditingMode && (
-                                                                    <div className={`w-5 h-5 rounded-full border transition-colors flex items-center justify-center ${isSelected ? 'bg-brand-green border-brand-green' : 'border-gray-300 dark:border-gray-600'}`}>
-                                                                        {isSelected && <CheckIcon size={12} className="text-white" strokeWidth={3} />}
-                                                                    </div>
-                                                                )}
-                                                                <div className="font-bold text-brand-dark dark:text-dark-heading mt-2">R$ {item.price}</div>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </motion.div>
-                            )}
-
-                            {/* CLIENT SELECTION */}
-                            {currentView === 'client' && (
-                                <motion.div key="client" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
-                                    <FormInput label="" name="clientSearch" placeholder="Pesquisar cliente (nome, email, telefone)" prefix={<SearchIcon size={18} className="text-brand-inactive-text" />} autoFocus />
-                                    <div className="space-y-2">
-                                        <button className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors text-left group">
-                                            <div className="w-12 h-12 rounded-full bg-[#f3e8ff] dark:bg-[#3b0764]/50 flex items-center justify-center text-[#7c3aed] dark:text-[#d8b4fe]"><PlusIcon size={24} /></div>
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading">Cadastrar novo cliente</span>
-                                        </button>
-                                        <div className="border-t border-brand-border dark:border-dark-border my-2"></div>
-                                        {clientsSource.map(client => (
-                                            <button key={client.id} onClick={() => { setSelectedClient(client); handleNext(); }} className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors text-left group">
-                                                <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-lg font-bold text-gray-600 dark:text-gray-300">{client.name.charAt(0)}</div>
-                                                <div>
-                                                    <div className="font-bold text-brand-dark dark:text-dark-heading">{client.name}</div>
-                                                    <div className="text-sm text-brand-inactive-text">{client.email}</div>
-                                                </div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </motion.div>
-                            )}
-
-                            {/* DATETIME SELECTION */}
-                            {currentView === 'datetime' && (
-                                <motion.div key="datetime" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
-                                    {/* Staff Selection */}
-                                    <Dropdown
-                                        width="w-full"
-                                        trigger={
-                                            <Button
-                                                variant="outline"
-                                                className="w-full justify-between items-center bg-white dark:bg-dark-surface h-14 px-4 rounded-xl border border-brand-border dark:border-dark-border hover:border-brand-dark transition-colors"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <img src={getSelectedStaffAvatar() || "https://i.pravatar.cc/150?u=20"} className="w-8 h-8 rounded-full object-cover" />
-                                                    <div className="text-left">
-                                                        <p className="text-[10px] uppercase tracking-wider text-brand-inactive-text font-bold leading-tight">Profissional</p>
-                                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{getSelectedStaffName()}</p>
-                                                    </div>
-                                                </div>
-                                            </Button>
-                                        }
-                                    >
-                                        {staffSource.map(staff => (
-                                            <DropdownItem key={staff.id} onClick={() => setSelectedStaffId(staff.id)} className="gap-2">
-                                                <img src={staff.avatar} className="w-6 h-6 rounded-full" /> {staff.name}
-                                            </DropdownItem>
-                                        ))}
-                                    </Dropdown>
-
-                                    {needsRangePicker ? (
-                                        /* RANGE PICKER FOR MULTI-DAY / HOURLY RENTALS */
-                                        <div className="space-y-6">
-                                            <div className="p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl flex items-start gap-3">
-                                                <div className="mt-0.5"><ClockIcon size={16} className="text-blue-600 dark:text-blue-400" /></div>
-                                                <div>
-                                                    <h4 className="text-sm font-bold text-blue-800 dark:text-blue-300 mb-1">Duração Variável</h4>
-                                                    <p className="text-xs text-blue-700/80 dark:text-blue-300/80">Este serviço é cobrado por {selectedServices[0].pricingUnit.toLowerCase()}. Selecione o início e fim.</p>
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-1 gap-4">
-                                                <div className="grid grid-cols-5 gap-2 items-end">
-                                                    <div className="col-span-3">
-                                                        <DatePicker
-                                                            label="Início"
-                                                            value={startDateRange}
-                                                            onChange={(date) => {
-                                                                const dateStr = formatDateStr(date);
-                                                                setStartDateRange(dateStr);
-                                                                if (endDateRange < dateStr) setEndDateRange(dateStr);
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <div className="col-span-2">
-                                                        <TimePicker
-                                                            value={startTimeRange}
-                                                            onChange={setStartTimeRange}
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex justify-center -my-1 text-brand-inactive-text">
-                                                    <ArrowRightIcon size={16} className="rotate-90 opacity-50" />
-                                                </div>
-
-                                                <div className="grid grid-cols-5 gap-2 items-end">
-                                                    <div className="col-span-3">
-                                                        <DatePicker
-                                                            label="Término"
-                                                            value={endDateRange}
-                                                            onChange={(date) => setEndDateRange(formatDateStr(date))}
-                                                        />
-                                                    </div>
-                                                    <div className="col-span-2">
-                                                        <TimePicker
-                                                            value={endTimeRange}
-                                                            onChange={setEndTimeRange}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border flex justify-between items-center bg-gray-50 dark:bg-zinc-900/50">
-                                                <span className="text-sm text-brand-inactive-text font-medium">Preço Estimado</span>
-                                                <span className="text-lg font-bold text-brand-dark dark:text-dark-heading">R$ {calculatedPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <div>
-                                                <div className="flex justify-between items-center mb-4 px-1">
-                                                    <h3 className="font-bold text-brand-dark dark:text-dark-heading">Janeiro 2026</h3>
-                                                    <div className="flex gap-4">
-                                                        <button onClick={() => handleDateNav('prev')} className="text-brand-inactive-text hover:text-brand-dark"><ChevronLeftIcon size={16} /></button>
-                                                        <button onClick={() => handleDateNav('next')} className="text-brand-dark dark:text-dark-heading"><ChevronRightIcon size={16} /></button>
-                                                    </div>
-                                                </div>
-                                                <div className="flex justify-between items-center text-center">
-                                                    {dates.map((d, i) => (
-                                                        <div key={i} className="flex flex-col gap-2 cursor-pointer group items-center" onClick={() => { }}>
-                                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${d.active ? 'bg-brand-dark text-white' : 'text-brand-dark dark:text-dark-heading border border-gray-200 dark:border-gray-700 hover:border-brand-dark'}`}>
-                                                                {d.num}
-                                                            </div>
-                                                            <span className={`text-xs font-medium ${d.active ? 'text-brand-dark dark:text-dark-heading' : 'text-brand-inactive-text'}`}>{d.day}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            <div>
-                                                <div className="flex justify-between items-center mb-4 px-1">
-                                                    <h3 className="font-bold text-brand-dark dark:text-dark-heading">Horários disponíveis</h3>
-                                                    <Button
-                                                        variant="outline"
-                                                        className="h-8 text-xs gap-2 rounded-full border-brand-border dark:border-dark-border"
-                                                        leftIcon={<CalendarIcon size={12} />}
-                                                        onClick={handleEnterSelectionMode}
-                                                    >
-                                                        Escolha no calendário
-                                                    </Button>
-                                                </div>
-                                                <div className="space-y-3">
-                                                    {timeSlots.map((slot, i) => (
-                                                        <button
-                                                            key={i}
-                                                            onClick={() => setSelectedTimeSlot(slot)}
-                                                            className={`w-full p-3 rounded-xl border text-sm font-bold transition-all flex justify-between items-center ${selectedTimeSlot === slot ? 'border-brand-dark bg-brand-dark text-white' : 'border-brand-border dark:border-dark-border hover:border-gray-300 text-brand-dark dark:text-dark-heading'}`}
-                                                        >
-                                                            {slot}
-                                                            {selectedTimeSlot === slot && <CheckIcon size={16} />}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </>
-                                    )}
-                                </motion.div>
-                            )}
-
-                            {/* VIEW: SUMMARY */}
-                            {currentView === 'summary' && (
-                                <motion.div key="summary" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
-
-                                    {/* Info Header Card - Adjusted for Ranges */}
-                                    {headerDateObj && (
-                                        <div className={`${getHeaderBgColor()} text-white rounded-2xl p-5 shadow-sm relative overflow-hidden transition-colors duration-300`}>
-                                            <div className="relative z-10 flex justify-between items-start">
-                                                <div>
-                                                    <h2 className="text-xl font-bold mb-1">
-                                                        {headerDateObj.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' })}
-                                                    </h2>
-
-                                                    <div className="text-sm opacity-90 font-medium">
-                                                        {needsRangePicker ? (
-                                                            <span>{startTimeRange} - {endTimeRange} <span className="text-xs opacity-75">({formatDuration(calculatedDuration)})</span></span>
-                                                        ) : (
-                                                            <span>{editTime || selectedTimeSlot} • {formatDuration(calculatedDuration)}</span>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Recurrence Indicator */}
-                                                    {recurrenceText && (
-                                                        <div className="flex items-center gap-2 text-xs opacity-90 mt-2 font-medium bg-white/20 w-fit px-2 py-1 rounded-lg backdrop-blur-sm">
-                                                            <RepeatIcon size={12} /> {recurrenceText}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                {/* Status Badge Dropdown */}
-                                                <Dropdown
-                                                    width="w-40"
-                                                    align="right"
-                                                    showChevron={false}
-                                                    trigger={
-                                                        <button className="px-3 py-1.5 rounded-full border border-white/30 text-xs font-bold flex items-center gap-2 cursor-pointer bg-white/10 hover:bg-white/20 transition-colors">
-                                                            {status} <ChevronDownIcon size={12} />
-                                                        </button>
-                                                    }
-                                                >
-                                                    <DropdownItem onClick={() => handleStatusChange('Reservado')}>Reservado</DropdownItem>
-                                                    <DropdownItem onClick={() => handleStatusChange('Confirmado')}>Confirmado</DropdownItem>
-                                                    <DropdownItem onClick={() => handleStatusChange('Aguardando')}>Aguardando</DropdownItem>
-                                                    <DropdownItem onClick={() => handleStatusChange('Iniciado')}>Iniciado</DropdownItem>
-                                                    <div className="h-px bg-gray-100 dark:bg-dark-border my-1"></div>
-                                                    <DropdownItem onClick={() => handleStatusChange('Pago')}>Pago</DropdownItem>
-                                                    <DropdownItem onClick={() => handleStatusChange('Pago Parcialmente')}>Pago Parcialmente</DropdownItem>
-                                                    <DropdownItem onClick={() => handleStatusChange('Ausência')}>Ausência</DropdownItem>
-                                                    <DropdownItem onClick={() => handleStatusChange('Cancelado')}>Cancelado</DropdownItem>
-                                                </Dropdown>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Client Section */}
-                                    <div>
-                                        <div className="flex justify-between items-center mb-3 px-1">
-                                            <h3 className="font-bold text-brand-dark dark:text-dark-heading">Cliente</h3>
-                                        </div>
-                                        {selectedClient && (
-                                            <div className="flex items-center justify-between py-2">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 font-bold text-lg">
-                                                        {selectedClient.name.charAt(0)}
-                                                    </div>
-                                                    <div>
-                                                        <div className="font-bold text-sm text-brand-dark dark:text-dark-heading">{selectedClient.name}</div>
-                                                        <div className="text-xs text-brand-inactive-text">Cliente</div>
-                                                    </div>
-                                                </div>
-                                                <Button variant="link">Alterar</Button>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="border-t border-brand-border dark:border-dark-border"></div>
-
-                                    {/* Services Section */}
-                                    <div>
-                                        <div className="flex justify-between items-center mb-3 px-1">
-                                            <h3 className="font-bold text-brand-dark dark:text-dark-heading">Serviços</h3>
-                                        </div>
-                                        <div className="space-y-3">
-                                            {selectedServices.map((service, idx) => (
-                                                <ServiceItemCard
-                                                    key={idx}
-                                                    // Pass individual service start time for display
-                                                    service={{ ...service, startTime: getServiceTimeRange(idx).split(' - ')[0] }}
-                                                    onEdit={() => handleServiceEdit(idx)}
-                                                    onRemove={() => handleRemoveServiceRequest(idx)}
-                                                    // Pass formatted time range
-                                                    timeRange={getServiceTimeRange(idx)}
-                                                />
-                                            ))}
-                                        </div>
-                                        <button
-                                            onClick={handleAddMoreService}
-                                            className="mt-4 text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1 hover:opacity-70"
-                                        >
-                                            <PlusIcon size={16} /> Adicionar serviço
-                                        </button>
-                                    </div>
-
-                                    {/* Total Row */}
-                                    <div className="flex justify-between items-end border-t border-brand-border dark:border-dark-border pt-4">
-                                        <div className="flex flex-col">
-                                            <span className="text-xs font-medium text-brand-inactive-text uppercase tracking-wide">Duração Total</span>
-                                            <span className="text-lg font-bold text-brand-dark dark:text-dark-heading">{formatDuration(calculatedDuration)}</span>
-                                        </div>
-                                        <div className="flex flex-col text-right">
-                                            <span className="text-xs font-medium text-brand-inactive-text uppercase tracking-wide">Valor Total</span>
-                                            <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(calculatedPrice)}</span>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            )}
-
-                            {currentView === 'edit-service' && editingServiceIndex !== null && (
-                                <motion.div key="edit-service" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
-                                    {/* Edit Service Content */}
-                                    <div
-                                        className="relative flex justify-between items-center p-4 rounded-xl border border-brand-border dark:border-dark-border bg-transparent cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
-                                        onClick={() => setCurrentView('services')}
-                                    >
-                                        <div className={`absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full ${selectedServices[editingServiceIndex].colorClass || 'bg-blue-500'}`}></div>
-                                        <div className="pl-4 w-full">
-                                            <div className="flex justify-between items-center">
-                                                <h4 className="font-bold text-brand-dark dark:text-dark-heading text-[15px]">
-                                                    {selectedServices[editingServiceIndex].name}
-                                                </h4>
-                                                <ChevronRightIcon size={16} className="text-brand-inactive-text" />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <FormInput
-                                            label="Preço do serviço"
-                                            name="price"
-                                            prefix="BRL"
-                                            value={selectedServices[editingServiceIndex].price}
-                                            onChange={(e) => updateEditingService('price', Number(e.target.value))}
-                                        />
-
-                                        <FormInput
-                                            label="Duração (minutos)"
-                                            name="duration"
-                                            type="number"
-                                            value={selectedServices[editingServiceIndex].duration}
-                                            onChange={(e) => updateEditingService('duration', e.target.value)}
-                                        />
-
-                                        <div className="flex flex-col gap-1.5">
-                                            <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Profissional</label>
-                                            <Dropdown
-                                                width="w-full"
-                                                showChevron={false}
-                                                trigger={
-                                                    <Button
-                                                        variant="outline"
-                                                        className="w-full justify-between items-center bg-white dark:bg-dark-surface h-[42px] px-3 rounded-lg border border-brand-border dark:border-dark-border hover:border-brand-dark transition-colors"
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <img src={staffSource.find(s => s.id === selectedServices[editingServiceIndex].staffId)?.avatar || "https://i.pravatar.cc/150?u=20"} className="w-6 h-6 rounded-full object-cover" />
-                                                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{selectedServices[editingServiceIndex].staff}</span>
-                                                        </div>
-                                                    </Button>
-                                                }
-                                            >
-                                                {staffSource.map(staff => (
-                                                    <DropdownItem key={staff.id} onClick={() => updateEditingService('staffId', staff.id)} className="gap-2">
-                                                        <img src={staff.avatar} className="w-6 h-6 rounded-full" /> {staff.name}
-                                                    </DropdownItem>
-                                                ))}
-                                            </Dropdown>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            )}
-
-                            {/* RECURRENCE VIEW */}
-                            {currentView === 'recurrence' && (
-                                <motion.div key="recurrence" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                                    <RecurrenceView
-                                        frequency={recurrenceFreq}
-                                        setFrequency={setRecurrenceFreq}
-                                        termination={recurrenceTerm}
-                                        setTermination={setRecurrenceTerm}
-                                        endDate={recurrenceEndDate}
-                                        setEndDate={setRecurrenceEndDate}
-                                    />
-                                    <div className="mt-8 flex justify-end">
-                                        <Button variant="default" onClick={() => setCurrentView('summary')}>
-                                            Salvar Repetição
-                                        </Button>
-                                    </div>
-                                </motion.div>
-                            )}
-
-                            {/* ACTIVITY VIEW */}
-                            {currentView === 'activity' && (
-                                <motion.div key="activity" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                                    <ActivityLog activity={appointment?.activityLog} />
-                                </motion.div>
-                            )}
-
-                            {/* NOTES VIEW */}
-                            {currentView === 'notes' && (
-                                <motion.div key="notes" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                                    <div className="space-y-4">
-                                        <FormTextarea
-                                            label="Notas Internas"
-                                            name="notes"
-                                            rows={8}
-                                            placeholder="Adicione notas sobre o agendamento..."
-                                            value={notes}
-                                            onChange={(e) => setNotes(e.target.value)}
-                                        />
-                                        <div className="flex justify-end">
-                                            <Button variant="default" className="px-6" onClick={() => setCurrentView('summary')}>
-                                                Salvar Nota
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            )}
-
-                        </AnimatePresence>
-                    </div>
-
-                    {/* Footer Actions */}
-                    {currentView !== 'activity' && currentView !== 'recurrence' && currentView !== 'notes' && (
-                        !(currentView === 'services' && editingServiceIndex !== null) && (
-                            <div className="absolute bottom-0 left-0 w-full bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-6 z-20">
-                                {mode === 'create' || currentView === 'edit-service' ? (
-                                    <div className="flex gap-3">
-                                        {currentView !== 'services' && (
-                                            <Button variant="outline" className="flex-1 h-[48px] rounded-xl font-bold" onClick={handleBack}>
-                                                Voltar
-                                            </Button>
-                                        )}
-                                        <Button
-                                            variant="default"
-                                            className={`flex-1 h-[48px] rounded-xl font-bold bg-black text-white hover:bg-gray-900 dark:bg-white dark:text-black dark:hover:bg-gray-200 ${currentView === 'services' && selectedServices.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                            onClick={currentView === 'edit-service' ? () => setCurrentView('summary') : handleNext}
-                                            disabled={currentView === 'services' && selectedServices.length === 0}
-                                        >
-                                            {currentView === 'summary' || (currentView === 'datetime' && (selectedTimeSlot || needsRangePicker)) ? <span className="flex items-center gap-2">Agendar <CheckCircleIcon size={18} /></span> : currentView === 'edit-service' ? 'Aplicar' : 'Próximo'}
-                                        </Button>
-                                    </div>
-                                ) : (
-                                    /* VIEW MODE FOOTER */
-                                    <div className="flex gap-3">
-                                        <Dropdown
-                                            align="left"
-                                            width="w-56"
-                                            showChevron={false}
-                                            trigger={
-                                                <Button variant="outline" className="w-[48px] h-[48px] rounded-xl flex items-center justify-center p-0">
-                                                    <MoreHorizontalIcon size={20} />
-                                                </Button>
-                                            }
-                                        >
-                                            <DropdownItem onClick={() => setCurrentView('notes')} className="gap-2"><FileIcon size={14} /> Notas</DropdownItem>
-                                            <DropdownItem onClick={() => setCurrentView('recurrence')} className="gap-2"><RepeatIcon size={14} /> Editar repetição</DropdownItem>
-                                            <DropdownItem onClick={() => setCurrentView('activity')} className="gap-2"><ClockIcon size={14} /> Ver histórico</DropdownItem>
-                                            <div className="h-px bg-gray-100 dark:bg-dark-border my-1"></div>
-                                            {isPaid && (
-                                                <DropdownItem onClick={onViewSale} className="gap-2"><ShoppingBagIcon size={14} /> Ver venda</DropdownItem>
-                                            )}
-                                            <DropdownItem className="gap-2 text-brand-dark"><EditIcon size={14} /> Editar</DropdownItem>
-                                            <div className="h-px bg-gray-100 dark:bg-dark-border my-1"></div>
-                                            <DropdownItem onClick={() => handleStatusChange('Cancelado')} className="gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"><XIcon size={14} /> Cancelar</DropdownItem>
-                                        </Dropdown>
-
-                                        <Button
-                                            variant="default"
-                                            className="flex-1 h-[48px] rounded-xl font-bold bg-brand-dark text-white hover:bg-black"
-                                            onClick={handleSaveChanges}
-                                        >
-                                            <SaveIcon size={18} className="mr-2" /> Salvar
-                                        </Button>
-                                    </div>
-                                )}
-                            </div>
-                        )
-                    )}
-                </motion.div>
-            </div>
+            {isMobile ? (
+                <BottomSheet isOpen={true} onClose={handleCloseAttempt}>
+                    {SheetContent}
+                </BottomSheet>
+            ) : (
+                <div className="fixed inset-0 z-[60] flex justify-end">
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCloseAttempt} />
+                    <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className="relative w-full max-w-md">
+                        {SheetContent}
+                    </motion.div>
+                </div>
+            )}
         </>
     )
 }

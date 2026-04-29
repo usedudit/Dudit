@@ -9,9 +9,8 @@ import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useStore } from "@/lib/store-context"
 import { useSidebar } from "@/lib/sidebar-context"
 import { createServiceAction, updateServiceAction, deleteServiceAction } from "@/app/actions/erp/services"
-import { createCategoryAction } from "@/app/actions/erp/product-metadata"
+import { createServiceCategoryAction, getServiceMetadataAction } from "@/app/actions/erp/service-metadata"
 import { generateSKUBase } from "@/lib/utils/code-generators"
-import { useProductMetadata } from "@/lib/product-metadata-context"
 import { useNotification } from "@/hooks/use-notification"
 import { usePermissions } from "@/lib/permission-context"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
@@ -133,21 +132,30 @@ export const AddServicePage: FC<AddServicePageProps> = ({
 
     const [activeTab, setActiveTab] = useState("general")
 
-    const { metadata, loadMetadata, refreshMetadata } = useProductMetadata()
+    const [categories, setCategories] = useState<any[]>([])
+
+    const loadCategories = useCallback(async () => {
+        if (!partnerId) return
+        const res = await getServiceMetadataAction(partnerId)
+        if (res.success && res.data) {
+            setCategories(res.data.categories)
+        }
+    }, [partnerId])
+
     useEffect(() => {
-        if (partnerId) loadMetadata(partnerId)
-    }, [partnerId, loadMetadata])
+        loadCategories()
+    }, [loadCategories])
 
     const categoryOptions = useMemo(() =>
-        metadata.categories.filter(c => !c.parent_id).map(c => ({ value: c.id, label: c.name })),
-        [metadata.categories])
+        categories.filter(c => !c.parent_id).map(c => ({ value: c.id, label: c.name })),
+        [categories])
 
     const subCategoryOptions = useMemo(() => {
         if (!serviceData.category_id) return []
-        return metadata.categories
+        return categories
             .filter(c => c.parent_id === serviceData.category_id)
             .map(c => ({ value: c.id, label: c.name }))
-    }, [metadata.categories, serviceData.category_id])
+    }, [categories, serviceData.category_id])
 
     const [metadataModal, setMetadataModal] = useState<{
         isOpen: boolean,
@@ -173,17 +181,17 @@ export const AddServicePage: FC<AddServicePageProps> = ({
         try {
             let result: any
             if (metadataModal.type === "category") {
-                result = await createCategoryAction({ partnerId, name: metadataModal.name })
+                result = await createServiceCategoryAction({ partnerId, name: metadataModal.name })
                 if (result.success) setServiceData((prev: any) => ({ ...prev, category_id: result.data.id }))
             } else if (metadataModal.type === "subcategory") {
-                result = await createCategoryAction({ partnerId, name: metadataModal.name, parentId: metadataModal.parentId })
+                result = await createServiceCategoryAction({ partnerId, name: metadataModal.name, parentId: metadataModal.parentId })
                 if (result.success) setServiceData((prev: any) => ({ ...prev, subcategory_id: result.data.id }))
             }
 
             if (result.success) {
                 notifySuccess(`${metadataModal.type === "subcategory" ? "Subcategoria" : "Categoria"} adicionada com sucesso!`)
-                await refreshMetadata(partnerId)
-                setMetadataModal({ isOpen: false, type: null, name: "", isSaving: false })
+                await loadCategories()
+                setMetadataModal({ isOpen: false, type: null, name: "", parentId: null, isSaving: false })
             } else {
                 notifyError(result.error || "Erro ao salvar")
             }
