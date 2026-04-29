@@ -1,8 +1,9 @@
 
+
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
-import { Dropdown, DropdownItem, Button } from '../../reusable';
+import { Dropdown, DropdownItem, Button, DatePicker } from '../../reusable';
 
 export const TopSelectionBar = ({ onClose, onViewSheet }: { onClose: () => void, onViewSheet: () => void }) => {
     return (
@@ -43,17 +44,6 @@ export const RecurrenceView = ({
     endDate, 
     setEndDate 
 }: RecurrenceViewProps) => {
-    
-    // Mock Calendar Data for "Janeiro 2026" based on image
-    const days = [
-        ['', '', '', 1, 2, 3, 4],
-        [5, 6, 7, 8, 9, 10, 11],
-        [12, 13, 14, 15, 16, 17, 18],
-        [19, 20, 21, 22, 23, 24, 25],
-        [26, 27, 28, 29, 30, 31, '']
-    ];
-
-    const selectedDay = endDate.getDate();
 
     return (
         <div className="space-y-6">
@@ -95,7 +85,6 @@ export const RecurrenceView = ({
                         <DropdownItem onClick={() => setTermination('Nunca')}>Nunca</DropdownItem>
                         <DropdownItem onClick={() => setTermination('Data específica')}>Data específica</DropdownItem>
                         <div className="h-px bg-gray-100 dark:bg-dark-border my-1"></div>
-                        {/* Mock options matching screenshot style */}
                         {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 20, 25, 30].map(num => (
                             <DropdownItem key={num} onClick={() => setTermination(`Após ${num} ocorrências`)}>
                                 Após {num} ocorrências
@@ -105,48 +94,15 @@ export const RecurrenceView = ({
                 </div>
             )}
 
-            {/* Show Calendar only if "Data específica" is selected */}
+            {/* Show DatePicker only if "Data específica" is selected */}
             {frequency !== 'Não se repete' && termination === 'Data específica' && (
                 <div className="flex flex-col gap-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Selecionar data</label>
-                    <div className="border border-brand-border dark:border-dark-border rounded-xl p-4 bg-white dark:bg-dark-surface shadow-sm w-full max-w-xs">
-                        <div className="flex items-center justify-between mb-4">
-                            <button className="p-1 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"><ChevronLeft size={16}/></button>
-                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Janeiro 2026</span>
-                            <button className="p-1 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"><ChevronRight size={16}/></button>
-                        </div>
-                        <div className="grid grid-cols-7 gap-1 text-center text-xs text-brand-inactive-text mb-2 capitalize">
-                            <span>segunda</span><span>terça</span><span>quarta</span><span>quinta</span><span>sexta</span><span>sábado</span><span>domingo</span>
-                        </div>
-                        <div className="grid grid-cols-7 gap-y-2 gap-x-1 text-center text-sm">
-                            {days.map((week, wIdx) => (
-                                <React.Fragment key={wIdx}>
-                                    {week.map((d, dIdx) => (
-                                        <div key={`${wIdx}-${dIdx}`} className="flex items-center justify-center">
-                                            {d ? (
-                                                <button 
-                                                    onClick={() => {
-                                                        const newDate = new Date(endDate);
-                                                        newDate.setDate(d as number);
-                                                        setEndDate(newDate);
-                                                    }}
-                                                    className={`
-                                                        w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200
-                                                        ${d === selectedDay 
-                                                            ? 'border border-gray-300 dark:border-gray-600 font-bold text-brand-dark dark:text-dark-heading shadow-sm' 
-                                                            : 'text-brand-dark dark:text-dark-heading hover:bg-gray-100 dark:hover:bg-zinc-800'
-                                                        }
-                                                    `}
-                                                >
-                                                    {d}
-                                                </button>
-                                            ) : <div className="w-8 h-8"></div>}
-                                        </div>
-                                    ))}
-                                </React.Fragment>
-                            ))}
-                        </div>
-                    </div>
+                    <DatePicker
+                        label="Selecionar data"
+                        value={endDate}
+                        onChange={(date: Date) => setEndDate(date)}
+                        mode="single"
+                    />
                 </div>
             )}
         </div>

@@ -208,3 +208,50 @@ export async function fetchPartnerTeamMembersBucket(): Promise<PartnerTeamMember
     role: m.role,
   }))
 }
+
+/**
+ * Fetch a lightweight bucket of active services for the current partner.
+ * Used for instant service selection in appointment creation (replaces mock data).
+ * Structured so a future business_hours table can be plugged in without refactoring.
+ */
+export type PartnerServiceBucketItem = {
+  id: string
+  name: string
+  price: number
+  duration: number
+  bufferMinutes: number
+  category: string | null
+  billingUnit: string
+}
+
+export async function fetchPartnerServicesBucket(): Promise<PartnerServiceBucketItem[]> {
+  const user = await getCurrentUser()
+  if (!user) throw new Error("Unauthorized")
+  const context = await getCurrentPartnerContext()
+  if (!context) throw new Error("No context")
+  const partnerId = context.partnerId
+
+  const supabase = await getSupabaseServerClient()
+  const { data, error } = await supabase
+    .from("services")
+    .select("id, name, price, duration_minutes, buffer_minutes, billing_unit, is_active, service_categories!category_id(name)")
+    .eq("partner_id", partnerId)
+    .eq("is_active", true)
+    .order("name")
+    .limit(500)
+
+  if (error) {
+    console.error("[fetchPartnerServicesBucket] Error:", error)
+    return []
+  }
+
+  return (data || []).map((s: any) => ({
+    id: String(s.id),
+    name: String(s.name || ""),
+    price: Number(s.price || 0),
+    duration: Number(s.duration_minutes || 60),
+    bufferMinutes: Number(s.buffer_minutes || 0),
+    category: s.service_categories?.name || null,
+    billingUnit: String(s.billing_unit || "per_service"),
+  }))
+}

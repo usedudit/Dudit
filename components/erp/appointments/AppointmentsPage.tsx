@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
     ChevronLeft,
     ChevronRight,
@@ -12,7 +12,8 @@ import {
     Calendar as CalendarIcon,
     PlusIcon,
     Search,
-    Filter
+    Filter,
+    Loader2
 } from 'lucide-react';
 import { Button, Dropdown, DropdownItem, Checkbox, Tabs, TabsList, TabsTrigger, Input as FormInput } from '@/components/reusable';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
@@ -24,12 +25,6 @@ import {
     ModeType,
     PopoverState
 } from './types';
-
-import {
-    initialAppointments,
-    mockClients,
-    staffMembers
-} from './data';
 
 import {
     formatDateStr,
@@ -44,21 +39,50 @@ import { MobileView, DayView, TimelineView, MonthView, ListView } from './views/
 import {
     createAppointmentsAction,
     getAppointmentHistoryAction,
-    getAppointmentsAction,
+    getAppointmentsByDateRangeAction,
     updateAppointmentAction,
 } from '@/app/actions/erp/appointments';
-import { fetchPartnerCustomersBucket, fetchPartnerTeamMembersBucket } from '@/app/actions/erp/client-loaders';
+import { fetchPartnerCustomersBucket, fetchPartnerTeamMembersBucket, fetchPartnerServicesBucket } from '@/app/actions/erp/client-loaders';
 import { FadeIn } from '@/components/animations/FadeIn';
+
+/**
+ * Compute the visible date range based on the current view and date.
+ * All filtering happens at the DB level — this determines the query bounds.
+ */
+function computeVisibleDateRange(date: Date, view: ViewType): { startDate: string; endDate: string } {
+    if (view === 'day') {
+        const dateStr = formatDateStr(date);
+        return { startDate: dateStr, endDate: dateStr };
+    }
+    if (view === 'week') {
+        const days = getWeekDays(date);
+        return { startDate: formatDateStr(days[0]), endDate: formatDateStr(days[6]) };
+    }
+    // month — include full grid (may show days from prev/next month)
+    const y = date.getFullYear();
+    const m = date.getMonth();
+    const firstDay = new Date(y, m, 1);
+    const lastDay = new Date(y, m + 1, 0);
+    // Extend to full week boundaries for the month grid
+    const gridStart = new Date(firstDay);
+    gridStart.setDate(gridStart.getDate() - gridStart.getDay());
+    const gridEnd = new Date(lastDay);
+    gridEnd.setDate(gridEnd.getDate() + (6 - gridEnd.getDay()));
+    return { startDate: formatDateStr(gridStart), endDate: formatDateStr(gridEnd) };
+}
 
 const AppointmentsPage = () => {
     const [viewMode, setViewMode] = useState<ModeType>('calendar');
     const [calendarView, setCalendarView] = useState<ViewType>('day');
-    const [currentDate, setCurrentDate] = useState(new Date(2024, 1, 24));
+    const [currentDate, setCurrentDate] = useState(new Date());
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 8;
-    const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
-    const [realStaffMembers, setRealStaffMembers] = useState(staffMembers);
-    const [realClients, setRealClients] = useState<any[]>(mockClients);
+    const [appointments, setAppointments] = useState<Appointment[]>([]);
+    const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
+    const [realStaffMembers, setRealStaffMembers] = useState<Array<{ id: string; name: string; role: string; avatar: string }>>([]);
+    const [realClients, setRealClients] = useState<any[]>([]);
+    const [realServices, setRealServices] = useState<any[]>([]);
+    const [selectedStaffFilter, setSelectedStaffFilter] = useState<string | null>(null);
 
     // Interaction State
     const [hoverTime, setHoverTime] = useState<{ hour: number, minutes: number, top: number } | null>(null);
@@ -75,6 +99,7 @@ const AppointmentsPage = () => {
     const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
     const [moreSheetDate, setMoreSheetDate] = useState<string>('');
     const [moreSheetAppointments, setMoreSheetAppointments] = useState<Appointment[]>([]);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Selection Mode
     const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -100,17 +125,14 @@ const AppointmentsPage = () => {
         partnerId: row.partner_id,
     }), []);
 
+    // -- Load staff + clients + services on mount (once) --
     useEffect(() => {
-        const loadRealData = async () => {
-            const [appointmentsRes, teamRes, clientsRes] = await Promise.all([
-                getAppointmentsAction(),
+        const loadCatalogs = async () => {
+            const [teamRes, clientsRes, servicesRes] = await Promise.all([
                 fetchPartnerTeamMembersBucket(),
                 fetchPartnerCustomersBucket(),
+                fetchPartnerServicesBucket(),
             ]);
-
-            if (appointmentsRes.success) {
-                setAppointments((appointmentsRes.items || []).map(mapDbAppointment));
-            }
 
             if (teamRes?.length) {
                 setRealStaffMembers(teamRes.map((member) => ({
@@ -128,10 +150,126 @@ const AppointmentsPage = () => {
                     email: client.email || undefined,
                 })));
             }
+
+            if (servicesRes?.length) {
+                setRealServices(servicesRes.map((svc) => ({
+                    id: svc.id,
+                    name: svc.name,
+                    price: svc.price,
+                    duration: String(svc.duration),
+                    category: svc.category || 'Sem categoria',
+                    bufferMinutes: svc.bufferMinutes,
+                    billingUnit: svc.billingUnit,
+                })));
+            }
+        };
+        loadCatalogs();
+    }, []);
+
+    // -- Appointment cache: keyed by "startDate|endDate|staffId" --
+    // Stale-while-revalidate: serve cache instantly, revalidate in background.
+    const appointmentCacheRef = useRef<Map<string, { data: Appointment[]; ts: number }>>(new Map());
+    const inFlightRef = useRef<Set<string>>(new Set());
+    const fetchAbortRef = useRef<number>(0);
+
+    // Stable cache key for the current view
+    const currentRange = useMemo(
+        () => computeVisibleDateRange(currentDate, calendarView),
+        [currentDate, calendarView]
+    );
+    const cacheKey = useMemo(
+        () => `${currentRange.startDate}|${currentRange.endDate}|${selectedStaffFilter || ''}`,
+        [currentRange, selectedStaffFilter]
+    );
+
+    // -- Core network fetch (always hits server, deduped by key) --
+    const fetchRange = useCallback(async (
+        startDate: string,
+        endDate: string,
+        staffFilter: string | null,
+    ): Promise<Appointment[] | null> => {
+        const key = `${startDate}|${endDate}|${staffFilter || ''}`;
+
+        // Skip if already in-flight (prevents duplicate requests)
+        if (inFlightRef.current.has(key)) return null;
+        inFlightRef.current.add(key);
+
+        try {
+            const res = await getAppointmentsByDateRangeAction(startDate, endDate, staffFilter || undefined);
+            if (res.success) {
+                const mapped = (res.items || []).map(mapDbAppointment);
+                appointmentCacheRef.current.set(key, { data: mapped, ts: Date.now() });
+                return mapped;
+            }
+            return null;
+        } catch (err) {
+            console.error('[AppointmentsPage] Fetch failed:', err);
+            return null;
+        } finally {
+            inFlightRef.current.delete(key);
+        }
+    }, [mapDbAppointment]);
+
+    // -- Compute adjacent ranges for prefetching --
+    const getAdjacentRanges = useCallback((date: Date, view: ViewType) => {
+        const prevDate = new Date(date);
+        const nextDate = new Date(date);
+
+        if (view === 'month') {
+            prevDate.setMonth(prevDate.getMonth() - 1);
+            nextDate.setMonth(nextDate.getMonth() + 1);
+        } else if (view === 'week') {
+            prevDate.setDate(prevDate.getDate() - 7);
+            nextDate.setDate(nextDate.getDate() + 7);
+        } else {
+            prevDate.setDate(prevDate.getDate() - 1);
+            nextDate.setDate(nextDate.getDate() + 1);
+        }
+
+        return {
+            prev: computeVisibleDateRange(prevDate, view),
+            next: computeVisibleDateRange(nextDate, view),
+        };
+    }, []);
+
+    // -- Main fetch effect: Stale-While-Revalidate --
+    useEffect(() => {
+        const fetchId = ++fetchAbortRef.current;
+
+        // 1. Serve stale: if ANY cache entry exists, render it instantly (no loading spinner)
+        const stale = appointmentCacheRef.current.get(cacheKey);
+        if (stale) {
+            setAppointments(stale.data);
+            setIsLoadingAppointments(false);
+        } else {
+            // Cold fetch — show loading skeleton
+            setIsLoadingAppointments(true);
+        }
+
+        // 2. Revalidate: always fetch fresh data in the background
+        const revalidate = async () => {
+            const freshData = await fetchRange(
+                currentRange.startDate,
+                currentRange.endDate,
+                selectedStaffFilter
+            );
+
+            // Only apply if this is still the latest request (race guard)
+            if (fetchAbortRef.current !== fetchId) return;
+
+            if (freshData) {
+                setAppointments(freshData);
+            }
+            setIsLoadingAppointments(false);
+
+            // 3. Prefetch adjacent ranges (fire-and-forget)
+            const { prev, next } = getAdjacentRanges(currentDate, calendarView);
+            fetchRange(prev.startDate, prev.endDate, selectedStaffFilter);
+            fetchRange(next.startDate, next.endDate, selectedStaffFilter);
         };
 
-        loadRealData();
-    }, [mapDbAppointment]);
+        revalidate();
+    }, [cacheKey, currentRange, selectedStaffFilter, currentDate, calendarView, fetchRange, getAdjacentRanges]);
 
     // --- ACTIONS ---
 
@@ -174,55 +312,66 @@ const AppointmentsPage = () => {
     };
 
     const handleSaveAppointment = async (payload: any | any[]) => {
-        if (selectedAppointment && sheetMode === 'view') {
-            const updateRes = await updateAppointmentAction(selectedAppointment.id, {
-                customerName: payload.customer || payload.customerName,
-                serviceName: payload.service || payload.serviceName,
-                date: payload.date || selectedAppointment.date,
-                time: payload.time || selectedAppointment.time,
-                endDate: payload.endDate || selectedAppointment.endDate,
-                endTime: payload.endTime || selectedAppointment.endTime,
-                duration: Number(payload.duration || selectedAppointment.duration),
-                staffId: payload.staffId || selectedAppointment.staffId,
-                staffName: payload.staff || payload.staffName || selectedAppointment.staff,
-                price: Number(payload.price || selectedAppointment.price),
-                pricingUnit: payload.pricingUnit || selectedAppointment.pricingUnit,
-                notes: payload.notes ?? selectedAppointment.notes,
-                status: payload.status || selectedAppointment.status,
-            });
+        // -- Frontend lock: prevent double-click duplicates --
+        if (isSaving) return;
+        setIsSaving(true);
 
-            if (updateRes.success && updateRes.item) {
-                const mapped = mapDbAppointment(updateRes.item);
-                setAppointments((prev) => prev.map((a) => a.id === mapped.id ? mapped : a));
-            }
-        } else {
-            const rows = (Array.isArray(payload) ? payload : [payload]).map((item) => ({
-                customerName: item.customerName || 'Cliente Sem Nome',
-                serviceName: item.serviceName || 'Serviço',
-                date: item.date || formatDateStr(currentDate),
-                time: item.time || '09:00',
-                endDate: item.endDate || item.date || formatDateStr(currentDate),
-                endTime: item.endTime || item.time || '09:00',
-                duration: Number(item.duration || 60),
-                staffId: String(item.staffId || preSelectedStaffId || realStaffMembers[0]?.id || ''),
-                staffName: item.staffName || realStaffMembers.find((s) => s.id === String(item.staffId || preSelectedStaffId))?.name || realStaffMembers[0]?.name || 'Profissional',
-                price: Number(item.price || 0),
-                pricingUnit: item.pricingUnit || 'Por Serviço',
-                notes: item.notes || null,
-                status: item.status || 'Reservado',
-                customerId: realClients.find((c) => c.name === item.customerName)?.id || null,
-            }));
+        try {
+            if (selectedAppointment && sheetMode === 'view') {
+                const updateRes = await updateAppointmentAction(selectedAppointment.id, {
+                    customerName: payload.customer || payload.customerName,
+                    serviceName: payload.service || payload.serviceName,
+                    date: payload.date || selectedAppointment.date,
+                    time: payload.time || selectedAppointment.time,
+                    endDate: payload.endDate || selectedAppointment.endDate,
+                    endTime: payload.endTime || selectedAppointment.endTime,
+                    duration: Number(payload.duration || selectedAppointment.duration),
+                    staffId: payload.staffId || selectedAppointment.staffId,
+                    staffName: payload.staff || payload.staffName || selectedAppointment.staff,
+                    price: Number(payload.price || selectedAppointment.price),
+                    pricingUnit: payload.pricingUnit || selectedAppointment.pricingUnit,
+                    notes: payload.notes ?? selectedAppointment.notes,
+                    status: payload.status || selectedAppointment.status,
+                });
 
-            const createRes = await createAppointmentsAction(rows);
-            if (createRes.success) {
-                setAppointments((prev) => [...prev, ...(createRes.created || []).map(mapDbAppointment)]);
+                if (updateRes.success && updateRes.item) {
+                    const mapped = mapDbAppointment(updateRes.item);
+                    setAppointments((prev) => prev.map((a) => a.id === mapped.id ? mapped : a));
+                }
+            } else {
+                const rows = (Array.isArray(payload) ? payload : [payload]).map((item) => ({
+                    customerName: item.customerName || 'Cliente Sem Nome',
+                    serviceName: item.serviceName || 'Serviço',
+                    date: item.date || formatDateStr(currentDate),
+                    time: item.time || '09:00',
+                    endDate: item.endDate || item.date || formatDateStr(currentDate),
+                    endTime: item.endTime || item.time || '09:00',
+                    duration: Number(item.duration || 60),
+                    staffId: String(item.staffId || preSelectedStaffId || realStaffMembers[0]?.id || ''),
+                    staffName: item.staffName || realStaffMembers.find((s) => s.id === String(item.staffId || preSelectedStaffId))?.name || realStaffMembers[0]?.name || 'Profissional',
+                    price: Number(item.price || 0),
+                    pricingUnit: item.pricingUnit || 'Por Serviço',
+                    notes: item.notes || null,
+                    status: item.status || 'Reservado',
+                    customerId: realClients.find((c) => c.name === item.customerName)?.id || null,
+                }));
+
+                const createRes = await createAppointmentsAction(rows);
+                if (createRes.success) {
+                    setAppointments((prev) => [...prev, ...(createRes.created || []).map(mapDbAppointment)]);
+                }
             }
+
+            // Invalidate cache so next navigation fetches fresh data
+            appointmentCacheRef.current.clear();
+
+            setIsSheetOpen(false);
+            setTempSelectionTime(null);
+            setDraftData(null);
+            setPreSelectedStaffId(undefined);
+        } finally {
+            setIsSaving(false);
         }
-
-        setIsSheetOpen(false);
-        setTempSelectionTime(null);
-        setDraftData(null);
-        setPreSelectedStaffId(undefined);
     };
 
     const enterSelectionMode = (currentData: any) => {
@@ -287,31 +436,14 @@ const AppointmentsPage = () => {
         return currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
     };
 
-    const getFilteredAppointments = useMemo(() => {
-        let filtered: Appointment[] = [];
-
-        if (calendarView === 'day' || calendarView === 'week') {
-            if (calendarView === 'week') {
-                const weekDays = getWeekDays(currentDate);
-                const startStr = formatDateStr(weekDays[0]);
-                const endStr = formatDateStr(weekDays[6]);
-                filtered = appointments.filter(a => a.date >= startStr && a.date <= endStr);
-            } else {
-                const dateStr = formatDateStr(currentDate);
-                filtered = appointments.filter(a => a.date === dateStr);
-            }
-        } else if (calendarView === 'month') {
-            const y = currentDate.getFullYear();
-            const m = currentDate.getMonth() + 1;
-            const prefix = `${y}-${String(m).padStart(2, '0')}`;
-            filtered = appointments.filter(a => a.date.startsWith(prefix));
-        }
-
-        return filtered.sort((a, b) => {
+    // Appointments are already filtered by date range + staff at the DB level.
+    // This sorted memo is used by the ListView and any other component that needs sorted data.
+    const sortedAppointments = useMemo(() => {
+        return [...appointments].sort((a, b) => {
             if (a.date !== b.date) return a.date.localeCompare(b.date);
             return a.time.localeCompare(b.time);
         });
-    }, [currentDate, calendarView, appointments]);
+    }, [appointments]);
 
     const handleGridMouseMove = (e: React.MouseEvent, colIndex: number) => {
         const rect = e.currentTarget.getBoundingClientRect();
@@ -474,19 +606,29 @@ const AppointmentsPage = () => {
                                         trigger={
                                             <button className="flex items-center gap-2 px-4 h-10 border border-brand-border dark:border-dark-border rounded-full bg-white dark:bg-dark-surface text-sm font-bold text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors whitespace-nowrap shadow-sm">
                                                 <Users size={16} className="text-brand-inactive-text" />
-                                                Toda a equipe
+                                                {selectedStaffFilter
+                                                    ? realStaffMembers.find(s => s.id === selectedStaffFilter)?.name || 'Profissional'
+                                                    : 'Toda a equipe'
+                                                }
                                                 <ChevronDown size={14} className="text-brand-inactive-text" />
                                             </button>
                                         }
                                     >
                                         <div className="p-1">
-                                            <DropdownItem className="rounded-lg font-medium bg-brand-dark/5 dark:bg-white/5 text-brand-dark dark:text-dark-heading">
+                                            <DropdownItem
+                                                onClick={() => setSelectedStaffFilter(null)}
+                                                className={`rounded-lg font-medium gap-2 ${!selectedStaffFilter ? 'bg-brand-dark/5 dark:bg-white/5 text-brand-dark dark:text-dark-heading' : ''}`}
+                                            >
                                                 <Users size={16} /> Toda a equipe
                                             </DropdownItem>
                                             <div className="my-2 border-t border-brand-border dark:border-dark-border"></div>
                                             <div className="space-y-1 px-1">
                                                 {realStaffMembers.map(staff => (
-                                                    <DropdownItem key={staff.id} className="gap-3">
+                                                    <DropdownItem
+                                                        key={staff.id}
+                                                        onClick={() => setSelectedStaffFilter(staff.id)}
+                                                        className={`gap-3 ${selectedStaffFilter === staff.id ? 'bg-brand-dark/5 dark:bg-white/5' : ''}`}
+                                                    >
                                                         <UserProfileImage fullName={staff.name} imageUrl={staff.avatar} className="w-6 h-6" />
                                                         <span className="text-sm">{staff.name}</span>
                                                     </DropdownItem>
@@ -639,7 +781,7 @@ const AppointmentsPage = () => {
                                             transition={{ duration: 0.2 }}
                                         >
                                             <ListView
-                                                appointments={getFilteredAppointments}
+                                                appointments={sortedAppointments}
                                                 onOpenView={handleOpenView}
                                                 currentPage={currentPage}
                                                 setCurrentPage={setCurrentPage}
@@ -667,8 +809,10 @@ const AppointmentsPage = () => {
                                 initialDraft={draftData}
                                 initialStaffId={preSelectedStaffId}
                                 onCheckout={handleOpenCheckout}
+                                servicesCatalog={realServices}
                                 staffCatalog={realStaffMembers}
                                 clientsCatalog={realClients}
+                                isSaving={isSaving}
                             />
                         )}
                     </AnimatePresence>
@@ -721,6 +865,7 @@ const AppointmentsPage = () => {
                                         source: 'unavailable',
                                     }]);
                                     if (createRes.success) {
+                                        appointmentCacheRef.current.clear();
                                         setAppointments((prev) => [...prev, ...(createRes.created || []).map(mapDbAppointment)]);
                                     }
                                     setIsUnavailableSheetOpen(false);

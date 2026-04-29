@@ -313,6 +313,7 @@ async function syncAppointmentReceivable(params: {
   return existingId
 }
 
+/** @deprecated Use getAppointmentsByDateRangeAction instead — this fetches ALL appointments with select(*) */
 export async function getAppointmentsAction() {
   try {
     const { partnerId } = await getPartnerContextWithPermission("view")
@@ -331,6 +332,141 @@ export async function getAppointmentsAction() {
   }
 }
 
+// -- Optimized appointment columns for list/calendar rendering (no select *) --
+const APPOINTMENT_LIST_COLUMNS = `
+  id, partner_id, customer_id, customer_name, service_name,
+  start_date, start_time, end_date, end_time, duration_minutes,
+  staff_partner_user_id, staff_name, status, price, pricing_unit, notes, source
+`
+
+/**
+ * Fetch appointments within a date range, with optional staff filter.
+ * All filtering is done at the database level — no in-memory filtering.
+ *
+ * Uses the standard interval overlap condition:
+ *   start_date <= queryEnd AND end_date >= queryStart
+ * This captures:
+ *   - Appointments fully within the range
+ *   - Multi-day appointments that started before the range
+ *   - Multi-day appointments that end after the range
+ *   - Appointments that span the entire range
+ */
+export async function getAppointmentsByDateRangeAction(
+  startDate: string,
+  endDate: string,
+  staffId?: string | null
+) {
+  try {
+    const { partnerId } = await getPartnerContextWithPermission("view")
+    const supabase = await getSupabaseServerClient()
+
+    let query = supabase
+      .from("appointments")
+      .select(APPOINTMENT_LIST_COLUMNS)
+      .eq("partner_id", partnerId)
+      // Optimal overlap: appointment.start_date <= queryEnd AND appointment.end_date >= queryStart
+      .lte("start_date", endDate)
+      .gte("end_date", startDate)
+
+    // Staff filtering at DB level
+    if (staffId) {
+      query = query.eq("staff_partner_user_id", staffId)
+    }
+
+    const { data, error } = await query
+      .order("start_date", { ascending: true })
+      .order("start_time", { ascending: true })
+      .limit(500) // Safety cap to prevent excessive data loads
+
+    if (error) throw error
+    return { success: true, items: data || [] }
+  } catch (error: any) {
+    return { success: false, error: error?.message || "Erro ao buscar agendamentos", items: [] }
+  }
+}
+
+// -- Default business hours (structured for easy future migration to a DB table) --
+const DEFAULT_BUSINESS_HOURS = { startHour: 8, startMinute: 0, endHour: 19, endMinute: 0 }
+const SLOT_INCREMENT_MINUTES = 15
+
+/**
+ * Generate available time slots for a staff member on a specific date.
+ * Takes into account:
+ * - Existing appointments (conflict detection)
+ * - Service duration (the slot must fit the full service)
+ * - Buffer minutes between appointments
+ * - Business hours (default 08:00–19:00, structured for future DB config)
+ *
+ * All computation is server-side — no client-side slot generation.
+ */
+export async function getAvailableTimeSlotsAction(
+  date: string,
+  staffId: string,
+  serviceDurationMinutes: number,
+  bufferMinutes: number = 0
+) {
+  try {
+    const { partnerId } = await getPartnerContextWithPermission("view")
+    const supabase = await getSupabaseServerClient()
+
+    // Fetch existing appointments for this staff on this date
+    const { data: existingAppts, error } = await supabase
+      .from("appointments")
+      .select("start_time, end_time, duration_minutes")
+      .eq("partner_id", partnerId)
+      .eq("staff_partner_user_id", staffId)
+      .eq("start_date", date)
+      .neq("status", "Cancelado")
+      .order("start_time", { ascending: true })
+
+    if (error) throw error
+
+    // Build list of occupied time ranges (in minutes from midnight)
+    const occupiedRanges: Array<{ start: number; end: number }> = (existingAppts || []).map((apt: any) => {
+      const [sh, sm] = String(apt.start_time || "").split(":").map(Number)
+      const startMin = (sh || 0) * 60 + (sm || 0)
+
+      let endMin: number
+      if (apt.end_time) {
+        const [eh, em] = String(apt.end_time).split(":").map(Number)
+        endMin = (eh || 0) * 60 + (em || 0)
+      } else {
+        endMin = startMin + Number(apt.duration_minutes || 60)
+      }
+
+      // Add buffer after each appointment
+      return { start: startMin, end: endMin + bufferMinutes }
+    })
+
+    // Generate all possible slots within business hours
+    const bh = DEFAULT_BUSINESS_HOURS
+    const dayStartMin = bh.startHour * 60 + bh.startMinute
+    const dayEndMin = bh.endHour * 60 + bh.endMinute
+    const totalDurationNeeded = serviceDurationMinutes + bufferMinutes
+
+    const slots: string[] = []
+
+    for (let slotStart = dayStartMin; slotStart + serviceDurationMinutes <= dayEndMin; slotStart += SLOT_INCREMENT_MINUTES) {
+      const slotEnd = slotStart + totalDurationNeeded
+
+      // Check if this slot conflicts with any existing appointment
+      const hasConflict = occupiedRanges.some(
+        (range) => slotStart < range.end && slotEnd > range.start
+      )
+
+      if (!hasConflict) {
+        const h = Math.floor(slotStart / 60)
+        const m = slotStart % 60
+        slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`)
+      }
+    }
+
+    return { success: true, slots }
+  } catch (error: any) {
+    return { success: false, error: error?.message || "Erro ao buscar horários", slots: [] }
+  }
+}
+
 export async function createAppointmentsAction(payload: AppointmentInput[]) {
   try {
     if (!Array.isArray(payload) || payload.length === 0) {
@@ -340,6 +476,28 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     const { user, partnerId } = await getPartnerContextWithPermission("create")
     const supabase = await getSupabaseServerClient()
     const rows = payload.map((item) => toDbPayload(item, partnerId))
+
+    // -- Idempotency guard: reject duplicate submissions within 30 seconds --
+    // Checks the first item in the batch against recent inserts
+    const firstRow = rows[0]
+    if (firstRow) {
+      const thirtySecondsAgo = new Date(Date.now() - 30000).toISOString()
+      const { data: recentDup } = await supabase
+        .from("appointments")
+        .select("id")
+        .eq("partner_id", partnerId)
+        .eq("customer_name", firstRow.customer_name)
+        .eq("service_name", firstRow.service_name)
+        .eq("start_date", firstRow.start_date)
+        .eq("start_time", firstRow.start_time)
+        .eq("staff_partner_user_id", firstRow.staff_partner_user_id)
+        .gte("created_at", thirtySecondsAgo)
+        .limit(1)
+
+      if (recentDup && recentDup.length > 0) {
+        return { success: false, error: "Agendamento duplicado detectado. Aguarde alguns segundos.", created: [] }
+      }
+    }
 
     const { data, error } = await supabase.from("appointments").insert(rows).select("*")
     if (error) throw error

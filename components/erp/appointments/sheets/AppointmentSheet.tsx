@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, ChevronDownIcon, CalendarIcon, CheckIcon, MoreHorizontalIcon, EditIcon, ClockIcon, RepeatIcon, SaveIcon, ShoppingBagIcon, ArrowRightIcon, FileIcon } from '@/lib/icons';
 import { Button, Input as FormInput, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea } from '@/components/reusable';
+import { getAvailableTimeSlotsAction } from '@/app/actions/erp/appointments';
 import { usePermissions } from '@/lib/permission-context';
 import { RecurrenceView, ActivityLog } from '../Shared';
-import { mockServices, mockClients, staffMembers } from '../data';
 import { Appointment } from '../types';
 import { ServiceItemCard } from '../ServiceItemCard';
 import { formatDateStr, formatDuration, getEndTime, parseLocalDate } from '../utils';
@@ -30,7 +30,8 @@ export const AppointmentSheet = ({
     onStatusChangeRequest,
     servicesCatalog,
     clientsCatalog,
-    staffCatalog
+    staffCatalog,
+    isSaving
 }: {
     onClose: () => void,
     mode: 'create' | 'view',
@@ -47,11 +48,12 @@ export const AppointmentSheet = ({
     onStatusChangeRequest?: (type: 'cancel' | 'absence', appointment: Appointment) => void,
     servicesCatalog?: any[],
     clientsCatalog?: any[],
-    staffCatalog?: any[]
+    staffCatalog?: any[],
+    isSaving?: boolean
 }) => {
-    const servicesSource = servicesCatalog && servicesCatalog.length ? servicesCatalog : mockServices;
-    const clientsSource = clientsCatalog && clientsCatalog.length ? clientsCatalog : mockClients;
-    const staffSource = staffCatalog && staffCatalog.length ? staffCatalog : staffMembers;
+    const servicesSource = servicesCatalog || [];
+    const clientsSource = clientsCatalog || [];
+    const staffSource = staffCatalog || [];
     const { canEdit, hasSpecific, canDelete } = usePermissions();
     const [currentView, setCurrentView] = useState<'summary' | 'services' | 'client' | 'datetime' | 'activity' | 'edit-service' | 'recurrence' | 'notes'>('summary');
     const [selectedServices, setSelectedServices] = useState<any[]>([]);
@@ -112,7 +114,11 @@ export const AppointmentSheet = ({
     // Recurrence State
     const [recurrenceFreq, setRecurrenceFreq] = useState('Não se repete');
     const [recurrenceTerm, setRecurrenceTerm] = useState('Data específica');
-    const [recurrenceEndDate, setRecurrenceEndDate] = useState(new Date(2026, 0, 12));
+    const [recurrenceEndDate, setRecurrenceEndDate] = useState(() => {
+        const d = new Date(defaultDate);
+        d.setDate(d.getDate() + 30);
+        return d;
+    });
 
     // Determine if appointment is paid or absence
     const isPaid = status === 'Paid' || status === 'Pago' || status === 'Partially Paid';
@@ -124,7 +130,36 @@ export const AppointmentSheet = ({
         return selectedServices.some(s => s.pricingUnit && s.pricingUnit !== 'Por Serviço');
     }, [selectedServices]);
 
-    const timeSlots = ['08:00', '08:15', '08:30', '08:45', '09:00', '09:15', '09:30', '09:45', '10:00', '10:15'];
+    // -- Dynamic time slots from server (replaces hardcoded array) --
+    const [timeSlots, setTimeSlots] = useState<string[]>([]);
+    const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+
+    // Fetch available time slots when the datetime view is shown
+    useEffect(() => {
+        if (currentView !== 'datetime') return;
+        if (!selectedStaffId) return;
+
+        const totalDuration = selectedServices.reduce((sum, s) => sum + (Number(s.duration) || 60), 0);
+        const maxBuffer = Math.max(0, ...selectedServices.map((s) => Number(s.bufferMinutes) || 0));
+        const targetDate = formatDateStr(editDate || selectedDate || defaultDate);
+
+        let cancelled = false;
+        setIsLoadingSlots(true);
+
+        getAvailableTimeSlotsAction(targetDate, selectedStaffId, totalDuration, maxBuffer)
+            .then((res) => {
+                if (cancelled) return;
+                if (res.success) {
+                    setTimeSlots(res.slots);
+                }
+            })
+            .catch(() => {})
+            .finally(() => {
+                if (!cancelled) setIsLoadingSlots(false);
+            });
+
+        return () => { cancelled = true; };
+    }, [currentView, selectedStaffId, selectedServices, editDate, selectedDate, defaultDate]);
 
     // Initial State Setup
     useEffect(() => {
@@ -530,7 +565,7 @@ export const AppointmentSheet = ({
 
     const [dateOffset, setDateOffset] = useState(0);
     const dates = useMemo(() => {
-        const baseDate = new Date(2026, 0, 12);
+        const baseDate = editDate || selectedDate || defaultDate;
         const days = [];
         for (let i = -2; i < 5; i++) {
             const d = new Date(baseDate);
@@ -544,7 +579,7 @@ export const AppointmentSheet = ({
             });
         }
         return days;
-    }, [dateOffset]);
+    }, [dateOffset, editDate, selectedDate, defaultDate]);
 
     const handleDateNav = (dir: 'prev' | 'next') => {
         setDateOffset(prev => dir === 'next' ? prev + 1 : prev - 1);
@@ -869,16 +904,28 @@ export const AppointmentSheet = ({
                                             </Button>
                                         </div>
                                         <div className="space-y-3">
-                                            {timeSlots.map((slot, i) => (
-                                                <button
-                                                    key={i}
-                                                    onClick={() => setSelectedTimeSlot(slot)}
-                                                    className={`w-full p-3 rounded-xl border text-sm font-bold transition-all flex justify-between items-center ${selectedTimeSlot === slot ? 'border-brand-dark bg-brand-dark text-white' : 'border-brand-border dark:border-dark-border hover:border-gray-300 text-brand-dark dark:text-dark-heading'}`}
-                                                >
-                                                    {slot}
-                                                    {selectedTimeSlot === slot && <CheckIcon size={16} />}
-                                                </button>
-                                            ))}
+                                            {isLoadingSlots ? (
+                                                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                                                    <div className="w-6 h-6 border-2 border-brand-dark/20 border-t-brand-dark rounded-full animate-spin" />
+                                                    <span className="text-sm text-brand-inactive-text font-medium">Verificando disponibilidade...</span>
+                                                </div>
+                                            ) : timeSlots.length === 0 ? (
+                                                <div className="text-center py-12">
+                                                    <p className="text-sm text-brand-inactive-text font-medium">Nenhum horário disponível nesta data.</p>
+                                                    <p className="text-xs text-brand-inactive-text mt-1">Tente outra data ou outro profissional.</p>
+                                                </div>
+                                            ) : (
+                                                timeSlots.map((slot, i) => (
+                                                    <button
+                                                        key={i}
+                                                        onClick={() => setSelectedTimeSlot(slot)}
+                                                        className={`w-full p-3 rounded-xl border text-sm font-bold transition-all flex justify-between items-center ${selectedTimeSlot === slot ? 'border-brand-dark bg-brand-dark text-white' : 'border-brand-border dark:border-dark-border hover:border-gray-300 text-brand-dark dark:text-dark-heading'}`}
+                                                    >
+                                                        {slot}
+                                                        {selectedTimeSlot === slot && <CheckIcon size={16} />}
+                                                    </button>
+                                                ))
+                                            )}
                                         </div>
                                     </div>
                                 </>
@@ -1137,9 +1184,14 @@ export const AppointmentSheet = ({
                                     variant="default"
                                     className={`flex-1 h-[48px] rounded-xl font-bold ${currentView === 'services' && selectedServices.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     onClick={currentView === 'edit-service' ? () => setCurrentView('summary') : handleNext}
-                                    disabled={currentView === 'services' && selectedServices.length === 0}
+                                    disabled={(currentView === 'services' && selectedServices.length === 0) || isSaving}
                                 >
-                                    {currentView === 'summary' || (currentView === 'datetime' && (selectedTimeSlot || needsRangePicker)) ? <span className="flex items-center gap-2">Agendar <CheckCircleIcon size={18} /></span> : currentView === 'edit-service' ? 'Aplicar' : 'Próximo'}
+                                    {isSaving && currentView === 'summary' ? (
+                                        <span className="flex items-center gap-2">
+                                            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            Salvando...
+                                        </span>
+                                    ) : currentView === 'summary' || (currentView === 'datetime' && (selectedTimeSlot || needsRangePicker)) ? <span className="flex items-center gap-2">Agendar <CheckCircleIcon size={18} /></span> : currentView === 'edit-service' ? 'Aplicar' : 'Próximo'}
                                 </Button>
                             </div>
                         ) : (
@@ -1171,8 +1223,16 @@ export const AppointmentSheet = ({
                                     variant="default"
                                     className="flex-1 h-[48px] rounded-xl font-bold"
                                     onClick={handleSaveChanges}
+                                    disabled={isSaving}
                                 >
-                                    <SaveIcon size={18} className="mr-2" /> Salvar Alterações
+                                    {isSaving ? (
+                                        <span className="flex items-center gap-2">
+                                            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            Salvando...
+                                        </span>
+                                    ) : (
+                                        <><SaveIcon size={18} className="mr-2" /> Salvar Alterações</>
+                                    )}
                                 </Button>
                             </div>
                         )}
