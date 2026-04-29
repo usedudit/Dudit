@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
     PlusIcon,
-} from 'lucide-react';
+} from '@/lib/icons';
 import { Button, Checkbox } from '@/components/reusable';
 import { motion, AnimatePresence } from 'framer-motion';
 

@@ -2,10 +2,9 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarX, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Users, RotateCcw, X, CalendarPlus, CalendarOff, User, MoreHorizontal, LayoutList, LayoutGrid, Clock, ArrowUpDown, Plus, Edit3, Utensils, Briefcase } from 'lucide-react';
-import { Button, Dropdown, DropdownItem, Badge, Checkbox as FormCheckbox, Pagination } from '../../../reusable';
+import { Button, Dropdown, DropdownItem, Badge, Checkbox as FormCheckbox } from '../../../reusable';
 import { Appointment, LayoutAppointment, StaffMember, PopoverState } from '../types';
 import { getAppointmentStyle, getEndTime, formatDateStr, getWeekDays, arrangeAppointments, formatDuration, isMultiDay, getMultiDayStyle, parseLocalDate } from '../utils';
-import { AppointmentListRow } from '../AppointmentListRow';
 
 // --- HELPER COMPONENTS ---
 
@@ -593,67 +592,3 @@ export const MonthView = ({ appointments, currentDate, handleGenericCellClick, a
         </div>
     )
 };
-
-export const ListView = ({ appointments, onOpenView, currentPage, setCurrentPage, itemsPerPage }: any) => {
-    const totalItems = appointments.length;
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const visibleItems = appointments.slice(startIndex, startIndex + itemsPerPage);
-    const columns = [
-        { id: "customer", align: "left" },
-        { id: "datetime", align: "left" },
-        { id: "staff", align: "left" },
-        { id: "price", align: "left" },
-        { id: "status", align: "center" },
-        { id: "actions", align: "center" },
-    ] as const;
-
-    return (
-        <div className="flex flex-col h-full bg-white dark:bg-dark-surface rounded-2xl overflow-hidden shadow-sm border border-brand-border dark:border-dark-border">
-            <div className="flex-1 overflow-y-auto no-scrollbar">
-                <AnimatePresence mode='popLayout'>
-                    {visibleItems.length > 0 ? (
-                        <motion.div 
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="flex flex-col"
-                        >
-                            {visibleItems.map((apt: Appointment) => (
-                                <AppointmentListRow 
-                                    key={apt.id} 
-                                    appointment={apt}
-                                    columns={columns as any}
-                                    selected={false}
-                                    onSelect={() => {}}
-                                    onView={onOpenView}
-                                />
-                            ))}
-                        </motion.div>
-                    ) : (
-                        <div className="p-20 text-center">
-                            <div className="w-16 h-16 bg-gray-50 dark:bg-zinc-900 rounded-full flex items-center justify-center mb-4 text-brand-inactive-text mx-auto">
-                                <CalendarX size={24} />
-                            </div>
-                            <h3 className="text-brand-dark dark:text-dark-heading font-bold mb-1">
-                                Nenhum agendamento encontrado
-                            </h3>
-                            <p className="text-sm text-brand-inactive-text">
-                                Não há agendamentos para este período ou filtros.
-                            </p>
-                        </div>
-                    )}
-                </AnimatePresence>
-            </div>
-            
-            {totalPages > 1 && (
-                <div className="p-4 border-t border-brand-border dark:border-dark-border bg-gray-50/50 dark:bg-zinc-900/30">
-                    <Pagination 
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        onPageChange={setCurrentPage}
-                    />
-                </div>
-            )}
-        </div>
-    )
-}

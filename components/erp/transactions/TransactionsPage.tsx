@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, Checkbox, IconPlaceholder, Badge, ActionsDropdown, DropdownItem, FormDropdown, MoneyInput } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, Badge, DropdownItem, FormDropdown, MoneyInput } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
@@ -32,7 +32,7 @@ import type {
     FinancialTransactionCursor,
     FinancialTransactionsPageSuccess,
     TransactionTab,
-} from "../../../lib/services/transactions.types"
+} from "@/lib/services/transactions.types"
 import type { RecurringOccurrence } from "@/app/actions/erp/recurring-transactions"
 import { markRecurringOccurrenceAsPaidAction } from "@/app/actions/erp/transactions"
 import { getInstallmentGroupDetailsAction } from "@/app/actions/erp/transactions"
@@ -44,8 +44,8 @@ import { getPaymentMethodsAction } from "@/app/actions/erp/payment-methods"
 import { useRouter } from "next/navigation"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import { useNotification } from "@/hooks/use-notification"
-import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
+import { useEntityPage } from "@/hooks/use-entity-page"
 import {
     EMPTY_DATE_PERIOD,
     resolveDatePeriodBounds,
@@ -169,10 +169,7 @@ export default function TransactionsPage({
     const [modals, setModals] = useState({ filter: false })
     const [selection, setSelection] = useState({ ids: new Set<string>() })
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
-    const [showCreateTransaction, setShowCreateTransaction] = useState(false)
-    const [editingTransaction, setEditingTransaction] = useState<ERPTransaction | null>(null)
     const [editingRecurringTemplateId, setEditingRecurringTemplateId] = useState<string | null>(null)
-    const [viewingTransactionId, setViewingTransactionId] = useState<string | null>(null)
     const [markingAsPaid, setMarkingAsPaid] = useState(false)
     const [openInstallmentGroupId, setOpenInstallmentGroupId] = useState<string | null>(null)
     const [installmentDetailLoading, setInstallmentDetailLoading] = useState(false)
@@ -193,24 +190,28 @@ export default function TransactionsPage({
     const [settlingGroup, setSettlingGroup] = useState(false)
     const observerTarget = useRef<HTMLDivElement>(null)
 
-    const { items: loadedTransactions, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteList<
-        ERPTransaction,
-        FinancialTransactionCursor,
-        FinancialTransactionsPageSuccess
-    >({
+    const entityPage = useEntityPage<ERPTransaction, ERPTransaction, FinancialTransactionCursor>({
+        entityType: "transactions",
+        partnerId,
         queryKey: financialTransactionsQueryKey(partnerId),
-        initialPage: {
-            items: initialItems,
-            nextCursor: initialNextCursor,
-            hasMore: initialHasMore,
-        },
-        fetchFn: async ({ cursor }) => {
+        initialItems,
+        initialNextCursor,
+        initialHasMore,
+        fetchPageFn: async ({ cursor }) => {
             const res = await getFinancialTransactionsAction(partnerId, { cursor })
             if (!res.success) throw new Error(res.error || "Erro ao carregar transações.")
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
         dedupeKey: useCallback((t: any) => t.id, []),
+        getDetailFn: async (id) => null, // List payload is complete; no detail fetch needed
+        listToDetail: (item) => item,
     })
+
+    const {
+        items: loadedTransactions, fetchNextPage, hasNextPage, isFetchingNextPage,
+        entityState, openEntity, closeEntity, isViewing, isEditing, isCreating,
+        currentEntity, getPrefetchProps,
+    } = entityPage
     const [settlePaymentsByInstallment, setSettlePaymentsByInstallment] = useState<
         Record<string, { paymentAmount: string; interestAmount: string; discountAmount: string; paymentMethodId: string }>
     >({})
@@ -695,13 +696,13 @@ export default function TransactionsPage({
         if (transaction.isRecurringOccurrence && transaction.recurringTemplateId) {
             setEditingRecurringTemplateId(transaction.recurringTemplateId)
         } else {
-            setEditingTransaction(transaction)
+            openEntity("edit", transaction.id)
         }
-    }, [])
+    }, [openEntity])
 
     const handleCloseTransactionDetail = useCallback(() => {
-        setViewingTransactionId(null)
-    }, [])
+        closeEntity()
+    }, [closeEntity])
 
     const handleEditFromTransactionDetail = useCallback(
         (id: string) => {
@@ -710,10 +711,9 @@ export default function TransactionsPage({
                 notifyError("Erro", "Transação não está na página atual. Volte à lista e abra novamente para editar.")
                 return
             }
-            setViewingTransactionId(null)
-            setEditingTransaction(t)
+            openEntity("edit", t.id)
         },
-        [loadedTransactions, notifyError],
+        [loadedTransactions, notifyError, openEntity],
     )
 
     const handleMarkAsPaid = useCallback(async (transaction: ERPTransaction) => {
@@ -872,9 +872,7 @@ export default function TransactionsPage({
             }
             if (transaction.isInstallmentGroup && Number(transaction.installmentPendingCount || 0) === 0) {
                 const representativeId = transaction.groupRepresentativeTransactionId || transaction.id
-                setViewingTransactionId(representativeId)
-                setShowCreateTransaction(false)
-                setEditingTransaction(null)
+                openEntity("view", representativeId)
                 setEditingRecurringTemplateId(null)
                 return
             }
@@ -890,12 +888,10 @@ export default function TransactionsPage({
                 debouncedRefresh()
                 return
             }
-            setViewingTransactionId(transaction.id)
-            setShowCreateTransaction(false)
-            setEditingTransaction(null)
+            openEntity("view", transaction.id)
             setEditingRecurringTemplateId(null)
         },
-        [loadedTransactions, notifyError, debouncedRefresh, partnerId],
+        [loadedTransactions, notifyError, debouncedRefresh, partnerId, openEntity],
     )
 
     const handleEditInstallment = useCallback((installmentId: string) => {
@@ -910,8 +906,8 @@ export default function TransactionsPage({
         }
         setOpenInstallmentGroupId(null)
         setInstallmentDetail(null)
-        setEditingTransaction(tx)
-    }, [loadedTransactions, notifyError])
+        openEntity("edit", tx.id)
+    }, [loadedTransactions, notifyError, openEntity])
 
     const handlePayInstallment = useCallback(async (installmentId: string) => {
         const row = (installmentDetail?.installments || []).find((item: any) => item.id === installmentId)
@@ -973,10 +969,10 @@ export default function TransactionsPage({
         refreshTransactionsNow,
     ])
 
-    if (viewingTransactionId) {
+    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
         return (
             <motion.div
-                key={`tx-detail-${viewingTransactionId}`}
+                key={`tx-detail-${entityState.entityId}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -984,7 +980,7 @@ export default function TransactionsPage({
                 className="w-full h-full min-h-[70vh]"
             >
                 <TransactionDetailView
-                    transactionId={viewingTransactionId}
+                    transactionId={entityState.entityId}
                     partnerId={partnerId}
                     onBack={handleCloseTransactionDetail}
                     onEdit={handleEditFromTransactionDetail}
@@ -1088,10 +1084,13 @@ export default function TransactionsPage({
         )
     }
 
-    if (showCreateTransaction || editingTransaction || editingRecurringTemplateId) {
+    const isFormOpen = (entityState.isOpen && (entityState.action === "create" || entityState.action === "edit" || entityState.action === "duplicate")) || !!editingRecurringTemplateId
+    const editingTx = entityState.isOpen && entityState.action === "edit" ? currentEntity : null
+
+    if (isFormOpen) {
         return (
             <motion.div
-                key={editingRecurringTemplateId ? `edit-rec-${editingRecurringTemplateId}` : editingTransaction ? `edit-${editingTransaction.id}` : "create-transaction"}
+                key={editingRecurringTemplateId ? `edit-rec-${editingRecurringTemplateId}` : editingTx ? `edit-${editingTx.id}` : "create-transaction"}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -1103,17 +1102,15 @@ export default function TransactionsPage({
                     categories={categories}
                     accounts={accounts}
                     paymentMethods={paymentMethods}
-                    editTransaction={editingTransaction || undefined}
+                    editTransaction={editingTx || undefined}
                     editRecurringTemplateId={editingRecurringTemplateId || undefined}
-                    editRecurringTemplate={editingRecurringTemplateId ? recurringTemplates.find((t: any) => t.id === editingRecurringTemplateId) : undefined}
+                    editRecurringTemplate={editingRecurringTemplateId ? recurringTemplates?.find((t: any) => t.id === editingRecurringTemplateId) : undefined}
                     onClose={() => {
-                        setShowCreateTransaction(false)
-                        setEditingTransaction(null)
+                        closeEntity()
                         setEditingRecurringTemplateId(null)
                     }}
                     onSuccess={() => {
-                        setShowCreateTransaction(false)
-                        setEditingTransaction(null)
+                        closeEntity()
                         setEditingRecurringTemplateId(null)
                         void refreshTransactionsNow()
                     }}
@@ -1152,7 +1149,7 @@ export default function TransactionsPage({
                             <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
                         </Button>
 
-                        <Button onClick={() => setShowCreateTransaction(true)}>
+                        <Button onClick={() => openEntity("create")}>
                             <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
                             Nova Transação
                         </Button>
@@ -1165,7 +1162,7 @@ export default function TransactionsPage({
                     search={search}
                     onSearchChange={setSearch}
                     onOpenFilter={() => setModals((prev) => ({ ...prev, filter: true }))}
-                    onAddTransaction={() => setShowCreateTransaction(true)}
+                    onAddTransaction={() => openEntity("create")}
                     filters={filters}
                     setFilters={setFilters}
                     viewMode={viewMode}
@@ -1290,6 +1287,7 @@ export default function TransactionsPage({
                                                 onMarkAsPaid={handleMarkAsPaid}
                                                 onCancelPending={handleRequestCancelPending}
                                                 onSettleInstallmentGroup={handleSettleInstallmentGroup}
+                                                {...getPrefetchProps(transaction.id)}
                                             />
                                         ))}
                                     </div>
@@ -1362,6 +1360,7 @@ export default function TransactionsPage({
                                                             onMarkAsPaid={handleMarkAsPaid}
                                                             onCancelPending={handleRequestCancelPending}
                                                             onSettleInstallmentGroup={handleSettleInstallmentGroup}
+                                                            {...getPrefetchProps(transaction.id)}
                                                         />
                                                     ))}
                                                 </tbody>

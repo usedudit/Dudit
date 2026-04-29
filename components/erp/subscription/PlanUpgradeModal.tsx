@@ -4,7 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
-import { Button } from "@/components/reusable"
+import { Button, ThreeDotsLoader } from "@/components/reusable"
 import { XIcon } from "@/lib/icons"
 import { toast } from "sonner"
 import { formatCurrency } from "@/lib/utils"
@@ -14,10 +14,9 @@ import {
   createSubscriptionAction,
   upgradeSubscriptionAction,
 } from "@/app/actions/erp/subscriptions"
-import { buildFeaturesDisplay, getHardcodedPlan } from "@/lib/subscription/feature-labels"
+import { getHardcodedPlan } from "@/lib/subscription/feature-labels"
 import { PLAN_UPGRADE_ICONS, PLAN_UPGRADE_MASCOTS, type PlanTierSlug } from "@/lib/subscription/plan-tier"
 import { Input as FormInput } from "@/components/reusable/Input"
-import { Loader2 } from "lucide-react"
 
 type UpgradeTarget = PlanTierSlug
 
@@ -166,7 +165,7 @@ function PlanUpgradeModalInner({
       <div className="mt-auto space-y-3">
         {loading ? (
           <div className="flex items-center gap-2 text-brand-inactive-text py-4">
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <ThreeDotsLoader />
             <span className="text-xs">Carregando detalhes do faturamento…</span>
           </div>
         ) : (

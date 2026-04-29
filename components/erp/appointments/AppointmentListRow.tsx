@@ -53,10 +53,13 @@ export const AppointmentListRow = React.memo(
             switch (colId) {
                 case "customer":
                     return (
-                        <div className="flex items-center gap-3">
-                            <UserProfileImage fullName={appointment.customer} className="w-10 h-10 shrink-0" />
-                            <div className="flex flex-col text-left min-w-0">
-                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[220px] xl:max-w-[320px]">
+                        <div className="flex items-center gap-3 text-left">
+                            <UserProfileImage
+                                fullName={appointment.customer}
+                                className="w-10 h-10 text-[14px]"
+                            />
+                            <div className="flex flex-col">
+                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[200px] xl:max-w-[300px]">
                                     {appointment.customer}
                                 </span>
                                 <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
@@ -123,11 +126,11 @@ export const AppointmentListRow = React.memo(
             <motion.tr
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/20 transition-colors cursor-pointer bg-white dark:bg-dark-background"
+                className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
                 onClick={() => onView(appointment)}
             >
                 <td
-                    className="py-2 pl-6 pr-0 border-b border-brand-border dark:border-dark-border w-14"
+                    className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12"
                     onClick={(e) => e.stopPropagation()}
                 >
                     <Checkbox checked={selected} onChange={() => onSelect(appointment.id)} />

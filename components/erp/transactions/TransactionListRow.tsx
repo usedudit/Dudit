@@ -25,6 +25,9 @@ interface TransactionListItemProps {
     onMarkAsPaid?: (transaction: ERPTransaction) => void
     onCancelPending?: (transaction: ERPTransaction) => void
     onSettleInstallmentGroup?: (transaction: ERPTransaction) => void
+    onPrefetchMouseEnter?: (id: string) => void
+    onPrefetchMouseLeave?: (id: string) => void
+    onPrefetchTouchStart?: (id: string) => void
 }
 
 const getPaymentIcon = (paymentType: string) => {
@@ -36,7 +39,7 @@ const getPaymentIcon = (paymentType: string) => {
 }
 
 const TransactionListItem = React.memo(
-    ({ transaction, columns, selected, onSelect, onOpenDetail, onEdit, onMarkAsPaid, onCancelPending, onSettleInstallmentGroup }: TransactionListItemProps) => {
+    ({ transaction, columns, selected, onSelect, onOpenDetail, onEdit, onMarkAsPaid, onCancelPending, onSettleInstallmentGroup, onPrefetchMouseEnter, onPrefetchMouseLeave, onPrefetchTouchStart }: TransactionListItemProps) => {
         const renderCellContent = (colId: string) => {
             switch (colId) {
                 case "transaction":
@@ -172,6 +175,9 @@ const TransactionListItem = React.memo(
                     if (el.closest("input") || el.closest(".action-btn")) return
                     onOpenDetail?.(transaction)
                 }}
+                onMouseEnter={() => onPrefetchMouseEnter?.(transaction.id)}
+                onMouseLeave={() => onPrefetchMouseLeave?.(transaction.id)}
+                onTouchStart={() => onPrefetchTouchStart?.(transaction.id)}
             >
                 <td
                     className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12"

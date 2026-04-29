@@ -36,6 +36,7 @@ import DefaultModal from "@/components/reusable/DefaultModal"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import ServiceGridCard from "./ServiceGridCard"
 import ServiceListItem from "./ServiceListRow"
+import ServiceMobileItem from "./ServiceMobileItem"
 import ServicePageControls from "./ServicePageControls"
 import { AddServicePage } from "./AddServicePage"
 
@@ -45,6 +46,7 @@ import {
     ExportFileIcon,
     Settings2Icon,
     UploadIcon,
+    ArrowUpDownIcon,
     TrashIcon,
     CheckCircleIcon,
     BlockedIcon
@@ -138,8 +140,7 @@ const EmptyState = React.memo(({ type, onAddFirst, onClearFilters }: EmptyStateP
                 } : undefined}
             />
         </FadeIn>
-    )
-})
+                )})
 EmptyState.displayName = "EmptyState"
 
 // --- MAIN COMPONENT ---
@@ -154,6 +155,7 @@ export default function ServicesPage({
     const { toast } = useToast()
     const { selectedStore } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
+    const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
 
     const queryClient = useQueryClient()
     const servicesQueryKey = useMemo(() => ['erp', 'services', partnerId] as const, [partnerId])
@@ -198,8 +200,10 @@ export default function ServicesPage({
     const [selection, setSelection] = useState({ ids: new Set<string>(), service: null as any, delete: null as any, duplicate: null as any, loadingDetails: false })
     const [actionModal, setActionModal] = useState<{ open: boolean; text: string }>({ open: false, text: "" })
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
+    const [scrollState, setScrollState] = useState({ left: false, right: false })
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
     const [activeTab, setActiveTab] = useState<"all" | "active" | "inactive">("all")
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
     const [ui, setUi] = useState<{ formMode: "edit" | "duplicate" | "details" | "add" | null; pageState: string; isSaving?: boolean }>({ formMode: null, pageState: "list" })
     const [confirmations, setConfirmations] = useState({
         delete: false,
@@ -208,10 +212,11 @@ export default function ServicesPage({
         bulkInactive: false
     })
 
-    const effectiveViewMode = isMobile ? "grid" : viewMode
+    const effectiveViewMode = viewMode
     const itemsPerPage = 8
 
     const containerRef = useRef<HTMLDivElement>(null)
+    const tableContainerRef = useRef<HTMLDivElement>(null)
 
     const hasServices = data.services.length > 0
     const hasActiveFilters =
@@ -221,6 +226,25 @@ export default function ServicesPage({
         !!filters.priceRange.max
 
     const isFiltered = data.search.length > 0 || hasActiveFilters
+
+    const checkScroll = useCallback(() => {
+        if (!tableContainerRef.current) return
+        const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
+        setScrollState((prev) => {
+            const nextLeft = scrollLeft > 0
+            const nextRight = scrollLeft < scrollWidth - clientWidth - 2
+            if (prev.left === nextLeft && prev.right === nextRight) return prev
+            return { left: nextLeft, right: nextRight }
+        })
+    }, [])
+
+    useEffect(() => {
+        checkScroll()
+        window.addEventListener("resize", checkScroll)
+        return () => {
+            window.removeEventListener("resize", checkScroll)
+        }
+    }, [checkScroll, effectiveViewMode, data.services])
 
     useEffect(() => {
         const t = setTimeout(() => setData((p) => ({ ...p, debouncedSearch: p.search })), 300)
@@ -252,8 +276,41 @@ export default function ServicesPage({
     }, [data.services, data.debouncedSearch, filters, activeTab])
 
     const sortedServices = useMemo(() => {
-        return filteredServices // Sorting not implemented in UI yet
-    }, [filteredServices])
+        if (!sortConfig) return filteredServices
+        return [...filteredServices].sort((a, b) => {
+            let valA: any
+            let valB: any
+
+            switch (sortConfig.key) {
+                case "category":
+                    valA = a.service_categories?.name || ""
+                    valB = b.service_categories?.name || ""
+                    break
+                case "duration":
+                    valA = a.duration_minutes ?? 0
+                    valB = b.duration_minutes ?? 0
+                    break
+                case "price":
+                    valA = a.price ?? 0
+                    valB = b.price ?? 0
+                    break
+                case "status":
+                    valA = a.is_active ? 1 : 0
+                    valB = b.is_active ? 1 : 0
+                    break
+                default:
+                    valA = a[sortConfig.key]
+                    valB = b[sortConfig.key]
+                    break
+            }
+
+            if (typeof valA === "string") valA = valA.toLowerCase()
+            if (typeof valB === "string") valB = valB.toLowerCase()
+            if (valA === valB) return 0
+            const comparison = valA < valB ? -1 : 1
+            return sortConfig.direction === "asc" ? comparison : -comparison
+        })
+    }, [filteredServices, sortConfig])
 
     const paginated = useMemo(() =>
         sortedServices.slice((data.page - 1) * itemsPerPage, data.page * itemsPerPage),
@@ -494,37 +551,69 @@ export default function ServicesPage({
                                                             />
                                                         ))}
                                                     </div>
+                                                ) : isTabletOrMobile ? (
+                                                    <div className="w-full">
+                                                        {paginated.map((service) => (
+                                                            <ServiceMobileItem
+                                                                key={service.id}
+                                                                service={service}
+                                                                onClick={handleDetailsService}
+                                                                isSelected={selection.ids.has(service.id)}
+                                                                onSelect={handleSelectRow}
+                                                            />
+                                                        ))}
+                                                    </div>
                                                 ) : (
-                                                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden flex flex-col mb-4">
-                                                        <div className="overflow-x-auto custom-scrollbar">
-                                                            <table className="w-full border-collapse">
+                                                    <div className="w-full overflow-hidden rounded-xl relative">
+                                                        <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                                        <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                                                        <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
                                                                 <thead>
-                                                                    <tr>
-                                                                        <th className="py-3 pl-6 pr-0 border-b border-brand-border dark:border-dark-border w-14 bg-brand-gray/50 dark:bg-dark-background/50">
+                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                        <th className="py-3 pl-6 pr-3 w-[48px] bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
                                                                             <Checkbox
                                                                                 checked={selection.ids.size === paginated.length && paginated.length > 0}
-                                                                                onChange={(checked: boolean) => {
-                                                                                    if (checked) {
-                                                                                        setSelection((p) => ({ ...p, ids: new Set(paginated.map((p) => p.id)) }))
-                                                                                    } else {
-                                                                                        setSelection((p) => ({ ...p, ids: new Set() }))
-                                                                                    }
+                                                                                onCheckedChange={(checked) => {
+                                                                                    if (checked) setSelection(p => ({ ...p, ids: new Set([...p.ids, ...paginated.map(x => x.id)]) }))
+                                                                                    else setSelection(p => {
+                                                                                        const s = new Set(p.ids)
+                                                                                        paginated.forEach(x => s.delete(x.id))
+                                                                                        return { ...p, ids: s }
+                                                                                    })
                                                                                 }}
                                                                             />
                                                                         </th>
-                                                                        {FIXED_COLUMNS.map((col) => (
-                                                                            <th
-                                                                                key={col.id}
-                                                                                className={`p-3 text-[11px] uppercase tracking-wider font-bold text-brand-inactive-text dark:text-dark-body border-b border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-background/50 whitespace-nowrap`}
-                                                                                style={{
-                                                                                    width: col.width,
-                                                                                    minWidth: col.minWidth,
-                                                                                    textAlign: col.align || "left",
-                                                                                }}
-                                                                            >
-                                                                                {col.label}
-                                                                            </th>
-                                                                        ))}
+                                                                        {FIXED_COLUMNS.map((col) => {
+                                                                            const isSorted = sortConfig?.key === col.id
+                                                                            return (
+                                                                                <th
+                                                                                    key={col.id}
+                                                                                    className={`py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${col.id === "actions" ? "rounded-r-lg" : ""}`}
+                                                                                    style={{ width: col.width, minWidth: col.minWidth }}
+                                                                                    onClick={() => {
+                                                                                        if (col.id === "actions") return
+                                                                                        setSortConfig((prev) => ({
+                                                                                            key: col.id,
+                                                                                            direction: prev?.key === col.id && prev.direction === "asc" ? "desc" : "asc",
+                                                                                        }))
+                                                                                    }}
+                                                                                >
+                                                                                    <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                                        <span>{col.label}</span>
+                                                                                        {col.id !== "actions" && (
+                                                                                            <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                                                                <ArrowUpDownIcon
+                                                                                                    size={14}
+                                                                                                    className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                                                                                />
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </th>
+                                                                            )
+                                                                        })}
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody>

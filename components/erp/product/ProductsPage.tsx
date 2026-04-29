@@ -772,20 +772,21 @@ export default function ProductsPage({
                                                         {paginated.map((product) => {
                                                             const prefetch = getPrefetchProps(product.id)
                                                             return (
-                                                            <ProductGridCard
-                                                                key={product.id}
-                                                                product={product}
-                                                                selected={selection.ids.has(product.id)}
-                                                                onSelect={() => handleSelectRow(product.id)}
-                                                                onEdit={() => handleEditProduct(product)}
-                                                                onDetails={() => handleDetailsProduct(product)}
-                                                                onDelete={() => handleDeleteProduct(product)}
-                                                                onDuplicate={() => handleDuplicateProduct(product)}
-                                                                onPrefetchMouseEnter={prefetch.onMouseEnter}
-                                                                onPrefetchMouseLeave={prefetch.onMouseLeave}
-                                                                onPrefetchTouchStart={prefetch.onTouchStart}
-                                                            />
-                                                        )})}
+                                                                <ProductGridCard
+                                                                    key={product.id}
+                                                                    product={product}
+                                                                    selected={selection.ids.has(product.id)}
+                                                                    onSelect={() => handleSelectRow(product.id)}
+                                                                    onEdit={() => handleEditProduct(product)}
+                                                                    onDetails={() => handleDetailsProduct(product)}
+                                                                    onDelete={() => handleDeleteProduct(product)}
+                                                                    onDuplicate={() => handleDuplicateProduct(product)}
+                                                                    onPrefetchMouseEnter={prefetch.onMouseEnter}
+                                                                    onPrefetchMouseLeave={prefetch.onMouseLeave}
+                                                                    onPrefetchTouchStart={prefetch.onTouchStart}
+                                                                />
+                                                            )
+                                                        })}
                                                     </div>
                                                 ) : (
                                                     <div className="w-full overflow-hidden rounded-xl relative">
@@ -844,22 +845,23 @@ export default function ProductsPage({
                                                                     {paginated.map((product) => {
                                                                         const prefetch = getPrefetchProps(product.id)
                                                                         return (
-                                                                        <ProductListItem
-                                                                            key={product.id}
-                                                                            product={product}
-                                                                            columns={FIXED_COLUMNS}
-                                                                            selected={selection.ids.has(product.id)}
-                                                                            onSelect={handleSelectRow}
-                                                                            onEdit={handleEditProduct}
-                                                                            onDetails={handleDetailsProduct}
-                                                                            onDelete={handleDeleteProduct}
-                                                                            onDuplicate={handleDuplicateProduct}
-                                                                            suppliers={[]}
-                                                                            onPrefetchMouseEnter={prefetch.onMouseEnter}
-                                                                            onPrefetchMouseLeave={prefetch.onMouseLeave}
-                                                                            onPrefetchTouchStart={prefetch.onTouchStart}
-                                                                        />
-                                                                    )})}
+                                                                            <ProductListItem
+                                                                                key={product.id}
+                                                                                product={product}
+                                                                                columns={FIXED_COLUMNS}
+                                                                                selected={selection.ids.has(product.id)}
+                                                                                onSelect={handleSelectRow}
+                                                                                onEdit={handleEditProduct}
+                                                                                onDetails={handleDetailsProduct}
+                                                                                onDelete={handleDeleteProduct}
+                                                                                onDuplicate={handleDuplicateProduct}
+                                                                                suppliers={[]}
+                                                                                onPrefetchMouseEnter={prefetch.onMouseEnter}
+                                                                                onPrefetchMouseLeave={prefetch.onMouseLeave}
+                                                                                onPrefetchTouchStart={prefetch.onTouchStart}
+                                                                            />
+                                                                        )
+                                                                    })}
                                                                 </tbody>
                                                             </table>
                                                         </div>

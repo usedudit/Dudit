@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import confetti from "canvas-confetti"
-import { Copy, Package, MapPin, CheckCircle2, Printer } from "lucide-react"
+import { CopyIcon, BoxIcon, MapPinIcon, CheckCircleIcon, PrinterIcon } from "@/lib/icons"
 import { Button, InfoCard, IconPlaceholder, Input, Spinner, Separator } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
@@ -93,7 +93,7 @@ export function PaymentWrapper({
             // If we have an orderId that is not temp, or we are in a success/pending state, redirect to orders
             const isOrderCreated = orderId && !orderId.startsWith("temp-")
             const isPaymentStarted = ["pix", "boleto", "success", "mp_redirect"].includes(step)
-            
+
             if (isOrderCreated || isPaymentStarted || paymentConfirmed) {
                 window.location.href = "/pedidos"
             } else {
@@ -539,7 +539,7 @@ export function PaymentWrapper({
                                         onClick={handleCopyQrCode}
                                         className="gap-2 shrink-0 h-[42px] w-[42px]"
                                     >
-                                        {copied ? <CheckCircle2 size={16} className="text-brand-green" /> : <Copy size={16} />}
+                                        {copied ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
                                     </Button>
                                 </div>
 
@@ -612,7 +612,7 @@ export function PaymentWrapper({
                                         }}
                                         className="gap-2 shrink-0 h-[42px] w-[42px]"
                                     >
-                                        {copied ? <CheckCircle2 size={16} className="text-brand-green" /> : <Copy size={16} />}
+                                        {copied ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
                                     </Button>
                                     {boletoData?.ticketUrl && (
                                         <Button
@@ -621,7 +621,7 @@ export function PaymentWrapper({
                                             className="gap-2 shrink-0 h-[42px] w-[42px]"
                                             title="Imprimir Boleto"
                                         >
-                                            <Printer size={16} />
+                                            <PrinterIcon size={16} />
                                         </Button>
                                     )}
                                 </div>
@@ -676,7 +676,7 @@ export function PaymentWrapper({
                             <div className="space-y-6 max-w-xl mx-auto mb-10">
                                 <div>
                                     <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4 flex items-center gap-2">
-                                        <Package size={16} className="text-brand-inactive-text" /> Itens comprados
+                                        <BoxIcon size={16} className="text-brand-inactive-text" /> Itens comprados
                                     </h3>
                                     <div className="space-y-4">
                                         {orderDetails.items.map((item, idx) => (
@@ -700,7 +700,7 @@ export function PaymentWrapper({
                                     <>
                                         <div>
                                             <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2 flex items-center gap-2">
-                                                <MapPin size={16} className="text-brand-inactive-text" /> Endereço de Entrega
+                                                <MapPinIcon size={16} className="text-brand-inactive-text" /> Endereço de Entrega
                                             </h3>
                                             <p className="text-sm text-brand-inactive-text leading-relaxed bg-brand-gray/30 dark:bg-dark-bg p-3 rounded-xl border border-brand-border dark:border-dark-border">
                                                 {orderDetails.deliveryAddress}

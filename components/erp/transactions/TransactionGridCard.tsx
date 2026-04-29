@@ -17,6 +17,9 @@ interface TransactionGridCardProps {
     onMarkAsPaid?: (transaction: ERPTransaction) => void
     onCancelPending?: (transaction: ERPTransaction) => void
     onSettleInstallmentGroup?: (transaction: ERPTransaction) => void
+    onPrefetchMouseEnter?: (id: string) => void
+    onPrefetchMouseLeave?: (id: string) => void
+    onPrefetchTouchStart?: (id: string) => void
 }
 
 const getPaymentIcon = (paymentType: string) => {
@@ -28,7 +31,7 @@ const getPaymentIcon = (paymentType: string) => {
 }
 
 const TransactionGridCard = React.memo(
-    ({ transaction, selected, onSelect, onOpenDetail, onEdit, onMarkAsPaid, onCancelPending, onSettleInstallmentGroup }: TransactionGridCardProps) => {
+    ({ transaction, selected, onSelect, onOpenDetail, onEdit, onMarkAsPaid, onCancelPending, onSettleInstallmentGroup, onPrefetchMouseEnter, onPrefetchMouseLeave, onPrefetchTouchStart }: TransactionGridCardProps) => {
         const PaymentIcon = getPaymentIcon(transaction.paymentType)
         const isRecurring = !!transaction.recurringId || !!transaction.isRecurringOccurrence
 
@@ -38,6 +41,9 @@ const TransactionGridCard = React.memo(
                 animate={{ opacity: 1 }}
                 className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
                 onClick={() => onOpenDetail?.(transaction)}
+                onMouseEnter={() => onPrefetchMouseEnter?.(transaction.id)}
+                onMouseLeave={() => onPrefetchMouseLeave?.(transaction.id)}
+                onTouchStart={() => onPrefetchTouchStart?.(transaction.id)}
             >
                 <div className="flex gap-4 mb-2">
                     <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
