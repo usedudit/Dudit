@@ -599,6 +599,14 @@ export const ListView = ({ appointments, onOpenView, currentPage, setCurrentPage
     const totalPages = Math.ceil(totalItems / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const visibleItems = appointments.slice(startIndex, startIndex + itemsPerPage);
+    const columns = [
+        { id: "customer", align: "left" },
+        { id: "datetime", align: "left" },
+        { id: "staff", align: "left" },
+        { id: "price", align: "left" },
+        { id: "status", align: "center" },
+        { id: "actions", align: "center" },
+    ] as const;
 
     return (
         <div className="flex flex-col h-full bg-white dark:bg-dark-surface rounded-2xl overflow-hidden shadow-sm border border-brand-border dark:border-dark-border">
@@ -613,8 +621,11 @@ export const ListView = ({ appointments, onOpenView, currentPage, setCurrentPage
                             {visibleItems.map((apt: Appointment) => (
                                 <AppointmentListRow 
                                     key={apt.id} 
-                                    appointment={apt} 
-                                    onView={onOpenView} 
+                                    appointment={apt}
+                                    columns={columns as any}
+                                    selected={false}
+                                    onSelect={() => {}}
+                                    onView={onOpenView}
                                 />
                             ))}
                         </motion.div>

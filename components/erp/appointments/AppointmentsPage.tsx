@@ -1,22 +1,9 @@
 "use client";
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
-    ChevronLeft,
-    ChevronRight,
-    LayoutList,
-    LayoutGrid,
-    ChevronDown,
-    RotateCcw,
-    Users,
-    Plus,
-    Calendar as CalendarIcon,
     PlusIcon,
-    Search,
-    Filter,
-    Loader2
 } from 'lucide-react';
-import { Button, Dropdown, DropdownItem, Checkbox, Tabs, TabsList, TabsTrigger, Input as FormInput } from '@/components/reusable';
-import { UserProfileImage } from '@/lib/utils/UserProfileImage';
+import { Button, Checkbox } from '@/components/reusable';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import {
@@ -35,7 +22,7 @@ import { TopSelectionBar } from './Shared';
 import { AppointmentSheet } from './sheets/AppointmentSheet';
 import CheckoutSheet from './sheets/CheckoutSheet';
 import { MoreAppointmentsSheet, AddUnavailableSheet } from './sheets/ActionSheets';
-import { MobileView, DayView, TimelineView, MonthView, ListView } from './views/CalendarViews';
+import { MobileView, DayView, TimelineView, MonthView } from './views/CalendarViews';
 import {
     createAppointmentsAction,
     getAppointmentHistoryAction,
@@ -44,6 +31,9 @@ import {
 } from '@/app/actions/erp/appointments';
 import { fetchPartnerCustomersBucket, fetchPartnerTeamMembersBucket, fetchPartnerServicesBucket } from '@/app/actions/erp/client-loaders';
 import { FadeIn } from '@/components/animations/FadeIn';
+import FilterSheet from '@/components/reusable/FilterSheet';
+import AppointmentsPageControls from './AppointmentsPageControls';
+import { AppointmentListRow } from './AppointmentListRow';
 
 /**
  * Compute the visible date range based on the current view and date.
@@ -72,6 +62,21 @@ function computeVisibleDateRange(date: Date, view: ViewType): { startDate: strin
 }
 
 const AppointmentsPage = () => {
+    const APPOINTMENT_COLUMNS = useMemo<Array<{
+        id: string;
+        label: string;
+        align: "left" | "center" | "right";
+        width: string;
+        minWidth: string;
+    }>>(() => ([
+        { id: "customer", label: "Cliente", align: "left", width: "280px", minWidth: "280px" },
+        { id: "datetime", label: "Data e hora", align: "left", width: "180px", minWidth: "180px" },
+        { id: "staff", label: "Profissional", align: "left", width: "180px", minWidth: "160px" },
+        { id: "price", label: "Valor", align: "left", width: "120px", minWidth: "120px" },
+        { id: "status", label: "Status", align: "center", width: "110px", minWidth: "100px" },
+        { id: "actions", label: "Acoes", align: "center", width: "70px", minWidth: "70px" },
+    ]), []);
+
     const [viewMode, setViewMode] = useState<ModeType>('calendar');
     const [calendarView, setCalendarView] = useState<ViewType>('day');
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -82,7 +87,9 @@ const AppointmentsPage = () => {
     const [realStaffMembers, setRealStaffMembers] = useState<Array<{ id: string; name: string; role: string; avatar: string }>>([]);
     const [realClients, setRealClients] = useState<any[]>([]);
     const [realServices, setRealServices] = useState<any[]>([]);
-    const [selectedStaffFilter, setSelectedStaffFilter] = useState<string | null>(null);
+    const [filtersOpen, setFiltersOpen] = useState(false);
+    const [appointmentFilters, setAppointmentFilters] = useState<{ teamIds: string[] }>({ teamIds: [] });
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
     // Interaction State
     const [hoverTime, setHoverTime] = useState<{ hour: number, minutes: number, top: number } | null>(null);
@@ -178,24 +185,23 @@ const AppointmentsPage = () => {
         [currentDate, calendarView]
     );
     const cacheKey = useMemo(
-        () => `${currentRange.startDate}|${currentRange.endDate}|${selectedStaffFilter || ''}`,
-        [currentRange, selectedStaffFilter]
+        () => `${currentRange.startDate}|${currentRange.endDate}`,
+        [currentRange]
     );
 
     // -- Core network fetch (always hits server, deduped by key) --
     const fetchRange = useCallback(async (
         startDate: string,
         endDate: string,
-        staffFilter: string | null,
     ): Promise<Appointment[] | null> => {
-        const key = `${startDate}|${endDate}|${staffFilter || ''}`;
+        const key = `${startDate}|${endDate}`;
 
         // Skip if already in-flight (prevents duplicate requests)
         if (inFlightRef.current.has(key)) return null;
         inFlightRef.current.add(key);
 
         try {
-            const res = await getAppointmentsByDateRangeAction(startDate, endDate, staffFilter || undefined);
+            const res = await getAppointmentsByDateRangeAction(startDate, endDate, undefined);
             if (res.success) {
                 const mapped = (res.items || []).map(mapDbAppointment);
                 appointmentCacheRef.current.set(key, { data: mapped, ts: Date.now() });
@@ -251,7 +257,6 @@ const AppointmentsPage = () => {
             const freshData = await fetchRange(
                 currentRange.startDate,
                 currentRange.endDate,
-                selectedStaffFilter
             );
 
             // Only apply if this is still the latest request (race guard)
@@ -264,12 +269,12 @@ const AppointmentsPage = () => {
 
             // 3. Prefetch adjacent ranges (fire-and-forget)
             const { prev, next } = getAdjacentRanges(currentDate, calendarView);
-            fetchRange(prev.startDate, prev.endDate, selectedStaffFilter);
-            fetchRange(next.startDate, next.endDate, selectedStaffFilter);
+            fetchRange(prev.startDate, prev.endDate);
+            fetchRange(next.startDate, next.endDate);
         };
 
         revalidate();
-    }, [cacheKey, currentRange, selectedStaffFilter, currentDate, calendarView, fetchRange, getAdjacentRanges]);
+    }, [cacheKey, currentRange, currentDate, calendarView, fetchRange, getAdjacentRanges]);
 
     // --- ACTIONS ---
 
@@ -436,14 +441,47 @@ const AppointmentsPage = () => {
         return currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
     };
 
-    // Appointments are already filtered by date range + staff at the DB level.
-    // This sorted memo is used by the ListView and any other component that needs sorted data.
+    const hasActiveFilters = appointmentFilters.teamIds.length > 0;
+
+    const visibleStaffMembers = useMemo(() => {
+        if (appointmentFilters.teamIds.length === 0) return realStaffMembers;
+        const selected = new Set(appointmentFilters.teamIds);
+        return realStaffMembers.filter((staff) => selected.has(staff.id));
+    }, [realStaffMembers, appointmentFilters.teamIds]);
+
+    const visibleAppointments = useMemo(() => {
+        if (appointmentFilters.teamIds.length === 0) return appointments;
+        const selected = new Set(appointmentFilters.teamIds);
+        return appointments.filter((appointment) => selected.has(appointment.staffId));
+    }, [appointments, appointmentFilters.teamIds]);
+
     const sortedAppointments = useMemo(() => {
-        return [...appointments].sort((a, b) => {
+        return [...visibleAppointments].sort((a, b) => {
             if (a.date !== b.date) return a.date.localeCompare(b.date);
             return a.time.localeCompare(b.time);
         });
-    }, [appointments]);
+    }, [visibleAppointments]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+        setSelectedIds(new Set());
+    }, [viewMode, calendarView, currentDate, appointmentFilters]);
+
+    const paginatedAppointments = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return sortedAppointments.slice(startIndex, startIndex + itemsPerPage);
+    }, [sortedAppointments, currentPage, itemsPerPage]);
+
+    const totalPages = Math.ceil(sortedAppointments.length / itemsPerPage);
+
+    const handleSelectRow = useCallback((id: string) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
 
     const handleGridMouseMove = (e: React.MouseEvent, colIndex: number) => {
         const rect = e.currentTarget.getBoundingClientRect();
@@ -572,124 +610,27 @@ const AppointmentsPage = () => {
                                 </div>
                             </div>
 
-                            {/* Standard ERP Header Controls */}
-                            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 px-4 md:px-8">
-                                <div className="flex items-center gap-2 w-full md:w-auto">
-                                    <Button 
-                                        variant="outline" 
-                                        className="rounded-full h-10 px-4" 
-                                        onClick={() => setCurrentDate(new Date())}
-                                    >
-                                        Hoje
-                                    </Button>
-
-                                    <div className="flex items-center border border-brand-border dark:border-dark-border rounded-full bg-white dark:bg-dark-surface h-10 shadow-sm overflow-hidden">
-                                        <button
-                                            onClick={() => navigateDate('prev')}
-                                            className="w-10 h-full flex items-center justify-center border-r border-brand-border dark:border-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors hover:bg-gray-50 dark:hover:bg-zinc-900"
-                                        >
-                                            <ChevronLeft size={18} />
-                                        </button>
-                                        <div className="px-4 text-sm font-bold text-brand-dark dark:text-dark-heading capitalize whitespace-nowrap min-w-[140px] text-center">
-                                            {getViewLabel()}
-                                        </div>
-                                        <button
-                                            onClick={() => navigateDate('next')}
-                                            className="w-10 h-full flex items-center justify-center border-l border-brand-border dark:border-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors hover:bg-gray-50 dark:hover:bg-zinc-900"
-                                        >
-                                            <ChevronRight size={18} />
-                                        </button>
-                                    </div>
-
-                                    <Dropdown
-                                        width="w-72"
-                                        trigger={
-                                            <button className="flex items-center gap-2 px-4 h-10 border border-brand-border dark:border-dark-border rounded-full bg-white dark:bg-dark-surface text-sm font-bold text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors whitespace-nowrap shadow-sm">
-                                                <Users size={16} className="text-brand-inactive-text" />
-                                                {selectedStaffFilter
-                                                    ? realStaffMembers.find(s => s.id === selectedStaffFilter)?.name || 'Profissional'
-                                                    : 'Toda a equipe'
-                                                }
-                                                <ChevronDown size={14} className="text-brand-inactive-text" />
-                                            </button>
-                                        }
-                                    >
-                                        <div className="p-1">
-                                            <DropdownItem
-                                                onClick={() => setSelectedStaffFilter(null)}
-                                                className={`rounded-lg font-medium gap-2 ${!selectedStaffFilter ? 'bg-brand-dark/5 dark:bg-white/5 text-brand-dark dark:text-dark-heading' : ''}`}
-                                            >
-                                                <Users size={16} /> Toda a equipe
-                                            </DropdownItem>
-                                            <div className="my-2 border-t border-brand-border dark:border-dark-border"></div>
-                                            <div className="space-y-1 px-1">
-                                                {realStaffMembers.map(staff => (
-                                                    <DropdownItem
-                                                        key={staff.id}
-                                                        onClick={() => setSelectedStaffFilter(staff.id)}
-                                                        className={`gap-3 ${selectedStaffFilter === staff.id ? 'bg-brand-dark/5 dark:bg-white/5' : ''}`}
-                                                    >
-                                                        <UserProfileImage fullName={staff.name} imageUrl={staff.avatar} className="w-6 h-6" />
-                                                        <span className="text-sm">{staff.name}</span>
-                                                    </DropdownItem>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </Dropdown>
-                                </div>
-
-                                <div className="flex items-center gap-3 w-full md:w-auto">
-                                    <div className="flex-1 md:w-64">
-                                        <FormInput 
-                                            placeholder="Buscar agendamentos..." 
-                                            prefix={<Search size={18} className="text-brand-inactive-text" />}
-                                            className="h-10 rounded-full"
-                                        />
-                                    </div>
-                                    
-                                    <Tabs 
-                                        value={viewMode}
-                                        onValueChange={(val: any) => setViewMode(val as ModeType)}
-                                        className="w-auto"
-                                    >
-                                        <TabsList className="bg-gray-100 dark:bg-zinc-900 p-1 rounded-full h-10 border-0 gap-1 flex">
-                                            <TabsTrigger 
-                                                value="calendar" 
-                                                className="rounded-full px-4 data-[state=active]:bg-white dark:data-[state=active]:bg-dark-surface data-[state=active]:text-brand-dark dark:data-[state=active]:text-white shadow-sm h-full flex items-center gap-2 pb-0"
-                                            >
-                                                <CalendarIcon size={16} /> Calendário
-                                            </TabsTrigger>
-                                            <TabsTrigger 
-                                                value="list" 
-                                                className="rounded-full px-4 data-[state=active]:bg-white dark:data-[state=active]:bg-dark-surface data-[state=active]:text-brand-dark dark:data-[state=active]:text-white shadow-sm h-full flex items-center gap-2 pb-0"
-                                            >
-                                                <LayoutList size={16} /> Lista
-                                            </TabsTrigger>
-                                        </TabsList>
-                                    </Tabs>
-
-                                    <Dropdown
-                                        width="w-32"
-                                        align="right"
-                                        trigger={
-                                            <button className="flex items-center gap-2 px-4 h-10 border border-brand-border dark:border-dark-border rounded-full bg-white dark:bg-dark-surface text-sm font-bold text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors whitespace-nowrap shadow-sm">
-                                                {calendarView === 'day' ? 'Dia' : calendarView === 'week' ? 'Semana' : 'Mês'}
-                                                <ChevronDown size={14} className="text-brand-inactive-text" />
-                                            </button>
-                                        }
-                                    >
-                                        <DropdownItem onClick={() => setCalendarView('day')} className="font-medium gap-2"><LayoutList size={16} /> Dia</DropdownItem>
-                                        <DropdownItem onClick={() => setCalendarView('week')} className="font-medium gap-2"><LayoutGrid size={16} /> Semana</DropdownItem>
-                                        <DropdownItem onClick={() => setCalendarView('month')} className="font-medium gap-2"><CalendarIcon size={16} /> Mês</DropdownItem>
-                                    </Dropdown>
-                                </div>
-                            </div>
+                            <AppointmentsPageControls
+                                currentLabel={getViewLabel()}
+                                onToday={() => setCurrentDate(new Date())}
+                                onPrev={() => navigateDate('prev')}
+                                onNext={() => navigateDate('next')}
+                                onOpenFilter={() => setFiltersOpen(true)}
+                                filters={appointmentFilters}
+                                setFilters={setAppointmentFilters}
+                                teamOptions={realStaffMembers.map((staff) => ({ id: staff.id, name: staff.name }))}
+                                hasActiveFilters={hasActiveFilters}
+                                viewMode={viewMode}
+                                onViewModeChange={(mode) => setViewMode(mode)}
+                                calendarView={calendarView}
+                                onCalendarViewChange={(view) => setCalendarView(view)}
+                            />
 
                             {/* Mobile View Container */}
                             <div className="block md:hidden h-full">
                                 <MobileView
                                     currentDate={currentDate}
-                                    appointments={appointments}
+                                    appointments={visibleAppointments}
                                     setCurrentDate={setCurrentDate}
                                     navigateDate={navigateDate}
                                     getViewLabel={getViewLabel}
@@ -722,7 +663,7 @@ const AppointmentsPage = () => {
                                                             ))}
                                                         </div>
                                                         <MonthView
-                                                            appointments={appointments}
+                                                            appointments={visibleAppointments}
                                                             currentDate={currentDate}
                                                             handleGenericCellClick={handleGenericCellClick}
                                                             activePopover={activePopover}
@@ -737,9 +678,9 @@ const AppointmentsPage = () => {
 
                                                 {calendarView === 'week' && (
                                                     <TimelineView
-                                                        appointments={appointments}
+                                                        appointments={visibleAppointments}
                                                         currentDate={currentDate}
-                                                        staffMembers={realStaffMembers}
+                                                        staffMembers={visibleStaffMembers}
                                                         onOpenView={handleOpenView}
                                                         handleTimelineMouseMove={handleTimelineMouseMove}
                                                         handleGridMouseLeave={handleGridMouseLeave}
@@ -755,9 +696,9 @@ const AppointmentsPage = () => {
 
                                                 {calendarView === 'day' && (
                                                     <DayView
-                                                        appointments={appointments}
+                                                        appointments={visibleAppointments}
                                                         currentDate={currentDate}
-                                                        staffMembers={realStaffMembers}
+                                                        staffMembers={visibleStaffMembers}
                                                         onOpenView={handleOpenView}
                                                         handleGridMouseMove={handleGridMouseMove}
                                                         handleGridMouseLeave={handleGridMouseLeave}
@@ -780,19 +721,115 @@ const AppointmentsPage = () => {
                                             exit={{ opacity: 0 }}
                                             transition={{ duration: 0.2 }}
                                         >
-                                            <ListView
-                                                appointments={sortedAppointments}
-                                                onOpenView={handleOpenView}
-                                                currentPage={currentPage}
-                                                setCurrentPage={setCurrentPage}
-                                                itemsPerPage={itemsPerPage}
-                                            />
+                                            <div className="flex flex-col h-full bg-white dark:bg-dark-surface rounded-2xl overflow-hidden">
+                                                <div className="overflow-x-auto custom-scrollbar">
+                                                    <table className="w-full border-collapse">
+                                                        <thead>
+                                                            <tr>
+                                                                <th className="py-3 pl-6 pr-0 border-b border-brand-border dark:border-dark-border w-14 bg-brand-gray/50 dark:bg-dark-background/50">
+                                                                    <Checkbox
+                                                                        checked={paginatedAppointments.length > 0 && paginatedAppointments.every((appointment) => selectedIds.has(appointment.id))}
+                                                                        onChange={(checked: boolean) => {
+                                                                            if (checked) {
+                                                                                setSelectedIds(new Set(paginatedAppointments.map((appointment) => appointment.id)));
+                                                                            } else {
+                                                                                setSelectedIds(new Set());
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                </th>
+                                                                {APPOINTMENT_COLUMNS.map((column) => (
+                                                                    <th
+                                                                        key={column.id}
+                                                                        className={`p-3 text-[11px] uppercase tracking-wider font-bold text-brand-inactive-text dark:text-dark-body border-b border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-background/50 whitespace-nowrap ${column.align === "center" ? "text-center" : column.align === "right" ? "text-right" : "text-left"}`}
+                                                                        style={{ width: column.width, minWidth: column.minWidth }}
+                                                                    >
+                                                                        {column.label}
+                                                                    </th>
+                                                                ))}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {paginatedAppointments.length > 0 ? (
+                                                                paginatedAppointments.map((appointment) => (
+                                                                    <AppointmentListRow
+                                                                        key={appointment.id}
+                                                                        appointment={appointment}
+                                                                        columns={APPOINTMENT_COLUMNS}
+                                                                        selected={selectedIds.has(appointment.id)}
+                                                                        onSelect={handleSelectRow}
+                                                                        onView={handleOpenView}
+                                                                    />
+                                                                ))
+                                                            ) : (
+                                                                <tr>
+                                                                    <td colSpan={APPOINTMENT_COLUMNS.length + 1}>
+                                                                        <div className="p-20 text-center">
+                                                                            <h3 className="text-brand-dark dark:text-dark-heading font-bold mb-1">
+                                                                                Nenhum agendamento encontrado
+                                                                            </h3>
+                                                                            <p className="text-sm text-brand-inactive-text">
+                                                                                Nao ha agendamentos para este periodo ou filtros.
+                                                                            </p>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            )}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+
+                                                {totalPages > 1 && (
+                                                    <div className="p-4 border-t border-brand-border dark:border-dark-border bg-gray-50/50 dark:bg-zinc-900/30">
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            {Array.from({ length: totalPages }, (_, index) => {
+                                                                const page = index + 1;
+                                                                return (
+                                                                    <button
+                                                                        key={page}
+                                                                        onClick={() => setCurrentPage(page)}
+                                                                        className={`min-w-9 h-9 px-3 rounded-full text-sm font-medium transition-colors ${currentPage === page ? "bg-brand-dark text-white dark:bg-white dark:text-brand-dark" : "text-brand-inactive-text hover:bg-brand-gray dark:hover:bg-dark-border"}`}
+                                                                    >
+                                                                        {page}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
                             </div>
                         </div>
                     </div>
+
+                    <FilterSheet
+                        isOpen={filtersOpen}
+                        onClose={() => setFiltersOpen(false)}
+                        sections={[
+                            {
+                                id: "teamIds",
+                                title: "Equipe",
+                                type: "checkbox-list",
+                                options: realStaffMembers.map((staff) => staff.name),
+                            },
+                        ]}
+                        filters={{
+                            teamIds: appointmentFilters.teamIds
+                                .map((id) => realStaffMembers.find((staff) => staff.id === id)?.name)
+                                .filter(Boolean),
+                        }}
+                        setFilters={(next: { teamIds: string[] }) => {
+                            setAppointmentFilters({
+                                teamIds: next.teamIds
+                                    .map((name) => realStaffMembers.find((staff) => staff.name === name)?.id)
+                                    .filter(Boolean) as string[],
+                            });
+                        }}
+                        onClear={() => setAppointmentFilters({ teamIds: [] })}
+                    />
 
                     {/* Sheets */}
                     <AnimatePresence>

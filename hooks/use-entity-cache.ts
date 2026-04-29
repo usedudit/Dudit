@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, useSyncExternalStore } from "react"
+import { useCallback, useSyncExternalStore } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -33,6 +33,8 @@ const globalCaches = new Map<string, Map<string, CacheEntry<any>>>()
 const inFlightRequests = new Map<string, Promise<any>>()
 // Subscriber notification for useSyncExternalStore
 const subscribers = new Map<string, Set<() => void>>()
+// Global version counter per cache key (ensures useSyncExternalStore works across all instances)
+const globalVersions = new Map<string, number>()
 
 function getCacheKey(entityType: string, partnerId: string) {
     return `${entityType}:${partnerId}`
@@ -47,7 +49,16 @@ function getEntityCacheMap(cacheKey: string): Map<string, CacheEntry<any>> {
     return map
 }
 
+function getVersion(cacheKey: string): number {
+    return globalVersions.get(cacheKey) ?? 0
+}
+
+function incrementVersion(cacheKey: string): void {
+    globalVersions.set(cacheKey, getVersion(cacheKey) + 1)
+}
+
 function notifySubscribers(cacheKey: string) {
+    incrementVersion(cacheKey)
     const subs = subscribers.get(cacheKey)
     if (subs) subs.forEach((fn) => fn())
 }
@@ -83,9 +94,8 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
     const cacheKey = getCacheKey(entityType, partnerId)
     const cacheMap = getEntityCacheMap(cacheKey)
 
-    // Snapshot for useSyncExternalStore — changes when cache is mutated
-    const versionRef = useRef(0)
-    const getSnapshot = useCallback(() => versionRef.current, [])
+    // Snapshot for useSyncExternalStore — uses global version counter
+    const getSnapshot = useCallback(() => getVersion(cacheKey), [cacheKey])
     const subscribeFn = useCallback(
         (cb: () => void) => subscribe(cacheKey, cb),
         [cacheKey],
@@ -107,7 +117,6 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
                 changed = true
             }
             if (changed) {
-                versionRef.current++
                 notifySubscribers(cacheKey)
             }
         },
@@ -138,7 +147,6 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
                     .then((detail) => {
                         if (detail) {
                             cacheMap.set(id, { data: detail, timestamp: Date.now() })
-                            versionRef.current++
                             notifySubscribers(cacheKey)
                         }
                     })
@@ -176,7 +184,6 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
                 .then((detail) => {
                     if (detail) {
                         cacheMap.set(id, { data: detail, timestamp: Date.now() })
-                        versionRef.current++
                         notifySubscribers(cacheKey)
                     }
                 })
@@ -194,7 +201,6 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
     const invalidateEntity = useCallback(
         (id: string) => {
             cacheMap.delete(id)
-            versionRef.current++
             notifySubscribers(cacheKey)
         },
         [cacheMap, cacheKey],
@@ -208,7 +214,6 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
 
     const invalidateAll = useCallback(() => {
         cacheMap.clear()
-        versionRef.current++
         notifySubscribers(cacheKey)
         invalidateList()
     }, [cacheMap, cacheKey, invalidateList])
@@ -220,7 +225,6 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
             const entry = cacheMap.get(id)
             if (!entry) return
             cacheMap.set(id, { data: updater(entry.data), timestamp: Date.now() })
-            versionRef.current++
             notifySubscribers(cacheKey)
         },
         [cacheMap, cacheKey],
@@ -231,7 +235,6 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
     const setEntity = useCallback(
         (id: string, data: TDetail) => {
             cacheMap.set(id, { data, timestamp: Date.now() })
-            versionRef.current++
             notifySubscribers(cacheKey)
         },
         [cacheMap, cacheKey],

@@ -47,17 +47,17 @@ const ServiceListItem = React.memo(
                 case "name":
                     return (
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
+                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                                 <img
                                     src={getR2ImageUrl(service.images?.[0], "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
                                     alt=""
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-cover rounded-full"
                                     loading="lazy"
                                 />
                             </div>
-                            <div className="flex flex-col text-left min-w-0">
-                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[200px] xl:max-w-[300px]">
-                                    {service.name}
+                            <div className="flex flex-col text-left">
+                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5">
+                                    <span className="truncate max-w-[200px] xl:max-w-[300px]">{service.name}</span>
                                 </span>
                                 <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
                                     {service.sku}

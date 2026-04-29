@@ -190,6 +190,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               description="Gerencie informações da empresa, endereço e contatos comerciais."
                               onClick={() => setActivePage("business-data")}
                               showChevron
+                              className="px-4 py-3 gap-4"
                             />
                           )}
                           {canAccessTeam && (
@@ -199,6 +200,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               description="Convide membros, defina funções e gerencie permissões de acesso."
                               onClick={() => setActivePage("team")}
                               showChevron
+                              className="px-4 py-3 gap-4"
                             />
                           )}
                           {canAccessSubscription && (
@@ -208,6 +210,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               description="Visualize seu plano atual, faturas e métodos de pagamento."
                               onClick={() => setActivePage("subscription")}
                               showChevron
+                              className="px-4 py-3 gap-4"
                             />
                           )}
                         </FadeIn>
@@ -224,6 +227,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               description="Configure os métodos de pagamento aceitos e as taxas de operadoras."
                               onClick={() => setActivePage("payment-methods")}
                               showChevron
+                              className="px-4 py-3 gap-4"
                             />
                           )}
                           <ListItem
@@ -232,6 +236,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                             description="Gerencie as regras de parcelamento e limites para vendas no fiado."
                             onClick={() => setActivePage("crediario")}
                             showChevron
+                            className="px-4 py-3 gap-4"
                           />
                           {canAccessCommissions && (
                             <ListItem
@@ -240,6 +245,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               description="Defina regras de comissão para vendedores e entregadores."
                               onClick={() => setActivePage("comissao")}
                               showChevron
+                              className="px-4 py-3 gap-4"
                             />
                           )}
                           {canAccessReturns && (
@@ -249,6 +255,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               description="Personalize o cabeçalho do recibo e políticas de trocas."
                               onClick={() => setActivePage("recibo")}
                               showChevron
+                              className="px-4 py-3 gap-4"
                             />
                           )}
                         </FadeIn>
@@ -265,6 +272,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               description="Configure o link, cores e produtos visíveis no seu catálogo online."
                               onClick={() => setActivePage("vitrine")}
                               showChevron
+                              className="px-4 py-3 gap-4"
                             />
                           )}
                           {showOS && (
@@ -274,6 +282,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               description="Personalize campos, status e o layout das ordens de serviço."
                               onClick={() => setActivePage("os")}
                               showChevron
+                              className="px-4 py-3 gap-4"
                             />
                           )}
                           {canAccessMessages && (
@@ -283,6 +292,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               description="Configure mensagens automáticas de WhatsApp e e-mail."
                               onClick={() => setActivePage("mensagens")}
                               showChevron
+                              className="px-4 py-3 gap-4"
                             />
                           )}
                           {canAccessDelivery && (
@@ -292,6 +302,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               description="Configure taxas de entrega, raios de atendimento e horários."
                               onClick={() => setActivePage("delivery")}
                               showChevron
+                              className="px-4 py-3 gap-4"
                             />
                           )}
                           {canAccessIntegrations && (
@@ -301,6 +312,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               description="Conecte-se com plataformas externas e APIs de terceiros."
                               onClick={() => setActivePage("integrations")}
                               showChevron
+                              className="px-4 py-3 gap-4"
                             />
                           )}
                         </FadeIn>
