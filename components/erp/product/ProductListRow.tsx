@@ -24,6 +24,10 @@ interface ProductListItemProps {
     onDelete: (product: Product) => void
     onDetails: (product: Product) => void
     suppliers: any[]
+    /** Prefetch handlers for hover/touch-based entity preloading */
+    onPrefetchMouseEnter?: () => void
+    onPrefetchMouseLeave?: () => void
+    onPrefetchTouchStart?: () => void
 }
 
 const ProductListItem = React.memo(
@@ -36,6 +40,9 @@ const ProductListItem = React.memo(
         onDuplicate,
         onDelete,
         onDetails,
+        onPrefetchMouseEnter,
+        onPrefetchMouseLeave,
+        onPrefetchTouchStart,
     }: ProductListItemProps) => {
         const stock = product.stock_quantity ?? 0
         const status = getStockStatus(stock, product.min_stock ?? undefined)
@@ -171,6 +178,9 @@ const ProductListItem = React.memo(
                 animate={{ opacity: 1 }}
                 className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/20 transition-colors cursor-pointer bg-white dark:bg-dark-background"
                 onClick={() => onDetails(product)}
+                onMouseEnter={onPrefetchMouseEnter}
+                onMouseLeave={onPrefetchMouseLeave}
+                onTouchStart={onPrefetchTouchStart}
             >
                 <td
                     className="py-2 pl-6 pr-0 border-b border-brand-border dark:border-dark-border w-14"
