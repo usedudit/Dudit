@@ -138,47 +138,47 @@ export default function POSShippingSheet({
             <TabsTrigger value="valores">Valores</TabsTrigger>
           </TabsList>
           <TabsContent value="cliente" className="mt-4 space-y-4">
-        {!hasSelectedCustomer && (
-          <p className="text-sm text-brand-inactive-text">
-            Selecione um cliente no PDV para configurar o envio.
-          </p>
-        )}
+            {!hasSelectedCustomer && (
+              <p className="text-sm text-brand-inactive-text">
+                Selecione um cliente no PDV para configurar o envio.
+              </p>
+            )}
 
-        {hasSelectedCustomer && customerDetails && (
-          <CustomerCard
-            customer={{ name: customerDetails.name || "", email: customerDetails.email || "", phone: customerDetails.phone || "" }}
-            address={customerDetails.address || null}
-            showMap={hasStreet}
-            chrome="minimal"
-            className="shadow-none"
-          />
-        )}
+            {hasSelectedCustomer && customerDetails && (
+              <CustomerCard
+                customer={{ name: customerDetails.name || "", email: customerDetails.email || "", phone: customerDetails.phone || "" }}
+                address={customerDetails.address || null}
+                showMap={hasStreet}
+                chrome="minimal"
+                className="shadow-none"
+              />
+            )}
 
-        {hasSelectedCustomer && hasStreet && (
-          <div className="mt-6">
-            <div className="border-t border-brand-border dark:border-dark-border mb-6 w-full"></div>
+            {hasSelectedCustomer && hasStreet && (
+              <div className="mt-6">
+                <div className="border-t border-brand-border dark:border-dark-border mb-6 w-full"></div>
 
-            <MoneyInput
-              label="Envio personalizado"
-              name="customShippingFee"
-              value={shippingFree ? 0 : shippingInput}
-              onChange={(value) => setShippingInput(value)}
-              suffix={(
-                <label className="flex items-center gap-1 text-xs text-brand-dark dark:text-dark-heading">
-                  <Checkbox checked={shippingFree} onChange={() => setShippingFree((prev) => !prev)} name="shippingFree" />
-                  Sem custo
-                </label>
-              )}
-              readOnly={shippingFree}
-            />
-          </div>
-        )}
+                <MoneyInput
+                  label="Envio personalizado"
+                  name="customShippingFee"
+                  value={shippingFree ? 0 : shippingInput}
+                  onChange={(value) => setShippingInput(value)}
+                  suffix={(
+                    <label className="flex items-center gap-1 text-xs text-brand-dark dark:text-dark-heading">
+                      <Checkbox checked={shippingFree} onChange={() => setShippingFree((prev) => !prev)} name="shippingFree" />
+                      Sem custo
+                    </label>
+                  )}
+                  readOnly={shippingFree}
+                />
+              </div>
+            )}
 
-        {hasSelectedCustomer && !hasStreet && (
-          <Button className="w-full" onClick={() => setIsAddressSheetOpen(true)}>
-            Adicionar endereço
-          </Button>
-        )}
+            {hasSelectedCustomer && !hasStreet && (
+              <Button className="w-full" onClick={() => setIsAddressSheetOpen(true)}>
+                Adicionar endereço
+              </Button>
+            )}
           </TabsContent>
           <TabsContent value="valores" className="mt-4 space-y-4">
             <div className="rounded-xl border border-brand-border p-4 text-sm dark:border-dark-border">

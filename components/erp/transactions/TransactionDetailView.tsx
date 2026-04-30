@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { ChevronLeftIcon, EditIcon, ThreeDotsIcon } from "@/lib/icons"
@@ -20,13 +20,15 @@ interface TransactionDetailViewProps {
     partnerId: string
     onBack: () => void
     onEdit: (transactionId: string) => void
+    initialDetail?: TransactionDetailPayload | null
+    loading?: boolean
 }
 
-export default function TransactionDetailView({ transactionId, partnerId, onBack, onEdit }: TransactionDetailViewProps) {
+export default function TransactionDetailView({ transactionId, partnerId, onBack, onEdit, initialDetail, loading: externalLoading }: TransactionDetailViewProps) {
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
-    const [detail, setDetail] = useState<TransactionDetailPayload | null>(null)
-    const [loading, setLoading] = useState(true)
+    const [detail, setDetail] = useState<TransactionDetailPayload | null>(initialDetail || null)
+    const [loading, setLoading] = useState(initialDetail ? false : (externalLoading ?? true))
     const [activeTab, setActiveTab] = useState("summary")
     const [historyEntries, setHistoryEntries] = useState<any[]>([])
     const [historyLoading, setHistoryLoading] = useState(false)
@@ -40,6 +42,16 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
     }, [])
 
     useEffect(() => {
+        if (initialDetail) {
+            setDetail(initialDetail)
+            setLoading(false)
+        }
+    }, [initialDetail])
+
+    useEffect(() => {
+        // If we already have a detail that matches the current transactionId, don't fetch
+        if (detail && detail.id === transactionId) return
+
         async function load() {
             setLoading(true)
             const res = await getTransactionDetailsAction(transactionId, partnerId)

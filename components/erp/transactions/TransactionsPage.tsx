@@ -11,7 +11,7 @@ import { SkeletonLoader } from "@/components/reusable/SkeletonLoader"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { formatCurrency } from "@/lib/utils"
-import { diffCalendarDaysInSaoPaulo } from "@/lib/utils/formatters"
+import { diffCalendarDaysInSaoPaulo, formatBrazilDateFromDbInput } from "@/lib/utils/formatters"
 import {
     PlusIcon,
     ExportFileIcon,
@@ -38,7 +38,7 @@ import { markRecurringOccurrenceAsPaidAction } from "@/app/actions/erp/transacti
 import { getInstallmentGroupDetailsAction } from "@/app/actions/erp/transactions"
 import { recordInstallmentPaymentAction } from "@/app/actions/erp/transactions"
 import { settleInstallmentGroupAction } from "@/app/actions/erp/transactions"
-import { getFinancialTransactionsAction } from "@/app/actions/erp/transactions"
+import { getFinancialTransactionsAction, getTransactionDetailsAction, type TransactionDetailPayload } from "@/app/actions/erp/transactions"
 import { cancelPendingTransactionAction } from "@/app/actions/erp/transactions"
 import { getPaymentMethodsAction } from "@/app/actions/erp/payment-methods"
 import { useRouter } from "next/navigation"
@@ -190,7 +190,7 @@ export default function TransactionsPage({
     const [settlingGroup, setSettlingGroup] = useState(false)
     const observerTarget = useRef<HTMLDivElement>(null)
 
-    const entityPage = useEntityPage<ERPTransaction, ERPTransaction, FinancialTransactionCursor>({
+    const entityPage = useEntityPage<ERPTransaction, TransactionDetailPayload, FinancialTransactionCursor>({
         entityType: "transactions",
         partnerId,
         queryKey: financialTransactionsQueryKey(partnerId),
@@ -203,8 +203,52 @@ export default function TransactionsPage({
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
         dedupeKey: useCallback((t: any) => t.id, []),
-        getDetailFn: async (id) => null, // List payload is complete; no detail fetch needed
-        listToDetail: (item) => item,
+        getDetailFn: async (id) => {
+            const res = await getTransactionDetailsAction(id, partnerId)
+            if (res.success) return res.data as TransactionDetailPayload
+            return null
+        },
+        listToDetail: (item) => ({
+            id: item.id,
+            headerTitle: item.description,
+            statusLabel: item.status,
+            statusVariant: item.statusVariant,
+            transactionType: item.transactionType,
+            isRecurring: !!item.recurringId,
+            paymentMethodSubtitle: item.paymentType,
+            paymentDateSubtitle: item.dueDate || item.paymentDateRaw || null,
+            creatorName: "...",
+            originLabel: item.origin === "manual" ? "Manual" : item.origin === "gateway" ? "Gateway" : "Sistema",
+            typeBannerLabel: item.transactionType === "income" ? "Receita" : item.transactionType === "expense" ? "Despesa" : "Ajuste",
+            amount: item.amount,
+            ledgerDirection: item.ledgerDirection,
+            canEdit: item.origin === "manual",
+            showDueDateRow: !!item.dueDateRaw,
+            timeline: {
+                step1: { label: "Criada", date: item.createdAtDate, time: item.createdAtTime, active: true },
+                step2: {
+                    label: item.transactionType === "income" ? "Recebimento" : "Pagamento",
+                    date: item.paymentDateRaw ? formatBrazilDateFromDbInput(item.paymentDateRaw, "dayMonth") : "-",
+                    time: "-",
+                    active: item.rawStatus === "paid",
+                    danger: item.isOverdue,
+                },
+            },
+            items: [],
+            contactCard: {
+                title: "Contato",
+                name: item.contactName,
+                email: null,
+                phone: null,
+                isCustomer: item.contactType === "customer",
+            },
+            categoryLine: item.category,
+            subcategoryLine: null,
+            accountLine: null,
+            dueDateLine: item.dueDate,
+            paymentDateLine: item.paymentDateRaw || null,
+            notesLine: item.notes || null,
+        } as TransactionDetailPayload),
     })
 
     const {
@@ -984,6 +1028,8 @@ export default function TransactionsPage({
                     partnerId={partnerId}
                     onBack={handleCloseTransactionDetail}
                     onEdit={handleEditFromTransactionDetail}
+                    initialDetail={currentEntity as TransactionDetailPayload | null}
+                    loading={!currentEntity}
                 />
             </motion.div>
         )
@@ -1085,7 +1131,7 @@ export default function TransactionsPage({
     }
 
     const isFormOpen = (entityState.isOpen && (entityState.action === "create" || entityState.action === "edit" || entityState.action === "duplicate")) || !!editingRecurringTemplateId
-    const editingTx = entityState.isOpen && entityState.action === "edit" ? currentEntity : null
+    const editingTx = entityState.isOpen && entityState.action === "edit" ? loadedTransactions.find((t: ERPTransaction) => t.id === entityState.entityId) : null
 
     if (isFormOpen) {
         return (

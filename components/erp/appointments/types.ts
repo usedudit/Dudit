@@ -33,7 +33,7 @@ export interface StaffMember {
     id: string;
     name: string;
     role: string;
-    avatar: string;
+    avatar?: string;
 }
 
 export interface PopoverState {

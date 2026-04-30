@@ -172,6 +172,7 @@ export const AppointmentSheet = ({
                 // Try to find the service in mock data to get individual price/duration
                 let catalogService: any = null;
                 for (const category of servicesSource) {
+                    if (!category.items) continue;
                     const found = category.items.find((i: any) => i.name === name);
                     if (found) {
                         catalogService = { ...found, colorClass: category.colorClass };
@@ -706,7 +707,7 @@ export const AppointmentSheet = ({
                                 <div key={idx}>
                                     {group.category_display && <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">{group.category}</h3>}
                                     <div className="space-y-3">
-                                        {group.items.map((item: any) => {
+                                        {group.items?.map((item: any) => {
                                             const isSelected = selectedServices.some(s => s.id === item.id);
                                             const isEditingMode = editingServiceIndex !== null;
 

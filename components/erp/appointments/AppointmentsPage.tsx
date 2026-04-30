@@ -10,8 +10,10 @@ import {
     Appointment,
     ViewType,
     ModeType,
-    PopoverState
+    PopoverState,
+    StaffMember
 } from './types';
+import { getCurrentPartnerContext } from '@/lib/auth/partner-context';
 
 import {
     formatDateStr,
@@ -84,9 +86,10 @@ const AppointmentsPage = () => {
     const itemsPerPage = 8;
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
-    const [realStaffMembers, setRealStaffMembers] = useState<Array<{ id: string; name: string; role: string; avatar: string }>>([]);
+    const [realStaffMembers, setRealStaffMembers] = useState<StaffMember[]>([]);
     const [realClients, setRealClients] = useState<any[]>([]);
     const [realServices, setRealServices] = useState<any[]>([]);
+    const [partnerId, setPartnerId] = useState<string>('');
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [appointmentFilters, setAppointmentFilters] = useState<{ teamIds: string[] }>({ teamIds: [] });
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -133,20 +136,23 @@ const AppointmentsPage = () => {
     }), []);
 
     // -- Load staff + clients + services on mount (once) --
-    useEffect(() => {
-        const loadCatalogs = async () => {
-            const [teamRes, clientsRes, servicesRes] = await Promise.all([
+    const loadCatalogs = useCallback(async () => {
+            const [contextRes, teamRes, clientsRes, servicesRes] = await Promise.all([
+                getCurrentPartnerContext(),
                 fetchPartnerTeamMembersBucket(),
                 fetchPartnerCustomersBucket(),
                 fetchPartnerServicesBucket(),
             ]);
+
+            if (contextRes) {
+                setPartnerId(contextRes.partnerId);
+            }
 
             if (teamRes?.length) {
                 setRealStaffMembers(teamRes.map((member) => ({
                     id: String(member.id),
                     name: member.fullName || member.email || 'Sem nome',
                     role: member.role,
-                    avatar: `https://i.pravatar.cc/150?u=${member.id}`,
                 })));
             }
 
@@ -164,14 +170,38 @@ const AppointmentsPage = () => {
                     name: svc.name,
                     price: svc.price,
                     duration: String(svc.duration),
-                    category: svc.category || 'Sem categoria',
+                    category: svc.category || 'Serviços',
                     bufferMinutes: svc.bufferMinutes,
                     billingUnit: svc.billingUnit,
                 })));
             }
-        };
+        }, []);
+
+    useEffect(() => {
         loadCatalogs();
-    }, []);
+    }, [loadCatalogs]);
+
+    // -- Group services by category for AppointmentSheet --
+    const groupedServices = useMemo(() => {
+        const groups: Record<string, any> = {};
+        realServices.forEach(svc => {
+            const cat = svc.category || 'Serviços';
+            if (!groups[cat]) {
+                groups[cat] = {
+                    category: cat,
+                    category_display: true,
+                    colorClass: 'bg-brand-primary', // Default color
+                    items: []
+                };
+            }
+            groups[cat].items.push(svc);
+        });
+        return Object.values(groups);
+    }, [realServices]);
+
+    const unavailableTypes = useMemo(() => {
+        return realServices.filter(svc => svc.category === 'Indisponível');
+    }, [realServices]);
 
     // -- Appointment cache: keyed by "startDate|endDate|staffId" --
     // Stale-while-revalidate: serve cache instantly, revalidate in background.
@@ -846,7 +876,7 @@ const AppointmentsPage = () => {
                                 initialDraft={draftData}
                                 initialStaffId={preSelectedStaffId}
                                 onCheckout={handleOpenCheckout}
-                                servicesCatalog={realServices}
+                                servicesCatalog={groupedServices}
                                 staffCatalog={realStaffMembers}
                                 clientsCatalog={realClients}
                                 isSaving={isSaving}
@@ -877,13 +907,17 @@ const AppointmentsPage = () => {
                             />
                         )}
                     </AnimatePresence>
-
                     <AnimatePresence>
                         {isUnavailableSheetOpen && (
                             <AddUnavailableSheet
                                 onClose={() => setIsUnavailableSheetOpen(false)}
+                                staffMembers={realStaffMembers}
+                                defaultDate={currentDate}
+                                unavailableTypes={unavailableTypes}
+                                partnerId={partnerId}
+                                onRefreshServices={loadCatalogs}
                                 onSave={async (item) => {
-                                    const staff = realStaffMembers.find((s) => s.name === item.staff) || realStaffMembers[0];
+                                    const staff = realStaffMembers.find((s) => s.id === item.staffId) || realStaffMembers[0];
                                     if (!staff) return;
                                     const createRes = await createAppointmentsAction([{
                                         customerName: 'Horário Indisponível',

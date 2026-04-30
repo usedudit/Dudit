@@ -1,310 +1,387 @@
 
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, MoreHorizontal, Edit3, Utensils, Briefcase, Plus, ChevronDown, ChevronLeft, ChevronRight, Minus, Check, User, Info, AlertCircle, AlertTriangle, ArrowRight, Trash2 } from 'lucide-react';
-import { Button, Input as FormInput, Checkbox as FormCheckbox, Dropdown, DropdownItem, Badge } from '../../../reusable';
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Utensils, Briefcase } from 'lucide-react';
+import { Button, Input as FormInput, Checkbox, Dropdown, DropdownItem, DatePicker, TimePicker, FormTextarea } from '@/components/reusable';
 import { Appointment } from '../types';
 import { AppointmentListCard } from '../AppointmentListCard';
-import { getEndTime } from '../utils';
+import { getEndTime, formatDateStr } from '../utils';
+import Portal from '@/components/Portal';
+import { createServiceAction } from '@/app/actions/erp/services';
+import { getServiceMetadataAction, createServiceCategoryAction } from '@/app/actions/erp/service-metadata';
+import { UserProfileImage } from '@/lib/utils/UserProfileImage';
+import BottomSheet from '@/components/BottomSheet';
+import { useMediaQuery } from '@/components/erp/hooks';
+import { formatCurrency } from '@/lib/utils/formatters';
+import { XIcon, EditIcon, PlusIcon, ChevronDownIcon, InfoIcon, AlertTriangleIcon } from '@/lib/icons';
 
-// Helper for Calendar within Dropdown
-const CalendarContent = ({ onSelect }: { onSelect: (dateStr: string) => void }) => {
-    // Mock days for "Janeiro"
-    const days = [
-        ['', '', '', '', '', '', 1],
-        [2, 3, 4, 5, 6, 7, 8],
-        [9, 10, 11, 12, 13, 14, 15],
-        [16, 17, 18, 19, 20, 21, 22],
-        [23, 24, 25, 26, 27, 28, 29],
-        [30, 31, '', '', '', '', '']
-    ];
-    const selectedDay = 12; // Visual mock
 
-    return (
-        <div className="p-4 w-[320px]">
-            <div className="flex items-center justify-between mb-4">
-                <button className="p-1 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg"><ChevronLeft size={16} /></button>
-                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Janeiro</span>
-                <button className="p-1 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg"><ChevronRight size={16} /></button>
-            </div>
-            <div className="grid grid-cols-7 text-center mb-2">
-                {['seg','ter','qua','qui','sex','sáb','dom'].map(d => (
-                    <span key={d} className="text-xs text-brand-inactive-text capitalize">{d}</span>
-                ))}
-            </div>
-            <div className="grid grid-cols-7 gap-y-2">
-                {days.map((week, idx) => (
-                    <React.Fragment key={idx}>
-                        {week.map((d, dIdx) => (
-                            <div key={dIdx} className="flex items-center justify-center">
-                                {d ? (
-                                    <button 
-                                        onClick={() => onSelect(`2024-02-24`)} // Hardcoded for demo to match current date
-                                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                                            d === selectedDay 
-                                            ? 'bg-[#7c3aed] text-white' 
-                                            : 'text-brand-dark dark:text-dark-heading hover:bg-gray-100 dark:hover:bg-zinc-800'
-                                        }`}
-                                    >
-                                        {d}
-                                    </button>
-                                ) : <div className="w-8 h-8"></div>}
-                            </div>
-                        ))}
-                    </React.Fragment>
-                ))}
-            </div>
-        </div>
-    )
-}
-
-const TypeCard = ({ icon: Icon, label, subLabel, selected, onClick, simple = false }: { icon: any, label: string, subLabel: string, selected: boolean, onClick: () => void, simple?: boolean }) => (
-    <div 
+const TypeCard = ({ icon: Icon, label, subLabel, selected, onClick, simple = false }: { icon?: any, label: string, subLabel?: string, selected?: boolean, onClick: () => void, simple?: boolean }) => (
+    <div
         onClick={onClick}
         className={`
             border rounded-xl p-3 cursor-pointer transition-all flex flex-col items-center justify-center text-center h-[120px] min-w-[140px] relative flex-shrink-0
-            ${selected 
-                ? 'border-[#7c3aed] ring-1 ring-[#7c3aed] bg-white dark:bg-dark-surface' 
-                : 'border-brand-border dark:border-dark-border hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-dark-surface'
+            ${selected
+                ? 'border-brand-green ring-1 ring-brand-green bg-white dark:bg-dark-surface'
+                : 'border-brand-border dark:border-dark-border hover:border-brand-green/30 dark:hover:border-brand-green/30 bg-white dark:bg-dark-surface'
             }
         `}
     >
         {simple ? (
-            <div className="flex flex-col items-center justify-center gap-2 h-full text-[#7c3aed]">
-                <div className="w-8 h-8 rounded-full border border-[#7c3aed] flex items-center justify-center">
-                    <Plus size={16} />
+            <div className="flex flex-col items-center justify-center gap-2 h-full text-brand-green">
+                <div className="w-10 h-10 rounded-full border border-brand-green flex items-center justify-center bg-brand-green/5">
+                    <PlusIcon size={20} />
                 </div>
-                <span className="text-sm font-bold opacity-80 group-hover:opacity-100"></span> 
+                <span className="text-xs font-bold">Novo Tipo</span>
             </div>
         ) : (
             <>
-                <Icon size={24} className={`mb-2 ${selected ? 'text-[#7c3aed]' : 'text-brand-dark dark:text-dark-heading'}`} />
-                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-1">{label}</span>
-                <span className="text-[10px] text-brand-inactive-text leading-tight">{subLabel}</span>
+                {Icon && <Icon size={24} className={`mb-2 ${selected ? 'text-brand-green' : 'text-brand-dark dark:text-dark-heading'}`} />}
+                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-1 truncate w-full px-1">{label}</span>
+                {subLabel && <span className="text-[10px] text-brand-inactive-text leading-tight">{subLabel}</span>}
             </>
         )}
     </div>
 )
 
-export const AddUnavailableSheet = ({ onClose, onSave, appointment }: { onClose: () => void, onSave?: (data: any) => void, appointment?: Appointment | null }) => {
-    // Initial State Logic
+export const AddUnavailableSheet = ({
+    onClose,
+    onSave,
+    appointment,
+    staffMembers = [],
+    defaultDate = new Date(),
+    unavailableTypes = [],
+    partnerId,
+    onRefreshServices
+}: {
+    onClose: () => void,
+    onSave?: (data: any) => void,
+    appointment?: Appointment | null,
+    staffMembers?: any[],
+    defaultDate?: Date,
+    unavailableTypes?: any[],
+    partnerId?: string,
+    onRefreshServices?: () => void
+}) => {
+    const isMobile = useMediaQuery("(max-width: 768px)");
     const isEditing = !!appointment;
-    
-    // Determine initial type
-    const initialType = appointment 
-        ? (appointment.service === 'Almoço' ? 'Almoço' : 'Personalizar') 
-        : 'Personalizar';
 
-    const [selectedType, setSelectedType] = useState(initialType);
+    // States for main sheet
+    const [selectedType, setSelectedType] = useState(appointment?.service || 'Personalizar');
     const [title, setTitle] = useState(appointment?.service || '');
-    const [date, setDate] = useState(appointment?.date || '2024-02-24');
+    const [date, setDate] = useState(appointment?.date || formatDateStr(defaultDate));
     const [startTime, setStartTime] = useState(appointment?.time || '11:00');
-    
-    // Calculate initial End Time based on duration if editing
-    const initialEndTime = appointment 
-        ? getEndTime(appointment.time, appointment.duration) 
-        : '12:00';
-        
-    const [endTime, setEndTime] = useState(initialEndTime);
-    const [collaborator, setCollaborator] = useState(appointment?.staff || 'Ana Silva');
-    const [frequency, setFrequency] = useState('Não se repete');
+    const [endTime, setEndTime] = useState(appointment ? getEndTime(appointment.time, appointment.duration) : '12:00');
+    const [selectedStaffId, setSelectedStaffId] = useState(appointment?.staffId || (staffMembers && staffMembers.length > 0 ? staffMembers[0].id : ''));
     const [description, setDescription] = useState(appointment?.notes || '');
+
+    // States for nested sheet (New Type)
+    const [isNewTypeSheetOpen, setIsNewTypeSheetOpen] = useState(false);
+    const [newTypeName, setNewTypeName] = useState('');
+    const [newTypeDuration, setNewTypeDuration] = useState('60');
+    const [isSavingNewType, setIsSavingNewType] = useState(false);
+
+    const selectedStaff = staffMembers?.find(s => s.id === selectedStaffId);
 
     const handleConfirm = () => {
         if (onSave) {
-            // Calculate duration
             const [startH, startM] = startTime.split(':').map(Number);
             const [endH, endM] = endTime.split(':').map(Number);
             const startTotal = startH * 60 + startM;
             const endTotal = endH * 60 + endM;
             const duration = Math.max(15, endTotal - startTotal);
 
-            const newItem = {
-                id: appointment?.id, // Pass ID if editing
+            onSave({
+                id: appointment?.id,
                 title: title || selectedType,
-                type: selectedType, 
+                type: selectedType,
                 date,
                 startTime,
                 endTime,
                 duration,
-                staff: collaborator,
+                staffId: selectedStaffId,
+                staff: selectedStaff?.name || 'Profissional',
                 description
-            };
-            onSave(newItem);
+            });
         }
     };
 
-    return (
-        <div className="fixed inset-0 z-[60] flex justify-end">
-            <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                onClick={onClose}
-            />
-            <motion.div 
-                initial={{ x: '100%' }}
-                animate={{ x: 0 }}
-                exit={{ x: '100%' }}
-                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                className="relative w-full md:w-[500px] h-full bg-white dark:bg-dark-surface shadow-2xl flex flex-col overflow-hidden"
-            >
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-5 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface z-10">
-                    <div className="flex items-center gap-3">
-                        <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
-                            {isEditing ? 'Detalhes do horário indisponível' : 'Adicionar horário indisponível'}
-                        </h2>
-                        {isEditing && (
-                             <button className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors">
-                                <Trash2 size={20} className="text-red-500" />
-                            </button>
-                        )}
-                    </div>
-                    <button onClick={onClose} className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors">
-                        <X size={24} />
-                    </button>
-                </div>
+    const handleSaveNewType = async () => {
+        if (!newTypeName.trim() || !partnerId) return;
+        setIsSavingNewType(true);
+        try {
+            // 1. Get or create category
+            const metaRes = await getServiceMetadataAction(partnerId);
+            let catId = '';
+            if (metaRes.success && metaRes.data) {
+                const existing = metaRes.data.categories.find((c: any) => c.name === 'Indisponível');
+                if (existing) catId = existing.id;
+            }
 
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
-                    
-                    {/* Type Selector */}
-                    <div>
-                        <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Tipo de horário indisponível</label>
-                        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
-                            <TypeCard 
-                                icon={Edit3} 
-                                label="Personalizar" 
-                                subLabel="Novo horário indisponível" 
-                                selected={selectedType === 'Personalizar'} 
-                                onClick={() => setSelectedType('Personalizar')} 
+            if (!catId) {
+                const createCatRes = await createServiceCategoryAction({ partnerId, name: 'Indisponível' });
+                if (createCatRes.success && createCatRes.data) catId = createCatRes.data.id;
+            }
+
+            if (!catId) throw new Error("Could not find or create category");
+
+            // 2. Create service
+            const createRes = await createServiceAction({
+                partnerId,
+                name: newTypeName,
+                categoryId: catId,
+                durationMinutes: Number(newTypeDuration),
+                isActive: true
+            });
+
+            if (createRes.success) {
+                if (onRefreshServices) onRefreshServices();
+                setIsNewTypeSheetOpen(false);
+                setNewTypeName('');
+                setNewTypeDuration('60');
+                setSelectedType(newTypeName);
+                setTitle(newTypeName);
+            }
+        } catch (err) {
+            console.error("Error saving new type:", err);
+        } finally {
+            setIsSavingNewType(false);
+        }
+    };
+
+    const defaultTypes = [
+        { label: 'Personalizar', icon: EditIcon, sub: 'Livre' },
+        { label: 'Almoço', icon: Utensils, sub: 'Intervalo' },
+        { label: 'Reunião', icon: Briefcase, sub: 'Evento' },
+    ];
+
+    const SheetBody = (
+        <div className="flex flex-col h-full bg-white dark:bg-dark-surface overflow-hidden">
+            {/* Header */}
+            <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
+                    {isEditing ? 'Detalhes da Indisponibilidade' : 'Adicionar Horário Indisponível'}
+                </h2>
+                <Button variant="ghost" onClick={onClose} size="icon">
+                    <XIcon className="h-5 w-5" />
+                </Button>
+            </header>
+
+            {/* Content Area */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6 pb-32">
+                {/* Type Selector Carousel */}
+                <div>
+                    <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Tipo</label>
+                    <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-2">
+                        {defaultTypes.map(t => (
+                            <TypeCard
+                                key={t.label}
+                                icon={t.icon}
+                                label={t.label}
+                                subLabel={t.sub}
+                                selected={selectedType === t.label}
+                                onClick={() => { setSelectedType(t.label); setTitle(t.label === 'Personalizar' ? '' : t.label); }}
                             />
-                            <TypeCard 
-                                icon={Utensils} 
-                                label="Almoço" 
-                                subLabel="30min • Não pago" 
-                                selected={selectedType === 'Almoço'} 
-                                onClick={() => { setSelectedType('Almoço'); setTitle('Almoço'); }} 
+                        ))}
+                        {unavailableTypes.map(t => (
+                            <TypeCard
+                                key={t.id}
+                                label={t.name}
+                                subLabel={`${t.duration} min`}
+                                selected={selectedType === t.name}
+                                onClick={() => { setSelectedType(t.name); setTitle(t.name); }}
                             />
-                            {/* Arrow right visual hint */}
-                            <button className="w-12 h-[120px] rounded-xl border border-brand-border dark:border-dark-border flex items-center justify-center flex-shrink-0 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">
-                                <ArrowRight size={20} className="text-brand-inactive-text" />
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Title */}
-                    <FormInput 
-                        label="Título (opcional)" 
-                        name="title" 
-                        placeholder="por exemplo, reunião de almoço" 
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                    />
-
-                    {/* Date */}
-                    <div className="flex flex-col gap-1.5">
-                        <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Data</label>
-                        <Dropdown 
-                            width="w-auto" 
-                            showChevron={false}
-                            trigger={
-                                <button className="flex items-center justify-between w-full h-[42px] px-3 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                    {date} <ChevronDown size={16} className="text-brand-inactive-text" />
-                                </button>
-                            }
-                        >
-                            <CalendarContent onSelect={(d) => setDate(d)} />
-                        </Dropdown>
-                    </div>
-
-                    {/* Time */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="flex flex-col gap-1.5">
-                            <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Horário de início</label>
-                            <Dropdown width="w-full" showChevron={false} trigger={<button className="flex items-center justify-between w-full h-[42px] px-3 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-sm font-medium text-brand-dark dark:text-dark-heading">{startTime} <ChevronDown size={16} className="text-brand-inactive-text" /></button>}>
-                                <DropdownItem onClick={() => setStartTime('11:00')}>11:00</DropdownItem>
-                                <DropdownItem onClick={() => setStartTime('12:00')}>12:00</DropdownItem>
-                                <DropdownItem onClick={() => setStartTime('13:00')}>13:00</DropdownItem>
-                            </Dropdown>
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Horário de término</label>
-                            <Dropdown width="w-full" showChevron={false} trigger={<button className="flex items-center justify-between w-full h-[42px] px-3 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-sm font-medium text-brand-dark dark:text-dark-heading">{endTime} <ChevronDown size={16} className="text-brand-inactive-text" /></button>}>
-                                <DropdownItem onClick={() => setEndTime('12:00')}>12:00</DropdownItem>
-                                <DropdownItem onClick={() => setEndTime('13:00')}>13:00</DropdownItem>
-                                <DropdownItem onClick={() => setEndTime('14:00')}>14:00</DropdownItem>
-                            </Dropdown>
-                            <div className="text-xs text-brand-inactive-text mt-1">Duração calculada</div>
-                        </div>
-                    </div>
-
-                    {/* Collaborator */}
-                    <div className="flex flex-col gap-1.5">
-                        <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Colaboradores</label>
-                        <Dropdown width="w-full" showChevron={false} trigger={
-                            <button className="flex items-center justify-between w-full h-[42px] px-3 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                <div className="flex items-center gap-2">
-                                    <img src="https://i.pravatar.cc/150?u=20" className="w-5 h-5 rounded-full" />
-                                    {collaborator}
-                                </div>
-                                <ChevronDown size={16} className="text-brand-inactive-text" />
-                            </button>
-                        }>
-                            <DropdownItem onClick={() => setCollaborator('Ana Silva')}>Ana Silva</DropdownItem>
-                            <DropdownItem onClick={() => setCollaborator('Carlos Lima')}>Carlos Lima</DropdownItem>
-                        </Dropdown>
-                    </div>
-
-                    {/* Frequency */}
-                    <div className="flex flex-col gap-1.5">
-                        <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Frequência</label>
-                        <Dropdown width="w-full" showChevron={false} trigger={<button className="flex items-center justify-between w-full h-[42px] px-3 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-sm font-medium text-brand-dark dark:text-dark-heading">{frequency} <ChevronDown size={16} className="text-brand-inactive-text" /></button>}>
-                            <DropdownItem onClick={() => setFrequency('Não se repete')}>Não se repete</DropdownItem>
-                            <DropdownItem onClick={() => setFrequency('Diariamente')}>Diariamente</DropdownItem>
-                            <DropdownItem onClick={() => setFrequency('Semanalmente')}>Semanalmente</DropdownItem>
-                        </Dropdown>
-                    </div>
-
-                    {/* Description */}
-                    <div>
-                        <div className="flex justify-between items-center mb-1.5">
-                            <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Descrição (opcional)</label>
-                            <span className="text-xs text-brand-inactive-text">{description.length}/255</span>
-                        </div>
-                        <textarea 
-                            className="w-full h-32 p-3 border border-brand-border dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-sm focus:outline-none focus:ring-1 focus:ring-brand-dark placeholder:text-gray-400 dark:placeholder:text-gray-600 resize-none"
-                            placeholder="Adicionar descrição ou nota"
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
+                        ))}
+                        <TypeCard
+                            simple
+                            label="Novo Tipo"
+                            onClick={() => setIsNewTypeSheetOpen(true)}
                         />
                     </div>
-
                 </div>
 
-                {/* Footer */}
-                <div className="p-6 border-t border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
-                    <Button variant="default" className="w-full h-[48px] bg-[#111827] hover:bg-black text-white font-bold rounded-xl" onClick={handleConfirm}>
-                        {isEditing ? 'Salvar alterações' : 'Salvar'}
+                {/* Title */}
+                <FormInput
+                    label="Título (opcional)"
+                    name="title"
+                    placeholder="Ex: Reunião, Almoço, etc"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                />
+
+                {/* Date and Times */}
+                <div className="space-y-4">
+                    <DatePicker
+                        label="Data"
+                        value={date}
+                        onChange={(d) => setDate(formatDateStr(d))}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <TimePicker
+                            label="Início"
+                            value={startTime}
+                            onChange={setStartTime}
+                        />
+                        <TimePicker
+                            label="Término"
+                            value={endTime}
+                            onChange={setEndTime}
+                        />
+                    </div>
+                </div>
+
+                {/* Collaborator */}
+                <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-bold text-brand-dark dark:text-dark-heading ml-1">Profissional</label>
+                    <Dropdown
+                        width="w-full"
+                        showChevron={false}
+                        trigger={
+                            <Button variant="outline" className="w-full h-12">
+                                <div className="flex items-center gap-3">
+                                    <UserProfileImage
+                                        fullName={selectedStaff?.name || 'Selecione'}
+                                        className="w-6 h-6"
+                                    />
+                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{selectedStaff?.name || 'Selecione'}</span>
+                                </div>
+                                <ChevronDownIcon size={16} className="text-brand-inactive-text" />
+                            </Button>
+                        }
+                    >
+                        <div className="max-h-[300px] overflow-y-auto p-1">
+                            {staffMembers?.map(staff => (
+                                <DropdownItem key={staff.id} onClick={() => setSelectedStaffId(staff.id)} className="gap-3">
+                                    <UserProfileImage fullName={staff.name} className="w-6 h-6" />
+                                    <span className="font-medium">{staff.name}</span>
+                                </DropdownItem>
+                            ))}
+                        </div>
+                    </Dropdown>
+                </div>
+
+                {/* Description */}
+                <FormTextarea
+                    label="Notas (opcional)"
+                    name="description"
+                    placeholder="Adicione detalhes aqui..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={4}
+                />
+            </div>
+
+            {/* Footer */}
+            <div className="absolute bottom-0 left-0 w-full p-6 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border z-20">
+                <Button className="w-full h-[48px] rounded-xl font-bold" onClick={handleConfirm}>
+                    {isEditing ? 'Salvar Alterações' : 'Salvar Horário'}
+                </Button>
+            </div>
+        </div>
+    );
+
+    const NewTypeSheetBody = (
+        <div className="flex flex-col h-full bg-white dark:bg-dark-surface overflow-hidden">
+            <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Novo Tipo de Indisponibilidade</h2>
+                <Button variant="ghost" onClick={() => setIsNewTypeSheetOpen(false)} size="icon">
+                    <XIcon className="h-5 w-5" />
+                </Button>
+            </header>
+
+            <div className="flex-1 space-y-4 overflow-y-auto p-6">
+                <FormInput
+                    label="Nome do Tipo"
+                    name="typeName"
+                    placeholder="Ex: Treinamento, Manutenção"
+                    value={newTypeName}
+                    onChange={(e) => setNewTypeName(e.target.value)}
+                />
+                <FormInput
+                    label="Duração Padrão (minutos)"
+                    name="typeDuration"
+                    type="number"
+                    value={newTypeDuration}
+                    onChange={(e) => setNewTypeDuration(e.target.value)}
+                />
+            </div>
+
+            <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <div className="flex items-center gap-3">
+                    <Button variant="outline" className="flex-1" onClick={() => setIsNewTypeSheetOpen(false)}>
+                        Cancelar
+                    </Button>
+                    <Button
+                        className="flex-1"
+                        isLoading={isSavingNewType}
+                        onClick={handleSaveNewType}
+                    >
+                        Salvar Tipo
                     </Button>
                 </div>
-            </motion.div>
+            </footer>
         </div>
-    )
-}
+    );
+
+    if (isMobile) {
+        return (
+            <>
+                <BottomSheet isOpen={true} onClose={onClose}>
+                    {SheetBody}
+                </BottomSheet>
+                <BottomSheet isOpen={isNewTypeSheetOpen} onClose={() => setIsNewTypeSheetOpen(false)}>
+                    {NewTypeSheetBody}
+                </BottomSheet>
+            </>
+        );
+    }
+
+    return (
+        <>
+            <Portal>
+                <div
+                    className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 opacity-100`}
+                    onClick={onClose}
+                >
+                    <div
+                        className={`fixed right-4 top-4 bottom-4 w-[520px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isNewTypeSheetOpen
+                            ? "-translate-x-10 scale-[0.97] opacity-70"
+                            : "translate-x-0 opacity-100"
+                            }`}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {SheetBody}
+                    </div>
+                </div>
+            </Portal>
+            <Portal>
+                <div
+                    className={`fixed inset-0 z-[60] bg-black/50 transition-opacity duration-300 ${isNewTypeSheetOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                    onClick={() => setIsNewTypeSheetOpen(false)}
+                >
+                    <div
+                        className={`fixed right-4 top-4 bottom-4 w-[520px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isNewTypeSheetOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {NewTypeSheetBody}
+                    </div>
+                </div>
+            </Portal>
+        </>
+    );
+};
 
 export const MoreAppointmentsSheet = ({ date, appointments, onClose, onViewAppointment }: { date: string, appointments: Appointment[], onClose: () => void, onViewAppointment: (apt: Appointment) => void }) => {
     // ... existing MoreAppointmentsSheet implementation
-    const dateObj = new Date(date + 'T00:00:00'); 
+    const dateObj = new Date(date + 'T00:00:00');
     return (
         <div className="fixed inset-0 z-[60] flex justify-end">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
             <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 30, stiffness: 300 }} className="relative w-full md:w-[400px] h-full bg-white dark:bg-dark-surface shadow-2xl flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between px-6 py-5 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface z-10">
                     <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading capitalize">{dateObj.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
-                    <button onClick={onClose} className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"><X size={24} /></button>
+                    <button onClick={onClose} className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"><XIcon size={24} /></button>
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
                     {appointments.length === 0 ? <div className="text-center text-brand-inactive-text py-10">No appointments.</div> : appointments.map(apt => <AppointmentListCard key={apt.id} appointment={apt} onClick={onViewAppointment} />)}
@@ -327,11 +404,11 @@ export const StatusActionSheet = ({ type, appointment, onClose, onConfirm }: { t
             <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 30, stiffness: 300 }} className="relative w-full md:w-[500px] h-full bg-white dark:bg-dark-surface shadow-2xl flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between px-6 py-5 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface z-10">
                     <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</h2>
-                    <button onClick={onClose} className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"><X size={24} /></button>
+                    <button onClick={onClose} className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"><XIcon size={24} /></button>
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
                     <div className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-xl p-4 flex gap-3">
-                        <AlertTriangle className="text-red-500 flex-shrink-0" size={20} />
+                        <AlertTriangleIcon className="text-red-500 flex-shrink-0" size={20} />
                         <div>
                             <h4 className="text-sm font-bold text-red-700 dark:text-red-400 mb-1">{isCancel ? 'Atenção ao cancelar' : 'Cliente não compareceu?'}</h4>
                             <p className="text-sm text-red-600/80 dark:text-red-300/80 leading-relaxed">{isCancel ? 'Ao cancelar, este agendamento será removido permanentemente da agenda.' : 'A ausência será registrada no histórico do cliente e o horário permanecerá ocupado.'}</p>
@@ -339,19 +416,19 @@ export const StatusActionSheet = ({ type, appointment, onClose, onConfirm }: { t
                     </div>
                     {/* ... Rest of existing form logic ... */}
                     <div className="bg-[#eff6ff] dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 rounded-lg p-3 flex items-start gap-3">
-                        <Info className="text-blue-500 mt-0.5 flex-shrink-0" size={18} />
+                        <InfoIcon className="text-blue-500 mt-0.5 flex-shrink-0" size={18} />
                         <span className="text-sm text-brand-dark dark:text-dark-body">Nenhuma política de cancelamento foi aplicada a este agendamento</span>
                     </div>
                     <div className="flex items-start gap-3 p-4 border border-brand-border dark:border-dark-border rounded-xl">
                         <div className="flex items-center justify-center w-5 h-5 mt-0.5">
-                            <FormCheckbox checked={true} onChange={() => {}} />
+                            <Checkbox checked={true} onChange={() => { }} />
                         </div>
                         <div><span className="block text-sm font-bold text-brand-dark dark:text-dark-heading">Enviar notificação</span><span className="block text-xs text-brand-inactive-text mt-1">Enviar uma mensagem informando ao cliente sobre a atualização do agendamento.</span></div>
                     </div>
                     {isCancel && (
                         <div>
                             <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Motivo do cancelamento</label>
-                            <Dropdown width="w-full" showChevron={false} trigger={<button className="flex items-center justify-between w-full px-4 py-3 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl text-sm font-medium text-brand-inactive-text dark:text-dark-body">{reason}<ChevronDown size={16} /></button>}>
+                            <Dropdown width="w-full" showChevron={false} trigger={<button className="flex items-center justify-between w-full px-4 py-3 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl text-sm font-medium text-brand-inactive-text dark:text-dark-body">{reason}<ChevronDownIcon size={16} /></button>}>
                                 <DropdownItem onClick={() => setReason('Nenhum motivo informado')}>Nenhum motivo informado</DropdownItem>
                                 <DropdownItem onClick={() => setReason('Agendamento duplicado')}>Agendamento duplicado</DropdownItem>
                                 <DropdownItem onClick={() => setReason('Agendamento feito por engano')}>Agendamento feito por engano</DropdownItem>
@@ -363,11 +440,11 @@ export const StatusActionSheet = ({ type, appointment, onClose, onConfirm }: { t
                         <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Resumo</h4>
                         <div className="flex justify-between items-center text-sm mb-2"><span className="text-brand-inactive-text">Serviço</span><span className="font-medium text-brand-dark dark:text-dark-heading">{appointment.service}</span></div>
                         <div className="flex justify-between items-center text-sm mb-2"><span className="text-brand-inactive-text">Cliente</span><span className="font-medium text-brand-dark dark:text-dark-heading">{appointment.customer}</span></div>
-                        <div className="border-t border-brand-border dark:border-dark-border my-2 pt-2 flex justify-between items-center"><span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Total a cobrar</span><span className="text-sm font-bold text-brand-dark dark:text-dark-heading">R$ 0,00</span></div>
+                        <div className="border-t border-brand-border dark:border-dark-border my-2 pt-2 flex justify-between items-center"><span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Total a cobrar</span><span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(appointment.price)}</span></div>
                     </div>
                 </div>
                 <div className="p-6 border-t border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface flex gap-3">
-                    <Button variant="outline" className="flex-1 h-[48px] rounded-xl font-bold" onClick={onClose}>Voltar</Button>
+                    <Button variant="outline" className="flex-1 h-[48px]" onClick={onClose}>Voltar</Button>
                     <Button className="flex-1 h-[48px] bg-[#dc2626] hover:bg-[#b91c1c] text-white font-bold rounded-xl shadow-lg shadow-red-200 dark:shadow-none" onClick={onConfirm}>{buttonText}</Button>
                 </div>
             </motion.div>
