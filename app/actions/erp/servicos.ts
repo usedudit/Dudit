@@ -76,7 +76,7 @@ export async function getServiceWithDetailsAction(serviceId: string) {
         const user = await requireUser()
         if (!user) throw new Error("Não autenticado")
         const admin = getAdminClient()
-        
+
         const { data: service, error } = await admin
             .from("services")
             .select("*")
@@ -145,6 +145,7 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             assigned_staff: data.assigned_staff || data.assignedStaff || { all: true, staff_ids: [] },
             is_active: data.isActive !== false && data.is_active !== false,
             images: data.images || [],
+            is_unavailable_type: data.isUnavailableType || data.is_unavailable_type || false,
             created_at: getBrasiliaTime(),
             updated_at: getBrasiliaTime(),
         }
@@ -170,8 +171,8 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
         }
 
         if (insertError) return errorResponse(insertError.message)
-        
-        revalidatePath("/erp/services")
+
+        revalidatePath("/erp/servicos")
         return successResponse(inserted)
     } catch (error: any) {
         return errorResponse(error.message)
@@ -239,7 +240,7 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         const { data: updated, error } = await supabase.from("services").update(payload).eq("id", serviceId).select().single()
         if (error) return errorResponse(error.message)
 
-        revalidatePath("/erp/services")
+        revalidatePath("/erp/servicos")
         return successResponse(updated)
     } catch (error: any) {
         return errorResponse(error.message)
@@ -260,10 +261,10 @@ export async function deleteServiceAction(serviceId: string): Promise<ActionResp
 
         const supabase = await getSupabaseServerClient()
         const { error } = await supabase.from("services").delete().eq("id", serviceId)
-        
+
         if (error) return errorResponse(error.message)
 
-        revalidatePath("/erp/services")
+        revalidatePath("/erp/servicos")
         return successResponse({ deleted: true })
     } catch (error: any) {
         return errorResponse(error.message)
@@ -289,10 +290,10 @@ export async function deleteServicesInBatchAction(serviceIds: string[]): Promise
 
         const supabase = await getSupabaseServerClient()
         const { error } = await supabase.from("services").delete().in("id", serviceIds)
-        
+
         if (error) return errorResponse(error.message)
 
-        revalidatePath("/erp/services")
+        revalidatePath("/erp/servicos")
         return successResponse({ deletedCount: serviceIds.length })
     } catch (error: any) {
         return errorResponse(error.message)
@@ -318,10 +319,10 @@ export async function toggleServicesStatusAction(serviceIds: string[], isActive:
 
         const supabase = await getSupabaseServerClient()
         const { error } = await supabase.from("services").update({ is_active: isActive }).in("id", serviceIds)
-        
+
         if (error) return errorResponse(error.message)
 
-        revalidatePath("/erp/services")
+        revalidatePath("/erp/servicos")
         return successResponse({ count: serviceIds.length })
     } catch (error: any) {
         return errorResponse(error.message)
@@ -356,7 +357,7 @@ export async function batchUpdateServicesAction(updates: any[]): Promise<ActionR
         const firstError = results.find(r => r.error)
         if (firstError) return errorResponse(firstError.error?.message || "Erro no batch update")
 
-        revalidatePath("/erp/services")
+        revalidatePath("/erp/servicos")
         return successResponse({ count: updates.length })
     } catch (error: any) {
         return errorResponse(error.message)
@@ -402,8 +403,8 @@ export async function duplicateServiceAction(serviceId: string) {
         }
 
         if (insertError) return errorResponse(insertError.message)
-        
-        revalidatePath("/erp/services")
+
+        revalidatePath("/erp/servicos")
         return successResponse({ newServiceId: inserted.id, product: inserted })
     } catch (error: any) {
         return errorResponse(error.message)

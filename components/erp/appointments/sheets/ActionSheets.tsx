@@ -7,8 +7,9 @@ import { Appointment } from '../types';
 import { AppointmentListCard } from '../AppointmentListCard';
 import { getEndTime, formatDateStr } from '../utils';
 import Portal from '@/components/Portal';
-import { createServiceAction } from '@/app/actions/erp/services';
+import { createServiceAction } from '@/app/actions/erp/servicos';
 import { getServiceMetadataAction, createServiceCategoryAction } from '@/app/actions/erp/service-metadata';
+import { createUnavailableTypeAction } from '@/app/actions/erp/unavailable-types';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import BottomSheet from '@/components/BottomSheet';
 import { useMediaQuery } from '@/components/erp/hooks';
@@ -74,6 +75,7 @@ export const AddUnavailableSheet = ({
     const [endTime, setEndTime] = useState(appointment ? getEndTime(appointment.time, appointment.duration) : '12:00');
     const [selectedStaffId, setSelectedStaffId] = useState(appointment?.staffId || (staffMembers && staffMembers.length > 0 ? staffMembers[0].id : ''));
     const [description, setDescription] = useState(appointment?.notes || '');
+    const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekly'>('none');
 
     // States for nested sheet (New Type)
     const [isNewTypeSheetOpen, setIsNewTypeSheetOpen] = useState(false);
@@ -101,7 +103,8 @@ export const AddUnavailableSheet = ({
                 duration,
                 staffId: selectedStaffId,
                 staff: selectedStaff?.name || 'Profissional',
-                description
+                description,
+                recurrence
             });
         }
     };
@@ -110,28 +113,11 @@ export const AddUnavailableSheet = ({
         if (!newTypeName.trim() || !partnerId) return;
         setIsSavingNewType(true);
         try {
-            // 1. Get or create category
-            const metaRes = await getServiceMetadataAction(partnerId);
-            let catId = '';
-            if (metaRes.success && metaRes.data) {
-                const existing = metaRes.data.categories.find((c: any) => c.name === 'Indisponível');
-                if (existing) catId = existing.id;
-            }
-
-            if (!catId) {
-                const createCatRes = await createServiceCategoryAction({ partnerId, name: 'Indisponível' });
-                if (createCatRes.success && createCatRes.data) catId = createCatRes.data.id;
-            }
-
-            if (!catId) throw new Error("Could not find or create category");
-
-            // 2. Create service
-            const createRes = await createServiceAction({
+            const createRes = await createUnavailableTypeAction({
                 partnerId,
                 name: newTypeName,
-                categoryId: catId,
                 durationMinutes: Number(newTypeDuration),
-                isActive: true
+                iconName: 'Plus' // Default for now
             });
 
             if (createRes.success) {
@@ -187,7 +173,7 @@ export const AddUnavailableSheet = ({
                             <TypeCard
                                 key={t.id}
                                 label={t.name}
-                                subLabel={`${t.duration} min`}
+                                subLabel={`${t.default_duration} min`}
                                 selected={selectedType === t.name}
                                 onClick={() => { setSelectedType(t.name); setTitle(t.name); }}
                             />
@@ -257,6 +243,29 @@ export const AddUnavailableSheet = ({
                                     <span className="font-medium">{staff.name}</span>
                                 </DropdownItem>
                             ))}
+                        </div>
+                    </Dropdown>
+                </div>
+
+                {/* Recurrence */}
+                <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-bold text-brand-dark dark:text-dark-heading ml-1">Repetição</label>
+                    <Dropdown
+                        width="w-full"
+                        showChevron={false}
+                        trigger={
+                            <Button variant="outline" className="w-full h-12 justify-between px-4">
+                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                    {recurrence === 'none' ? 'Não se repete' : recurrence === 'daily' ? 'Diariamente' : 'Semanalmente'}
+                                </span>
+                                <ChevronDownIcon size={16} className="text-brand-inactive-text" />
+                            </Button>
+                        }
+                    >
+                        <div className="p-1">
+                            <DropdownItem onClick={() => setRecurrence('none')}>Não se repete</DropdownItem>
+                            <DropdownItem onClick={() => setRecurrence('daily')}>Diariamente</DropdownItem>
+                            <DropdownItem onClick={() => setRecurrence('weekly')}>Semanalmente</DropdownItem>
                         </div>
                     </Dropdown>
                 </div>

@@ -13,7 +13,7 @@ import {
     PopoverState,
     StaffMember
 } from './types';
-import { getCurrentPartnerContext } from '@/lib/auth/partner-context';
+
 
 import {
     formatDateStr,
@@ -30,7 +30,9 @@ import {
     getAppointmentHistoryAction,
     getAppointmentsByDateRangeAction,
     updateAppointmentAction,
+    type AppointmentInput
 } from '@/app/actions/erp/appointments';
+import { getUnavailableTypesAction } from '@/app/actions/erp/unavailable-types';
 import { fetchPartnerCustomersBucket, fetchPartnerTeamMembersBucket, fetchPartnerServicesBucket } from '@/app/actions/erp/client-loaders';
 import { FadeIn } from '@/components/animations/FadeIn';
 import FilterSheet from '@/components/reusable/FilterSheet';
@@ -63,7 +65,7 @@ function computeVisibleDateRange(date: Date, view: ViewType): { startDate: strin
     return { startDate: formatDateStr(gridStart), endDate: formatDateStr(gridEnd) };
 }
 
-const AppointmentsPage = () => {
+const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }) => {
     const APPOINTMENT_COLUMNS = useMemo<Array<{
         id: string;
         label: string;
@@ -89,7 +91,8 @@ const AppointmentsPage = () => {
     const [realStaffMembers, setRealStaffMembers] = useState<StaffMember[]>([]);
     const [realClients, setRealClients] = useState<any[]>([]);
     const [realServices, setRealServices] = useState<any[]>([]);
-    const [partnerId, setPartnerId] = useState<string>('');
+    const [realUnavailableTypes, setRealUnavailableTypes] = useState<any[]>([]);
+    const [partnerId, setPartnerId] = useState<string>(initialPartnerId || '');
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [appointmentFilters, setAppointmentFilters] = useState<{ teamIds: string[] }>({ teamIds: [] });
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -137,45 +140,47 @@ const AppointmentsPage = () => {
 
     // -- Load staff + clients + services on mount (once) --
     const loadCatalogs = useCallback(async () => {
-            const [contextRes, teamRes, clientsRes, servicesRes] = await Promise.all([
-                getCurrentPartnerContext(),
-                fetchPartnerTeamMembersBucket(),
-                fetchPartnerCustomersBucket(),
-                fetchPartnerServicesBucket(),
-            ]);
+        const [teamRes, clientsRes, servicesRes, unavailRes] = await Promise.all([
+            fetchPartnerTeamMembersBucket(),
+            fetchPartnerCustomersBucket(),
+            fetchPartnerServicesBucket(),
+            getUnavailableTypesAction(partnerId),
+        ]);
 
-            if (contextRes) {
-                setPartnerId(contextRes.partnerId);
-            }
 
-            if (teamRes?.length) {
-                setRealStaffMembers(teamRes.map((member) => ({
-                    id: String(member.id),
-                    name: member.fullName || member.email || 'Sem nome',
-                    role: member.role,
-                })));
-            }
 
-            if (clientsRes?.length) {
-                setRealClients(clientsRes.map((client) => ({
-                    id: client.id,
-                    name: client.name,
-                    email: client.email || undefined,
-                })));
-            }
+        if (teamRes?.length) {
+            setRealStaffMembers(teamRes.map((member) => ({
+                id: String(member.id),
+                name: member.fullName || member.email || 'Sem nome',
+                role: member.role,
+            })));
+        }
 
-            if (servicesRes?.length) {
-                setRealServices(servicesRes.map((svc) => ({
-                    id: svc.id,
-                    name: svc.name,
-                    price: svc.price,
-                    duration: String(svc.duration),
-                    category: svc.category || 'Serviços',
-                    bufferMinutes: svc.bufferMinutes,
-                    billingUnit: svc.billingUnit,
-                })));
-            }
-        }, []);
+        if (clientsRes?.length) {
+            setRealClients(clientsRes.map((client) => ({
+                id: client.id,
+                name: client.name,
+                email: client.email || undefined,
+            })));
+        }
+
+        if (servicesRes?.length) {
+            setRealServices(servicesRes.map((svc) => ({
+                id: svc.id,
+                name: svc.name,
+                price: svc.price,
+                duration: String(svc.duration),
+                category: svc.category || 'Serviços',
+                bufferMinutes: svc.bufferMinutes,
+                billingUnit: svc.billingUnit,
+            })));
+        }
+
+        if (unavailRes?.success) {
+            setRealUnavailableTypes(unavailRes.data || []);
+        }
+    }, [partnerId]);
 
     useEffect(() => {
         loadCatalogs();
@@ -200,8 +205,8 @@ const AppointmentsPage = () => {
     }, [realServices]);
 
     const unavailableTypes = useMemo(() => {
-        return realServices.filter(svc => svc.category === 'Indisponível');
-    }, [realServices]);
+        return realUnavailableTypes;
+    }, [realUnavailableTypes]);
 
     // -- Appointment cache: keyed by "startDate|endDate|staffId" --
     // Stale-while-revalidate: serve cache instantly, revalidate in background.
@@ -919,22 +924,46 @@ const AppointmentsPage = () => {
                                 onSave={async (item) => {
                                     const staff = realStaffMembers.find((s) => s.id === item.staffId) || realStaffMembers[0];
                                     if (!staff) return;
-                                    const createRes = await createAppointmentsAction([{
-                                        customerName: 'Horário Indisponível',
-                                        serviceName: item.title || item.type || 'Indisponível',
-                                        date: item.date,
-                                        time: item.startTime,
-                                        endDate: item.date,
-                                        endTime: item.endTime,
-                                        duration: item.duration,
-                                        staffId: staff.id,
-                                        staffName: staff.name,
-                                        price: 0,
-                                        pricingUnit: 'Por Serviço',
-                                        notes: item.description || null,
-                                        status: 'Indisponível',
-                                        source: 'unavailable',
-                                    }]);
+
+                                    const payloads: AppointmentInput[] = [];
+                                    const baseDate = new Date(item.date + 'T12:00:00'); // Use noon to avoid TZ issues
+                                    const recurrenceGroupId = item.recurrence !== 'none' ? crypto.randomUUID() : null;
+
+                                    let repeatCount = 1;
+                                    if (item.recurrence === 'daily') repeatCount = 30; // Default to 30 days
+                                    if (item.recurrence === 'weekly') repeatCount = 12; // Default to 12 weeks
+
+                                    for (let i = 0; i < repeatCount; i++) {
+                                        const currentDate = new Date(baseDate);
+                                        if (item.recurrence === 'daily') {
+                                            currentDate.setDate(baseDate.getDate() + i);
+                                        } else if (item.recurrence === 'weekly') {
+                                            currentDate.setDate(baseDate.getDate() + (i * 7));
+                                        }
+
+                                        const dateStr = currentDate.toISOString().split('T')[0];
+
+                                        payloads.push({
+                                            customerName: 'Horário Indisponível',
+                                            serviceName: item.title || item.type || 'Indisponível',
+                                            date: dateStr,
+                                            time: item.startTime,
+                                            endDate: dateStr,
+                                            endTime: item.endTime,
+                                            duration: item.duration,
+                                            staffId: staff.id,
+                                            staffName: staff.name,
+                                            price: 0,
+                                            pricingUnit: 'Por Serviço',
+                                            notes: item.description || null,
+                                            status: 'Indisponível',
+                                            source: 'unavailable',
+                                            recurrenceGroupId: recurrenceGroupId,
+                                            recurrenceRule: item.recurrence !== 'none' ? item.recurrence : null
+                                        });
+                                    }
+
+                                    const createRes = await createAppointmentsAction(payloads);
                                     if (createRes.success) {
                                         appointmentCacheRef.current.clear();
                                         setAppointments((prev) => [...prev, ...(createRes.created || []).map(mapDbAppointment)]);

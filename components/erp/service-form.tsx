@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input, MoneyInput } from "@/components/reusable"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { createServiceAction } from "@/app/actions/erp/services"
+import { createServiceAction } from "@/app/actions/erp/servicos"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
 import { CSRFTokenInput } from "@/components/security/csrf-token-input"
@@ -46,7 +46,7 @@ export function ServiceForm({ partnerId }: ServiceFormProps) {
       if ((result as any).error) {
         setError((result as any).error)
       } else {
-        router.push("/erp/services")
+        router.push("/erp/servicos")
         // No router.refresh() needed - push already navigates
       }
     } catch (err) {
@@ -58,7 +58,7 @@ export function ServiceForm({ partnerId }: ServiceFormProps) {
   }
 
   const handleCancel = () => {
-    handleNavigation("/erp/services" as any)
+    handleNavigation("/erp/servicos" as any)
   }
 
   return (

@@ -1,6 +1,6 @@
 import { ERPPageHeader } from "@/components/erp/page-header-state"
-import ServicesPage from "@/components/erp/services/ServicesPage"
-import { getERPServicesPageAction } from "@/app/actions/erp/services"
+import ServicesPage from "@/components/erp/servicos/ServicesPage"
+import { getERPServicesPageAction } from "@/app/actions/erp/servicos"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"

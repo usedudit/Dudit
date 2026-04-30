@@ -20,7 +20,7 @@ export default async function AgendamentosPage() {
     <>
       <ERPPageHeader title="Agendamentos" />
       <FadeIn className="p-4">
-        <AppointmentsPage />
+        <AppointmentsPage partnerId={partnerId} />
       </FadeIn>
     </>
   )

@@ -52,7 +52,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
     },
     invoices: { key: "invoices", path: "/erp/invoices", label: "Notas Fiscais", category: "Vendas", legacyCategory: "orders" },
     pos: {
-        key: "pos", path: "/erp/pos", label: "PDV (Frente de Caixa)", category: "Vendas", legacyCategory: "orders",
+        key: "pos", path: "/erp/pdv", label: "PDV (Frente de Caixa)", category: "Vendas", legacyCategory: "orders",
         specificPermissions: ["can_discount", "can_cancel_sale"],
     },
     quotes: { key: "quotes", path: "/erp/quotes", label: "Orçamentos", category: "Vendas", legacyCategory: "quotes" },
@@ -80,7 +80,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
         ],
     },
     services: {
-        key: "services", path: "/erp/services", label: "Catálogo de Serviços", category: "Serviços", legacyCategory: "services",
+        key: "services", path: "/erp/servicos", label: "Catálogo de Serviços", category: "Serviços", legacyCategory: "services",
         specificPermissions: ["can_change_service_price"],
     },
     cadastros_services: { key: "cadastros_services", path: "/erp/cadastros-services", label: "Cadastros", category: "Serviços", legacyCategory: "services" },
@@ -610,16 +610,16 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
 
     if (legacy.products) {
         const mapped = mapLegacy(legacy.products)
-        ;["products", "stock_movements", "import_notes", "cadastros_produtos", "suppliers"].forEach((routeKey) =>
-            apply(routeKey as RouteKey, mapped)
-        )
+            ;["products", "stock_movements", "import_notes", "cadastros_produtos", "suppliers"].forEach((routeKey) =>
+                apply(routeKey as RouteKey, mapped)
+            )
     }
 
     if (legacy.services) {
         const mapped = mapLegacy(legacy.services)
-        ;["appointments", "services", "cadastros_services"].forEach((routeKey) =>
-            apply(routeKey as RouteKey, mapped)
-        )
+            ;["appointments", "services", "cadastros_services"].forEach((routeKey) =>
+                apply(routeKey as RouteKey, mapped)
+            )
     }
 
     if (legacy.orders) {
@@ -629,7 +629,7 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
             edit: legacy.orders.edit,
             delete: legacy.orders.delete ?? legacy.orders.delete_cancel ?? false,
         }
-        ;["orders", "returns", "invoices"].forEach((routeKey) => apply(routeKey as RouteKey, mapped))
+            ;["orders", "returns", "invoices"].forEach((routeKey) => apply(routeKey as RouteKey, mapped))
     }
 
     if (legacy.delivery) {
@@ -669,7 +669,7 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
             delete: false,
             specific: { can_cancel: legacy.financial.cancel ?? false },
         }
-        ;["financial_transactions", "cadastros_financeiro"].forEach((routeKey) => apply(routeKey as RouteKey, mapped))
+            ;["financial_transactions", "cadastros_financeiro"].forEach((routeKey) => apply(routeKey as RouteKey, mapped))
     }
 
     if (legacy.cash_register) {

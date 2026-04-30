@@ -515,7 +515,7 @@ export async function openCashSessionAction(input: {
   })
   await revalidateEntityTimeline("cash_session", data.id)
   revalidatePath("/erp/cash-register")
-  revalidatePath("/erp/pos")
+  revalidatePath("/erp/pdv")
 
   return { success: true as const, data }
 }
@@ -894,7 +894,7 @@ export async function closeCashSessionAction(input: {
   })
   await revalidateEntityTimeline("cash_session", input.cashSessionId)
   revalidatePath("/erp/cash-register")
-  revalidatePath("/erp/pos")
+  revalidatePath("/erp/pdv")
 
   return {
     success: true as const,

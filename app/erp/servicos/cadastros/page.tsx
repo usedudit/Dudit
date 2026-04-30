@@ -1,6 +1,6 @@
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getServiceMetadataAction } from "@/app/actions/erp/service-metadata"
-import ServiceCategoriesPage from "@/components/erp/services/categorias/ServiceCategoriesPage"
+import ServiceCategoriesPage from "@/components/erp/servicos/cadastros/ServiceCategoriesPage"
 import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { AccessDenied } from "@/components/erp/access-denied"
@@ -31,9 +31,9 @@ export default async function Page() {
   }
 
   const isFreePlan = plan.slug.toLowerCase() === "free"
-  const planGate = isFreePlan ? { 
-    requiredPlanSlug: "vendedor" as const, 
-    message: "O acesso aos cadastros de categorias requer o plano Vendedor ou superior." 
+  const planGate = isFreePlan ? {
+    requiredPlanSlug: "vendedor" as const,
+    message: "O acesso aos cadastros de categorias requer o plano Vendedor ou superior."
   } : undefined
 
   return (

@@ -20,23 +20,23 @@ import {
     upsertPreSaleDraftAction,
     applyCouponToPreSaleAction,
     removeCouponFromPreSaleAction,
-} from "@/app/actions/erp/pos"
+} from "@/app/actions/erp/pdv"
 import { validateCouponAction } from "@/app/actions/shared/coupons"
 import { createProductComprehensiveAction } from "@/app/actions/erp/products"
 import { openCashSessionAction } from "@/app/actions/erp/cash-register"
 import { getTeamMembers } from "@/app/actions/erp/team"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
-import SelectSellerSheet from "@/components/erp/pos/SelectSellerSheet"
-import SelectCouponSheet from "@/components/erp/pos/SelectCouponSheet"
+import SelectSellerSheet from "@/components/erp/pdv/SelectSellerSheet"
+import SelectCouponSheet from "@/components/erp/pdv/SelectCouponSheet"
 import PaymentModal, { PAYMENT_MODAL_HEADER_SUBTITLE } from "@/components/erp/orders/PaymentModal"
-import POSCartItemCard from "@/components/erp/pos/POSCartItemCard"
-import { POSMorePreSalesCard, POSPreSaleCard } from "@/components/erp/pos/POSPreSaleCard"
-import POSCashClosedView from "@/components/erp/pos/POSCashClosedView"
-import POSHeader from "@/components/erp/pos/POSHeader"
-import POSDesktopOrderPanel, { POSOrderSummaryContent } from "@/components/erp/pos/POSOrderSummaryCard"
-import POSQuickProductSheet from "@/components/erp/pos/POSQuickProductSheet"
-import POSShippingSheet from "@/components/erp/pos/POSShippingSheet"
-import SelectProductVariantSheet from "@/components/erp/pos/SelectProductVariantSheet"
+import POSCartItemCard from "@/components/erp/pdv/POSCartItemCard"
+import { POSMorePreSalesCard, POSPreSaleCard } from "@/components/erp/pdv/POSPreSaleCard"
+import POSCashClosedView from "@/components/erp/pdv/POSCashClosedView"
+import POSHeader from "@/components/erp/pdv/POSHeader"
+import POSDesktopOrderPanel, { POSOrderSummaryContent } from "@/components/erp/pdv/POSOrderSummaryCard"
+import POSQuickProductSheet from "@/components/erp/pdv/POSQuickProductSheet"
+import POSShippingSheet from "@/components/erp/pdv/POSShippingSheet"
+import SelectProductVariantSheet from "@/components/erp/pdv/SelectProductVariantSheet"
 import type {
     PDVCartItem as CartItem,
     PDVCustomer as Customer,

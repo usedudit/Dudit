@@ -60,7 +60,7 @@ const navItems: NavItem[] = [
             { label: "Pedidos e Vendas", href: "/erp/orders" },
             { label: "Orçamentos", href: "/erp/quotes" },
             { label: "Metas", href: "/erp/goals" },
-            { label: "PDV (Frente de Caixa)", href: "/erp/pos" },
+            { label: "PDV (Frente de Caixa)", href: "/erp/pdv" },
             { label: "Devoluções", href: "/" },
             { label: "Expedição e Entregas", href: "/erp/logistics" },
         ],
@@ -80,12 +80,12 @@ const navItems: NavItem[] = [
     {
         icon: WrenchIcon,
         label: "Serviços",
-        href: "/erp/services",
+        href: "/erp/servicos",
         submenu: [
             { label: "Agendamentos", href: "/erp/agendamentos" },
             { label: "Ordens de Serviço", href: "/" },
-            { label: "Catálogo de Serviços", href: "/erp/services" },
-            { label: "Categorias de Serviços", href: "/erp/services/categorias" },
+            { label: "Catálogo de Serviços", href: "/erp/servicos" },
+            { label: "Cadastros de Serviços", href: "/erp/servicos/cadastros" },
         ],
     },
     {
@@ -137,7 +137,7 @@ const navItems: NavItem[] = [
 const PLAN_GATED_MINIMUM: Record<string, "vendedor"> = {
     "/erp/logistics": "vendedor",
     "/erp/products/cadastros": "vendedor",
-    "/erp/services/categorias": "vendedor",
+    "/erp/servicos/categorias": "vendedor",
     "/erp/financial/cadastros-financeiro": "vendedor",
 }
 

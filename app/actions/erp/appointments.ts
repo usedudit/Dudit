@@ -41,6 +41,8 @@ export type AppointmentInput = {
   notes?: string | null
   status?: AppointmentStatus
   source?: "appointment" | "unavailable"
+  recurrenceRule?: string | null
+  recurrenceGroupId?: string | null
 }
 
 function safeRevalidateTag(tag: string) {
@@ -79,6 +81,8 @@ function toDbPayload(input: AppointmentInput, partnerId: string) {
     notes: input.notes || null,
     status: sanitizeStatus(input.status),
     source: input.source || "appointment",
+    recurrence_rule: input.recurrenceRule || null,
+    recurrence_group_id: input.recurrenceGroupId || null,
   }
 }
 
@@ -534,7 +538,7 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     increment_usage_counter(partnerId, "appointments_month_count", data.length).catch(console.error)
 
     safeRevalidateTag(TAGS.entityTimeline("appointment-list", partnerId))
-    revalidatePath("/erp/services")
+    revalidatePath("/erp/servicos")
 
     return { success: true, created: data || [] }
   } catch (error: any) {
@@ -644,7 +648,7 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
 
     await revalidateEntityTimeline("appointment", appointmentId)
     safeRevalidateTag(TAGS.entityTimeline("appointment-list", partnerId))
-    revalidatePath("/erp/services")
+    revalidatePath("/erp/servicos")
 
     return { success: true, item: syncedAppointment || updated }
   } catch (error: any) {

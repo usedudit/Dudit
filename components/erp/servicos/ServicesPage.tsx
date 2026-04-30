@@ -9,7 +9,7 @@ import { generateSKUBase } from "@/lib/utils/code-generators"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
 import { useQueryClient } from "@tanstack/react-query"
-import { getERPServicesPageAction, type ERPServiceListCursor } from "@/app/actions/erp/services"
+import { getERPServicesPageAction, type ERPServiceListCursor } from "@/app/actions/erp/servicos"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 
@@ -23,7 +23,7 @@ import {
     getServiceWithDetailsAction,
     batchUpdateServicesAction,
     duplicateServiceAction
-} from "@/app/actions/erp/services"
+} from "@/app/actions/erp/servicos"
 
 // Components
 import { Button, IconPlaceholder, Checkbox } from "@/components/reusable"
@@ -140,7 +140,8 @@ const EmptyState = React.memo(({ type, onAddFirst, onClearFilters }: EmptyStateP
                 } : undefined}
             />
         </FadeIn>
-                )})
+    )
+})
 EmptyState.displayName = "EmptyState"
 
 // --- MAIN COMPONENT ---
