@@ -5,7 +5,8 @@ import { useSupabase } from "@/providers/supabase-provider"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { getPartnerUrl, getProductUrl } from "@/lib/utils/url-generator"
-import { MinusIcon, PlusIcon, TrashIcon, ChevronLeftIcon, ChevronUpIcon, ChevronDownIcon } from "@/lib/icons"
+import { TrashIcon, ChevronLeftIcon, ChevronUpIcon, ChevronDownIcon } from "@/lib/icons"
+import { QuantitySelector } from "@/components/reusable/QuantitySelector"
 import { AnimatePresence, motion } from "framer-motion"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
@@ -77,10 +78,9 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
     return token
   }
 
-  const updateQty = async (cartItemId: string, delta: number, currentQty: number) => {
-    if (loading || isActionInProgress.current) return
+  const updateQty = async (cartItemId: string, newQty: number, currentQty: number) => {
+    if (loading || isActionInProgress.current || newQty === currentQty) return
     isActionInProgress.current = true
-    const newQty = Math.max(1, currentQty + delta)
     setOptimisticItems(prev => ({ ...prev, [cartItemId]: { ...prev[cartItemId], quantity: newQty } }))
     setLoading(cartItemId)
     try {
@@ -175,25 +175,25 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
     const partnerItems = partnerData.items.filter((item: any) => getItemSelected(item))
 
     const checkoutData = {
-        source: "cart",
-        partnerId: partnerId,
-        products: getPartnerCheckoutProducts(partnerId),
-        partnerInfo: {
-            address: partnerData.partner?.addresses?.[0] || {},
-            paymentMethods: partnerData.paymentMethods || ["Dinheiro"],
-            mpConnected: !!partnerData.partner?.mp_user_id,
-            mpPublicKey: partnerData.partner?.mp_public_key,
-            store_name: partnerData.partner?.store_name,
-            openingHours: partnerData.partner?.opening_hours || null,
-        },
-        cartItems: partnerItems.map((item: any) => ({
-            cartItemId: item.id,
-            productId: item.product_id,
-            variantId: item.variant_id || undefined,
-            quantity: getItemQuantity(item),
-        }))
+      source: "cart",
+      partnerId: partnerId,
+      products: getPartnerCheckoutProducts(partnerId),
+      partnerInfo: {
+        address: partnerData.partner?.addresses?.[0] || {},
+        paymentMethods: partnerData.paymentMethods || ["Dinheiro"],
+        mpConnected: !!partnerData.partner?.mp_user_id,
+        mpPublicKey: partnerData.partner?.mp_public_key,
+        store_name: partnerData.partner?.store_name,
+        openingHours: partnerData.partner?.opening_hours || null,
+      },
+      cartItems: partnerItems.map((item: any) => ({
+        cartItemId: item.id,
+        productId: item.product_id,
+        variantId: item.variant_id || undefined,
+        quantity: getItemQuantity(item),
+      }))
     }
-    
+
     sessionStorage.setItem("checkout_session", JSON.stringify(checkoutData))
     router.push("/checkout")
   }
@@ -362,11 +362,12 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                         )}
 
                                         <div className="flex items-center justify-between mt-2">
-                                          <div className="flex items-center border border-brand-border rounded-[6px] h-[32px]">
-                                            <button onClick={() => updateQty(item.id, -1, itemQty)} className="w-8 h-full flex items-center justify-center hover:bg-brand-gray" disabled={loading === item.id || itemQty <= 1}><MinusIcon size={13} /></button>
-                                            <span className="w-7 text-center text-[13px] font-medium">{itemQty}</span>
-                                            <button onClick={() => updateQty(item.id, 1, itemQty)} className="w-8 h-full flex items-center justify-center hover:bg-brand-gray" disabled={loading === item.id}><PlusIcon size={13} /></button>
-                                          </div>
+                                          <QuantitySelector
+                                            value={itemQty}
+                                            onChange={(val) => updateQty(item.id, val, itemQty)}
+                                            disabled={loading === item.id}
+                                            size="sm"
+                                          />
                                           <span className="text-[15px] font-semibold text-brand-dark">{formatCurrency(getItemPrice(item) * itemQty)}</span>
                                         </div>
                                       </div>
@@ -409,11 +410,12 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                         </div>
 
                                         <div className="flex items-center justify-end gap-4">
-                                          <div className="flex items-center border border-brand-border rounded-[6px] h-[36px]">
-                                            <button onClick={() => updateQty(item.id, -1, itemQty)} className="w-9 h-full flex items-center justify-center hover:bg-brand-gray" disabled={loading === item.id || itemQty <= 1}><MinusIcon size={14} /></button>
-                                            <span className="w-8 text-center text-[14px] font-medium">{itemQty}</span>
-                                            <button onClick={() => updateQty(item.id, 1, itemQty)} className="w-9 h-full flex items-center justify-center hover:bg-brand-gray" disabled={loading === item.id}><PlusIcon size={14} /></button>
-                                          </div>
+                                          <QuantitySelector
+                                            value={itemQty}
+                                            onChange={(val) => updateQty(item.id, val, itemQty)}
+                                            disabled={loading === item.id}
+                                            size="sm"
+                                          />
                                           <div className="text-right min-w-[80px] font-semibold">{formatCurrency(getItemPrice(item) * itemQty)}</div>
                                           <button onClick={() => setDeleteModal({ open: true, cartItemId: item.id })} className="text-brand-red p-2 hover:bg-brand-red/15 rounded-full transition-colors" disabled={loading === item.id}><TrashIcon size={18} /></button>
                                         </div>

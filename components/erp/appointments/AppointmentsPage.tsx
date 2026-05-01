@@ -38,6 +38,7 @@ import { FadeIn } from '@/components/animations/FadeIn';
 import FilterSheet from '@/components/reusable/FilterSheet';
 import AppointmentsPageControls from './AppointmentsPageControls';
 import { AppointmentListRow } from './AppointmentListRow';
+import SavingStatusModal from '@/components/reusable/SavingStatusModal';
 
 /**
  * Compute the visible date range based on the current view and date.
@@ -153,7 +154,7 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
             setRealStaffMembers(teamRes.map((member) => ({
                 id: String(member.id),
                 name: member.fullName || member.email || 'Sem nome',
-                role: member.role,
+                role: member.role
             })));
         }
 
@@ -659,23 +660,10 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
                                 onViewModeChange={(mode) => setViewMode(mode)}
                                 calendarView={calendarView}
                                 onCalendarViewChange={(view) => setCalendarView(view)}
+                                onOpenCreate={() => handleOpenCreate()}
                             />
 
-                            {/* Mobile View Container */}
-                            <div className="block md:hidden h-full">
-                                <MobileView
-                                    currentDate={currentDate}
-                                    appointments={visibleAppointments}
-                                    setCurrentDate={setCurrentDate}
-                                    navigateDate={navigateDate}
-                                    getViewLabel={getViewLabel}
-                                    handleOpenCreate={handleOpenCreate}
-                                    handleOpenView={handleOpenView}
-                                />
-                            </div>
-
-                            {/* Desktop Container */}
-                            <div className="hidden md:block bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)]">
+                            <div className="flex-1 bg-white dark:bg-dark-surface md:border border-brand-border dark:border-dark-border md:rounded-2xl overflow-hidden h-full">
 
                                 <AnimatePresence mode="wait">
                                     {viewMode === 'calendar' ? (
@@ -687,7 +675,19 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
                                             transition={{ duration: 0.2 }}
                                             className="flex flex-col h-full"
                                         >
-                                            <div className="flex-1 overflow-y-auto no-scrollbar">
+                                            <div className="block md:hidden h-full">
+                                                <MobileView
+                                                    currentDate={currentDate}
+                                                    appointments={visibleAppointments}
+                                                    setCurrentDate={setCurrentDate}
+                                                    navigateDate={navigateDate}
+                                                    getViewLabel={getViewLabel}
+                                                    handleOpenCreate={handleOpenCreate}
+                                                    handleOpenView={handleOpenView}
+                                                    columns={APPOINTMENT_COLUMNS}
+                                                />
+                                            </div>
+                                            <div className="hidden md:flex flex-1 flex-col overflow-y-auto no-scrollbar">
                                                 {calendarView === 'month' && (
                                                     <>
                                                         <div className="grid grid-cols-7 border-b border-brand-border dark:border-dark-border bg-gray-50 dark:bg-zinc-900/50 flex-shrink-0">
@@ -756,12 +756,12 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
                                             exit={{ opacity: 0 }}
                                             transition={{ duration: 0.2 }}
                                         >
-                                            <div className="flex flex-col h-full bg-white dark:bg-dark-surface rounded-2xl overflow-hidden">
-                                                <div className="overflow-x-auto custom-scrollbar">
-                                                    <table className="w-full border-collapse">
+                                            <div className="flex flex-col h-full bg-white dark:bg-dark-surface rounded-2xl overflow-hidden pb-20 md:pb-0">
+                                                <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                                    <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                                                         <thead>
-                                                            <tr>
-                                                                <th className="py-3 pl-6 pr-0 border-b border-brand-border dark:border-dark-border w-14 bg-brand-gray/50 dark:bg-dark-background/50">
+                                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                <th className="py-3 pl-6 pr-3 w-[48px] bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
                                                                     <Checkbox
                                                                         checked={paginatedAppointments.length > 0 && paginatedAppointments.every((appointment) => selectedIds.has(appointment.id))}
                                                                         onChange={(checked: boolean) => {
@@ -776,7 +776,7 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
                                                                 {APPOINTMENT_COLUMNS.map((column) => (
                                                                     <th
                                                                         key={column.id}
-                                                                        className={`p-3 text-[11px] uppercase tracking-wider font-bold text-brand-inactive-text dark:text-dark-body border-b border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-background/50 whitespace-nowrap ${column.align === "center" ? "text-center" : column.align === "right" ? "text-right" : "text-left"}`}
+                                                                        className={`py-3 px-3 text-[11px] uppercase tracking-wider font-bold text-brand-inactive-text dark:text-dark-body whitespace-nowrap bg-brand-gray dark:bg-dark-border/50 ${column.align === "center" ? "text-center" : column.align === "right" ? "text-right" : "text-left"}`}
                                                                         style={{ width: column.width, minWidth: column.minWidth }}
                                                                     >
                                                                         {column.label}
@@ -973,6 +973,7 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
                             />
                         )}
                     </AnimatePresence>
+                    <SavingStatusModal isOpen={isSaving} text="Salvando agendamento..." />
                 </FadeIn>
             </AnimatePresence>
         </>

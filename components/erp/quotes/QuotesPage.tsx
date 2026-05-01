@@ -12,6 +12,7 @@ import QuoteSkeleton from "./QuoteSkeleton"
 import { deleteQuoteAction, batchDeleteQuotesAction, batchUpdateQuotesStatusAction } from "@/app/actions/erp/quotes"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import Pagination from "@/components/reusable/Pagination"
 import QuoteListItem from "./QuoteListRow"
@@ -791,6 +792,8 @@ export default function QuotesPage({
                     Excluir
                 </Button>
             </FloatingActionBar>
+
+            <SavingStatusModal isOpen={isDeleting} text="Excluindo..." />
         </>
     )
 }

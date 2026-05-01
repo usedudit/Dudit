@@ -11,7 +11,7 @@ import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 
 // Components
-import { Button, IconPlaceholder, ThreeDotsLoader, Checkbox, Badge, AlertModal } from "@/components/reusable"
+import { Button, IconPlaceholder, ThreeDotsLoader, Checkbox, Badge, AlertModal, SavingStatusModal } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
@@ -675,7 +675,6 @@ export default function CustomersPage({
                 confirmText="Sim, excluir"
                 variant="danger"
                 onConfirm={() => confirmBulk("delete")}
-                isLoading={isProcessingBulk}
             />
 
             <AlertModal
@@ -686,7 +685,6 @@ export default function CustomersPage({
                 confirmText="Confirmar"
                 variant="warning"
                 onConfirm={() => confirmBulk("inactive")}
-                isLoading={isProcessingBulk}
             />
 
             <AlertModal
@@ -696,11 +694,12 @@ export default function CustomersPage({
                 }}
                 title="Excluir cliente?"
                 description={`Tem certeza que deseja excluir ${customerToDelete?.name || "este cliente"}? Esta ação não pode ser desfeita.`}
-                confirmText={isDeletingCustomer ? "Excluindo..." : "Excluir"}
+                confirmText="Excluir"
                 variant="danger"
                 onConfirm={confirmDeleteCustomer}
-                isLoading={isDeletingCustomer}
             />
+
+            <SavingStatusModal isOpen={isDeletingCustomer || isProcessingBulk} text={isDeletingCustomer ? "Excluindo cliente..." : "Processando..."} />
 
             <FloatingActionBar selectedCount={selection.ids.size} onClearSelection={() => setSelection((p) => ({ ...p, ids: new Set() }))}>
                 <Button

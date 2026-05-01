@@ -263,7 +263,18 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     }), [quoteItems, selectedCustomer, internalNote, staffInternalNotes, quoteDate, expiryDate, status, discount, discountType, shippingFee, otherCosts]);
 
     const isDirty = useMemo(() => {
-        if (!originalQuoteData) return mode === 'create' && quoteItems.length > 0;
+        if (!originalQuoteData) {
+            if (mode === 'create' || mode === 'duplicate') {
+                return quoteItems.length > 0 || 
+                    !!selectedCustomer || 
+                    !!internalNote.trim() || 
+                    !!staffInternalNotes.trim() || 
+                    Number(discount) > 0 || 
+                    Number(shippingFee) > 0 || 
+                    Number(otherCosts) > 0;
+            }
+            return false;
+        }
 
         // Fast shallow checks first
         if (
@@ -1051,23 +1062,25 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     isOpen={showAlertModal}
                     onClose={() => setShowAlertModal(false)}
                     onConfirm={confirmNavigation}
-                    title="Descartar Alterações"
-                    description="Você tem alterações não salvas. Deseja realmente sair sem salvar?"
-                    confirmText="Descartar"
+                    title="Descartar alterações?"
+                    description="Você tem alterações não salvas. Se sair agora, elas serão perdidas."
+                    confirmText="Sair sem salvar"
                     cancelText="Cancelar"
                     variant="warning"
                 />
 
-                <AlertModal
-                    isOpen={unsavedChangesDialogOpen}
-                    onClose={handleUnsavedChangesDialogClose}
-                    onConfirm={handleUnsavedChangesConfirm}
-                    title="Descartar Alterações"
-                    description="Você tem alterações não salvas. Deseja realmente sair sem salvar?"
-                    confirmText="Descartar"
-                    cancelText="Cancelar"
-                    variant="warning"
-                />
+                {unsavedChangesDialogOpen && (
+                    <AlertModal
+                        isOpen={unsavedChangesDialogOpen}
+                        onClose={handleUnsavedChangesDialogClose}
+                        onConfirm={handleUnsavedChangesConfirm}
+                        title="Descartar alterações?"
+                        description="Você tem alterações não salvas. Se sair agora, elas serão perdidas."
+                        confirmText="Sair sem salvar"
+                        cancelText="Cancelar"
+                        variant="warning"
+                    />
+                )}
 
                 <AlertModal
                     isOpen={showValidationModal}

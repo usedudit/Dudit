@@ -7,6 +7,9 @@ import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import AlertModal from "@/components/reusable/AlertModal"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 
 type ShippingCustomerDetails = {
   id: string
@@ -93,6 +96,31 @@ export default function POSShippingSheet({
     setCity(customerDetails.address.city || "")
     setState(customerDetails.address.state || "")
   }, [customerDetails?.id])
+
+  const isDirty = 
+    zipCode !== (customerDetails?.address?.zipCode || "") ||
+    street !== (customerDetails?.address?.street || "") ||
+    number !== (customerDetails?.address?.number || "") ||
+    complement !== (customerDetails?.address?.complement || "") ||
+    neighborhood !== (customerDetails?.address?.neighborhood || "") ||
+    city !== (customerDetails?.address?.city || "") ||
+    state !== (customerDetails?.address?.state || "")
+
+  const { showConfirmDialog, confirmNavigation, cancelNavigation } = useUnsavedChanges(isDirty && isAddressSheetOpen)
+  const [showAlertModal, setShowAlertModal] = useState(false)
+
+  const handleCloseAddressSheet = () => {
+    if (isDirty) {
+      setShowAlertModal(true)
+    } else {
+      setIsAddressSheetOpen(false)
+    }
+  }
+
+  const confirmCloseAddressSheet = () => {
+    setShowAlertModal(false)
+    setIsAddressSheetOpen(false)
+  }
 
   const hasSelectedCustomer = !!selectedCustomerId
   const hasStreet = !!customerDetails?.address?.street?.trim()
@@ -216,7 +244,7 @@ export default function POSShippingSheet({
     <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
       <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Cadastrar Endereço</h2>
-        <Button variant="ghost" onClick={() => setIsAddressSheetOpen(false)} size="icon">
+        <Button variant="ghost" onClick={handleCloseAddressSheet} size="icon">
           <XIcon className="h-5 w-5" />
         </Button>
       </header>
@@ -241,7 +269,7 @@ export default function POSShippingSheet({
 
       <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="flex-1" onClick={() => setIsAddressSheetOpen(false)}>
+          <Button variant="outline" className="flex-1" onClick={handleCloseAddressSheet}>
             Cancelar
           </Button>
           <Button
@@ -272,9 +300,30 @@ export default function POSShippingSheet({
     return (
       <>
         <BottomSheet isOpen={isOpen} onClose={onClose}>{content}</BottomSheet>
-        <BottomSheet isOpen={isAddressSheetOpen} onClose={() => setIsAddressSheetOpen(false)}>
+        <BottomSheet isOpen={isAddressSheetOpen} onClose={handleCloseAddressSheet}>
           {addressSheetContent}
         </BottomSheet>
+        <SavingStatusModal isOpen={isSavingAddress} text="Salvando endereço..." />
+        <AlertModal
+          isOpen={showAlertModal}
+          onClose={() => setShowAlertModal(false)}
+          onConfirm={confirmCloseAddressSheet}
+          title="Descartar alterações?"
+          description="Você tem alterações não salvas. Se sair agora, elas serão perdidas."
+          confirmText="Sair sem salvar"
+          variant="warning"
+        />
+        {showConfirmDialog && (
+          <AlertModal
+            isOpen={showConfirmDialog}
+            onClose={cancelNavigation}
+            onConfirm={confirmNavigation}
+            title="Descartar alterações?"
+            description="Você tem alterações não salvas. Se sair agora, elas serão perdidas."
+            confirmText="Sair sem salvar"
+            variant="warning"
+          />
+        )}
       </>
     )
   }
@@ -302,7 +351,7 @@ export default function POSShippingSheet({
       <Portal>
         <div
           className={`fixed inset-0 z-[60] bg-black/50 transition-opacity duration-300 ${isAddressSheetOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-          onClick={() => setIsAddressSheetOpen(false)}
+          onClick={handleCloseAddressSheet}
         >
           <div
             className={`fixed right-4 top-4 bottom-4 w-[520px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isAddressSheetOpen ? "translate-x-0" : "translate-x-[120%]"}`}
@@ -312,6 +361,28 @@ export default function POSShippingSheet({
           </div>
         </div>
       </Portal>
+
+      <SavingStatusModal isOpen={isSavingAddress} text="Salvando endereço..." />
+      <AlertModal
+        isOpen={showAlertModal}
+        onClose={() => setShowAlertModal(false)}
+        onConfirm={confirmCloseAddressSheet}
+        title="Descartar alterações?"
+        description="Você tem alterações não salvas. Se sair agora, elas serão perdidas."
+        confirmText="Sair sem salvar"
+        variant="warning"
+      />
+      {showConfirmDialog && (
+        <AlertModal
+          isOpen={showConfirmDialog}
+          onClose={cancelNavigation}
+          onConfirm={confirmNavigation}
+          title="Descartar alterações?"
+          description="Você tem alterações não salvas. Se sair agora, elas serão perdidas."
+          confirmText="Sair sem salvar"
+          variant="warning"
+        />
+      )}
     </>
   )
 }

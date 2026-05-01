@@ -5,6 +5,8 @@ import { CalendarX, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Users, 
 import { Button, Dropdown, DropdownItem, Badge, Checkbox as FormCheckbox } from '../../../reusable';
 import { Appointment, LayoutAppointment, StaffMember, PopoverState } from '../types';
 import { getAppointmentStyle, getEndTime, formatDateStr, getWeekDays, arrangeAppointments, formatDuration, isMultiDay, getMultiDayStyle, parseLocalDate } from '../utils';
+import { AppointmentListRow } from '../AppointmentListRow';
+import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 
 // --- HELPER COMPONENTS ---
 
@@ -87,41 +89,11 @@ export const MobileView = ({
     navigateDate,
     getViewLabel,
     handleOpenCreate,
-    handleOpenView
+    handleOpenView,
+    columns
 }: any) => {
     // ... Mobile View implementation same as previous ...
-    const renderMobileHeader = () => {
-        const fullLabel = getViewLabel();
-        return (
-            <div className="flex flex-col gap-3 mb-4 px-2">
-                <div className="flex items-center justify-between gap-2">
-                    <div className="flex flex-1 items-center border border-brand-border dark:border-dark-border rounded-full bg-white dark:bg-dark-surface h-[40px] shadow-sm min-w-0">
-                        <button onClick={() => navigateDate('prev')} className="w-10 h-full flex items-center justify-center border-r border-brand-border dark:border-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"><ChevronLeft size={18} /></button>
-                        <div className="flex-1 px-2 text-sm font-bold text-brand-dark dark:text-dark-heading capitalize whitespace-nowrap text-center truncate">{fullLabel}</div>
-                        <button onClick={() => navigateDate('next')} className="w-10 h-full flex items-center justify-center border-l border-brand-border dark:border-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"><ChevronRight size={18} /></button>
-                    </div>
 
-                    <Button className="w-10 h-10" onClick={() => setCurrentDate(new Date())}>
-                        <RotateCcw size={18} />
-                    </Button>
-                    <Button className="w-10 h-10">
-                        <Users size={18} />
-                    </Button>
-                    <Button className="w-10 h-10">
-                        <CalendarIcon size={18} />
-                    </Button>
-                </div>
-
-                <Button
-                    variant="default"
-                    className="w-full h-[40px] rounded-full shadow-sm bg-brand-green hover:bg-brand-green/90 text-white font-bold"
-                    onClick={() => handleOpenCreate()}
-                >
-                    Novo Agendamento
-                </Button>
-            </div>
-        )
-    };
 
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -141,8 +113,7 @@ export const MobileView = ({
     const selectedDateApps = appointments.filter((a: Appointment) => a.date === formatDateStr(currentDate)).sort((a: Appointment, b: Appointment) => a.time.localeCompare(b.time));
 
     return (
-        <div className="flex flex-col h-full">
-            {renderMobileHeader()}
+        <div className="flex flex-col h-full mt-4">
             <div className="bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border py-4 mb-4">
                 <div className="flex overflow-x-auto gap-4 px-4 no-scrollbar snap-x items-center justify-between text-center">
                     {days.map((dayItem, index) => (
@@ -170,43 +141,37 @@ export const MobileView = ({
             <AnimatePresence mode='wait'>
                 <motion.div key={currentDate.toISOString()} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="flex-1 overflow-y-auto px-4 pb-20 space-y-3">
                     {selectedDateApps.length > 0 ? (
-                        selectedDateApps.map((apt: Appointment) => {
-                            const style = getAppointmentStyle(apt.status);
-                            const borderColor = style.bar.replace('bg-', 'border-');
-
-                            let timeLabel = `${apt.time}`;
-                            if (apt.endDate && apt.date !== apt.endDate) {
-                                const endD = new Date(apt.endDate);
-                                timeLabel += ` - ${endD.getDate()}/${endD.getMonth() + 1}`;
-                            } else {
-                                const endTime = getEndTime(apt.time, apt.duration);
-                                timeLabel += ` - ${endTime}`;
-                            }
-
-                            return (
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    key={apt.id}
-                                    className={`w-full rounded-xl p-3 border-l-4 border-y border-r ${style.container} ${borderColor} cursor-pointer shadow-sm relative overflow-hidden transition-all active:scale-[0.98]`}
-                                    onClick={() => handleOpenView(apt)}
-                                >
-                                    <div className="flex gap-3 h-full">
-                                        <div className="flex-1 min-w-0 flex flex-col">
-                                            <div className="flex items-center justify-between mb-1">
-                                                <span className={`font-bold text-xs ${style.title} truncate`}>{timeLabel}</span>
-                                                <div className={`w-2 h-2 rounded-full ${style.dot}`}></div>
-                                            </div>
-                                            <div className={`font-bold text-sm ${style.title} truncate leading-tight mb-1`}>{apt.customer}</div>
-                                            <div className={`text-xs ${style.text} truncate opacity-90 mb-2`}>{apt.service}</div>
-                                            <div className="flex items-center gap-2 pt-2 border-t border-black/5 dark:border-white/5 mt-auto">
-                                                <span className={`text-[10px] font-bold ${style.text}`}>{apt.staff}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            );
-                        })
+                        <div className="overflow-x-auto pb-4 custom-scrollbar bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border mt-2">
+                            <table className="w-full text-left border-separate border-spacing-0 min-w-[800px]">
+                                <thead>
+                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                        <th className="py-3 pl-6 pr-3 w-[48px] bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
+                                        </th>
+                                        {columns?.map((column: any) => (
+                                            <th
+                                                key={column.id}
+                                                className={`py-3 px-3 text-[11px] uppercase tracking-wider font-bold text-brand-inactive-text dark:text-dark-body whitespace-nowrap bg-brand-gray dark:bg-dark-border/50 ${column.align === "center" ? "text-center" : column.align === "right" ? "text-right" : "text-left"}`}
+                                                style={{ width: column.width, minWidth: column.minWidth }}
+                                            >
+                                                {column.label}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {selectedDateApps.map((apt: Appointment) => (
+                                        <AppointmentListRow
+                                            key={apt.id}
+                                            appointment={apt}
+                                            columns={columns}
+                                            selected={false}
+                                            onSelect={() => {}}
+                                            onView={handleOpenView}
+                                        />
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center py-20 text-center">
                             <div className="w-16 h-16 bg-gray-50 dark:bg-zinc-900 rounded-full flex items-center justify-center mb-4 text-brand-inactive-text"><CalendarX size={24} /></div>
@@ -274,7 +239,7 @@ export const DayView = ({ appointments, currentDate, staffMembers, onOpenView, h
                         return (
                             <div key={staff.id} className="flex-1 min-w-[200px] border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface relative group resource-column">
                                 <div className="h-16 border-b border-brand-border dark:border-dark-border flex flex-col items-center justify-center sticky top-0 bg-white dark:bg-dark-surface z-20 px-2 pointer-events-none">
-                                    <div className="flex items-center gap-2"><img src={staff.avatar} className="w-8 h-8 rounded-full object-cover border border-brand-border dark:border-dark-border" /><div className="flex flex-col"><span className="text-sm font-bold text-brand-dark dark:text-dark-heading leading-tight">{staff.name}</span><span className="text-[10px] text-brand-inactive-text dark:text-dark-body truncate max-w-[100px]">{staff.role}</span></div></div>
+                                    <div className="flex items-center gap-2"><UserProfileImage fullName={staff.name} imageUrl={staff.avatar} className="w-8 h-8 shrink-0 text-[10px]" /><div className="flex flex-col"><span className="text-sm font-bold text-brand-dark dark:text-dark-heading leading-tight">{staff.name}</span><span className="text-[10px] text-brand-inactive-text dark:text-dark-body truncate max-w-[100px]">{staff.role}</span></div></div>
                                 </div>
                                 <div className="relative" onMouseMove={(e) => handleGridMouseMove(e, colIndex)} onMouseLeave={handleGridMouseLeave} onClick={(e) => handleGridClick(e, staff.id)}>
                                     {hours.map(h => (
@@ -402,7 +367,7 @@ export const TimelineView = ({ appointments, currentDate, staffMembers, onOpenVi
                 <div className="w-48 flex-shrink-0 border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface z-20 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)] overflow-y-auto no-scrollbar">
                     {staffMembers.map((staff: StaffMember) => (
                         <div key={staff.id} className="h-40 border-b border-brand-border dark:border-dark-border flex items-center gap-3 px-4">
-                            <img src={staff.avatar} className="w-10 h-10 rounded-full object-cover border border-brand-border dark:border-dark-border" />
+                            <UserProfileImage fullName={staff.name} imageUrl={staff.avatar} className="w-10 h-10 shrink-0 text-xs" />
                             <div className="flex flex-col">
                                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading leading-tight">{staff.name}</span>
                                 <span className="text-[10px] text-brand-inactive-text dark:text-dark-body truncate max-w-[100px]">{staff.role}</span>

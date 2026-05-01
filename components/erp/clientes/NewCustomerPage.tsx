@@ -18,7 +18,8 @@ import {
     WebsiteInput,
     DatePicker,
     ListItem,
-    RadioButton
+    RadioButton,
+    UnsavedChangesDialog
 } from "@/components/reusable"
 import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { CpfCnpjInput } from "@/components/reusable/Inputs/CpfCnpjInput"
@@ -119,10 +120,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
             cep !== "" || street !== "" || number !== "" || neighborhood !== "" || city !== ""
     }, [customerName, fantasia, cnpj, ie, cpf, rg, email, phone, mobile, website, birthDate, motherName, fatherName, observacoes, cep, street, number, neighborhood, city])
 
-    const { showConfirmDialog: unsavedChangesDialogOpen, confirmNavigation: handleUnsavedChangesConfirm, cancelNavigation: handleUnsavedChangesDialogClose } = useUnsavedChanges(isDirty)
+    const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
-    const [nextAction, setNextAction] = useState<(() => void) | null>(null)
-    const [showAlertModal, setShowAlertModal] = useState(false)
     const [isLoadingData, setIsLoadingData] = useState(false)
 
     // Fetch customer data for editing
@@ -199,17 +198,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
         }
     }, [customerId, partnerId])
 
-    const handleAttemptNav = useCallback((action: () => void) => {
-        if (isDirty) { setNextAction(() => action); setShowAlertModal(true) }
-        else action()
-    }, [isDirty])
-
-    const handleBack = useCallback(() => handleAttemptNav(onBack), [handleAttemptNav, onBack])
-
-    const confirmNavigation = useCallback(() => {
-        nextAction?.()
-        setShowAlertModal(false)
-    }, [nextAction])
+    const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
 
     const getTabErrorCount = useCallback((tab: string) => {
         return REQUIRED_FIELDS.filter(({ field, tab: fieldTab }) => fieldTab === tab && fieldErrors.has(field)).length
@@ -847,16 +836,32 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                     <div className="w-full h-[120px] bg-brand-gray dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group" onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${street}, ${number}, ${neighborhood}, ${city} - ${uf}, ${cep}`)}`, '_blank')}>
                                                         <img alt="Mapa" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" src="https://img.dudit.com.br/static/MapLarge.png" onError={(e) => { e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" fill="rgb(229,231,235)"><rect width="100%" height="100%"/></svg>' }} />
                                                         <div className="absolute inset-0 flex items-center justify-center">
-                                                            <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white z-10 transition-transform group-hover:scale-110"></div>
-                                                            <div className="w-12 h-12 bg-white/30 rounded-full absolute mix-blend-overlay animate-pulse"></div>
+                                                            <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white z-10 transition-transform group-hover:scale-110">
+                                                                <div className="w-2 h-2 bg-white rounded-full"></div>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     <div className="flex items-start justify-between">
                                                         <div className="flex flex-col flex-1 truncate pr-4">
-                                                            <h4 className="font-bold text-brand-dark dark:text-dark-heading text-[15px] mb-1.5 truncate">{customerName || "Nome do Cliente"}</h4>
-                                                            <p className="text-brand-inactive-text text-[13px] leading-snug truncate">{street ? `${street}, ${noNumber ? 'S/N' : number}` : 'Logradouro não informado'}</p>
-                                                            <p className="text-brand-inactive-text text-[13px] leading-snug truncate mt-0.5">{neighborhood ? `${neighborhood}, ${city} - ${uf}` : 'Bairro/Cidade não informados'}</p>
-                                                            <p className="text-brand-inactive-text text-[13px] leading-snug mt-0.5">{cep || 'CEP não informado'}</p>
+                                                            <h4 className="font-bold text-brand-dark dark:text-dark-heading text-[15px] mb-1.5 truncate">
+                                                                {customerName || "Nome do Cliente"}
+                                                            </h4>
+
+                                                            <p className="text-brand-inactive-text dark:text-dark-body text-[13px] truncate">
+                                                                {street
+                                                                    ? `${street}, ${noNumber ? 'S/N' : number} - ${neighborhood || 'Bairro não informado'}`
+                                                                    : 'Logradouro não informado'}
+                                                            </p>
+
+                                                            <p className="text-brand-inactive-text dark:text-dark-body text-[13px]truncate">
+                                                                {city && uf
+                                                                    ? `${city} - ${uf}`
+                                                                    : 'Cidade/Estado não informados'}
+                                                            </p>
+
+                                                            <p className="text-brand-inactive-text dark:text-dark-body text-[13px] truncate">
+                                                                {cep || 'CEP não informado'}
+                                                            </p>
                                                         </div>
                                                         <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${street}, ${noNumber ? 'S/N' : number}, ${neighborhood}, ${city} - ${uf}, ${cep}`)}`} target="_blank" rel="noopener noreferrer" className="text-[13px] font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark/20 dark:decoration-dark-heading/20 hover:decoration-brand-dark whitespace-nowrap pt-1">Ver no mapa</a>
                                                     </div>
@@ -892,28 +897,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                 </Tabs>
 
                 {/* Modals */}
-                {unsavedChangesDialogOpen && (
-                    <AlertModal
-                        isOpen={unsavedChangesDialogOpen}
-                        onClose={handleUnsavedChangesDialogClose}
-                        onConfirm={handleUnsavedChangesConfirm}
-                        title="Descartar alterações?"
-                        description="Você tem alterações não salvas. Se sair agora, perderá todo o progresso deste cadastro."
-                        confirmText="Sair sem salvar"
-                        variant="warning"
-                    />
-                )}
-                {showAlertModal && (
-                    <AlertModal
-                        isOpen
-                        onClose={() => setShowAlertModal(false)}
-                        onConfirm={confirmNavigation}
-                        title="Descartar alterações?"
-                        description="Existem dados não salvos neste formulário. Tem certeza que deseja cancelar o cadastro?"
-                        confirmText="Sair sem salvar"
-                        variant="warning"
-                    />
-                )}
+                <UnsavedChangesDialog open={showConfirmDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />
 
                 <SavingStatusModal isOpen={isSaving} text={customerId ? "Salvando cliente..." : "Criando cliente..."} />
             </div>

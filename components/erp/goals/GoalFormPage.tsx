@@ -12,8 +12,9 @@ import {
   FormDropdown,
   Input,
   ListItem,
-  MoneyInput,
   UnsavedChangesDialog,
+  SavingStatusModal,
+  MoneyInput,
 } from "@/components/reusable"
 import { ChevronLeftIcon, PlusIcon, SaveIcon, TargetIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
@@ -528,6 +529,8 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
         message={<ul className="list-disc list-inside">{validationMessages.map((message, index) => <li key={index}>{message}</li>)}</ul>}
         variant="warning"
       />
+
+      <SavingStatusModal isOpen={saving || isSavingAccount} text={saving ? "Salvando meta..." : "Salvando conta..."} />
     </FadeIn>
   )
 }

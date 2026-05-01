@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { deleteSupplierAction } from "@/app/actions/erp/suppliers"
 import { toast } from "sonner"
 import AlertModal from "../reusable/AlertModal"
+import SavingStatusModal from "../reusable/SavingStatusModal"
 import { TrashIcon } from "@/lib/icons"
 import Link from "next/link"
 import { useERPData } from "./hooks"
@@ -133,12 +134,13 @@ export function SuppliersList({ suppliers: initialSuppliers, partnerId }: { supp
           onConfirm={handleConfirmDelete}
           title="Excluir fornecedor?"
           message="Tem certeza que deseja excluir este fornecedor? Esta ação não pode ser desfeita."
-          confirmText={isDeleting ? "Excluindo..." : "Excluir"}
+          confirmText="Excluir"
           icon={<TrashIcon />}
           isDestructive
-          disabled={isDeleting}
         />
       )}
+
+      <SavingStatusModal isOpen={isDeleting} text="Deletando fornecedor..." />
     </>
   )
 }

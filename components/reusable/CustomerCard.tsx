@@ -54,12 +54,20 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
 
     const formatAddress = (addr: any) => {
         if (!addr) return null;
-        return [
-            `${addr.street || ""}${addr.number ? `, ${addr.number}` : ""}${addr.complement ? ` (${addr.complement})` : ""}`,
-            addr.neighborhood,
-            `${addr.city || ""}${(addr.state || addr.uf) ? ` - ${addr.state || addr.uf}` : ""}`,
-            addr.zipCode || addr.zip_code
-        ].filter(Boolean).join("\n");
+
+        const streetLine = addr.street
+            ? `${addr.street}${addr.number ? `, ${addr.number}` : ""} - ${addr.neighborhood || "Bairro não informado"}`
+            : null;
+
+        const cityLine = (addr.city || addr.state || addr.uf)
+            ? `${addr.city || ""}${(addr.state || addr.uf) ? ` - ${addr.state || addr.uf}` : ""}`
+            : null;
+
+        const zipLine = addr.zipCode || addr.zip_code;
+
+        return [streetLine, cityLine, zipLine]
+            .filter(Boolean)
+            .join("\n");
     };
 
     const formattedAddress = formatAddress(addressToUse);
@@ -69,6 +77,12 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
         chrome === "minimal"
             ? "border-0"
             : "rounded-2xl border border-brand-border dark:border-dark-border"
+
+    const fullAddress = addressToUse
+        ? `${addressToUse.street || ""}, ${addressToUse.number || ""}, ${addressToUse.neighborhood || ""}, ${addressToUse.city || ""} - ${addressToUse.state || ""}, ${addressToUse.zipCode || ""}`
+        : "";
+
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
 
     return (
         <div className={`bg-white dark:bg-dark-surface ${chromeClass} relative overflow-hidden transition-colors ${className}`}>
@@ -132,7 +146,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
                         <>
                             {showMap && (
                                 /* Map Placeholder */
-                                <div className="w-full h-[120px] bg-brand-gray dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group">
+                                <div className="w-full h-[120px] bg-brand-gray dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group" onClick={() => window.open(mapsUrl, '_blank')}>
                                     <img src="https://img.dudit.com.br/static/MapLarge.png" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Mapa" />
                                     <div className="absolute inset-0 flex items-center justify-center">
                                         <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white z-10 transition-transform group-hover:scale-110">
@@ -145,7 +159,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
                             <div className="mb-0">
                                 <div className="flex justify-between items-start mb-1">
                                     <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate pr-2">{customer?.name || "Endereço Padrão"}</h4>
-                                    <a href="#" className="text-xs font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark dark:decoration-dark-heading shrink-0">Ver Mapa</a>
+                                    <a href={mapsUrl} target="_blank" className="text-xs font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark dark:decoration-dark-heading shrink-0">Ver Mapa</a>
                                 </div>
                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-line">
                                     {formattedAddress}
@@ -154,7 +168,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
                         </>
                     ) : (
                         <div className="bg-brand-gray/30 dark:bg-dark-border/30 rounded-lg p-4 text-center">
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body italic">
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
                                 Nenhum endereço de entrega cadastrado.
                             </p>
                         </div>
@@ -206,7 +220,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
                         </div>
                     ) : (
                         <div className="bg-brand-gray/30 dark:bg-dark-border/30 rounded-lg p-4 text-center">
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body italic">
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
                                 Nenhuma informação de contato disponível.
                             </p>
                         </div>

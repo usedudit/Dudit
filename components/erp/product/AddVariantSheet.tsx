@@ -13,6 +13,7 @@ import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import AlertModal from "@/components/reusable/AlertModal"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { createProductVariantsBatchAction, getProductVariantsAction } from "@/app/actions/erp/products"
 import { useNotification } from "@/hooks/use-notification"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
@@ -899,6 +900,8 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
         variant="danger"
         icon={<TrashIcon />}
       />
+
+      <SavingStatusModal isOpen={isSaving} text="Salvando Variantes..." />
     </div>
   )
 

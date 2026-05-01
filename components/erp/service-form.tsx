@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Button, InfoCard } from "@/components/reusable"
 import { Card, CardContent } from "@/components/ui/card"
@@ -21,19 +21,22 @@ export function ServiceForm({ partnerId }: ServiceFormProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [isDirty, setIsDirty] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     price: 0,
   })
 
-  const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
+  const initialSnapshot = useMemo(() => JSON.stringify({
+    name: "",
+    description: "",
+    price: 0,
+  }), [])
 
-  useEffect(() => {
-    const hasChanges = formData.name || formData.description || formData.price > 0
-    setIsDirty(Boolean(hasChanges))
-  }, [formData])
+  const currentSnapshot = useMemo(() => JSON.stringify(formData), [formData])
+  const isDirty = currentSnapshot !== initialSnapshot
+
+  const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

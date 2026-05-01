@@ -38,6 +38,7 @@ interface AppointmentsPageControlsProps {
     onViewModeChange: (mode: "calendar" | "list") => void;
     calendarView: "day" | "week" | "month";
     onCalendarViewChange: (view: "day" | "week" | "month") => void;
+    onOpenCreate: () => void;
 }
 
 const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
@@ -54,6 +55,7 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
     onViewModeChange,
     calendarView,
     onCalendarViewChange,
+    onOpenCreate,
 }) => {
     const filtersContainerRef = useRef<HTMLDivElement>(null);
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false });
@@ -95,8 +97,8 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
     return (
         <>
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                    <Button variant="outline" className="w-[42px] h-[42px] p-0 md:hidden" onClick={onToday}>
+                <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar">
+                    <Button variant="outline" className="w-[42px] h-[42px] p-0 md:hidden shrink-0 rounded-full" onClick={onToday}>
                         <ReloadIcon size={18} />
                     </Button>
 
@@ -104,22 +106,32 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
                         Hoje
                     </Button>
 
-                    <div className="flex items-center border border-brand-border dark:border-dark-border rounded-full bg-white dark:bg-dark-surface h-[42px] overflow-hidden flex-1 md:flex-none">
+                    <div className="flex items-center border border-brand-border dark:border-dark-border rounded-full bg-white dark:bg-dark-surface h-[42px] overflow-hidden flex-1 md:flex-none min-w-[150px]">
                         <button
                             onClick={onPrev}
-                            className="w-10 h-full flex items-center justify-center border-r border-brand-border dark:border-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                            className="w-10 h-full flex items-center justify-center border-r border-brand-border dark:border-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors shrink-0"
                         >
                             <ChevronLeftIcon size={18} />
                         </button>
-                        <div className="flex-1 md:flex-none px-4 text-sm font-bold text-brand-dark dark:text-dark-heading capitalize whitespace-nowrap text-center min-w-[140px]">
+                        <div className="flex-1 md:flex-none px-2 md:px-4 text-[13px] md:text-sm font-bold text-brand-dark dark:text-dark-heading capitalize whitespace-nowrap text-center min-w-[100px] md:min-w-[140px] truncate">
                             {currentLabel}
                         </div>
                         <button
                             onClick={onNext}
-                            className="w-10 h-full flex items-center justify-center border-l border-brand-border dark:border-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                            className="w-10 h-full flex items-center justify-center border-l border-brand-border dark:border-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors shrink-0"
                         >
                             <ChevronRightIcon size={18} />
                         </button>
+                    </div>
+
+                    <div className="md:hidden flex items-center gap-2 shrink-0">
+                        <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] p-0 rounded-full bg-white dark:bg-dark-surface relative">
+                            <FilterIcon className="w-[18px] h-[18px]" />
+                            {hasActiveFilters && <div className="absolute top-2 right-2 w-2 h-2 bg-brand-primary rounded-full"></div>}
+                        </Button>
+                        <Button onClick={onOpenCreate} className="w-[42px] h-[42px] p-0 rounded-full bg-brand-green hover:bg-brand-green/90 text-white shadow-sm border-none">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                        </Button>
                     </div>
                 </div>
 
@@ -195,47 +207,7 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
                     </div>
                 </div>
 
-                <div className="md:hidden flex items-center gap-2 w-full">
-                    <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] p-0">
-                        <FilterIcon className="w-4 h-4" />
-                    </Button>
 
-                    <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
-                        <button
-                            onClick={() => onViewModeChange("calendar")}
-                            className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "calendar" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
-                        >
-                            <CalendarIcon className="w-[18px] h-[18px]" />
-                        </button>
-                        <button
-                            onClick={() => onViewModeChange("list")}
-                            className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
-                        >
-                            <ListIcon className="w-[18px] h-[18px]" />
-                        </button>
-                    </div>
-
-                    <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
-                        <button
-                            onClick={() => onCalendarViewChange("day")}
-                            className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${calendarView === "day" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
-                        >
-                            <ListIcon className="w-[16px] h-[16px]" />
-                        </button>
-                        <button
-                            onClick={() => onCalendarViewChange("week")}
-                            className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${calendarView === "week" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
-                        >
-                            <GridIcon className="w-[16px] h-[16px]" />
-                        </button>
-                        <button
-                            onClick={() => onCalendarViewChange("month")}
-                            className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${calendarView === "month" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
-                        >
-                            <CalendarIcon className="w-[16px] h-[16px]" />
-                        </button>
-                    </div>
-                </div>
             </div>
 
             <div className="md:hidden w-full overflow-x-auto hide-scrollbar mb-4 flex-none px-4">

@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
-import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, AlertModal } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, AlertModal, SavingStatusModal } from "@/components/reusable"
 import { ArrowUpDownIcon, ExportFileIcon, PlusIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useToast } from "@/hooks/use-toast"
@@ -811,24 +811,9 @@ export default function CouponsPage({
                 confirmText="Excluir"
                 cancelText="Cancelar"
                 isDestructive
-                isLoading={isDeleting}
             />
 
-            <AnimatePresence>
-                {actionModal.open && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 backdrop-blur-[2px]"
-                    >
-                        <div className="bg-white dark:bg-dark-surface rounded-3xl p-8 shadow-2xl flex flex-col items-center gap-6 max-w-sm w-full mx-4">
-                            <img src="https://img.dudit.com.br/static/mascots/Aguarde.png" alt="Aguarde" className="w-36 h-36 object-contain" />
-                            <p className="text-lg font-semibold text-brand-dark dark:text-dark-heading text-center leading-tight">{actionModal.text}</p>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <SavingStatusModal isOpen={actionModal.open} text={actionModal.text} />
         </>
     )
 }

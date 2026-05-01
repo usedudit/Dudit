@@ -13,6 +13,7 @@ import {
     PercentageInput,
     ListItem,
     AlertModal,
+    SavingStatusModal,
 } from "@/components/reusable"
 import {
     createPaymentMethodAction,
@@ -801,6 +802,8 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                     variant="warning"
                 />
             )}
+
+            <SavingStatusModal isOpen={isLoading || isSavingAccount} text={isSavingAccount ? "Criando conta..." : "Salvando..."} />
         </>
     )
 }

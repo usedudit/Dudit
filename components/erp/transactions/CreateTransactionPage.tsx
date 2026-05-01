@@ -23,7 +23,9 @@ import {
 } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
     SaveIcon,
@@ -397,12 +399,10 @@ export default function CreateTransactionPage({
         defaultRecurrenceNext,
     ])
 
+    const { showConfirmDialog: unsavedChangesDialogOpen, confirmNavigation: handleUnsavedChangesConfirm, cancelNavigation: handleUnsavedChangesDialogClose } = useUnsavedChanges(isDirty)
+
     const requestClose = useCallback(() => {
         if (isDirty) {
-            pendingCloseRef.current = () => {
-                setShowDiscardModal(false)
-                onClose()
-            }
             setShowDiscardModal(true)
         } else {
             onClose()
@@ -410,9 +410,9 @@ export default function CreateTransactionPage({
     }, [isDirty, onClose])
 
     const confirmDiscard = useCallback(() => {
-        pendingCloseRef.current?.()
-        pendingCloseRef.current = null
-    }, [])
+        setShowDiscardModal(false)
+        onClose()
+    }, [onClose])
 
     const isIncomeExpense = txKind === "income" || txKind === "expense"
     const needsContactPanel = isIncomeExpense || txKind === "refund"
@@ -2118,12 +2118,23 @@ export default function CreateTransactionPage({
                     partnerId={partnerId}
                 />
 
+                <SavingStatusModal isOpen={isSaving} text="Salvando transação..." />
+
+                {unsavedChangesDialogOpen && (
+                    <AlertModal
+                        isOpen={unsavedChangesDialogOpen}
+                        onClose={handleUnsavedChangesDialogClose}
+                        onConfirm={handleUnsavedChangesConfirm}
+                        title="Descartar alterações?"
+                        description="Você tem dados não salvos. Se sair agora, eles serão perdidos."
+                        confirmText="Sair sem salvar"
+                        variant="warning"
+                    />
+                )}
+
                 <AlertModal
                     isOpen={showDiscardModal}
-                    onClose={() => {
-                        setShowDiscardModal(false)
-                        pendingCloseRef.current = null
-                    }}
+                    onClose={() => setShowDiscardModal(false)}
                     onConfirm={confirmDiscard}
                     title="Descartar alterações?"
                     description="Você tem dados não salvos. Se sair agora, eles serão perdidos."

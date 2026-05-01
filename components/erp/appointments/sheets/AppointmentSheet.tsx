@@ -263,8 +263,8 @@ export const AppointmentSheet = ({
                     // If returning from draft (calendar selection), go to Summary
                     setCurrentView('summary');
                 } else {
-                    // Start at Services
-                    setCurrentView('services');
+                    // Start at Client
+                    setCurrentView('client');
                 }
             }
         }
@@ -374,7 +374,11 @@ export const AppointmentSheet = ({
 
     // Navigation Flow Logic
     const handleNext = () => {
-        if (currentView === 'services') {
+        if (currentView === 'client') {
+            if (!selectedClient) return;
+            setCurrentView('services');
+        }
+        else if (currentView === 'services') {
             if (selectedServices.length === 0) return;
 
             // If adding more services, go straight back to summary
@@ -382,13 +386,9 @@ export const AppointmentSheet = ({
                 setIsAddingMore(false);
                 setCurrentView('summary');
             } else {
-                // Normal Flow: Services -> Client
-                setCurrentView('client');
+                // Normal Flow: Services -> Datetime
+                setCurrentView('datetime');
             }
-        }
-        else if (currentView === 'client') {
-            // Flow: Client -> Datetime
-            setCurrentView('datetime');
         }
         else if (currentView === 'datetime') {
             // Validation for range picker
@@ -503,8 +503,8 @@ export const AppointmentSheet = ({
 
     const handleBack = () => {
         // Reverse Flow
-        if (currentView === 'client') setCurrentView('services');
-        else if (currentView === 'datetime') setCurrentView('client');
+        if (currentView === 'services') setCurrentView('client');
+        else if (currentView === 'datetime') setCurrentView('services');
         else if (currentView === 'summary') {
             if (mode === 'create') {
                 // Creating: Go back to Datetime
@@ -768,37 +768,60 @@ export const AppointmentSheet = ({
                         </motion.div>
                     )}
 
-                    {/* CLIENT SELECTION (PLACEHOLDER FOR SelectCustomerSheet integration if needed here too) */}
+                    {/* CLIENT SELECTION */}
                     {currentView === 'client' && (
-                        <motion.div key="client" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
-                            <div className="flex flex-col gap-4">
-                                <Button
-                                    variant="outline"
-                                    className="h-16 w-full justify-between px-6 rounded-2xl border-dashed border-2"
-                                    onClick={() => setIsCustomerSheetOpen(true)}
-                                >
-                                    {selectedClient ? (
-                                        <div className="flex items-center gap-4">
+                        <motion.div key="client" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-0 -mx-6 -mt-6">
+                            <div className="z-10 shrink-0 border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface sticky top-0">
+                                <FormInput
+                                    label=""
+                                    name="customerSearch"
+                                    placeholder="Buscar por nome, email ou telefone..."
+                                    value={clientSearch}
+                                    onChange={(e) => setClientSearch(e.target.value)}
+                                    prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                                    className="mb-0"
+                                />
+                            </div>
+
+                            <div className="flex flex-col px-2 pb-2">
+                                {filteredClients.map((customer) => {
+                                    const isSelected = selectedClient?.id === customer.id;
+                                    return (
+                                        <div
+                                            key={customer.id}
+                                            role="button"
+                                            onClick={() => {
+                                                setSelectedClient(customer);
+                                                handleNext();
+                                            }}
+                                            className={`group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40`}
+                                        >
                                             <UserProfileImage
-                                                fullName={selectedClient.name}
-                                                imageUrl={selectedClient.avatar_url}
-                                                className="w-10 h-10"
+                                                fullName={customer.name || "Cliente"}
+                                                imageUrl={customer.avatar_url}
+                                                className="h-12 w-12 shrink-0 text-lg"
                                             />
-                                            <div className="text-left">
-                                                <p className="font-bold text-brand-dark dark:text-dark-heading">{selectedClient.name}</p>
-                                                <p className="text-xs text-brand-inactive-text">{selectedClient.email || 'Sem e-mail'}</p>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                                    <span className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                        {customer.name}
+                                                    </span>
+                                                </div>
+                                                <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                                    ID #{customer.id ? customer.id.substring(0, 5).toUpperCase() : "-"}
+                                                </p>
+                                                <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                                    {customer.email || "Sem e-mail"}
+                                                </p>
+                                            </div>
+                                            <div className="flex shrink-0 items-center gap-2">
+                                                <div className="flex h-8 w-8 items-center justify-center text-brand-inactive-text opacity-0 transition-opacity group-hover:opacity-100">
+                                                    <PlusIcon size={18} />
+                                                </div>
                                             </div>
                                         </div>
-                                    ) : (
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border flex items-center justify-center text-brand-inactive-text">
-                                                <PlusIcon size={20} />
-                                            </div>
-                                            <span className="font-bold text-brand-inactive-text">Selecionar Cliente</span>
-                                        </div>
-                                    )}
-                                    <ChevronRightIcon size={20} className="text-brand-inactive-text" />
-                                </Button>
+                                    )
+                                })}
                             </div>
                         </motion.div>
                     )}
@@ -1205,7 +1228,7 @@ export const AppointmentSheet = ({
                     <div className="absolute bottom-0 left-0 w-full bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-6 z-20">
                         {mode === 'create' || currentView === 'edit-service' ? (
                             <div className="flex gap-3">
-                                {currentView !== 'services' && (
+                                {currentView !== 'client' && (
                                     <Button variant="outline" className="flex-1 h-[48px]" onClick={handleBack}>
                                         Voltar
                                     </Button>
@@ -1301,7 +1324,6 @@ export const AppointmentSheet = ({
                 onSelect={(customer) => {
                     setSelectedClient(customer);
                     setIsCustomerSheetOpen(false);
-                    if (currentView === 'client') handleNext();
                 }}
                 partnerId={appointment?.partnerId || ""}
                 selectedCustomerId={selectedClient?.id}

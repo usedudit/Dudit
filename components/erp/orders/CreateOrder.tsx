@@ -24,6 +24,8 @@ import {
 import { createERPDeliveryAction, fetchDeliveryPeopleBucketAction } from "@/app/actions/erp/deliveries"
 import { pickBankThenCashDefaultFinanceAccountId, type FinanceAccountType } from "@/lib/finance-utils"
 import DefaultModal from "@/components/reusable/DefaultModal"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { Input, MoneyInput, Combobox, Checkbox, ListItem, RadioButton, InfoCard, PercentageInput, Button as ReusableButton } from "@/components/reusable"
 import { TagIcon, MoneyIcon, FileIcon } from "@/lib/icons"
 import SelectCouponSheet from "@/components/erp/pdv/SelectCouponSheet"
@@ -264,6 +266,46 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         return value
     }, [])
 
+    const currentOrderSignature = useMemo(() => {
+        return JSON.stringify({
+            items: items.map(i => ({ id: i.productId || i.id, qty: i.quantity, price: i.unitPrice, name: i.name })),
+            customerId: selectedCustomer?.id || null,
+            salesChannel,
+            deliveryMethod,
+            paymentStatus,
+            deliveryStatus,
+            deliveryDate,
+            deliveryTime,
+            financeAccountId,
+            notes,
+            shippingFee,
+            otherCosts,
+            discountValue,
+            discountType,
+            couponId
+        })
+    }, [items, selectedCustomer, salesChannel, deliveryMethod, paymentStatus, deliveryStatus, deliveryDate, deliveryTime, financeAccountId, notes, shippingFee, otherCosts, discountValue, discountType, couponId])
+
+    const [initialSignature, setInitialSignature] = useState("")
+    const signatureCaptured = useRef(false)
+
+    useEffect(() => {
+        if (!isLoadingData && !signatureCaptured.current) {
+            setInitialSignature(currentOrderSignature)
+            signatureCaptured.current = true
+        }
+    }, [isLoadingData, currentOrderSignature])
+
+    const isDirty = useMemo(() => {
+        if (!editOrderId) {
+            return items.length > 0 || !!selectedCustomer || Number(discountValue) > 0 || Number(shippingFee) > 0 || !!notes.trim()
+        }
+        if (isLoadingData || !initialSignature) return false
+        return currentOrderSignature !== initialSignature
+    }, [editOrderId, items, selectedCustomer, discountValue, shippingFee, notes, isLoadingData, initialSignature, currentOrderSignature])
+
+    const { showConfirmDialog, confirmNavigation, cancelNavigation } = useUnsavedChanges(isDirty && !isPaymentModalOpen && !isSaving)
+
     // --- Effects ---
     useEffect(() => {
         if (!editOrderId) return
@@ -429,7 +471,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     }, [])
 
     const handleBack = () => {
-        if (items.length > 0 || selectedCustomer) {
+        if (isDirty) {
             setShowAlertModal(true)
         } else {
             onBack()
@@ -1228,9 +1270,23 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     }}
                     title="Descartar alterações?"
                     description="Se você sair agora, todas as informações preenchidas serão perdidas. Tem certeza que deseja descartar?"
-                    confirmText="Descartar"
+                    confirmText="Sair sem salvar"
                     variant="warning"
                 />
+
+                {showConfirmDialog && (
+                    <AlertModal
+                        isOpen={showConfirmDialog}
+                        onClose={cancelNavigation}
+                        onConfirm={confirmNavigation}
+                        title="Descartar alterações?"
+                        description="Se você sair agora, todas as informações preenchidas serão perdidas. Tem certeza que deseja descartar?"
+                        confirmText="Sair sem salvar"
+                        variant="warning"
+                    />
+                )}
+
+                <SavingStatusModal isOpen={isSaving} text="Salvando pedido..." />
 
                 <AlertModal
                     isOpen={showValidationModal}

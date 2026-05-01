@@ -2,10 +2,10 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useMemo } from "react"
 import { Button, InfoCard } from "@/components/reusable"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input, Checkbox, CpfCnpjInput } from "@/components/reusable"
+import { Input, Checkbox, CpfCnpjInput, UnsavedChangesDialog, SavingStatusModal } from "@/components/reusable"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -15,6 +15,7 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { useNotification } from "@/hooks/use-notification"
 import { uploadImageToR2Action } from "@/app/actions/shared/r2"
 import { CSRFTokenInput } from "@/components/security/csrf-token-input"
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 
 interface SettingsFormProps {
   partner: any
@@ -47,6 +48,25 @@ export function SettingsForm({ partner, paymentMethods: initialPaymentMethods }:
     },
     paymentMethods: initialPaymentMethods || [],
   })
+
+  const initialSnapshot = useMemo(() => JSON.stringify({
+    storeName: partner.store_name || "",
+    storeDescription: partner.store_description || "",
+    address: partner.address || "",
+    businessType: partner.business_type || "pf",
+    cnpj: partner.cnpj || "",
+    openingHours: partner.opening_hours ? JSON.stringify(partner.opening_hours) : "",
+    storeImageUrl: partner.store_image_url || "",
+    businessInfo: {
+      sells: Array.isArray(businessInfo.sells) ? businessInfo.sells : ["products"],
+      channels: Array.isArray(businessInfo.channels) ? businessInfo.channels : ["online"],
+    },
+    paymentMethods: initialPaymentMethods || [],
+  }), [partner, businessInfo, initialPaymentMethods])
+
+  const currentSnapshot = useMemo(() => JSON.stringify(formData), [formData])
+  const isDirty = currentSnapshot !== initialSnapshot
+  const { showConfirmDialog, confirmNavigation, cancelNavigation } = useUnsavedChanges(isDirty)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -358,6 +378,9 @@ export function SettingsForm({ partner, paymentMethods: initialPaymentMethods }:
           {isLoading ? "Salvando..." : "Salvar configurações"}
         </Button>
       </div>
+
+      <UnsavedChangesDialog open={showConfirmDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />
+      <SavingStatusModal isOpen={isLoading} text="Salvando configurações..." />
     </form>
   )
 }

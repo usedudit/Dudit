@@ -30,17 +30,31 @@ export function UserProfilePage({ userId, profile, initialFullName, email, hasPa
     const { success: notifySuccess, error: notifyError } = useNotification()
     const router = useRouter()
     const searchParams = useSearchParams()
-    const tab = searchParams.get("tab") as View | null
+    const initialTab = searchParams.get("tab") as View | null
 
-    const [currentView, setCurrentView] = useState<View>(tab || "main")
+    const [currentView, setCurrentView] = useState<View>(initialTab || "main")
 
     useEffect(() => {
-        if (tab && tab !== currentView) {
-            setCurrentView(tab)
-        } else if (!tab && currentView !== "main") {
+        const params = new URLSearchParams(window.location.search)
+        const tabFromUrl = params.get("tab") as View | null
+
+        if (tabFromUrl && tabFromUrl !== currentView) {
+            setCurrentView(tabFromUrl)
+        } else if (!tabFromUrl && currentView !== "main") {
             setCurrentView("main")
         }
-    }, [tab])
+    }, [])
+
+    useEffect(() => {
+        const handlePopState = () => {
+            const params = new URLSearchParams(window.location.search)
+            const tabFromUrl = params.get("tab") as View | null
+            setCurrentView(tabFromUrl || "main")
+        }
+
+        window.addEventListener("popstate", handlePopState)
+        return () => window.removeEventListener("popstate", handlePopState)
+    }, [])
 
     const [isLoading, setIsLoading] = useState(false)
     const [success, setSuccess] = useState<string | null>(null)
@@ -124,11 +138,8 @@ export function UserProfilePage({ userId, profile, initialFullName, email, hasPa
 
         setCurrentView(view)
 
-        if (view === "main") {
-            router.push("/perfil", { scroll: false })
-        } else {
-            router.push(`/perfil?tab=${view}`, { scroll: false })
-        }
+        const url = view === "main" ? "/perfil" : `/perfil?tab=${view}`
+        window.history.replaceState(null, "", url)
     }
 
     const startTimer = (

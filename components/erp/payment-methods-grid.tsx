@@ -10,6 +10,7 @@ import { deletePaymentMethodAction } from "@/app/actions/erp/payment-methods"
 import AlertModal from "../reusable/AlertModal"
 import { toast } from "sonner"
 import { formatPercent } from "@/lib/utils"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 
 interface PaymentMethod {
   id: string
@@ -193,6 +194,8 @@ export function PaymentMethodsGrid({ partnerId, methods, onUpdate }: PaymentMeth
         partnerId={partnerId}
         editingMethod={editingMethod}
       />
+
+      <SavingStatusModal isOpen={!!isDeleting} text="Excluindo..." />
     </div>
   )
 }

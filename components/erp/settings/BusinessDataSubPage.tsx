@@ -3,11 +3,14 @@
 import React, { useState, useCallback, useRef, useTransition } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, Input as FormInput, Checkbox as FormCheckbox, RadioButton as FormRadioButton } from "@/components/reusable"
-import { CpfCnpjInput, CepInput, StateComboBox, PhoneInput, ListItem, Spinner, Tabs, TabsList, TabsTrigger, TabsContent, DefaultModal } from "@/components/reusable"
+import { CpfCnpjInput, CepInput, StateComboBox, PhoneInput, ListItem, Spinner, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
 import { BusinessHoursSelector } from "@/components/business-hours-selector"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
 import { ChevronLeftIcon, SaveIcon, Store, ShoppingBagIcon, HomeIcon, WrenchIcon } from "@/lib/icons"
 import { useNotification } from "@/hooks/use-notification"
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
+import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { NumberInputWithCheckbox } from "@/components/reusable/Inputs/NumberInputWithCheckbox"
@@ -101,6 +104,25 @@ export const BusinessDataSubPage = ({
 
     const [hours, setHours] = useState(() => normalizeOpeningHours(partner.opening_hours))
 
+    const [initialState] = useState(() => ({
+        generalInfo: { ...generalInfo },
+        addresses: { ...addresses },
+        fiscalInfo: { ...fiscalInfo },
+        hours: { ...hours },
+    }))
+
+    const isDirty = React.useMemo(() => {
+        return JSON.stringify(initialState.generalInfo) !== JSON.stringify(generalInfo) ||
+            JSON.stringify(initialState.addresses) !== JSON.stringify(addresses) ||
+            JSON.stringify(initialState.fiscalInfo) !== JSON.stringify(fiscalInfo) ||
+            JSON.stringify(initialState.hours) !== JSON.stringify(hours)
+    }, [initialState, generalInfo, addresses, fiscalInfo, hours])
+
+    const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
+
+    const handleBack = useCallback(() => {
+        handleNavigation(onBack)
+    }, [handleNavigation, onBack])
 
     const [imagePreview, setImagePreview] = useState<string | null>(partner.store_image_url || null)
     const [cropModalOpen, setCropModalOpen] = useState(false)
@@ -221,7 +243,7 @@ export const BusinessDataSubPage = ({
 
                                 {/* Back button - desktop only */}
                                 <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                    <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                    <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
                                 </div>
@@ -240,7 +262,7 @@ export const BusinessDataSubPage = ({
 
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <Button variant="outline" onClick={onBack} disabled={isLoading}>
+                                        <Button variant="outline" onClick={handleBack} disabled={isLoading}>
                                             Cancelar
                                         </Button>
                                         <Button onClick={handleSubmit} disabled={isLoading}>
@@ -284,7 +306,7 @@ export const BusinessDataSubPage = ({
                                                             label="Celular (WhatsApp)"
                                                             placeholder="(00) 00000-0000"
                                                             value={generalInfo.phone}
-                                                            onChange={(val) => setGeneralInfo({ ...generalInfo, phone: val })}
+                                                            onChange={(e) => setGeneralInfo({ ...generalInfo, phone: e.target.value })}
                                                         />
                                                     </div>
                                                 </div>
@@ -444,7 +466,7 @@ export const BusinessDataSubPage = ({
                                                         onChange={e => setAddresses({ ...addresses, street: e.target.value })}
                                                     />
 
-                                                    <div className="grid grid-cols-2 gap-3 flex-row items-center pt-1.5 pb-1.5">
+                                                    <div className="grid grid-cols-2 gap-3 flex-row items-start pt-1.5 pb-1.5">
                                                         <div>
                                                             <NumberInputWithCheckbox
                                                                 label="Número"
@@ -454,7 +476,7 @@ export const BusinessDataSubPage = ({
                                                                 onNoNumberChange={checked => setAddresses({ ...addresses, noNumber: checked, number: checked ? "S/N" : "" })}
                                                             />
                                                         </div>
-                                                        <div className="mt-[27px]">
+                                                        <div>
                                                             <FormInput
                                                                 label="Complemento"
                                                                 placeholder="Apto, Bloco, etc."
@@ -470,8 +492,8 @@ export const BusinessDataSubPage = ({
                                                         onChange={e => setAddresses({ ...addresses, neighborhood: e.target.value })}
                                                     />
 
-                                                    <div className="grid grid-cols-2 gap-3 items-end">
-                                                        <div className="mb-[22px]">
+                                                    <div className="grid grid-cols-2 gap-3 items-start">
+                                                        <div>
                                                             <FormInput
                                                                 label="Cidade"
                                                                 placeholder="Nome da cidade"
@@ -544,7 +566,7 @@ export const BusinessDataSubPage = ({
                 <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
                     <Button
                         variant="outline"
-                        onClick={onBack}
+                        onClick={handleBack}
                         className="flex-1 h-[48px]"
                         disabled={isLoading}
                     >
@@ -561,14 +583,13 @@ export const BusinessDataSubPage = ({
                 </div>
 
 
-                <DefaultModal isOpen={isLoading} onClose={() => { }} title="" maxWidth="sm" hideHeader>
-                    <div className="flex flex-col items-center justify-center p-6 gap-6 h-full mt-4">
-                        <img src="https://img.dudit.com.br/static/mascots/Aguarde.png" alt="Aguarde" className="w-36 h-36 object-contain" />
-                        <p className="text-lg font-semibold text-brand-dark dark:text-dark-heading text-center leading-tight">
-                            Salvando configurações...
-                        </p>
-                    </div>
-                </DefaultModal>
+                <SavingStatusModal isOpen={isLoading} text="Salvando configurações..." />
+
+                <UnsavedChangesDialog
+                    open={showConfirmDialog}
+                    onConfirm={confirmNavigation}
+                    onCancel={cancelNavigation}
+                />
 
                 <ImageCropperModal
                     isOpen={cropModalOpen}

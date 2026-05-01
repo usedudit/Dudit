@@ -8,6 +8,7 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input, IconPlaceholder, ListItem, RadioButton } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useNotification } from "@/hooks/use-notification"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
@@ -1708,20 +1709,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                         }}
                     />
 
-                    <DefaultModal
-                        isOpen={isSavingDraft && isUserDraftSaveUi}
-                        onClose={() => { }}
-                        title=""
-                        maxWidth="sm"
-                        hideHeader
-                    >
-                        <div className="flex flex-col items-center justify-center gap-6 p-6">
-                            <img src="https://img.dudit.com.br/static/mascots/Aguarde.png" alt="Aguarde" className="h-36 w-36 object-contain" />
-                            <p className="text-center text-lg font-semibold leading-tight text-brand-dark dark:text-dark-heading">
-                                Salvando pedido...
-                            </p>
-                        </div>
-                    </DefaultModal>
+                    <SavingStatusModal isOpen={isSavingDraft && isUserDraftSaveUi} text="Salvando pedido..." />
 
                     <AlertModal
                         isOpen={isResetAlertOpen}

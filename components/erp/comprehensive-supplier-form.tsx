@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -46,32 +46,21 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
   const [error, setError] = useState<string | null>(null)
   const [personType, setPersonType] = useState(supplier?.person_type || ("pf" as PersonType))
   const [cnpjLoading, setCnpjLoading] = useState(false)
-  const [isDirty, setIsDirty] = useState(false)
   const queryClient = useQueryClient()
-  const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
   const [formData, setFormData] = useState({
-    // Dados Gerais
     name: supplier?.name || "",
     email: supplier?.email || "",
     phone: supplier?.phone || "",
     personType: supplier?.person_type || ("pf" as PersonType),
-
-    // Pessoa Física
     cpf: supplier?.cpf || "",
     contribuinte: supplier?.contribuinte || "9",
-
-    // Pessoa Jurídica
     cnpj: supplier?.cnpj || "",
     nomeFantasia: supplier?.nome_fantasia || "",
     inscricaoEstadual: supplier?.inscricao_estadual || "",
     regimeTributario: supplier?.regime_tributario || "Não definido",
     contribuinteIcms: supplier?.contribuinte_icms || "9",
-
-    // Estrangeiro
     country: supplier?.country || "",
-
-    // Endereço
     zipCode: supplier?.zip_code || "",
     street: supplier?.street || "",
     number: supplier?.number || "",
@@ -82,13 +71,33 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
     municipioCodigoIbge: supplier?.municipio_codigo_ibge || "",
   })
 
-  useEffect(() => {
-    const hasChanges =
-      formData.name !== (supplier?.name || "") ||
-      formData.email !== (supplier?.email || "") ||
-      formData.phone !== (supplier?.phone || "")
-    setIsDirty(hasChanges)
-  }, [formData, supplier])
+  const initialSnapshot = useMemo(() => JSON.stringify({
+    name: supplier?.name || "",
+    email: supplier?.email || "",
+    phone: supplier?.phone || "",
+    personType: supplier?.person_type || ("pf" as PersonType),
+    cpf: supplier?.cpf || "",
+    contribuinte: supplier?.contribuinte || "9",
+    cnpj: supplier?.cnpj || "",
+    nomeFantasia: supplier?.nome_fantasia || "",
+    inscricaoEstadual: supplier?.inscricao_estadual || "",
+    regimeTributario: supplier?.regime_tributario || "Não definido",
+    contribuinteIcms: supplier?.contribuinte_icms || "9",
+    country: supplier?.country || "",
+    zipCode: supplier?.zip_code || "",
+    street: supplier?.street || "",
+    number: supplier?.number || "",
+    complement: supplier?.complement || "",
+    neighborhood: supplier?.neighborhood || "",
+    city: supplier?.city || "",
+    state: supplier?.state || "",
+    municipioCodigoIbge: supplier?.municipio_codigo_ibge || "",
+  }), [supplier])
+
+  const currentSnapshot = useMemo(() => JSON.stringify(formData), [formData])
+  const isDirty = currentSnapshot !== initialSnapshot
+
+  const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
   const handleCNPJBlur = async () => {
     const cnpj = formData.cnpj

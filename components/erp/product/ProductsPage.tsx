@@ -39,6 +39,7 @@ import { ImportXmlModal } from "@/components/erp/import-xml-modal"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import Pagination from "@/components/reusable/Pagination"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 
 // New Component Imports
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
@@ -974,18 +975,9 @@ export default function ProductsPage({
                 <div className="p-8 text-center text-gray-500">Funcionalidade de exportação em breve.</div>
             </DefaultModal>
 
-            {/* Modal de ação (salvar/excluir) */}
-            <DefaultModal
-                isOpen={actionModal.open}
-                onClose={() => { }}
-                title=""
-                hideHeader
-            >
-                <div className="flex flex-col items-center justify-center p-6 gap-6 h-full mt-4">
-                    <img src="https://img.dudit.com.br/static/mascots/Aguarde.png" alt="Aguarde" className="w-36 h-36 object-contain" />
-                    <p className="text-lg font-semibold text-brand-dark dark:text-dark-heading text-center leading-tight">{actionModal.text}</p>
-                </div>
             </DefaultModal>
+
+            <SavingStatusModal isOpen={actionModal.open} text={actionModal.text || "Salvando..."} />
         </>
     )
 }

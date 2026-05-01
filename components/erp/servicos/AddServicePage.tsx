@@ -17,6 +17,7 @@ import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { FadeIn } from "@/components/animations/FadeIn"
 
 import AlertModal from "@/components/reusable/AlertModal"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { ServiceGeneralTab } from "./ServiceGeneralTab"
 import { ServiceResourcesTab } from "./ServiceResourcesTab"
@@ -101,10 +102,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
     const csrfTokenCache = useRef<{ token: string; timestamp: number } | null>(null)
 
     const isDirty = useMemo(() => {
-        for (const key in serviceData) {
-            if (serviceData[key] !== originalServiceData[key]) return true
-        }
-        return false
+        return JSON.stringify(serviceData) !== JSON.stringify(originalServiceData)
     }, [serviceData, originalServiceData])
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation } = useUnsavedChanges(isEditing && isDirty)
@@ -556,11 +554,25 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                 isOpen={showAlertModal}
                 onClose={() => setShowAlertModal(false)}
                 onConfirm={confirmNavigationAction}
-                title="Sair sem salvar?"
-                description="Você tem alterações não salvas. Se sair agora, elas serão perdidas."
-                confirmText="Sair mesmo assim"
-                cancelText="Continuar editando"
+                title="Descartar alterações?"
+                description="Você tem dados não salvos neste formulário. Tem certeza que deseja cancelar?"
+                confirmText="Sair sem salvar"
+                variant="warning"
             />
+
+            {showConfirmDialog && (
+                <AlertModal
+                    isOpen={showConfirmDialog}
+                    onClose={cancelNavigation}
+                    onConfirm={confirmNavigation}
+                    title="Descartar alterações?"
+                    description="Você tem alterações não salvas. Se sair agora, perderá todo o progresso."
+                    confirmText="Sair sem salvar"
+                    variant="warning"
+                />
+            )}
+
+            <SavingStatusModal isOpen={isSavingService} text="Salvando serviço..." />
 
             <AlertModal
                 isOpen={showDeleteModal}
