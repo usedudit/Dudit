@@ -8,6 +8,8 @@ import { useQueryClient } from "@tanstack/react-query"
 interface CacheEntry<T> {
     data: T
     timestamp: number
+    /** True when data came from list mapping (incomplete). getEntity will always fetch full detail. */
+    partial?: boolean
 }
 
 export interface UseEntityCacheOptions<TListItem, TDetail> {
@@ -110,10 +112,10 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
             for (const item of items) {
                 if (!item.id) continue
                 const existing = cacheMap.get(item.id)
-                // Don't overwrite a fresh full-detail entry with partial list data
-                if (existing && Date.now() - existing.timestamp < staleTime) continue
+                // Don't overwrite a full-detail entry with partial list data
+                if (existing && !existing.partial && Date.now() - existing.timestamp < staleTime) continue
                 const detail = listToDetail ? listToDetail(item) : item
-                cacheMap.set(item.id, { data: detail as TDetail, timestamp: Date.now() })
+                cacheMap.set(item.id, { data: detail as TDetail, timestamp: Date.now(), partial: !!listToDetail })
                 changed = true
             }
             if (changed) {
@@ -123,7 +125,7 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
         [cacheMap, cacheKey, listToDetail, staleTime],
     )
 
-    // ── Get entity (cache-first, fetch if stale/missing) ─────────────────
+    // ── Get entity (cache-first, fetch if stale/missing/partial) ─────────
 
     const getEntity = useCallback(
         (
@@ -132,38 +134,41 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
             if (!id) return { data: null, isLoading: false, isStale: false }
 
             const entry = cacheMap.get(id)
-            const isFresh = entry && Date.now() - entry.timestamp < staleTime
-            const isStale = entry && !isFresh
+            const isFresh = entry && !entry.partial && Date.now() - entry.timestamp < staleTime
+            const needsFetch = !entry || entry.partial || Date.now() - entry.timestamp >= staleTime
 
-            // If fresh, return immediately — no fetch
+            // If fresh AND full (not partial), return immediately — no fetch
             if (isFresh) {
                 return { data: entry!.data, isLoading: false, isStale: false }
             }
 
-            // If stale or missing, trigger background fetch (deduplicated)
-            const flightKey = `${cacheKey}:${id}`
-            if (!inFlightRequests.has(flightKey)) {
-                const promise = getDetailFn(id)
-                    .then((detail) => {
-                        if (detail) {
-                            cacheMap.set(id, { data: detail, timestamp: Date.now() })
-                            notifySubscribers(cacheKey)
-                        }
-                    })
-                    .catch(() => {
-                        // Silently fail — stale data is still shown
-                    })
-                    .finally(() => {
-                        inFlightRequests.delete(flightKey)
-                    })
-                inFlightRequests.set(flightKey, promise)
+            // If partial, stale, or missing → trigger background fetch (deduplicated)
+            if (needsFetch) {
+                const flightKey = `${cacheKey}:${id}`
+                if (!inFlightRequests.has(flightKey)) {
+                    const promise = getDetailFn(id)
+                        .then((detail) => {
+                            if (detail) {
+                                // Full detail: set partial=false so it won't refetch
+                                cacheMap.set(id, { data: detail, timestamp: Date.now(), partial: false })
+                                notifySubscribers(cacheKey)
+                            }
+                        })
+                        .catch(() => {
+                            // Silently fail — partial/stale data is still shown
+                        })
+                        .finally(() => {
+                            inFlightRequests.delete(flightKey)
+                        })
+                    inFlightRequests.set(flightKey, promise)
+                }
             }
 
-            // Return stale data immediately (SWR), or null if nothing cached
+            // Return cached data immediately (SWR pattern), or null if nothing cached
             return {
                 data: entry?.data ?? null,
                 isLoading: !entry, // Only "loading" if we have NO data at all
-                isStale: !!isStale,
+                isStale: !!entry?.partial || (!!entry && Date.now() - entry.timestamp >= staleTime),
             }
         },
         [cacheMap, cacheKey, getDetailFn, staleTime],
@@ -224,7 +229,7 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
         (id: string, updater: (prev: TDetail) => TDetail) => {
             const entry = cacheMap.get(id)
             if (!entry) return
-            cacheMap.set(id, { data: updater(entry.data), timestamp: Date.now() })
+            cacheMap.set(id, { data: updater(entry.data), timestamp: Date.now(), partial: false })
             notifySubscribers(cacheKey)
         },
         [cacheMap, cacheKey],
@@ -234,7 +239,7 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
 
     const setEntity = useCallback(
         (id: string, data: TDetail) => {
-            cacheMap.set(id, { data, timestamp: Date.now() })
+            cacheMap.set(id, { data, timestamp: Date.now(), partial: false })
             notifySubscribers(cacheKey)
         },
         [cacheMap, cacheKey],

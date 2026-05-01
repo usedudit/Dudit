@@ -2,11 +2,10 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { useEntityState, type EntityAction } from "./use-entity-state"
-import { useEntityCache, type UseEntityCacheOptions } from "./use-entity-cache"
-import { createPrefetchPropsFactory, type PrefetchProps } from "./use-prefetch"
+import { useEntityState } from "./use-entity-state"
+import { useEntityCache } from "./use-entity-cache"
+import { createPrefetchPropsFactory } from "./use-prefetch"
 import { useInfiniteList } from "./use-infinite-list"
-import type { InfiniteListPage } from "@/lib/services/infinite-list.types"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

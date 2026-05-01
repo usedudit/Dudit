@@ -27,7 +27,7 @@ interface TransactionDetailViewProps {
 export default function TransactionDetailView({ transactionId, partnerId, onBack, onEdit, initialDetail, loading: externalLoading }: TransactionDetailViewProps) {
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
-    // CACHE-FIRST: Use initialDetail from parent (useEntityPage cache) as primary source
+    // Render whatever the parent provides (starts with partial, updates to full)
     const [detail, setDetail] = useState<TransactionDetailPayload | null>(initialDetail || null)
     const [loading, setLoading] = useState(!initialDetail)
     const [activeTab, setActiveTab] = useState("summary")
@@ -42,35 +42,14 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
         }
     }, [])
 
-    // Sync with parent cache updates (useEntityPage fetches in background and updates currentEntity)
+    // Reactively sync with parent cache updates
+    // Parent (useEntityPage) provides partial data instantly, then full data when background fetch completes
     useEffect(() => {
         if (initialDetail) {
             setDetail(initialDetail)
             setLoading(false)
         }
     }, [initialDetail])
-
-    // Fallback: only fetch if parent cache never provided data (defensive, should rarely happen)
-    useEffect(() => {
-        if (detail && detail.id === transactionId) return // Already have data from cache
-        if (initialDetail) return // Parent will provide via cache updates
-
-        let cancelled = false
-        async function load() {
-            setLoading(true)
-            const res = await getTransactionDetailsAction(transactionId, partnerId)
-            if (cancelled) return
-            if (res.success) {
-                setDetail(res.data)
-            } else {
-                notifyError("Erro", res.error)
-                onBack()
-            }
-            setLoading(false)
-        }
-        load()
-        return () => { cancelled = true }
-    }, [transactionId, partnerId, notifyError, onBack, initialDetail])
 
     useEffect(() => {
         async function loadHistory() {

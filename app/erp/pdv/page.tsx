@@ -34,7 +34,7 @@ export default async function POSPageServer() {
   return (
     <>
       <ERPPageHeader title="PDV" />
-      <FadeIn className="p-4 md:p-6 h-full">
+      <FadeIn className="p-4 h-full overflow-hidden">
         <POSPage
           partnerId={partnerId}
           initialData={initialData}
