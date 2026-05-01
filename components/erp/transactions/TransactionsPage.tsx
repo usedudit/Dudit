@@ -41,8 +41,7 @@ import { settleInstallmentGroupAction } from "@/app/actions/erp/transactions"
 import { getFinancialTransactionsAction, getTransactionDetailsAction, type TransactionDetailPayload } from "@/app/actions/erp/transactions"
 import { cancelPendingTransactionAction } from "@/app/actions/erp/transactions"
 import { getPaymentMethodsAction } from "@/app/actions/erp/payment-methods"
-import { useRouter } from "next/navigation"
-import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
+
 import { useNotification } from "@/hooks/use-notification"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
@@ -153,9 +152,6 @@ export default function TransactionsPage({
     recurringTemplates?: any[]
     paymentMethods?: any[]
 }) {
-    const router = useRouter()
-    const queryClient = useQueryClient()
-    const debouncedRefresh = useDebouncedRefresh()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
@@ -737,14 +733,10 @@ export default function TransactionsPage({
 
     const handleEditFromTransactionDetail = useCallback(
         (id: string) => {
-            const t = loadedTransactions.find((x: ERPTransaction) => x.id === id)
-            if (!t) {
-                notifyError("Erro", "Transação não está na página atual. Volte à lista e abra novamente para editar.")
-                return
-            }
-            openEntity("edit", t.id)
+            // Products pattern: INSTANT open, NO validation
+            openEntity("edit", id)
         },
-        [loadedTransactions, notifyError, openEntity],
+        [openEntity],
     )
 
     const handleMarkAsPaid = useCallback(async (transaction: ERPTransaction) => {
@@ -886,6 +878,7 @@ export default function TransactionsPage({
 
     const handleOpenTransactionDetail = useCallback(
         (transaction: ERPTransaction) => {
+            // Installment group with pending → open installment detail view
             if (transaction.isInstallmentGroup && transaction.installmentGroupId && Number(transaction.installmentPendingCount || 0) > 0) {
                 setOpenInstallmentGroupId(transaction.installmentGroupId)
                 setInstallmentDetail(null)
@@ -901,28 +894,25 @@ export default function TransactionsPage({
                 })()
                 return
             }
+            // Fully paid installment group → view representative transaction
             if (transaction.isInstallmentGroup && Number(transaction.installmentPendingCount || 0) === 0) {
                 const representativeId = transaction.groupRepresentativeTransactionId || transaction.id
                 openEntity("view", representativeId)
                 setEditingRecurringTemplateId(null)
                 return
             }
+            // Recurring occurrence → edit recurring template
             if (transaction.isRecurringOccurrence) {
                 if (transaction.recurringTemplateId) {
                     setEditingRecurringTemplateId(transaction.recurringTemplateId)
                 }
                 return
             }
-            const existsInLoadedList = loadedTransactions.some((row: ERPTransaction) => row.id === transaction.id)
-            if (!existsInLoadedList) {
-                notifyError("Erro", "Essa transação não está mais disponível. Atualize a página e tente novamente.")
-                debouncedRefresh()
-                return
-            }
+            // Standard transaction → INSTANT open (Products pattern: NO validation before openEntity)
             openEntity("view", transaction.id)
             setEditingRecurringTemplateId(null)
         },
-        [loadedTransactions, notifyError, debouncedRefresh, partnerId, openEntity],
+        [partnerId, notifyError, openEntity],
     )
 
     const handleEditInstallment = useCallback((installmentId: string) => {
@@ -1118,7 +1108,17 @@ export default function TransactionsPage({
     }
 
     const isFormOpen = (entityState.isOpen && (entityState.action === "create" || entityState.action === "edit" || entityState.action === "duplicate")) || !!editingRecurringTemplateId
-    const editingTx = entityState.isOpen && entityState.action === "edit" ? loadedTransactions.find((t: ERPTransaction) => t.id === entityState.entityId) : null
+    // Products pattern: derive form data from cache (currentEntity), not from list scan
+    const editingTx = useMemo(() => {
+        if (!entityState.isOpen || entityState.action !== "edit" || !entityState.entityId) return null
+        // First try cache (instant), then fall back to list scan
+        if (currentEntity && (currentEntity as any).id === entityState.entityId) {
+            // Map cache detail back to list item shape for the form
+            const listItem = loadedTransactions.find((t: ERPTransaction) => t.id === entityState.entityId)
+            return listItem || null
+        }
+        return loadedTransactions.find((t: ERPTransaction) => t.id === entityState.entityId) || null
+    }, [entityState, currentEntity, loadedTransactions])
 
     if (isFormOpen) {
         return (
