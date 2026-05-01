@@ -14,6 +14,8 @@ import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { useTransitionDirection } from "@/providers/transition-provider"
 import { ShoppingBagIcon } from "@/lib/icons"
+import BottomSheet from "@/components/BottomSheet"
+import { Button } from "@/components/reusable/Button"
 import { PackageIcon } from "lucide-react"
 
 // --- TYPES ---
@@ -271,12 +273,21 @@ const InfoTab = ({ partner, stats }: any) => {
     const [isPaymentSheetOpen, setIsPaymentSheetOpen] = useState(false)
 
     // Extrai métodos de pagamento
-    const paymentMethods = partner.businessInfo?.payment_methods || partner.payment_methods || {}
-    const hasPix = paymentMethods.pix
-    const hasCash = paymentMethods.dinheiro || paymentMethods.cash
-    const hasCredit = paymentMethods.credito && paymentMethods.credito.length > 0
-    const hasDebit = paymentMethods.debito && paymentMethods.debito.length > 0
-    const hasMercadoPago = paymentMethods.mercado_pago || partner.businessInfo?.mercado_pago_connected
+    const paymentMethodsArr = partner.paymentMethods || []
+
+    const hasPix = paymentMethodsArr.some((pm: any) => pm.type === "pix" && pm.is_active)
+    const hasCash = paymentMethodsArr.some((pm: any) => pm.type === "cash" && pm.is_active)
+
+    const creditMethods = paymentMethodsArr.filter((pm: any) => pm.type === "credit_card" && pm.is_active)
+    const debitMethods = paymentMethodsArr.filter((pm: any) => pm.type === "debit_card" && pm.is_active)
+
+    const hasCredit = creditMethods.length > 0
+    const hasDebit = debitMethods.length > 0
+
+    const creditoBrands = Array.from(new Set(creditMethods.map((pm: any) => (pm.card_brand || "mastercard").toLowerCase())))
+    const debitoBrands = Array.from(new Set(debitMethods.map((pm: any) => (pm.card_brand || "visa").toLowerCase())))
+
+    const hasMercadoPago = partner.businessInfo?.mercado_pago_connected || false
 
     const displayPaymentIcons = []
     if (hasPix) displayPaymentIcons.push({ id: "pix", icon: "https://img.dudit.com.br/static/payment/pix.png" })
@@ -379,9 +390,9 @@ const InfoTab = ({ partner, stats }: any) => {
                             <div>
                                 <h4 className="text-[14px] text-brand-inactive-text mb-3">Cartão de débito</h4>
                                 <div className="flex flex-wrap gap-2">
-                                    {paymentMethods.debito.map((brand: string) => (
+                                    {debitoBrands.map((brand: any) => (
                                         <div key={brand} className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
-                                            <img src={`https://img.dudit.com.br/static/payment/${brand.toLowerCase()}.png`} alt={brand} className="h-4 object-contain" />
+                                            <img src={`https://img.dudit.com.br/static/payment/${brand}.png`} alt={brand} className="h-4 object-contain" />
                                             <span className="text-[14px] text-brand-dark capitalize">{brand}</span>
                                         </div>
                                     ))}
@@ -393,9 +404,9 @@ const InfoTab = ({ partner, stats }: any) => {
                             <div>
                                 <h4 className="text-[14px] text-brand-inactive-text mb-3 mt-5">Cartão de crédito</h4>
                                 <div className="flex flex-wrap gap-2">
-                                    {paymentMethods.credito.map((brand: string) => (
+                                    {creditoBrands.map((brand: any) => (
                                         <div key={brand} className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
-                                            <img src={`https://img.dudit.com.br/static/payment/${brand.toLowerCase()}.png`} alt={brand} className="h-4 object-contain" />
+                                            <img src={`https://img.dudit.com.br/static/payment/${brand}.png`} alt={brand} className="h-4 object-contain" />
                                             <span className="text-[14px] text-brand-dark capitalize">{brand}</span>
                                         </div>
                                     ))}
@@ -587,30 +598,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
 
     useEffect(() => { setIsMounted(true) }, [])
 
-    // Atualiza a URL quando a sheet "Sobre" (detalhes) é aberta
-    useEffect(() => {
-        if (isAboutPageOpen) {
-            window.history.pushState(null, "", "?view=detalhes")
-        } else {
-            if (window.location.search.includes("view=detalhes")) {
-                const url = new URL(window.location.href)
-                url.searchParams.delete("view")
-                window.history.pushState(null, "", url.toString())
-            }
-        }
-    }, [isAboutPageOpen])
-
-    useEffect(() => {
-        const handlePopState = () => {
-            if (!window.location.search.includes("view=detalhes") && isAboutPageOpen) {
-                setIsAboutPageOpen(false)
-            } else if (window.location.search.includes("view=detalhes") && !isAboutPageOpen) {
-                setIsAboutPageOpen(true)
-            }
-        }
-        window.addEventListener("popstate", handlePopState)
-        return () => window.removeEventListener("popstate", handlePopState)
-    }, [isAboutPageOpen])
+    // Removemos manipulação nativa de URL para não causar bugs de renderização/popstate.
 
     useEffect(() => {
         const handleScroll = () => {
@@ -671,57 +659,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
         setActiveSection("products")
     }, [])
 
-    // Página "Sobre" mobile (Seller Details Sheet)
-    if (isAboutPageOpen) {
-        return (
-            <div className="bg-brand-gray min-h-screen font-sans animate-fade-in text-brand-dark fixed inset-0 z-[2000] overflow-y-auto no-scrollbar">
-                <div className={`h-[50px] flex items-center px-4 sticky top-0 z-50 transition-colors duration-300 ${isScrolled ? "bg-brand-dark shadow-md" : "bg-transparent"}`}>
-                    <button onClick={() => { setIsAboutPageOpen(false); router.back(); }} className={`w-10 h-10 flex items-center justify-center shrink-0 rounded-full transition-colors ${isScrolled ? "text-white" : "bg-white text-brand-dark shadow-sm"}`}>
-                        <ArrowLeftIcon size={20} strokeWidth={2.5} />
-                    </button>
-                    <div className={`flex-1 text-center truncate px-2 transition-opacity duration-300 ${isScrolled ? "opacity-100" : "opacity-0"}`}>
-                        <h2 className="text-[16px] font-bold text-white truncate">{partner.storeName}</h2>
-                    </div>
-                    <button onClick={() => setShowShareModal(true)} className={`w-10 h-10 flex items-center justify-center shrink-0 rounded-full transition-colors ${isScrolled ? "text-white hidden" : "bg-white text-brand-dark shadow-sm"}`}>
-                        <ShareIcon size={20} />
-                    </button>
-                </div>
-
-                <div className="px-5 py-5 mt-4 bg-white rounded-t-[24px]">
-                    <div className="flex items-center gap-4 mb-5">
-                        <div className="w-[56px] h-[56px] rounded-full overflow-hidden border border-brand-border shrink-0">
-                            <img
-                                src={partnerProfileImageUrl || "https://img.dudit.com.br/static/Placeholder.png"}
-                                alt={partner.storeName}
-                                className="w-full h-full object-cover"
-                            />
-                        </div>
-                        <div>
-                            <h2 className="text-[20px] font-semibold text-brand-dark leading-none mb-1">{partner.storeName}</h2>
-                            <p className="text-[13px] text-brand-inactive-text font-normal">{partner.city}, {partner.state}</p>
-                        </div>
-                    </div>
-                    <StoreStats rating={partner.rating} sales={stats.salesCount} createdAt={partner.createdAt} reviewsCount={stats.reviewsCount} />
-                </div>
-
-                <div className="sticky top-[50px] z-40 bg-white">
-                    <Tabs value={mobileModalTab} onValueChange={(v) => setMobileModalTab(v as any)}>
-                        <TabsList className="justify-center">
-                            <TabsTrigger value="reviews" className="flex-1 justify-center text-[15px]">Avaliações</TabsTrigger>
-                            <TabsTrigger value="info" className="flex-1 justify-center text-[15px]">Informações</TabsTrigger>
-                        </TabsList>
-                    </Tabs>
-                </div>
-
-                <div className="px-5 pt-5 bg-white min-h-[50vh]">
-                    {mobileModalTab === "reviews"
-                        ? <ReviewsTab partner={partner} stats={stats} ratingDistribution={ratingDistribution} reviews={reviews} />
-                        : <InfoTab partner={partner} stats={stats} />
-                    }
-                </div>
-            </div>
-        )
-    }
+    // Detalhes agora renderizados pelo BottomSheet abaixo
 
     return (
         <div className="container mx-auto px-0 lg:px-6 max-w-[1300px] animate-fade-in lg:mt-6">
@@ -730,71 +668,32 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                 onShare={() => setShowShareModal(true)}
                 userProfile={userProfile}
                 cartCount={cartCount}
-                hideMobile={true}
             />
 
-            {/* Custom Mobile Header */}
-            <header className={`lg:hidden w-full fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? "bg-white shadow-sm" : "bg-transparent pointer-events-none"}`}>
-                {/* Scrolled State */}
-                <div className={`w-full flex flex-col transition-all duration-300 ${isScrolled ? "opacity-100 pointer-events-auto h-auto" : "opacity-0 h-0 overflow-hidden"}`}>
-                    <div className="flex items-center gap-2 px-3 pt-3 pb-2">
-                        <button
-                            className="shrink-0 w-9 h-9 flex items-center justify-center bg-white border border-brand-border rounded-full shadow-sm text-brand-dark"
-                            onClick={() => { setDirection("back"); router.back() }}
-                        >
-                            <ArrowLeftIcon size={20} strokeWidth={2.5} />
-                        </button>
-                        <button
-                            onClick={() => setIsContextModalOpen(true)}
-                            className="h-9 px-4 rounded-full bg-brand-dark text-white flex items-center justify-center gap-2 shrink-0 shadow-sm transition-colors text-[13px] font-medium"
-                        >
-                            {activeContext === "Produtos" ? <PackageIcon size={16} /> : <HeartIcon size={16} />}
-                            {activeContext}
-                        </button>
-                        <div className="w-[1px] h-6 bg-gray-200 shrink-0 mx-1" />
-                        <div className="flex-1 overflow-x-auto hide-scrollbar -mx-2 px-2">
-                            <Tabs value={activeTag} onValueChange={handleTagSelect}>
-                                <TabsList className="border-0 pb-0 pt-1 gap-4">
-                                    {currentTags.map(tag => (
-                                        <TabsTrigger key={tag} value={tag.toLowerCase()} className="pb-1 capitalize">
-                                            {tag}
-                                        </TabsTrigger>
-                                    ))}
-                                </TabsList>
-                            </Tabs>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Not Scrolled State */}
-                <div className={`absolute top-0 left-0 w-full flex items-center justify-between px-4 pt-3 transition-all duration-300 ${!isScrolled ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}>
-                    <button
-                        className="shrink-0 w-10 h-10 flex items-center justify-center bg-white rounded-full shadow-md text-brand-dark"
-                        onClick={() => { setDirection("back"); router.back() }}
+            {/* TABS STICKY MOBILE - Colado abaixo do header */}
+            <div className={`lg:hidden w-full fixed top-[55px] left-0 right-0 z-[45] bg-brand-dark transition-all duration-300 ${isScrolled ? "opacity-100 pointer-events-auto translate-y-0" : "opacity-0 pointer-events-none -translate-y-2 absolute"}`}>
+                <div className="flex items-center gap-3 px-4 py-2 border-t border-white/10 shadow-md">
+                    <Button
+                        variant="filled"
+                        onClick={() => setIsContextModalOpen(true)}
+                        className="h-10 w-10 shrink-0 p-0 rounded-xl flex items-center justify-center border-none shadow-none"
                     >
-                        <ArrowLeftIcon size={20} strokeWidth={2.5} />
-                    </button>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => setShowShareModal(true)}
-                            className="shrink-0 w-10 h-10 flex items-center justify-center bg-white rounded-full shadow-md text-brand-dark"
-                        >
-                            <ShareIcon size={20} />
-                        </button>
-                        <Link
-                            href="/cart"
-                            className="shrink-0 w-10 h-10 flex items-center justify-center bg-white rounded-full shadow-md text-brand-dark relative"
-                        >
-                            <ShoppingBagIcon size={20} />
-                            {cartCount !== undefined && cartCount > 0 && (
-                                <span className="absolute -top-1 -right-1 bg-brand-orange text-white text-[10px] font-bold h-[18px] min-w-[18px] px-1 rounded-full flex items-center justify-center border border-white">
-                                    {cartCount}
-                                </span>
-                            )}
-                        </Link>
+                        {activeContext === "Produtos" ? <PackageIcon size={18} /> : <HeartIcon size={18} />}
+                    </Button>
+                    <div className="w-[1px] h-6 bg-white/20 shrink-0" />
+                    <div className="flex-1 overflow-x-auto hide-scrollbar -mx-2 px-2">
+                        <Tabs value={activeTag} onValueChange={handleTagSelect}>
+                            <TabsList className="border-0 pb-0 pt-1 gap-5 bg-transparent">
+                                {currentTags.map(tag => (
+                                    <TabsTrigger key={tag} value={tag.toLowerCase()} className="pb-1 capitalize text-white/70 hover:text-white data-[state=active]:text-white data-[state=active]:font-bold transition-all bg-transparent data-[state=active]:bg-transparent">
+                                        {tag}
+                                    </TabsTrigger>
+                                ))}
+                            </TabsList>
+                        </Tabs>
                     </div>
                 </div>
-            </header>
+            </div>
 
             {/* Banner - rounded a partir de lg, sem margem lateral no mobile para ocupar tudo sob o header */}
             <div className="w-full h-[180px] lg:h-[220px] lg:rounded-[24px] lg:mb-4 overflow-hidden relative">
@@ -994,22 +893,70 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
             />
 
             {/* Bottom-sheet modals mobile */}
-            <BottomSheetModal
-                open={isContextModalOpen}
-                onClose={() => setIsContextModalOpen(false)}
-                title="Selecione"
-                options={["Produtos", "Serviços"]}
-                active={activeContext}
-                onSelect={v => setActiveContext(v as any)}
-            />
-            <BottomSheetModal
-                open={isSortOpen}
-                onClose={() => setIsSortOpen(false)}
-                title="ordenar por"
-                options={SORT_OPTIONS}
-                active={selectedSort}
-                onSelect={setSelectedSort}
-            />
+            <BottomSheet isOpen={isContextModalOpen} onClose={() => setIsContextModalOpen(false)} title="Selecione">
+                <div className="px-5 pb-8">
+                    {["Produtos", "Serviços"].map((opt, i) => (
+                        <div key={opt} onClick={() => { setActiveContext(opt as any); setIsContextModalOpen(false) }}
+                            className={`flex items-center justify-between py-5 cursor-pointer ${i === 0 ? "border-b border-brand-border" : ""}`}>
+                            <span className={`text-[16px] ${activeContext === opt ? "font-medium text-brand-green" : "font-normal text-brand-dark"}`}>{opt}</span>
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${activeContext === opt ? "border-brand-green" : "border-brand-border"}`}>
+                                {activeContext === opt && <div className="w-3 h-3 bg-brand-green rounded-full animate-scale-in" />}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </BottomSheet>
+
+            <BottomSheet isOpen={isSortOpen} onClose={() => setIsSortOpen(false)} title="Ordenar por">
+                <div className="px-5 pb-8">
+                    {SORT_OPTIONS.map((opt, i) => (
+                        <div key={opt} onClick={() => { setSelectedSort(opt); setIsSortOpen(false) }}
+                            className={`flex items-center justify-between py-5 cursor-pointer ${i !== SORT_OPTIONS.length - 1 ? "border-b border-brand-border" : ""}`}>
+                            <span className={`text-[16px] ${selectedSort === opt ? "font-medium text-brand-green" : "font-normal text-brand-dark"}`}>{opt}</span>
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${selectedSort === opt ? "border-brand-green" : "border-brand-border"}`}>
+                                {selectedSort === opt && <div className="w-3 h-3 bg-brand-green rounded-full animate-scale-in" />}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </BottomSheet>
+
+            {/* Modal de Detalhes da Loja (Sobre) */}
+            <BottomSheet isOpen={isAboutPageOpen} onClose={() => setIsAboutPageOpen(false)}>
+                <div className="flex flex-col">
+                    <div className="px-1 py-2 flex flex-col items-center">
+                        <div className="w-[64px] h-[64px] rounded-full overflow-hidden border border-brand-border shrink-0 mb-3 shadow-sm">
+                            <img
+                                src={partnerProfileImageUrl || "https://img.dudit.com.br/static/Placeholder.png"}
+                                alt={partner.storeName}
+                                className="w-full h-full object-cover"
+                            />
+                        </div>
+                        <h2 className="text-[20px] font-bold text-brand-dark leading-none mb-1">{partner.storeName}</h2>
+                        <p className="text-[13px] text-brand-inactive-text font-medium">{partner.city}, {partner.state}</p>
+                    </div>
+
+                    <div className="mt-4 mb-2 flex justify-center">
+                        <StoreStats rating={partner.rating} sales={stats.salesCount} createdAt={partner.createdAt} reviewsCount={stats.reviewsCount} />
+                    </div>
+
+                    <div className="sticky top-0 z-40 bg-white border-b border-brand-border mb-4">
+                        <Tabs value={mobileModalTab} onValueChange={(v) => setMobileModalTab(v as any)}>
+                            <TabsList className="justify-center gap-8 bg-transparent">
+                                <TabsTrigger value="reviews" className="text-[15px] pb-3">Avaliações</TabsTrigger>
+                                <TabsTrigger value="info" className="text-[15px] pb-3">Informações</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
+                    </div>
+
+                    <div className="px-2 pb-6">
+                        {mobileModalTab === "reviews"
+                            ? <ReviewsTab partner={partner} stats={stats} ratingDistribution={ratingDistribution} reviews={reviews} />
+                            : <InfoTab partner={partner} stats={stats} />
+                        }
+                    </div>
+                </div>
+            </BottomSheet>
         </div>
     )
 }

@@ -49,22 +49,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         const partners = partnersResponse.data || []
         const products = productsResponse.data || []
 
+        const productsSitemap: MetadataRoute.Sitemap = products.map((prod: any) => ({
+            url: `https://dudit.com.br${getProductUrl(prod, prod.partners)}`,
+            lastModified: new Date(prod.updated_at || prod.created_at),
+            changeFrequency: 'daily',
+            priority: 0.9,
+        }))
+
         const partnersSitemap: MetadataRoute.Sitemap = partners.map((p: any) => ({
             url: `https://dudit.com.br${getPartnerUrl(p)}`,
-            lastModified: new Date(p.created_at),
+            lastModified: new Date(p.updated_at || p.created_at),
             changeFrequency: 'weekly',
             priority: 0.8,
         }))
 
-        const productsSitemap: MetadataRoute.Sitemap = products.map((prod: any) => ({
-            url: `https://dudit.com.br${getProductUrl(prod, prod.partners)}`,
-            lastModified: new Date(prod.created_at),
-            changeFrequency: 'daily',
-            priority: 0.7,
-        }))
-
         // Juntamos e limitamos para validar o conceito: Crescimento Orgânico Simples sem Indexação Lixo
-        const completeSitemap = [...staticUrls, ...partnersSitemap, ...productsSitemap]
+        const completeSitemap = [...staticUrls, ...productsSitemap, ...partnersSitemap]
 
         return completeSitemap.slice(0, MAX_SITEMAP_URLS)
     } catch (error) {

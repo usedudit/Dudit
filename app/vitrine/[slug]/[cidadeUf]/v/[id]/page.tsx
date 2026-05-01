@@ -184,6 +184,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     lat: partner.latitude,
     lng: partner.longitude,
     businessInfo: partner.business_info,
+    paymentMethods: partner.payment_methods,
   }
 
   return (

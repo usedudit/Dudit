@@ -5,11 +5,6 @@ export default function robots(): MetadataRoute.Robots {
         rules: [
             {
                 userAgent: '*',
-                allow: [
-                    '/',
-                    '/vitrine/*',
-                    '/produto/*',
-                ],
                 disallow: [
                     '/api/',
                     '/auth/',
@@ -26,11 +21,6 @@ export default function robots(): MetadataRoute.Robots {
             // Googlebot regras explícitas (Performance de Crawl)
             {
                 userAgent: 'Googlebot',
-                allow: [
-                    '/',
-                    '/vitrine/*',
-                    '/produto/*',
-                ],
                 disallow: [
                     '/api/',
                     '/erp/',

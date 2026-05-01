@@ -14,7 +14,7 @@ const inter = Inter({
 export const metadata: Metadata = {
     title: "Dudit | Descubra o que tem por aqui",
     description:
-        "Encontre produtos, serviços e negócios perto de você ou comece a vender online sem taxas. Organize pedidos, clientes e vendas em um só lugar com a Dudit.",
+        "Encontre produtos e serviços na sua cidade ou anuncie o que você oferece. Venda sem taxas e organize seus pedidos, clientes e vendas em um só lugar.",
     keywords: [
         "vender online sem taxa",
         "vitrine digital",
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     openGraph: {
         title: "Dudit | Descubra o que tem por aqui",
         description:
-            "Compre de quem está perto ou venda online sem taxas. Produtos, serviços e negócios locais em um só lugar.",
+            "Encontre produtos e serviços na sua cidade ou anuncie o que você oferece. Simples, direto e sem taxas.",
         url: "https://dudit.com.br",
         siteName: "Dudit",
         images: [
@@ -45,6 +45,7 @@ export const metadata: Metadata = {
         icon: "https://img.dudit.com.br/static/Icon.png",
         apple: "https://img.dudit.com.br/static/Icon.png",
     },
+    metadataBase: new URL("https://dudit.com.br"),
 }
 
 import { SupabaseProvider } from "@/providers/supabase-provider"
@@ -82,7 +83,7 @@ export default async function RootLayout({
                                     "name": "Dudit",
                                     "url": "https://dudit.com.br",
                                     "logo": "https://img.dudit.com.br/static/Icon.png",
-                                    "description": "Plataforma para encontrar produtos, serviços e negócios locais ou vender online sem taxas.",
+                                    "description": "A Dudit é uma plataforma para descobrir produtos e serviços locais e ajudar negócios a vender e se organizar de forma simples.",
                                     "knowsAbout": [
                                         "vendas online",
                                         "produtos locais",
@@ -97,7 +98,7 @@ export default async function RootLayout({
                                     "@type": "WebSite",
                                     "name": "Dudit",
                                     "url": "https://dudit.com.br",
-                                    "description": "Descubra produtos, serviços e negócios perto de você.",
+                                    "description": "Explore produtos, serviços e negócios da sua cidade em um só lugar.",
                                     "potentialAction": {
                                         "@type": "SearchAction",
                                         "target": "https://dudit.com.br/explorar?q={search_term_string}",
@@ -110,21 +111,20 @@ export default async function RootLayout({
                                     "applicationCategory": "BusinessApplication",
                                     "operatingSystem": "All",
                                     "url": "https://dudit.com.br",
-                                    "description": "Venda online sem taxas e organize pedidos, clientes e serviços em um só lugar.",
+                                    "description": "Gerencie pedidos, clientes e vendas e anuncie seus produtos e serviços de forma simples, sem taxas.",
                                     "offers": {
                                         "@type": "Offer",
-                                        "price": "0",
                                         "priceCurrency": "BRL"
                                     }
                                 },
                                 {
-                                    "@type": "LocalBusiness",
+                                    "@type": "OnlineBusiness",
                                     "name": "Dudit",
                                     "areaServed": {
                                         "@type": "Country",
                                         "name": "Brasil"
                                     },
-                                    "description": "Marketplace local para comprar e vender produtos e serviços na sua cidade."
+                                    "description": "Plataforma online que conecta pessoas a produtos e serviços disponíveis na sua cidade."
                                 }
                             ]
                         })

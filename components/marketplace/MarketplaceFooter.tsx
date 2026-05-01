@@ -26,8 +26,7 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
               />
             </Link>
             <p className="text-gray-400 text-sm leading-relaxed max-w-xs">
-              A ferramenta simples para organizar sua loja e começar a vender online.
-              A Dudit não cobra comissão, a venda é 100% sua.
+              Um lugar pra ver o que tem na sua cidade e anunciar o que você oferece.
             </p>
           </div>
 

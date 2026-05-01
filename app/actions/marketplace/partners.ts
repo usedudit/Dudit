@@ -27,7 +27,8 @@ async function _getPartnerProfile(partnerId: string) {
     .from("partners")
     .select(`
       *,
-      addresses(id, zip_code, street, number, complement, neighborhood, city, state, is_default)
+      addresses(id, zip_code, street, number, complement, neighborhood, city, state, is_default),
+      payment_methods(*)
     `)
     .eq("id", partnerId)
     .eq("is_active", true)
@@ -156,7 +157,8 @@ export const getCachedPartnerProfile = async (partnerId: string) => {
         .from("partners")
         .select(`
           *,
-          addresses(id, zip_code, street, number, complement, neighborhood, city, state, is_default)
+          addresses(id, zip_code, street, number, complement, neighborhood, city, state, is_default),
+          payment_methods(*)
         `)
         .eq("id", partnerId)
         .eq("is_active", true)
