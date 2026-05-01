@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, ChevronDownIcon, CalendarIcon, CheckIcon, MoreHorizontalIcon, EditIcon, ClockIcon, RepeatIcon, SaveIcon, ShoppingBagIcon, ArrowRightIcon, FileIcon } from '@/lib/icons';
-import { Button, Input as FormInput, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea } from '@/components/reusable';
+import { Button, Input as FormInput, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder } from '@/components/reusable';
 import { getAvailableTimeSlotsAction } from '@/app/actions/erp/appointments';
 import { usePermissions } from '@/lib/permission-context';
 import { RecurrenceView, ActivityLog } from '../Shared';
 import { Appointment } from '../types';
 import { ServiceItemCard } from '../ServiceItemCard';
-import { formatDateStr, formatDuration, getEndTime, parseLocalDate } from '../utils';
+import { formatDateStr, formatDuration, parseLocalDate } from '../utils';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { useMediaQuery } from '@/components/erp/hooks';
 import BottomSheet from '@/components/BottomSheet';
@@ -64,7 +64,7 @@ export const AppointmentSheet = ({
     const [serviceToDeleteIndex, setServiceToDeleteIndex] = useState<number | null>(null);
     const [isUnsavedModalOpen, setIsUnsavedModalOpen] = useState(false);
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false);
-    
+
     const isMobile = useMediaQuery("(max-width: 768px)");
 
     // Status & Notes State
@@ -105,7 +105,11 @@ export const AppointmentSheet = ({
     const [endTimeRange, setEndTimeRange] = useState<string>('');
 
     // Specific Staff Selection for New Appointment
-    const [selectedStaffId, setSelectedStaffId] = useState<string>(initialStaffId || '1');
+    const [selectedStaffId, setSelectedStaffId] = useState<string>(initialStaffId || (staffSource.length > 0 ? staffSource[0].id : ''));
+
+    // Date Navigation Base
+    const [baseDate, setBaseDate] = useState<Date>(selectedDate || defaultDate);
+    const [dateOffset, setDateOffset] = useState(0);
 
     // Edit Mode State
     const [editDate, setEditDate] = useState<Date | undefined>(undefined);
@@ -119,6 +123,18 @@ export const AppointmentSheet = ({
         d.setDate(d.getDate() + 30);
         return d;
     });
+
+    // Client Selection Search
+    const [clientSearch, setClientSearch] = useState('');
+    const filteredClients = useMemo(() => {
+        if (!clientSearch) return clientsSource;
+        const q = clientSearch.toLowerCase();
+        return clientsSource.filter(c =>
+            (c.name || '').toLowerCase().includes(q) ||
+            (c.email || '').toLowerCase().includes(q) ||
+            (c.phone || '').includes(q)
+        );
+    }, [clientSearch, clientsSource]);
 
     // Determine if appointment is paid or absence
     const isPaid = status === 'Paid' || status === 'Pago' || status === 'Partially Paid';
@@ -153,7 +169,7 @@ export const AppointmentSheet = ({
                     setTimeSlots(res.slots);
                 }
             })
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => {
                 if (!cancelled) setIsLoadingSlots(false);
             });
@@ -198,7 +214,9 @@ export const AppointmentSheet = ({
 
             // Initialize edit state
             const [y, m, d] = appointment.date.split('-').map(Number);
-            setEditDate(new Date(y, m - 1, d));
+            const aptDate = new Date(y, m - 1, d);
+            setEditDate(aptDate);
+            setBaseDate(aptDate);
             setEditTime(appointment.time);
             setStatus(appointment.status);
             setNotes(appointment.notes || '');
@@ -221,7 +239,9 @@ export const AppointmentSheet = ({
             }
 
             // Init Range Defaults
-            const todayStr = formatDateStr(selectedDate || defaultDate);
+            const targetDate = selectedDate || defaultDate;
+            const todayStr = formatDateStr(targetDate);
+            setBaseDate(targetDate);
             setStartDateRange(todayStr);
             setStartTimeRange(initialTimeSlot || '09:00');
             setEndDateRange(todayStr);
@@ -233,6 +253,8 @@ export const AppointmentSheet = ({
 
             if (initialStaffId) {
                 setSelectedStaffId(initialStaffId);
+            } else if (staffSource.length > 0) {
+                setSelectedStaffId(staffSource[0].id);
             }
 
             // Standard Flow Initialization for Create Mode
@@ -246,7 +268,7 @@ export const AppointmentSheet = ({
                 }
             }
         }
-    }, [mode, appointment, initialTimeSlot, initialDraft, selectedDate, initialStaffId]);
+    }, [mode, appointment, initialTimeSlot, initialDraft, selectedDate, initialStaffId, staffSource]);
 
     // Calculate Price dynamically for Time-Based Services
     const calculatedPrice = useMemo(() => {
@@ -531,7 +553,7 @@ export const AppointmentSheet = ({
 
     const renderHeader = () => {
         const title = getHeaderTitle();
-        
+
         return (
             <div className="p-6 border-b border-brand-border dark:border-dark-border flex justify-between items-center bg-white dark:bg-dark-surface z-20">
                 <div className="flex items-center gap-3">
@@ -564,14 +586,15 @@ export const AppointmentSheet = ({
         return 'bg-blue-600';
     }
 
-    const [dateOffset, setDateOffset] = useState(0);
     const dates = useMemo(() => {
-        const baseDate = editDate || selectedDate || defaultDate;
         const days = [];
+        const currentSelectedDateStr = formatDateStr(editDate || selectedDate || defaultDate);
+
         for (let i = -2; i < 5; i++) {
             const d = new Date(baseDate);
             d.setDate(baseDate.getDate() + i + dateOffset);
-            const isSelected = i + dateOffset === 0;
+            const dateStr = formatDateStr(d);
+            const isSelected = dateStr === currentSelectedDateStr;
             days.push({
                 day: d.toLocaleDateString('pt-BR', { weekday: 'short' }).slice(0, 3),
                 num: d.getDate(),
@@ -580,11 +603,15 @@ export const AppointmentSheet = ({
             });
         }
         return days;
-    }, [dateOffset, editDate, selectedDate, defaultDate]);
+    }, [baseDate, dateOffset, editDate, selectedDate, defaultDate]);
 
     const handleDateNav = (dir: 'prev' | 'next') => {
-        setDateOffset(prev => dir === 'next' ? prev + 1 : prev - 1);
+        setDateOffset(prev => dir === 'next' ? prev + 7 : prev - 7);
     }
+
+    const handleSelectDay = (date: Date) => {
+        setEditDate(date);
+    };
 
     const handleServiceEdit = (index: number) => {
         setEditingServiceIndex(index);
@@ -689,7 +716,7 @@ export const AppointmentSheet = ({
     const formattedHeaderDate = formatDate(headerDateObj);
 
     const SheetContent = (
-        <div className={`relative w-full ${isMobile ? '' : 'max-w-md'} bg-white dark:bg-dark-surface shadow-2xl flex flex-col h-full overflow-hidden`}>
+        <div className={`relative w-full ${isMobile ? '' : 'max-w-md'} bg-white dark:bg-dark-surface flex flex-col h-full overflow-hidden`}>
             {renderHeader()}
 
             {/* Content Area */}
@@ -717,7 +744,7 @@ export const AppointmentSheet = ({
                                                     onClick={() => handleServiceSwap({ ...item, colorClass: group.colorClass })}
                                                     className={`relative flex justify-between items-center p-4 rounded-xl cursor-pointer border bg-transparent transition-all ${isSelected && !isEditingMode ? 'border-brand-green' : 'border-brand-border dark:border-dark-border hover:border-gray-300 dark:hover:border-gray-600'}`}
                                                 >
-                                                    <div className={`absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full ${group.colorClass}`}></div>
+                                                    <div className="absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full bg-brand-gray dark:bg-dark-border/50"></div>
                                                     <div className="pl-4">
                                                         <div className="font-bold text-brand-dark dark:text-dark-heading text-[15px] mb-1">{item.name}</div>
                                                         <div className="text-xs text-brand-inactive-text">
@@ -797,7 +824,6 @@ export const AppointmentSheet = ({
                                                 />
                                                 <div className="text-left">
                                                     <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{getSelectedStaffName()}</p>
-                                                    <p className="text-[10px] uppercase tracking-wider text-brand-inactive-text font-bold leading-tight">Membro da Equipe</p>
                                                 </div>
                                             </div>
                                         </Button>
@@ -907,13 +933,16 @@ export const AppointmentSheet = ({
                                         <div className="space-y-3">
                                             {isLoadingSlots ? (
                                                 <div className="flex flex-col items-center justify-center py-12 gap-3">
-                                                    <div className="w-6 h-6 border-2 border-brand-dark/20 border-t-brand-dark rounded-full animate-spin" />
+                                                    <ThreeDotsLoader />
                                                     <span className="text-sm text-brand-inactive-text font-medium">Verificando disponibilidade...</span>
                                                 </div>
                                             ) : timeSlots.length === 0 ? (
                                                 <div className="text-center py-12">
-                                                    <p className="text-sm text-brand-inactive-text font-medium">Nenhum horário disponível nesta data.</p>
-                                                    <p className="text-xs text-brand-inactive-text mt-1">Tente outra data ou outro profissional.</p>
+                                                    <IconPlaceholder
+                                                        icon={CalendarIcon}
+                                                        title="Nenhum horário disponível nesta data"
+                                                        subtitle="Tente outra data ou outro profissional."
+                                                    />
                                                 </div>
                                             ) : (
                                                 timeSlots.map((slot, i) => (
@@ -940,7 +969,7 @@ export const AppointmentSheet = ({
 
                             {/* Info Header Card - Adjusted for Ranges */}
                             {headerDateObj && (
-                                <div className={`${getHeaderBgColor()} text-white rounded-2xl p-5 shadow-sm relative overflow-hidden transition-colors duration-300`}>
+                                <div className={`${getHeaderBgColor()} text-white rounded-2xl p-5 relative overflow-hidden transition-colors duration-300`}>
                                     <div className="relative z-10 flex justify-between items-start">
                                         <div>
                                             <h2 className="text-xl font-bold mb-1">
@@ -1059,7 +1088,7 @@ export const AppointmentSheet = ({
                                 className="relative flex justify-between items-center p-4 rounded-xl border border-brand-border dark:border-dark-border bg-transparent cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
                                 onClick={() => setCurrentView('services')}
                             >
-                                <div className={`absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full ${selectedServices[editingServiceIndex].colorClass || 'bg-blue-500'}`}></div>
+                                <div className="absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full bg-brand-gray dark:bg-dark-border/50"></div>
                                 <div className="pl-4 w-full">
                                     <div className="flex justify-between items-center">
                                         <h4 className="font-bold text-brand-dark dark:text-dark-heading text-[15px]">
@@ -1177,20 +1206,19 @@ export const AppointmentSheet = ({
                         {mode === 'create' || currentView === 'edit-service' ? (
                             <div className="flex gap-3">
                                 {currentView !== 'services' && (
-                                    <Button variant="outline" className="flex-1 h-[48px] rounded-xl" onClick={handleBack}>
+                                    <Button variant="outline" className="flex-1 h-[48px]" onClick={handleBack}>
                                         Voltar
                                     </Button>
                                 )}
                                 <Button
                                     variant="default"
-                                    className={`flex-1 h-[48px] rounded-xl font-bold ${currentView === 'services' && selectedServices.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    className={`flex-1 h-[48px] ${currentView === 'services' && selectedServices.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     onClick={currentView === 'edit-service' ? () => setCurrentView('summary') : handleNext}
                                     disabled={(currentView === 'services' && selectedServices.length === 0) || isSaving}
                                 >
                                     {isSaving && currentView === 'summary' ? (
                                         <span className="flex items-center gap-2">
-                                            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                            Salvando...
+                                            Loader
                                         </span>
                                     ) : currentView === 'summary' || (currentView === 'datetime' && (selectedTimeSlot || needsRangePicker)) ? <span className="flex items-center gap-2">Agendar <CheckCircleIcon size={18} /></span> : currentView === 'edit-service' ? 'Aplicar' : 'Próximo'}
                                 </Button>
@@ -1222,7 +1250,7 @@ export const AppointmentSheet = ({
 
                                 <Button
                                     variant="default"
-                                    className="flex-1 h-[48px] rounded-xl font-bold"
+                                    className="flex-1 h-[48px]"
                                     onClick={handleSaveChanges}
                                     disabled={isSaving}
                                 >

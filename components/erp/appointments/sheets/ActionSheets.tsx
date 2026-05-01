@@ -254,11 +254,10 @@ export const AddUnavailableSheet = ({
                         width="w-full"
                         showChevron={false}
                         trigger={
-                            <Button variant="outline" className="w-full h-12 justify-between px-4">
+                            <Button variant="outline" className="w-full h-12">
                                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
                                     {recurrence === 'none' ? 'Não se repete' : recurrence === 'daily' ? 'Diariamente' : 'Semanalmente'}
                                 </span>
-                                <ChevronDownIcon size={16} className="text-brand-inactive-text" />
                             </Button>
                         }
                     >
@@ -283,7 +282,7 @@ export const AddUnavailableSheet = ({
 
             {/* Footer */}
             <div className="absolute bottom-0 left-0 w-full p-6 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border z-20">
-                <Button className="w-full h-[48px] rounded-xl font-bold" onClick={handleConfirm}>
+                <Button className="w-full h-[48px]" onClick={handleConfirm}>
                     {isEditing ? 'Salvar Alterações' : 'Salvar Horário'}
                 </Button>
             </div>

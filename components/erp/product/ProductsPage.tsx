@@ -38,6 +38,7 @@ import AddProductPage from "./AddProductPage"
 import { ImportXmlModal } from "@/components/erp/import-xml-modal"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
+import Pagination from "@/components/reusable/Pagination"
 
 // New Component Imports
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
@@ -251,9 +252,7 @@ export default function ProductsPage({
     // ── UI State (non-URL) ────────────────────────────────────────────
     const [selection, setSelection] = useState({ ids: new Set<string>(), delete: null as Product | null })
     const [actionModal, setActionModal] = useState<{ open: boolean; text: string }>({ open: false, text: "" })
-    const [viewMode, setViewModeState] = useState<"list" | "grid">(
-        isMobile ? "grid" : "list",
-    )
+    const [viewMode, setViewModeState] = useState<"list" | "grid">("list")
     const [scrollState, setScrollState] = useState({ left: false, right: false })
     const [filters, setFilters] = useState<FilterState>({
         stocks: [],
@@ -275,7 +274,7 @@ export default function ProductsPage({
     const [modals, setModals] = useState({ filter: false, import: false, export: false })
     const [bulkEditModal, setBulkEditModal] = useState({ isOpen: false })
 
-    const effectiveViewMode = isMobile ? "grid" : viewMode
+    const effectiveViewMode = viewMode
     const itemsPerPage = 8
 
     // Initialize refs for container scrolling
@@ -872,6 +871,7 @@ export default function ProductsPage({
                                     )}
                                 </AnimatePresence>
                             </div>
+                            <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
                         </div>
                     </FadeIn>
                 )}

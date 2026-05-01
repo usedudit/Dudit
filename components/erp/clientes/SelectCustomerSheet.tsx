@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { SearchIcon, UserIcon, PlusIcon, XIcon } from "@/lib/icons"
-import { Button, Input, IconPlaceholder, Badge } from "@/components/reusable"
+import { Button, Input, IconPlaceholder, Badge, EmailInput, PhoneInput, InfoCard } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery, usePickerBucket } from "@/components/erp/hooks"
@@ -337,22 +337,20 @@ const SelectCustomerSheet = ({
           onChange={(e) => setNewCustomerName(e.target.value)}
           placeholder="Nome do cliente"
         />
-        <Input
+        <EmailInput
           label="E-mail"
           name="newCustomerEmail"
           value={newCustomerEmail}
           onChange={(e) => setNewCustomerEmail(e.target.value)}
-          placeholder="cliente@exemplo.com"
         />
-        <Input
+        <PhoneInput
           label="Telefone"
           name="newCustomerPhone"
           value={newCustomerPhone}
           onChange={(e) => setNewCustomerPhone(e.target.value)}
-          placeholder="(00) 00000-0000"
         />
         {newCustomerError && (
-          <p className="text-sm font-medium text-brand-red">{newCustomerError}</p>
+          <InfoCard title="Erro ao salvar cliente" message={newCustomerError} color="red" />
         )}
       </div>
 
@@ -398,7 +396,7 @@ const SelectCustomerSheet = ({
           </Button>
         </div>
       </footer>
-    </div>
+    </div >
   )
 
   if (isMobile) {

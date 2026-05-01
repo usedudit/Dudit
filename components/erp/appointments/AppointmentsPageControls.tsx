@@ -104,7 +104,7 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
                         Hoje
                     </Button>
 
-                    <div className="flex items-center border border-brand-border dark:border-dark-border rounded-full bg-white dark:bg-dark-surface h-[42px] shadow-sm overflow-hidden flex-1 md:flex-none">
+                    <div className="flex items-center border border-brand-border dark:border-dark-border rounded-full bg-white dark:bg-dark-surface h-[42px] overflow-hidden flex-1 md:flex-none">
                         <button
                             onClick={onPrev}
                             className="w-10 h-full flex items-center justify-center border-r border-brand-border dark:border-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"

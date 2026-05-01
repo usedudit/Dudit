@@ -27,8 +27,9 @@ interface TransactionDetailViewProps {
 export default function TransactionDetailView({ transactionId, partnerId, onBack, onEdit, initialDetail, loading: externalLoading }: TransactionDetailViewProps) {
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
+    // CACHE-FIRST: Use initialDetail from parent (useEntityPage cache) as primary source
     const [detail, setDetail] = useState<TransactionDetailPayload | null>(initialDetail || null)
-    const [loading, setLoading] = useState(initialDetail ? false : (externalLoading ?? true))
+    const [loading, setLoading] = useState(!initialDetail)
     const [activeTab, setActiveTab] = useState("summary")
     const [historyEntries, setHistoryEntries] = useState<any[]>([])
     const [historyLoading, setHistoryLoading] = useState(false)
@@ -41,6 +42,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
         }
     }, [])
 
+    // Sync with parent cache updates (useEntityPage fetches in background and updates currentEntity)
     useEffect(() => {
         if (initialDetail) {
             setDetail(initialDetail)
@@ -48,13 +50,16 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
         }
     }, [initialDetail])
 
+    // Fallback: only fetch if parent cache never provided data (defensive, should rarely happen)
     useEffect(() => {
-        // If we already have a detail that matches the current transactionId, don't fetch
-        if (detail && detail.id === transactionId) return
+        if (detail && detail.id === transactionId) return // Already have data from cache
+        if (initialDetail) return // Parent will provide via cache updates
 
+        let cancelled = false
         async function load() {
             setLoading(true)
             const res = await getTransactionDetailsAction(transactionId, partnerId)
+            if (cancelled) return
             if (res.success) {
                 setDetail(res.data)
             } else {
@@ -64,7 +69,8 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
             setLoading(false)
         }
         load()
-    }, [transactionId, partnerId, notifyError, onBack])
+        return () => { cancelled = true }
+    }, [transactionId, partnerId, notifyError, onBack, initialDetail])
 
     useEffect(() => {
         async function loadHistory() {

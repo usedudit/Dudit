@@ -255,6 +255,7 @@ export default function TransactionsPage({
         items: loadedTransactions, fetchNextPage, hasNextPage, isFetchingNextPage,
         entityState, openEntity, closeEntity, isViewing, isEditing, isCreating,
         currentEntity, getPrefetchProps,
+        afterMutation, cache, queryClient: entityQueryClient,
     } = entityPage
     const [settlePaymentsByInstallment, setSettlePaymentsByInstallment] = useState<
         Record<string, { paymentAmount: string; interestAmount: string; discountAmount: string; paymentMethodId: string }>
@@ -687,25 +688,11 @@ export default function TransactionsPage({
     const hasTransactions = loadedTransactions.length > 0
 
     const refreshTransactionsNow = useCallback(async () => {
-        const res = await getFinancialTransactionsAction(partnerId, {})
-        if (!res.success) {
-            notifyError(res.error || "Erro ao atualizar transações.")
-            return false
-        }
-        queryClient.setQueryData(financialTransactionsQueryKey(partnerId), {
-            pages: [
-                {
-                    items: res.items,
-                    nextCursor: res.nextCursor,
-                    hasMore: res.hasMore,
-                } satisfies FinancialTransactionsPageSuccess,
-            ],
-            pageParams: [null] as (FinancialTransactionCursor | null)[],
-        })
+        // Invalidate cache + list via the entity page pattern (same as Products)
+        afterMutation()
         setPage(1)
-        router.refresh()
         return true
-    }, [partnerId, notifyError, queryClient, router])
+    }, [afterMutation])
 
     useInfiniteScrollObserver(observerTarget, {
         enabled: true,
@@ -1156,9 +1143,11 @@ export default function TransactionsPage({
                         setEditingRecurringTemplateId(null)
                     }}
                     onSuccess={() => {
+                        // Invalidate caches + close (same pattern as Products)
+                        if (entityState.entityId) cache.invalidateEntity(entityState.entityId)
+                        afterMutation(entityState.entityId || undefined)
                         closeEntity()
                         setEditingRecurringTemplateId(null)
-                        void refreshTransactionsNow()
                     }}
                 />
             </motion.div>
