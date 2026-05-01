@@ -1108,17 +1108,10 @@ export default function TransactionsPage({
     }
 
     const isFormOpen = (entityState.isOpen && (entityState.action === "create" || entityState.action === "edit" || entityState.action === "duplicate")) || !!editingRecurringTemplateId
-    // Products pattern: derive form data from cache (currentEntity), not from list scan
-    const editingTx = useMemo(() => {
-        if (!entityState.isOpen || entityState.action !== "edit" || !entityState.entityId) return null
-        // First try cache (instant), then fall back to list scan
-        if (currentEntity && (currentEntity as any).id === entityState.entityId) {
-            // Map cache detail back to list item shape for the form
-            const listItem = loadedTransactions.find((t: ERPTransaction) => t.id === entityState.entityId)
-            return listItem || null
-        }
-        return loadedTransactions.find((t: ERPTransaction) => t.id === entityState.entityId) || null
-    }, [entityState, currentEntity, loadedTransactions])
+    // Plain expression (NOT useMemo — can't use hooks after early returns)
+    const editingTx = (entityState.isOpen && entityState.action === "edit" && entityState.entityId)
+        ? loadedTransactions.find((t: ERPTransaction) => t.id === entityState.entityId) || null
+        : null
 
     if (isFormOpen) {
         return (

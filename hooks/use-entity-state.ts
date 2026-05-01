@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, startTransition } from "react"
-import { useSearchParams, useRouter, usePathname } from "next/navigation"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { useSearchParams, usePathname } from "next/navigation"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,6 +32,11 @@ function stateFromParams(searchParams: URLSearchParams): EntityState {
     return CLOSED_STATE
 }
 
+function stateFromCurrentUrl(): EntityState {
+    if (typeof window === "undefined") return CLOSED_STATE
+    return stateFromParams(new URLSearchParams(window.location.search))
+}
+
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -39,10 +44,12 @@ function stateFromParams(searchParams: URLSearchParams): EntityState {
  *
  * Architecture:
  *   1. Local useState updates SYNCHRONOUSLY on open/close (UI responds in <1ms)
- *   2. URL syncs in the background via startTransition + router.replace
- *   3. On browser back/forward, URL changes → local state syncs
+ *   2. URL syncs INSTANTLY via window.history.replaceState (NO Next.js router)
+ *   3. On browser back/forward, popstate → local state syncs
  *
- * This ensures the UI NEVER blocks on router.replace() which is async in Next.js.
+ * CRITICAL: We do NOT use router.replace() because it triggers Next.js
+ * server-side revalidation, causing 2-3 second delays. Instead we use
+ * window.history.replaceState() which is <1ms.
  *
  * URL patterns:
  *   /erp/products              → list (no action)
@@ -53,7 +60,6 @@ function stateFromParams(searchParams: URLSearchParams): EntityState {
  */
 export function useEntityState() {
     const searchParams = useSearchParams()
-    const router = useRouter()
     const pathname = usePathname()
 
     // ── PRIMARY: Local state (synchronous, instant) ──────────────────────
@@ -65,19 +71,25 @@ export function useEntityState() {
     const isUserActionRef = useRef(false)
 
     // ── SECONDARY: Sync from URL on browser back/forward ─────────────────
-    // Only sync from URL when it wasn't triggered by our own open/close
     useEffect(() => {
         if (isUserActionRef.current) {
-            // This URL change was caused by our own open/close call — skip sync
             isUserActionRef.current = false
             return
         }
-        // URL changed externally (browser back/forward/direct navigation)
         const urlState = stateFromParams(searchParams)
         setLocalState(urlState)
     }, [searchParams])
 
-    // ── Open: instant local state + background URL sync ──────────────────
+    // ── Popstate handler for browser back/forward ────────────────────────
+    useEffect(() => {
+        const handlePopState = () => {
+            setLocalState(stateFromCurrentUrl())
+        }
+        window.addEventListener("popstate", handlePopState)
+        return () => window.removeEventListener("popstate", handlePopState)
+    }, [])
+
+    // ── Open: instant local state + instant URL sync ─────────────────────
 
     const open = useCallback(
         (action: EntityAction, id?: string) => {
@@ -90,27 +102,23 @@ export function useEntityState() {
             setLocalState({ action, entityId, isOpen: true })
             isUserActionRef.current = true
 
-            // 2. BACKGROUND: Sync URL (non-blocking)
-            startTransition(() => {
-                const sp = new URLSearchParams({ [action]: value })
-                router.replace(`${pathname}?${sp.toString()}`, { scroll: false })
-            })
+            // 2. INSTANT: Sync URL via replaceState (NO Next.js router = NO server revalidation)
+            const sp = new URLSearchParams({ [action]: value })
+            window.history.replaceState(null, "", `${pathname}?${sp.toString()}`)
         },
-        [router, pathname],
+        [pathname],
     )
 
-    // ── Close: instant local state + background URL sync ─────────────────
+    // ── Close: instant local state + instant URL sync ────────────────────
 
     const close = useCallback(() => {
         // 1. INSTANT: Clear local state synchronously
         setLocalState(CLOSED_STATE)
         isUserActionRef.current = true
 
-        // 2. BACKGROUND: Sync URL (non-blocking)
-        startTransition(() => {
-            router.replace(pathname, { scroll: false })
-        })
-    }, [router, pathname])
+        // 2. INSTANT: Sync URL via replaceState (NO Next.js router)
+        window.history.replaceState(null, "", pathname)
+    }, [pathname])
 
     // ── Derived booleans (from instant local state) ──────────────────────
 

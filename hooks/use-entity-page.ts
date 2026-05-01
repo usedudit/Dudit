@@ -84,6 +84,8 @@ export function useEntityPage<
         },
         fetchFn: fetchPageFn,
         dedupeKey,
+        refetchOnWindowFocus: false,
+        refetchOnMount: false,
     })
 
     // ── Entity Cache ─────────────────────────────────────────────────────
