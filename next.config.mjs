@@ -104,6 +104,20 @@ const nextConfig = {
       },
     ]
   },
+  async redirects() {
+    return [
+      {
+        source: '/produto/:slug/:cidadeUf/p/:id',
+        destination: '/:cidadeUf/:slug/p/:id',
+        permanent: true,
+      },
+      {
+        source: '/vitrine/:slug/:cidadeUf/v/:id',
+        destination: '/:cidadeUf/:slug/v/:id',
+        permanent: true,
+      },
+    ]
+  },
 }
 
 export default nextConfig

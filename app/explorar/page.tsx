@@ -7,12 +7,21 @@ import { getUserSessionData } from "@/lib/data/user"
 import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
-export const metadata: Metadata = {
-    title: "Explorar Produtos e Serviços Perto de Você | Dudit",
-    description: "Chega de esperar dias pela entrega. Encontre os melhores produtos, serviços e negócios locais na sua cidade e compre sem pagar taxas extras.",
-    alternates: {
-        canonical: "https://dudit.com.br/explorar",
-    },
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }): Promise<Metadata> {
+    const resolvedParams = await searchParams
+    const hasParams = Object.keys(resolvedParams).length > 0
+
+    return {
+        title: "Explorar Produtos e Serviços Perto de Você | Dudit",
+        description: "Chega de esperar dias pela entrega. Encontre os melhores produtos, serviços e negócios locais na sua cidade e compre sem pagar taxas extras.",
+        robots: {
+            index: !hasParams,
+            follow: true
+        },
+        alternates: {
+            canonical: "https://dudit.com.br/explorar",
+        },
+    }
 }
 
 export default async function ExplorarPage({

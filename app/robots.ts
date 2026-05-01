@@ -29,7 +29,8 @@ export default function robots(): MetadataRoute.Robots {
                     '*?sort=*',       // Bloqueia parâmetros de filtro
                     '*?searchValue=*',// Bloqueia buscas por ter zero valia orgânica (Thin Content)
                     '*?category=*',    // Bloqueia categorização dinâmica de Lojas p/ economizar budget
-                    '*?tab=*'    // Bloqueia tabs
+                    '*?tab=*',    // Bloqueia tabs
+                    '*?q=*'       // Bloqueia queries genericas da exploração
                 ]
             }
         ],

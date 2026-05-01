@@ -16,7 +16,7 @@ export function formatCityStateSlug(city?: string, state?: string): string {
 
 /**
  * Gera a URL canonica do produto utilizando o novo formato com cidade e estado
- * /produto/[slug-do-produto]/[cidade-uf]/p/[id]
+ * /[cidade-uf]/[slug-do-produto]/p/[id]
  */
 export function getProductUrl(product: any, partner?: any): string {
     if (!product) return "/"
@@ -29,17 +29,17 @@ export function getProductUrl(product: any, partner?: any): string {
 
     // As vezes o endereço está em p.addresses[0], as vezes na raiz (p.address ou p direto se já normalizado)
     const address = p.addresses?.[0] || p.address || p
-    const city = p.city || address.city
-    const state = p.state || address.state
+    const city = p.city || address?.city
+    const state = p.state || address?.state
 
     const cityStateSlug = formatCityStateSlug(city, state)
 
-    return `/produto/${prodSlug}/${cityStateSlug}/p/${prodId}`
+    return `/${cityStateSlug}/${prodSlug}/p/${prodId}`
 }
 
 /**
  * Gera a URL canonica do parceiro utilizando o novo formato com cidade e estado
- * /vitrine/[slug-da-loja]/[cidade-uf]/v/[id]
+ * /[cidade-uf]/[slug-da-loja]/v/[id]
  */
 export function getPartnerUrl(partner: any): string {
     if (!partner) return "/"
@@ -48,11 +48,11 @@ export function getPartnerUrl(partner: any): string {
     const partnerId = partner.id || ""
 
     const address = partner.addresses?.[0] || partner.address || partner
-    const city = partner.city || address.city
-    const state = partner.state || address.state
+    const city = partner.city || address?.city
+    const state = partner.state || address?.state
 
     const cityStateSlug = formatCityStateSlug(city, state)
 
-    return `/vitrine/${partnerSlug}/${cityStateSlug}/v/${partnerId}`
+    return `/${cityStateSlug}/${partnerSlug}/v/${partnerId}`
 }
 
