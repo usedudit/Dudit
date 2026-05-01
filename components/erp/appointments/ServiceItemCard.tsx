@@ -33,7 +33,7 @@ export const ServiceItemCard: React.FC<ServiceItemCardProps> = ({
             onClick={onClick}
             className={`relative flex justify-between items-center p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-zinc-900/50 group transition-all ${onClick ? 'cursor-pointer hover:border-gray-300 dark:hover:border-gray-600' : ''}`}
         >
-            <div className="absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full bg-brand-gray dark:bg-dark-border/50"></div>
+            <div className="absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full bg-brand-green dark:bg-brand-green"></div>
 
             <div className="pl-4 flex-1">
                 <div className="flex justify-between items-start mb-2">

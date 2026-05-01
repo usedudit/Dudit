@@ -183,6 +183,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     phone: partner.phone,
     lat: partner.latitude,
     lng: partner.longitude,
+    businessInfo: partner.business_info,
   }
 
   return (
@@ -193,7 +194,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
       />
 
 
-      <main className="pt-[120px] flex-grow">
+      <main className="lg:pt-[120px] flex-grow">
         <VendorPageClient
           partner={partnerData}
           products={products || []}

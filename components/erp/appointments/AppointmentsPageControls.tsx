@@ -113,7 +113,7 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
                         >
                             <ChevronLeftIcon size={18} />
                         </button>
-                        <div className="flex-1 md:flex-none px-2 md:px-4 text-[13px] md:text-sm font-bold text-brand-dark dark:text-dark-heading capitalize whitespace-nowrap text-center min-w-[100px] md:min-w-[140px] truncate">
+                        <div className="flex-1 md:flex-none px-2 md:px-4 text-[13px] md:text-sm font-semibold text-brand-dark dark:text-dark-heading capitalize whitespace-nowrap text-center min-w-[100px] md:min-w-[140px] truncate">
                             {currentLabel}
                         </div>
                         <button
@@ -125,12 +125,12 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
                     </div>
 
                     <div className="md:hidden flex items-center gap-2 shrink-0">
-                        <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] p-0 rounded-full bg-white dark:bg-dark-surface relative">
+                        <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] relative">
                             <FilterIcon className="w-[18px] h-[18px]" />
                             {hasActiveFilters && <div className="absolute top-2 right-2 w-2 h-2 bg-brand-primary rounded-full"></div>}
                         </Button>
-                        <Button onClick={onOpenCreate} className="w-[42px] h-[42px] p-0 rounded-full bg-brand-green hover:bg-brand-green/90 text-white shadow-sm border-none">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                        <Button onClick={onOpenCreate} className="w-[42px] h-[42px]">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
                         </Button>
                     </div>
                 </div>

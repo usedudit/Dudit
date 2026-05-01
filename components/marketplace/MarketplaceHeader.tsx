@@ -46,6 +46,7 @@ interface HeaderProps {
   onFavorite?: () => void
   isFavorite?: boolean
   simpleTitle?: string
+  hideMobile?: boolean
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -57,7 +58,8 @@ const Header: React.FC<HeaderProps> = ({
   onShare,
   onFavorite,
   isFavorite,
-  simpleTitle
+  simpleTitle,
+  hideMobile
 }) => {
   const { user, supabase, isLoading: isSupabaseLoading } = useSupabase()
 
@@ -214,6 +216,7 @@ const Header: React.FC<HeaderProps> = ({
   }, [router, setDirection])
 
   const renderMobileHeader = () => {
+    if (hideMobile) return null;
     const isProductDetail = !!productName
 
     if (simpleTitle) {

@@ -744,7 +744,7 @@ export const AppointmentSheet = ({
                                                     onClick={() => handleServiceSwap({ ...item, colorClass: group.colorClass })}
                                                     className={`relative flex justify-between items-center p-4 rounded-xl cursor-pointer border bg-transparent transition-all ${isSelected && !isEditingMode ? 'border-brand-green' : 'border-brand-border dark:border-dark-border hover:border-gray-300 dark:hover:border-gray-600'}`}
                                                 >
-                                                    <div className="absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full bg-brand-gray dark:bg-dark-border/50"></div>
+                                                    <div className="absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full bg-brand-green dark:bg-brand-green"></div>
                                                     <div className="pl-4">
                                                         <div className="font-bold text-brand-dark dark:text-dark-heading text-[15px] mb-1">{item.name}</div>
                                                         <div className="text-xs text-brand-inactive-text">
@@ -1111,7 +1111,7 @@ export const AppointmentSheet = ({
                                 className="relative flex justify-between items-center p-4 rounded-xl border border-brand-border dark:border-dark-border bg-transparent cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
                                 onClick={() => setCurrentView('services')}
                             >
-                                <div className="absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full bg-brand-gray dark:bg-dark-border/50"></div>
+                                <div className="absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full bg-brand-green dark:bg-brand-green"></div>
                                 <div className="pl-4 w-full">
                                     <div className="flex justify-between items-center">
                                         <h4 className="font-bold text-brand-dark dark:text-dark-heading text-[15px]">

@@ -975,8 +975,6 @@ export default function ProductsPage({
                 <div className="p-8 text-center text-gray-500">Funcionalidade de exportação em breve.</div>
             </DefaultModal>
 
-            </DefaultModal>
-
             <SavingStatusModal isOpen={actionModal.open} text={actionModal.text || "Salvando..."} />
         </>
     )
