@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { AlertModal, Button, Checkbox, IconPlaceholder, SavingStatusModal } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -15,7 +15,6 @@ import { BlockedIcon, CheckCircleIcon, ChevronLeftIcon, TrashIcon } from "@/lib/
 import PaymentMethodPageControls from "./PaymentMethodPageControls"
 import PaymentMethodListRow, { getPaymentTypeLabel, PaymentMethodListItem } from "./PaymentMethodListRow"
 import PaymentMethodGridCard from "./PaymentMethodGridCard"
-import { GridIcon, ListIcon } from "@/lib/icons"
 
 const PAYMENT_METHODS_VERSION_PREFIX = "payment-methods-version:"
 const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated"

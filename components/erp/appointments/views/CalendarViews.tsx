@@ -6,6 +6,7 @@ import { Button, Dropdown, DropdownItem, Badge, Checkbox as FormCheckbox } from 
 import { Appointment, LayoutAppointment, StaffMember, PopoverState } from '../types';
 import { getAppointmentStyle, getEndTime, formatDateStr, getWeekDays, arrangeAppointments, formatDuration, isMultiDay, getMultiDayStyle, parseLocalDate } from '../utils';
 import { AppointmentListRow } from '../AppointmentListRow';
+import { AppointmentListCard } from '../AppointmentListCard';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 
 // --- HELPER COMPONENTS ---
@@ -141,36 +142,14 @@ export const MobileView = ({
             <AnimatePresence mode='wait'>
                 <motion.div key={currentDate.toISOString()} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="flex-1 overflow-y-auto px-4 pb-20 space-y-3">
                     {selectedDateApps.length > 0 ? (
-                        <div className="overflow-x-auto pb-4 custom-scrollbar bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border mt-2">
-                            <table className="w-full text-left border-separate border-spacing-0 min-w-[800px]">
-                                <thead>
-                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                        <th className="py-3 pl-6 pr-3 w-[48px] bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
-                                        </th>
-                                        {columns?.map((column: any) => (
-                                            <th
-                                                key={column.id}
-                                                className={`py-3 px-3 text-[11px] uppercase tracking-wider font-bold text-brand-inactive-text dark:text-dark-body whitespace-nowrap bg-brand-gray dark:bg-dark-border/50 ${column.align === "center" ? "text-center" : column.align === "right" ? "text-right" : "text-left"}`}
-                                                style={{ width: column.width, minWidth: column.minWidth }}
-                                            >
-                                                {column.label}
-                                            </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {selectedDateApps.map((apt: Appointment) => (
-                                        <AppointmentListRow
-                                            key={apt.id}
-                                            appointment={apt}
-                                            columns={columns}
-                                            selected={false}
-                                            onSelect={() => {}}
-                                            onView={handleOpenView}
-                                        />
-                                    ))}
-                                </tbody>
-                            </table>
+                        <div className="space-y-3 mt-2">
+                            {selectedDateApps.map((apt: Appointment) => (
+                                <AppointmentListCard
+                                    key={apt.id}
+                                    appointment={apt}
+                                    onClick={handleOpenView}
+                                />
+                            ))}
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center py-20 text-center">

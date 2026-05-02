@@ -22,7 +22,7 @@ import {
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Input, Button, Checkbox, MoneyInput, Badge, Tooltip } from '@/components/reusable';
-import { ReceiptContent, PaymentMethodCard, SplitPaymentCard, Numpad } from './POSComponents';
+import { ReceiptContent, PaymentMethodCard, SplitPaymentCard, Numpad } from '../POSComponents';
 import { calculatePaymentMethodAmountsAction, getPaymentMethodsAction, previewSplitPaymentBreakdownAction } from '@/app/actions/erp/payment-methods';
 import { useToast } from "@/components/ui/use-toast";
 import { cn, formatCurrency, formatDate, formatNumber, formatTime } from '@/lib/utils';

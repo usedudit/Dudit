@@ -307,30 +307,30 @@ export function ProductDetailsPageClient({
   const handleBuyNow = useCallback(() => {
     if (!userId) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname))
     const checkoutData = {
-        source: "product",
-        partnerId: partner.id,
-        products: [{
-            id: product.id,
-            name: `${product.name} ${selectedVariant?.variant_name || ""}`,
-            price: pricing.current,
-            quantity,
-            image: productImages[activeImgIndex],
-            variant: selectedVariant?.variant_name,
-            availabilityValue: Number(product.availability_value || 0),
-            availabilityUnit: product.availability_unit || "Minutos",
-        }],
-        partnerInfo: {
-            address: partner.address || {},
-            paymentMethods: partner.paymentMethods || ["Dinheiro"],
-            mpConnected: !!partner.mp_user_id,
-            mpPublicKey: partner.mp_public_key,
-            store_name: partner.store_name,
-            openingHours: partner.openingHours || null,
-        },
-        itemId: selectedVariant?.id || product.id,
-        itemType: "product"
+      source: "product",
+      partnerId: partner.id,
+      products: [{
+        id: product.id,
+        name: `${product.name} ${selectedVariant?.variant_name || ""}`,
+        price: pricing.current,
+        quantity,
+        image: productImages[activeImgIndex],
+        variant: selectedVariant?.variant_name,
+        availabilityValue: Number(product.availability_value || 0),
+        availabilityUnit: product.availability_unit || "Minutos",
+      }],
+      partnerInfo: {
+        address: partner.address || {},
+        paymentMethods: partner.paymentMethods || ["Dinheiro"],
+        mpConnected: !!partner.mp_user_id,
+        mpPublicKey: partner.mp_public_key,
+        store_name: partner.store_name,
+        openingHours: partner.openingHours || null,
+      },
+      itemId: selectedVariant?.id || product.id,
+      itemType: "product"
     }
-    
+
     sessionStorage.setItem("checkout_session", JSON.stringify(checkoutData))
     router.push("/checkout")
   }, [userId, router, partner, product, selectedVariant, pricing.current, quantity, productImages, activeImgIndex])
@@ -607,12 +607,6 @@ export function ProductDetailsPageClient({
         <div className="flex items-center gap-2">
           <button className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
             <HeartIcon size={20} />
-          </button>
-          <button
-            onClick={() => setShowShareModal(true)}
-            className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors"
-          >
-            <ShareIcon size={20} />
           </button>
         </div>
       </div>

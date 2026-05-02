@@ -97,12 +97,8 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
     return (
         <>
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
-                <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar">
-                    <Button variant="outline" className="w-[42px] h-[42px] p-0 md:hidden shrink-0 rounded-full" onClick={onToday}>
-                        <ReloadIcon size={18} />
-                    </Button>
-
-                    <Button variant="outline" className="hidden md:inline-flex" onClick={onToday}>
+                <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto md:overflow-visible no-scrollbar pb-1 md:pb-0 shrink-0">
+                    <Button variant="outline" className="h-[42px] px-4 shrink-0" onClick={onToday}>
                         Hoje
                     </Button>
 

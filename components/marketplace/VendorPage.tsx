@@ -290,13 +290,13 @@ const InfoTab = ({ partner, stats }: any) => {
     const hasMercadoPago = partner.businessInfo?.mercado_pago_connected || false
 
     const displayPaymentIcons = []
-    if (hasPix) displayPaymentIcons.push({ id: "pix", icon: "https://img.dudit.com.br/static/payment/pix.png" })
-    if (hasCash) displayPaymentIcons.push({ id: "dinheiro", icon: "https://img.dudit.com.br/static/payment/dinheiro.png" })
+    if (hasPix) displayPaymentIcons.push({ id: "pix", icon: "https://img.dudit.com.br/static/icons/payments/Pix.png" })
+    if (hasCash) displayPaymentIcons.push({ id: "dinheiro", icon: "https://img.dudit.com.br/static/icons/payments/Pix.png" })
     if (hasCredit || hasDebit) {
-        displayPaymentIcons.push({ id: "mastercard", icon: "https://img.dudit.com.br/static/payment/mastercard.png" })
-        displayPaymentIcons.push({ id: "visa", icon: "https://img.dudit.com.br/static/payment/visa.png" })
+        displayPaymentIcons.push({ id: "mastercard", icon: "https://img.dudit.com.br/static/icons/payments/Mastercard.png" })
+        displayPaymentIcons.push({ id: "visa", icon: "https://img.dudit.com.br/static/icons/payments/Visa.png" })
     }
-    if (hasMercadoPago) displayPaymentIcons.push({ id: "mercadopago", icon: "https://img.dudit.com.br/static/payment/mercadopago.png" })
+    if (hasMercadoPago) displayPaymentIcons.push({ id: "mercadopago", icon: "https://img.dudit.com.br/static/icons/payments/MercadoPago.png" })
 
     return (
         <div className="pb-10 space-y-8 animate-fade-in">
@@ -392,7 +392,7 @@ const InfoTab = ({ partner, stats }: any) => {
                                 <div className="flex flex-wrap gap-2">
                                     {debitoBrands.map((brand: any) => (
                                         <div key={brand} className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
-                                            <img src={`https://img.dudit.com.br/static/payment/${brand}.png`} alt={brand} className="h-4 object-contain" />
+                                            <img src={`https://img.dudit.com.br/static/icons/payments/${brand}.png`} alt={brand} className="h-4 object-contain" />
                                             <span className="text-[14px] text-brand-dark capitalize">{brand}</span>
                                         </div>
                                     ))}
@@ -406,7 +406,7 @@ const InfoTab = ({ partner, stats }: any) => {
                                 <div className="flex flex-wrap gap-2">
                                     {creditoBrands.map((brand: any) => (
                                         <div key={brand} className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
-                                            <img src={`https://img.dudit.com.br/static/payment/${brand}.png`} alt={brand} className="h-4 object-contain" />
+                                            <img src={`https://img.dudit.com.br/static/icons/payments/${brand}.png`} alt={brand} className="h-4 object-contain" />
                                             <span className="text-[14px] text-brand-dark capitalize">{brand}</span>
                                         </div>
                                     ))}
@@ -420,19 +420,19 @@ const InfoTab = ({ partner, stats }: any) => {
                                 <div className="flex flex-wrap gap-2">
                                     {hasPix && (
                                         <div className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
-                                            <img src="https://img.dudit.com.br/static/payment/pix.png" alt="Pix" className="h-4 object-contain" />
+                                            <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="h-4 object-contain" />
                                             <span className="text-[14px] text-brand-dark">Pix</span>
                                         </div>
                                     )}
                                     {hasCash && (
                                         <div className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
-                                            <img src="https://img.dudit.com.br/static/payment/dinheiro.png" alt="Dinheiro" className="h-4 object-contain" />
+                                            <img src="https://img.dudit.com.br/static/icons/payments/Dinheiro.png" alt="Dinheiro" className="h-4 object-contain" />
                                             <span className="text-[14px] text-brand-dark">Dinheiro</span>
                                         </div>
                                     )}
                                     {hasMercadoPago && (
                                         <div className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
-                                            <img src="https://img.dudit.com.br/static/payment/mercadopago.png" alt="Mercado Pago" className="h-4 object-contain" />
+                                            <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="h-4 object-contain" />
                                             <span className="text-[14px] text-brand-dark">Mercado Pago</span>
                                         </div>
                                     )}

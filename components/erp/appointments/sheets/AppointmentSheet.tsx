@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, ChevronDownIcon, CalendarIcon, CheckIcon, MoreHorizontalIcon, EditIcon, ClockIcon, RepeatIcon, SaveIcon, ShoppingBagIcon, ArrowRightIcon, FileIcon } from '@/lib/icons';
-import { Button, Input as FormInput, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder } from '@/components/reusable';
+import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, ChevronDownIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon } from '@/lib/icons';
+import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Badge } from '@/components/reusable';
 import { getAvailableTimeSlotsAction } from '@/app/actions/erp/appointments';
 import { usePermissions } from '@/lib/permission-context';
 import { RecurrenceView, ActivityLog } from '../Shared';
@@ -11,8 +11,9 @@ import { formatDateStr, formatDuration, parseLocalDate } from '../utils';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { useMediaQuery } from '@/components/erp/hooks';
 import BottomSheet from '@/components/BottomSheet';
-import SelectCustomerSheet from '@/components/erp/clientes/SelectCustomerSheet';
+import Portal from '@/components/Portal';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
+import PaymentSheet from './PaymentSheet';
 
 export const AppointmentSheet = ({
     onClose,
@@ -25,13 +26,12 @@ export const AppointmentSheet = ({
     defaultDate,
     initialDraft,
     initialStaffId,
-    onCheckout,
-    onViewSale,
     onStatusChangeRequest,
     servicesCatalog,
     clientsCatalog,
     staffCatalog,
-    isSaving
+    isSaving,
+    partnerId
 }: {
     onClose: () => void,
     mode: 'create' | 'view',
@@ -49,7 +49,8 @@ export const AppointmentSheet = ({
     servicesCatalog?: any[],
     clientsCatalog?: any[],
     staffCatalog?: any[],
-    isSaving?: boolean
+    isSaving?: boolean,
+    partnerId?: string,
 }) => {
     const servicesSource = servicesCatalog || [];
     const clientsSource = clientsCatalog || [];
@@ -63,7 +64,6 @@ export const AppointmentSheet = ({
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [serviceToDeleteIndex, setServiceToDeleteIndex] = useState<number | null>(null);
     const [isUnsavedModalOpen, setIsUnsavedModalOpen] = useState(false);
-    const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false);
 
     const isMobile = useMediaQuery("(max-width: 768px)");
 
@@ -137,7 +137,7 @@ export const AppointmentSheet = ({
     }, [clientSearch, clientsSource]);
 
     // Determine if appointment is paid or absence
-    const isPaid = status === 'Paid' || status === 'Pago' || status === 'Partially Paid';
+    const isPaid = ['paid', 'pago', 'partially paid', 'parcialmente pago'].includes((status || '').toLowerCase());
 
     // Helper to determine if we need Range Picker
     const needsRangePicker = useMemo(() => {
@@ -196,15 +196,19 @@ export const AppointmentSheet = ({
                     }
                 }
 
-                return {
-                    id: 990 + index,
-                    name: name,
-                    // Use catalog values if found, otherwise guess/split (fallback)
-                    price: catalogService ? catalogService.price : 0,
-                    duration: catalogService ? catalogService.duration : Math.floor(appointment.duration / serviceNames.length),
+                return catalogService ? {
+                    ...catalogService,
+                    price: catalogService.price,
                     staff: appointment.staff,
                     staffId: appointment.staffId,
-                    colorClass: catalogService ? catalogService.colorClass : 'bg-purple-500',
+                } : {
+                    id: String(990 + index),
+                    name: name,
+                    price: 0,
+                    duration: Math.floor(appointment.duration / serviceNames.length),
+                    staff: appointment.staff,
+                    staffId: appointment.staffId,
+                    colorClass: 'bg-purple-500',
                     pricingUnit: appointment.pricingUnit || 'Por Serviço'
                 };
             });
@@ -263,8 +267,8 @@ export const AppointmentSheet = ({
                     // If returning from draft (calendar selection), go to Summary
                     setCurrentView('summary');
                 } else {
-                    // Start at Client
-                    setCurrentView('client');
+                    // Start at Services
+                    setCurrentView('services');
                 }
             }
         }
@@ -374,11 +378,7 @@ export const AppointmentSheet = ({
 
     // Navigation Flow Logic
     const handleNext = () => {
-        if (currentView === 'client') {
-            if (!selectedClient) return;
-            setCurrentView('services');
-        }
-        else if (currentView === 'services') {
+        if (currentView === 'services') {
             if (selectedServices.length === 0) return;
 
             // If adding more services, go straight back to summary
@@ -386,9 +386,13 @@ export const AppointmentSheet = ({
                 setIsAddingMore(false);
                 setCurrentView('summary');
             } else {
-                // Normal Flow: Services -> Datetime
-                setCurrentView('datetime');
+                // Normal Flow: Services -> Client
+                setCurrentView('client');
             }
+        }
+        else if (currentView === 'client') {
+            if (!selectedClient) return;
+            setCurrentView('datetime');
         }
         else if (currentView === 'datetime') {
             // Validation for range picker
@@ -503,8 +507,8 @@ export const AppointmentSheet = ({
 
     const handleBack = () => {
         // Reverse Flow
-        if (currentView === 'services') setCurrentView('client');
-        else if (currentView === 'datetime') setCurrentView('services');
+        if (currentView === 'client') setCurrentView('services');
+        else if (currentView === 'datetime') setCurrentView('client');
         else if (currentView === 'summary') {
             if (mode === 'create') {
                 // Creating: Go back to Datetime
@@ -581,10 +585,19 @@ export const AppointmentSheet = ({
         if (s === 'ausência' || s === 'absent' || s === 'ausencia') return 'bg-red-500';
         if (s === 'cancelado' || s === 'canceled' || s === 'cancelar') return 'bg-red-600';
         if (s === 'iniciado' || s === 'in progress') return 'bg-[#003d32]';
-        if (s === 'pago' || s === 'paid') return 'bg-green-600';
+        if (s === 'pago' || s === 'paid' || s === 'parcialmente pago') return 'bg-green-600';
         if (s === 'finalizado' || s === 'finished') return 'bg-gray-700';
         return 'bg-blue-600';
     }
+    const [isPaymentSheetOpen, setIsPaymentSheetOpen] = useState(false);
+
+    const VIEW_STATUS_OPTIONS = [
+        { value: 'Reservado', label: 'Reservado' },
+        { value: 'Confirmado', label: 'Confirmado' },
+        { value: 'Aguardando', label: 'Aguardando' },
+        { value: 'Iniciado', label: 'Iniciado' },
+        { value: 'Ausência', label: 'Ausência' },
+    ];
 
     const dates = useMemo(() => {
         const days = [];
@@ -772,7 +785,7 @@ export const AppointmentSheet = ({
                     {currentView === 'client' && (
                         <motion.div key="client" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-0 -mx-6 -mt-6">
                             <div className="z-10 shrink-0 border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface sticky top-0">
-                                <FormInput
+                                <Input
                                     label=""
                                     name="customerSearch"
                                     placeholder="Buscar por nome, email ou telefone..."
@@ -780,6 +793,7 @@ export const AppointmentSheet = ({
                                     onChange={(e) => setClientSearch(e.target.value)}
                                     prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                     className="mb-0"
+                                    variant="full-rounded"
                                 />
                             </div>
 
@@ -789,12 +803,13 @@ export const AppointmentSheet = ({
                                     return (
                                         <div
                                             key={customer.id}
-                                            role="button"
-                                            onClick={() => {
-                                                setSelectedClient(customer);
-                                                handleNext();
-                                            }}
-                                            className={`group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40`}
+                                            role={isSelected ? undefined : "button"}
+                                            tabIndex={isSelected ? undefined : 0}
+                                            onClick={!isSelected ? () => { setSelectedClient(customer); handleNext(); } : undefined}
+                                            className={`group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border ${isSelected
+                                                ? "bg-brand-primary/5 dark:bg-brand-primary/10"
+                                                : "cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40"
+                                                }`}
                                         >
                                             <UserProfileImage
                                                 fullName={customer.name || "Cliente"}
@@ -806,6 +821,11 @@ export const AppointmentSheet = ({
                                                     <span className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
                                                         {customer.name}
                                                     </span>
+                                                    {isSelected && (
+                                                        <Badge variant="green" className="whitespace-nowrap scale-90 shrink-0">
+                                                            Selecionado
+                                                        </Badge>
+                                                    )}
                                                 </div>
                                                 <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                                                     ID #{customer.id ? customer.id.substring(0, 5).toUpperCase() : "-"}
@@ -815,9 +835,11 @@ export const AppointmentSheet = ({
                                                 </p>
                                             </div>
                                             <div className="flex shrink-0 items-center gap-2">
-                                                <div className="flex h-8 w-8 items-center justify-center text-brand-inactive-text opacity-0 transition-opacity group-hover:opacity-100">
-                                                    <PlusIcon size={18} />
-                                                </div>
+                                                {!isSelected && (
+                                                    <div className="flex h-8 w-8 items-center justify-center text-brand-inactive-text opacity-0 transition-opacity group-hover:opacity-100">
+                                                        <PlusIcon size={18} />
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     )
@@ -1016,24 +1038,17 @@ export const AppointmentSheet = ({
                                         </div>
                                         {/* Status Badge Dropdown */}
                                         <Dropdown
-                                            width="w-40"
-                                            align="right"
-                                            showChevron={false}
+                                            width="w-[140px]"
                                             trigger={
-                                                <button className="px-3 py-1.5 rounded-full border border-white/30 text-xs font-bold flex items-center gap-2 cursor-pointer bg-white/10 hover:bg-white/20 transition-colors">
-                                                    {status} <ChevronDownIcon size={12} />
+                                                <button disabled={isPaid} className={`flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-full text-white text-sm font-bold transition-colors ${isPaid ? 'opacity-70 cursor-not-allowed' : ''}`}>
+                                                    {status}
+                                                    {!isPaid && <ChevronDownIcon size={16} />}
                                                 </button>
                                             }
                                         >
-                                            <DropdownItem onClick={() => handleStatusChange('Reservado')}>Reservado</DropdownItem>
-                                            <DropdownItem onClick={() => handleStatusChange('Confirmado')}>Confirmado</DropdownItem>
-                                            <DropdownItem onClick={() => handleStatusChange('Aguardando')}>Aguardando</DropdownItem>
-                                            <DropdownItem onClick={() => handleStatusChange('Iniciado')}>Iniciado</DropdownItem>
-                                            <div className="h-px bg-gray-100 dark:bg-dark-border my-1"></div>
-                                            <DropdownItem onClick={() => handleStatusChange('Pago')}>Pago</DropdownItem>
-                                            <DropdownItem onClick={() => handleStatusChange('Pago Parcialmente')}>Pago Parcialmente</DropdownItem>
-                                            <DropdownItem onClick={() => handleStatusChange('Ausência')}>Ausência</DropdownItem>
-                                            <DropdownItem onClick={() => handleStatusChange('Cancelado')}>Cancelado</DropdownItem>
+                                            {VIEW_STATUS_OPTIONS.map(opt => (
+                                                <DropdownItem key={opt.value} onClick={() => setStatus(opt.value)}>{opt.label}</DropdownItem>
+                                            ))}
                                         </Dropdown>
                                     </div>
                                 </div>
@@ -1046,18 +1061,16 @@ export const AppointmentSheet = ({
                                 </div>
                                 {selectedClient && (
                                     <div className="flex items-center justify-between py-2 px-1">
-                                        <div className="flex items-center gap-4">
-                                            <UserProfileImage
-                                                fullName={selectedClient.name}
-                                                imageUrl={selectedClient.avatar_url}
-                                                className="w-12 h-12"
-                                            />
-                                            <div>
-                                                <div className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">{selectedClient.name}</div>
-                                                <div className="text-xs text-brand-inactive-text">{selectedClient.email || 'Cliente'}</div>
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <UserProfileImage fullName={selectedClient.name} imageUrl={selectedClient.avatar_url} className="w-10 h-10" />
+                                                <div className="flex flex-col">
+                                                    <div className="font-bold text-brand-dark dark:text-dark-heading leading-tight">{selectedClient.name}</div>
+                                                    <div className="text-xs text-brand-inactive-text">{selectedClient.email || 'Cliente'}</div>
+                                                </div>
                                             </div>
+                                            {!isPaid && <Button variant="link" className="font-bold" onClick={() => setCurrentView('client')}>Alterar</Button>}
                                         </div>
-                                        <Button variant="link" className="font-bold" onClick={() => setIsCustomerSheetOpen(true)}>Alterar</Button>
                                     </div>
                                 )}
                             </div>
@@ -1075,19 +1088,22 @@ export const AppointmentSheet = ({
                                             key={idx}
                                             // Pass individual service start time for display
                                             service={{ ...service, startTime: getServiceTimeRange(idx).split(' - ')[0] }}
-                                            onEdit={() => handleServiceEdit(idx)}
-                                            onRemove={() => handleRemoveServiceRequest(idx)}
+                                            onEdit={!isPaid ? () => handleServiceEdit(idx) : undefined}
+                                            onRemove={!isPaid ? () => handleRemoveServiceRequest(idx) : undefined}
                                             // Pass formatted time range
                                             timeRange={getServiceTimeRange(idx)}
                                         />
                                     ))}
                                 </div>
-                                <button
-                                    onClick={handleAddMoreService}
-                                    className="mt-4 text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2 hover:opacity-70 ml-1"
-                                >
-                                    <PlusIcon size={18} /> Adicionar serviço
-                                </button>
+                                {!isPaid && (
+                                    <Button
+                                        variant="link"
+                                        onClick={handleAddMoreService}
+                                        className="mt-4"
+                                    >
+                                        <PlusIcon size={18} /> Adicionar serviço
+                                    </Button>
+                                )}
                             </div>
 
                             {/* Total Row */}
@@ -1123,7 +1139,7 @@ export const AppointmentSheet = ({
                             </div>
 
                             <div className="space-y-4">
-                                <FormInput
+                                <Input
                                     label="Preço do serviço"
                                     name="price"
                                     prefix="BRL"
@@ -1131,7 +1147,7 @@ export const AppointmentSheet = ({
                                     onChange={(e) => updateEditingService('price', Number(e.target.value))}
                                 />
 
-                                <FormInput
+                                <Input
                                     label="Duração (minutos)"
                                     name="duration"
                                     type="number"
@@ -1203,10 +1219,9 @@ export const AppointmentSheet = ({
                         <motion.div key="notes" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
                             <div className="space-y-4">
                                 <FormTextarea
-                                    label="Notas Internas"
+                                    label="Observações"
                                     name="notes"
-                                    rows={8}
-                                    placeholder="Adicione notas sobre o agendamento..."
+                                    placeholder="Adicione observações ao agendamento..."
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
                                 />
@@ -1248,45 +1263,15 @@ export const AppointmentSheet = ({
                             </div>
                         ) : (
                             /* VIEW MODE FOOTER */
-                            <div className="flex gap-3">
-                                <Dropdown
-                                    align="left"
-                                    width="w-56"
-                                    showChevron={false}
-                                    trigger={
-                                        <Button variant="outline" className="h-[48px] w-12 p-0 rounded-xl">
-                                            <MoreHorizontalIcon size={20} />
-                                        </Button>
-                                    }
-                                >
-                                    <DropdownItem onClick={() => setCurrentView('notes')} className="gap-3 font-medium"><FileIcon size={16} /> Notas</DropdownItem>
-                                    <DropdownItem onClick={() => setCurrentView('recurrence')} className="gap-3 font-medium"><RepeatIcon size={16} /> Editar repetição</DropdownItem>
-                                    <DropdownItem onClick={() => setCurrentView('activity')} className="gap-3 font-medium"><ClockIcon size={16} /> Ver histórico</DropdownItem>
-                                    <div className="h-px bg-gray-100 dark:bg-dark-border my-1"></div>
-                                    {isPaid && (
-                                        <DropdownItem onClick={onViewSale} className="gap-3 font-medium"><ShoppingBagIcon size={16} /> Ver venda</DropdownItem>
-                                    )}
-                                    <DropdownItem className="gap-3 font-medium"><EditIcon size={16} /> Editar</DropdownItem>
-                                    <div className="h-px bg-gray-100 dark:bg-dark-border my-1"></div>
-                                    <DropdownItem onClick={() => handleStatusChange('Cancelado')} className="gap-3 font-medium text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"><XIcon size={16} /> Cancelar</DropdownItem>
-                                </Dropdown>
-
-                                <Button
-                                    variant="default"
-                                    className="flex-1 h-[48px]"
-                                    onClick={handleSaveChanges}
-                                    disabled={isSaving}
-                                >
-                                    {isSaving ? (
-                                        <span className="flex items-center gap-2">
-                                            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                            Salvando...
-                                        </span>
-                                    ) : (
-                                        <><SaveIcon size={18} className="mr-2" /> Salvar Alterações</>
-                                    )}
+                            isPaid ? (
+                                <Button variant="default" className="w-full font-bold" onClick={handleSaveChanges}>
+                                    Salvar Observações
                                 </Button>
-                            </div>
+                            ) : (
+                                <Button variant="default" className="w-full font-bold bg-brand-green hover:bg-brand-green/90 border-brand-green" onClick={() => setIsPaymentSheetOpen(true)}>
+                                    Checkout
+                                </Button>
+                            )
                         )}
                     </div>
                 )
@@ -1318,30 +1303,44 @@ export const AppointmentSheet = ({
                 isDestructive
             />
 
-            <SelectCustomerSheet
-                isOpen={isCustomerSheetOpen}
-                onClose={() => setIsCustomerSheetOpen(false)}
-                onSelect={(customer) => {
-                    setSelectedClient(customer);
-                    setIsCustomerSheetOpen(false);
-                }}
-                partnerId={appointment?.partnerId || ""}
-                selectedCustomerId={selectedClient?.id}
-                title="Selecionar Cliente"
-            />
-
-            {isMobile ? (
-                <BottomSheet isOpen={true} onClose={handleCloseAttempt}>
-                    {SheetContent}
-                </BottomSheet>
-            ) : (
-                <div className="fixed inset-0 z-[60] flex justify-end">
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCloseAttempt} />
-                    <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className="relative w-full max-w-md">
+            {!isPaymentSheetOpen && (
+                isMobile ? (
+                    <BottomSheet isOpen={true} onClose={handleCloseAttempt}>
                         {SheetContent}
-                    </motion.div>
-                </div>
+                    </BottomSheet>
+                ) : (
+                    <Portal>
+                        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={handleCloseAttempt} />
+                        <motion.div
+                            initial={{ x: '100%', opacity: 0.5 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            exit={{ x: '100%', opacity: 0.5 }}
+                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                            className="fixed inset-y-0 right-0 z-50 w-full max-w-sm flex flex-col bg-white shadow-2xl dark:bg-dark-surface overflow-hidden"
+                        >
+                            {SheetContent}
+                        </motion.div>
+                    </Portal>
+                )
             )}
+
+            <AnimatePresence>
+                {isPaymentSheetOpen && (
+                    <PaymentSheet
+                        isOpen={isPaymentSheetOpen}
+                        onClose={() => setIsPaymentSheetOpen(false)}
+                        appointment={appointment}
+                        partnerId={partnerId || ''}
+                        onSuccess={() => {
+                            setIsPaymentSheetOpen(false);
+                            onClose();
+                        }}
+                        cart={selectedServices.map(s => ({ ...s, qty: 1, productId: s.id }))}
+                        total={calculatedPrice}
+                        customer={{ id: selectedClient?.id, name: selectedClient?.name }}
+                    />
+                )}
+            </AnimatePresence>
         </>
     )
 }

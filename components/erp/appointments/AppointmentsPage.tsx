@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
     PlusIcon,
 } from '@/lib/icons';
-import { Button, Checkbox } from '@/components/reusable';
+import { Button, Checkbox, Pagination } from '@/components/reusable';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import {
@@ -663,7 +663,7 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
                                 onOpenCreate={() => handleOpenCreate()}
                             />
 
-                            <div className="flex-1 bg-white dark:bg-dark-surface md:border border-brand-border dark:border-dark-border md:rounded-2xl overflow-hidden h-full">
+                            <div className="flex-1 bg-white dark:bg-dark-surface md:rounded-2xl overflow-hidden h-full">
 
                                 <AnimatePresence mode="wait">
                                     {viewMode === 'calendar' ? (
@@ -815,21 +815,12 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
                                                 </div>
 
                                                 {totalPages > 1 && (
-                                                    <div className="p-4 border-t border-brand-border dark:border-dark-border bg-gray-50/50 dark:bg-zinc-900/30">
-                                                        <div className="flex items-center justify-center gap-2">
-                                                            {Array.from({ length: totalPages }, (_, index) => {
-                                                                const page = index + 1;
-                                                                return (
-                                                                    <button
-                                                                        key={page}
-                                                                        onClick={() => setCurrentPage(page)}
-                                                                        className={`min-w-9 h-9 px-3 rounded-full text-sm font-medium transition-colors ${currentPage === page ? "bg-brand-dark text-white dark:bg-white dark:text-brand-dark" : "text-brand-inactive-text hover:bg-brand-gray dark:hover:bg-dark-border"}`}
-                                                                    >
-                                                                        {page}
-                                                                    </button>
-                                                                );
-                                                            })}
-                                                        </div>
+                                                    <div className="mt-4 pb-6">
+                                                        <Pagination
+                                                            currentPage={currentPage}
+                                                            totalPages={totalPages}
+                                                            onPageChange={setCurrentPage}
+                                                        />
                                                     </div>
                                                 )}
                                             </div>
@@ -884,6 +875,7 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
                                 servicesCatalog={groupedServices}
                                 staffCatalog={realStaffMembers}
                                 clientsCatalog={realClients}
+                                partnerId={partnerId}
                                 isSaving={isSaving}
                             />
                         )}

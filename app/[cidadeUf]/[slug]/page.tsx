@@ -4,6 +4,8 @@ import MarketplaceHeader from '@/components/marketplace/MarketplaceHeader'
 import MarketplaceFooter from '@/components/marketplace/MarketplaceFooter'
 import { ItemCard } from '@/components/marketplace/shared-components'
 import Link from 'next/link'
+import { redirect, permanentRedirect } from 'next/navigation'
+import { isValidCitySlug } from '@/lib/validation/city'
 
 export const revalidate = 86400 // Cache 24h
 
@@ -33,7 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       follow: true,
     },
     alternates: {
-      canonical: `https://dudit.com.br/${cidadeUf}/${slug}`,
+      canonical: `https://dudit.com.br/${cidadeUf.toLowerCase()}/${slug.toLowerCase()}`,
     },
     openGraph: {
       title: `${termFormatted} em ${cityFormatted} | Dudit`,
@@ -46,6 +48,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CityTermPage({ params }: Props) {
   const { cidadeUf, slug } = await params
+
+  // Redirect legacy /sp/sao-paulo to /sao-paulo-sp
+  if (cidadeUf.length === 2) {
+    permanentRedirect(`/${slug}-${cidadeUf}`)
+  }
+
+  // Redirect invalid city to /explorar
+  if (!isValidCitySlug(cidadeUf)) {
+    redirect(`/explorar?q=${slug}`)
+  }
+
+  // Canonical lowercase redirect
+  if (cidadeUf !== cidadeUf.toLowerCase() || slug !== slug.toLowerCase()) {
+    permanentRedirect(`/${cidadeUf.toLowerCase()}/${slug.toLowerCase()}`)
+  }
 
   const cityFormatted = cidadeUf.split('-').slice(0, -1).join(' ').replace(/\b\w/g, l => l.toUpperCase())
   const stateFormatted = cidadeUf.split('-').pop()?.toUpperCase() || ''

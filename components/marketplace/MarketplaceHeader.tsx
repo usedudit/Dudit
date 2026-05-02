@@ -24,6 +24,7 @@ import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { getSearchSuggestionsBucket } from "@/app/actions/marketplace/suggestions"
 import { useUserSession } from "@/hooks/use-user-session"
 import { useTransitionDirection } from "@/providers/transition-provider"
+import { useLocationRedirect } from "@/hooks/use-location-redirect"
 
 interface HeaderProps {
   setView?: (
@@ -88,6 +89,7 @@ const Header: React.FC<HeaderProps> = ({
   const [isMobileCategoryMenuOpen, setIsMobileCategoryMenuOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const { requestLocation, loading: isLocationLoading, error: locationError } = useLocationRedirect()
 
   // DERIVED VALUES - useMemo instead of useState+useEffect to avoid extra re-render
   const { userName, fullName } = useMemo(() => {
@@ -342,12 +344,13 @@ const Header: React.FC<HeaderProps> = ({
 
           {/* Delivery Info */}
           {(!isScrolled && showDeliveryInfo && !isProductDetail) && (
-            <div className="flex items-center gap-1.5 px-1 mt-2.5 text-brand-inactive-text cursor-pointer w-full overflow-hidden">
+            <div onClick={requestLocation} className="flex items-center gap-1.5 px-1 mt-2.5 text-brand-inactive-text cursor-pointer w-full overflow-hidden hover:opacity-80 transition-opacity">
               <MapPinIcon size={14} className="shrink-0 text-white" />
               <span className="text-[12px] font-normal truncate leading-tight ml-0.5 text-white">
-                {userLocation ? `Enviar para ${userLocation}` : "Informe o endereço"}
+                {isLocationLoading ? "Buscando..." : userLocation ? `Enviar para ${userLocation}` : "Usar minha localização"}
               </span>
-              <ChevronRightIcon size={14} className="opacity-60 shrink-0 mt-0.5 text-white" />
+              {!isLocationLoading && <ChevronRightIcon size={14} className="opacity-60 shrink-0 mt-0.5 text-white" />}
+              {locationError && <span className="text-[10px] text-red-400 ml-auto truncate">{locationError}</span>}
             </div>
           )}
         </div>
@@ -455,7 +458,7 @@ const Header: React.FC<HeaderProps> = ({
             />
           </Link>
 
-          <div className="flex flex-col justify-center items-start text-white hover:bg-white/10 rounded-md px-2 py-1.5 cursor-pointer min-w-[140px] transition-colors -ml-1">
+          <div onClick={requestLocation} className="flex flex-col justify-center items-start text-white hover:bg-white/10 rounded-md px-2 py-1.5 cursor-pointer min-w-[140px] transition-colors -ml-1">
             {userLocation ? (
               <span className="text-[11px] text-gray-300 leading-none ml-4 block mb-0.5">
                 Enviar para {userName}
@@ -464,9 +467,10 @@ const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center gap-1">
               <MapPinIcon size={16} className="text-white shrink-0" strokeWidth={2.5} />
               <span className="text-[13px] font-bold leading-none truncate max-w-[160px]">
-                {userLocation || "Informe o endereço"}
+                {isLocationLoading ? "Buscando..." : userLocation || "Usar localização"}
               </span>
             </div>
+            {locationError && <span className="text-[10px] text-red-400 leading-tight mt-0.5 ml-4">{locationError}</span>}
           </div>
 
           <div className="flex-1 relative z-[110] mx-4 h-[42px]" ref={searchContainerRef}>

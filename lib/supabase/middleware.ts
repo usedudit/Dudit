@@ -49,6 +49,59 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // ============================================================================
+  // CUSTOM EXPLORE REDIRECTS (SEO & Navigation Simplification)
+  // ============================================================================
+  const segments = pathname.split('/').filter(Boolean)
+  const isSystemPath = 
+    PUBLIC_PATHS.some(p => pathname.startsWith(p)) || 
+    ["/institucional", "/erp", "/account", "/auth", "/cart", "/perfil", "/pedidos", "/api", "/dashboard", "/payment", "/ddt-admin", "/vitrine", "/produto"].some(p => pathname.startsWith(p));
+
+  // Apenas intercepta paths de 1 ou 2 segmentos que não são de sistema
+  if (!isSystemPath && (segments.length === 1 || segments.length === 2)) {
+      const [seg1, seg2] = segments;
+
+      if (!seg1.includes('.')) {
+          const VALID_UFS = new Set(['ac', 'al', 'ap', 'am', 'ba', 'ce', 'df', 'es', 'go', 'ma', 'mt', 'ms', 'mg', 'pa', 'pb', 'pr', 'pe', 'pi', 'rj', 'rn', 'rs', 'ro', 'rr', 'sc', 'sp', 'se', 'to']);
+          const isCitySlug = (slug: string) => {
+              const match = slug.match(/-([a-z]{2})$/i);
+              return match ? VALID_UFS.has(match[1].toLowerCase()) : false;
+          };
+
+          let redirectUrl = new URL('/explorar', request.url);
+          let shouldRedirect = false;
+
+          if (segments.length === 1) {
+              if (isCitySlug(seg1)) {
+                  redirectUrl.searchParams.set('cidade', seg1);
+                  shouldRedirect = true;
+              } else {
+                  redirectUrl.searchParams.set('q', seg1);
+                  shouldRedirect = true;
+              }
+          } else if (segments.length === 2) {
+              if (isCitySlug(seg1)) {
+                  redirectUrl.searchParams.set('cidade', seg1);
+                  redirectUrl.searchParams.set('q', seg2);
+                  shouldRedirect = true;
+              } else if (isCitySlug(seg2)) {
+                  redirectUrl.searchParams.set('cidade', seg2);
+                  redirectUrl.searchParams.set('q', seg1);
+                  shouldRedirect = true;
+              }
+          }
+
+          if (shouldRedirect) {
+              request.nextUrl.searchParams.forEach((val, key) => {
+                  if (!redirectUrl.searchParams.has(key)) {
+                      redirectUrl.searchParams.set(key, val);
+                  }
+              });
+              return NextResponse.redirect(redirectUrl, { status: 301 });
+          }
+      }
+  }
+
   console.log(`[MIDDLEWARE] ${request.method} ${pathname}`)
   const forwarded = request.headers.get("x-forwarded-for")
   const ip = forwarded ? forwarded.split(",")[0].trim() : request.headers.get("x-real-ip") || "unknown"
