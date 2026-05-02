@@ -2,6 +2,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarX, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Users, RotateCcw, X, CalendarPlus, CalendarOff, User, MoreHorizontal, LayoutList, LayoutGrid, Clock, ArrowUpDown, Plus, Edit3, Utensils, Briefcase } from 'lucide-react';
+import { MoneyIcon, PartiallyPaidIcon, LikeIcon, PlayIcon, EyeOffIcon, ClockIcon } from '@/lib/icons';
 import { Button, Dropdown, DropdownItem, Badge, Checkbox as FormCheckbox } from '../../../reusable';
 import { Appointment, LayoutAppointment, StaffMember, PopoverState } from '../types';
 import { getAppointmentStyle, getEndTime, formatDateStr, getWeekDays, arrangeAppointments, formatDuration, isMultiDay, getMultiDayStyle, parseLocalDate } from '../utils';
@@ -252,7 +253,19 @@ export const DayView = ({ appointments, currentDate, staffMembers, onOpenView, h
                                                         <div className="flex-1 min-w-0 flex flex-col">
                                                             <div className="flex items-center justify-between mb-0.5">
                                                                 <span className={`font-bold text-[10px] ${style.title} truncate`}>{apt.time} - {endTime}</span>
-                                                                {height > 60 && <User size={12} className={style.text} />}
+                                                                <div className="flex items-center gap-1">
+                                                                    {apt.paymentStatus && ['paid', 'pago', 'partially paid', 'parcialmente pago'].includes(apt.paymentStatus.toLowerCase()) && (
+                                                                        <div className={`${style.text} opacity-70`}>
+                                                                            {['paid', 'pago'].includes(apt.paymentStatus.toLowerCase()) ? <MoneyIcon size={12} /> : <PartiallyPaidIcon size={12} />}
+                                                                        </div>
+                                                                    )}
+                                                                    <div className={`${style.text} opacity-70`}>
+                                                                        {apt.status.toLowerCase() === 'confirmado' || apt.status.toLowerCase() === 'confirmed' ? <LikeIcon size={12} /> :
+                                                                         apt.status.toLowerCase() === 'iniciado' || apt.status.toLowerCase() === 'in progress' ? <PlayIcon size={12} /> :
+                                                                         ['ausência', 'absent', 'ausencia'].includes(apt.status.toLowerCase()) ? <EyeOffIcon size={12} /> :
+                                                                         <ClockIcon size={12} />}
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                             <div className={`font-bold text-[11px] ${style.title} truncate leading-tight mb-0.5`}>{apt.customer}</div>
                                                             <div className={`text-[9px] ${style.text} truncate opacity-90 mb-1`}>{apt.service}</div>

@@ -1049,17 +1049,17 @@ export const AppointmentSheet = ({
                                         </div>
                                         {/* Status Badge Dropdown */}
                                         <Dropdown
-                                            width="w-[140px]"
                                             trigger={
-                                                <button disabled={isPaid} className={`flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-full text-white text-sm font-bold transition-colors ${isPaid ? 'opacity-70 cursor-not-allowed' : ''}`}>
+                                                <button disabled={isPaid} className={`flex items-center px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-full text-white text-sm font-bold transition-colors ${isPaid ? 'opacity-70 cursor-not-allowed' : ''}`}>
                                                     {status}
-                                                    {!isPaid && <ChevronDownIcon size={16} />}
                                                 </button>
                                             }
                                         >
-                                            {VIEW_STATUS_OPTIONS.map(opt => (
-                                                <DropdownItem key={opt.value} onClick={() => setStatus(opt.value)}>{opt.label}</DropdownItem>
-                                            ))}
+                                            <div className="min-w-[140px]">
+                                                {VIEW_STATUS_OPTIONS.map(opt => (
+                                                    <DropdownItem key={opt.value} onClick={() => setStatus(opt.value)}>{opt.label}</DropdownItem>
+                                                ))}
+                                            </div>
                                         </Dropdown>
                                     </div>
                                 </div>
@@ -1275,13 +1275,18 @@ export const AppointmentSheet = ({
                         ) : (
                             /* VIEW MODE FOOTER */
                             isPaid ? (
-                                <Button variant="default" className="w-full font-bold" onClick={handleSaveChanges}>
+                                <Button variant="default" className="w-full font-bold h-[48px]" onClick={handleSaveChanges}>
                                     Salvar Observações
                                 </Button>
                             ) : (
-                                <Button variant="default" className="w-full font-bold bg-brand-green hover:bg-brand-green/90 border-brand-green" onClick={() => setIsPaymentSheetOpen(true)}>
-                                    Checkout
-                                </Button>
+                                <div className="flex gap-3">
+                                    <Button variant="outline" className="flex-1 font-bold h-[48px]" onClick={() => setIsPaymentSheetOpen(true)}>
+                                        Checkout
+                                    </Button>
+                                    <Button variant="default" className="flex-1 font-bold h-[48px]" onClick={handleSaveChanges}>
+                                        Salvar
+                                    </Button>
+                                </div>
                             )
                         )}
                     </div>
@@ -1321,21 +1326,24 @@ export const AppointmentSheet = ({
                     </BottomSheet>
                 ) : (
                     <Portal>
-                        <div
-                            className="fixed inset-0 z-50 bg-black/50 transition-opacity"
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-50 bg-black/50"
                             onClick={handleCloseAttempt}
                         >
                             <motion.div
-                                initial={{ x: '120%', opacity: 1 }}
+                                initial={{ x: '100%', opacity: 1 }}
                                 animate={{ x: 0, opacity: 1 }}
-                                exit={{ x: '120%', opacity: 1 }}
-                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                exit={{ x: '100%', opacity: 1 }}
+                                transition={{ type: "spring", stiffness: 400, damping: 40 }}
                                 className="fixed right-4 top-4 bottom-4 z-50 w-[450px] flex flex-col bg-white shadow-2xl dark:bg-dark-surface overflow-hidden rounded-2xl"
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 {SheetContent}
                             </motion.div>
-                        </div>
+                        </motion.div>
                     </Portal>
                 )
             )}

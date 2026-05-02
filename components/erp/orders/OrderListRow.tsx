@@ -28,6 +28,9 @@ interface OrderListItemProps {
     /** Sangrias/reforços: título curto, subtítulo com operador, status simplificado. */
     rowVariant?: "order" | "cash_movement"
     actionMenuExtra?: React.ReactNode
+    onPrefetchMouseEnter?: () => void
+    onPrefetchMouseLeave?: () => void
+    onPrefetchTouchStart?: () => void
 }
 
 const OrderListItem = React.memo(
@@ -45,6 +48,9 @@ const OrderListItem = React.memo(
         extraActions,
         rowVariant = "order",
         actionMenuExtra,
+        onPrefetchMouseEnter,
+        onPrefetchMouseLeave,
+        onPrefetchTouchStart,
     }: OrderListItemProps) => {
 
         const renderCellContent = (colId: string) => {
@@ -188,6 +194,9 @@ const OrderListItem = React.memo(
                 animate={{ opacity: 1 }}
                 className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
                 onClick={() => onDetails(order)}
+                onMouseEnter={onPrefetchMouseEnter}
+                onMouseLeave={onPrefetchMouseLeave}
+                onTouchStart={onPrefetchTouchStart}
             >
                 {showCheckbox && (
                     <td

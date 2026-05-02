@@ -16,6 +16,9 @@ interface OrderGridCardProps {
     canEdit?: boolean
     cancelLabel?: string
     extraActions?: React.ReactNode
+    onPrefetchMouseEnter?: () => void
+    onPrefetchMouseLeave?: () => void
+    onPrefetchTouchStart?: () => void
 }
 
 const OrderGridCard = React.memo(
@@ -28,7 +31,10 @@ const OrderGridCard = React.memo(
         onDetails,
         canEdit = true,
         cancelLabel = "Cancelar",
-        extraActions
+        extraActions,
+        onPrefetchMouseEnter,
+        onPrefetchMouseLeave,
+        onPrefetchTouchStart,
     }: OrderGridCardProps) => {
 
         return (
@@ -39,6 +45,9 @@ const OrderGridCard = React.memo(
                 transition={{ duration: 0.2 }}
                 className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
                 onClick={onDetails}
+                onMouseEnter={onPrefetchMouseEnter}
+                onMouseLeave={onPrefetchMouseLeave}
+                onTouchStart={onPrefetchTouchStart}
             >
                 <div className="flex gap-4 mb-2">
                     {/* Order Visual Indicator */}

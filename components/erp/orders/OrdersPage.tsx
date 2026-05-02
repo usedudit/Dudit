@@ -5,9 +5,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useStore } from "@/lib/store-context"
-import { useQueryClient } from "@tanstack/react-query"
 import { useUserProfile } from "@/hooks/use-user-profile"
-import { useInfiniteList } from "@/hooks/use-infinite-list"
+import { useEntityPage } from "@/hooks/use-entity-page"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 
 // Components
@@ -36,7 +35,7 @@ import {
     DeliveryFailedIcon,
     PartiallyPaidIcon
 } from "@/lib/icons"
-import { useRouter } from "next/navigation"
+
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
 import {
     EMPTY_DATE_PERIOD,
@@ -53,7 +52,7 @@ import DefaultModal from "@/components/reusable/DefaultModal"
 import { DropdownItem } from "@/components/reusable/Dropdown"
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import NotesSheet from "@/components/erp/shared/NotesSheet"
-import { updateOrderNotesAction, updateOrdersStatusInBatchAction, getERPOrdersPageAction, type ERPOrderListCursor } from "@/app/actions/erp/orders"
+import { updateOrderNotesAction, updateOrdersStatusInBatchAction, getERPOrdersPageAction, getOrderDetailsAction, type ERPOrderListCursor } from "@/app/actions/erp/orders"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
 import { FadeIn } from "@/components/animations/FadeIn"
 
@@ -123,15 +122,46 @@ export default function OrdersPage({
     partnerId: string
 }) {
     const { toast } = useToast()
-    const router = useRouter()
     const { selectedStore, isLoading: storeLoading } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const { profile: userProfile } = useUserProfile()
     const currentUserName = userProfile?.full_name || "Usuário"
 
+    // ── Entity Page (URL-driven state + cache + infinite list) ─────────
+    const ordersQueryKey = useMemo(() => ['erp', 'orders', partnerId] as const, [partnerId])
+
+    const entityPage = useEntityPage<any, any, ERPOrderListCursor>({
+        entityType: 'orders',
+        partnerId,
+        queryKey: ordersQueryKey,
+        initialItems: rawOrders,
+        initialNextCursor: initialNextCursor,
+        initialHasMore: initialHasMore,
+        fetchPageFn: async ({ cursor }) => {
+            const res = await getERPOrdersPageAction(partnerId, { cursor, limit: 100 })
+            if (!res.success) throw new Error(res.error || "Erro ao carregar pedidos.")
+            return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
+        },
+        dedupeKey: useCallback((o: any) => String(o?.id || ""), []),
+        getDetailFn: async (id: string) => {
+            const res = await getOrderDetailsAction(id, partnerId)
+            if (res.success && res.data) return res.data
+            return null
+        },
+        listToDetail: (item) => ({ ...item, __partial: true }),
+        staleTime: 30_000,
+    })
+
+    const {
+        items: effectiveOrders, fetchNextPage, hasNextPage, isFetchingNextPage,
+        entityState, openEntity, closeEntity,
+        currentEntity, isLoadingDetail,
+        cache, getPrefetchProps,
+        search, setSearch, debouncedSearch,
+        afterMutation, queryClient,
+    } = entityPage
+
     // State
-    const [search, setSearch] = useState("")
-    const [debouncedSearch, setDebouncedSearch] = useState("")
     const [activeTab, setActiveTab] = useState<"Todos" | "Pendente" | "Pago" | "Enviado" | "Cancelado">("Todos")
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const effectiveViewMode = isMobile ? "grid" : viewMode
@@ -146,57 +176,31 @@ export default function OrdersPage({
     const [generateAutomaticRefundOnCancel, setGenerateAutomaticRefundOnCancel] = useState(true)
     const [singleCancelId, setSingleCancelId] = useState<string | null>(null)
     const [selection, setSelection] = useState({ ids: new Set<string>() })
-    const [wrapperMode, setWrapperMode] = useState<'create' | 'edit' | 'view' | null>(null)
-    const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
     const [deliveryStatusModal, setDeliveryStatusModal] = useState<{ open: boolean; order: Order | null }>({ open: false, order: null })
     const [deliveryStatusValue, setDeliveryStatusValue] = useState("not_sent")
     const [notesSheet, setNotesSheet] = useState<{ open: boolean; orderId: string | null; notes: string }>({ open: false, orderId: null, notes: "" })
     const [notesSheetSaving, setNotesSheetSaving] = useState(false)
-    const [detailRefreshToken, setDetailRefreshToken] = useState(0)
 
-    const queryClient = useQueryClient()
-
-    const queryKey = useMemo(() => ['erp', 'orders', partnerId] as const, [partnerId])
-    const observerTarget = useRef<HTMLDivElement>(null)
-
-    const { items: effectiveOrders, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading: isQueryLoading } = useInfiniteList<any, ERPOrderListCursor>({
-        queryKey,
-        initialPage: { items: rawOrders, nextCursor: initialNextCursor, hasMore: initialHasMore },
-        fetchFn: async ({ cursor }) => {
-            const res = await getERPOrdersPageAction(partnerId, { cursor, limit: 100 })
-            if (!res.success) throw new Error(res.error || "Erro ao carregar pedidos.")
-            return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
-        },
-        dedupeKey: useCallback((o: any) => String(o?.id || ""), []),
-    })
-
-    const isLoading = storeLoading || isQueryLoading
+    const isLoading = storeLoading || entityPage.isListLoading
 
     const itemsPerPage = 8
 
+    const observerTarget = useRef<HTMLDivElement>(null)
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
 
-    const invalidateAndRefresh = () => {
-        setWrapperMode(null)
-        setSelectedOrderId(null)
-        queryClient.invalidateQueries({ queryKey: ['erp', 'orders', partnerId] })
-    }
+    const invalidateAndRefresh = useCallback(() => {
+        if (entityState.entityId) cache.invalidateEntity(entityState.entityId)
+        afterMutation(entityState.entityId || undefined)
+        closeEntity()
+    }, [entityState.entityId, cache, afterMutation, closeEntity])
 
     useEffect(() => {
-        const handleReset = () => {
-            setWrapperMode(null)
-            setSelectedOrderId(null)
-        }
+        const handleReset = () => closeEntity()
         window.addEventListener('erp-sidebar-reset', handleReset)
         return () => window.removeEventListener('erp-sidebar-reset', handleReset)
-    }, [])
-
-    useEffect(() => {
-        const t = setTimeout(() => setDebouncedSearch(search), 300)
-        return () => clearTimeout(t)
-    }, [search])
+    }, [closeEntity])
 
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return
@@ -369,21 +373,19 @@ export default function OrdersPage({
     const hasOrders = (effectiveOrders?.length || 0) > 0
 
     // Handlers
-    const handleAddOrder = () => {
-        setWrapperMode('create')
-    }
-    const handleEditOrder = (order: Order) => {
+    const handleAddOrder = useCallback(() => {
+        openEntity('create')
+    }, [openEntity])
+    const handleEditOrder = useCallback((order: Order) => {
         if (!order.canEdit) {
             toast({ title: "Edição bloqueada", description: "Pedidos cancelados não podem ser editados.", variant: "destructive" })
             return
         }
-        setSelectedOrderId(order.originalId)
-        setWrapperMode('edit')
-    }
-    const handleDetailsOrder = (order: Order) => {
-        setSelectedOrderId(order.originalId)
-        setWrapperMode('view')
-    }
+        openEntity('edit', order.originalId)
+    }, [openEntity, toast])
+    const handleDetailsOrder = useCallback((order: Order) => {
+        openEntity('view', order.originalId)
+    }, [openEntity])
     const openDeliveryStatusModal = (order: Order) => {
         setDeliveryStatusModal({ open: true, order })
         const statusLabel = order.deliveryStatusLabel
@@ -409,8 +411,7 @@ export default function OrdersPage({
                 statusValue: deliveryStatusValue,
             })
             if (result.success) {
-                await queryClient.invalidateQueries({ queryKey: ['erp', 'orders', partnerId] })
-                await queryClient.refetchQueries({ queryKey: ['erp', 'orders', partnerId], type: 'active' })
+                afterMutation(targetOrder.originalId)
                 toast({ title: "Sucesso", description: "Status de entrega atualizado." })
                 setDeliveryStatusModal({ open: false, order: null })
             } else {
@@ -479,9 +480,8 @@ export default function OrdersPage({
                 toast({ title: "Erro", description: result.error, variant: "destructive" })
                 return
             }
-            await queryClient.invalidateQueries({ queryKey: ['erp', 'orders', partnerId] })
-            await queryClient.refetchQueries({ queryKey: ['erp', 'orders', partnerId], type: 'active' })
-            setDetailRefreshToken((value) => value + 1)
+            afterMutation(notesSheet.orderId || undefined)
+            if (notesSheet.orderId) cache.invalidateEntity(notesSheet.orderId)
             setNotesSheet({ open: false, orderId: null, notes: "" })
             toast({ title: "Sucesso", description: "Observação salva com sucesso." })
         } catch (error) {
@@ -508,8 +508,7 @@ export default function OrdersPage({
                     statusValue: payload.orderStatus
                 })
                 if (result.success) {
-                    await queryClient.invalidateQueries({ queryKey: ['erp', 'orders', partnerId] })
-                    await queryClient.refetchQueries({ queryKey: ['erp', 'orders', partnerId], type: 'active' })
+                    afterMutation()
                     setSelection({ ids: new Set() })
                     toast({ title: "Sucesso", description: "Status alterado com sucesso" })
                     if ((result as any).warning) {
@@ -548,8 +547,7 @@ export default function OrdersPage({
             })
 
             if (result.success) {
-                await queryClient.invalidateQueries({ queryKey: ['erp', 'orders', partnerId] })
-                await queryClient.refetchQueries({ queryKey: ['erp', 'orders', partnerId], type: 'active' })
+                afterMutation()
                 if (!singleCancelId) setSelection({ ids: new Set() })
                 toast({
                     title: "Sucesso",
@@ -583,15 +581,14 @@ export default function OrdersPage({
     return (
         <>
             <AnimatePresence mode="wait">
-                {wrapperMode === 'view' && selectedOrderId ? (
+                {entityState.isOpen && entityState.action === 'view' && entityState.entityId ? (
                     <FadeIn key="view-order" className="w-full h-full bg-white dark:bg-dark-background">
                         <OrderDetailView
-                            orderId={selectedOrderId}
+                            orderId={entityState.entityId}
                             partnerId={partnerId}
                             onBack={invalidateAndRefresh}
                             onEditOrder={(order: any) => {
-                                setSelectedOrderId(order.id)
-                                setWrapperMode('edit')
+                                openEntity('edit', order.id)
                             }}
                             onUpdateDeliveryStatus={(order: any) => {
                                 openDeliveryStatusModal({
@@ -620,19 +617,19 @@ export default function OrdersPage({
                             }}
                             onCancelOrder={(order: any) => openCancelModal(order.id)}
                             onOpenNotes={(order: any) => openNotesSheet(order)}
-                            initialOrder={effectiveOrders?.find((o: any) => o.id === selectedOrderId) || undefined}
-                            key={`order-detail-${selectedOrderId}-${detailRefreshToken}`}
+                            initialOrder={currentEntity || effectiveOrders?.find((o: any) => o.id === entityState.entityId) || undefined}
+                            key={`order-detail-${entityState.entityId}`}
                         />
                     </FadeIn>
-                ) : wrapperMode === 'edit' && selectedOrderId ? (
+                ) : entityState.isOpen && entityState.action === 'edit' && entityState.entityId ? (
                     <FadeIn key="edit-order" className="w-full h-full bg-white dark:bg-dark-background">
                         <CreateOrder
                             partnerId={partnerId}
-                            editOrderId={selectedOrderId}
+                            editOrderId={entityState.entityId}
                             onBack={invalidateAndRefresh}
                         />
                     </FadeIn>
-                ) : wrapperMode === 'create' ? (
+                ) : entityState.isOpen && entityState.action === 'create' ? (
                     <FadeIn key="create-order" className="w-full h-full bg-white dark:bg-dark-background">
                         <CreateOrder
                             partnerId={partnerId}
@@ -806,6 +803,9 @@ export default function OrdersPage({
                                                                         Alterar status de entrega
                                                                     </DropdownItem>
                                                                 ) : null}
+                                                                onPrefetchMouseEnter={getPrefetchProps(o.originalId).onMouseEnter}
+                                                                onPrefetchMouseLeave={getPrefetchProps(o.originalId).onMouseLeave}
+                                                                onPrefetchTouchStart={getPrefetchProps(o.originalId).onTouchStart}
                                                             />
                                                         ))}
                                                     </div>
@@ -882,6 +882,9 @@ export default function OrdersPage({
                                                                                     Alterar status de entrega
                                                                                 </DropdownItem>
                                                                             ) : null}
+                                                                            onPrefetchMouseEnter={getPrefetchProps(o.originalId).onMouseEnter}
+                                                                            onPrefetchMouseLeave={getPrefetchProps(o.originalId).onMouseLeave}
+                                                                            onPrefetchTouchStart={getPrefetchProps(o.originalId).onTouchStart}
                                                                         />
                                                                     ))}
                                                                 </tbody>

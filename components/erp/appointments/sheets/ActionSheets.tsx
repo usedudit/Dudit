@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Utensils, Briefcase } from 'lucide-react';
 import { Button, Input as FormInput, Checkbox, Dropdown, DropdownItem, DatePicker, TimePicker, FormTextarea } from '@/components/reusable';
 import { Appointment } from '../types';
@@ -73,12 +73,12 @@ export const AddUnavailableSheet = ({
     const [date, setDate] = useState(appointment?.date || formatDateStr(defaultDate));
     const [startTime, setStartTime] = useState(appointment?.time || '11:00');
     const [endTime, setEndTime] = useState(appointment ? getEndTime(appointment.time, appointment.duration) : '12:00');
-    
+
     // MULTI-STAFF SELECTION
     const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>(
         appointment?.staffId ? [appointment.staffId] : []
     );
-    
+
     const [description, setDescription] = useState(appointment?.notes || '');
     const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekly'>(
         (appointment as any)?.recurrence || 'none'
@@ -160,7 +160,7 @@ export const AddUnavailableSheet = ({
     ];
 
     const toggleStaff = (id: string) => {
-        setSelectedStaffIds(prev => 
+        setSelectedStaffIds(prev =>
             prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
         );
     };
@@ -229,9 +229,9 @@ export const AddUnavailableSheet = ({
                         trigger={
                             <Button variant="outline" className="w-full h-12 justify-between px-4">
                                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                                    {selectedStaffIds.length === 0 
-                                        ? 'Selecione os profissionais' 
-                                        : selectedStaffIds.length === 1 
+                                    {selectedStaffIds.length === 0
+                                        ? 'Selecione os profissionais'
+                                        : selectedStaffIds.length === 1
                                             ? staffMembers.find(s => s.id === selectedStaffIds[0])?.name
                                             : `${selectedStaffIds.length} selecionados`}
                                 </span>
@@ -241,14 +241,14 @@ export const AddUnavailableSheet = ({
                     >
                         <div className="max-h-[300px] overflow-y-auto p-1">
                             {staffMembers?.map(staff => (
-                                <div 
-                                    key={staff.id} 
+                                <div
+                                    key={staff.id}
                                     className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-zinc-800 rounded-lg cursor-pointer transition-colors"
                                     onClick={() => toggleStaff(staff.id)}
                                 >
-                                    <Checkbox 
-                                        checked={selectedStaffIds.includes(staff.id)} 
-                                        onChange={() => {}} 
+                                    <Checkbox
+                                        checked={selectedStaffIds.includes(staff.id)}
+                                        onChange={() => { }}
                                         className="pointer-events-none"
                                     />
                                     <UserProfileImage fullName={staff.name} className="w-6 h-6" />
@@ -308,10 +308,10 @@ export const AddUnavailableSheet = ({
                             </div>
 
                             {recurrenceEndType === 'date' && (
-                                <DatePicker 
-                                    label="Data final" 
-                                    value={recurrenceEndDate} 
-                                    onChange={(d) => setRecurrenceEndDate(formatDateStr(d))} 
+                                <DatePicker
+                                    label="Data final"
+                                    value={recurrenceEndDate}
+                                    onChange={(d) => setRecurrenceEndDate(formatDateStr(d))}
                                 />
                             )}
 
@@ -375,21 +375,47 @@ export const AddUnavailableSheet = ({
     return (
         <>
             <Portal>
-                <div className="fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 opacity-100" onClick={onClose}>
-                    <div
-                        className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isNewTypeSheetOpen ? "-translate-x-10 scale-[0.97] opacity-70" : "translate-x-0 opacity-100"}`}
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-50 bg-black/50"
+                    onClick={onClose}
+                >
+                    <motion.div
+                        initial={{ x: '100%' }}
+                        animate={{ x: isNewTypeSheetOpen ? "-40px" : 0, scale: isNewTypeSheetOpen ? 0.97 : 1, opacity: isNewTypeSheetOpen ? 0.7 : 1 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 40 }}
+                        className="fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-surface"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {SheetBody}
-                    </div>
-                </div>
+                    </motion.div>
+                </motion.div>
             </Portal>
             <Portal>
-                <div className={`fixed inset-0 z-[60] bg-black/50 transition-opacity duration-300 ${isNewTypeSheetOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} onClick={() => setIsNewTypeSheetOpen(false)}>
-                    <div className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isNewTypeSheetOpen ? "translate-x-0" : "translate-x-[120%]"}`} onClick={(e) => e.stopPropagation()}>
-                        {NewTypeSheetBody}
-                    </div>
-                </div>
+                <AnimatePresence>
+                    {isNewTypeSheetOpen && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[60] bg-black/50"
+                            onClick={() => setIsNewTypeSheetOpen(false)}
+                        >
+                            <motion.div
+                                initial={{ x: '100%' }}
+                                animate={{ x: 0 }}
+                                exit={{ x: '100%' }}
+                                transition={{ type: "spring", stiffness: 400, damping: 40 }}
+                                className="fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-surface"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {NewTypeSheetBody}
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </Portal>
         </>
     );
