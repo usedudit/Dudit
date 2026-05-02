@@ -192,6 +192,19 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                             width="w-full"
                         />
 
+                        <FormDropdown
+                            label="Tipo de Serviço"
+                            options={[
+                                { value: "in_person", label: "Presencial" },
+                                { value: "online", label: "Online (Remoto)" },
+                                { value: "hybrid", label: "Híbrido" }
+                            ]}
+                            value={serviceData?.service_type || 'in_person'}
+                            setValue={(v) => manualChange("service_type", v)}
+                            disabled={!isEditing}
+                            width="w-full"
+                        />
+
                         {/* Garantia is a string input in the current implementation, but user said "igual é la pra aba de marketplace de cadastrar novo produto". Let's match product's warranty fields. I'll need to store warranty_value and warranty_period in serviceData. Or just use the existing warranty field for now, but formatted nicely? No, user explicitly said "igual de produtos". Let's add warranty_value and warranty_period inputs, saving to a single JSON or just multiple fields. Wait, the schema has `warranty` text. Let's assume warranty holds a string like "X Meses". For now, we will bind to warranty_value and warranty_period, but how do we save it?
                         Actually, `services` table has `warranty (text)`. I'll just use the text field but present it as two inputs, or just one text input like before. But the user said "igual é la pra produtos". Let's see how Product does it. It uses `warranty_value` and `warranty_period`. We can just store them as `warranty_value` and `warranty_period` in the serviceData object, and map them to `warranty` on save, or let the backend save them into the `warranty` field if it's text. Let's just use the two fields and we can concat them on submit or backend. */}
                         <div className="grid grid-cols-2 gap-4">

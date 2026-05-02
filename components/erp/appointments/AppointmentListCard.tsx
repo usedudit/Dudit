@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { User, Banknote, Ban, MessageSquare, UserX, Wallet, Check, Clock, Play } from 'lucide-react';
+import { MoneyIcon, BlockedIcon, EyeOffIcon, PartiallyPaidIcon, LikeIcon, ClockIcon, PlayIcon } from '@/lib/icons';
 import { Appointment } from './types';
 import { getAppointmentStyle, getEndTime } from './utils';
 
@@ -13,55 +13,49 @@ interface AppointmentListCardProps {
 export const AppointmentListCard: React.FC<AppointmentListCardProps> = ({ appointment, onClick }) => {
     const style = getAppointmentStyle(appointment.status);
     const endTime = getEndTime(appointment.time, appointment.duration);
-    
+
     // Normalize status for check
-    const s = appointment.status.toLowerCase();
+    const s = (appointment.status || '').toLowerCase();
+    const ps = (appointment.paymentStatus || '').toLowerCase();
 
-    // Determine Top Right Icon based on status
-    let StatusIcon = User;
-    
-    if (s === 'paid' || s === 'pago') {
-        StatusIcon = Banknote;
-    } else if (s === 'partially paid' || s === 'pago parcialmente') {
-        StatusIcon = Wallet;
-    } else if (s === 'ausência' || s === 'absent' || s === 'ausencia') {
-        StatusIcon = UserX;
-    } else if (s === 'confirmed' || s === 'confirmado') {
-        StatusIcon = Check;
-    } else if (s === 'iniciado' || s === 'in progress') {
-        StatusIcon = Play;
-    } else if (s === 'pending' || s === 'aguardando' || s === 'reservado') {
-        StatusIcon = Clock;
-    } else if (s === 'canceled' || s === 'cancelado') {
-        StatusIcon = Ban;
-    }
+    // Determine Status Icon
+    let StatusIcon = ClockIcon;
+    if (s === 'confirmed' || s === 'confirmado') StatusIcon = LikeIcon;
+    else if (s === 'iniciado' || s === 'in progress') StatusIcon = PlayIcon;
+    else if (s === 'ausência' || s === 'absent' || s === 'ausencia') StatusIcon = EyeOffIcon;
+    else if (s === 'canceled' || s === 'cancelado') StatusIcon = BlockedIcon;
 
-    // Extract border color logic
-    const borderColorClass = style.bar.replace('bg-', 'border-');
+    // Determine Payment Icon
+    let PaymentIcon = null;
+    if (ps === 'paid' || ps === 'pago') PaymentIcon = MoneyIcon;
+    else if (ps === 'partially paid' || ps === 'parcialmente pago') PaymentIcon = PartiallyPaidIcon;
 
     return (
-        <motion.div 
+        <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className={`
-                w-full rounded-xl p-3 border-l-4 border-y border-r cursor-pointer shadow-sm relative overflow-hidden transition-all active:scale-[0.98]
-                ${style.container} ${borderColorClass}
+                w-full rounded-xl p-2 border cursor-pointer shadow-sm relative overflow-hidden transition-all active:scale-[0.98]
+                ${style.container}
             `}
             onClick={() => onClick(appointment)}
         >
-            <div className="relative z-10 flex flex-col h-full">
-                <div className="flex items-center justify-between mb-1">
-                    <span className={`font-bold text-xs truncate ${style.title}`}>{appointment.time} - {endTime}</span>
-                    <div className="flex items-center gap-1">
-                        {appointment.notes && <MessageSquare size={12} className="text-brand-inactive-text mr-1" />}
-                        <StatusIcon size={14} className={`${style.text} opacity-70`} />
+            <div className="flex h-full gap-2">
+                <div className={`w-1 rounded-full flex-shrink-0 ${style.bar}`}></div>
+                <div className="flex-1 min-w-0 flex flex-col">
+                    <div className="flex items-center justify-between mb-0.5">
+                        <span className={`font-bold text-[10px] ${style.title} truncate`}>{appointment.time} - {endTime}</span>
+                        <div className="flex items-center gap-1.5">
+                            {PaymentIcon && <PaymentIcon size={14} className={`${style.text} opacity-70`} />}
+                            <StatusIcon size={14} className={`${style.text} opacity-70`} />
+                        </div>
                     </div>
-                </div>
-                <div className={`font-bold text-sm truncate leading-tight mb-0.5 ${style.title}`}>{appointment.customer}</div>
-                <div className={`text-xs truncate mb-2 ${style.text} opacity-90`}>{appointment.service}</div>
-                
-                <div className="border-t border-black/5 dark:border-white/5 pt-2 mt-auto">
-                    <span className={`text-[11px] font-medium truncate ${style.text}`}>{appointment.staff}</span>
+                    <div className={`font-bold text-[11px] ${style.title} truncate leading-tight mb-0.5`}>{appointment.customer}</div>
+                    <div className={`text-[9px] ${style.text} truncate opacity-90 mb-2`}>{appointment.service}</div>
+
+                    <div className="border-t border-black/5 dark:border-white/5 pt-1 mt-auto">
+                        <span className={`text-[9px] font-bold ${style.text} truncate block`}>{appointment.staff}</span>
+                    </div>
                 </div>
             </div>
         </motion.div>

@@ -87,21 +87,22 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess }: {
     const clientName = initialData?.client?.name || 'Cliente Sem Nome';
 
     return (
-        <div className="fixed inset-0 z-[60] flex justify-end">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
             <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                className="absolute inset-0 bg-black/50 transition-opacity"
                 onClick={onClose}
             />
             
             <motion.div 
-                initial={{ x: '100%' }}
+                initial={{ x: '120%' }}
                 animate={{ x: 0 }}
-                exit={{ x: '100%' }}
+                exit={{ x: '120%' }}
                 transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                className="relative w-full md:w-[480px] h-full bg-white dark:bg-dark-surface shadow-2xl flex flex-col overflow-hidden"
+                className="fixed right-4 top-4 bottom-4 z-50 w-[480px] flex flex-col bg-white shadow-2xl dark:bg-dark-surface overflow-hidden rounded-2xl"
+                onClick={(e) => e.stopPropagation()}
             >
                 <AnimatePresence mode="wait">
                     {step === 'summary' && (

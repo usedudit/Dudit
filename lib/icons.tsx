@@ -25,6 +25,7 @@ import {
     RepeatIcon as RepeatIcon01,
     Chart03Icon,
     ViewIcon,
+    ViewOffSlashIcon,
     Mail01Icon,
     DiceFaces03Icon,
     StarAward01Icon,
@@ -111,7 +112,9 @@ import {
     DeliverySent01Icon,
     DeliveryTracking01Icon,
     SplitIcon,
-    Target02Icon
+    Target02Icon,
+    PlayIcon as PlayIcon01,
+    ThumbsUpIcon
 } from "@hugeicons/core-free-icons"
 
 interface IconProps {
@@ -188,6 +191,8 @@ export const ExportFileIcon = CreateIcon(FileUploadIcon)
 export const Check = CreateIcon(MenuSquare01)
 export const CheckIcon = CreateIcon(MenuSquare01)
 export const CheckCircleIcon = CreateIcon(CheckmarkCircle01Icon)
+export const LikeIcon = CreateIcon(ThumbsUpIcon)
+export const PlayIcon = CreateIcon(PlayIcon01)
 
 export const AlertCircleIcon = CreateIcon(AlertCircleIcon01)
 export const AlertTriangleIcon = CreateIcon(Alert02Icon)
@@ -199,7 +204,6 @@ export const HelpCircleIcon = CreateIcon(HelpCircle)
 export const CancelIcon = CreateIcon(Cancel01Icon)
 export const CancelCircleIcon = CreateIcon(CancelCircle)
 export const XIcon = CreateIcon(Cancel01Icon)
-
 
 // ============================
 // FILES / MEDIA
@@ -293,6 +297,7 @@ export const ItalicIcon = CreateIcon(TextItalicIcon)
 export const LinkIcon = CreateIcon(Link02Icon)
 export const DownloadIcon = CreateIcon(Download01Icon)
 export const EyeIcon = CreateIcon(ViewIcon)
+export const EyeOffIcon = CreateIcon(ViewOffSlashIcon)
 export const MailIcon = CreateIcon(Mail01Icon)
 export const PrinterIcon = CreateIcon(Printer)
 export const UnderlineIcon = CreateIcon(TextUnderlineIcon)

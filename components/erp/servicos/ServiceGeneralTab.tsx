@@ -108,20 +108,6 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                             />
                         </div>
 
-                        <div className="col-span-12 sm:col-span-4">
-                            <FormDropdown
-                                label="Tipo de Serviço"
-                                options={[
-                                    { value: "in_person", label: "Presencial" },
-                                    { value: "online", label: "Online (Remoto)" },
-                                    { value: "hybrid", label: "Híbrido" }
-                                ]}
-                                value={serviceData.service_type || 'in_person'}
-                                setValue={(v) => handleFieldChange({ target: { name: "service_type", value: v } })}
-                                disabled={!isEditing}
-                                width="w-full"
-                            />
-                        </div>
                     </div>
                 </div>
 

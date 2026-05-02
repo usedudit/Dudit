@@ -13,6 +13,7 @@ export interface Appointment {
     endTime?: string;   // End Time (HH:MM) - New
     duration: number;   // minutes (calculated total)
     status: string;
+    paymentStatus?: string;
     staff: string;
     staffId: string;
     price: number;

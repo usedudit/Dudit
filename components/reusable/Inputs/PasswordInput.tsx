@@ -1,7 +1,7 @@
 "use client"
 import React, { useState } from "react"
-import { Eye, EyeOff } from "lucide-react"
 import { Input } from "@/components/reusable"
+import { EyeIcon, EyeOffIcon } from "@/lib/icons"
 
 interface PasswordInputProps extends Omit<React.ComponentProps<typeof Input>, "type" | "suffix"> { }
 
@@ -23,7 +23,7 @@ export const PasswordInput: React.FC<PasswordInputProps> = (props) => {
                     className="text-gray-400 hover:text-gray-600 transition-colors flex items-center justify-center"
                     tabIndex={-1}
                 >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    {showPassword ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
                 </button>
             }
         />

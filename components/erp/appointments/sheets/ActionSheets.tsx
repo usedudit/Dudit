@@ -73,17 +73,27 @@ export const AddUnavailableSheet = ({
     const [date, setDate] = useState(appointment?.date || formatDateStr(defaultDate));
     const [startTime, setStartTime] = useState(appointment?.time || '11:00');
     const [endTime, setEndTime] = useState(appointment ? getEndTime(appointment.time, appointment.duration) : '12:00');
-    const [selectedStaffId, setSelectedStaffId] = useState(appointment?.staffId || (staffMembers && staffMembers.length > 0 ? staffMembers[0].id : ''));
+    
+    // MULTI-STAFF SELECTION
+    const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>(
+        appointment?.staffId ? [appointment.staffId] : []
+    );
+    
     const [description, setDescription] = useState(appointment?.notes || '');
-    const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekly'>('none');
+    const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekly'>(
+        (appointment as any)?.recurrence || 'none'
+    );
+
+    // RECURRENCE END LOGIC
+    const [recurrenceEndType, setRecurrenceEndType] = useState<'never' | 'date' | 'count'>('never');
+    const [recurrenceEndDate, setRecurrenceEndDate] = useState<string>(formatDateStr(new Date()));
+    const [recurrenceCount, setRecurrenceCount] = useState<number>(10);
 
     // States for nested sheet (New Type)
     const [isNewTypeSheetOpen, setIsNewTypeSheetOpen] = useState(false);
     const [newTypeName, setNewTypeName] = useState('');
     const [newTypeDuration, setNewTypeDuration] = useState('60');
     const [isSavingNewType, setIsSavingNewType] = useState(false);
-
-    const selectedStaff = staffMembers?.find(s => s.id === selectedStaffId);
 
     const handleConfirm = () => {
         if (onSave) {
@@ -93,6 +103,7 @@ export const AddUnavailableSheet = ({
             const endTotal = endH * 60 + endM;
             const duration = Math.max(15, endTotal - startTotal);
 
+            // If multi-staff is selected, the parent might need to handle it as multiple entries
             onSave({
                 id: appointment?.id,
                 title: title || selectedType,
@@ -101,10 +112,17 @@ export const AddUnavailableSheet = ({
                 startTime,
                 endTime,
                 duration,
-                staffId: selectedStaffId,
-                staff: selectedStaff?.name || 'Profissional',
+                staffIds: selectedStaffIds,
+                // Fallback for single staff compatibility
+                staffId: selectedStaffIds[0],
+                staff: selectedStaffIds.map(id => staffMembers.find(s => s.id === id)?.name).filter(Boolean).join(', '),
                 description,
-                recurrence
+                recurrence,
+                recurrenceEnd: {
+                    type: recurrenceEndType,
+                    date: recurrenceEndType === 'date' ? recurrenceEndDate : null,
+                    count: recurrenceEndType === 'count' ? recurrenceCount : null
+                }
             });
         }
     };
@@ -117,7 +135,7 @@ export const AddUnavailableSheet = ({
                 partnerId,
                 name: newTypeName,
                 durationMinutes: Number(newTypeDuration),
-                iconName: 'Plus' // Default for now
+                iconName: 'Plus'
             });
 
             if (createRes.success) {
@@ -141,9 +159,14 @@ export const AddUnavailableSheet = ({
         { label: 'Reunião', icon: Briefcase, sub: 'Evento' },
     ];
 
+    const toggleStaff = (id: string) => {
+        setSelectedStaffIds(prev => 
+            prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+        );
+    };
+
     const SheetBody = (
         <div className="flex flex-col h-full bg-white dark:bg-dark-surface overflow-hidden">
-            {/* Header */}
             <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
                 <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
                     {isEditing ? 'Detalhes da Indisponibilidade' : 'Adicionar Horário Indisponível'}
@@ -153,9 +176,8 @@ export const AddUnavailableSheet = ({
                 </Button>
             </header>
 
-            {/* Content Area */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6 pb-32">
-                {/* Type Selector Carousel */}
+                {/* Type Selector */}
                 <div>
                     <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Tipo</label>
                     <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-2">
@@ -178,15 +200,10 @@ export const AddUnavailableSheet = ({
                                 onClick={() => { setSelectedType(t.name); setTitle(t.name); }}
                             />
                         ))}
-                        <TypeCard
-                            simple
-                            label="Novo Tipo"
-                            onClick={() => setIsNewTypeSheetOpen(true)}
-                        />
+                        <TypeCard simple label="Novo Tipo" onClick={() => setIsNewTypeSheetOpen(true)} />
                     </div>
                 </div>
 
-                {/* Title */}
                 <FormInput
                     label="Título (opcional)"
                     name="title"
@@ -195,81 +212,121 @@ export const AddUnavailableSheet = ({
                     onChange={(e) => setTitle(e.target.value)}
                 />
 
-                {/* Date and Times */}
                 <div className="space-y-4">
-                    <DatePicker
-                        label="Data"
-                        value={date}
-                        onChange={(d) => setDate(formatDateStr(d))}
-                    />
-
+                    <DatePicker label="Data" value={date} onChange={(d) => setDate(formatDateStr(d))} />
                     <div className="grid grid-cols-2 gap-4">
-                        <TimePicker
-                            label="Início"
-                            value={startTime}
-                            onChange={setStartTime}
-                        />
-                        <TimePicker
-                            label="Término"
-                            value={endTime}
-                            onChange={setEndTime}
-                        />
+                        <TimePicker label="Início" value={startTime} onChange={setStartTime} />
+                        <TimePicker label="Término" value={endTime} onChange={setEndTime} />
                     </div>
                 </div>
 
-                {/* Collaborator */}
+                {/* Professional Selection - MULTI SELECT */}
                 <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-bold text-brand-dark dark:text-dark-heading ml-1">Profissional</label>
+                    <label className="text-sm font-bold text-brand-dark dark:text-dark-heading ml-1">Profissionais</label>
                     <Dropdown
                         width="w-full"
                         showChevron={false}
                         trigger={
-                            <Button variant="outline" className="w-full h-12">
-                                <div className="flex items-center gap-3">
-                                    <UserProfileImage
-                                        fullName={selectedStaff?.name || 'Selecione'}
-                                        className="w-6 h-6"
-                                    />
-                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{selectedStaff?.name || 'Selecione'}</span>
-                                </div>
+                            <Button variant="outline" className="w-full h-12 justify-between px-4">
+                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                    {selectedStaffIds.length === 0 
+                                        ? 'Selecione os profissionais' 
+                                        : selectedStaffIds.length === 1 
+                                            ? staffMembers.find(s => s.id === selectedStaffIds[0])?.name
+                                            : `${selectedStaffIds.length} selecionados`}
+                                </span>
                                 <ChevronDownIcon size={16} className="text-brand-inactive-text" />
                             </Button>
                         }
                     >
                         <div className="max-h-[300px] overflow-y-auto p-1">
                             {staffMembers?.map(staff => (
-                                <DropdownItem key={staff.id} onClick={() => setSelectedStaffId(staff.id)} className="gap-3">
+                                <div 
+                                    key={staff.id} 
+                                    className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-zinc-800 rounded-lg cursor-pointer transition-colors"
+                                    onClick={() => toggleStaff(staff.id)}
+                                >
+                                    <Checkbox 
+                                        checked={selectedStaffIds.includes(staff.id)} 
+                                        onChange={() => {}} 
+                                        className="pointer-events-none"
+                                    />
                                     <UserProfileImage fullName={staff.name} className="w-6 h-6" />
-                                    <span className="font-medium">{staff.name}</span>
-                                </DropdownItem>
+                                    <span className="font-medium text-sm text-brand-dark dark:text-dark-heading">{staff.name}</span>
+                                </div>
                             ))}
                         </div>
                     </Dropdown>
                 </div>
 
-                {/* Recurrence */}
-                <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-bold text-brand-dark dark:text-dark-heading ml-1">Repetição</label>
-                    <Dropdown
-                        width="w-full"
-                        showChevron={false}
-                        trigger={
-                            <Button variant="outline" className="w-full h-12">
-                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                    {recurrence === 'none' ? 'Não se repete' : recurrence === 'daily' ? 'Diariamente' : 'Semanalmente'}
-                                </span>
-                            </Button>
-                        }
-                    >
-                        <div className="p-1">
-                            <DropdownItem onClick={() => setRecurrence('none')}>Não se repete</DropdownItem>
-                            <DropdownItem onClick={() => setRecurrence('daily')}>Diariamente</DropdownItem>
-                            <DropdownItem onClick={() => setRecurrence('weekly')}>Semanalmente</DropdownItem>
+                {/* Recurrence with End Logic */}
+                <div className="space-y-4">
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-sm font-bold text-brand-dark dark:text-dark-heading ml-1">Repetição</label>
+                        <Dropdown
+                            width="w-full"
+                            showChevron={false}
+                            trigger={
+                                <Button variant="outline" className="w-full h-12 justify-between px-4">
+                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                        {recurrence === 'none' ? 'Não se repete' : recurrence === 'daily' ? 'Diariamente' : 'Semanalmente'}
+                                    </span>
+                                    <ChevronDownIcon size={16} className="text-brand-inactive-text" />
+                                </Button>
+                            }
+                        >
+                            <div className="p-1">
+                                <DropdownItem onClick={() => setRecurrence('none')}>Não se repete</DropdownItem>
+                                <DropdownItem onClick={() => setRecurrence('daily')}>Diariamente</DropdownItem>
+                                <DropdownItem onClick={() => setRecurrence('weekly')}>Semanalmente</DropdownItem>
+                            </div>
+                        </Dropdown>
+                    </div>
+
+                    {recurrence !== 'none' && (
+                        <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-gray-50/50 dark:bg-zinc-900/20 space-y-4">
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider">Termina em</label>
+                                <Dropdown
+                                    width="w-full"
+                                    showChevron={false}
+                                    trigger={
+                                        <Button variant="ghost" className="w-full h-10 justify-between px-0 hover:bg-transparent">
+                                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                                {recurrenceEndType === 'never' ? 'Nunca' : recurrenceEndType === 'date' ? 'Em uma data' : 'Após ocorrências'}
+                                            </span>
+                                            <ChevronDownIcon size={14} />
+                                        </Button>
+                                    }
+                                >
+                                    <div className="p-1">
+                                        <DropdownItem onClick={() => setRecurrenceEndType('never')}>Nunca</DropdownItem>
+                                        <DropdownItem onClick={() => setRecurrenceEndType('date')}>Em uma data específica</DropdownItem>
+                                        <DropdownItem onClick={() => setRecurrenceEndType('count')}>Após um número de vezes</DropdownItem>
+                                    </div>
+                                </Dropdown>
+                            </div>
+
+                            {recurrenceEndType === 'date' && (
+                                <DatePicker 
+                                    label="Data final" 
+                                    value={recurrenceEndDate} 
+                                    onChange={(d) => setRecurrenceEndDate(formatDateStr(d))} 
+                                />
+                            )}
+
+                            {recurrenceEndType === 'count' && (
+                                <FormInput
+                                    label="Número de ocorrências"
+                                    type="number"
+                                    value={recurrenceCount.toString()}
+                                    onChange={(e) => setRecurrenceCount(parseInt(e.target.value) || 1)}
+                                />
+                            )}
                         </div>
-                    </Dropdown>
+                    )}
                 </div>
 
-                {/* Description */}
                 <FormTextarea
                     label="Notas (opcional)"
                     name="description"
@@ -280,7 +337,6 @@ export const AddUnavailableSheet = ({
                 />
             </div>
 
-            {/* Footer */}
             <div className="absolute bottom-0 left-0 w-full p-6 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border z-20">
                 <Button className="w-full h-[48px]" onClick={handleConfirm}>
                     {isEditing ? 'Salvar Alterações' : 'Salvar Horário'}
@@ -292,42 +348,17 @@ export const AddUnavailableSheet = ({
     const NewTypeSheetBody = (
         <div className="flex flex-col h-full bg-white dark:bg-dark-surface overflow-hidden">
             <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Novo Tipo de Indisponibilidade</h2>
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Novo Tipo</h2>
                 <Button variant="ghost" onClick={() => setIsNewTypeSheetOpen(false)} size="icon">
                     <XIcon className="h-5 w-5" />
                 </Button>
             </header>
-
-            <div className="flex-1 space-y-4 overflow-y-auto p-6">
-                <FormInput
-                    label="Nome do Tipo"
-                    name="typeName"
-                    placeholder="Ex: Treinamento, Manutenção"
-                    value={newTypeName}
-                    onChange={(e) => setNewTypeName(e.target.value)}
-                />
-                <FormInput
-                    label="Duração Padrão (minutos)"
-                    name="typeDuration"
-                    type="number"
-                    value={newTypeDuration}
-                    onChange={(e) => setNewTypeDuration(e.target.value)}
-                />
+            <div className="flex-1 space-y-4 p-6">
+                <FormInput label="Nome" value={newTypeName} onChange={(e) => setNewTypeName(e.target.value)} />
+                <FormInput label="Duração (min)" type="number" value={newTypeDuration} onChange={(e) => setNewTypeDuration(e.target.value)} />
             </div>
-
-            <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                <div className="flex items-center gap-3">
-                    <Button variant="outline" className="flex-1" onClick={() => setIsNewTypeSheetOpen(false)}>
-                        Cancelar
-                    </Button>
-                    <Button
-                        className="flex-1"
-                        isLoading={isSavingNewType}
-                        onClick={handleSaveNewType}
-                    >
-                        Salvar Tipo
-                    </Button>
-                </div>
+            <footer className="p-6 border-t border-brand-border bg-white dark:bg-dark-surface dark:border-dark-border">
+                <Button className="w-full" isLoading={isSavingNewType} onClick={handleSaveNewType}>Salvar Tipo</Button>
             </footer>
         </div>
     );
@@ -335,12 +366,8 @@ export const AddUnavailableSheet = ({
     if (isMobile) {
         return (
             <>
-                <BottomSheet isOpen={true} onClose={onClose}>
-                    {SheetBody}
-                </BottomSheet>
-                <BottomSheet isOpen={isNewTypeSheetOpen} onClose={() => setIsNewTypeSheetOpen(false)}>
-                    {NewTypeSheetBody}
-                </BottomSheet>
+                <BottomSheet isOpen={true} onClose={onClose}>{SheetBody}</BottomSheet>
+                <BottomSheet isOpen={isNewTypeSheetOpen} onClose={() => setIsNewTypeSheetOpen(false)}>{NewTypeSheetBody}</BottomSheet>
             </>
         );
     }
@@ -348,15 +375,9 @@ export const AddUnavailableSheet = ({
     return (
         <>
             <Portal>
-                <div
-                    className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 opacity-100`}
-                    onClick={onClose}
-                >
+                <div className="fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 opacity-100" onClick={onClose}>
                     <div
-                        className={`fixed right-4 top-4 bottom-4 w-[520px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isNewTypeSheetOpen
-                            ? "-translate-x-10 scale-[0.97] opacity-70"
-                            : "translate-x-0 opacity-100"
-                            }`}
+                        className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isNewTypeSheetOpen ? "-translate-x-10 scale-[0.97] opacity-70" : "translate-x-0 opacity-100"}`}
                         onClick={(e) => e.stopPropagation()}
                     >
                         {SheetBody}
@@ -364,14 +385,8 @@ export const AddUnavailableSheet = ({
                 </div>
             </Portal>
             <Portal>
-                <div
-                    className={`fixed inset-0 z-[60] bg-black/50 transition-opacity duration-300 ${isNewTypeSheetOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-                    onClick={() => setIsNewTypeSheetOpen(false)}
-                >
-                    <div
-                        className={`fixed right-4 top-4 bottom-4 w-[520px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isNewTypeSheetOpen ? "translate-x-0" : "translate-x-[120%]"}`}
-                        onClick={(e) => e.stopPropagation()}
-                    >
+                <div className={`fixed inset-0 z-[60] bg-black/50 transition-opacity duration-300 ${isNewTypeSheetOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} onClick={() => setIsNewTypeSheetOpen(false)}>
+                    <div className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isNewTypeSheetOpen ? "translate-x-0" : "translate-x-[120%]"}`} onClick={(e) => e.stopPropagation()}>
                         {NewTypeSheetBody}
                     </div>
                 </div>

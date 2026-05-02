@@ -56,7 +56,12 @@ export const AppointmentSheet = ({
     const clientsSource = clientsCatalog || [];
     const staffSource = staffCatalog || [];
     const { canEdit, hasSpecific, canDelete } = usePermissions();
-    const [currentView, setCurrentView] = useState<'summary' | 'services' | 'client' | 'datetime' | 'activity' | 'edit-service' | 'recurrence' | 'notes'>('summary');
+    const [currentView, setCurrentView] = useState<'summary' | 'services' | 'client' | 'datetime' | 'activity' | 'edit-service' | 'recurrence' | 'notes'>(() => {
+        if (mode === 'create' && initialStaffId && selectedDate && initialTimeSlot) {
+            return 'services';
+        }
+        return 'summary';
+    });
     const [selectedServices, setSelectedServices] = useState<any[]>([]);
     const [selectedClient, setSelectedClient] = useState<any>(null);
     const [editingServiceIndex, setEditingServiceIndex] = useState<number | null>(null);
@@ -392,7 +397,13 @@ export const AppointmentSheet = ({
         }
         else if (currentView === 'client') {
             if (!selectedClient) return;
-            setCurrentView('datetime');
+            
+            // IF INITIAL PARAMS WERE PASSED, SKIP DATETIME
+            if (initialStaffId && initialTimeSlot && mode === 'create') {
+                setCurrentView('summary');
+            } else {
+                setCurrentView('datetime');
+            }
         }
         else if (currentView === 'datetime') {
             // Validation for range picker
@@ -729,7 +740,7 @@ export const AppointmentSheet = ({
     const formattedHeaderDate = formatDate(headerDateObj);
 
     const SheetContent = (
-        <div className={`relative w-full ${isMobile ? '' : 'max-w-md'} bg-white dark:bg-dark-surface flex flex-col h-full overflow-hidden`}>
+        <div className="relative w-full bg-white dark:bg-dark-surface flex flex-col h-full overflow-hidden">
             {renderHeader()}
 
             {/* Content Area */}
@@ -1310,16 +1321,21 @@ export const AppointmentSheet = ({
                     </BottomSheet>
                 ) : (
                     <Portal>
-                        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={handleCloseAttempt} />
-                        <motion.div
-                            initial={{ x: '100%', opacity: 0.5 }}
-                            animate={{ x: 0, opacity: 1 }}
-                            exit={{ x: '100%', opacity: 0.5 }}
-                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                            className="fixed inset-y-0 right-0 z-50 w-full max-w-sm flex flex-col bg-white shadow-2xl dark:bg-dark-surface overflow-hidden"
+                        <div
+                            className="fixed inset-0 z-50 bg-black/50 transition-opacity"
+                            onClick={handleCloseAttempt}
                         >
-                            {SheetContent}
-                        </motion.div>
+                            <motion.div
+                                initial={{ x: '120%', opacity: 1 }}
+                                animate={{ x: 0, opacity: 1 }}
+                                exit={{ x: '120%', opacity: 1 }}
+                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                className="fixed right-4 top-4 bottom-4 z-50 w-[450px] flex flex-col bg-white shadow-2xl dark:bg-dark-surface overflow-hidden rounded-2xl"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {SheetContent}
+                            </motion.div>
+                        </div>
                     </Portal>
                 )
             )}

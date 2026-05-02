@@ -1,9 +1,14 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
-import { Button, Input, FormDropdown } from "@/components/reusable"
-import { PlusIcon, TrashIcon } from "@/lib/icons"
+import { useRef, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { Button, Input, FormDropdown, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
+import QuantitySelector from "@/components/reusable/QuantitySelector"
+import { PlusIcon, TrashIcon, SearchIcon, CheckCircleIcon, EditIcon } from "@/lib/icons"
+import { useProductBucket } from "../hooks"
+import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 interface ServiceResourcesTabProps {
     serviceData: any
@@ -15,89 +20,252 @@ export const ServiceResourcesTab: React.FC<ServiceResourcesTabProps> = ({
     serviceData, handleInputChange, isEditing
 }) => {
     const resources = serviceData.resources || []
+    const searchRef = useRef<HTMLDivElement>(null)
+    const productBucket = useProductBucket(fetchPartnerProductsBucket)
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+                productBucket.setSearchQuery("")
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside)
+        return () => document.removeEventListener("mousedown", handleClickOutside)
+    }, [productBucket])
+
+    const manualChange = (name: string, value: any) => {
+        handleInputChange({ target: { name, value } })
+    }
 
     const addResource = () => {
-        const newResources = [...resources, { name: "", quantity: 1, usage_type: "consumed" }]
-        handleInputChange({ target: { name: "resources", value: newResources } })
+        const newResources = [...resources, {
+            name: "",
+            quantity: 1,
+            usage_type: "consumed",
+            isEditing: true,
+            isManual: true
+        }]
+        manualChange("resources", newResources)
+    }
+
+    const handleProductClick = (product: any) => {
+        const newResources = [...resources, {
+            product_id: product.id,
+            name: product.name,
+            sku: product.sku,
+            quantity: 1,
+            usage_type: "consumed",
+            image: product.image,
+            isManual: false
+        }]
+        manualChange("resources", newResources)
+        productBucket.setSearchQuery("")
     }
 
     const updateResource = (index: number, field: string, value: any) => {
         const newResources = [...resources]
         newResources[index] = { ...newResources[index], [field]: value }
-        handleInputChange({ target: { name: "resources", value: newResources } })
+        manualChange("resources", newResources)
     }
 
     const removeResource = (index: number) => {
         const newResources = resources.filter((_: any, i: number) => i !== index)
-        handleInputChange({ target: { name: "resources", value: newResources } })
+        manualChange("resources", newResources)
+    }
+
+    const toggleItemEdit = (index: number, isEditing: boolean) => {
+        const newResources = [...resources]
+        if (isEditing && !newResources[index]?.isManual) return
+        newResources[index] = { ...newResources[index], isEditing }
+        manualChange("resources", newResources)
     }
 
     return (
-        <div className="max-w-4xl">
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Itens e Recursos Necessários</h3>
-                    <p className="text-brand-inactive-text dark:text-dark-body text-sm mt-1">
+        <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 animate-fade-in">
+            {/* ESQUERDA (Principal) */}
+            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
+                <div className="mb-8">
+                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">Itens e Recursos Necessários</h3>
+                    <p className="text-brand-inactive-text dark:text-dark-body text-sm mb-6">
                         Cadastre os materiais ou equipamentos utilizados na execução deste serviço.
                     </p>
+
+                    <div ref={searchRef} className="relative mb-6">
+                        {isEditing && (
+                            <Input
+                                label=""
+                                name="productSearch"
+                                placeholder="Buscar itens para adicionar..."
+                                prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                                value={productBucket.searchQuery}
+                                onChange={(e) => {
+                                    productBucket.setSearchQuery(e.target.value)
+                                    productBucket.loadBucket()
+                                }}
+                                onFocus={() => productBucket.loadBucket()}
+                                className="mb-0"
+                            />
+                        )}
+
+                        <AnimatePresence>
+                            {productBucket.searchQuery && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 5 }}
+                                    className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-xl z-20 max-h-60 overflow-y-auto"
+                                >
+                                    {productBucket.isLoading ? (
+                                        <div className="p-4"><ThreeDotsLoader /></div>
+                                    ) : productBucket.filteredResults.length > 0 ? (
+                                        productBucket.filteredResults.map((product: any) => (
+                                            <div
+                                                key={product.id}
+                                                onClick={() => handleProductClick(product)}
+                                                className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0"
+                                            >
+                                                <img src={getR2ImageUrl(product.image, "thumbnail")} className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border object-cover" />
+                                                <div className="flex-1">
+                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</div>
+                                                    <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">SKU: {product.sku}</div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="p-4 text-center text-sm text-brand-inactive-text">Nenhum item encontrado.</div>
+                                    )}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+
+                    {/* ITEMS TABLE */}
+                    {resources.length > 0 ? (
+                        <div className="w-full overflow-x-auto pb-4 custom-scrollbar mb-4">
+                            <table className="w-full text-left border-separate border-spacing-0">
+                                <thead>
+                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                        <th className="py-3 pl-6 pr-4 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg">Item</th>
+                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-40">Tipo de Uso</th>
+                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36">Qtd.</th>
+                                        {isEditing && <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-24 rounded-r-lg">Ações</th>}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {resources.map((resource: any, index: number) => (
+                                        <tr key={index} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+                                            <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
+                                                        <img src={getR2ImageUrl(resource.image, "thumbnail")} className={`w-full h-full ${!resource.image ? 'object-contain' : 'object-cover'}`} alt="" />
+                                                    </div>
+                                                    <div className="flex flex-col text-left flex-1 min-w-0">
+                                                        {resource.isEditing ? (
+                                                            <Input
+                                                                name={`item-name-${index}`}
+                                                                value={resource.name}
+                                                                onChange={(e) => updateResource(index, "name", e.target.value)}
+                                                                placeholder="Nome do item..."
+                                                                className="mb-0"
+                                                            />
+                                                        ) : (
+                                                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[250px]">
+                                                                {resource.name || 'Item sem nome'}
+                                                            </span>
+                                                        )}
+                                                        {!resource.isEditing && (
+                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                                {resource.sku || (resource.isManual ? 'Manual' : 'Sem SKU')}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                <div className="w-full">
+                                                    <FormDropdown
+                                                        label=""
+                                                        options={[
+                                                            { value: "consumed", label: "Consumido" },
+                                                            { value: "returnable", label: "Retornável" },
+                                                            { value: "reference", label: "Referência" }
+                                                        ]}
+                                                        value={resource.usage_type}
+                                                        setValue={(v) => updateResource(index, "usage_type", v)}
+                                                        disabled={!isEditing}
+                                                        width="w-full"
+                                                        className="mb-0"
+                                                    />
+                                                </div>
+                                            </td>
+                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                <div className="flex justify-center">
+                                                    <QuantitySelector value={resource.quantity} onChange={(val) => updateResource(index, "quantity", val)} size="md" disabled={!isEditing} />
+                                                </div>
+                                            </td>
+                                            {isEditing && (
+                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                    <div className="flex justify-center gap-2">
+                                                        {resource.isEditing ? (
+                                                            <button
+                                                                onClick={() => toggleItemEdit(index, false)}
+                                                                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-green-50 dark:hover:bg-green-900/10 text-brand-green transition-colors"
+                                                            >
+                                                                <CheckCircleIcon size={18} />
+                                                            </button>
+                                                        ) : resource.isManual ? (
+                                                            <button
+                                                                onClick={() => toggleItemEdit(index, true)}
+                                                                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark transition-colors"
+                                                            >
+                                                                <EditIcon size={18} />
+                                                            </button>
+                                                        ) : null}
+                                                        <button
+                                                            onClick={() => removeResource(index)}
+                                                            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
+                                                        >
+                                                            <TrashIcon size={18} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            )}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <div className="w-full flex-col flex items-center justify-center py-10">
+                            <IconPlaceholder
+                                icon={SearchIcon}
+                                title="Nenhum item adicionado"
+                                subtitle="Busque itens no campo acima ou adicione manualmente."
+                                itemButton={isEditing ? {
+                                    text: "Adicionar item manual",
+                                    action: addResource,
+                                    variant: "outline",
+                                } : undefined}
+                            />
+                        </div>
+                    )}
+
+                    {isEditing && resources.length > 0 && (
+                        <Button
+                            type="button"
+                            variant="link"
+                            onClick={addResource}
+                            className="mt-2"
+                        >
+                            <PlusIcon size={14} strokeWidth={3} className="mr-1" />
+                            Adicionar item manual
+                        </Button>
+                    )}
                 </div>
-                <Button onClick={addResource} disabled={!isEditing} variant="outline" size="sm">
-                    <PlusIcon className="w-4 h-4 mr-2" />
-                    Adicionar Recurso
-                </Button>
             </div>
 
-            <div className="space-y-4">
-                {resources.length === 0 ? (
-                    <div className="text-center py-10 border border-dashed border-brand-border dark:border-dark-border rounded-xl">
-                        <p className="text-brand-inactive-text">Nenhum recurso cadastrado para este serviço.</p>
-                    </div>
-                ) : (
-                    resources.map((resource: any, index: number) => (
-                        <div key={index} className="flex flex-col sm:flex-row gap-4 items-start sm:items-center p-4 border border-brand-border dark:border-dark-border rounded-xl bg-gray-50/50 dark:bg-dark-surface/50">
-                            <div className="flex-1 w-full">
-                                <Input
-                                    label="Nome do Item / Produto"
-                                    value={resource.name}
-                                    onChange={(e) => updateResource(index, "name", e.target.value)}
-                                    disabled={!isEditing}
-                                    placeholder="Ex: Shampoo, Toalha, Projetor..."
-                                />
-                            </div>
-                            <div className="w-full sm:w-32">
-                                <Input
-                                    label="Qtd."
-                                    type="number"
-                                    value={resource.quantity}
-                                    onChange={(e) => updateResource(index, "quantity", Number(e.target.value))}
-                                    disabled={!isEditing}
-                                />
-                            </div>
-                            <div className="w-full sm:w-48">
-                                <FormDropdown
-                                    label="Tipo de Uso"
-                                    options={[
-                                        { value: "consumed", label: "Consumido" },
-                                        { value: "returnable", label: "Retornável" },
-                                        { value: "reference", label: "Apenas Referência" }
-                                    ]}
-                                    value={resource.usage_type}
-                                    setValue={(v) => updateResource(index, "usage_type", v)}
-                                    disabled={!isEditing}
-                                />
-                            </div>
-                            <div className="pt-0 sm:pt-6">
-                                <Button
-                                    onClick={() => removeResource(index)}
-                                    disabled={!isEditing}
-                                    className="px-3"
-                                >
-                                    <TrashIcon className="w-4 h-4" />
-                                </Button>
-                            </div>
-                        </div>
-                    ))
-                )}
+            {/* DIREITA (Vazio para manter layout) */}
+            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
             </div>
         </div>
     )
