@@ -261,7 +261,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
 
                 {/* Sticky Header */}
-                <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
                     <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
 
                         {/* Back button - desktop only */}

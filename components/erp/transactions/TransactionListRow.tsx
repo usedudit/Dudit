@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { ActionsDropdown, Badge, Checkbox } from "@/components/reusable"
+import { ActionsDropdown, Badge, Checkbox, DropdownItem } from "@/components/reusable"
 import { CreditCardIcon, FileIcon, InstallmentIcon, MoneyIcon, RepeatIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { DueDateCountdown } from "@/lib/utils/transaction-due-countdown"
@@ -144,7 +144,13 @@ const TransactionListItem = React.memo(
                                         ? "Quitar tudo"
                                         : (transaction.isRecurringOccurrence ? "Marcar como pago" : (String(transaction.rawStatus || "").toLowerCase() === "pending" && !transaction.installmentGroupId ? "Cancelar" : undefined))
                                 }
-                            />
+                            >
+                                {((String(transaction.rawStatus || "").toLowerCase() === "pending" || transaction.isOverdue) && !transaction.isInstallmentGroup && !transaction.isRecurringOccurrence && onMarkAsPaid) && (
+                                    <DropdownItem onClick={() => onMarkAsPaid(transaction)}>
+                                        <MoneyIcon className="w-4 h-4" /> Marcar como {transaction.ledgerDirection === "in" ? "recebido" : "pago"}
+                                    </DropdownItem>
+                                )}
+                            </ActionsDropdown>
                         </div>
                     )
 

@@ -200,8 +200,10 @@ export default function CreateTransactionPage({
     const isEditMode = !!editTransaction || !!editRecurringTemplate
     const isRecurringTemplateEdit = !!editRecurringTemplate
     const isPaidTransaction = !!editTransaction && String(editTransaction.rawStatus || "").toLowerCase() === "paid"
+    const isPendingTransaction = !!editTransaction && String(editTransaction.rawStatus || "").toLowerCase() === "pending"
     const isSystemGatewayOrigin = !!editTransaction && ["system", "gateway"].includes(String(editTransaction.origin || "").toLowerCase())
     const lockFinancialFields = isPaidTransaction || isSystemGatewayOrigin
+    const lockAmountField = lockFinancialFields || (isEditMode && !!editTransaction && isPendingTransaction)
     const isInstallmentTransaction = !!editTransaction?.installmentGroupId
     const isRecurringTransaction = !!editTransaction && !!editTransaction.recurringId
     const isSalesOrigin = !!editTransaction && String(editTransaction.category || "").toLowerCase() === "vendas"
@@ -1299,7 +1301,7 @@ export default function CreateTransactionPage({
                         label="Valor"
                         value={amount}
                         onChange={setAmount}
-                        disabled={lockFinancialFields}
+                        disabled={lockAmountField}
                         error={fieldErrors.has("amount")}
                         errorMessage={fieldErrors.has("amount") ? "Valor obrigatório" : undefined}
                     />

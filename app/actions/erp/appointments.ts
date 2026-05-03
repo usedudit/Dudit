@@ -5,19 +5,22 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { logAuditEvent } from "@/lib/services/timeline.service"
-import { revalidateEntityTimeline } from "@/lib/utils/revalidation"
+import { revalidateEntityTimeline, revalidateStockMovements } from "@/lib/utils/revalidation"
 import { revalidatePath, revalidateTag } from "next/cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { applyServiceOrderToGoals } from "@/lib/services/sales-goals.service"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
 import { getAdminTimeline } from "@/lib/services/timeline.service"
 import { increment_usage_counter } from "@/lib/services/subscription.service"
+import { reserveOrderInventory, releaseOrderInventory, finalizeOrderInventory } from "@/lib/stock/reservations"
+import { invalidateProductCache } from "@/lib/cache/invalidation"
 
 export type AppointmentStatus =
   | "Reservado"
   | "Confirmado"
   | "Aguardando"
   | "Iniciado"
+  | "Concluído"
   | "Pago"
   | "Ausência"
   | "Cancelado"
@@ -55,6 +58,7 @@ function sanitizeStatus(value?: string | null): AppointmentStatus {
   if (v === "confirmado" || v === "confirmed") return "Confirmado"
   if (v === "aguardando" || v === "pending") return "Aguardando"
   if (v === "iniciado" || v === "in progress") return "Iniciado"
+  if (v === "concluído" || v === "concluido" || v === "completed") return "Concluído"
   if (v === "pago" || v === "paid") return "Pago"
   if (v === "pago parcialmente" || v === "partially paid" || v === "parcialmente pago") return "Pago Parcialmente"
   if (v === "ausência" || v === "ausencia" || v === "absence") return "Ausência"
@@ -96,7 +100,7 @@ async function getPartnerContextWithPermission(permission: "view" | "create" | "
 
 function isPaidStatus(status: string | null | undefined) {
   const s = String(status || "").toLowerCase()
-  return s === "pago" || s === "paid"
+  return s === "pago" || s === "paid" || s === "concluído" || s === "concluido" || s === "completed" || s === "finalizado"
 }
 
 function isPartialStatus(status: string | null | undefined) {
@@ -669,6 +673,21 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
       metadata: { oldStatus: current.status, newStatus: normalizedStatus, paidAmount: effectivePaidAmount },
     })
 
+    // -- Stock Movement Integration --
+    try {
+      await handleAppointmentStockMovement({
+        supabase,
+        partnerId,
+        appointment: syncedAppointment || updated,
+        oldStatus: current.status,
+        newStatus: normalizedStatus,
+        userId: user.id,
+      })
+    } catch (stockErr) {
+      console.error("[appointment_stock] failed to process movement:", stockErr)
+      // We don't fail the whole update if stock fails, but we log it.
+    }
+
     await revalidateEntityTimeline("appointment", appointmentId)
     safeRevalidateTag(TAGS.entityTimeline("appointment-list", partnerId))
     revalidatePath("/erp/servicos")
@@ -677,6 +696,120 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
   } catch (error: any) {
     return { success: false, error: error?.message || "Erro ao atualizar agendamento" }
   }
+}
+
+/**
+ * Handle stock movements (reservation, consumption, release) during appointment lifecycle.
+ * Mirrors the logic used in Orders but adapted for service resources.
+ */
+async function handleAppointmentStockMovement(params: {
+  supabase: any
+  partnerId: string
+  appointment: any
+  oldStatus: string | null
+  newStatus: string
+  userId: string
+}) {
+  const { supabase, partnerId, appointment, oldStatus, newStatus, userId } = params
+
+  // 1. Movement Classification
+  const isStarted = (s: string | null) => s === 'Iniciado'
+  const isCompleted = (s: string | null) => ['Concluído', 'Pago', 'Pago Parcialmente', 'Partially Paid'].includes(s || "")
+  const isCancelled = (s: string | null) => ['Cancelado', 'Ausência'].includes(s || "")
+  const isWaiting = (s: string | null) => ['Reservado', 'Confirmado', 'Aguardando'].includes(s || "")
+
+  let action: 'reserve' | 'finalize' | 'release' | null = null
+
+  if (isWaiting(oldStatus) && isStarted(newStatus)) {
+    action = 'reserve'
+  } else if (isStarted(oldStatus) && isCompleted(newStatus)) {
+    action = 'finalize'
+  } else if (isStarted(oldStatus) && isCancelled(newStatus)) {
+    action = 'release'
+  } else if (isWaiting(oldStatus) && isCompleted(newStatus)) {
+    // Direct Jump from waiting to completed
+    action = 'finalize'
+  }
+
+  if (!action) return
+
+  // 2. Resolve Resources from Services
+  const serviceNames = String(appointment.service_name || "").split(',').map(s => s.trim()).filter(Boolean)
+  if (serviceNames.length === 0) return
+
+  const { data: services } = await supabase
+    .from("services")
+    .select("resources")
+    .eq("partner_id", partnerId)
+    .in("name", serviceNames)
+
+  if (!services || services.length === 0) return
+
+  const items: any[] = []
+  for (const s of services) {
+    if (s.resources && Array.isArray(s.resources)) {
+      for (const res of s.resources) {
+        if (res.productId && res.quantity) {
+          items.push({
+            product_id: res.productId,
+            variant_id: res.variantId || null,
+            quantity: Number(res.quantity),
+            returnable: res.returnable === true
+          })
+        }
+      }
+    }
+  }
+
+  if (items.length === 0) return
+
+  // 3. Execute Movements using core inventory library
+  // We use appointment.id as the reference ID for the inventory RPCs
+  const stockItems = items.map(i => ({
+    product_id: i.product_id,
+    variant_id: i.variant_id,
+    quantity: i.quantity
+  }))
+
+  if (action === 'reserve') {
+    await reserveOrderInventory({ client: supabase, partnerId, orderId: appointment.id, items: stockItems })
+  } else if (action === 'finalize') {
+    // Consumable items are deducted from reserved stock
+    const consumableItems = items.filter(i => !i.returnable).map(i => ({
+      product_id: i.product_id,
+      variant_id: i.variant_id,
+      quantity: i.quantity
+    }))
+    // Returnable items (equipment) are just released back to stock
+    const returnableItems = items.filter(i => i.returnable).map(i => ({
+      product_id: i.product_id,
+      variant_id: i.variant_id,
+      quantity: i.quantity
+    }))
+
+    if (consumableItems.length > 0) {
+      await finalizeOrderInventory({
+        client: supabase,
+        partnerId,
+        orderId: appointment.id,
+        items: consumableItems,
+        createdBy: userId,
+        reason: `Agendamento Concluído: ${appointment.service_name}`
+      })
+    }
+    if (returnableItems.length > 0) {
+      await releaseOrderInventory({ client: supabase, partnerId, orderId: appointment.id, items: returnableItems })
+    }
+  } else if (action === 'release') {
+    await releaseOrderInventory({ client: supabase, partnerId, orderId: appointment.id, items: stockItems })
+  }
+
+  // 4. Invalidate Caches
+  const productIds = Array.from(new Set(items.map(i => i.product_id)))
+  for (const pid of productIds) {
+    await invalidateProductCache(pid, partnerId, 'update', { silent: true })
+  }
+  revalidateStockMovements(partnerId)
 }
 
 export async function deleteAppointmentAction(appointmentId: string) {

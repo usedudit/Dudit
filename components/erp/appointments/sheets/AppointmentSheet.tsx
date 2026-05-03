@@ -607,8 +607,9 @@ export const AppointmentSheet = ({
         { value: 'Confirmado', label: 'Confirmado' },
         { value: 'Aguardando', label: 'Aguardando' },
         { value: 'Iniciado', label: 'Iniciado' },
+        { value: 'Concluído', label: 'Concluído' },
         { value: 'Ausência', label: 'Ausência' },
-    ];
+    ] as const;
 
     const dates = useMemo(() => {
         const days = [];
@@ -675,7 +676,7 @@ export const AppointmentSheet = ({
         });
     };
 
-    const handleStatusChange = (newStatus: string) => {
+    const handleStatusChange = (newStatus: Appointment['status']) => {
         if ((newStatus === 'Ausência' || newStatus === 'Cancelado') && onStatusChangeRequest && appointment) {
             // Trigger the special sheet in parent
             onStatusChangeRequest(newStatus === 'Ausência' ? 'absence' : 'cancel', appointment);
@@ -1057,7 +1058,7 @@ export const AppointmentSheet = ({
                                         >
                                             <div className="min-w-[140px]">
                                                 {VIEW_STATUS_OPTIONS.map(opt => (
-                                                    <DropdownItem key={opt.value} onClick={() => setStatus(opt.value)}>{opt.label}</DropdownItem>
+                                                    <DropdownItem key={opt.value} onClick={() => handleStatusChange(opt.value)}>{opt.label}</DropdownItem>
                                                 ))}
                                             </div>
                                         </Dropdown>

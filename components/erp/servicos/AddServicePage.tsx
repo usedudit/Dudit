@@ -29,14 +29,14 @@ const BOOLEAN_FIELDS = new Set(["is_active", "show_in_marketplace", "highlight_s
 
 const REQUIRED_FIELDS = [
     { field: "name", tab: "general", validate: (v: any) => !!v?.trim(), message: "Nome é obrigatório" },
-    { field: "price", tab: "general", validate: (v: any, data: any) => data.price_type === 'free' || v >= 0, message: "Preço inválido" },
-    { field: "duration_minutes", tab: "general", validate: (v: any) => v > 0, message: "Duração é obrigatória" },
+    { field: "price", tab: "general", validate: (v: any, data: any) => data.price_type === 'free' || Number(v) > 0, message: "Preço é obrigatório" },
+    { field: "duration_minutes", tab: "general", validate: (v: any) => Number(v) > 0, message: "Duração é obrigatória" },
 ]
 
 const getEmptyService = () => ({
     id: "", name: "", category: "", category_id: "", sku: "", description: "", subcategory: "", subcategory_id: "",
-    price: 0, cost_price: 0, price_type: "fixed", billing_unit: "per_service",
-    duration_minutes: 60, buffer_minutes: 0, service_type: "in_person",
+    price: null as unknown as number, cost_price: null as unknown as number, price_type: "fixed", billing_unit: "per_service",
+    duration_minutes: null as unknown as number, buffer_minutes: null as unknown as number, service_type: "in_person",
     images: [], primary_image_index: 0, video_url: "",
     is_active: true, show_in_marketplace: false, highlight_service: false,
     warranty: "", technical_details: null,

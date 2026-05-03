@@ -1,14 +1,15 @@
 "use client"
 
-import type React from "react"
+import React from "react"
 import { useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, Input, FormDropdown, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
 import QuantitySelector from "@/components/reusable/QuantitySelector"
-import { PlusIcon, TrashIcon, SearchIcon, CheckCircleIcon, EditIcon } from "@/lib/icons"
+import { PlusIcon, TrashIcon, SearchIcon, CheckCircleIcon, EditIcon, AlertTriangleIcon } from "@/lib/icons"
 import { useProductBucket } from "../hooks"
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import AlertModal from "@/components/reusable/AlertModal"
 
 interface ServiceResourcesTabProps {
     serviceData: any
@@ -22,6 +23,9 @@ export const ServiceResourcesTab: React.FC<ServiceResourcesTabProps> = ({
     const resources = serviceData.resources || []
     const searchRef = useRef<HTMLDivElement>(null)
     const productBucket = useProductBucket(fetchPartnerProductsBucket)
+
+    const [isAlertOpen, setIsAlertOpen] = React.useState(false)
+    const [pendingProduct, setPendingProduct] = React.useState<any>(null)
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -49,6 +53,15 @@ export const ServiceResourcesTab: React.FC<ServiceResourcesTabProps> = ({
     }
 
     const handleProductClick = (product: any) => {
+        if (product.stock <= 0 && !product.allow_sell_without_stock) {
+            setPendingProduct(product)
+            setIsAlertOpen(true)
+            return
+        }
+        confirmAddProduct(product)
+    }
+
+    const confirmAddProduct = (product: any) => {
         const newResources = [...resources, {
             product_id: product.id,
             name: product.name,
@@ -60,6 +73,8 @@ export const ServiceResourcesTab: React.FC<ServiceResourcesTabProps> = ({
         }]
         manualChange("resources", newResources)
         productBucket.setSearchQuery("")
+        setIsAlertOpen(false)
+        setPendingProduct(null)
     }
 
     const updateResource = (index: number, field: string, value: any) => {
@@ -126,8 +141,13 @@ export const ServiceResourcesTab: React.FC<ServiceResourcesTabProps> = ({
                                             >
                                                 <img src={getR2ImageUrl(product.image, "thumbnail")} className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border object-cover" />
                                                 <div className="flex-1">
-                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</div>
-                                                    <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">SKU: {product.sku}</div>
+                                                    <div className="flex justify-between items-center">
+                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</div>
+                                                        <div className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${product.stock > 0 ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+                                                            {product.stock} em estoque
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">SKU: {product.sku}</div>
                                                 </div>
                                             </div>
                                         ))
@@ -267,6 +287,17 @@ export const ServiceResourcesTab: React.FC<ServiceResourcesTabProps> = ({
             {/* DIREITA (Vazio para manter layout) */}
             <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
             </div>
+
+            <AlertModal
+                isOpen={isAlertOpen}
+                onClose={() => setIsAlertOpen(false)}
+                onConfirm={() => confirmAddProduct(pendingProduct)}
+                title="Estoque insuficiente"
+                description={`O item "${pendingProduct?.name}" está sem estoque disponível. Deseja adicionar assim mesmo?`}
+                confirmText="Continuar mesmo assim"
+                cancelText="Cancelar"
+                variant="warning"
+            />
         </div>
     )
 }

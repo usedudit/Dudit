@@ -86,7 +86,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                             />
                         </div>
 
-                        <div className={`col-span-12 sm:col-span-4`}>
+                        <div className="col-span-12 lg:col-span-6">
                             <FormDropdown
                                 label="Status"
                                 options={[{ value: "true", label: "Ativo" }, { value: "false", label: "Inativo" }]}
@@ -97,7 +97,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                             />
                         </div>
 
-                        <div className={`col-span-12 sm:col-span-4`}>
+                        <div className="col-span-12 lg:col-span-6">
                             <FormDropdown
                                 label="Exibir na Vitrine"
                                 options={[{ value: "true", label: "Sim" }, { value: "false", label: "Não" }]}

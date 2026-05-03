@@ -184,6 +184,8 @@ export default function TransactionsPage({
     const [cancelReason, setCancelReason] = useState("")
     const [cancellingTransaction, setCancellingTransaction] = useState(false)
     const [settlingGroup, setSettlingGroup] = useState(false)
+    const [confirmRegularMarkAsPaid, setConfirmRegularMarkAsPaid] = useState<ERPTransaction | null>(null)
+    const [markingRegularAsPaid, setMarkingRegularAsPaid] = useState(false)
     const observerTarget = useRef<HTMLDivElement>(null)
 
     const entityPage = useEntityPage<ERPTransaction, TransactionDetailPayload, FinancialTransactionCursor>({
@@ -740,8 +742,11 @@ export default function TransactionsPage({
     )
 
     const handleMarkAsPaid = useCallback(async (transaction: ERPTransaction) => {
-        if (!transaction.isRecurringOccurrence) return
-        setConfirmRecurringPayment(transaction)
+        if (transaction.isRecurringOccurrence) {
+            setConfirmRecurringPayment(transaction)
+        } else {
+            setConfirmRegularMarkAsPaid(transaction)
+        }
     }, [])
 
     const handleRequestCancelPending = useCallback((transaction: ERPTransaction) => {
@@ -810,6 +815,33 @@ export default function TransactionsPage({
             setConfirmRecurringPayment(null)
         }
     }, [partnerId, markingAsPaid, refreshTransactionsNow, notifySuccess, notifyError, confirmRecurringPayment])
+
+    const handleConfirmRegularMarkAsPaid = useCallback(async () => {
+        const transaction = confirmRegularMarkAsPaid
+        if (!transaction) return
+        if (markingRegularAsPaid) return
+        setMarkingRegularAsPaid(true)
+        try {
+            const { updateManualTransactionAction } = await import("@/app/actions/erp/transactions")
+
+            const res = await updateManualTransactionAction(transaction.id, partnerId, {
+                status: "paid",
+                paymentDate: new Date().toISOString()
+            } as any)
+
+            if (!res.success) {
+                notifyError(res.error || "Erro ao atualizar transação")
+                return
+            }
+            notifySuccess(`Transação marcada como ${transaction.ledgerDirection === "in" ? "recebida" : "paga"}!`)
+            void refreshTransactionsNow()
+        } catch {
+            notifyError("Erro ao atualizar transação")
+        } finally {
+            setMarkingRegularAsPaid(false)
+            setConfirmRegularMarkAsPaid(null)
+        }
+    }, [partnerId, markingRegularAsPaid, refreshTransactionsNow, notifySuccess, notifyError, confirmRegularMarkAsPaid])
 
     const handleSettleInstallmentGroup = useCallback(
         async (transaction: ERPTransaction) => {
@@ -1014,96 +1046,100 @@ export default function TransactionsPage({
 
     if (openInstallmentGroupId) {
         return (
-            <motion.div
-                key={`installment-group-${openInstallmentGroupId}`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="w-full h-full min-h-[70vh] bg-white dark:bg-dark-background"
-            >
-                <div className="max-w-[1300px] mx-auto p-4 md:p-6 space-y-6">
-                    <div className="flex items-center gap-3">
-                        <Button
-                            variant="filled"
-                            onClick={() => {
-                                setOpenInstallmentGroupId(null)
-                                setInstallmentDetail(null)
-                            }}
-                            className="w-10 h-10 p-0 flex items-center justify-center"
-                        >
-                            <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                        </Button>
-                        <div>
-                            <h2 className="text-xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading">Detalhe do parcelado</h2>
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Resumo completo e lista de parcelas</p>
-                        </div>
-                    </div>
+            <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
+                {/* Sticky Header */}
+                <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                    <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
+                        <div className="flex items-center gap-3">
 
-                    {installmentDetailLoading ? (
-                        <p className="text-sm text-brand-inactive-text">Carregando parcelas...</p>
-                    ) : installmentDetail ? (
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                {(() => {
-                                    const total = Number(installmentDetail.group?.total_amount || 0)
-                                    const rows = installmentDetail.installments || []
-                                    const paid = rows.reduce((acc: number, row: any) => acc + Number(row.paidAmount || 0), 0)
-                                    const overdue = rows
-                                        .filter((row: any) => row.status === "overdue")
-                                        .reduce((acc: number, row: any) => acc + Number(row.remainingAmount || 0), 0)
-                                    const pending = Math.max(0, total - paid)
-                                    const cells = [
-                                        { label: "Total", value: total },
-                                        { label: "Pago", value: paid },
-                                        { label: "Restante", value: pending },
-                                        { label: "Vencido", value: overdue },
-                                    ]
-                                    return cells.map((cell) => (
-                                        <div key={cell.label} className="rounded-xl border border-brand-border dark:border-dark-border p-3">
-                                            <p className="text-xs text-brand-inactive-text">{cell.label}</p>
-                                            <p className="text-base font-bold">{formatCurrency(cell.value)}</p>
-                                        </div>
-                                    ))
-                                })()}
+                            {/* Back button - desktop only */}
+                            <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500`}>
+                                <Button variant="filled" onClick={() => {
+                                    setOpenInstallmentGroupId(null)
+                                    setInstallmentDetail(null)
+                                }} className="w-10 h-10 p-0 flex items-center justify-center">
+                                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                </Button>
                             </div>
-                            <div className="mt-4 border-t border-brand-border dark:border-dark-border pt-2">
-                                <InstallmentParcelsTable
-                                    rows={
-                                        (installmentDetail.installments || []).map(
-                                            (row: any): InstallmentParcelRow => ({
-                                                id: row.id,
-                                                installmentNumber: row.installmentNumber,
-                                                totalCount: Number(installmentDetail.group?.installments_count) || 0,
-                                                status: row.status,
-                                                originalAmount: Number(row.originalAmount || 0),
-                                                paidAmount: Number(row.paidAmount || 0),
-                                                interestAmount: row.interestAmount != null ? Number(row.interestAmount) : undefined,
-                                                discountAmount: row.discountAmount != null ? Number(row.discountAmount) : undefined,
-                                                dueDate: row.dueDate ? String(row.dueDate) : null,
-                                                finalizationDate: row.paymentDate ? String(row.paymentDate) : null,
-                                                paymentType: row.paymentType ? String(row.paymentType) : null,
-                                                reason: String(installmentDetail.group?.description || "Parcela"),
-                                                reference: String(row.description || "—"),
-                                            }),
-                                        )
-                                    }
-                                    getActionsSlot={(row) =>
-                                        row.status === "paid" ? null : (
-                                            <>
-                                                <DropdownItem onClick={() => handleEditInstallment(row.id)}>Editar</DropdownItem>
-                                                <DropdownItem onClick={() => void handlePayInstallment(row.id)}>Registrar pagamento</DropdownItem>
-                                            </>
-                                        )
-                                    }
-                                />
+                            {/* Title row */}
+                            <div className="hidden md:flex items-start justify-between">
+                                <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                    <h1 className="font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 text-xl md:text-3xl">
+                                        <span className="truncate">Detalhes do parcelamento</span>
+                                    </h1>
+
+                                    <div className="hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden max-h-20">
+                                        Resumo completo e lista de parcelas
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    ) : (
-                        <p className="text-sm text-brand-inactive-text">Nenhum detalhe encontrado.</p>
-                    )}
+
+                        {installmentDetailLoading ? (
+                            <p className="text-sm text-brand-inactive-text">Carregando parcelas...</p>
+                        ) : installmentDetail ? (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    {(() => {
+                                        const total = Number(installmentDetail.group?.total_amount || 0)
+                                        const rows = installmentDetail.installments || []
+                                        const paid = rows.reduce((acc: number, row: any) => acc + Number(row.paidAmount || 0), 0)
+                                        const overdue = rows
+                                            .filter((row: any) => row.status === "overdue")
+                                            .reduce((acc: number, row: any) => acc + Number(row.remainingAmount || 0), 0)
+                                        const pending = Math.max(0, total - paid)
+                                        const cells = [
+                                            { label: "Total", value: total },
+                                            { label: "Pago", value: paid },
+                                            { label: "Restante", value: pending },
+                                            { label: "Vencido", value: overdue },
+                                        ]
+                                        return cells.map((cell) => (
+                                            <div key={cell.label} className="rounded-xl border border-brand-border dark:border-dark-border p-3">
+                                                <p className="text-xs text-brand-inactive-text">{cell.label}</p>
+                                                <p className="text-base font-bold">{formatCurrency(cell.value)}</p>
+                                            </div>
+                                        ))
+                                    })()}
+                                </div>
+                                <div className="mt-4 border-t border-brand-border dark:border-dark-border pt-2">
+                                    <InstallmentParcelsTable
+                                        rows={
+                                            (installmentDetail.installments || []).map(
+                                                (row: any): InstallmentParcelRow => ({
+                                                    id: row.id,
+                                                    installmentNumber: row.installmentNumber,
+                                                    totalCount: Number(installmentDetail.group?.installments_count) || 0,
+                                                    status: row.status,
+                                                    originalAmount: Number(row.originalAmount || 0),
+                                                    paidAmount: Number(row.paidAmount || 0),
+                                                    interestAmount: row.interestAmount != null ? Number(row.interestAmount) : undefined,
+                                                    discountAmount: row.discountAmount != null ? Number(row.discountAmount) : undefined,
+                                                    dueDate: row.dueDate ? String(row.dueDate) : null,
+                                                    finalizationDate: row.paymentDate ? String(row.paymentDate) : null,
+                                                    paymentType: row.paymentType ? String(row.paymentType) : null,
+                                                    reason: String(installmentDetail.group?.description || "Parcela"),
+                                                    reference: String(row.description || "—"),
+                                                }),
+                                            )
+                                        }
+                                        getActionsSlot={(row) =>
+                                            row.status === "paid" ? null : (
+                                                <>
+                                                    <DropdownItem onClick={() => handleEditInstallment(row.id)}>Editar</DropdownItem>
+                                                    <DropdownItem onClick={() => void handlePayInstallment(row.id)}>Registrar pagamento</DropdownItem>
+                                                </>
+                                            )
+                                        }
+                                    />
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-sm text-brand-inactive-text">Nenhum detalhe encontrado.</p>
+                        )}
+                    </div>
                 </div>
-            </motion.div>
+            </FadeIn>
         )
     }
 
@@ -1485,6 +1521,39 @@ export default function TransactionsPage({
                     </div>
                 ) : null}
             </DefaultModal>
+
+            <DefaultModal
+                isOpen={!!confirmRegularMarkAsPaid}
+                onClose={() => {
+                    if (markingRegularAsPaid) return
+                    setConfirmRegularMarkAsPaid(null)
+                }}
+                title={`Confirmar ${confirmRegularMarkAsPaid?.ledgerDirection === "in" ? "recebimento" : "pagamento"}`}
+                maxWidth="md"
+            >
+                {confirmRegularMarkAsPaid ? (
+                    <div className="space-y-4">
+                        <p className="text-sm text-brand-inactive-text">
+                            Deseja marcar esta transação como {confirmRegularMarkAsPaid.ledgerDirection === "in" ? "recebida" : "paga"}?
+                        </p>
+                        <div className="rounded-lg border border-brand-border dark:border-dark-border p-3 text-sm">
+                            <p className="font-semibold">{confirmRegularMarkAsPaid.description}</p>
+                            <p className="text-brand-inactive-text mt-1">
+                                Valor: {formatCurrency(confirmRegularMarkAsPaid.amount)} • Vencimento: {confirmRegularMarkAsPaid.dueDate}
+                            </p>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setConfirmRegularMarkAsPaid(null)} disabled={markingRegularAsPaid}>
+                                Cancelar
+                            </Button>
+                            <Button onClick={() => void handleConfirmRegularMarkAsPaid()} disabled={markingRegularAsPaid}>
+                                Confirmar
+                            </Button>
+                        </div>
+                    </div>
+                ) : null}
+            </DefaultModal>
+
 
             <DefaultModal
                 isOpen={!!confirmRecurringPayment}

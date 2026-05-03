@@ -28,6 +28,7 @@ export const getMultiDayStyle = (status: string) => {
      if (s === 'cancelado' || s === 'canceled' || s === 'cancelar') return 'bg-red-600 border-red-700 text-white';
      if (s === 'ausência' || s === 'absent') return 'bg-red-500 border-red-600 text-white';
      if (s === 'indisponível' || s === 'unavailable' || s === 'almoço') return 'bg-gray-500 border-gray-600 text-white';
+     if (s === 'concluído' || s === 'concluido' || s === 'finished' || s === 'completed') return 'bg-emerald-700 border-emerald-800 text-white';
      return 'bg-gray-500 border-gray-600 text-white';
 }
 
