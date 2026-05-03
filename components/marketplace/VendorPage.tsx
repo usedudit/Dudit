@@ -17,6 +17,18 @@ import { ShoppingBagIcon } from "@/lib/icons"
 import BottomSheet from "@/components/BottomSheet"
 import { Button } from "@/components/reusable/Button"
 import { PackageIcon } from "lucide-react"
+import { DefaultModal } from "@/components/reusable"
+
+const AVAILABLE_BRANDS = [
+    { id: "american_express", label: "American Express", image: "https://img.dudit.com.br/static/icons/payments/Amex.png" },
+    { id: "diners", label: "Diners Club", image: "https://img.dudit.com.br/static/icons/payments/Diners.png" },
+    { id: "discover", label: "Discover", image: "https://img.dudit.com.br/static/icons/payments/Discover.png" },
+    { id: "elo", label: "Elo", image: "https://img.dudit.com.br/static/icons/payments/Elo.png" },
+    { id: "hipercard", label: "Hipercard", image: "https://img.dudit.com.br/static/icons/payments/Hipercard.png" },
+    { id: "jcb", label: "JCB", image: "https://img.dudit.com.br/static/icons/payments/JCB.png" },
+    { id: "mastercard", label: "Mastercard", image: "https://img.dudit.com.br/static/icons/payments/Mastercard.png" },
+    { id: "visa", label: "Visa", image: "https://img.dudit.com.br/static/icons/payments/Visa.png" },
+]
 
 // --- TYPES ---
 interface VendorPageClientProps {
@@ -284,14 +296,21 @@ const InfoTab = ({ partner, stats }: any) => {
     const hasCredit = creditMethods.length > 0
     const hasDebit = debitMethods.length > 0
 
-    const creditoBrands = Array.from(new Set(creditMethods.map((pm: any) => (pm.card_brand || "mastercard").toLowerCase())))
-    const debitoBrands = Array.from(new Set(debitMethods.map((pm: any) => (pm.card_brand || "visa").toLowerCase())))
+    const getUniqueBrands = (methods: any[]) => {
+        const all = methods.flatMap((pm: any) =>
+            (pm.card_brand || "").split(";").map((b: string) => b.trim().toLowerCase()).filter(Boolean)
+        )
+        return Array.from(new Set(all))
+    }
+
+    const creditoBrands = getUniqueBrands(creditMethods)
+    const debitoBrands = getUniqueBrands(debitMethods)
 
     const hasMercadoPago = partner.businessInfo?.mercado_pago_connected || false
 
     const displayPaymentIcons = []
     if (hasPix) displayPaymentIcons.push({ id: "pix", icon: "https://img.dudit.com.br/static/icons/payments/Pix.png" })
-    if (hasCash) displayPaymentIcons.push({ id: "dinheiro", icon: "https://img.dudit.com.br/static/icons/payments/Pix.png" })
+    if (hasCash) displayPaymentIcons.push({ id: "dinheiro", icon: "https://img.dudit.com.br/static/icons/payments/Dinheiro.png" })
     if (hasCredit || hasDebit) {
         displayPaymentIcons.push({ id: "mastercard", icon: "https://img.dudit.com.br/static/icons/payments/Mastercard.png" })
         displayPaymentIcons.push({ id: "visa", icon: "https://img.dudit.com.br/static/icons/payments/Visa.png" })
@@ -375,73 +394,81 @@ const InfoTab = ({ partner, stats }: any) => {
                 </div>
             </div>
 
-            <BottomSheetModal
-                open={isPaymentSheetOpen}
+            <DefaultModal
+                isOpen={isPaymentSheetOpen}
                 onClose={() => setIsPaymentSheetOpen(false)}
                 title="Formas de pagamento"
-                options={[]} // We don't use options here, we'll customize it below
-                active=""
-                onSelect={() => { }}
-                customContent={
-                    <div className="px-5 pb-12 space-y-6">
+                maxWidth="md"
+            >
+                <div className="space-y-6">
+                    <div>
                         <h3 className="text-[16px] font-semibold text-brand-dark mb-3">Pagamento na entrega</h3>
-
-                        {hasDebit && (
-                            <div>
-                                <h4 className="text-[14px] text-brand-inactive-text mb-3">Cartão de débito</h4>
-                                <div className="flex flex-wrap gap-2">
-                                    {debitoBrands.map((brand: any) => (
-                                        <div key={brand} className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
-                                            <img src={`https://img.dudit.com.br/static/icons/payments/${brand}.png`} alt={brand} className="h-4 object-contain" />
-                                            <span className="text-[14px] text-brand-dark capitalize">{brand}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {hasCredit && (
-                            <div>
-                                <h4 className="text-[14px] text-brand-inactive-text mb-3 mt-5">Cartão de crédito</h4>
-                                <div className="flex flex-wrap gap-2">
-                                    {creditoBrands.map((brand: any) => (
-                                        <div key={brand} className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
-                                            <img src={`https://img.dudit.com.br/static/icons/payments/${brand}.png`} alt={brand} className="h-4 object-contain" />
-                                            <span className="text-[14px] text-brand-dark capitalize">{brand}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {(hasPix || hasCash || hasMercadoPago) && (
-                            <div>
-                                <h4 className="text-[14px] text-brand-inactive-text mb-3 mt-5">Outros</h4>
-                                <div className="flex flex-wrap gap-2">
-                                    {hasPix && (
-                                        <div className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
-                                            <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="h-4 object-contain" />
-                                            <span className="text-[14px] text-brand-dark">Pix</span>
-                                        </div>
-                                    )}
-                                    {hasCash && (
-                                        <div className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
-                                            <img src="https://img.dudit.com.br/static/icons/payments/Dinheiro.png" alt="Dinheiro" className="h-4 object-contain" />
-                                            <span className="text-[14px] text-brand-dark">Dinheiro</span>
-                                        </div>
-                                    )}
-                                    {hasMercadoPago && (
-                                        <div className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
-                                            <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="h-4 object-contain" />
-                                            <span className="text-[14px] text-brand-dark">Mercado Pago</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
+                        <p className="text-[14px] text-brand-inactive-text mb-4">Abaixo estão as formas de pagamento aceitas diretamente no estabelecimento.</p>
                     </div>
-                }
-            />
+
+                    {hasDebit && (
+                        <div>
+                            <h4 className="text-[14px] text-brand-inactive-text mb-3">Cartão de débito</h4>
+                            <div className="flex flex-wrap gap-2">
+                                {debitoBrands.map((brandId: string) => {
+                                    const brand = AVAILABLE_BRANDS.find(b => b.id === brandId)
+                                    if (!brand) return null
+                                    return (
+                                        <div key={brandId} className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
+                                            <img src={brand.image} alt={brand.label} className="h-4 object-contain" />
+                                            <span className="text-[14px] text-brand-dark">{brand.label}</span>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {hasCredit && (
+                        <div>
+                            <h4 className="text-[14px] text-brand-inactive-text mb-3 mt-5">Cartão de crédito</h4>
+                            <div className="flex flex-wrap gap-2">
+                                {creditoBrands.map((brandId: string) => {
+                                    const brand = AVAILABLE_BRANDS.find(b => b.id === brandId)
+                                    if (!brand) return null
+                                    return (
+                                        <div key={brandId} className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
+                                            <img src={brand.image} alt={brand.label} className="h-4 object-contain" />
+                                            <span className="text-[14px] text-brand-dark">{brand.label}</span>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {(hasPix || hasCash || hasMercadoPago) && (
+                        <div>
+                            <h4 className="text-[14px] text-brand-inactive-text mb-3 mt-5">Outros</h4>
+                            <div className="flex flex-wrap gap-2">
+                                {hasPix && (
+                                    <div className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
+                                        <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="h-4 object-contain" />
+                                        <span className="text-[14px] text-brand-dark">Pix</span>
+                                    </div>
+                                )}
+                                {hasCash && (
+                                    <div className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
+                                        <img src="https://img.dudit.com.br/static/icons/payments/Dinheiro.png" alt="Dinheiro" className="h-4 object-contain" />
+                                        <span className="text-[14px] text-brand-dark">Dinheiro</span>
+                                    </div>
+                                )}
+                                {hasMercadoPago && (
+                                    <div className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
+                                        <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="h-4 object-contain" />
+                                        <span className="text-[14px] text-brand-dark">Mercado Pago</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </DefaultModal>
         </div>
     )
 }
@@ -546,36 +573,6 @@ const ReviewsTab = ({ partner, stats, ratingDistribution, reviews }: any) => {
 }
 
 // Modal genérico de bottom-sheet mobile/desktop
-const BottomSheetModal = ({ open, onClose, title, options, active, onSelect, customContent }: {
-    open: boolean; onClose: () => void; title: string
-    options: string[]; active: string; onSelect: (v: string) => void
-    customContent?: React.ReactNode
-}) => (
-    <div className={`fixed inset-0 z-[2000] transition-all duration-300 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}>
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
-        <div className={`absolute bottom-0 left-0 right-0 lg:top-1/2 lg:left-1/2 lg:bottom-auto lg:right-auto lg:-translate-x-1/2 lg:w-[440px] bg-white rounded-t-[24px] lg:rounded-[24px] transition-all duration-500 ease-[cubic-bezier(0.32,0,0.67,0)] ${open ? "translate-y-0 lg:-translate-y-1/2 lg:scale-100" : "translate-y-full lg:-translate-y-1/2 lg:scale-95"} max-h-[85vh] overflow-y-auto shadow-xl`}>
-            <div className="lg:hidden w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-3 mb-6 shrink-0" />
-            <div className="text-center mb-6 shrink-0 lg:mt-8">
-                <h2 className="text-[20px] font-semibold text-brand-dark">{title}</h2>
-            </div>
-            {customContent ? (
-                customContent
-            ) : (
-                <div className="px-5 pb-12">
-                    {options.map((opt, i) => (
-                        <div key={opt} onClick={() => { onSelect(opt); onClose() }}
-                            className={`flex items-center justify-between py-5 cursor-pointer ${i !== options.length - 1 ? "border-b border-brand-border" : ""}`}>
-                            <span className={`text-[16px] ${active === opt ? "font-medium text-brand-green" : "font-normal text-brand-dark"}`}>{opt}</span>
-                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${active === opt ? "border-brand-green" : "border-brand-border"}`}>
-                                {active === opt && <div className="w-3 h-3 bg-brand-green rounded-full animate-scale-in" />}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-        </div>
-    </div>
-)
 
 // --- MAIN COMPONENT ---
 export function VendorPageClient({ partner, products, services, reviews, stats, ratingDistribution, productCategories, serviceCategories, userProfile, cartCount }: VendorPageClientProps) {

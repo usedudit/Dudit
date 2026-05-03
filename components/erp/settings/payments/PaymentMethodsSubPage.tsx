@@ -1,20 +1,21 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { AnimatePresence, motion } from "framer-motion"
-import { AlertModal, Button, Checkbox, IconPlaceholder, SavingStatusModal } from "@/components/reusable"
+import { AnimatePresence } from "framer-motion"
+import { AlertModal, Badge, Button, Checkbox, IconPlaceholder, SavingStatusModal, Separator } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
-import { PaymentMethodDialog } from "@/components/erp/payment-method-dialog"
+import { PaymentMethodEditPage } from "./PaymentMethodEditPage"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useNotification } from "@/hooks/use-notification"
 import { deletePaymentMethodAction, getPaymentMethodsAction, updatePaymentMethodAction } from "@/app/actions/erp/payment-methods"
 import { BlockedIcon, CheckCircleIcon, ChevronLeftIcon, TrashIcon } from "@/lib/icons"
 import PaymentMethodPageControls from "./PaymentMethodPageControls"
-import PaymentMethodListRow, { getPaymentTypeLabel, PaymentMethodListItem } from "./PaymentMethodListRow"
+import PaymentMethodListRow, { getPaymentTypeLabel, PaymentMethodListItem, getPaymentIcon, getBrandsLabel } from "./PaymentMethodListRow"
 import PaymentMethodGridCard from "./PaymentMethodGridCard"
+import React from "react"
 
 const PAYMENT_METHODS_VERSION_PREFIX = "payment-methods-version:"
 const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated"
@@ -56,7 +57,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
     const [page, setPage] = useState(1)
     const [selection, setSelection] = useState<{ ids: Set<string> }>({ ids: new Set() })
 
-    const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+    const [currentView, setCurrentView] = useState<"list" | "edit">("list")
     const [editingPayment, setEditingPayment] = useState<PaymentMethodListItem | null>(null)
     const [methodToDelete, setMethodToDelete] = useState<PaymentMethodListItem | null>(null)
     const [bulkActionMode, setBulkActionMode] = useState<"activate" | "deactivate" | "delete" | null>(null)
@@ -210,14 +211,14 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
 
             if (!res.success) {
                 setMethods((prev) => prev.map((current) => current.id === method.id ? { ...current, is_active: originalStatus } : current))
-                notifyError("Erro ao alterar status", res.error || "Nao foi possivel atualizar o metodo.")
+                notifyError("Erro ao alterar status", res.error || "Não foi possível atualizar o método.")
             } else {
                 notifyPaymentMethodsChanged(optimisticMethods)
-                notifySuccess(`Metodo ${checked ? "ativado" : "desativado"} com sucesso`)
+                notifySuccess(`Método ${checked ? "ativado" : "desativado"} com sucesso`)
             }
         } catch {
             setMethods((prev) => prev.map((current) => current.id === method.id ? { ...current, is_active: originalStatus } : current))
-            notifyError("Erro inesperado", "Nao foi possivel alterar o status do metodo.")
+            notifyError("Erro inesperado", "Não foi possível alterar o status do método.")
         } finally {
             setIsTogglingStatus((prev) => {
                 const next = new Set(prev)
@@ -230,7 +231,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
     const runDelete = useCallback(async (ids: string[]) => {
         setProcessingModal({
             open: true,
-            text: ids.length > 1 ? "Excluindo metodos de pagamento..." : "Excluindo metodo de pagamento...",
+            text: ids.length > 1 ? "Excluindo métodos de pagamento..." : "Excluindo método de pagamento...",
         })
 
         setIsDeletingMethod((prev) => {
@@ -255,14 +256,14 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
 
             if (failed.length > 0) {
                 notifyError(
-                    "Alguns metodos nao foram excluidos",
+                    "Alguns métodos não foram excluídos",
                     failed[0]?.result.error || "Confira e tente novamente.",
                 )
             } else {
-                notifySuccess(ids.length > 1 ? "Metodos excluidos com sucesso" : "Metodo excluido com sucesso")
+                notifySuccess(ids.length > 1 ? "Métodos excluídos com sucesso" : "Método excluído com sucesso")
             }
         } catch {
-            notifyError("Erro inesperado", "Nao foi possivel excluir os metodos selecionados.")
+            notifyError("Erro inesperado", "Não foi possível excluir os métodos selecionados.")
         } finally {
             setProcessingModal({ open: false, text: "" })
             setIsDeletingMethod((prev) => {
@@ -278,7 +279,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
 
         setProcessingModal({
             open: true,
-            text: nextValue ? "Ativando metodos de pagamento..." : "Desativando metodos de pagamento...",
+            text: nextValue ? "Ativando métodos de pagamento..." : "Desativando métodos de pagamento...",
         })
 
         setIsTogglingStatus((prev) => {
@@ -304,7 +305,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                 }))
 
                 notifyError(
-                    "Nem todos os metodos foram atualizados",
+                    "Nem todos os métodos foram atualizados",
                     results.find((entry) => !entry.result.success)?.result.error || "Confira e tente novamente.",
                 )
             }
@@ -320,11 +321,11 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                 }))
 
                 notifyPaymentMethodsChanged(nextMethods)
-                notifySuccess(nextValue ? "Metodos ativados com sucesso" : "Metodos desativados com sucesso")
+                notifySuccess(nextValue ? "Métodos ativados com sucesso" : "Métodos desativados com sucesso")
             }
         } catch {
             setMethods(snapshot)
-            notifyError("Erro inesperado", "Nao foi possivel atualizar os metodos selecionados.")
+            notifyError("Erro inesperado", "Não foi possível atualizar os métodos selecionados.")
         } finally {
             clearSelection()
             setProcessingModal({ open: false, text: "" })
@@ -373,17 +374,17 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
 
     const emptyStateContent = emptyStateType === "no-data"
         ? {
-            title: "Voce ainda nao cadastrou formas de pagamento",
-            subtitle: "Adicione Pix, dinheiro ou cartoes para configurar como sua loja recebe.",
+            title: "Você ainda não cadastrou formas de pagamento",
+            subtitle: "Adicione Pix, dinheiro ou cartões para configurar como sua loja recebe.",
             imageSrc: "https://img.dudit.com.br/static/mascots/Aguarde.png",
-            buttonText: "Adicionar primeiro metodo",
+            buttonText: "Adicionar primeiro método",
             onClick: () => {
                 setEditingPayment(null)
-                setPaymentModalOpen(true)
+                setCurrentView("edit")
             },
         }
         : {
-            title: "Nenhum metodo encontrado",
+            title: "Nenhum método encontrado",
             subtitle: "Tente ajustar os filtros ou buscar por outro termo.",
             imageSrc: "https://img.dudit.com.br/static/mascots/NaoEncontrado.png",
             buttonText: "Limpar filtros",
@@ -401,6 +402,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
         type: editingPayment.type || undefined,
         payment_type: editingPayment.payment_type || undefined,
         is_active: Boolean(editingPayment.is_active),
+        is_online_default: Boolean(editingPayment.is_online_default),
         fee_percent: editingPayment.fee_percent ?? undefined,
         fee_fixed: editingPayment.fee_fixed ?? undefined,
         discount_percent: editingPayment.discount_percent ?? undefined,
@@ -447,6 +449,53 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
     const renderListContent = () => {
         if (paginatedMethods.length === 0) return renderEmptyState()
 
+        if (isMobile) {
+            return (
+                <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
+                    {paginatedMethods.map((method, idx) => (
+                        <React.Fragment key={method.id}>
+                            <div
+                                className="py-5 flex items-center gap-4 cursor-pointer"
+                                onClick={() => {
+                                    setEditingPayment(method)
+                                    setCurrentView("edit")
+                                }}
+                            >
+                                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                    {getPaymentIcon(method)}
+                                </div>
+
+                                <div className="flex-1 min-w-0 flex flex-col gap-1">
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex flex-col min-w-0 pr-1">
+                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                {method.name || "Sem nome"}
+                                            </h3>
+                                            <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
+                                                {getBrandsLabel(method) || getPaymentTypeLabel(method)}
+                                            </span>
+                                        </div>
+                                        <Badge variant={method.is_active ? "green" : "red"} icon={null} className="shrink-0 text-[10px] h-5 px-1.5">
+                                            {method.is_active ? "Ativo" : "Inativo"}
+                                        </Badge>
+                                    </div>
+                                    <div className="flex justify-between items-center mt-1">
+                                        <Badge variant="gray" icon={null} className="text-[10px] h-5 px-1.5 uppercase">
+                                            {getPaymentTypeLabel(method)}
+                                        </Badge>
+                                        <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
+                                            <Checkbox checked={selection.ids.has(method.id)} onChange={() => handleSelectRow(method.id)} />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {idx < paginatedMethods.length - 1 && <Separator className="opacity-50" />}
+                        </React.Fragment>
+                    ))}
+                </div>
+            )
+        }
+
         if (viewMode === "grid") {
             return (
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
@@ -458,7 +507,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                             onSelect={() => handleSelectRow(method.id)}
                             onEdit={(current) => {
                                 setEditingPayment(current)
-                                setPaymentModalOpen(true)
+                                setCurrentView("edit")
                             }}
                             onDelete={(current) => setMethodToDelete(current)}
                         />
@@ -503,7 +552,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                                     onSelect={handleSelectRow}
                                     onEdit={(current) => {
                                         setEditingPayment(current)
-                                        setPaymentModalOpen(true)
+                                        setCurrentView("edit")
                                     }}
                                     onDelete={(current) => setMethodToDelete(current)}
                                 />
@@ -517,7 +566,8 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
 
     return (
         <>
-            <FadeIn>
+            {currentView === "list" && (
+                <FadeIn>
                 <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
                     <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
@@ -549,10 +599,10 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                                         <Button
                                             onClick={() => {
                                                 setEditingPayment(null)
-                                                setPaymentModalOpen(true)
+                                                setCurrentView("edit")
                                             }}
                                         >
-                                            Novo metodo
+                                            Novo método
                                         </Button>
                                     </div>
                                 </div>
@@ -565,7 +615,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                                     onOpenFilter={() => setModals({ filter: true })}
                                     onAddMethod={() => {
                                         setEditingPayment(null)
-                                        setPaymentModalOpen(true)
+                                        setCurrentView("edit")
                                     }}
                                     filters={filters}
                                     setFilters={setFilters}
@@ -576,12 +626,9 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
 
                                 <div className="mt-4">
                                     <AnimatePresence mode="wait">
-                                        <motion.div
+                                        <FadeIn
                                             key={`${viewMode}-${debouncedSearch}-${filters.type.join(",")}-${filters.status.join(",")}-${page}`}
-                                            initial={{ opacity: 0, scale: 0.95 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            exit={{ opacity: 0, scale: 0.95 }}
-                                            transition={{ duration: 0.2 }}
+                                            className="w-full"
                                         >
                                             {renderListContent()}
 
@@ -594,7 +641,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                                                     />
                                                 </div>
                                             ) : null}
-                                        </motion.div>
+                                        </FadeIn>
                                     </AnimatePresence>
                                 </div>
                             </div>
@@ -602,18 +649,20 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                     </div>
                 </div>
             </FadeIn>
+            )}
 
-            <PaymentMethodDialog
-                open={paymentModalOpen}
-                onClose={async (shouldReload?: boolean) => {
-                    setPaymentModalOpen(false)
-                    if (shouldReload) {
-                        await handleReloadMethods()
-                    }
-                }}
-                partnerId={partner.id}
-                editingMethod={normalizedEditingMethod}
-            />
+            {currentView === "edit" && (
+                <PaymentMethodEditPage
+                    partnerId={partner.id}
+                    editingMethod={normalizedEditingMethod}
+                    onBack={async (shouldReload) => {
+                        setCurrentView("list")
+                        if (shouldReload) {
+                            await handleReloadMethods()
+                        }
+                    }}
+                />
+            )}
 
             <FilterSheet
                 isOpen={modals.filter}
@@ -627,8 +676,8 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
             <AlertModal
                 isOpen={!!methodToDelete}
                 onClose={() => setMethodToDelete(null)}
-                title="Excluir metodo?"
-                description={`Tem certeza que deseja excluir "${methodToDelete?.name || "este metodo"}"? Esta acao nao pode ser desfeita.`}
+                title="Excluir método?"
+                description={`Tem certeza que deseja excluir "${methodToDelete?.name || "este método"}"? Esta ação não pode ser desfeita.`}
                 confirmText="Excluir"
                 cancelText="Cancelar"
                 onConfirm={handleConfirmDelete}
@@ -638,8 +687,8 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
             <AlertModal
                 isOpen={bulkActionMode === "delete"}
                 onClose={() => setBulkActionMode(null)}
-                title="Excluir metodos"
-                description={`Tem certeza que deseja excluir ${selection.ids.size} metodo(s)? Esta acao nao pode ser desfeita.`}
+                title="Excluir métodos"
+                description={`Tem certeza que deseja excluir ${selection.ids.size} método(s)? Esta ação não pode ser desfeita.`}
                 confirmText="Excluir"
                 cancelText="Cancelar"
                 onConfirm={handleConfirmBulkAction}
@@ -649,11 +698,11 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
             <AlertModal
                 isOpen={bulkActionMode === "activate" || bulkActionMode === "deactivate"}
                 onClose={() => setBulkActionMode(null)}
-                title={bulkActionMode === "activate" ? "Ativar metodos" : "Desativar metodos"}
+                title={bulkActionMode === "activate" ? "Ativar métodos" : "Desativar métodos"}
                 description={
                     bulkActionMode === "activate"
-                        ? `Deseja ativar ${selection.ids.size} metodo(s) selecionado(s)?`
-                        : `Deseja desativar ${selection.ids.size} metodo(s) selecionado(s)?`
+                        ? `Deseja ativar ${selection.ids.size} método(s) selecionado(s)?`
+                        : `Deseja desativar ${selection.ids.size} método(s) selecionado(s)?`
                 }
                 confirmText={bulkActionMode === "activate" ? "Ativar" : "Desativar"}
                 cancelText="Cancelar"

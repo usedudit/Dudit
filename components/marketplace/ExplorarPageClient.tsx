@@ -53,7 +53,7 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
         queryKey: ["explore", query, currentType],
         initialPage:
             currentType === type
-                ? { items: initialResults, nextCursor: null, hasMore: initialResults.length >= 40 }
+                ? { items: initialResults, nextCursor: null, hasMore: initialResults.length >= (type === 'tudo' ? 10 : 40) }
                 : undefined,
         fetchFn: async ({ cursor }) => {
             const res = await searchMarketplace(query, currentType as any, {
@@ -86,7 +86,7 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
     const normalizedInitialResults = useMemo(() => {
         const normalizeItemType = (item: any) => {
             const rawType = String(item?.itemType || "").toLowerCase()
-            if (rawType === "loja" || rawType === "vitrine" || rawType === "partner" || rawType === "parceiro") {
+            if (rawType === "loja" || rawType === "vitrine" || rawType === "vitrines" || rawType === "partner" || rawType === "parceiro") {
                 return "loja"
             }
             if (rawType === "produto" || rawType === "product") return "produto"
@@ -382,7 +382,7 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
                                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                                                 {vitrinesDestaque.map((item) => (
                                                     <Link key={`vitrine-${item.id}`} href={getPartnerUrl(item.partners)} prefetch={false} className="border border-brand-border p-4 rounded-xl flex flex-col items-center text-center hover:border-brand-green transition-colors group">
-                                                        <img src={item.images[0]} alt={item.name} className="w-20 h-20 rounded-full object-cover mb-3" />
+                                                        <img src={item.images?.[0] || "https://img.dudit.com.br/static/Placeholder.png"} alt={item.name} className="w-20 h-20 rounded-full object-cover mb-3" />
                                                         <h3 className="font-bold text-brand-dark truncate w-full group-hover:text-brand-green transition-colors">{item.name}</h3>
                                                         <p className="text-xs text-brand-inactive-text truncate w-full mb-3">{item.partners?.city} - {item.partners?.state}</p>
                                                         <span className="text-[11px] font-bold text-brand-green mt-auto bg-green-50 px-3 py-1 rounded-full uppercase tracking-wider">Ver Vitrine</span>
@@ -406,7 +406,7 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
                                                 if (item.itemType === 'loja') {
                                                     return (
                                                         <Link key={`loja-${item.id}`} href={getPartnerUrl(item.partners)} prefetch={false} className="border border-brand-border p-4 rounded-xl flex flex-col items-center text-center hover:border-brand-green transition-colors group">
-                                                            <img src={item.images[0]} alt={item.name} className="w-20 h-20 rounded-full object-cover mb-4 shadow-sm" />
+                                                            <img src={item.images?.[0] || "https://img.dudit.com.br/static/Placeholder.png"} alt={item.name} className="w-20 h-20 rounded-full object-cover mb-4 shadow-sm" />
                                                             <h3 className="font-bold text-brand-dark truncate w-full group-hover:text-brand-green transition-colors">{item.name}</h3>
                                                             <p className="text-xs text-brand-inactive-text truncate w-full mb-4">{item.partners?.city} - {item.partners?.state}</p>
                                                             <span className="text-sm font-bold text-brand-green mt-auto uppercase tracking-wide">Explorar Loja</span>

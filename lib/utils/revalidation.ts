@@ -174,6 +174,7 @@ export async function revalidateAddresses(entityType: string, entityId: string) 
  */
 export async function revalidatePartnerProfile(partnerId: string) {
   safeRevalidateTag(TAGS.partnerProfile(partnerId))
+  safeRevalidateTag("partner-profile")
   safeRevalidateTag(TAGS.partner(partnerId))
 }
 

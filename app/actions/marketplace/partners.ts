@@ -11,6 +11,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { sanitizeInput, validatePhoneBR } from "@/lib/input-validator"
 import { normalizePhoneToE164 } from "@/lib/utils/phone-utils"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
+import { decryptCPF } from "@/lib/crypto"
 
 // --- CLIENTES ---
 
@@ -44,6 +45,14 @@ async function _getPartnerProfile(partnerId: string) {
       data.business_info = JSON.parse(data.business_info)
     } catch (e) {
       data.business_info = { sells: ["products"], channels: ["online"] }
+    }
+  }
+
+  if (data && data.cpf_encrypted) {
+    try {
+      data.cpf = await decryptCPF(data.cpf_encrypted)
+    } catch (e) {
+      console.error("[Partner] CPF decryption error:", e)
     }
   }
 
@@ -170,6 +179,13 @@ export const getCachedPartnerProfile = async (partnerId: string) => {
           data.business_info = JSON.parse(data.business_info)
         } catch (e) {
           data.business_info = { sells: ["products"], channels: ["online"] }
+        }
+      }
+      if (data && data.cpf_encrypted) {
+        try {
+          data.cpf = await decryptCPF(data.cpf_encrypted)
+        } catch (e) {
+          console.error("[Partner] CPF decryption error:", e)
         }
       }
       return data
@@ -320,7 +336,13 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   if (data.openingHours !== undefined) updateData.opening_hours = normalizeOpeningHours(data.openingHours)
   if (sanitizedPhone !== undefined) {
     if (sanitizedPhone) {
-      if (!validatePhoneBR(sanitizedPhone)) {
+      let phoneToValidate = sanitizedPhone
+      const digits = sanitizedPhone.replace(/\D/g, "")
+      if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
+        phoneToValidate = digits.slice(2)
+      }
+      
+      if (!validatePhoneBR(phoneToValidate)) {
         return { error: "Número de telefone inválido" }
       }
       updateData.phone = normalizePhoneToE164(sanitizedPhone)
@@ -336,12 +358,20 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   if (data.ieIsento !== undefined) updateData.ie_isento = data.ieIsento
   if (data.inscricaoMunicipal !== undefined) updateData.inscricao_municipal = data.inscricaoMunicipal
 
-  if (data.cpf) {
-    try {
-      const { encryptCPF } = await import("@/lib/crypto")
-      updateData.cpf_encrypted = await encryptCPF(data.cpf)
-    } catch (error) {
-      console.error("Erro ao criptografar CPF:", error)
+  // Handle CPF (Encrypted)
+  if (data.cpf !== undefined) {
+    const cleanCPF = data.cpf ? data.cpf.replace(/\D/g, "") : null
+    if (cleanCPF) {
+      try {
+        const { encryptCPF } = await import("@/lib/crypto")
+        updateData.cpf_encrypted = await encryptCPF(cleanCPF)
+        updateData.cpf = null // Ensure plain text CPF is cleared
+      } catch (error) {
+        console.error("Erro ao criptografar CPF:", error)
+      }
+    } else {
+      updateData.cpf_encrypted = null
+      updateData.cpf = null
     }
   }
 

@@ -7,6 +7,8 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { listEmployeeCommissionsAction, upsertEmployeeCommissionAction, type CommissionSettingsRow } from "@/app/actions/erp/commissions"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { useToast } from "@/hooks/use-toast"
+import { Badge } from "@/components/reusable/Badge"
+import { getTeamMembers } from "@/app/actions/erp/team"
 import React from "react"
 
 const sellerOptions = [
@@ -25,6 +27,7 @@ export function CommissionsSubPage({ partnerId, onBack }: { partnerId: string; o
     const [savingAll, setSavingAll] = useState(false)
     const [savingId, setSavingId] = useState<string | null>(null)
     const [rows, setRows] = useState<CommissionSettingsRow[]>([])
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null)
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const { toast } = useToast()
@@ -78,8 +81,12 @@ export function CommissionsSubPage({ partnerId, onBack }: { partnerId: string; o
 
     async function load() {
         setLoading(true)
-        const result = await listEmployeeCommissionsAction(partnerId)
-        if (result.success) setRows(result.items)
+        const [commResult, teamResult] = await Promise.all([
+            listEmployeeCommissionsAction(partnerId),
+            getTeamMembers()
+        ])
+        if (commResult.success) setRows(commResult.items)
+        if (!teamResult.error) setCurrentUserId(teamResult.currentUserId || null)
         setLoading(false)
     }
 
@@ -160,10 +167,9 @@ export function CommissionsSubPage({ partnerId, onBack }: { partnerId: string; o
                                     <table className="w-full text-left border-separate border-spacing-0">
                                         <thead>
                                             <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                <th className="py-3 px-6 rounded-l-lg text-[13px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">Membro</th>
-                                                <th className="py-3 px-4 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">Tipo de Comissão</th>
-                                                <th className="py-3 px-4 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider text-center">Valor</th>
-                                                <th className="py-3 px-6 rounded-r-lg text-[13px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider text-right">Ações</th>
+                                                <th className="py-3 px-6 rounded-l-lg text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Membro</th>
+                                                <th className="py-3 px-4 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Tipo de Comissão</th>
+                                                <th className="py-3 px-4 rounded-r-lg text-[13px] font-bold text-brand-inactive-text dark:text-dark-body text-center">Valor</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-brand-border dark:divide-dark-border">
@@ -181,9 +187,14 @@ export function CommissionsSubPage({ partnerId, onBack }: { partnerId: string; o
                                                                     className="w-10 h-10 text-[14px]"
                                                                 />
                                                                 <div className="flex flex-col min-w-0">
-                                                                    <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                                                                        {row.name}
-                                                                    </span>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                            {row.name}
+                                                                        </span>
+                                                                        {row.userId === currentUserId && (
+                                                                            <Badge variant="gray" icon={null} className="whitespace-nowrap scale-90 shrink-0">Você</Badge>
+                                                                        )}
+                                                                    </div>
                                                                     <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body flex items-center gap-1">
                                                                         {isSeller ? <Users size={12} /> : <TruckIcon size={12} />}
                                                                         {row.roleLabel}
@@ -227,19 +238,7 @@ export function CommissionsSubPage({ partnerId, onBack }: { partnerId: string; o
                                                                     className="h-9 text-center font-bold text-sm"
                                                                     placeholder="0.00"
                                                                 />
-                                                                <p className="text-[10px] text-center text-brand-inactive-text mt-1 uppercase font-bold">{valueLabel}</p>
                                                             </div>
-                                                        </td>
-                                                        <td className="py-4 px-6 text-right">
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => handleSaveRow(row)}
-                                                                isLoading={savingId === row.partnerUserId}
-                                                                className="h-8 text-xs font-bold"
-                                                            >
-                                                                Salvar
-                                                            </Button>
                                                         </td>
                                                     </tr>
                                                 )
@@ -264,9 +263,14 @@ export function CommissionsSubPage({ partnerId, onBack }: { partnerId: string; o
                                                             className="w-12 h-12 text-[16px]"
                                                         />
                                                         <div className="flex flex-col min-w-0">
-                                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                                                                {row.name}
-                                                            </h3>
+                                                            <div className="flex items-center gap-2">
+                                                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                    {row.name}
+                                                                </h3>
+                                                                {row.userId === currentUserId && (
+                                                                    <Badge variant="gray" icon={null} className="text-[10px] py-0 h-4 scale-90">Você</Badge>
+                                                                )}
+                                                            </div>
                                                             <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium flex items-center gap-1">
                                                                 {isSeller ? <Users size={14} /> : <TruckIcon size={14} />}
                                                                 {row.roleLabel}
@@ -274,8 +278,8 @@ export function CommissionsSubPage({ partnerId, onBack }: { partnerId: string; o
                                                         </div>
                                                     </div>
 
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        <div className="col-span-2">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex-1">
                                                             <FormDropdown
                                                                 label="Tipo de comissão"
                                                                 value={row.commissionType}
@@ -291,30 +295,23 @@ export function CommissionsSubPage({ partnerId, onBack }: { partnerId: string; o
                                                                 options={options}
                                                             />
                                                         </div>
-                                                        <Input
-                                                            label={valueLabel}
-                                                            value={String(row.value)}
-                                                            onChange={(e) => {
-                                                                const next = e.target.value
-                                                                setRows((prev) =>
-                                                                    prev.map((item) =>
-                                                                        item.partnerUserId === row.partnerUserId && item.commissionRole === row.commissionRole
-                                                                            ? { ...item, value: Number(next || 0) }
-                                                                            : item,
-                                                                    ),
-                                                                )
-                                                            }}
-                                                            disabled={row.commissionType === "none"}
-                                                            className="font-bold"
-                                                        />
-                                                        <div className="flex items-end">
-                                                            <Button
-                                                                className="w-full h-11"
-                                                                onClick={() => handleSaveRow(row)}
-                                                                isLoading={savingId === row.partnerUserId}
-                                                            >
-                                                                Salvar
-                                                            </Button>
+                                                        <div className="w-[120px]">
+                                                            <Input
+                                                                label={valueLabel}
+                                                                value={String(row.value)}
+                                                                onChange={(e) => {
+                                                                    const next = e.target.value
+                                                                    setRows((prev) =>
+                                                                        prev.map((item) =>
+                                                                            item.partnerUserId === row.partnerUserId && item.commissionRole === row.commissionRole
+                                                                                ? { ...item, value: Number(next || 0) }
+                                                                                : item,
+                                                                        ),
+                                                                    )
+                                                                }}
+                                                                disabled={row.commissionType === "none"}
+                                                                className="font-bold text-center"
+                                                            />
                                                         </div>
                                                     </div>
                                                 </div>

@@ -19,6 +19,7 @@ export interface PaymentMethodListItem {
     fee_fixed?: number | null
     fixed_amount?: number | null
     is_active?: boolean | null
+    is_online_default?: boolean | null
 }
 
 interface ColumnDef {
@@ -59,7 +60,7 @@ export const getPaymentTypeLabel = (method: PaymentMethodListItem) => {
     }
 }
 
-const getPaymentIcon = (method: PaymentMethodListItem) => {
+export const getPaymentIcon = (method: PaymentMethodListItem) => {
     const raw = String(method.type || method.payment_type || "").toLowerCase()
 
     if (raw === "pix") {
@@ -85,7 +86,7 @@ const getFeeLabel = (method: PaymentMethodListItem) => {
     return parts.join(" ")
 }
 
-const getBrandsLabel = (method: PaymentMethodListItem) => {
+export const getBrandsLabel = (method: PaymentMethodListItem) => {
     if (!method.card_brand) return ""
 
     return method.card_brand
@@ -132,7 +133,7 @@ const PaymentMethodListRow = React.memo(
 
                 case "type":
                     return (
-                        <Badge variant="gray" className="capitalize">
+                        <Badge variant="gray" className="capitalize" icon={null}>
                             {getPaymentTypeLabel(method)}
                         </Badge>
                     )
@@ -160,7 +161,7 @@ const PaymentMethodListRow = React.memo(
 
                 case "status":
                     return (
-                        <Badge variant={method.is_active ? "green" : "red"}>
+                        <Badge variant={method.is_active ? "green" : "red"} icon={null}>
                             {method.is_active ? "Ativo" : "Inativo"}
                         </Badge>
                     )
@@ -197,10 +198,8 @@ const PaymentMethodListRow = React.memo(
 
         return (
             <motion.tr
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                transition={{ duration: 0.2 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/20 transition-colors cursor-pointer bg-white dark:bg-dark-background"
                 onClick={() => onEdit(method)}
             >

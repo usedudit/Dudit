@@ -9,19 +9,20 @@ import { cn } from "@/lib/utils"
 interface BusinessHoursSelectorProps {
     value: Record<string, { enabled: boolean; from: string; to: string }>
     onChange: (value: Record<string, { enabled: boolean; from: string; to: string }>) => void
+    interval?: 1 | 5 | 10 | 15 | 30
 }
 
 const DAYS = [
-    { key: "monday", label: "Monday" },
-    { key: "tuesday", label: "Tuesday" },
-    { key: "wednesday", label: "Wednesday" },
-    { key: "thursday", label: "Thursday" },
-    { key: "friday", label: "Friday" },
-    { key: "saturday", label: "Saturday" },
-    { key: "sunday", label: "Sunday" },
+    { key: "monday", label: "Segunda" },
+    { key: "tuesday", label: "Terça" },
+    { key: "wednesday", label: "Quarta" },
+    { key: "thursday", label: "Quinta" },
+    { key: "friday", label: "Sexta" },
+    { key: "saturday", label: "Sábado" },
+    { key: "sunday", label: "Domingo" },
 ]
 
-export function BusinessHoursSelector({ value, onChange }: BusinessHoursSelectorProps) {
+export function BusinessHoursSelector({ value, onChange, interval = 5 }: BusinessHoursSelectorProps) {
     const handleToggle = (day: string, enabled: boolean) => {
         onChange({
             ...value,
@@ -66,22 +67,24 @@ export function BusinessHoursSelector({ value, onChange }: BusinessHoursSelector
                         {isEnabled ? (
                             <div className="flex items-center gap-3 flex-1 animate-in fade-in slide-in-from-left-2 duration-300">
                                 <TimePicker
-                                    prefix="From"
+                                    prefix="De"
                                     value={dayData.from}
                                     onChange={(time) => handleTimeChange(key, "from", time)}
                                     className="max-w-[160px]"
+                                    interval={interval}
                                 />
                                 <TimePicker
-                                    prefix="To"
+                                    prefix="Até"
                                     value={dayData.to}
                                     onChange={(time) => handleTimeChange(key, "to", time)}
                                     className="max-w-[160px]"
+                                    interval={interval}
                                 />
                             </div>
                         ) : (
                             <div className="flex items-center gap-3 px-6 h-[46px] bg-brand-gray/40 dark:bg-dark-border/20 rounded-xl flex-1 border border-transparent transition-all duration-300">
                                 <MoonIcon className="w-4 h-4 text-brand-inactive-text/60 shrink-0" />
-                                <span className="text-[14px] font-semibold text-brand-inactive-text/60">Closed</span>
+                                <span className="text-[14px] font-semibold text-brand-inactive-text/60">Fechado</span>
                             </div>
                         )}
                     </div>

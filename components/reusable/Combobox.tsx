@@ -34,6 +34,7 @@ interface ComboboxProps {
     required?: boolean
     /** Borda vermelha (validação), alinhado ao Input */
     error?: boolean
+    errorMessage?: string
 }
 
 export function Combobox({
@@ -50,6 +51,7 @@ export function Combobox({
     label,
     required,
     error = false,
+    errorMessage,
 }: ComboboxProps) {
     const [isOpen, setIsOpen] = useState(false)
     const [isMounted, setIsMounted] = useState(false)
@@ -287,6 +289,11 @@ export function Combobox({
                         )}
                     />
                 </button>
+                {error && errorMessage && (
+                    <p className="mt-1.5 text-xs text-brand-red animate-in fade-in slide-in-from-top-1 duration-200">
+                        {errorMessage}
+                    </p>
+                )}
             </div>
 
             {isMobile && (

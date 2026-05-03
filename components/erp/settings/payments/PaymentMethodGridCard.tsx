@@ -61,10 +61,8 @@ const PaymentMethodGridCard = React.memo(
     ({ method, selected, onSelect, onEdit, onDelete }: PaymentMethodGridCardProps) => {
         return (
             <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.2 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 onClick={() => onEdit(method)}
                 className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 cursor-pointer group flex flex-col h-full relative overflow-hidden"
             >
@@ -79,7 +77,7 @@ const PaymentMethodGridCard = React.memo(
                                 <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
                                     {method.name || "Sem nome"}
                                 </h3>
-                                <Badge variant={method.is_active ? "green" : "red"} className="whitespace-nowrap scale-90 shrink-0">
+                                <Badge variant={method.is_active ? "green" : "red"} icon={null} className="whitespace-nowrap scale-90 shrink-0">
                                     {method.is_active ? "Ativo" : "Inativo"}
                                 </Badge>
                             </div>
@@ -115,7 +113,7 @@ const PaymentMethodGridCard = React.memo(
                         <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Tipo</span>
                             <div className="flex items-center gap-2.5">
-                                <Badge variant="gray" className="whitespace-nowrap scale-90">
+                                <Badge variant="gray" icon={null} className="whitespace-nowrap scale-90">
                                     {getPaymentTypeLabel(method)}
                                 </Badge>
                             </div>

@@ -18,7 +18,6 @@ import {
     TabsTrigger,
     TabsContent,
     AlertModal,
-    UnsavedChangesDialog,
     SavingStatusModal,
     NumberInputWithCheckbox
 } from "@/components/reusable"
@@ -31,6 +30,7 @@ import ImageCropperModal from "@/components/ImageCropperModal"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
+import { formatE164ToDisplay } from "@/lib/utils/phone-utils"
 
 const SELLS_OPTIONS = [
     {
@@ -93,10 +93,10 @@ export const BusinessDataSubPage = ({
         storeDescription: partner.store_description || "",
         storeImageUrl: partner.store_image_url || "",
         businessType: partner.business_type || "pf",
-        cnpj: partner.cnpj || "",
+        cnpj: partner.cpf || partner.cnpj || "",
         sells: businessInfo?.sells || ["products"],
         channels: businessInfo?.channels || ["online"],
-        phone: partner.phone || "",
+        phone: formatE164ToDisplay(partner.phone) || "",
     })
 
     const address = partner.addresses?.[0] || {};
@@ -191,9 +191,8 @@ export const BusinessDataSubPage = ({
             return
         }
 
+        setIsLoading(true)
         startTransition(async () => {
-            setIsLoading(true)
-
             try {
                 const businessInfoData = {
                     sells: generalInfo.sells,
@@ -227,6 +226,7 @@ export const BusinessDataSubPage = ({
 
                 if (result?.error) {
                     notifyError(result.error)
+                    setIsLoading(false)
                 } else {
                     notifySuccess("Configurações atualizadas com sucesso!")
                     setInitialState({
@@ -235,10 +235,14 @@ export const BusinessDataSubPage = ({
                         fiscalInfo: { ...fiscalInfo },
                         hours: { ...hours },
                     })
+                    // Pequeno delay para garantir que o usuário veja a notificação e o modal de sucesso se houver, 
+                    // e então volta para a página anterior
+                    setTimeout(() => {
+                        onBack()
+                    }, 500)
                 }
             } catch (err) {
                 notifyError("Erro ao atualizar configurações")
-            } finally {
                 setIsLoading(false)
             }
         })
@@ -696,11 +700,17 @@ export const BusinessDataSubPage = ({
 
                 <SavingStatusModal isOpen={isLoading} text="Salvando configurações..." />
 
-                <UnsavedChangesDialog
-                    open={showConfirmDialog}
-                    onConfirm={confirmNavigation}
-                    onCancel={cancelNavigation}
-                />
+                {showConfirmDialog && (
+                    <AlertModal
+                        isOpen={showConfirmDialog}
+                        onClose={cancelNavigation}
+                        onConfirm={confirmNavigation}
+                        title="Descartar alterações?"
+                        description="Existem dados não salvos neste formulário. Se sair agora, você perderá o que preencheu."
+                        confirmText="Sair sem salvar"
+                        variant="warning"
+                    />
+                )}
 
                 <AlertModal
                     isOpen={showValidationModal}

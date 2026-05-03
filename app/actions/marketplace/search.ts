@@ -73,11 +73,12 @@ export const searchMarketplace = async (
 
     // This search backend doesn’t currently expose an exact hasMore flag.
     // We conservatively assume "hasMore" when we got a full page.
+    // We assume "hasMore" when we got a full page.
     const limitCount =
         type === "tudo"
             ? (limits.geral ?? 40)
             : type === "vitrines"
-              ? (limits.vitrines ?? 4)
+              ? (limits.vitrines ?? 40) // Standardizing to 40 for client searches
               : type === "produtos"
                 ? (limits.produtos ?? 20)
                 : (limits.servicos ?? 20)
@@ -191,7 +192,16 @@ async function _searchMarketplaceInternal(
         const startScore = cursor ? `(${cursor}` : "+inf"
         const ids = (await redis.zrange(indexKey, startScore as any, "-inf", { byScore: true, rev: true, offset: 0, count: limitCount + 5 })) as string[]
 
-        if (!ids || ids.length === 0) return { results: [], filteredIds: [] }
+        if (!ids || ids.length === 0) {
+            // SAFE FALLBACK: Se o índice do Redis estiver vazio (ex: após limpeza ou falha de sync),
+            // tentamos buscar no Postgres FTS para não deixar o marketplace vazio.
+            // Apenas para a primeira página (sem cursor/lastId).
+            if (!cursor && !lastId) {
+                console.log(`[REDIS] Index ${indexKey} is empty. Falling back to Postgres FTS for ${type}.`)
+                return await searchMarketplacePostgresFTS(query, type, limits)
+            }
+            return { results: [], filteredIds: [] }
+        }
 
         let filteredIds = ids
         if (lastId) {

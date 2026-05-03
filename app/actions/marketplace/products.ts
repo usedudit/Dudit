@@ -231,7 +231,7 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
 // searchMarketplaceDirect already uses react.cache() for per-request deduplication.
 export const getCachedExploreProducts = async (query: string, type: MarketplaceSearchType) => {
   return await searchMarketplaceDirect(query, type, {
-    vitrines: 4,
+    vitrines: type === 'vitrines' ? 40 : 4,
     produtos: 20,
     servicos: 20
   })

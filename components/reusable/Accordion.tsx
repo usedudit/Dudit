@@ -115,6 +115,7 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
     }
     align="right"
     showChevron={false}
+    fullWidth={false}
   >
     {onView && (
       <DropdownItem onClick={onView}>

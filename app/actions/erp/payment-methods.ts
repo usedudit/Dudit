@@ -35,6 +35,7 @@ type UpsertPaymentMethodInput = {
     defaultFinanceAccountId: string
     priority?: number
     isDefault?: boolean
+    isOnlineDefault?: boolean
 }
 
 async function resolvePixKeyFromPartner(
@@ -117,7 +118,7 @@ function sanitizeInstallmentFees(input: InstallmentFeeInput[] | undefined, maxIn
 }
 
 export async function getPaymentMethodsAction(partnerId: string) {
-    await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+    await requirePartnerAccessWithPermission(partnerId, "payment_methods", "view")
 
     // Use admin client after authz check so invited ERP users can read methods.
     const supabase = createAdminClient()
@@ -125,7 +126,7 @@ export async function getPaymentMethodsAction(partnerId: string) {
     const { data: methods, error } = await supabase
         .from("payment_methods")
         .select(
-            "id, name, payment_type, type, is_active, is_default, " +
+            "id, name, payment_type, type, is_active, is_default, is_online_default, " +
             "fee_percent, fee_fixed, fee_bearer, discount_percent, " +
             "supports_installments, max_installments, card_brand, " +
             "receiving_days, default_finance_account_id, priority, " +
@@ -158,7 +159,7 @@ export async function getPaymentMethodDetailsAction(methodId: string) {
     const { data: method } = await supabase.from("payment_methods").select("id, partner_id").eq("id", methodId).single()
     if (!method) return { error: "Método de pagamento não encontrado" }
 
-    await requirePartnerAccessWithPermission(method.partner_id, "financial", "view")
+    await requirePartnerAccessWithPermission(method.partner_id, "payment_methods", "view")
 
     const [methodRes, feesRes] = await Promise.all([
         supabase.from("payment_methods").select("*").eq("id", methodId).single(),
@@ -199,7 +200,7 @@ export async function calculatePaymentMethodAmountsAction(input: {
         .single()
 
     if (!method) return { error: "Método de pagamento não encontrado" }
-    await requirePartnerAccessWithPermission(method.partner_id, "financial", "view")
+    await requirePartnerAccessWithPermission(method.partner_id, "payment_methods", "view")
 
     const { data: fees } = await supabase
         .from("payment_method_installment_fees")
@@ -239,7 +240,7 @@ export async function previewSplitPaymentBreakdownAction(input: {
     }>
 }) {
     await requireUser()
-    await requirePartnerAccessWithPermission(input.partnerId, "financial", "view")
+    await requirePartnerAccessWithPermission(input.partnerId, "payment_methods", "view")
     const supabase = createAdminClient()
     const methodIds = Array.from(new Set(input.legs.map((l) => l.paymentMethodId).filter(Boolean))) as string[]
 
@@ -304,7 +305,7 @@ export async function previewSplitPaymentBreakdownAction(input: {
 export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) {
     await requireRateLimit(RateLimitCategory.PAYMENT)
 
-    await requirePartnerAccessWithPermission(data.partnerId, "financial", "create")
+    await requirePartnerAccessWithPermission(data.partnerId, "payment_methods", "create")
 
     const canonicalType = toCanonicalPaymentType(data.paymentType)
     if (canonicalType === "cash") {
@@ -339,6 +340,7 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
         defaultFinanceAccountId: data.defaultFinanceAccountId,
         priority: Math.max(0, Number(data.priority || 0)),
         isDefault: Boolean(data.isDefault),
+        isOnlineDefault: Boolean(data.isOnlineDefault),
         installmentFees: supportsInstallments ? (data.installmentFees || []) : [],
     })
 
@@ -359,6 +361,14 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
 
     if (!financeAccount?.id) {
         return { error: "Conta financeira inválida ou inativa para este parceiro." }
+    }
+
+    if (data.isOnlineDefault) {
+        await supabase
+            .from("payment_methods")
+            .update({ is_online_default: false })
+            .eq("partner_id", data.partnerId)
+            .eq("type", canonicalType)
     }
 
     const { data: method, error: methodError } = await supabase
@@ -385,6 +395,7 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
             default_finance_account_id: data.defaultFinanceAccountId,
             priority: Math.max(0, Number(data.priority || 0)),
             is_default: Boolean(data.isDefault),
+            is_online_default: Boolean(data.isOnlineDefault),
         })
         .select()
         .single()
@@ -426,6 +437,7 @@ export async function updatePaymentMethodAction(
         defaultFinanceAccountId?: string
         priority?: number
         isDefault?: boolean
+        isOnlineDefault?: boolean
     },
 ) {
     await requireRateLimit(RateLimitCategory.PAYMENT)
@@ -441,7 +453,7 @@ export async function updatePaymentMethodAction(
         return { error: "Método de pagamento não encontrado" }
     }
 
-    await requirePartnerAccessWithPermission(method.partner_id, "financial", "edit")
+    await requirePartnerAccessWithPermission(method.partner_id, "payment_methods", "edit")
 
     if (data.feePercent !== undefined && (Number(data.feePercent) < 0 || Number(data.feePercent) > 100)) {
         return { error: "Taxa percentual deve estar entre 0 e 100." }
@@ -512,6 +524,16 @@ export async function updatePaymentMethodAction(
     }
     if (data.priority !== undefined) updateData.priority = Math.max(0, Number(data.priority || 0))
     if (data.isDefault !== undefined) updateData.is_default = Boolean(data.isDefault)
+    if (data.isOnlineDefault !== undefined) {
+        updateData.is_online_default = Boolean(data.isOnlineDefault)
+        if (data.isOnlineDefault) {
+            await supabase
+                .from("payment_methods")
+                .update({ is_online_default: false })
+                .eq("partner_id", method.partner_id)
+                .eq("type", effectiveType)
+        }
+    }
     const { error: methodError } = await supabase
         .from("payment_methods")
         .update(updateData)
@@ -564,7 +586,7 @@ export async function deletePaymentMethodAction(methodId: string) {
         return { error: "Método de pagamento não encontrado" }
     }
 
-    await requirePartnerAccessWithPermission(method.partner_id, "financial", "delete")
+    await requirePartnerAccessWithPermission(method.partner_id, "payment_methods", "delete")
 
     const normalizedType = toCanonicalPaymentType(String(method.type || method.payment_type || ""))
     const normalizedName = String(method.name || "").trim().toLowerCase()
@@ -588,7 +610,7 @@ export async function pickBestPaymentMethodAction(input: {
     type: string
     context?: { preferDefault?: boolean }
 }) {
-    await requirePartnerAccessWithPermission(input.partnerId, "financial", "view")
+    await requirePartnerAccessWithPermission(input.partnerId, "payment_methods", "view")
     const supabase = createAdminClient()
     const method = await pickBestPaymentMethod(supabase as any, input.type, input.partnerId, input.context || {})
     if (!method) return { error: "Nenhum método ativo encontrado para este tipo." }
@@ -596,7 +618,7 @@ export async function pickBestPaymentMethodAction(input: {
 }
 
 export async function getPartnerFinanceAccountsForPaymentMethodsAction(partnerId: string) {
-    await requirePartnerAccessWithPermission(partnerId, "financial", "view")
+    await requirePartnerAccessWithPermission(partnerId, "payment_methods", "view")
     const supabase = createAdminClient()
     const { data, error } = await supabase
         .from("finance_accounts")
