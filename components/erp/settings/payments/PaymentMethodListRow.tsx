@@ -198,13 +198,15 @@ const PaymentMethodListRow = React.memo(
 
         return (
             <motion.tr
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/20 transition-colors cursor-pointer bg-white dark:bg-dark-background"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -5 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="group hover:bg-brand-gray/40 dark:hover:bg-dark-border/20 transition-all duration-200 cursor-pointer bg-white dark:bg-dark-background border-b border-brand-border/50 dark:border-dark-border/30 last:border-0"
                 onClick={() => onEdit(method)}
             >
                 <td
-                    className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12"
+                    className="py-4 pl-6 w-12"
                     onClick={(e) => e.stopPropagation()}
                 >
                     <Checkbox checked={selected} onChange={() => onSelect(method.id)} />
@@ -213,7 +215,7 @@ const PaymentMethodListRow = React.memo(
                 {columns.map((col) => (
                     <td
                         key={col.id}
-                        className={`p-2 border-b border-brand-border dark:border-dark-border ${getAlignClass(col.align)}`}
+                        className={`py-4 px-2 ${getAlignClass(col.align)}`}
                     >
                         <div className={`flex items-center w-full min-w-0 ${getJustifyClass(col.align)}`}>
                             {renderCellContent(col.id)}

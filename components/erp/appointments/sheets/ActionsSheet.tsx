@@ -2,7 +2,8 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Utensils, Briefcase } from 'lucide-react';
-import { Button, Input as FormInput, Checkbox, Dropdown, DropdownItem, DatePicker, TimePicker, FormTextarea } from '@/components/reusable';
+import { Button, Input as FormInput, Checkbox, Dropdown, DropdownItem, DatePicker, TimePicker, FormTextarea, RadioButton } from '@/components/reusable';
+import AlertModal from "@/components/reusable/AlertModal"
 import { Appointment } from '../types';
 import { AppointmentListCard } from '../AppointmentListCard';
 import { getEndTime, formatDateStr } from '../utils';
@@ -14,40 +15,77 @@ import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import BottomSheet from '@/components/BottomSheet';
 import { useMediaQuery } from '@/components/erp/hooks';
 import { formatCurrency } from '@/lib/utils/formatters';
-import { XIcon, EditIcon, PlusIcon, ChevronDownIcon, InfoIcon, AlertTriangleIcon } from '@/lib/icons';
+import { XIcon, EditIcon, PlusIcon, ChevronDownIcon, InfoIcon, AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon } from '@/lib/icons';
+import { useRef } from 'react';
 
-
-const TypeCard = ({ icon: Icon, label, subLabel, selected, onClick, simple = false }: { icon?: any, label: string, subLabel?: string, selected?: boolean, onClick: () => void, simple?: boolean }) => (
-    <div
-        onClick={onClick}
-        className={`
-            border rounded-xl p-3 cursor-pointer transition-all flex flex-col items-center justify-center text-center h-[120px] min-w-[140px] relative flex-shrink-0
-            ${selected
-                ? 'border-brand-green ring-1 ring-brand-green bg-white dark:bg-dark-surface'
-                : 'border-brand-border dark:border-dark-border hover:border-brand-green/30 dark:hover:border-brand-green/30 bg-white dark:bg-dark-surface'
-            }
-        `}
-    >
-        {simple ? (
-            <div className="flex flex-col items-center justify-center gap-2 h-full text-brand-green">
-                <div className="w-10 h-10 rounded-full border border-brand-green flex items-center justify-center bg-brand-green/5">
-                    <PlusIcon size={20} />
-                </div>
-                <span className="text-xs font-bold">Novo Tipo</span>
+const EmojiPicker = ({ onSelect, onClose }: { onSelect: (emoji: string) => void, onClose: () => void }) => {
+    const emojis = ["⏰", "☕", "🍴", "🍽️", "🤝", "💻", "📞", "📅", "🚫", "💤", "🚗", "🚶", "🏢", "🏠", "⚠️", "💡", "🛠️", "🩺", "✂️", "🧘", "🚿", "🏋️", "🍕", "🧴", "🧼"];
+    return (
+        <div className="absolute bottom-full left-0 mb-2 p-3 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-2xl z-[100] w-[260px] animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-2 px-1">
+                <span className="text-xs font-bold text-brand-inactive-text uppercase">Selecione um ícone</span>
+                <button onClick={onClose} className="text-brand-inactive-text hover:text-brand-dark"><XIcon size={14} /></button>
             </div>
-        ) : (
-            <>
-                {Icon && <Icon size={24} className={`mb-2 ${selected ? 'text-brand-green' : 'text-brand-dark dark:text-dark-heading'}`} />}
-                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-1 truncate w-full px-1">{label}</span>
-                {subLabel && <span className="text-[10px] text-brand-inactive-text leading-tight">{subLabel}</span>}
-            </>
-        )}
-    </div>
-)
+            <div className="grid grid-cols-5 gap-1.5">
+                {emojis.map(e => (
+                    <button
+                        key={e}
+                        onClick={() => { onSelect(e); onClose(); }}
+                        className="text-xl p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-all hover:scale-110 active:scale-95"
+                    >
+                        {e}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+
+const TypeCard = ({ icon, label, subLabel, selected, onClick, simple = false }: { icon?: any, label: string, subLabel?: string, selected?: boolean, onClick: () => void, simple?: boolean }) => {
+    const isEmoji = typeof icon === 'string' && icon.length > 0;
+    const IconComponent = !isEmoji ? icon : null;
+
+    return (
+        <div
+            onClick={onClick}
+            className={`
+                border rounded-xl p-3 cursor-pointer transition-all flex flex-col items-center justify-center text-center h-[110px] min-w-[130px] relative flex-shrink-0
+                ${selected
+                    ? 'border-brand-green ring-1 ring-brand-green bg-white dark:bg-dark-surface shadow-sm'
+                    : 'border-brand-border dark:border-dark-border hover:border-brand-green/30 dark:hover:border-brand-green/30 bg-white dark:bg-dark-surface'
+                }
+            `}
+        >
+            {simple ? (
+                <div className="flex flex-col items-center justify-center gap-2 h-full text-brand-green">
+                    <div className="w-10 h-10 rounded-full border border-brand-green flex items-center justify-center bg-brand-green/5">
+                        <PlusIcon size={20} />
+                    </div>
+                    <span className="text-xs font-bold">Novo Tipo</span>
+                </div>
+            ) : (
+                <>
+                    {icon && (
+                        isEmoji ? (
+                            <span className="text-2xl mb-2">{icon}</span>
+                        ) : (
+                            <IconComponent size={24} className={`mb-2 ${selected ? 'text-brand-green' : 'text-brand-dark dark:text-dark-heading'}`} />
+                        )
+                    )}
+                    {!icon && <ClockIcon size={24} className={`mb-2 ${selected ? 'text-brand-green' : 'text-brand-dark dark:text-dark-heading'}`} />}
+                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-1 truncate w-full px-1">{label}</span>
+                    {subLabel && <span className="text-[10px] text-brand-inactive-text leading-tight">{subLabel}</span>}
+                </>
+            )}
+        </div>
+    );
+}
 
 export const AddUnavailableSheet = ({
     onClose,
     onSave,
+    onDelete,
     appointment,
     staffMembers = [],
     defaultDate = new Date(),
@@ -57,6 +95,7 @@ export const AddUnavailableSheet = ({
 }: {
     onClose: () => void,
     onSave?: (data: any) => void,
+    onDelete?: (id: string, deleteAll: boolean, category: string) => void,
     appointment?: Appointment | null,
     staffMembers?: any[],
     defaultDate?: Date,
@@ -94,6 +133,23 @@ export const AddUnavailableSheet = ({
     const [newTypeName, setNewTypeName] = useState('');
     const [newTypeDuration, setNewTypeDuration] = useState('60');
     const [isSavingNewType, setIsSavingNewType] = useState(false);
+    const [newTypeEmoji, setNewTypeEmoji] = useState('⏰');
+    const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+
+    // DELETION MODAL STATE
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [deleteOption, setDeleteOption] = useState<'single' | 'series'>('single');
+
+    // Horizontal Scroll Ref
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    const scroll = (direction: 'left' | 'right') => {
+        if (scrollRef.current) {
+            const { current } = scrollRef;
+            const scrollAmount = 300;
+            current.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
+        }
+    };
 
     const handleConfirm = () => {
         if (onSave) {
@@ -114,7 +170,7 @@ export const AddUnavailableSheet = ({
                 duration,
                 staffIds: selectedStaffIds,
                 // Fallback for single staff compatibility
-                staffId: selectedStaffIds[0],
+                staffId: selectedStaffIds[0] || '',
                 staff: selectedStaffIds.map(id => staffMembers.find(s => s.id === id)?.name).filter(Boolean).join(', '),
                 description,
                 recurrence,
@@ -135,7 +191,7 @@ export const AddUnavailableSheet = ({
                 partnerId,
                 name: newTypeName,
                 durationMinutes: Number(newTypeDuration),
-                iconName: 'Plus'
+                iconName: newTypeEmoji
             });
 
             if (createRes.success) {
@@ -178,9 +234,31 @@ export const AddUnavailableSheet = ({
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6 pb-32">
                 {/* Type Selector */}
-                <div>
-                    <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Tipo</label>
-                    <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-2">
+                <div className="relative group/types">
+                    <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3 px-1">Tipo</label>
+
+                    {/* Shadow indicators */}
+                    <div className="absolute left-0 top-[44px] bottom-[8px] w-12 bg-gradient-to-r from-white dark:from-dark-surface to-transparent z-10 pointer-events-none opacity-0 group-hover/types:opacity-100 transition-opacity"></div>
+                    <div className="absolute right-0 top-[44px] bottom-[8px] w-12 bg-gradient-to-l from-white dark:from-dark-surface to-transparent z-10 pointer-events-none opacity-0 group-hover/types:opacity-100 transition-opacity"></div>
+
+                    {/* Navigation Buttons */}
+                    <button
+                        onClick={() => scroll('left')}
+                        className="absolute left-1 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-white/90 dark:bg-zinc-800/90 shadow-lg border border-brand-border dark:border-dark-border opacity-0 group-hover/types:opacity-100 transition-opacity hover:scale-110 active:scale-95"
+                    >
+                        <ChevronLeftIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                    </button>
+                    <button
+                        onClick={() => scroll('right')}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-white/90 dark:bg-zinc-800/90 shadow-lg border border-brand-border dark:border-dark-border opacity-0 group-hover/types:opacity-100 transition-opacity hover:scale-110 active:scale-95"
+                    >
+                        <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                    </button>
+
+                    <div
+                        ref={scrollRef}
+                        className="flex gap-3 overflow-x-auto hide-scrollbar pb-2 px-1 relative scroll-smooth"
+                    >
                         {defaultTypes.map(t => (
                             <TypeCard
                                 key={t.label}
@@ -194,6 +272,7 @@ export const AddUnavailableSheet = ({
                         {unavailableTypes.map(t => (
                             <TypeCard
                                 key={t.id}
+                                icon={t.icon_name}
                                 label={t.name}
                                 subLabel={`${t.default_duration} min`}
                                 selected={selectedType === t.name}
@@ -227,7 +306,9 @@ export const AddUnavailableSheet = ({
                         width="w-full"
                         showChevron={false}
                         trigger={
-                            <Button variant="outline" className="w-full h-12 justify-between px-4">
+                            <button
+                                className="flex items-center text-brand-dark dark:text-dark-heading bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg py-2.5 px-4 text-sm transition-colors duration-150 w-full text-left justify-between"
+                            >
                                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
                                     {selectedStaffIds.length === 0
                                         ? 'Selecione os profissionais'
@@ -236,7 +317,7 @@ export const AddUnavailableSheet = ({
                                             : `${selectedStaffIds.length} selecionados`}
                                 </span>
                                 <ChevronDownIcon size={16} className="text-brand-inactive-text" />
-                            </Button>
+                            </button>
                         }
                     >
                         <div className="max-h-[300px] overflow-y-auto p-1">
@@ -267,12 +348,14 @@ export const AddUnavailableSheet = ({
                             width="w-full"
                             showChevron={false}
                             trigger={
-                                <Button variant="outline" className="w-full h-12 justify-between px-4">
+                                <button
+                                    className="flex items-center text-brand-dark dark:text-dark-heading bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg py-2.5 px-4 text-sm transition-colors duration-150 w-full text-left justify-between"
+                                >
                                     <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
                                         {recurrence === 'none' ? 'Não se repete' : recurrence === 'daily' ? 'Diariamente' : 'Semanalmente'}
                                     </span>
                                     <ChevronDownIcon size={16} className="text-brand-inactive-text" />
-                                </Button>
+                                </button>
                             }
                         >
                             <div className="p-1">
@@ -337,11 +420,57 @@ export const AddUnavailableSheet = ({
                 />
             </div>
 
-            <div className="absolute bottom-0 left-0 w-full p-6 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border z-20">
-                <Button className="w-full h-[48px]" onClick={handleConfirm}>
+            <div className="absolute bottom-0 left-0 w-full p-6 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border z-20 flex gap-3">
+                {isEditing && (
+                    <Button
+                        variant="outline"
+                        className="flex-1 h-[48px] border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10"
+                        onClick={() => setIsDeleteModalOpen(true)}
+                    >
+                        Excluir
+                    </Button>
+                )}
+                <Button className={isEditing ? "flex-1 h-[48px]" : "w-full h-[48px]"} onClick={handleConfirm}>
                     {isEditing ? 'Salvar Alterações' : 'Salvar Horário'}
                 </Button>
             </div>
+
+            {/* DELETION MODAL */}
+            <AlertModal
+                isOpen={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                onConfirm={() => {
+                    if (onDelete && appointment && appointment.id) {
+                        onDelete(appointment.id, deleteOption === 'series', appointment.service);
+                        setIsDeleteModalOpen(false);
+                    }
+                }}
+                title="Excluir horário indisponível"
+                confirmText="Excluir"
+                variant="danger"
+                isDestructive
+                message={
+                    <div className="space-y-4 py-2 text-left">
+                        <p className="text-sm text-brand-inactive-text">Como você deseja excluir este horário indisponível?</p>
+                        <div className="space-y-1">
+                            <RadioButton
+                                name="deleteOption"
+                                value="single"
+                                checked={deleteOption === 'single'}
+                                onChange={() => setDeleteOption('single')}
+                                label="Excluir apenas este horário"
+                            />
+                            <RadioButton
+                                name="deleteOption"
+                                value="series"
+                                checked={deleteOption === 'series'}
+                                onChange={() => setDeleteOption('series')}
+                                label={`Excluir todos os horários de "${appointment?.service}"`}
+                            />
+                        </div>
+                    </div>
+                }
+            />
         </div>
     );
 
@@ -353,9 +482,29 @@ export const AddUnavailableSheet = ({
                     <XIcon className="h-5 w-5" />
                 </Button>
             </header>
-            <div className="flex-1 space-y-4 p-6">
-                <FormInput label="Nome" value={newTypeName} onChange={(e) => setNewTypeName(e.target.value)} />
-                <FormInput label="Duração (min)" type="number" value={newTypeDuration} onChange={(e) => setNewTypeDuration(e.target.value)} />
+            <div className="flex-1 space-y-6 p-6">
+                <div className="relative">
+                    <div className="flex gap-3">
+                        <div className="flex-1">
+                            <FormInput label="Nome" placeholder="Ex: Almoço" value={newTypeName} onChange={(e) => setNewTypeName(e.target.value)} />
+                        </div>
+                        <div className="w-20 pt-7">
+                            <button
+                                onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
+                                className="w-full h-10 flex items-center justify-center bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg text-2xl hover:bg-white dark:hover:bg-dark-surface transition-colors"
+                            >
+                                {newTypeEmoji}
+                            </button>
+                            {isEmojiPickerOpen && (
+                                <EmojiPicker
+                                    onSelect={(e) => { setNewTypeEmoji(e); setIsEmojiPickerOpen(false); }}
+                                    onClose={() => setIsEmojiPickerOpen(false)}
+                                />
+                            )}
+                        </div>
+                    </div>
+                </div>
+                <FormInput label="Duração padrão (min)" type="number" value={newTypeDuration} onChange={(e) => setNewTypeDuration(e.target.value)} />
             </div>
             <footer className="p-6 border-t border-brand-border bg-white dark:bg-dark-surface dark:border-dark-border">
                 <Button className="w-full" isLoading={isSavingNewType} onClick={handleSaveNewType}>Salvar Tipo</Button>
@@ -385,6 +534,7 @@ export const AddUnavailableSheet = ({
                     <motion.div
                         initial={{ x: '100%' }}
                         animate={{ x: isNewTypeSheetOpen ? "-40px" : 0, scale: isNewTypeSheetOpen ? 0.97 : 1, opacity: isNewTypeSheetOpen ? 0.7 : 1 }}
+                        exit={{ x: '100%' }}
                         transition={{ type: "spring", stiffness: 400, damping: 40 }}
                         className="fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-surface"
                         onClick={(e) => e.stopPropagation()}

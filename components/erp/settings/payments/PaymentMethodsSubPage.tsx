@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { AnimatePresence } from "framer-motion"
+import { AnimatePresence, motion } from "framer-motion"
 import { AlertModal, Badge, Button, Checkbox, IconPlaceholder, SavingStatusModal, Separator } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
@@ -47,7 +47,7 @@ const LIST_COLUMNS = [
 
 export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: PaymentMethodsSubPageProps) {
     const { success: notifySuccess, error: notifyError } = useNotification()
-    const isMobile = useMediaQuery("(max-width: 767px)")
+    const isMobile = useMediaQuery("(max-width: 1024px)")
 
     const [methods, setMethods] = useState<PaymentMethodListItem[]>(paymentMethods || [])
     const [search, setSearch] = useState("")
@@ -451,46 +451,58 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
 
         if (isMobile) {
             return (
-                <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
+                <div className="flex flex-col">
                     {paginatedMethods.map((method, idx) => (
-                        <React.Fragment key={method.id}>
+                        <motion.div
+                            key={method.id}
+                            initial={{ opacity: 0, y: 15 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: idx * 0.05, duration: 0.3 }}
+                        >
                             <div
-                                className="py-5 flex items-center gap-4 cursor-pointer"
+                                className="py-6 flex items-center gap-5 cursor-pointer active:scale-[0.98] transition-transform"
                                 onClick={() => {
                                     setEditingPayment(method)
                                     setCurrentView("edit")
                                 }}
                             >
-                                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                <div className="w-14 h-14 rounded-2xl bg-brand-gray/50 dark:bg-dark-border/30 shrink-0 flex items-center justify-center border border-brand-border/50 dark:border-dark-border/20 shadow-sm">
                                     {getPaymentIcon(method)}
                                 </div>
 
-                                <div className="flex-1 min-w-0 flex flex-col gap-1">
+                                <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                                     <div className="flex justify-between items-start">
                                         <div className="flex flex-col min-w-0 pr-1">
-                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                            <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading leading-tight truncate">
                                                 {method.name || "Sem nome"}
                                             </h3>
-                                            <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
+                                            <span className="text-[13px] text-brand-inactive-text dark:text-dark-body font-medium truncate mt-0.5">
                                                 {getBrandsLabel(method) || getPaymentTypeLabel(method)}
                                             </span>
                                         </div>
-                                        <Badge variant={method.is_active ? "green" : "red"} icon={null} className="shrink-0 text-[10px] h-5 px-1.5">
+                                        <Badge variant={method.is_active ? "green" : "red"} icon={null} className="shrink-0 text-[10px] h-5 px-2">
                                             {method.is_active ? "Ativo" : "Inativo"}
                                         </Badge>
                                     </div>
-                                    <div className="flex justify-between items-center mt-1">
-                                        <Badge variant="gray" icon={null} className="text-[10px] h-5 px-1.5 uppercase">
-                                            {getPaymentTypeLabel(method)}
-                                        </Badge>
+                                    <div className="flex justify-between items-center mt-2">
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="gray" icon={null} className="text-[10px] h-5 px-2 uppercase tracking-wider">
+                                                {getPaymentTypeLabel(method)}
+                                            </Badge>
+                                            {method.discount_percent ? (
+                                                <Badge variant="blue" icon={null} className="text-[10px] h-5 px-2">
+                                                    -{method.discount_percent}%
+                                                </Badge>
+                                            ) : null}
+                                        </div>
                                         <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
                                             <Checkbox checked={selection.ids.has(method.id)} onChange={() => handleSelectRow(method.id)} />
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            {idx < paginatedMethods.length - 1 && <Separator className="opacity-50" />}
-                        </React.Fragment>
+                            {idx < paginatedMethods.length - 1 && <Separator className="opacity-30" />}
+                        </motion.div>
                     ))}
                 </div>
             )
@@ -568,87 +580,87 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
         <>
             {currentView === "list" && (
                 <FadeIn>
-                <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
-                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
+                    <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
+                        <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
-                        {/* Sticky Header */}
-                        <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
-                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+                            {/* Sticky Header */}
+                            <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+                                <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
 
-                                {/* Back button - desktop only */}
-                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                    <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
-                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                    </Button>
-                                </div>
-
-                                {/* Title row */}
-                                <div className="hidden md:flex items-start justify-between">
-                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                        <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                            <span className="truncate">Formas de Pagamento</span>
-                                        </h1>
-
-                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                            Gerencie os métodos de pagamento aceitos em seu negócio.
-                                        </div>
-                                    </div>
-
-                                    {/* Desktop action buttons */}
-                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <Button
-                                            onClick={() => {
-                                                setEditingPayment(null)
-                                                setCurrentView("edit")
-                                            }}
-                                        >
-                                            Novo método
+                                    {/* Back button - desktop only */}
+                                    <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                        <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                            <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                         </Button>
                                     </div>
+
+                                    {/* Title row */}
+                                    <div className="hidden md:flex items-start justify-between">
+                                        <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                            <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                                <span className="truncate">Formas de Pagamento</span>
+                                            </h1>
+
+                                            <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                                Gerencie os métodos de pagamento aceitos em seu negócio.
+                                            </div>
+                                        </div>
+
+                                        {/* Desktop action buttons */}
+                                        <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                            <Button
+                                                onClick={() => {
+                                                    setEditingPayment(null)
+                                                    setCurrentView("edit")
+                                                }}
+                                            >
+                                                Novo método
+                                            </Button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div className="px-3 md:px-0 py-2 max-w-[1300px] mx-auto mt-8 w-full">
-                                <PaymentMethodPageControls
-                                    search={search}
-                                    onSearchChange={setSearch}
-                                    onOpenFilter={() => setModals({ filter: true })}
-                                    onAddMethod={() => {
-                                        setEditingPayment(null)
-                                        setCurrentView("edit")
-                                    }}
-                                    filters={filters}
-                                    setFilters={setFilters}
-                                    viewMode={viewMode}
-                                    onViewModeChange={setViewMode}
-                                    hasActiveFilters={hasActiveFilters}
-                                />
+                                <div className="px-3 md:px-0 py-2 max-w-[1300px] mx-auto mt-8 w-full">
+                                    <PaymentMethodPageControls
+                                        search={search}
+                                        onSearchChange={setSearch}
+                                        onOpenFilter={() => setModals({ filter: true })}
+                                        onAddMethod={() => {
+                                            setEditingPayment(null)
+                                            setCurrentView("edit")
+                                        }}
+                                        filters={filters}
+                                        setFilters={setFilters}
+                                        viewMode={viewMode}
+                                        onViewModeChange={setViewMode}
+                                        hasActiveFilters={hasActiveFilters}
+                                    />
 
-                                <div className="mt-4">
-                                    <AnimatePresence mode="wait">
-                                        <FadeIn
-                                            key={`${viewMode}-${debouncedSearch}-${filters.type.join(",")}-${filters.status.join(",")}-${page}`}
-                                            className="w-full"
-                                        >
-                                            {renderListContent()}
+                                    <div className="mt-4">
+                                        <AnimatePresence mode="wait">
+                                            <FadeIn
+                                                key={`${viewMode}-${debouncedSearch}-${filters.type.join(",")}-${filters.status.join(",")}-${page}`}
+                                                className="w-full"
+                                            >
+                                                {renderListContent()}
 
-                                            {totalPages > 1 ? (
-                                                <div className="mt-6">
-                                                    <Pagination
-                                                        currentPage={page}
-                                                        totalPages={totalPages}
-                                                        onPageChange={setPage}
-                                                    />
-                                                </div>
-                                            ) : null}
-                                        </FadeIn>
-                                    </AnimatePresence>
+                                                {totalPages > 1 ? (
+                                                    <div className="mt-6">
+                                                        <Pagination
+                                                            currentPage={page}
+                                                            totalPages={totalPages}
+                                                            onPageChange={setPage}
+                                                        />
+                                                    </div>
+                                                ) : null}
+                                            </FadeIn>
+                                        </AnimatePresence>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </FadeIn>
+                </FadeIn>
             )}
 
             {currentView === "edit" && (

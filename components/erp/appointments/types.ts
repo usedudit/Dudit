@@ -20,6 +20,8 @@ export interface Appointment {
     pricingUnit?: 'Por Serviço' | 'Por Hora' | 'Por Dia' | 'Por Semana'; // New
     notes?: string;
     activityLog?: any[];
+    source?: 'unavailable' | 'appointment';
+    recurrence?: 'none' | 'daily' | 'weekly';
 }
 
 // Helper interface for layout calculation

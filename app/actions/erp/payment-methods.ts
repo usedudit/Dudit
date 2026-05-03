@@ -32,7 +32,7 @@ type UpsertPaymentMethodInput = {
     pixKey?: string | null
     usePartnerPixData?: boolean
     cardBrand?: string | null
-    defaultFinanceAccountId: string
+    defaultFinanceAccountId?: string | null
     priority?: number
     isDefault?: boolean
     isOnlineDefault?: boolean
@@ -311,9 +311,7 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
     if (canonicalType === "cash") {
         return { error: "O tipo Dinheiro já é criado automaticamente e não pode ser cadastrado manualmente." }
     }
-    if (!data.defaultFinanceAccountId) {
-        return { error: "Selecione a conta financeira padrão para este método." }
-    }
+    // defaultFinanceAccountId is now optional
     const maxInstallments = Math.max(1, Math.min(24, Number(data.maxInstallments || 1)))
     const supportsInstallments = canonicalType === "credit_card" && Boolean(data.supportsInstallments)
     const validatedInstallmentFees = sanitizeInstallmentFees(data.installmentFees, maxInstallments)
@@ -351,16 +349,18 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
 
     const supabase = createAdminClient()
 
-    const { data: financeAccount } = await supabase
-        .from("finance_accounts")
-        .select("id")
-        .eq("id", data.defaultFinanceAccountId)
-        .eq("partner_id", data.partnerId)
-        .eq("is_active", true)
-        .maybeSingle()
+    if (data.defaultFinanceAccountId) {
+        const { data: financeAccount } = await supabase
+            .from("finance_accounts")
+            .select("id")
+            .eq("id", data.defaultFinanceAccountId)
+            .eq("partner_id", data.partnerId)
+            .eq("is_active", true)
+            .maybeSingle()
 
-    if (!financeAccount?.id) {
-        return { error: "Conta financeira inválida ou inativa para este parceiro." }
+        if (!financeAccount?.id) {
+            return { error: "Conta financeira inválida ou inativa para este parceiro." }
+        }
     }
 
     if (data.isOnlineDefault) {
@@ -392,7 +392,7 @@ export async function createPaymentMethodAction(data: UpsertPaymentMethodInput) 
             pix_key_type: isPix ? (data.pixKeyType || null) : null,
             pix_key: isPix ? persistedPixKey : null,
             use_partner_pix_data: isPix ? Boolean(data.usePartnerPixData) : false,
-            default_finance_account_id: data.defaultFinanceAccountId,
+            default_finance_account_id: data.defaultFinanceAccountId || null,
             priority: Math.max(0, Number(data.priority || 0)),
             is_default: Boolean(data.isDefault),
             is_online_default: Boolean(data.isOnlineDefault),
@@ -434,7 +434,7 @@ export async function updatePaymentMethodAction(
         pixKey?: string | null
         usePartnerPixData?: boolean
         cardBrand?: string | null
-        defaultFinanceAccountId?: string
+        defaultFinanceAccountId?: string | null
         priority?: number
         isDefault?: boolean
         isOnlineDefault?: boolean
@@ -505,11 +505,8 @@ export async function updatePaymentMethodAction(
     if (data.cardBrand !== undefined) {
         updateData.card_brand = data.cardBrand
     }
-    const expectedFinanceAccountId = data.defaultFinanceAccountId ?? method.default_finance_account_id
-    if (!expectedFinanceAccountId) {
-        return { error: "Método de pagamento precisa ter uma conta financeira vinculada." }
-    }
-    if (data.defaultFinanceAccountId !== undefined) {
+    // Finance account is now optional
+    if (data.defaultFinanceAccountId) {
         const { data: financeAccount } = await supabase
             .from("finance_accounts")
             .select("id")
@@ -521,6 +518,8 @@ export async function updatePaymentMethodAction(
             return { error: "Conta financeira inválida ou inativa para este parceiro." }
         }
         updateData.default_finance_account_id = data.defaultFinanceAccountId
+    } else if (data.defaultFinanceAccountId === null) {
+        updateData.default_finance_account_id = null
     }
     if (data.priority !== undefined) updateData.priority = Math.max(0, Number(data.priority || 0))
     if (data.isDefault !== undefined) updateData.is_default = Boolean(data.isDefault)

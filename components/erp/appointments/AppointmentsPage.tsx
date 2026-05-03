@@ -23,13 +23,15 @@ import {
 import { TopSelectionBar } from './Shared';
 import { AppointmentSheet } from './sheets/AppointmentSheet';
 import CheckoutSheet from './sheets/CheckoutSheet';
-import { MoreAppointmentsSheet, AddUnavailableSheet } from './sheets/ActionSheets';
+import { MoreAppointmentsSheet, AddUnavailableSheet } from './sheets/ActionsSheet';
 import { MobileView, DayView, TimelineView, MonthView } from './views/CalendarViews';
 import {
     createAppointmentsAction,
     getAppointmentHistoryAction,
     getAppointmentsByDateRangeAction,
     updateAppointmentAction,
+    deleteAppointmentAction,
+    deleteUnavailableSeriesAction,
     type AppointmentInput
 } from '@/app/actions/erp/appointments';
 import { getUnavailableTypesAction } from '@/app/actions/erp/unavailable-types';
@@ -137,6 +139,8 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
         pricingUnit: row.pricing_unit || 'Por Serviço',
         notes: row.notes || undefined,
         partnerId: row.partner_id,
+        source: (row.source as any) || (row.status?.toLowerCase() === 'indisponível' ? 'unavailable' : 'appointment'),
+        recurrence: (row.recurrence as any) || 'none'
     }), []);
 
     // -- Load staff + clients + services on mount (once) --
@@ -336,6 +340,14 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
 
     const handleOpenView = async (appointment: Appointment) => {
         if (isSelectionMode) return;
+
+        // Redirect to Unavailable Sheet if it's an unavailable slot
+        if (appointment.status?.toLowerCase() === 'indisponível' || appointment.source === 'unavailable') {
+            setSelectedAppointment(appointment);
+            setIsUnavailableSheetOpen(true);
+            return;
+        }
+
         const historyRes = await getAppointmentHistoryAction(appointment.id);
         const enrichedAppointment = historyRes.success
             ? { ...appointment, activityLog: historyRes.history }
@@ -343,6 +355,33 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
         setSheetMode('view');
         setSelectedAppointment(enrichedAppointment);
         setIsSheetOpen(true);
+    };
+
+    const handleDeleteUnavailable = async (appointmentId: string, deleteAll: boolean, category: string) => {
+        setIsSaving(true);
+        try {
+            let res;
+            if (deleteAll) {
+                res = await deleteUnavailableSeriesAction(partnerId, category);
+            } else {
+                res = await deleteAppointmentAction(appointmentId);
+            }
+
+            if (res.success) {
+                appointmentCacheRef.current.clear();
+                // We could just filter locally for speed, but let's re-fetch for safety or rely on revalidation
+                setAppointments(prev => {
+                    if (deleteAll) {
+                        return prev.filter(a => !(a.service === category && (a.source === 'unavailable' || a.status?.toLowerCase() === 'indisponível')));
+                    }
+                    return prev.filter(a => a.id !== appointmentId);
+                });
+                setIsUnavailableSheetOpen(false);
+                setSelectedAppointment(null);
+            }
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleOpenMore = (dateStr: string, apps: Appointment[]) => {
@@ -692,7 +731,7 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
                                                     <>
                                                         <div className="grid grid-cols-7 border-b border-brand-border dark:border-dark-border bg-gray-50 dark:bg-zinc-900/50 flex-shrink-0">
                                                             {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                                                                <div key={day} className="py-2 text-center text-xs font-bold text-brand-inactive-text uppercase tracking-wide">
+                                                                <div key={day} className="py-2 text-center text-xs font-bold text-brand-inactive-text">
                                                                     {day}
                                                                 </div>
                                                             ))}
@@ -776,7 +815,7 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
                                                                 {APPOINTMENT_COLUMNS.map((column) => (
                                                                     <th
                                                                         key={column.id}
-                                                                        className={`py-3 px-3 text-[11px] uppercase tracking-wider font-bold text-brand-inactive-text dark:text-dark-body whitespace-nowrap bg-brand-gray dark:bg-dark-border/50 ${column.align === "center" ? "text-center" : column.align === "right" ? "text-right" : "text-left"}`}
+                                                                        className={`py-3 px-3 text-[11px] font-bold text-brand-inactive-text dark:text-dark-body whitespace-nowrap bg-brand-gray dark:bg-dark-border/50 ${column.align === "center" ? "text-center" : column.align === "right" ? "text-right" : "text-left"}`}
                                                                         style={{ width: column.width, minWidth: column.minWidth }}
                                                                     >
                                                                         {column.label}
@@ -907,60 +946,93 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
                     <AnimatePresence>
                         {isUnavailableSheetOpen && (
                             <AddUnavailableSheet
-                                onClose={() => setIsUnavailableSheetOpen(false)}
+                                onClose={() => {
+                                    setIsUnavailableSheetOpen(false);
+                                    setSelectedAppointment(null);
+                                }}
+                                appointment={selectedAppointment}
+                                onDelete={handleDeleteUnavailable}
                                 staffMembers={realStaffMembers}
                                 defaultDate={currentDate}
                                 unavailableTypes={unavailableTypes}
                                 partnerId={partnerId}
                                 onRefreshServices={loadCatalogs}
                                 onSave={async (item) => {
-                                    const staff = realStaffMembers.find((s) => s.id === item.staffId) || realStaffMembers[0];
-                                    if (!staff) return;
+                                    setIsSaving(true);
+                                    try {
+                                        const staff = realStaffMembers.find((s) => s.id === item.staffId) || realStaffMembers[0];
+                                        if (!staff) return;
 
-                                    const payloads: AppointmentInput[] = [];
-                                    const baseDate = new Date(item.date + 'T12:00:00'); // Use noon to avoid TZ issues
-                                    const recurrenceGroupId = item.recurrence !== 'none' ? crypto.randomUUID() : null;
+                                        // If editing, update instead of create (for simplicity, only single update for now or series logic)
+                                        if (selectedAppointment && selectedAppointment.id) {
+                                            const updateRes = await updateAppointmentAction(selectedAppointment.id, {
+                                                serviceName: item.title || item.type || 'Indisponível',
+                                                date: item.date,
+                                                time: item.startTime,
+                                                endDate: item.date,
+                                                endTime: item.endTime,
+                                                duration: item.duration,
+                                                staffId: staff.id,
+                                                staffName: staff.name,
+                                                notes: item.description || null,
+                                                status: 'Indisponível',
+                                                source: 'unavailable'
+                                            });
 
-                                    let repeatCount = 1;
-                                    if (item.recurrence === 'daily') repeatCount = 30; // Default to 30 days
-                                    if (item.recurrence === 'weekly') repeatCount = 12; // Default to 12 weeks
+                                            if (updateRes.success && updateRes.item) {
+                                                const mapped = mapDbAppointment(updateRes.item);
+                                                setAppointments((prev) => prev.map((a) => a.id === mapped.id ? mapped : a));
+                                            }
+                                        } else {
+                                            const payloads: AppointmentInput[] = [];
+                                            const baseDate = new Date(item.date + 'T12:00:00'); 
+                                            const recurrenceGroupId = item.recurrence !== 'none' ? crypto.randomUUID() : null;
 
-                                    for (let i = 0; i < repeatCount; i++) {
-                                        const currentDate = new Date(baseDate);
-                                        if (item.recurrence === 'daily') {
-                                            currentDate.setDate(baseDate.getDate() + i);
-                                        } else if (item.recurrence === 'weekly') {
-                                            currentDate.setDate(baseDate.getDate() + (i * 7));
+                                            let repeatCount = 1;
+                                            if (item.recurrence === 'daily') repeatCount = 30; 
+                                            if (item.recurrence === 'weekly') repeatCount = 12; 
+
+                                            for (let i = 0; i < repeatCount; i++) {
+                                                const currentDate = new Date(baseDate);
+                                                if (item.recurrence === 'daily') {
+                                                    currentDate.setDate(baseDate.getDate() + i);
+                                                } else if (item.recurrence === 'weekly') {
+                                                    currentDate.setDate(baseDate.getDate() + (i * 7));
+                                                }
+
+                                                const dateStr = currentDate.toISOString().split('T')[0];
+
+                                                payloads.push({
+                                                    customerName: 'Horário Indisponível',
+                                                    serviceName: item.title || item.type || 'Indisponível',
+                                                    date: dateStr,
+                                                    time: item.startTime,
+                                                    endDate: dateStr,
+                                                    endTime: item.endTime,
+                                                    duration: item.duration,
+                                                    staffId: staff.id,
+                                                    staffName: staff.name,
+                                                    price: 0,
+                                                    pricingUnit: 'Por Serviço',
+                                                    notes: item.description || null,
+                                                    status: 'Indisponível',
+                                                    source: 'unavailable',
+                                                    recurrenceGroupId: recurrenceGroupId,
+                                                    recurrenceRule: item.recurrence !== 'none' ? item.recurrence : null
+                                                });
+                                            }
+
+                                            const createRes = await createAppointmentsAction(payloads);
+                                            if (createRes.success) {
+                                                appointmentCacheRef.current.clear();
+                                                setAppointments((prev) => [...prev, ...(createRes.created || []).map(mapDbAppointment)]);
+                                            }
                                         }
-
-                                        const dateStr = currentDate.toISOString().split('T')[0];
-
-                                        payloads.push({
-                                            customerName: 'Horário Indisponível',
-                                            serviceName: item.title || item.type || 'Indisponível',
-                                            date: dateStr,
-                                            time: item.startTime,
-                                            endDate: dateStr,
-                                            endTime: item.endTime,
-                                            duration: item.duration,
-                                            staffId: staff.id,
-                                            staffName: staff.name,
-                                            price: 0,
-                                            pricingUnit: 'Por Serviço',
-                                            notes: item.description || null,
-                                            status: 'Indisponível',
-                                            source: 'unavailable',
-                                            recurrenceGroupId: recurrenceGroupId,
-                                            recurrenceRule: item.recurrence !== 'none' ? item.recurrence : null
-                                        });
+                                        setIsUnavailableSheetOpen(false);
+                                        setSelectedAppointment(null);
+                                    } finally {
+                                        setIsSaving(false);
                                     }
-
-                                    const createRes = await createAppointmentsAction(payloads);
-                                    if (createRes.success) {
-                                        appointmentCacheRef.current.clear();
-                                        setAppointments((prev) => [...prev, ...(createRes.created || []).map(mapDbAppointment)]);
-                                    }
-                                    setIsUnavailableSheetOpen(false);
                                 }}
                             />
                         )}

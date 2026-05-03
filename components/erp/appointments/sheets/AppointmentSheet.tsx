@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, ChevronDownIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon } from '@/lib/icons';
-import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Badge } from '@/components/reusable';
+import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Badge, Spinner } from '@/components/reusable';
 import { getAvailableTimeSlotsAction } from '@/app/actions/erp/appointments';
 import { usePermissions } from '@/lib/permission-context';
 import { RecurrenceView, ActivityLog } from '../Shared';
@@ -397,7 +397,7 @@ export const AppointmentSheet = ({
         }
         else if (currentView === 'client') {
             if (!selectedClient) return;
-            
+
             // IF INITIAL PARAMS WERE PASSED, SKIP DATETIME
             if (initialStaffId && initialTimeSlot && mode === 'create') {
                 setCurrentView('summary');
@@ -1267,7 +1267,7 @@ export const AppointmentSheet = ({
                                 >
                                     {isSaving && currentView === 'summary' ? (
                                         <span className="flex items-center gap-2">
-                                            Loader
+                                            <Spinner size={18} />
                                         </span>
                                     ) : currentView === 'summary' || (currentView === 'datetime' && (selectedTimeSlot || needsRangePicker)) ? <span className="flex items-center gap-2">Agendar <CheckCircleIcon size={18} /></span> : currentView === 'edit-service' ? 'Aplicar' : 'Próximo'}
                                 </Button>

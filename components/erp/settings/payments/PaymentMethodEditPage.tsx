@@ -1,31 +1,42 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect, useMemo } from "react"
+import React, { useState, useEffect, useMemo, useCallback } from "react"
 import {
     Button,
     Input,
     Checkbox,
-    FormDropdown,
-    Combobox,
-    MoneyInput,
-    PercentageInput,
-    ListItem,
+    RadioButton,
     AlertModal,
     SavingStatusModal,
-    InfoCard,
-    Separator,
-    DefaultModal,
+    Badge,
 } from "@/components/reusable"
 import {
-    createPaymentMethodAction,
-    getPaymentMethodDetailsAction,
-    getPartnerFinanceAccountsForPaymentMethodsAction,
-    updatePaymentMethodAction,
-} from "@/app/actions/erp/payment-methods"
-import { createFinanceAccountAction, getFinanceAccountsAction } from "@/app/actions/erp/finance-accounts"
-import { PlusIcon, ChevronLeftIcon, CheckCircleIcon, QRCodeIcon, CreditCardIcon, MoneyIcon } from "@/lib/icons"
+    CpfCnpjInput,
+    EmailInput,
+    PhoneInput,
+} from "@/components/reusable"
+import { useNotification } from "@/hooks/use-notification"
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import { createPaymentMethodAction, updatePaymentMethodAction, getPaymentMethodDetailsAction } from "@/app/actions/erp/payment-methods"
+import { ChevronLeftIcon, SaveIcon, InfoIcon, MoneyIcon, CreditCardIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
+
+const AVAILABLE_BRANDS = [
+    { id: "visa", name: "Visa", image: "https://img.dudit.com.br/static/icons/payments/Visa.png" },
+    { id: "mastercard", name: "Mastercard", image: "https://img.dudit.com.br/static/icons/payments/Mastercard.png" },
+    { id: "elo", name: "Elo", image: "https://img.dudit.com.br/static/icons/payments/Elo.png" },
+    { id: "american_express", name: "Amex", image: "https://img.dudit.com.br/static/icons/payments/Amex.png" },
+    { id: "hipercard", name: "Hipercard", image: "https://img.dudit.com.br/static/icons/payments/Hipercard.png" },
+    { id: "diners", name: "Diners", image: "https://img.dudit.com.br/static/icons/payments/Diners.png" },
+]
+
+const PIX_KEY_TYPES = [
+    { id: "cpf", name: "CPF" },
+    { id: "cnpj", name: "CNPJ" },
+    { id: "email", name: "E-mail" },
+    { id: "phone", name: "Celular" },
+    { id: "random", name: "Chave Aleatória" },
+]
 
 interface PaymentMethod {
     id: string
@@ -36,15 +47,12 @@ interface PaymentMethod {
     is_online_default?: boolean
     fee_percent?: number | null
     fee_fixed?: number | null
-    fee_bearer?: "merchant" | "customer"
-    supports_installments?: boolean
-    max_installments?: number
-    receiving_days?: number
     discount_percent?: number | null
+    card_brand?: string | null
+    max_installments?: number | null
     pix_key_type?: "cpf" | "cnpj" | "email" | "phone" | "random" | null
     pix_key?: string | null
-    card_brand?: string | null
-    installment_fees?: Array<{ installment_number: number; fee_percent: number }>
+    use_partner_pix_data?: boolean
     default_finance_account_id?: string | null
 }
 
@@ -54,715 +62,522 @@ interface PaymentMethodEditPageProps {
     onBack: (shouldReload?: boolean) => void
 }
 
-const AVAILABLE_BRANDS = [
-    { id: "american_express", label: "American Express", image: "https://img.dudit.com.br/static/icons/payments/Amex.png" },
-    { id: "diners", label: "Diners Club", image: "https://img.dudit.com.br/static/icons/payments/Diners.png" },
-    { id: "discover", label: "Discover", image: "https://img.dudit.com.br/static/icons/payments/Discover.png" },
-    { id: "elo", label: "Elo", image: "https://img.dudit.com.br/static/icons/payments/Elo.png" },
-    { id: "hipercard", label: "Hipercard", image: "https://img.dudit.com.br/static/icons/payments/Hipercard.png" },
-    { id: "jcb", label: "JCB", image: "https://img.dudit.com.br/static/icons/payments/JCB.png" },
-    { id: "mastercard", label: "Mastercard", image: "https://img.dudit.com.br/static/icons/payments/Mastercard.png" },
-    { id: "visa", label: "Visa", image: "https://img.dudit.com.br/static/icons/payments/Visa.png" },
-]
-
-const ACCOUNT_TYPE_OPTIONS = [
-    { value: "bank", label: "Banco" },
-    { value: "cash", label: "Caixa" },
-    { value: "wallet", label: "Carteira" },
-] as const
+const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: string; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+        {title && <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">{title}</h4>}
+        {children}
+    </div>
+)
 
 export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: PaymentMethodEditPageProps) {
+    const { success: notifySuccess, error: notifyError } = useNotification()
     const [isLoading, setIsLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
     const [isLoadingDetails, setIsLoadingDetails] = useState(false)
-    const [financeAccounts, setFinanceAccounts] = useState<Array<{ id: string; name: string; type?: string }>>([])
-    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
-    const [brandsModalOpen, setBrandsModalOpen] = useState(false)
-    const [installmentsModalOpen, setInstallmentsModalOpen] = useState(false)
-    const [showUnsavedModal, setShowUnsavedModal] = useState(false)
-    const [baselineFormData, setBaselineFormData] = useState<any>(null)
-
-    const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
-    const [isSavingAccount, setIsSavingAccount] = useState(false)
-    const [newAccountName, setNewAccountName] = useState("")
-    const [newAccountType, setNewAccountType] = useState<"cash" | "bank" | "wallet">("bank")
-    const [newAccountInitialBalance, setNewAccountInitialBalance] = useState(0)
-    const [newAccountIsDefault, setNewAccountIsDefault] = useState(false)
-    const [newAccountNameError, setNewAccountNameError] = useState(false)
-
+    // Form state
     const [formData, setFormData] = useState({
         name: "",
-        payment_type: "pix",
+        type: "credit_card",
         is_active: true,
         is_online_default: false,
         fee_percent: 0,
         fee_fixed: 0,
-        fee_bearer: "merchant" as "merchant" | "customer",
-        receiving_days: 0,
         discount_percent: 0,
-        pix_key_type: "email" as "cpf" | "cnpj" | "email" | "phone" | "random",
-        pix_key: "",
-        card_brand: "" as string,
-        default_finance_account_id: "",
-        has_fees: false,
-        supports_installments: false,
+        card_brand: null as string | null,
         max_installments: 1,
-        installment_fees: [{ installment_number: 1, fee_percent: 0 }] as Array<{ installment_number: number; fee_percent: number }>,
+        pix_key_type: "cpf" as "cpf" | "cnpj" | "email" | "phone" | "random",
+        pix_key: "",
+        use_partner_pix_data: false,
+        supports_installments: true,
     })
 
-    const buildInstallments = (maxInstallments: number, existing?: Array<{ installment_number: number; fee_percent: number }>) => {
-        const map = new Map<number, number>((existing || []).map((row) => [row.installment_number, row.fee_percent]))
-        return Array.from({ length: maxInstallments }).map((_, idx) => ({
-            installment_number: idx + 1,
-            fee_percent: map.get(idx + 1) ?? 0,
-        }))
-    }
+    const [baselineFormData, setBaselineFormData] = useState<any>(null)
+
+    useEffect(() => {
+        const loadDetails = async () => {
+            if (!editingMethod) {
+                const initial = {
+                    name: "",
+                    type: "credit_card",
+                    is_active: true,
+                    is_online_default: false,
+                    fee_percent: 0,
+                    fee_fixed: 0,
+                    discount_percent: 0,
+                    card_brand: null,
+                    max_installments: 1,
+                    pix_key_type: "cpf" as const,
+                    pix_key: "",
+                    use_partner_pix_data: false,
+                    supports_installments: true,
+                }
+                setFormData(initial)
+                setBaselineFormData(JSON.parse(JSON.stringify(initial)))
+                return
+            }
+
+            setIsLoadingDetails(true)
+            try {
+                const res = await getPaymentMethodDetailsAction(editingMethod.id)
+                if (res.success && res.method) {
+                    const m = res.method
+                    const initial = {
+                        name: m.name || "",
+                        type: m.type || m.payment_type || "credit_card",
+                        is_active: m.is_active ?? true,
+                        is_online_default: m.is_online_default ?? false,
+                        fee_percent: Number(m.fee_percent || 0),
+                        fee_fixed: Number(m.fee_fixed || 0),
+                        discount_percent: Number(m.discount_percent || 0),
+                        card_brand: m.card_brand || null,
+                        max_installments: Number(m.max_installments || 1),
+                        pix_key_type: (m.pix_key_type || "cpf") as any,
+                        pix_key: m.pix_key || "",
+                        use_partner_pix_data: Boolean(m.use_partner_pix_data),
+                        supports_installments: Boolean(m.supports_installments ?? ((m.max_installments || 1) > 1)),
+                    }
+                    setFormData(initial)
+                    setBaselineFormData(JSON.parse(JSON.stringify(initial)))
+                }
+            } catch (err) {
+                notifyError("Erro ao carregar detalhes")
+            } finally {
+                setIsLoadingDetails(false)
+            }
+        }
+        loadDetails()
+    }, [editingMethod, notifyError])
 
     const isDirty = useMemo(() => {
         if (!baselineFormData) return false
-        const current = JSON.stringify(formData)
-        const baseline = JSON.stringify(baselineFormData)
-        return current !== baseline
+        return JSON.stringify(formData) !== JSON.stringify(baselineFormData)
     }, [formData, baselineFormData])
 
-    useEffect(() => {
-        if (!editingMethod) {
-            const initial = {
-                name: "",
-                payment_type: "pix",
-                is_active: true,
-                is_online_default: false,
-                fee_percent: 0,
-                fee_fixed: 0,
-                fee_bearer: "merchant" as const,
-                receiving_days: 0,
-                discount_percent: 0,
-                pix_key_type: "email" as const,
-                pix_key: "",
-                card_brand: "",
-                default_finance_account_id: "",
-                has_fees: false,
-                supports_installments: false,
-                max_installments: 1,
-                installment_fees: [{ installment_number: 1, fee_percent: 0 }],
-            }
-            setFormData(initial)
-            setBaselineFormData(initial)
-            setError(null)
-            setFieldErrors({})
-        } else {
-            setIsLoadingDetails(true)
-            getPaymentMethodDetailsAction(editingMethod.id)
-                .then((res: any) => {
-                    const full = res?.method || editingMethod
-                    const resolvedType = full.type || full.payment_type || "pix"
-                    const maxInstallments = Number(full.max_installments || 1)
-                    const data = {
-                        name: full.name || "",
-                        payment_type: resolvedType,
-                        is_active: full.is_active ?? true,
-                        is_online_default: full.is_online_default ?? false,
-                        fee_percent: Number(full.fee_percent || 0),
-                        fee_fixed: Number(full.fee_fixed || 0),
-                        fee_bearer: (full.fee_bearer || "merchant") as "merchant" | "customer",
-                        receiving_days: Number(full.receiving_days || 0),
-                        discount_percent: Number(full.discount_percent || 0),
-                        pix_key_type: (full.pix_key_type || "email") as "cpf" | "cnpj" | "email" | "phone" | "random",
-                        pix_key: full.pix_key || "",
-                        card_brand: full.card_brand || "",
-                        default_finance_account_id: full.default_finance_account_id || "",
-                        has_fees: Number(full.fee_percent || 0) > 0 || Number(full.fee_fixed || 0) > 0 || (full.installment_fees && full.installment_fees.length > 0),
-                        supports_installments: resolvedType === "credit_card" ? Boolean(full.supports_installments || maxInstallments > 1) : false,
-                        max_installments: resolvedType === "credit_card" ? maxInstallments : 1,
-                        installment_fees: resolvedType === "credit_card" ? buildInstallments(maxInstallments, full.installment_fees) : [{ installment_number: 1, fee_percent: 0 }],
-                    }
-                    setFormData(data)
-                    setBaselineFormData(data)
-                })
-                .finally(() => setIsLoadingDetails(false))
+    const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
+
+    const handleBack = useCallback(() => {
+        handleNavigation(() => onBack())
+    }, [handleNavigation, onBack])
+
+    const isPix = formData.type === "pix"
+    const isCard = formData.type === "credit_card" || formData.type === "debit_card"
+    const isCredit = formData.type === "credit_card"
+
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+
+    const validate = () => {
+        const errors: Record<string, string> = {}
+        if (!formData.name.trim()) errors.name = "Nome é obrigatório"
+        if (isPix && !formData.use_partner_pix_data && !formData.pix_key.trim()) {
+            errors.pix_key = "Chave PIX é obrigatória"
         }
-
-        getPartnerFinanceAccountsForPaymentMethodsAction(partnerId).then((res: any) => {
-            if (res?.accounts) {
-                setFinanceAccounts(res.accounts)
-                if (!editingMethod) {
-                    const initialAccountId = res.accounts?.[0]?.id || ""
-                    setFormData((prev) => ({
-                        ...prev,
-                        default_finance_account_id: initialAccountId,
-                    }))
-                    setBaselineFormData((prev: any) => {
-                        if (prev && !prev.default_finance_account_id && initialAccountId) {
-                            return { ...prev, default_finance_account_id: initialAccountId }
-                        }
-                        return prev
-                    })
-                }
-            }
-        })
-    }, [editingMethod, partnerId])
-
-    const isPix = formData.payment_type === "pix"
-    const isCreditCard = formData.payment_type === "credit_card"
-    const isDebitCard = formData.payment_type === "debit_card"
-    const isCard = isCreditCard || isDebitCard
-    const showFeeFields = isPix || isDebitCard || (isCreditCard && !formData.supports_installments)
-    const selectedBrandIds = formData.card_brand ? formData.card_brand.split(";").map((b) => b.trim()).filter(Boolean) : []
-    const selectedBrands = AVAILABLE_BRANDS.filter((brand) => selectedBrandIds.includes(brand.id))
-    const selectedInstallments = formData.installment_fees.filter((row) => row.installment_number > 0)
-
-    const clearFieldError = (key: string) => {
-        setFieldErrors((prev) => {
-            if (!prev[key]) return prev
-            const next = { ...prev }
-            delete next[key]
-            return next
-        })
+        setFieldErrors(errors)
+        return Object.keys(errors).length === 0
     }
 
-    const handleBrandToggle = (brandId: string) => {
-        const brands = formData.card_brand ? formData.card_brand.split(";").map((b) => b.trim()).filter(Boolean) : []
-        const index = brands.indexOf(brandId)
-        if (index > -1) {
-            brands.splice(index, 1)
-        } else {
-            brands.push(brandId)
-        }
-        setFormData({ ...formData, card_brand: brands.join("; ") })
-        clearFieldError("card_brand")
-    }
-
-    const renderBrandAvatar = (brand: (typeof AVAILABLE_BRANDS)[number]) => (
-        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border/40 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
-            <img
-                src={brand.image}
-                alt={brand.label}
-                className="w-7 h-7 object-contain"
-                onError={(e) => {
-                    e.currentTarget.style.display = "none"
-                    const sibling = e.currentTarget.nextElementSibling as HTMLSpanElement | null
-                    if (sibling) sibling.style.display = "inline-flex"
-                }}
-            />
-            <span className="text-[10px] font-bold hidden">{brand.label.slice(0, 2).toUpperCase()}</span>
-        </div>
-    )
-
-    const refreshFinanceAccounts = async (preferredAccountId?: string) => {
-        const refreshed = await getFinanceAccountsAction(partnerId)
-        if (refreshed.success && refreshed.data) {
-            const active = (refreshed.data.accounts || []).filter((acc: any) => acc.is_active)
-            setFinanceAccounts(active.map((acc: any) => ({ id: acc.id, name: acc.name, type: acc.type })))
-            setFormData((prev) => ({
-                ...prev,
-                default_finance_account_id: preferredAccountId || prev.default_finance_account_id || active?.[0]?.id || "",
-            }))
-            if (preferredAccountId) clearFieldError("default_finance_account_id")
-        }
-    }
-
-    const handleCreateAccount = async () => {
-        if (!newAccountName.trim()) {
-            setNewAccountNameError(true)
+    const handleSubmit = async () => {
+        if (!validate()) {
+            notifyError("Preencha os campos obrigatórios")
             return
         }
-        setIsSavingAccount(true)
-        try {
-            const created = await createFinanceAccountAction({
-                partnerId,
-                name: newAccountName.trim(),
-                type: newAccountType,
-                initialBalance: newAccountInitialBalance,
-                isDefault: newAccountIsDefault,
-            })
-            if (!created.success || !created.data) {
-                setError(created.error || "Não foi possível criar a conta financeira.")
-                return
-            }
-            await refreshFinanceAccounts(created.data.id)
-            setIsAccountModalOpen(false)
-            setNewAccountName("")
-            setNewAccountType("bank")
-            setNewAccountInitialBalance(0)
-            setNewAccountIsDefault(false)
-            setNewAccountNameError(false)
-        } finally {
-            setIsSavingAccount(false)
-        }
-    }
 
-    const validatePixKey = (type: string, key: string) => {
-        if (!key.trim()) return true
-        switch (type) {
-            case "cpf":
-                return /^\d{3}\.?\d{3}\.?\d{3}-?\d{2}$/.test(key)
-            case "cnpj":
-                return /^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$/.test(key)
-            case "email":
-                return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(key)
-            case "phone":
-                return /^\+?[\d\s()-]{8,20}$/.test(key)
-            default:
-                return true
-        }
-    }
-
-    const handleSubmit = async (e?: React.FormEvent) => {
-        if (e) e.preventDefault()
         setIsLoading(true)
-        setError(null)
-
-        const nextFieldErrors: Record<string, string> = {}
-
-        if (!formData.name.trim()) {
-            nextFieldErrors.name = "Nome é obrigatório"
-        }
-        if (!formData.default_finance_account_id) {
-            nextFieldErrors.default_finance_account_id = "Selecione a conta financeira padrão"
-        }
-
-        if (isPix && formData.pix_key && !validatePixKey(formData.pix_key_type, formData.pix_key)) {
-            nextFieldErrors.pix_key = "Formato de chave PIX inválido para o tipo selecionado"
-        }
-
-        if (formData.supports_installments && (formData.max_installments < 1 || formData.max_installments > 24)) {
-            nextFieldErrors.max_installments = "Informe de 1 até 24 parcelas"
-        }
-        if (isCreditCard && formData.supports_installments) {
-            const invalidInstallment = formData.installment_fees.find((row) => row.fee_percent < 0 || row.fee_percent > 100)
-            if (invalidInstallment) {
-                nextFieldErrors.installment_fees = "As taxas de parcela devem estar entre 0% e 100%"
-            }
-        }
-
-        if (Object.keys(nextFieldErrors).length > 0) {
-            setFieldErrors(nextFieldErrors)
-            setError("Revise os campos obrigatórios antes de salvar.")
-            setIsLoading(false)
-            return
-        }
-
-        setFieldErrors({})
-
         try {
             const payload = {
                 name: formData.name,
+                paymentType: formData.type,
                 isActive: formData.is_active,
                 isOnlineDefault: formData.is_online_default,
-                paymentType: formData.payment_type,
-                feePercent: formData.has_fees && showFeeFields ? formData.fee_percent : 0,
-                feeFixed: formData.has_fees && showFeeFields ? formData.fee_fixed : 0,
-                receivingDays: formData.receiving_days,
-                discountPercent: formData.discount_percent,
-                feeBearer: formData.fee_bearer,
-                supportsInstallments: isCreditCard ? formData.supports_installments : false,
-                maxInstallments: isCreditCard && formData.supports_installments ? formData.max_installments : 1,
-                installmentFees: isCreditCard && formData.supports_installments
-                    ? formData.installment_fees.map((row) => ({ installmentNumber: row.installment_number, feePercent: row.fee_percent }))
-                    : [],
+                feePercent: Number(formData.fee_percent || 0),
+                feeFixed: Number(formData.fee_fixed || 0),
+                discountPercent: Number(formData.discount_percent || 0),
+                maxInstallments: isCredit ? Number(formData.max_installments || 1) : 1,
+                supportsInstallments: isCredit && formData.supports_installments,
                 pixKeyType: isPix ? formData.pix_key_type : null,
                 pixKey: isPix ? formData.pix_key : null,
-                usePartnerPixData: false,
+                usePartnerPixData: isPix ? formData.use_partner_pix_data : false,
                 cardBrand: isCard ? formData.card_brand : null,
-                defaultFinanceAccountId: formData.default_finance_account_id,
+                defaultFinanceAccountId: null,
+                partnerId: partnerId,
             }
 
+            let res
             if (editingMethod) {
-                const result = await updatePaymentMethodAction(editingMethod.id, payload)
-                if (result.error) setError(result.error)
-                else onBack(true)
+                res = await updatePaymentMethodAction(editingMethod.id, payload as any)
             } else {
-                const result = await createPaymentMethodAction({ partnerId, ...payload })
-                if (result.error) setError(result.error)
-                else onBack(true)
+                res = await createPaymentMethodAction(payload as any)
             }
-        } catch {
-            setError("Erro ao salvar método de pagamento")
+
+            if (res.success) {
+                notifySuccess(editingMethod ? "Método atualizado!" : "Método criado!")
+                onBack(true)
+            } else {
+                notifyError(res.error || "Erro ao salvar")
+            }
+        } catch (err) {
+            notifyError("Erro inesperado ao salvar")
         } finally {
             setIsLoading(false)
         }
     }
 
-    const handleAttemptBack = () => {
-        if (isDirty) setShowUnsavedModal(true)
-        else onBack(false)
-    }
+    const [isScrolled, setIsScrolled] = useState(false)
+    const scrollContainerRef = useCallback((node: HTMLDivElement) => {
+        if (node !== null) {
+            node.onscroll = () => setIsScrolled(node.scrollTop > 10)
+        }
+    }, [])
 
     if (isLoadingDetails) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[400px]">
-                <p className="text-brand-inactive-text animate-pulse">Carregando detalhes do método...</p>
+                <div className="w-10 h-10 border-4 border-brand-green border-t-transparent rounded-full animate-spin mb-4" />
+                <p className="text-brand-inactive-text animate-pulse">Carregando detalhes...</p>
             </div>
         )
     }
 
     return (
-        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
-            {/* Header */}
-            <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border px-4 md:px-6 py-4">
-                <div className="max-w-[1300px] mx-auto flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <Button variant="outline" size="sm" onClick={handleAttemptBack} className="w-10 h-10 p-0 rounded-full">
-                            <ChevronLeftIcon className="w-5 h-5" />
-                        </Button>
-                        <h1 className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
-                            {editingMethod ? "Editar Método" : "Novo Método"}
-                        </h1>
+        <FadeIn>
+            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
+                {/* Sticky Header */}
+                <div className={`sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out ${isScrolled ? "shadow-sm border-brand-border dark:border-dark-border" : "border-transparent"}`}>
+                    <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+                        {/* Back button - desktop only */}
+                        <div className="absolute -left-12 top-4 h-full hidden xl:flex justify-center transition-all duration-500">
+                            <Button variant="outline" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                            </Button>
+                        </div>
+
+                        {/* Title row */}
+                        <div className="flex items-center justify-between py-4">
+                            <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                <h1 className="font-bold text-brand-dark dark:text-dark-heading text-xl md:text-2xl truncate">
+                                    {editingMethod ? "Editar Método de Pagamento" : "Novo Método de Pagamento"}
+                                </h1>
+                                <p className="hidden md:block text-brand-inactive-text dark:text-dark-body text-sm font-medium truncate">
+                                    {editingMethod ? `Configurando ${formData.name}` : "Configure um novo meio de pagamento para sua loja."}
+                                </p>
+                            </div>
+
+                            {/* Desktop action buttons */}
+                            <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                <Button variant="outline" onClick={handleBack} disabled={isLoading}>
+                                    Cancelar
+                                </Button>
+                                <Button onClick={handleSubmit} disabled={isLoading}>
+                                    <SaveIcon className="w-5 h-5 mr-2" />
+                                    {isLoading ? "Salvando..." : "Salvar"}
+                                </Button>
+                            </div>
+                        </div>
                     </div>
-                    <Button onClick={() => handleSubmit()} isLoading={isLoading} leftIcon={<CheckCircleIcon className="w-5 h-5" />}>
-                        Salvar Alterações
-                    </Button>
                 </div>
-            </div>
 
-            <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
-                <div className="max-w-[1300px] mx-auto px-4 md:px-6 py-8">
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {/* Content Body */}
+                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto no-scrollbar pb-24 md:pb-8">
+                    <div className="px-4 md:px-6 py-8 max-w-[1300px] mx-auto">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                            
+                            {/* Left Column: Form Sections */}
+                            <div className="lg:col-span-8 space-y-8">
+                                <section className="space-y-6">
+                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                        <InfoIcon className="w-5 h-5 text-brand-inactive-text" />
+                                        Informações Gerais
+                                    </h3>
 
-                        {/* Left Column: General Info */}
-                        <div className="lg:col-span-7 space-y-6">
-                            <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border shadow-sm space-y-6">
-                                <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border pb-3">
-                                    Informações Gerais
-                                </h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <Input
+                                            label="Nome do método"
+                                            placeholder="Ex: Cartão de Crédito - Loja"
+                                            value={formData.name}
+                                            onChange={(e) => {
+                                                setFormData({ ...formData, name: e.target.value })
+                                                if (fieldErrors.name) setFieldErrors(p => { const n = {...p}; delete n.name; return n })
+                                            }}
+                                            error={!!fieldErrors.name}
+                                            errorMessage={fieldErrors.name}
+                                        />
 
-                                <div className="space-y-4">
-                                    <Input
-                                        label="Nome / Descrição"
-                                        required
-                                        value={formData.name}
-                                        onChange={(e) => {
-                                            setFormData({ ...formData, name: e.target.value })
-                                            clearFieldError("name")
-                                        }}
-                                        placeholder="Ex: Cartão Visa, PIX Dudit, etc"
-                                        error={Boolean(fieldErrors.name)}
-                                        errorMessage={fieldErrors.name}
-                                    />
-
-                                    <FormDropdown
-                                        label="Tipo de Pagamento"
-                                        value={formData.payment_type}
-                                        setValue={(value) => {
-                                            const isNowCreditCard = value === "credit_card"
-                                            setFormData({
-                                                ...formData,
-                                                payment_type: value,
-                                                supports_installments: isNowCreditCard ? formData.supports_installments : false,
-                                                max_installments: isNowCreditCard ? formData.max_installments : 1,
-                                                installment_fees: isNowCreditCard ? formData.installment_fees : [{ installment_number: 1, fee_percent: 0 }],
-                                            })
-                                        }}
-                                        options={[
-                                            { value: "pix", label: "PIX" },
-                                            { value: "credit_card", label: "Cartão de Crédito" },
-                                            { value: "debit_card", label: "Cartão de Débito" },
-                                            { value: "other", label: "Outros" },
-                                        ]}
-                                    />
-
-                                    {isPix && (
-                                        <div className="space-y-4 pt-2">
-                                            <InfoCard
-                                                color="red"
-                                                title="Atenção!"
-                                                message="O sistema não valida a chave PIX. Por favor, informe a chave correta."
-                                            />
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <FormDropdown
-                                                    label="Tipo da chave PIX"
-                                                    value={formData.pix_key_type}
-                                                    setValue={(value: any) => setFormData({ ...formData, pix_key_type: value })}
-                                                    options={[
-                                                        { value: "cpf", label: "CPF" },
-                                                        { value: "cnpj", label: "CNPJ" },
-                                                        { value: "email", label: "Email" },
-                                                        { value: "phone", label: "Telefone" },
-                                                        { value: "random", label: "Chave aleatéria" },
-                                                    ]}
+                                        <div>
+                                            <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Tipo de método</label>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <RadioButton
+                                                    name="type"
+                                                    value="credit_card"
+                                                    checked={formData.type === "credit_card"}
+                                                    onChange={() => setFormData({ ...formData, type: "credit_card", supports_installments: true })}
+                                                    label="Crédito"
                                                 />
-                                                <Input
-                                                    label="Chave PIX"
-                                                    value={formData.pix_key}
-                                                    onChange={(e) => {
-                                                        setFormData({ ...formData, pix_key: e.target.value })
-                                                        clearFieldError("pix_key")
-                                                    }}
-                                                    placeholder="Informe a chave PIX"
-                                                    error={Boolean(fieldErrors.pix_key)}
-                                                    errorMessage={fieldErrors.pix_key}
+                                                <RadioButton
+                                                    name="type"
+                                                    value="debit_card"
+                                                    checked={formData.type === "debit_card"}
+                                                    onChange={() => setFormData({ ...formData, type: "debit_card", supports_installments: false, max_installments: 1 })}
+                                                    label="Débito"
+                                                />
+                                                <RadioButton
+                                                    name="type"
+                                                    value="pix"
+                                                    checked={formData.type === "pix"}
+                                                    onChange={() => setFormData({ ...formData, type: "pix", supports_installments: false, max_installments: 1 })}
+                                                    label="Pix"
+                                                />
+                                                <RadioButton
+                                                    name="type"
+                                                    value="other"
+                                                    checked={formData.type === "other"}
+                                                    onChange={() => setFormData({ ...formData, type: "other", supports_installments: false, max_installments: 1 })}
+                                                    label="Dinheiro/Outro"
                                                 />
                                             </div>
                                         </div>
-                                    )}
+                                    </div>
+                                </section>
 
-                                    {isCard && (
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between">
-                                                <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Bandeiras Aceitas</label>
-                                                <Button variant="link" size="sm" onClick={() => setBrandsModalOpen(true)} className="px-0 h-auto">
-                                                    Selecionar bandeiras
-                                                </Button>
-                                            </div>
-                                            {selectedBrands.length > 0 ? (
-                                                <div className="flex flex-wrap gap-2">
-                                                    {selectedBrands.map(brand => (
-                                                        <div key={brand.id} className="flex items-center gap-2 bg-gray-50 dark:bg-dark-border/30 px-3 py-1.5 rounded-full border border-brand-border dark:border-dark-border">
-                                                            <img src={brand.image} alt={brand.label} className="w-5 h-5 object-contain" />
-                                                            <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">{brand.label}</span>
+                                <hr className="border-brand-border dark:border-dark-border opacity-50" />
+
+                                {/* Specialized Card Settings */}
+                                {isCard && (
+                                    <section className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                            <CreditCardIcon className="w-5 h-5 text-brand-inactive-text" />
+                                            Detalhes do Cartão
+                                        </h3>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            {isCredit && (
+                                                <div className="space-y-4">
+                                                    <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading">Parcelamento Máximo</label>
+                                                    <div className="grid grid-cols-4 gap-2">
+                                                        {[1, 2, 3, 4, 6, 10, 12, 18, 24].map((n) => (
+                                                            <Button
+                                                                key={n}
+                                                                variant={formData.max_installments === n ? "default" : "outline"}
+                                                                className="h-10 text-xs font-bold"
+                                                                onClick={() => setFormData({ ...formData, max_installments: n })}
+                                                            >
+                                                                {n}x
+                                                            </Button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="space-y-4">
+                                                <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading">Bandeiras Aceitas</label>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    {AVAILABLE_BRANDS.map((brand) => (
+                                                        <div
+                                                            key={brand.id}
+                                                            className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer transition-all ${
+                                                                formData.card_brand?.includes(brand.id)
+                                                                    ? "bg-brand-green/10 border-brand-green text-brand-green"
+                                                                    : "bg-white dark:bg-dark-surface border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body"
+                                                            }`}
+                                                            onClick={() => {
+                                                                const current = formData.card_brand ? formData.card_brand.split(",") : []
+                                                                const next = current.includes(brand.id)
+                                                                    ? current.filter((b) => b !== brand.id)
+                                                                    : [...current, brand.id]
+                                                                setFormData({ ...formData, card_brand: next.join(",") || null })
+                                                            }}
+                                                        >
+                                                            <Checkbox checked={!!formData.card_brand?.includes(brand.id)} onChange={() => {}} />
+                                                            <img src={brand.image} alt={brand.name} className="w-4 h-4 object-contain opacity-80" />
+                                                            <span className="text-sm font-medium">{brand.name}</span>
                                                         </div>
                                                     ))}
                                                 </div>
-                                            ) : (
-                                                <p className="text-xs text-brand-inactive-text italic">Nenhuma bandeira selecionada (opcional)</p>
+                                            </div>
+                                        </div>
+                                    </section>
+                                )}
+
+                                {/* Specialized PIX Settings */}
+                                {isPix && (
+                                    <section className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                            <MoneyIcon className="w-5 h-5 text-brand-inactive-text" />
+                                            Configuração de Chave PIX
+                                        </h3>
+
+                                        <div className="space-y-6">
+                                            <div className="bg-brand-gray/30 dark:bg-dark-surface/50 p-4 rounded-2xl border border-brand-border dark:border-dark-border flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Importar da Empresa</p>
+                                                    <p className="text-xs text-brand-inactive-text">Usa a chave já cadastrada no perfil da loja.</p>
+                                                </div>
+                                                <Checkbox
+                                                    checked={formData.use_partner_pix_data}
+                                                    onChange={(checked) => setFormData({ ...formData, use_partner_pix_data: checked })}
+                                                />
+                                            </div>
+
+                                            {!formData.use_partner_pix_data && (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                    <div>
+                                                        <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">Tipo de Chave</label>
+                                                        <div className="grid grid-cols-1 gap-3">
+                                                            {PIX_KEY_TYPES.map((type) => (
+                                                                <RadioButton
+                                                                    key={type.id}
+                                                                    name="pixKeyType"
+                                                                    value={type.id}
+                                                                    checked={formData.pix_key_type === type.id}
+                                                                    onChange={() => setFormData({ ...formData, pix_key_type: type.id as any, pix_key: "" })}
+                                                                    label={type.name}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex flex-col">
+                                                        {formData.pix_key_type === "cpf" || formData.pix_key_type === "cnpj" ? (
+                                                            <CpfCnpjInput
+                                                                label={`Chave ${formData.pix_key_type === "cpf" ? "CPF" : "CNPJ"}`}
+                                                                value={formData.pix_key}
+                                                                onChange={(e) => setFormData({ ...formData, pix_key: e.target.value })}
+                                                                error={!!fieldErrors.pix_key}
+                                                                errorMessage={fieldErrors.pix_key}
+                                                            />
+                                                        ) : formData.pix_key_type === "email" ? (
+                                                            <EmailInput
+                                                                label="Chave E-mail"
+                                                                value={formData.pix_key}
+                                                                onChange={(e) => setFormData({ ...formData, pix_key: e.target.value })}
+                                                                error={!!fieldErrors.pix_key}
+                                                                errorMessage={fieldErrors.pix_key}
+                                                            />
+                                                        ) : formData.pix_key_type === "phone" ? (
+                                                            <PhoneInput
+                                                                label="Chave Celular"
+                                                                value={formData.pix_key}
+                                                                onChange={(e) => setFormData({ ...formData, pix_key: e.target.value })}
+                                                                error={!!fieldErrors.pix_key}
+                                                                errorMessage={fieldErrors.pix_key}
+                                                            />
+                                                        ) : (
+                                                            <Input
+                                                                label="Chave Aleatória"
+                                                                placeholder="Digite a chave..."
+                                                                value={formData.pix_key}
+                                                                onChange={(e) => setFormData({ ...formData, pix_key: e.target.value })}
+                                                                error={!!fieldErrors.pix_key}
+                                                                errorMessage={fieldErrors.pix_key}
+                                                            />
+                                                        )}
+                                                        <p className="text-[11px] text-brand-inactive-text mt-3 bg-brand-gray/20 dark:bg-dark-border/20 p-3 rounded-lg border border-dashed border-brand-border dark:border-dark-border">
+                                                            Sua chave é armazenada com criptografia de ponta a ponta para sua segurança.
+                                                        </p>
+                                                    </div>
+                                                </div>
                                             )}
                                         </div>
-                                    )}
+                                    </section>
+                                )}
+                            </div>
 
-                                    <Combobox
-                                        label="Conta Padrão no Financeiro"
-                                        value={formData.default_finance_account_id || undefined}
-                                        onChange={(value) => {
-                                            setFormData({ ...formData, default_finance_account_id: value })
-                                            clearFieldError("default_finance_account_id")
-                                        }}
-                                        options={financeAccounts.map((account) => ({
-                                            value: account.id,
-                                            label: account.name, // Displaying only account name as requested
-                                        }))}
-                                        actionItem={{ label: "Criar conta", icon: <PlusIcon className="w-4 h-4" />, onClick: () => setIsAccountModalOpen(true) }}
-                                        error={Boolean(fieldErrors.default_finance_account_id)}
-                                        errorMessage={fieldErrors.default_finance_account_id}
-                                    />
-
-                                    <div className="pt-4 space-y-4 border-t border-brand-border dark:border-dark-border">
-                                        <div className="flex items-center gap-2">
-                                            <Checkbox
-                                                id="is_active"
-                                                checked={formData.is_active}
-                                                onChange={(checked) => setFormData({ ...formData, is_active: checked as boolean })}
-                                            />
-                                            <label htmlFor="is_active" className="text-sm font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
-                                                Método Ativo
-                                            </label>
-                                        </div>
-                                        <div className="flex flex-col gap-1">
-                                            <div className="flex items-center gap-2">
-                                                <Checkbox
-                                                    id="is_online_default"
-                                                    checked={formData.is_online_default}
-                                                    onChange={(checked) => setFormData({ ...formData, is_online_default: checked as boolean })}
-                                                />
-                                                <label htmlFor="is_online_default" className="text-sm font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
-                                                    Método padrão na vitrine online
-                                                </label>
-                                            </div>
-                                            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body ml-7">
-                                                Apenas um método padrão é permitido por tipo (Dinheiro, PIX, Crédito, Débito).
+                            {/* Right Column: Cards */}
+                            <div className="lg:col-span-4 space-y-6">
+                                <SidebarCard title="Taxas e Custos" className="relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                                        <SaveIcon className="w-12 h-12" />
+                                    </div>
+                                    <div className="space-y-5">
+                                        <Input
+                                            label="Taxa Administrativa (%)"
+                                            type="number"
+                                            value={formData.fee_percent}
+                                            onChange={(e) => setFormData({ ...formData, fee_percent: Number(e.target.value) })}
+                                            suffix="%"
+                                        />
+                                        <Input
+                                            label="Taxa Fixa por Venda (R$)"
+                                            type="number"
+                                            value={formData.fee_fixed}
+                                            onChange={(e) => setFormData({ ...formData, fee_fixed: Number(e.target.value) })}
+                                            prefix="R$"
+                                        />
+                                        <Input
+                                            label="Desconto p/ Cliente (%)"
+                                            type="number"
+                                            value={formData.discount_percent}
+                                            onChange={(e) => setFormData({ ...formData, discount_percent: Number(e.target.value) })}
+                                            suffix="%"
+                                        />
+                                        <div className="pt-2">
+                                            <p className="text-[11px] text-brand-inactive-text leading-relaxed">
+                                                Essas taxas são usadas para calcular automaticamente o valor líquido a receber em cada venda.
                                             </p>
                                         </div>
                                     </div>
+                                </SidebarCard>
+
+                                <SidebarCard title="Preferências">
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray/10 dark:bg-dark-background/40 border border-brand-border dark:border-dark-border">
+                                            <div>
+                                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Ativo</p>
+                                                <p className="text-[11px] text-brand-inactive-text">Visível para seleção</p>
+                                            </div>
+                                            <Checkbox
+                                                checked={formData.is_active}
+                                                onChange={(checked) => setFormData({ ...formData, is_active: checked })}
+                                            />
+                                        </div>
+
+                                        <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray/10 dark:bg-dark-background/40 border border-brand-border dark:border-dark-border">
+                                            <div>
+                                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Padrão Online</p>
+                                                <p className="text-[11px] text-brand-inactive-text">Selecionado na vitrine</p>
+                                            </div>
+                                            <Checkbox
+                                                checked={formData.is_online_default}
+                                                onChange={(checked) => setFormData({ ...formData, is_online_default: checked })}
+                                            />
+                                        </div>
+                                    </div>
+                                </SidebarCard>
+                                
+                                <div className="hidden lg:block">
+                                    <Button onClick={handleSubmit} className="w-full h-12" disabled={isLoading}>
+                                        <SaveIcon className="w-5 h-5 mr-2" />
+                                        {isLoading ? "Salvando..." : "Salvar Alterações"}
+                                    </Button>
                                 </div>
                             </div>
                         </div>
-
-                        {/* Right Column: Fees & Advanced */}
-                        <div className="lg:col-span-5 space-y-6">
-                            <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border shadow-sm space-y-6">
-                                <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border pb-3">
-                                    Taxas e Recebimento
-                                </h2>
-
-                                <div className="space-y-6">
-                                    {isCreditCard && (
-                                        <div className="space-y-4 p-4 rounded-xl bg-brand-gray/30 dark:bg-dark-border/10 border border-brand-border dark:border-dark-border">
-                                            <div className="flex items-center gap-2">
-                                                <Checkbox
-                                                    id="supports_installments"
-                                                    checked={formData.supports_installments}
-                                                    onChange={(checked) => setFormData({ ...formData, supports_installments: checked as boolean })}
-                                                />
-                                                <label htmlFor="supports_installments" className="text-sm font-bold text-brand-dark dark:text-dark-heading cursor-pointer">
-                                                    Aceita parcelamento
-                                                </label>
-                                            </div>
-
-                                            {formData.supports_installments && (
-                                                <div className="space-y-4 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                                                    <div className="flex items-center justify-between gap-2">
-                                                        <label className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Máximo de parcelas</label>
-                                                        <Button variant="link" size="sm" onClick={() => setInstallmentsModalOpen(true)} className="px-0 h-auto">
-                                                            Configurar parcelas
-                                                        </Button>
-                                                    </div>
-                                                    <Input
-                                                        type="number"
-                                                        min="1"
-                                                        max="24"
-                                                        value={formData.max_installments}
-                                                        onChange={(e) => {
-                                                            const nextMax = Math.max(1, Math.min(24, Number(e.target.value || 1)))
-                                                            setFormData((prev) => ({
-                                                                ...prev,
-                                                                max_installments: nextMax,
-                                                                installment_fees: buildInstallments(nextMax, prev.installment_fees),
-                                                            }))
-                                                            clearFieldError("max_installments")
-                                                        }}
-                                                        error={Boolean(fieldErrors.max_installments)}
-                                                    />
-
-                                                    {selectedInstallments.length > 0 && (
-                                                        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                                                            {selectedInstallments.slice(0, 4).map((row) => (
-                                                                <div key={row.installment_number} className="shrink-0 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-lg px-2 py-1">
-                                                                    <p className="text-[10px] font-bold">{row.installment_number}x</p>
-                                                                    <p className="text-[10px] text-brand-inactive-text">{row.fee_percent}%</p>
-                                                                </div>
-                                                            ))}
-                                                            {selectedInstallments.length > 4 && <div className="flex items-center text-[10px] font-bold text-brand-inactive-text px-1">...</div>}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* Configurações de taxa - Hidden if credit card accepts installments as requested */}
-                                    {(!isCreditCard || !formData.supports_installments) && (
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-2 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-gray-50/50 dark:bg-dark-border/10">
-                                                <Checkbox
-                                                    id="has_fees"
-                                                    checked={formData.has_fees}
-                                                    onChange={(checked) => setFormData({ ...formData, has_fees: checked as boolean })}
-                                                />
-                                                <label htmlFor="has_fees" className="text-sm font-medium text-brand-dark dark:text-dark-heading cursor-pointer select-none">
-                                                    Possui taxas de recebimento
-                                                </label>
-                                            </div>
-
-                                            {formData.has_fees && (
-                                                <div className="space-y-4 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                                                    <FormDropdown
-                                                        label="Quem paga a taxa?"
-                                                        value={formData.fee_bearer}
-                                                        setValue={(value: any) => setFormData({ ...formData, fee_bearer: value })}
-                                                        options={[
-                                                            { value: "merchant", label: "Empresa (absorve)" },
-                                                            { value: "customer", label: "Cliente (acrescenta)" },
-                                                        ]}
-                                                    />
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <PercentageInput
-                                                            label="Taxa %"
-                                                            value={formData.fee_percent}
-                                                            onChange={(value) => setFormData({ ...formData, fee_percent: value })}
-                                                        />
-                                                        <MoneyInput
-                                                            label="Taxa fixa"
-                                                            value={formData.fee_fixed}
-                                                            onChange={(value) => setFormData({ ...formData, fee_fixed: value })}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    <div className="pt-4 border-t border-brand-border dark:border-dark-border">
-                                        <PercentageInput
-                                            label="Desconto para este método"
-                                            value={formData.discount_percent}
-                                            onChange={(value) => setFormData({ ...formData, discount_percent: value })}
-                                            placeholder="0"
-                                        />
-                                    </div>
-
-                                    <div className="pt-4 border-t border-brand-border dark:border-dark-border">
-                                        <Input
-                                            label="Prazo de recebimento (dias)"
-                                            type="number"
-                                            min="0"
-                                            value={formData.receiving_days}
-                                            onChange={(e) => setFormData({ ...formData, receiving_days: Number(e.target.value || 0) })}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
                     </div>
                 </div>
+
+                {/* Mobile Bottom Bar */}
+                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
+                    <Button variant="outline" onClick={handleBack} className="flex-1 h-[48px]" disabled={isLoading}>
+                        Cancelar
+                    </Button>
+                    <Button onClick={handleSubmit} className="flex-1 h-[48px]" disabled={isLoading}>
+                        Salvar
+                    </Button>
+                </div>
+
+                <SavingStatusModal isOpen={isLoading} text="Salvando..." />
+
+                {showConfirmDialog && (
+                    <AlertModal
+                        isOpen={showConfirmDialog}
+                        onClose={cancelNavigation}
+                        onConfirm={confirmNavigation}
+                        title="Descartar alterações?"
+                        description="Você possui alterações não salvas. Se sair agora, perderá o que preencheu."
+                        confirmText="Sair sem salvar"
+                        variant="warning"
+                    />
+                )}
             </div>
-
-            {error && (
-                <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4">
-                    <InfoCard color="red" title="Erro ao salvar" message={error} />
-                </div>
-            )}
-
-            {/* Modals */}
-            <DefaultModal isOpen={brandsModalOpen} onClose={() => setBrandsModalOpen(false)} title="Bandeiras Aceitas" maxWidth="lg">
-                <div className="max-h-[60vh] overflow-y-auto custom-scrollbar pr-2 space-y-2">
-                    {AVAILABLE_BRANDS.map((brand) => (
-                        <ListItem
-                            key={brand.id}
-                            title={brand.label}
-                            left={<div className="pr-3">{renderBrandAvatar(brand)}</div>}
-                            right={<Checkbox checked={selectedBrandIds.includes(brand.id)} onChange={() => handleBrandToggle(brand.id)} />}
-                            onClick={() => handleBrandToggle(brand.id)}
-                            className="px-3 py-3"
-                        />
-                    ))}
-                </div>
-            </DefaultModal>
-
-            <DefaultModal isOpen={installmentsModalOpen} onClose={() => setInstallmentsModalOpen(false)} title="Taxas por Parcela" maxWidth="lg">
-                <div className="max-h-[60vh] overflow-y-auto custom-scrollbar pr-2 space-y-2">
-                    {formData.installment_fees.map((row, index) => (
-                        <ListItem
-                            key={row.installment_number}
-                            title={`${row.installment_number}x parcela`}
-                            right={
-                                <div className="w-[130px]" onClick={(e) => e.stopPropagation()}>
-                                    <PercentageInput
-                                        value={row.fee_percent}
-                                        onChange={(value) => {
-                                            const next = [...formData.installment_fees]
-                                            next[index] = { ...row, fee_percent: value }
-                                            setFormData({ ...formData, installment_fees: next })
-                                        }}
-                                    />
-                                </div>
-                            }
-                            className="px-3 py-3"
-                        />
-                    ))}
-                </div>
-            </DefaultModal>
-
-            <DefaultModal isOpen={isAccountModalOpen} onClose={() => setIsAccountModalOpen(false)} title="Nova Conta Financeira">
-                <div className="space-y-4 p-2">
-                    <Input label="Nome" value={newAccountName} onChange={(e) => setNewAccountName(e.target.value)} placeholder="Ex: Inter PJ" />
-                    <FormDropdown label="Tipo" value={newAccountType} setValue={(v) => setNewAccountType(v as any)} options={ACCOUNT_TYPE_OPTIONS.map(o => ({ value: o.value, label: o.label }))} />
-                    <MoneyInput label="Saldo Inicial" value={newAccountInitialBalance} onChange={setNewAccountInitialBalance} />
-                    <Button className="w-full" isLoading={isSavingAccount} onClick={handleCreateAccount}>Salvar Conta</Button>
-                </div>
-            </DefaultModal>
-
-            <AlertModal
-                isOpen={showUnsavedModal}
-                onClose={() => setShowUnsavedModal(false)}
-                onConfirm={() => onBack(false)}
-                title="Descartar alterações?"
-                description="Você possui alterações não salvas. Deseja realmente sair sem salvar?"
-                confirmText="Sair sem salvar"
-                variant="danger"
-            />
-
-            <SavingStatusModal isOpen={isLoading} text="Salvando método de pagamento..." />
         </FadeIn>
     )
 }

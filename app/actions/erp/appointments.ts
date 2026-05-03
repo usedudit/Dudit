@@ -656,6 +656,77 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
   }
 }
 
+export async function deleteAppointmentAction(appointmentId: string) {
+  try {
+    if (!appointmentId) return { success: false, error: "Agendamento inválido" }
+    const { partnerId, user } = await getPartnerContextWithPermission("edit")
+    const supabase = await getSupabaseServerClient()
+
+    // Log the deletion
+    const { data: current } = await supabase
+      .from("appointments")
+      .select("customer_name, service_name")
+      .eq("id", appointmentId)
+      .eq("partner_id", partnerId)
+      .single()
+
+    if (current) {
+      await logAuditEvent({
+        partnerId,
+        actorUserId: user.id,
+        entityType: "appointment",
+        entityId: appointmentId,
+        actionType: "deleted",
+        changeLines: [`excluiu agendamento de ${current.customer_name} (${current.service_name}).`],
+      })
+    }
+
+    const { error } = await supabase
+      .from("appointments")
+      .delete()
+      .eq("id", appointmentId)
+      .eq("partner_id", partnerId)
+
+    if (error) throw error
+
+    safeRevalidateTag(TAGS.entityTimeline("appointment-list", partnerId))
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error?.message || "Erro ao excluir agendamento" }
+  }
+}
+
+export async function deleteUnavailableSeriesAction(partnerId: string, serviceName: string) {
+  try {
+    const { user } = await getPartnerContextWithPermission("edit")
+    const supabase = await getSupabaseServerClient()
+
+    // Only delete "unavailable" sources with matching service name
+    const { error } = await supabase
+      .from("appointments")
+      .delete()
+      .eq("partner_id", partnerId)
+      .eq("service_name", serviceName)
+      .eq("source", "unavailable")
+
+    if (error) throw error
+
+    await logAuditEvent({
+      partnerId,
+      actorUserId: user.id,
+      entityType: "appointment",
+      entityId: "batch",
+      actionType: "deleted",
+      changeLines: [`excluiu série de horários indisponíveis: ${serviceName}.`],
+    })
+
+    safeRevalidateTag(TAGS.entityTimeline("appointment-list", partnerId))
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error?.message || "Erro ao excluir série" }
+  }
+}
+
 export async function getAppointmentHistoryAction(appointmentId: string) {
   try {
     if (!appointmentId) return { success: false, history: [], error: "Agendamento inválido" }
