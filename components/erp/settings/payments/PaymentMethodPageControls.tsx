@@ -89,7 +89,7 @@ export default function PaymentMethodPageControls({
 
     return (
         <>
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4">
                 <div className="md:hidden flex items-center gap-2 w-full">
                     <div className="flex-1 min-w-0">
                         <Input

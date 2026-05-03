@@ -67,13 +67,26 @@ export function useEntityState() {
         stateFromParams(searchParams),
     )
 
-    // Track whether local state was set by user action (vs URL sync)
-    const isUserActionRef = useRef(false)
+    // Track pending user actions that should NOT be overridden by searchParams sync.
+    // We use a counter (not boolean) because multiple rapid user actions may queue
+    // multiple searchParams updates, each of which would trigger the sync effect.
+    const pendingUserActionsRef = useRef(0)
+
+    // Timestamp of last user action — prevents stale searchParams from overriding
+    const lastUserActionRef = useRef(0)
 
     // ── SECONDARY: Sync from URL on browser back/forward ─────────────────
+    // This effect listens to Next.js searchParams changes. However, when we use
+    // window.history.replaceState, Next.js may re-fire searchParams reactively
+    // with either the old or new params. We skip these to prevent auto-close.
     useEffect(() => {
-        if (isUserActionRef.current) {
-            isUserActionRef.current = false
+        if (pendingUserActionsRef.current > 0) {
+            pendingUserActionsRef.current--
+            return
+        }
+        // Guard: if a user action happened very recently (<500ms), ignore
+        // searchParams updates since they're likely stale Next.js reactions
+        if (Date.now() - lastUserActionRef.current < 500) {
             return
         }
         const urlState = stateFromParams(searchParams)
@@ -83,7 +96,8 @@ export function useEntityState() {
     // ── Popstate handler for browser back/forward ────────────────────────
     useEffect(() => {
         const handlePopState = () => {
-            setLocalState(stateFromCurrentUrl())
+            const urlState = stateFromCurrentUrl()
+            setLocalState(urlState)
         }
         window.addEventListener("popstate", handlePopState)
         return () => window.removeEventListener("popstate", handlePopState)
@@ -100,7 +114,8 @@ export function useEntityState() {
 
             // 1. INSTANT: Update local state synchronously
             setLocalState({ action, entityId, isOpen: true })
-            isUserActionRef.current = true
+            pendingUserActionsRef.current++
+            lastUserActionRef.current = Date.now()
 
             // 2. INSTANT: Sync URL via replaceState (NO Next.js router = NO server revalidation)
             const sp = new URLSearchParams({ [action]: value })
@@ -114,7 +129,8 @@ export function useEntityState() {
     const close = useCallback(() => {
         // 1. INSTANT: Clear local state synchronously
         setLocalState(CLOSED_STATE)
-        isUserActionRef.current = true
+        pendingUserActionsRef.current++
+        lastUserActionRef.current = Date.now()
 
         // 2. INSTANT: Sync URL via replaceState (NO Next.js router)
         window.history.replaceState(null, "", pathname)

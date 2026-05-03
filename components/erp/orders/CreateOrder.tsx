@@ -1031,7 +1031,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-screen bg-white dark:bg-dark-background overflow-hidden relative">
                 <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-10">
 
-                    {/* --- STICKY HEADER --- */}
+                    {/* Sticky Header */}
                     <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
                         <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 

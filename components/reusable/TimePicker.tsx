@@ -2,8 +2,6 @@
 
 import * as React from "react"
 import { AnimatePresence, motion } from "framer-motion"
-
-import { Button } from "@/components/reusable/Button"
 import { useIsMobile } from "@/components/ui/use-mobile"
 import {
     Drawer,
@@ -22,6 +20,7 @@ import { cn } from "@/lib/utils"
 
 interface TimePickerProps {
     label?: string
+    prefix?: string
     value?: string
     onChange?: (time: string) => void
     placeholder?: string
@@ -33,7 +32,7 @@ interface TimePickerProps {
 }
 
 const HOURS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"))
-const MINUTES = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0"))
+const MINUTES = ["00", "15", "30", "45"] // Simplified minutes for better UX in business hours
 
 function normalizeTime(value?: string) {
     if (!value) return { hour: "", minute: "" }
@@ -41,51 +40,12 @@ function normalizeTime(value?: string) {
     return { hour, minute }
 }
 
-function TimeColumn({
-    title,
-    items,
-    selectedValue,
-    onSelect,
-}: {
-    title: string
-    items: string[]
-    selectedValue: string
-    onSelect: (value: string) => void
-}) {
-    return (
-        <div className="min-w-0 flex-1">
-            <p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-brand-inactive-text">
-                {title}
-            </p>
-            <div className="max-h-64 space-y-1 overflow-y-auto rounded-2xl border border-brand-border bg-brand-gray/40 p-2 dark:border-dark-border dark:bg-dark-border/20">
-                {items.map((item) => {
-                    const isSelected = item === selectedValue
-                    return (
-                        <button
-                            key={item}
-                            type="button"
-                            onClick={() => onSelect(item)}
-                            className={cn(
-                                "flex h-10 w-full items-center justify-center rounded-xl text-sm font-semibold transition-all duration-200",
-                                isSelected
-                                    ? "bg-brand-green text-white shadow-sm"
-                                    : "text-brand-dark hover:bg-white dark:text-dark-heading dark:hover:bg-dark-surface"
-                            )}
-                        >
-                            {item}
-                        </button>
-                    )
-                })}
-            </div>
-        </div>
-    )
-}
-
 export const TimePicker: React.FC<TimePickerProps> = ({
     label,
+    prefix,
     value,
     onChange,
-    placeholder = "Selecione um horário",
+    placeholder = "00:00",
     required,
     disabled,
     className,
@@ -100,98 +60,109 @@ export const TimePicker: React.FC<TimePickerProps> = ({
     const handleSelect = React.useCallback(
         (part: "hour" | "minute", nextValue: string) => {
             const current = normalizeTime(value)
-            const nextHour = part === "hour" ? nextValue : current.hour
-            const nextMinute = part === "minute" ? nextValue : current.minute
-
-            if (nextHour && nextMinute) {
-                onChange?.(`${nextHour}:${nextMinute}`)
-            } else {
-                onChange?.(`${nextHour}:${nextMinute}`.replace(/:$/, ""))
-            }
+            const nextHour = part === "hour" ? nextValue : (current.hour || "09")
+            const nextMinute = part === "minute" ? nextValue : (current.minute || "00")
+            
+            onChange?.(`${nextHour}:${nextMinute}`)
         },
         [onChange, value]
     )
 
     const PickerContent = (
-        <div className="w-full max-w-[420px] bg-white p-4 dark:bg-dark-surface">
-            <div className="mb-4 rounded-2xl border border-brand-border bg-brand-gray/50 px-4 py-3 dark:border-dark-border dark:bg-dark-border/20">
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-brand-inactive-text">
-                    Horário selecionado
-                </p>
-                <p className="mt-1 text-2xl font-bold text-brand-dark dark:text-dark-heading">
-                    {displayValue || "--:--"}
-                </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-                <TimeColumn
-                    title="Hora"
-                    items={HOURS}
-                    selectedValue={hour}
-                    onSelect={(nextHour) => handleSelect("hour", nextHour)}
-                />
-                <TimeColumn
-                    title="Minuto"
-                    items={MINUTES}
-                    selectedValue={minute}
-                    onSelect={(nextMinute) => {
-                        handleSelect("minute", nextMinute)
-                        if (hour) setOpen(false)
-                    }}
-                />
+        <div className="w-full bg-white dark:bg-dark-surface p-1">
+            <div className="flex gap-1">
+                {/* Hours Column */}
+                <div className="flex-1 max-h-[220px] overflow-y-auto no-scrollbar py-1">
+                    {HOURS.map((h) => (
+                        <button
+                            key={h}
+                            onClick={() => handleSelect("hour", h)}
+                            className={cn(
+                                "w-full py-2 px-3 text-sm font-medium rounded-lg transition-colors mb-0.5",
+                                hour === h 
+                                    ? "bg-brand-primary text-white" 
+                                    : "text-brand-dark dark:text-dark-heading hover:bg-gray-100 dark:hover:bg-dark-border"
+                            )}
+                        >
+                            {h}
+                        </button>
+                    ))}
+                </div>
+                {/* Minutes Column */}
+                <div className="flex-1 max-h-[220px] overflow-y-auto no-scrollbar py-1 border-l border-brand-border dark:border-dark-border">
+                    {MINUTES.map((m) => (
+                        <button
+                            key={m}
+                            onClick={() => {
+                                handleSelect("minute", m)
+                                setOpen(false)
+                            }}
+                            className={cn(
+                                "w-full py-2 px-3 text-sm font-medium rounded-lg transition-colors mb-0.5",
+                                minute === m 
+                                    ? "bg-brand-primary text-white" 
+                                    : "text-brand-dark dark:text-dark-heading hover:bg-gray-100 dark:hover:bg-dark-border"
+                            )}
+                        >
+                            {m}
+                        </button>
+                    ))}
+                </div>
             </div>
         </div>
     )
 
     const Trigger = (
-        <Button
-            variant="outline"
+        <button
+            type="button"
             disabled={disabled}
             className={cn(
-                "flex h-[42px] w-full items-center justify-between rounded-lg border px-4 py-2.5 text-left text-sm font-normal transition-colors duration-150",
-                "bg-brand-gray dark:bg-dark-border/30",
+                "group relative flex items-center h-[46px] w-full min-w-[120px] rounded-xl border px-4 transition-all duration-200 ease-in-out",
+                "bg-white dark:bg-dark-surface",
                 error
-                    ? "border-brand-red"
-                    : "border-brand-border dark:border-dark-border focus:border-brand-dark dark:focus:border-dark-body",
-                "text-brand-dark dark:text-dark-heading",
-                "focus:bg-white dark:focus:bg-dark-surface focus:outline-none focus-visible:ring-0",
-                "disabled:bg-brand-gray dark:disabled:bg-dark-border/30 disabled:cursor-not-allowed",
-                open && "bg-white dark:bg-dark-surface border-brand-dark dark:border-dark-body"
+                    ? "border-brand-red shadow-[0_0_0_1px_rgba(239,68,68,0.1)]"
+                    : "border-brand-border dark:border-dark-border hover:border-brand-primary/50 dark:hover:border-brand-primary/50",
+                open && "border-brand-primary ring-2 ring-brand-primary/10",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
+                className
             )}
         >
-            <span className="flex min-w-0 items-center">
-                <ClockIcon className="mr-3 h-4 w-4 shrink-0 text-brand-inactive-text" />
-                <span className={cn("truncate", !displayValue && "text-brand-inactive-text")}>
+            <div className="flex items-center w-full">
+                {prefix && (
+                    <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mr-3 shrink-0">
+                        {prefix}
+                    </span>
+                )}
+                <span className={cn(
+                    "flex-1 text-[15px] font-bold text-left",
+                    displayValue ? "text-brand-dark dark:text-dark-heading" : "text-brand-inactive-text"
+                )}>
                     {displayValue || placeholder}
                 </span>
-            </span>
-            <ChevronDownIcon
-                className={cn(
-                    "ml-2 h-4 w-4 shrink-0 text-brand-inactive-text transition-transform duration-200",
-                    open && "rotate-180"
-                )}
-            />
-        </Button>
+                <ClockIcon className={cn(
+                    "ml-2 h-4 w-4 shrink-0 transition-colors",
+                    open ? "text-brand-primary" : "text-brand-inactive-text"
+                )} />
+            </div>
+        </button>
     )
 
     return (
-        <div className={cn("flex-1 w-full", className)}>
+        <div className={cn("w-full", className)}>
             {label && (
-                <div className="mb-1.5 flex items-center gap-2">
-                    <label className="truncate text-sm font-medium text-brand-dark dark:text-dark-heading">
-                        {label}
-                        {required && <span className="text-brand-red"> *</span>}
-                    </label>
-                </div>
+                <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-1.5">
+                    {label}
+                    {required && <span className="text-brand-red ml-1">*</span>}
+                </label>
             )}
 
             {isMobile ? (
                 <Drawer open={open} onOpenChange={setOpen}>
                     <DrawerTrigger asChild>{Trigger}</DrawerTrigger>
-                    <DrawerContent className="p-0">
-                        <DrawerHeader className="border-b border-brand-border pb-4 dark:border-dark-border">
-                            <DrawerTitle className="font-bold text-brand-dark dark:text-dark-heading">
-                                {label || placeholder}
+                    <DrawerContent className="p-0 border-none bg-white dark:bg-dark-surface rounded-t-[32px]">
+                        <DrawerHeader className="border-b border-brand-border dark:border-dark-border px-6 py-5">
+                            <DrawerTitle className="text-lg font-bold text-brand-dark dark:text-dark-heading">
+                                {label || "Selecionar Horário"}
                             </DrawerTitle>
                         </DrawerHeader>
                         <div className="p-4">{PickerContent}</div>
@@ -201,26 +172,19 @@ export const TimePicker: React.FC<TimePickerProps> = ({
                 <Popover open={open} onOpenChange={setOpen}>
                     <PopoverTrigger asChild>{Trigger}</PopoverTrigger>
                     <PopoverContent
-                        className="w-auto rounded-2xl border-brand-border p-0 shadow-xl dark:border-dark-border"
+                        className="w-[180px] p-2 rounded-2xl border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface shadow-2xl animate-in fade-in zoom-in-95 duration-200"
                         align="start"
                         sideOffset={8}
                     >
-                        <AnimatePresence mode="wait">
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.98, y: -4 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.98, y: -4 }}
-                                transition={{ duration: 0.2, ease: "easeOut" }}
-                            >
-                                {PickerContent}
-                            </motion.div>
-                        </AnimatePresence>
+                        {PickerContent}
                     </PopoverContent>
                 </Popover>
             )}
 
             {error && errorMessage && (
-                <p className="mt-1 text-xs text-brand-red">{errorMessage}</p>
+                <p className="mt-1.5 text-xs font-medium text-brand-red animate-in slide-in-from-top-1 duration-200">
+                    {errorMessage}
+                </p>
             )}
         </div>
     )

@@ -228,6 +228,17 @@ export default function OrdersPage({
         threshold: 0,
     })
 
+    // Aggressive prefetch: pre-warm cache for first 10 visible items
+    const prefetchedRef = useRef(false)
+    useEffect(() => {
+        if (prefetchedRef.current || !effectiveOrders?.length) return
+        prefetchedRef.current = true
+        const first10 = effectiveOrders.slice(0, 10)
+        for (const o of first10) {
+            if (o?.id) cache.prefetchEntity(o.id)
+        }
+    }, [effectiveOrders, cache])
+
 
     const filterSections: FilterSectionConfig[] = useMemo(
         () => [

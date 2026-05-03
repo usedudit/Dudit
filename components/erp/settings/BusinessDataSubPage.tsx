@@ -1,19 +1,34 @@
 "use client"
 
-import React, { useState, useCallback, useRef, useTransition } from "react"
+import React, { useState, useCallback, useRef, useTransition, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, Input as FormInput, Checkbox as FormCheckbox, RadioButton as FormRadioButton } from "@/components/reusable"
-import { CpfCnpjInput, CepInput, StateComboBox, PhoneInput, ListItem, Spinner, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
-import { BusinessHoursSelector } from "@/components/business-hours-selector"
+import {
+    Button,
+    Input,
+    Checkbox,
+    RadioButton,
+    CpfCnpjInput,
+    CepInput,
+    StateComboBox,
+    PhoneInput,
+    ListItem,
+    Spinner,
+    Tabs,
+    TabsList,
+    TabsTrigger,
+    TabsContent,
+    AlertModal,
+    UnsavedChangesDialog,
+    SavingStatusModal,
+    NumberInputWithCheckbox
+} from "@/components/reusable"
+import { BusinessHoursSelector } from "@/components/BusinessHoursSelector"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
 import { ChevronLeftIcon, SaveIcon, Store, ShoppingBagIcon, HomeIcon, WrenchIcon } from "@/lib/icons"
 import { useNotification } from "@/hooks/use-notification"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
-import SavingStatusModal from "@/components/reusable/SavingStatusModal"
-import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
-import { NumberInputWithCheckbox } from "@/components/reusable/Inputs/NumberInputWithCheckbox"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 
@@ -62,6 +77,8 @@ export const BusinessDataSubPage = ({
     const [activeTab, setActiveTab] = useState("general")
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
+    const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set())
+    const [showValidationModal, setShowValidationModal] = useState(false)
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
@@ -104,14 +121,14 @@ export const BusinessDataSubPage = ({
 
     const [hours, setHours] = useState(() => normalizeOpeningHours(partner.opening_hours))
 
-    const [initialState] = useState(() => ({
+    const [initialState, setInitialState] = useState(() => ({
         generalInfo: { ...generalInfo },
         addresses: { ...addresses },
         fiscalInfo: { ...fiscalInfo },
         hours: { ...hours },
     }))
 
-    const isDirty = React.useMemo(() => {
+    const isDirty = useMemo(() => {
         return JSON.stringify(initialState.generalInfo) !== JSON.stringify(generalInfo) ||
             JSON.stringify(initialState.addresses) !== JSON.stringify(addresses) ||
             JSON.stringify(initialState.fiscalInfo) !== JSON.stringify(fiscalInfo) ||
@@ -139,8 +156,41 @@ export const BusinessDataSubPage = ({
             }
         })
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const validate = useCallback(() => {
+        const errors = new Set<string>()
+        if (!generalInfo.storeName.trim()) errors.add("storeName")
+        if (!generalInfo.phone.trim()) errors.add("phone")
+
+        const cleanCep = addresses.zipCode.replace(/\D/g, "")
+        if (cleanCep.length !== 8) errors.add("zipCode")
+
+        if (!addresses.street.trim()) errors.add("street")
+        if (!addresses.neighborhood.trim()) errors.add("neighborhood")
+        if (!addresses.city.trim()) errors.add("city")
+        if (!addresses.state.trim()) errors.add("state")
+
+        setFieldErrors(errors)
+        return errors.size === 0
+    }, [generalInfo, addresses])
+
+    const getTabErrorCount = useCallback((tab: string) => {
+        if (tab === "general") {
+            return ["storeName", "phone"].filter(f => fieldErrors.has(f)).length
+        }
+        if (tab === "address") {
+            return ["zipCode", "street", "neighborhood", "city", "state"].filter(f => fieldErrors.has(f)).length
+        }
+        return 0
+    }, [fieldErrors])
+
+    const handleSubmit = async (e?: React.FormEvent) => {
         if (e) e.preventDefault()
+
+        if (!validate()) {
+            setShowValidationModal(true)
+            return
+        }
+
         startTransition(async () => {
             setIsLoading(true)
 
@@ -179,6 +229,12 @@ export const BusinessDataSubPage = ({
                     notifyError(result.error)
                 } else {
                     notifySuccess("Configurações atualizadas com sucesso!")
+                    setInitialState({
+                        generalInfo: { ...generalInfo },
+                        addresses: { ...addresses },
+                        fiscalInfo: { ...fiscalInfo },
+                        hours: { ...hours },
+                    })
                 }
             } catch (err) {
                 notifyError("Erro ao atualizar configurações")
@@ -231,6 +287,27 @@ export const BusinessDataSubPage = ({
         }
     }
 
+    const formattedAddress = React.useMemo(() => {
+        const streetLine = addresses.street
+            ? `${addresses.street}${addresses.number ? `, ${addresses.number}` : ""} - ${addresses.neighborhood || "Bairro não informado"}`
+            : null;
+
+        const cityLine = (addresses.city || addresses.state)
+            ? `${addresses.city || ""}${addresses.state ? ` - ${addresses.state}` : ""}`
+            : null;
+
+        const zipLine = addresses.zipCode;
+
+        return [streetLine, cityLine, zipLine]
+            .filter(Boolean)
+            .join("\n");
+    }, [addresses]);
+
+    const mapsUrl = React.useMemo(() => {
+        const fullAddress = `${addresses.street || ""}, ${addresses.number || ""}, ${addresses.neighborhood || ""}, ${addresses.city || ""} - ${addresses.state || ""}, ${addresses.zipCode || ""}`;
+        return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
+    }, [addresses]);
+
     return (
         <FadeIn>
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
@@ -275,8 +352,14 @@ export const BusinessDataSubPage = ({
                                 {/* Tabs */}
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                        <TabsTrigger value="general">Dados gerais</TabsTrigger>
-                                        <TabsTrigger value="address">Endereço</TabsTrigger>
+                                        <TabsTrigger value="general">
+                                            Dados gerais
+                                            {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                        </TabsTrigger>
+                                        <TabsTrigger value="address">
+                                            Endereço
+                                            {getTabErrorCount("address") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                        </TabsTrigger>
                                         <TabsTrigger value="hours">Horários</TabsTrigger>
                                     </TabsList>
                                 </div>
@@ -294,11 +377,15 @@ export const BusinessDataSubPage = ({
                                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Identificação</h3>
                                                 <div className="grid grid-cols-12 gap-5">
                                                     <div className="col-span-12 md:col-span-6">
-                                                        <FormInput
+                                                        <Input
                                                             label="Nome do negócio"
                                                             placeholder="Ex: Minha Loja"
                                                             value={generalInfo.storeName}
-                                                            onChange={(e) => setGeneralInfo({ ...generalInfo, storeName: e.target.value })}
+                                                            onChange={(e) => {
+                                                                setGeneralInfo({ ...generalInfo, storeName: e.target.value })
+                                                                setFieldErrors(prev => { const n = new Set(prev); n.delete("storeName"); return n })
+                                                            }}
+                                                            error={fieldErrors.has("storeName")}
                                                         />
                                                     </div>
                                                     <div className="col-span-12 md:col-span-6">
@@ -306,12 +393,16 @@ export const BusinessDataSubPage = ({
                                                             label="Celular (WhatsApp)"
                                                             placeholder="(00) 00000-0000"
                                                             value={generalInfo.phone}
-                                                            onChange={(e) => setGeneralInfo({ ...generalInfo, phone: e.target.value })}
+                                                            onChange={(e) => {
+                                                                setGeneralInfo({ ...generalInfo, phone: e.target.value })
+                                                                setFieldErrors(prev => { const n = new Set(prev); n.delete("phone"); return n })
+                                                            }}
+                                                            error={fieldErrors.has("phone")}
                                                         />
                                                     </div>
                                                 </div>
                                                 <div className="mt-5">
-                                                    <FormInput
+                                                    <Input
                                                         label="Descrição (O que faz)"
                                                         type="textarea"
                                                         placeholder="Conte um pouco sobre seu negócio..."
@@ -331,14 +422,14 @@ export const BusinessDataSubPage = ({
                                                     <div>
                                                         <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Tipo de pessoa</label>
                                                         <div className="flex gap-8">
-                                                            <FormRadioButton
+                                                            <RadioButton
                                                                 name="businessType"
                                                                 value="pf"
                                                                 checked={generalInfo.businessType === "pf"}
                                                                 onChange={() => setGeneralInfo({ ...generalInfo, businessType: "pf" })}
                                                                 label="Pessoa Física"
                                                             />
-                                                            <FormRadioButton
+                                                            <RadioButton
                                                                 name="businessType"
                                                                 value="pj"
                                                                 checked={generalInfo.businessType === "pj"}
@@ -373,7 +464,7 @@ export const BusinessDataSubPage = ({
                                                             description={opt.description}
                                                             onClick={() => toggleArrayItem("sells", opt.value)}
                                                             right={
-                                                                <FormCheckbox
+                                                                <Checkbox
                                                                     checked={generalInfo.sells.includes(opt.value)}
                                                                     onChange={() => toggleArrayItem("sells", opt.value)}
                                                                 />
@@ -396,7 +487,7 @@ export const BusinessDataSubPage = ({
                                                             description={opt.description}
                                                             onClick={() => toggleArrayItem("channels", opt.value)}
                                                             right={
-                                                                <FormCheckbox
+                                                                <Checkbox
                                                                     checked={generalInfo.channels.includes(opt.value)}
                                                                     onChange={() => toggleArrayItem("channels", opt.value)}
                                                                 />
@@ -447,7 +538,10 @@ export const BusinessDataSubPage = ({
                                                         label="CEP"
                                                         placeholder="00000-000"
                                                         value={addresses.zipCode}
-                                                        onChange={(val) => setAddresses({ ...addresses, zipCode: val })}
+                                                        onChange={(val) => {
+                                                            setAddresses({ ...addresses, zipCode: val })
+                                                            setFieldErrors(prev => { const n = new Set(prev); n.delete("zipCode"); return n })
+                                                        }}
                                                         name="cep"
                                                         onAddressFetched={(data) => {
                                                             setAddresses(prev => ({
@@ -457,13 +551,27 @@ export const BusinessDataSubPage = ({
                                                                 city: data.city || prev.city,
                                                                 state: data.state || prev.state,
                                                             }))
+                                                            setFieldErrors(prev => {
+                                                                const n = new Set(prev)
+                                                                n.delete("street")
+                                                                n.delete("neighborhood")
+                                                                n.delete("city")
+                                                                n.delete("state")
+                                                                return n
+                                                            })
                                                         }}
+                                                        error={fieldErrors.has("zipCode")}
+                                                        errorMessage={fieldErrors.has("zipCode") ? "CEP inválido" : ""}
                                                     />
-                                                    <FormInput
+                                                    <Input
                                                         label="Logradouro"
                                                         placeholder="Rua, Avenida, etc."
                                                         value={addresses.street}
-                                                        onChange={e => setAddresses({ ...addresses, street: e.target.value })}
+                                                        onChange={e => {
+                                                            setAddresses({ ...addresses, street: e.target.value })
+                                                            setFieldErrors(prev => { const n = new Set(prev); n.delete("street"); return n })
+                                                        }}
+                                                        error={fieldErrors.has("street")}
                                                     />
 
                                                     <div className="grid grid-cols-2 gap-3 flex-row items-start pt-1.5 pb-1.5">
@@ -477,7 +585,7 @@ export const BusinessDataSubPage = ({
                                                             />
                                                         </div>
                                                         <div>
-                                                            <FormInput
+                                                            <Input
                                                                 label="Complemento"
                                                                 placeholder="Apto, Bloco, etc."
                                                                 value={addresses.complement}
@@ -485,20 +593,28 @@ export const BusinessDataSubPage = ({
                                                             />
                                                         </div>
                                                     </div>
-                                                    <FormInput
+                                                    <Input
                                                         label="Bairro"
                                                         placeholder="Nome do bairro"
                                                         value={addresses.neighborhood}
-                                                        onChange={e => setAddresses({ ...addresses, neighborhood: e.target.value })}
+                                                        onChange={e => {
+                                                            setAddresses({ ...addresses, neighborhood: e.target.value })
+                                                            setFieldErrors(prev => { const n = new Set(prev); n.delete("neighborhood"); return n })
+                                                        }}
+                                                        error={fieldErrors.has("neighborhood")}
                                                     />
 
                                                     <div className="grid grid-cols-2 gap-3 items-start">
                                                         <div>
-                                                            <FormInput
+                                                            <Input
                                                                 label="Cidade"
                                                                 placeholder="Nome da cidade"
                                                                 value={addresses.city}
-                                                                onChange={e => setAddresses({ ...addresses, city: e.target.value })}
+                                                                onChange={e => {
+                                                                    setAddresses({ ...addresses, city: e.target.value })
+                                                                    setFieldErrors(prev => { const n = new Set(prev); n.delete("city"); return n })
+                                                                }}
+                                                                error={fieldErrors.has("city")}
                                                             />
                                                         </div>
                                                         <div>
@@ -518,31 +634,26 @@ export const BusinessDataSubPage = ({
                                             <div className="bg-white dark:bg-dark-surface p-0 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden flex flex-col">
                                                 <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
                                                 <div className="p-4 flex items-center justify-between border-b border-brand-border dark:border-dark-border mt-1 border-opacity-60">
-                                                    <h3 className="font-bold text-brand-dark dark:text-dark-heading">Localização</h3>
+                                                    <h4 className="font-bold text-brand-dark dark:text-dark-heading">Localização</h4>
                                                 </div>
                                                 <div className="p-4 flex flex-col">
-                                                    <div
-                                                        className="w-full h-[120px] bg-brand-gray dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group"
-                                                        onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${addresses.street}, ${addresses.number}, ${addresses.neighborhood}, ${addresses.city} - ${addresses.state}, ${addresses.zipCode}`)}`, '_blank')}
-                                                    >
-                                                        <img
-                                                            alt="Mapa"
-                                                            className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                                                            src="https://img.dudit.com.br/static/MapLarge.png"
-                                                            onError={(e) => { e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" fill="rgb(229,231,235)"><rect width="100%" height="100%"/></svg>' }}
-                                                        />
+                                                    <div className="w-full h-[120px] bg-brand-gray dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group" onClick={() => window.open(mapsUrl, '_blank')}>
+                                                        <img src="https://img.dudit.com.br/static/MapLarge.png" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Mapa" />
                                                         <div className="absolute inset-0 flex items-center justify-center">
-                                                            <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white z-10 transition-transform group-hover:scale-110"></div>
-                                                            <div className="w-12 h-12 bg-white/30 rounded-full absolute mix-blend-overlay animate-pulse"></div>
+                                                            <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white z-10 transition-transform group-hover:scale-110">
+                                                                <div className="w-2 h-2 bg-white rounded-full"></div>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-start justify-between">
-                                                        <div className="flex flex-col flex-1 truncate pr-4 text-left">
-                                                            <h4 className="font-bold text-brand-dark dark:text-dark-heading text-[15px] mb-1.5 truncate">{generalInfo.storeName || "Nome do Negócio"}</h4>
-                                                            <p className="text-brand-inactive-text text-[13px] leading-snug truncate">{addresses.street ? `${addresses.street}, ${addresses.number}` : 'Endereço não informado'}</p>
-                                                            <p className="text-brand-inactive-text text-[13px] leading-snug truncate mt-0.5">{addresses.neighborhood ? `${addresses.neighborhood}, ${addresses.city} - ${addresses.state}` : 'Bairro/Cidade não informados'}</p>
+
+                                                    <div className="mb-0">
+                                                        <div className="flex justify-between items-start mb-1">
+                                                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate pr-2">{generalInfo.storeName || "Nome do Negócio"}</h4>
+                                                            <a href={mapsUrl} target="_blank" className="text-xs font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark dark:decoration-dark-heading shrink-0">Ver Mapa</a>
                                                         </div>
-                                                        <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${addresses.street}, ${addresses.number}, ${addresses.neighborhood}, ${addresses.city} - ${addresses.state}, ${addresses.zipCode}`)}`} target="_blank" rel="noopener noreferrer" className="text-[13px] font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark/20 dark:decoration-dark-heading/20 hover:decoration-brand-dark whitespace-nowrap pt-1">Ver no mapa</a>
+                                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-line">
+                                                            {formattedAddress}
+                                                        </p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -589,6 +700,14 @@ export const BusinessDataSubPage = ({
                     open={showConfirmDialog}
                     onConfirm={confirmNavigation}
                     onCancel={cancelNavigation}
+                />
+
+                <AlertModal
+                    isOpen={showValidationModal}
+                    onClose={() => setShowValidationModal(false)}
+                    title="Campos obrigatórios"
+                    description="Existem campos pendentes ou inválidos. Verifique as abas com a marcação vermelha antes de salvar."
+                    variant="warning"
                 />
 
                 <ImageCropperModal

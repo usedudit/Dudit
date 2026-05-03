@@ -1,16 +1,18 @@
 "use client"
 
-import React, { useState, useEffect, useTransition, useRef, useCallback } from "react"
+import React, { useState, useEffect, useTransition, useRef, useCallback, useMemo } from "react"
 import cn from "classnames"
-import { Button, IconPlaceholder, InfoCard, Input, ThreeDotsLoader } from "@/components/reusable"
-import { TrashIcon, MailIcon, MoreHorizontalIcon, CheckCircleIcon, ChevronLeftIcon, PlusIcon } from "@/lib/icons"
+import { Button, IconPlaceholder, InfoCard, Input, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, TabsContent, Separator, ActionsDropdown, Badge, AlertModal, DropdownItem } from "@/components/reusable"
+import { MailIcon, CheckCircleIcon, ChevronLeftIcon, PlusIcon, CalendarIcon, UserIcon } from "@/lib/icons"
 import DefaultModal from "@/components/reusable/DefaultModal"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { getTeamMembers, removeTeamMember, updateTeamMemberRole } from "@/app/actions/erp/team"
 import type { TeamMember } from "@/app/actions/erp/team"
 import { ROLE_LABELS, ROLE_DESCRIPTIONS, getAllowedInviteRoles, canModifyUser } from "@/lib/permissions/partner-roles"
 import type { PartnerRole } from "@/lib/permissions/types"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import { formatDate } from "@/lib/utils"
+import { useToast } from "@/hooks/use-toast"
 
 export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: () => void }) => {
     const [showInviteModal, setShowInviteModal] = useState(false)
@@ -35,6 +37,10 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
     const [isLoadingMembers, setIsLoadingMembers] = useState(true)
     const [errorMembers, setErrorMembers] = useState<string | null>(null)
     const [isPending, startTransition] = useTransition()
+    const [activeTab, setActiveTab] = useState<"members" | "invites">("members")
+    const [memberToDelete, setMemberToDelete] = useState<string | null>(null)
+    const [inviteToDelete, setInviteToDelete] = useState<string | null>(null)
+    const { toast } = useToast()
 
     const fetchMembers = async () => {
         setIsLoadingMembers(true)
@@ -90,16 +96,18 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
         }
     }
 
-    const handleRemoveMember = async (userId: string) => {
-        if (!confirm("Tem certeza que deseja remover este membro da equipe?")) return
+    const handleRemoveMember = async () => {
+        if (!memberToDelete) return
 
         startTransition(async () => {
-            const result = await removeTeamMember(userId)
+            const result = await removeTeamMember(memberToDelete)
             if (result.error) {
-                alert(result.error)
+                toast({ title: "Erro", description: result.error, variant: "destructive" })
             } else {
+                toast({ title: "Sucesso", description: "Membro removido da equipe." })
                 fetchMembers()
             }
+            setMemberToDelete(null)
         })
     }
 
@@ -107,9 +115,30 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
         startTransition(async () => {
             const result = await updateTeamMemberRole(userId, newRole)
             if (result.error) {
-                alert(result.error)
+                toast({ title: "Erro", description: result.error, variant: "destructive" })
             } else {
+                toast({ title: "Sucesso", description: "Função atualizada com sucesso." })
                 fetchMembers()
+            }
+        })
+    }
+
+    const handleRevokeInvitation = async () => {
+        if (!inviteToDelete) return
+        startTransition(async () => {
+            try {
+                const { revokeInvitation } = await import("@/app/actions/invitations")
+                const result = await revokeInvitation({ invitationId: inviteToDelete, partnerId })
+                if (result.success) {
+                    toast({ title: "Sucesso", description: "Convite revogado com sucesso." })
+                    fetchMembers()
+                } else {
+                    toast({ title: "Erro", description: result.error || "Erro ao revogar convite.", variant: "destructive" })
+                }
+            } catch (e) {
+                toast({ title: "Erro", description: "Erro ao revogar convite.", variant: "destructive" })
+            } finally {
+                setInviteToDelete(null)
             }
         })
     }
@@ -126,7 +155,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
 
     return (
         <FadeIn>
-            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
+            <div className="flex flex-col h-[calc(100vh - 65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
                 <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
                     {/* Sticky Header */}
                     <div className={`sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out ${isScrolled ? "py-2 md:py-3" : ""}`}>
@@ -161,120 +190,276 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                         </div>
                     </div>
 
-                    <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                    <div className="px-4 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                         {isLoadingMembers ? (
                             <div className="flex justify-center p-12">
                                 <ThreeDotsLoader />
                             </div>
                         ) : errorMembers ? (
                             <InfoCard message={errorMembers} color="red" className="mb-6" />
-                        ) : teamMembers.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center text-center min-h-[300px] mb-6">
-                                <IconPlaceholder
-                                    placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/Equipe.png"
-                                    imageAlt="Sem pedidos"
-                                    title="Nenhum membro encontrado"
-                                    subtitle="Você ainda não convidou ninguém para sua equipe."
-                                    itemButton={{
-                                        text: "Convidar primeiro membro",
-                                        action: () => setShowInviteModal(true)
-                                    }}
-                                />
-                            </div>
                         ) : (
-                            <div className="space-y-6">
-                                <div className="grid grid-cols-1 gap-4">
-                                    {teamMembers.map((member) => (
-                                        <div
-                                            key={member.userId}
-                                            className="flex items-center justify-between p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
+                            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+                                <div className="flex items-center justify-between mb-6 border-b border-brand-border dark:border-dark-border">
+                                    <TabsList className="bg-transparent p-0 gap-8 h-auto border-0">
+                                        <TabsTrigger
+                                            value="members"
+                                            className="px-0 py-4 bg-transparent border-b-2 border-transparent data-[state=active]:border-brand-dark dark:data-[state=active]:border-dark-heading data-[state=active]:bg-transparent rounded-none font-bold text-brand-inactive-text dark:text-dark-body data-[state=active]:text-brand-dark dark:data-[state=active]:text-dark-heading transition-all"
                                         >
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-gray-800 flex items-center justify-center font-bold text-brand-dark dark:text-dark-heading">
-                                                    {member.fullName?.[0]?.toUpperCase() || "U"}
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                                        {member.fullName}
-                                                        {member.userId === currentUserId ? (
-                                                            <span className="text-[10px] bg-brand-gray dark:bg-gray-800 px-1.5 py-0.5 rounded text-brand-dark dark:text-dark-heading">VOCÊ</span>
-                                                        ) : null}
-                                                    </p>
-                                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">{member.email}</p>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center gap-3">
-                                                <div className="text-right">
-                                                    <p className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider mb-0.5">FUNÇÃO</p>
-                                                    <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                                        {ROLE_LABELS[member.role as PartnerRole] || member.role}
-                                                    </p>
-                                                </div>
-
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50" disabled={isPending}>
-                                                            <MoreHorizontalIcon size={18} className="text-brand-inactive-text hover:text-brand-dark" />
-                                                        </button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        {currentUserRole && member.userId !== currentUserId && (
-                                                            <>
-                                                                {getAllowedInviteRoles(currentUserRole)
-                                                                    .filter((role) => canModifyUser(currentUserRole, member.role as PartnerRole))
-                                                                    .map((role) => (
-                                                                        <DropdownMenuItem
-                                                                            key={role}
-                                                                            onClick={() => handleUpdateRole(member.userId, role)}
-                                                                            className={member.role === role ? "bg-brand-gray font-bold" : ""}
-                                                                        >
-                                                                            Alterar para {ROLE_LABELS[role]}
-                                                                        </DropdownMenuItem>
-                                                                    ))}
-                                                                <div className="h-px bg-gray-100 my-1" />
-                                                            </>
-                                                        )}
-                                                        {member.userId !== currentUserId && (
-                                                            <DropdownMenuItem
-                                                                className="text-red-600 focus:bg-red-50 focus:text-red-700 cursor-pointer"
-                                                                onClick={() => handleRemoveMember(member.userId)}
-                                                            >
-                                                                <TrashIcon className="w-4 h-4 mr-2" /> Remover Membro
-                                                            </DropdownMenuItem>
-                                                        )}
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </div>
-                                        </div>
-                                    ))}
+                                            Equipe ({teamMembers.length})
+                                        </TabsTrigger>
+                                        <TabsTrigger
+                                            value="invites"
+                                            className="px-0 py-4 bg-transparent border-b-2 border-transparent data-[state=active]:border-brand-dark dark:data-[state=active]:border-dark-heading data-[state=active]:bg-transparent rounded-none font-bold text-brand-inactive-text dark:text-dark-body data-[state=active]:text-brand-dark dark:data-[state=active]:text-dark-heading transition-all"
+                                        >
+                                            Convites ({invitations.filter(i => !i.used_at && !i.revoked_at).length})
+                                        </TabsTrigger>
+                                    </TabsList>
                                 </div>
 
-                                {invitations.length > 0 && (
-                                    <div className="mt-8">
-                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Convites Pendentes</h3>
-                                        <div className="grid grid-cols-1 gap-4">
-                                            {invitations.filter(i => i.status === "PENDING").map((inv) => (
-                                                <div key={inv.id} className="flex items-center justify-between p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface opacity-90">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-400">
-                                                            <MailIcon size={18} />
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                                                {inv.email}
-                                                                <span className="text-[10px] bg-brand-gray dark:bg-gray-800 px-1.5 py-0.5 rounded text-brand-dark dark:text-dark-heading uppercase tracking-tighter">PENDENTE</span>
-                                                            </p>
-                                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Função: {ROLE_LABELS[inv.role as PartnerRole]}</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                <TabsContent value="members" className="mt-0 outline-none">
+                                    {teamMembers.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center text-center min-h-[300px]">
+                                            <IconPlaceholder
+                                                placeholderType="image"
+                                                imageSrc="https://img.dudit.com.br/static/mascots/Equipe.png"
+                                                imageAlt="Sem membros"
+                                                title="Nenhum membro encontrado"
+                                                subtitle="Você ainda não convidou ninguém para sua equipe."
+                                                itemButton={{
+                                                    text: "Convidar primeiro membro",
+                                                    action: () => setShowInviteModal(true)
+                                                }}
+                                            />
                                         </div>
-                                    </div>
-                                )}
-                            </div>
+                                    ) : (
+                                        <>
+                                            {/* Desktop Table */}
+                                            <div className="hidden md:block overflow-x-auto">
+                                                <table className="w-full text-left border-separate border-spacing-0">
+                                                    <thead>
+                                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                            <th className="py-3 px-6 rounded-l-lg text-[13px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">Membro</th>
+                                                            <th className="py-3 px-4 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider text-center">Data de Entrada</th>
+                                                            <th className="py-3 px-4 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider text-center">Função</th>
+                                                            <th className="py-3 px-6 rounded-r-lg text-[13px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider text-right">Ações</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-brand-border dark:divide-dark-border">
+                                                        {teamMembers.map((member) => (
+                                                            <tr key={member.userId} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/20 transition-colors">
+                                                                <td className="py-4 px-6">
+                                                                    <div className="flex items-center gap-4">
+                                                                        <UserProfileImage
+                                                                            fullName={member.fullName || "Usuário"}
+                                                                            className="w-10 h-10 text-[14px]"
+                                                                        />
+                                                                        <div className="flex flex-col min-w-0">
+                                                                            <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                                {member.fullName || "Usuário"}
+                                                                                {member.userId === currentUserId && (
+                                                                                    <Badge variant="gray" className="whitespace-nowrap scale-90 shrink-0">Você</Badge>
+                                                                                )}
+                                                                            </span>
+                                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                                                {member.email}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="py-4 px-4 text-center">
+                                                                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
+                                                                        {member.createdAt ? formatDate(member.createdAt) : "-"}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="py-4 px-4 text-center">
+                                                                    <Badge variant="blue" className="text-[11px] font-bold">
+                                                                        {ROLE_LABELS[member.role as PartnerRole] || member.role}
+                                                                    </Badge>
+                                                                </td>
+                                                                <td className="py-4 px-6 text-right">
+                                                                    <ActionsDropdown
+                                                                        onDelete={member.userId !== currentUserId ? () => setMemberToDelete(member.userId) : undefined}
+                                                                    >
+                                                                        {currentUserRole && member.userId !== currentUserId && (
+                                                                            getAllowedInviteRoles(currentUserRole)
+                                                                                .filter((role) => canModifyUser(currentUserRole, member.role as PartnerRole) && role !== member.role)
+                                                                                .map((role) => (
+                                                                                    <DropdownItem
+                                                                                        key={role}
+                                                                                        onClick={() => handleUpdateRole(member.userId, role)}
+                                                                                    >
+                                                                                        <UserIcon size={16} /> Alterar para {ROLE_LABELS[role]}
+                                                                                    </DropdownItem>
+                                                                                ))
+                                                                        )}
+                                                                    </ActionsDropdown>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            {/* Mobile List */}
+                                            <div className="md:hidden flex flex-col">
+                                                {teamMembers.map((member, idx) => (
+                                                    <React.Fragment key={member.userId}>
+                                                        <div className="py-5 flex items-center justify-between gap-4">
+                                                            <div className="flex items-center gap-4 min-w-0">
+                                                                <UserProfileImage
+                                                                    fullName={member.fullName || "Usuário"}
+                                                                    className="w-12 h-12 text-[16px]"
+                                                                />
+                                                                <div className="flex flex-col min-w-0">
+                                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                        {member.fullName || "Usuário"}
+                                                                        {member.userId === currentUserId && (
+                                                                            <Badge variant="gray" className="ml-2 text-[10px] py-0 h-4">VOCÊ</Badge>
+                                                                        )}
+                                                                    </h3>
+                                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mb-1">
+                                                                        {member.email}
+                                                                    </span>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Badge variant="blue" className="text-[10px] py-0 h-5 font-bold uppercase">
+                                                                            {ROLE_LABELS[member.role as PartnerRole] || member.role}
+                                                                        </Badge>
+                                                                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body flex items-center gap-1 font-medium">
+                                                                            <CalendarIcon size={12} /> {member.createdAt ? formatDate(member.createdAt) : "-"}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <ActionsDropdown
+                                                                onDelete={member.userId !== currentUserId ? () => setMemberToDelete(member.userId) : undefined}
+                                                            >
+                                                                {currentUserRole && member.userId !== currentUserId && (
+                                                                    getAllowedInviteRoles(currentUserRole)
+                                                                        .filter((role) => canModifyUser(currentUserRole, member.role as PartnerRole) && role !== member.role)
+                                                                        .map((role) => (
+                                                                            <DropdownItem
+                                                                                key={role}
+                                                                                onClick={() => handleUpdateRole(member.userId, role)}
+                                                                            >
+                                                                                <UserIcon size={16} /> Alterar para {ROLE_LABELS[role]}
+                                                                            </DropdownItem>
+                                                                        ))
+                                                                )}
+                                                            </ActionsDropdown>
+                                                        </div>
+                                                        {idx < teamMembers.length - 1 && <Separator className="opacity-50" />}
+                                                    </React.Fragment>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </TabsContent>
+
+                                <TabsContent value="invites" className="mt-0 outline-none">
+                                    {invitations.filter(i => i.status === "PENDING").length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center text-center min-h-[300px]">
+                                            <IconPlaceholder
+                                                placeholderType="image"
+                                                imageSrc="https://img.dudit.com.br/static/mascots/Convites.png"
+                                                imageAlt="Sem convites"
+                                                title="Nenhum convite pendente"
+                                                subtitle="Todos os convites enviados já foram aceitos ou expiraram."
+                                                itemButton={{
+                                                    text: "Enviar novo convite",
+                                                    action: () => setShowInviteModal(true)
+                                                }}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {/* Desktop Table */}
+                                            <div className="hidden md:block overflow-x-auto">
+                                                <table className="w-full text-left border-separate border-spacing-0">
+                                                    <thead>
+                                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                            <th className="py-3 px-6 rounded-l-lg text-[13px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">Email do Convidado</th>
+                                                            <th className="py-3 px-4 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider text-center">Data do Convite</th>
+                                                            <th className="py-3 px-4 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider text-center">Função</th>
+                                                            <th className="py-3 px-6 rounded-r-lg text-[13px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider text-right">Ações</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-brand-border dark:divide-dark-border">
+                                                        {invitations.filter(i => !i.used_at && !i.revoked_at).map((inv) => (
+                                                            <tr key={inv.id} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/20 transition-colors">
+                                                                <td className="py-4 px-6">
+                                                                    <div className="flex items-center gap-4">
+                                                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center text-brand-inactive-text">
+                                                                            <MailIcon size={20} />
+                                                                        </div>
+                                                                        <div className="flex flex-col min-w-0">
+                                                                            <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                                {inv.email}
+                                                                            </span>
+                                                                            <span className="text-[10px] font-bold text-brand-primary uppercase tracking-tighter">
+                                                                                Aguardando aceitação
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="py-4 px-4 text-center">
+                                                                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
+                                                                        {inv.createdAt ? formatDate(inv.createdAt) : "-"}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="py-4 px-4 text-center">
+                                                                    <Badge variant="gray" className="text-[11px] font-bold">
+                                                                        {ROLE_LABELS[inv.role as PartnerRole] || inv.role}
+                                                                    </Badge>
+                                                                </td>
+                                                                <td className="py-4 px-6 text-right">
+                                                                    <ActionsDropdown
+                                                                        onDelete={() => setInviteToDelete(inv.id)}
+                                                                    />
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            {/* Mobile List */}
+                                            <div className="md:hidden flex flex-col">
+                                                {invitations.filter(i => !i.used_at && !i.revoked_at).map((inv, idx, arr) => (
+                                                    <React.Fragment key={inv.id}>
+                                                        <div className="py-5 flex items-center justify-between gap-4">
+                                                            <div className="flex items-center gap-4 min-w-0">
+                                                                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center text-brand-inactive-text shrink-0">
+                                                                    <MailIcon size={24} />
+                                                                </div>
+                                                                <div className="flex flex-col min-w-0">
+                                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                        {inv.email}
+                                                                    </h3>
+                                                                    <span className="text-[10px] font-bold text-brand-primary uppercase tracking-tighter mb-1">
+                                                                        Aguardando aceitação
+                                                                    </span>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Badge variant="gray" className="text-[10px] py-0 h-5 font-bold uppercase">
+                                                                            {ROLE_LABELS[inv.role as PartnerRole] || inv.role}
+                                                                        </Badge>
+                                                                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body flex items-center gap-1 font-medium">
+                                                                            <CalendarIcon size={12} /> {inv.createdAt ? formatDate(inv.createdAt) : "-"}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <ActionsDropdown
+                                                                onDelete={() => setInviteToDelete(inv.id)}
+                                                            />
+                                                        </div>
+                                                        {idx < arr.length - 1 && <Separator className="opacity-50" />}
+                                                    </React.Fragment>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </TabsContent>
+                            </Tabs>
                         )}
                     </div>
                 </div>
@@ -377,6 +562,27 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                         </div>
                     )}
                 </DefaultModal>
+
+                <AlertModal
+                    isOpen={!!memberToDelete}
+                    onClose={() => setMemberToDelete(null)}
+                    title="Remover Membro?"
+                    description="Tem certeza que deseja remover este membro da sua equipe? Ele perderá o acesso imediatamente."
+                    confirmText="Sim, remover"
+                    variant="danger"
+                    onConfirm={handleRemoveMember}
+                    isLoading={isPending}
+                />
+                <AlertModal
+                    isOpen={!!inviteToDelete}
+                    onClose={() => setInviteToDelete(null)}
+                    title="Revogar Convite?"
+                    description="Tem certeza que deseja revogar este convite? O link deixará de funcionar imediatamente."
+                    confirmText="Sim, revogar"
+                    variant="danger"
+                    onConfirm={handleRevokeInvitation}
+                    isLoading={isPending}
+                />
             </div>
         </FadeIn>
     )

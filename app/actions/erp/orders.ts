@@ -2090,7 +2090,7 @@ export async function updateOrderNotesAction(input: {
     notes: string
 }) {
     const user = await requireUser()
-    if (!user) return { success: false as const, error: "NÃ£o autenticado" }
+    if (!user) return { success: false as const, error: "Não autenticado" }
 
     await requirePartnerAccessWithPermission(input.partnerId, "orders", "edit")
     const supabase = createAdminClient()
@@ -2132,7 +2132,7 @@ export async function updateOrderNotesAction(input: {
             entityType: "order",
             entityId: input.orderId,
             actionType: "updated",
-            changeLines: ["alterou as observaÃ§Ãµes do pedido."],
+            changeLines: ["alterou as observações do pedido."],
             source: "manual",
         })
     } catch (historyError) {
@@ -2154,7 +2154,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
     userName?: string
 }) {
     const user = await requireUser()
-    if (!user) return { error: "Nao autenticado" }
+    if (!user) return { error: "Não autenticado" }
 
     const runtimeActionType = String((payload as { actionType?: string }).actionType || "")
     if (!["payment_status", "delivery_status", "cancel"].includes(runtimeActionType)) {

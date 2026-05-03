@@ -558,7 +558,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                                 </div>
                             </div>
 
-                            <div className="px-3 md:px-0 py-2 max-w-[1300px] mx-auto w-full">
+                            <div className="px-3 md:px-0 py-2 max-w-[1300px] mx-auto mt-8 w-full">
                                 <PaymentMethodPageControls
                                     search={search}
                                     onSearchChange={setSearch}

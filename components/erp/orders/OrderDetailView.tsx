@@ -53,10 +53,17 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         }
     }, [])
 
+    // Always fetch full data in background, even if we have initialOrder
     useEffect(() => {
+        let mounted = true
+
         async function load() {
+            // Only show loading spinner if we have NO data at all
             if (!initialOrder) setLoading(true)
+
             const res = await getOrderDetailsAction(orderId, partnerId)
+            if (!mounted) return
+
             if (res.success) {
                 setOrder(res.data)
             } else if (!initialOrder) {
@@ -65,8 +72,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
             }
             setLoading(false)
         }
+
         load()
-    }, [orderId, partnerId, initialOrder, notifyError, onBack])
+        return () => { mounted = false }
+    }, [orderId, partnerId])
 
     useEffect(() => {
         async function loadHistory() {
@@ -166,7 +175,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-screen bg-white dark:bg-dark-background overflow-hidden relative">
                 <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-10">
 
-                    {/* --- STICKY HEADER --- */}
+                    {/* Sticky Header */}
                     <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
                         <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
