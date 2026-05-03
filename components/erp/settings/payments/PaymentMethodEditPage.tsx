@@ -45,6 +45,13 @@ const PIX_KEY_TYPES = [
     { id: "random", name: "Chave Aleatória" },
 ]
 
+const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+        {children}
+    </div>
+)
+
 interface PaymentMethod {
     id: string
     name: string
@@ -254,25 +261,25 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
 
                 {/* Sticky Header */}
-                <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
-                    <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
+                <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                    <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
 
                         {/* Back button - desktop only */}
-                        <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                        <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                             <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                 <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                             </Button>
                         </div>
 
                         {/* Title row */}
-                        <div className="flex items-center justify-between py-4">
+                        <div className="hidden md:flex items-start justify-between">
                             <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                <h1 className="font-bold text-brand-dark dark:text-dark-heading text-xl md:text-2xl truncate">
+                                <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                     {editingMethod ? "Editar Método de Pagamento" : "Novo Método de Pagamento"}
                                 </h1>
-                                <p className="hidden md:block text-brand-inactive-text dark:text-dark-body text-sm font-medium truncate">
+                                <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                     {editingMethod ? `Configurando ${formData.name}` : "Configure um novo meio de pagamento para sua loja."}
-                                </p>
+                                </div>
                             </div>
 
                             {/* Desktop action buttons */}
@@ -291,13 +298,11 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
 
                 {/* Content Body */}
                 <div ref={scrollContainerRef} className="flex-1 overflow-y-auto no-scrollbar pb-24 md:pb-8">
-                    <div className="px-4 md:px-6 py-8 max-w-[1300px] mx-auto">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 relative">
-                            {/* Vertical Divider */}
-                            <div className="absolute left-1/2 top-0 bottom-0 w-px bg-brand-border dark:bg-dark-border/50 hidden md:block" />
+                    <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                        <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
 
                             {/* Left Column */}
-                            <div className="space-y-10">
+                            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-10">
                                 <FormSection title="Informações Gerais">
                                     <div className="grid grid-cols-1 gap-6">
                                         <Input
@@ -488,8 +493,9 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                             </div>
 
                             {/* Right Column */}
-                            <div className="space-y-10">
-                                <FormSection title="Taxas e Custos">
+                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
+                                <SidebarCard hasTopStrip>
+                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Taxas e Custos</h3>
                                     <div className="grid grid-cols-1 gap-6">
                                         <Input
                                             label="Taxa Administrativa (%)"
@@ -516,9 +522,10 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                                             Essas taxas são usadas para calcular automaticamente o valor líquido a receber em cada venda efetuada por este método.
                                         </p>
                                     </div>
-                                </FormSection>
+                                </SidebarCard>
 
-                                <FormSection title="Preferências e Visibilidade">
+                                <SidebarCard>
+                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Preferências</h3>
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-between p-4 rounded-xl bg-brand-gray/10 dark:bg-dark-background/40 border border-brand-border dark:border-dark-border">
                                             <div>
@@ -542,7 +549,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                                             />
                                         </div>
                                     </div>
-                                </FormSection>
+                                </SidebarCard>
 
                                 <div className="hidden md:block pt-6">
                                     <Button onClick={handleSubmit} className="w-full h-12" disabled={isLoading}>

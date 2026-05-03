@@ -442,7 +442,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                     </TabsContent>
 
                                     <TabsContent value="Review" className="mt-0">
-                                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                                             {/* Review content stays mostly the same but with standardized classes */}
                                             <div className="rounded-2xl bg-brand-green/5 dark:bg-brand-green/10 border border-brand-green/20 p-6 flex items-start gap-5 mb-10 shadow-sm relative overflow-hidden group">
                                                 <div className="absolute top-0 right-0 w-32 h-32 bg-brand-green/10 rounded-full -mr-16 -mt-16 blur-3xl transition-all duration-500 group-hover:scale-150" />

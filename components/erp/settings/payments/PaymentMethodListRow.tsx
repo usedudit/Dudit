@@ -198,10 +198,10 @@ const PaymentMethodListRow = React.memo(
 
         return (
             <motion.tr
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -5 }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
                 className="group hover:bg-brand-gray/40 dark:hover:bg-dark-border/20 transition-all duration-200 cursor-pointer bg-white dark:bg-dark-background border-b border-brand-border/50 dark:border-dark-border/30 last:border-0"
                 onClick={() => onEdit(method)}
             >

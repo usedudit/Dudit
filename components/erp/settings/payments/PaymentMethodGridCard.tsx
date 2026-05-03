@@ -61,9 +61,9 @@ const PaymentMethodGridCard = React.memo(
     ({ method, selected, onSelect, onEdit, onDelete }: PaymentMethodGridCardProps) => {
         return (
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
                 onClick={() => onEdit(method)}
                 className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-5 hover:border-brand-green/30 dark:hover:border-brand-green/30 hover:shadow-xl hover:shadow-brand-green/5 transition-all duration-400 cursor-pointer group flex flex-col h-full relative overflow-hidden"
             >

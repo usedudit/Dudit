@@ -455,9 +455,9 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                     {paginatedMethods.map((method, idx) => (
                         <motion.div
                             key={method.id}
-                            initial={{ opacity: 0, y: 15 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: idx * 0.05, duration: 0.3 }}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: idx * 0.05, duration: 0.2 }}
                         >
                             <div
                                 className="py-6 flex items-center gap-5 cursor-pointer active:scale-[0.98] transition-transform"

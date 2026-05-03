@@ -520,8 +520,8 @@ export const hasBusinessCapability = cache(async (
   } else {
     const admin = getAdminClient()
     const { data: partner } = await admin.from("partners").select("business_info").eq("id", partnerId).single()
-    info = typeof partner?.business_info === "string" 
-      ? JSON.parse(partner.business_info) 
+    info = typeof partner?.business_info === "string"
+      ? JSON.parse(partner.business_info)
       : (partner?.business_info || { sells: ["products"], channels: ["online"] })
   }
 
@@ -702,6 +702,7 @@ const RESOURCE_ACTION_ROUTE_CHECKS: Partial<
     change_plan: canRouteSpecific("settings_subscription", "can_change_subscription"),
   },
   payment_methods: {
+    view: () => true,
     create: canRouteAction("settings", "create"),
     edit: canRouteAction("settings", "edit"),
     delete: canRouteAction("settings", "delete"),
