@@ -301,7 +301,7 @@ export const AddUnavailableSheet = ({
 
                 {/* Professional Selection - MULTI SELECT */}
                 <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-bold text-brand-dark dark:text-dark-heading ml-1">Profissionais</label>
+                    <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">Profissionais</label>
                     <Dropdown
                         width="w-full"
                         showChevron={false}
@@ -309,7 +309,7 @@ export const AddUnavailableSheet = ({
                             <button
                                 className="flex items-center text-brand-dark dark:text-dark-heading bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg py-2.5 px-4 text-sm transition-colors duration-150 w-full text-left justify-between"
                             >
-                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                <span className="truncate block">
                                     {selectedStaffIds.length === 0
                                         ? 'Selecione os profissionais'
                                         : selectedStaffIds.length === 1
@@ -343,7 +343,7 @@ export const AddUnavailableSheet = ({
                 {/* Recurrence with End Logic */}
                 <div className="space-y-4">
                     <div className="flex flex-col gap-1.5">
-                        <label className="text-sm font-bold text-brand-dark dark:text-dark-heading ml-1">Repetição</label>
+                        <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">Repetição</label>
                         <Dropdown
                             width="w-full"
                             showChevron={false}
@@ -351,7 +351,7 @@ export const AddUnavailableSheet = ({
                                 <button
                                     className="flex items-center text-brand-dark dark:text-dark-heading bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg py-2.5 px-4 text-sm transition-colors duration-150 w-full text-left justify-between"
                                 >
-                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                    <span className="truncate block">
                                         {recurrence === 'none' ? 'Não se repete' : recurrence === 'daily' ? 'Diariamente' : 'Semanalmente'}
                                     </span>
                                     <ChevronDownIcon size={16} className="text-brand-inactive-text" />

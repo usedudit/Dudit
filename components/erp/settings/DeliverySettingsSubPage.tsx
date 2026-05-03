@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Button, Input, ListItem, FormDropdown, InfoCard } from "@/components/reusable"
 import { ChevronLeftIcon, TruckIcon, ClockIcon, PlusIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -25,6 +25,8 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
   })
   const [rules, setRules] = useState<any[]>([])
   const [newRule, setNewRule] = useState({ startTime: "18:00", endTime: "22:00", type: "fixed", value: "0" })
+
+  const handleBack = useCallback(() => onBack(), [onBack])
 
   const isFree = planSlug === "free"
   const isVendedor = planSlug === "vendedor"
@@ -61,7 +63,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
       <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
         <div className="max-w-[1300px] mx-auto px-4 md:px-6 py-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0"><ChevronLeftIcon className="w-5 h-5" /></Button>
+            <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0"><ChevronLeftIcon className="w-5 h-5" /></Button>
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading">Entrega</h1>
               <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">Configure taxas e regras de entrega</p>

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useCallback } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { ActionsDropdown, Badge, Button, Tabs, TabsContent, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
 import { ChevronLeftIcon, EditIcon } from "@/lib/icons"
@@ -59,6 +59,8 @@ export default function CouponDetailPage({
 }) {
   const [activeTab, setActiveTab] = useState("summary")
 
+  const handleBack = useCallback(() => onBack(), [onBack])
+
   return (
     <FadeIn>
       <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative">
@@ -66,7 +68,7 @@ export default function CouponDetailPage({
           <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
               <div className="absolute -left-12 top-7 h-full hidden xl:flex justify-center">
-                <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                   <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                 </Button>
               </div>

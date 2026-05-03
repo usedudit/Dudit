@@ -258,6 +258,8 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
 
+    const handleBack = useCallback(() => onBack(), [onBack])
+
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
     }, [])
@@ -435,7 +437,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
 
                             {/* Back button - desktop only */}
                             <div className={`absolute -left-12 top-1/2 -translate-y-1/2 h-full hidden xl:flex items-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                     <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                 </Button>
                             </div>
@@ -717,7 +719,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
                 <Button
                     variant="outline"
-                    onClick={onBack}
+                    onClick={handleBack}
                     className="flex-1 h-[48px] font-bold"
                 >
                     Voltar

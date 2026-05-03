@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useState } from "react"
+import React, { useMemo, useState, useCallback } from "react"
 import { AnimatePresence } from "framer-motion"
 import {
   Badge,
@@ -266,6 +266,8 @@ export default function CouponFormPage({
   const isDirty = currentSnapshot !== initialSnapshot
   const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
+  const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
+
   const pageTitle = mode === "edit" ? "Editar cupom" : "Novo cupom"
   const dateFromValue = form.startsAt ? new Date(`${form.startsAt}T12:00:00`) : undefined
   const dateToValue = form.endsAt ? new Date(`${form.endsAt}T12:00:00`) : undefined
@@ -320,7 +322,7 @@ export default function CouponFormPage({
           <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
               <div className="absolute -left-12 top-7 h-full hidden xl:flex justify-center">
-                <Button variant="filled" onClick={() => handleNavigation(onBack)} className="w-10 h-10 p-0 flex items-center justify-center">
+                <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                   <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                 </Button>
               </div>
@@ -341,7 +343,7 @@ export default function CouponFormPage({
                 </div>
 
                 <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                  <Button variant="outline" onClick={() => handleNavigation(onBack)} disabled={isSaving}>
+                  <Button variant="outline" onClick={handleBack} disabled={isSaving}>
                     Cancelar
                   </Button>
                   <Button onClick={onSave} disabled={isSaving}>
@@ -509,7 +511,7 @@ export default function CouponFormPage({
                         {form.applyScope !== "all" && (
                           <LinkedItemsSection
                             title="Itens vinculados"
-                            items={linkedScopeItems}
+                            items={linkedScopeItems as any[]}
                             getId={(item) => item.id}
                             getTitle={(item) => item.name}
                             getDescription={(item) => {
@@ -676,7 +678,7 @@ export default function CouponFormPage({
         </Tabs>
 
         <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-brand-border dark:border-dark-border bg-white dark:bg-dark-background p-4 flex gap-3">
-          <Button variant="outline" onClick={() => handleNavigation(onBack)} className="flex-1" disabled={isSaving}>
+          <Button variant="outline" onClick={handleBack} className="flex-1" disabled={isSaving}>
             Cancelar
           </Button>
           <Button onClick={onSave} className="flex-1" disabled={isSaving}>

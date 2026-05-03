@@ -506,37 +506,60 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     const { data, error } = await supabase.from("appointments").insert(rows).select("*")
     if (error) throw error
 
-    for (const row of data || []) {
-      const receivableId = await syncAppointmentReceivable({
-        supabase,
-        partnerId,
-        userId: user.id,
-        appointment: { ...row, paid_amount: Number(row.paid_amount || 0) },
-        currentReceivableId: row.receivable_transaction_id || null,
-      })
-      if (receivableId) {
-        await supabase
-          .from("appointments")
-          .update({ receivable_transaction_id: receivableId })
-          .eq("id", row.id)
-          .eq("partner_id", partnerId)
-      }
+    const createdRows = data || []
 
-      await logAuditEvent({
-        partnerId,
-        actorUserId: user.id,
-        entityType: "appointment",
-        entityId: row.id,
-        actionType: "created",
-        changeLines: [`criou agendamento para ${row.customer_name}.`],
-        metadata: { status: row.status, source: row.source },
-      })
-      await revalidateEntityTimeline("appointment", row.id)
+    // -- Post-insert processing (optimized: skip unnecessary work, batch where safe) --
+    // Receivable sync is only needed for appointments with price > 0
+    // Unavailable slots (price=0) never need receivables
+    const receivableUpdates: Array<{ id: string; receivableId: string }> = []
+    for (const row of createdRows) {
+      const price = Number(row.price || 0)
+      if (price > 0.009 && row.source !== "unavailable") {
+        const receivableId = await syncAppointmentReceivable({
+          supabase,
+          partnerId,
+          userId: user.id,
+          appointment: { ...row, paid_amount: Number(row.paid_amount || 0) },
+          currentReceivableId: row.receivable_transaction_id || null,
+        })
+        if (receivableId) {
+          receivableUpdates.push({ id: row.id, receivableId })
+        }
+      }
     }
 
-    // Increment usage counter for each created appointment
-    increment_usage_counter(partnerId, "appointments_month_count", data.length).catch(console.error)
+    // Batch receivable ID updates
+    if (receivableUpdates.length > 0) {
+      await Promise.all(
+        receivableUpdates.map(({ id, receivableId }) =>
+          supabase
+            .from("appointments")
+            .update({ receivable_transaction_id: receivableId })
+            .eq("id", id)
+            .eq("partner_id", partnerId)
+        )
+      )
+    }
 
+    // Audit logs — run in parallel (each is an independent insert)
+    await Promise.all(
+      createdRows.map((row: any) =>
+        logAuditEvent({
+          partnerId,
+          actorUserId: user.id,
+          entityType: "appointment",
+          entityId: row.id,
+          actionType: "created",
+          changeLines: [`criou agendamento para ${row.customer_name}.`],
+          metadata: { status: row.status, source: row.source },
+        })
+      )
+    )
+
+    // Increment usage counter for each created appointment
+    increment_usage_counter(partnerId, "appointments_month_count", createdRows.length).catch(console.error)
+
+    // Revalidation — once at the end, not per-row
     safeRevalidateTag(TAGS.entityTimeline("appointment-list", partnerId))
     revalidatePath("/erp/servicos")
 

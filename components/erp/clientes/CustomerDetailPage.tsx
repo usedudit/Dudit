@@ -36,6 +36,8 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const isMobile = useMediaQuery("(max-width: 767px)");
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+    const handleBack = useCallback(() => onBack(), [onBack]);
+
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5);
     }, []);
@@ -212,7 +214,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
 
                                 {/* Back button - desktop only */}
                                 <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                    <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                    <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
                                 </div>
@@ -249,7 +251,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"} pt-4 md:pt-0 pb-0 flex items-center`}>
                                     {/* Tiny mobile back button to preserve navigation since title logic was removed */}
                                     <div className="md:hidden mr-4">
-                                        <button onClick={onBack} className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-50 dark:bg-dark-border text-brand-dark dark:text-dark-heading border border-gray-200 dark:border-dark-border">
+                                        <button onClick={handleBack} className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-50 dark:bg-dark-border text-brand-dark dark:text-dark-heading border border-gray-200 dark:border-dark-border">
                                             <ChevronLeftIcon className="w-4 h-4" />
                                         </button>
                                     </div>

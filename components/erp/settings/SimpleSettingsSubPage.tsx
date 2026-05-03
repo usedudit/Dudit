@@ -13,6 +13,7 @@ interface SimpleSettingsSubPageProps {
 }
 
 export function SimpleSettingsSubPage({ title, description, onBack }: SimpleSettingsSubPageProps) {
+  const handleBack = React.useCallback(() => onBack(), [onBack])
   return (
     <FadeIn>
       <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
@@ -21,7 +22,7 @@ export function SimpleSettingsSubPage({ title, description, onBack }: SimpleSett
           <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 py-6 flex items-center justify-between">
             {/* Back button - desktop only */}
             <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500`}>
-              <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+              <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                 <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
               </Button>
             </div>
@@ -38,7 +39,7 @@ export function SimpleSettingsSubPage({ title, description, onBack }: SimpleSett
             </div>
 
             <div className="flex items-center gap-3">
-              <Button variant="outline" onClick={onBack}>
+              <Button variant="outline" onClick={handleBack}>
                 Voltar
               </Button>
             </div>

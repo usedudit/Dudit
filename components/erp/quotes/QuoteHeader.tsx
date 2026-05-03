@@ -1,5 +1,6 @@
 "use client"
 
+import React, { useCallback } from 'react';
 import { ChevronLeftIcon, SaveIcon } from '@/lib/icons';
 import { Button, TabsList, TabsTrigger } from '@/components/reusable';
 
@@ -26,6 +27,8 @@ const QuoteHeader = ({
     activeTab = "Dados Gerais",
     hideOnMobile = false
 }: QuoteHeaderProps) => {
+    const handleBack = useCallback(() => onBack(), [onBack]);
+
     // Hide title on mobile/tablet when preview tab is active
     const showTitle = activeTab !== 'Visualização';
 
@@ -38,7 +41,7 @@ const QuoteHeader = ({
                     <div className="flex items-center gap-4 min-w-0">
                         {/* Back button - desktop only */}
                         <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                            <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                            <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                 <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                             </Button>
                         </div>
@@ -58,7 +61,7 @@ const QuoteHeader = ({
 
                     {onSave && (
                         <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                            <Button variant="outline" onClick={onBack} className={isScrolled ? "h-9 px-3 text-xs" : ""}>
+                            <Button variant="outline" onClick={handleBack} className={isScrolled ? "h-9 px-3 text-xs" : ""}>
                                 Cancelar
                             </Button>
                             <Button

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
     MapPinIcon,
     ChevronRightIcon,
@@ -128,6 +128,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const [isCanceling, setIsCanceling] = useState(false);
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
 
+    const handleBack = useCallback(() => onBack(), [onBack]);
+
     if (!order) return null;
 
     const orderNumber = order.order_number || order.id.slice(0, 8).toUpperCase();
@@ -205,7 +207,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 {/* Header */}
                 <div className="mb-8 flex flex-col md:flex-row md:items-center gap-4 w-full justify-start">
                     <div className="hidden md:flex">
-                        <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
+                        <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
                             <XIcon className="w-5 h-5" />
                         </Button>
                     </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import { Button, Badge, InfoCard, ThreeDotsLoader } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon } from "@/lib/icons"
@@ -20,6 +20,8 @@ export default function DeliveryDetailPage({
   const [delivery, setDelivery] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const mounted = useRef(true)
+
+  const handleBack = useCallback(() => onBack(), [onBack])
 
   useEffect(() => {
     mounted.current = true
@@ -52,7 +54,7 @@ export default function DeliveryDetailPage({
       <div className="sticky top-0 z-20 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
         <div className="max-w-[1300px] mx-auto px-4 md:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0"><ChevronLeftIcon className="w-5 h-5" /></Button>
+            <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0"><ChevronLeftIcon className="w-5 h-5" /></Button>
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading">Entrega {order?.order_number || ""}</h1>
               <p className="text-brand-inactive-text dark:text-dark-body text-sm">Detalhes da entrega e do pedido vinculado</p>

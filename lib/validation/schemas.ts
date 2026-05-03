@@ -116,7 +116,7 @@ export const PaymentMethodSchema = z.object({
   maxInstallments: z.number().int().min(1).max(24).optional().nullable(),
   discountPercent: z.number().min(0).max(100).optional().nullable(),
   cardBrand: z.string().max(500).optional().nullable(),
-  defaultFinanceAccountId: z.string().uuid("Conta financeira inválida"),
+  defaultFinanceAccountId: z.string().uuid("Conta financeira inválida").optional().nullable(),
   priority: z.number().int().min(0).optional(),
   isDefault: z.boolean().optional(),
   isOnlineDefault: z.boolean().optional(),

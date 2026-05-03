@@ -9,6 +9,8 @@ import {
     AlertModal,
     SavingStatusModal,
     Badge,
+    FormSection,
+    FormDropdown,
 } from "@/components/reusable"
 import {
     CpfCnpjInput,
@@ -17,7 +19,12 @@ import {
 } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
-import { createPaymentMethodAction, updatePaymentMethodAction, getPaymentMethodDetailsAction } from "@/app/actions/erp/payment-methods"
+import {
+    createPaymentMethodAction,
+    updatePaymentMethodAction,
+    getPaymentMethodDetailsAction,
+    getPartnerFinanceAccountsForPaymentMethodsAction
+} from "@/app/actions/erp/payment-methods"
 import { ChevronLeftIcon, SaveIcon, InfoIcon, MoneyIcon, CreditCardIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 
@@ -62,18 +69,11 @@ interface PaymentMethodEditPageProps {
     onBack: (shouldReload?: boolean) => void
 }
 
-const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: string; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
-    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-        {title && <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">{title}</h4>}
-        {children}
-    </div>
-)
-
 export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: PaymentMethodEditPageProps) {
     const { success: notifySuccess, error: notifyError } = useNotification()
     const [isLoading, setIsLoading] = useState(false)
     const [isLoadingDetails, setIsLoadingDetails] = useState(false)
+    const [financeAccounts, setFinanceAccounts] = useState<any[]>([])
 
     // Form state
     const [formData, setFormData] = useState({
@@ -90,9 +90,18 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
         pix_key: "",
         use_partner_pix_data: false,
         supports_installments: true,
+        default_finance_account_id: "" as string,
     })
 
     const [baselineFormData, setBaselineFormData] = useState<any>(null)
+
+    useEffect(() => {
+        const loadAccounts = async () => {
+            const res = await getPartnerFinanceAccountsForPaymentMethodsAction(partnerId)
+            if (res.success) setFinanceAccounts(res.accounts || [])
+        }
+        loadAccounts()
+    }, [partnerId])
 
     useEffect(() => {
         const loadDetails = async () => {
@@ -111,6 +120,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                     pix_key: "",
                     use_partner_pix_data: false,
                     supports_installments: true,
+                    default_finance_account_id: "",
                 }
                 setFormData(initial)
                 setBaselineFormData(JSON.parse(JSON.stringify(initial)))
@@ -136,6 +146,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                         pix_key: m.pix_key || "",
                         use_partner_pix_data: Boolean(m.use_partner_pix_data),
                         supports_installments: Boolean(m.supports_installments ?? ((m.max_installments || 1) > 1)),
+                        default_finance_account_id: m.default_finance_account_id || "",
                     }
                     setFormData(initial)
                     setBaselineFormData(JSON.parse(JSON.stringify(initial)))
@@ -198,7 +209,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                 pixKey: isPix ? formData.pix_key : null,
                 usePartnerPixData: isPix ? formData.use_partner_pix_data : false,
                 cardBrand: isCard ? formData.card_brand : null,
-                defaultFinanceAccountId: null,
+                defaultFinanceAccountId: formData.default_finance_account_id || null,
                 partnerId: partnerId,
             }
 
@@ -241,12 +252,14 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
     return (
         <FadeIn>
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
+
                 {/* Sticky Header */}
-                <div className={`sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out ${isScrolled ? "shadow-sm border-brand-border dark:border-dark-border" : "border-transparent"}`}>
-                    <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+                <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+                    <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
+
                         {/* Back button - desktop only */}
-                        <div className="absolute -left-12 top-4 h-full hidden xl:flex justify-center transition-all duration-500">
-                            <Button variant="outline" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                        <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                            <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                 <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                             </Button>
                         </div>
@@ -279,24 +292,21 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                 {/* Content Body */}
                 <div ref={scrollContainerRef} className="flex-1 overflow-y-auto no-scrollbar pb-24 md:pb-8">
                     <div className="px-4 md:px-6 py-8 max-w-[1300px] mx-auto">
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                            
-                            {/* Left Column: Form Sections */}
-                            <div className="lg:col-span-8 space-y-8">
-                                <section className="space-y-6">
-                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                        <InfoIcon className="w-5 h-5 text-brand-inactive-text" />
-                                        Informações Gerais
-                                    </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 relative">
+                            {/* Vertical Divider */}
+                            <div className="absolute left-1/2 top-0 bottom-0 w-px bg-brand-border dark:bg-dark-border/50 hidden md:block" />
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Left Column */}
+                            <div className="space-y-10">
+                                <FormSection title="Informações Gerais">
+                                    <div className="grid grid-cols-1 gap-6">
                                         <Input
                                             label="Nome do método"
                                             placeholder="Ex: Cartão de Crédito - Loja"
                                             value={formData.name}
                                             onChange={(e) => {
                                                 setFormData({ ...formData, name: e.target.value })
-                                                if (fieldErrors.name) setFieldErrors(p => { const n = {...p}; delete n.name; return n })
+                                                if (fieldErrors.name) setFieldErrors(p => { const n = { ...p }; delete n.name; return n })
                                             }}
                                             error={!!fieldErrors.name}
                                             errorMessage={fieldErrors.name}
@@ -335,24 +345,27 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                                                 />
                                             </div>
                                         </div>
+
+                                        <FormDropdown
+                                            label="Conta Financeira (Opcional)"
+                                            placeholder="Selecione uma conta"
+                                            value={formData.default_finance_account_id}
+                                            setValue={(val) => setFormData({ ...formData, default_finance_account_id: val })}
+                                            options={[
+                                                { value: "", label: "Nenhuma (não vincular)" },
+                                                ...financeAccounts.map(a => ({ value: a.id, label: a.name }))
+                                            ]}
+                                        />
                                     </div>
-                                </section>
+                                </FormSection>
 
-                                <hr className="border-brand-border dark:border-dark-border opacity-50" />
-
-                                {/* Specialized Card Settings */}
                                 {isCard && (
-                                    <section className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                            <CreditCardIcon className="w-5 h-5 text-brand-inactive-text" />
-                                            Detalhes do Cartão
-                                        </h3>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <FormSection title="Configurações do Cartão">
+                                        <div className="grid grid-cols-1 gap-6">
                                             {isCredit && (
                                                 <div className="space-y-4">
                                                     <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading">Parcelamento Máximo</label>
-                                                    <div className="grid grid-cols-4 gap-2">
+                                                    <div className="grid grid-cols-5 md:grid-cols-4 lg:grid-cols-5 gap-2">
                                                         {[1, 2, 3, 4, 6, 10, 12, 18, 24].map((n) => (
                                                             <Button
                                                                 key={n}
@@ -369,15 +382,14 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
 
                                             <div className="space-y-4">
                                                 <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading">Bandeiras Aceitas</label>
-                                                <div className="grid grid-cols-2 gap-2">
+                                                <div className="grid grid-cols-2 gap-3">
                                                     {AVAILABLE_BRANDS.map((brand) => (
                                                         <div
                                                             key={brand.id}
-                                                            className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer transition-all ${
-                                                                formData.card_brand?.includes(brand.id)
-                                                                    ? "bg-brand-green/10 border-brand-green text-brand-green"
-                                                                    : "bg-white dark:bg-dark-surface border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body"
-                                                            }`}
+                                                            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${formData.card_brand?.includes(brand.id)
+                                                                ? "bg-brand-green/10 border-brand-green text-brand-green"
+                                                                : "bg-white dark:bg-dark-surface border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body"
+                                                                }`}
                                                             onClick={() => {
                                                                 const current = formData.card_brand ? formData.card_brand.split(",") : []
                                                                 const next = current.includes(brand.id)
@@ -386,7 +398,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                                                                 setFormData({ ...formData, card_brand: next.join(",") || null })
                                                             }}
                                                         >
-                                                            <Checkbox checked={!!formData.card_brand?.includes(brand.id)} onChange={() => {}} />
+                                                            <Checkbox checked={!!formData.card_brand?.includes(brand.id)} onChange={() => { }} />
                                                             <img src={brand.image} alt={brand.name} className="w-4 h-4 object-contain opacity-80" />
                                                             <span className="text-sm font-medium">{brand.name}</span>
                                                         </div>
@@ -394,17 +406,11 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                                                 </div>
                                             </div>
                                         </div>
-                                    </section>
+                                    </FormSection>
                                 )}
 
-                                {/* Specialized PIX Settings */}
                                 {isPix && (
-                                    <section className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                            <MoneyIcon className="w-5 h-5 text-brand-inactive-text" />
-                                            Configuração de Chave PIX
-                                        </h3>
-
+                                    <FormSection title="Configuração de Chave PIX">
                                         <div className="space-y-6">
                                             <div className="bg-brand-gray/30 dark:bg-dark-surface/50 p-4 rounded-2xl border border-brand-border dark:border-dark-border flex items-center justify-between">
                                                 <div>
@@ -418,10 +424,10 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                                             </div>
 
                                             {!formData.use_partner_pix_data && (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                <div className="grid grid-cols-1 gap-8">
                                                     <div>
                                                         <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">Tipo de Chave</label>
-                                                        <div className="grid grid-cols-1 gap-3">
+                                                        <div className="grid grid-cols-2 gap-3">
                                                             {PIX_KEY_TYPES.map((type) => (
                                                                 <RadioButton
                                                                     key={type.id}
@@ -477,17 +483,14 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                                                 </div>
                                             )}
                                         </div>
-                                    </section>
+                                    </FormSection>
                                 )}
                             </div>
 
-                            {/* Right Column: Cards */}
-                            <div className="lg:col-span-4 space-y-6">
-                                <SidebarCard title="Taxas e Custos" className="relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 p-4 opacity-10">
-                                        <SaveIcon className="w-12 h-12" />
-                                    </div>
-                                    <div className="space-y-5">
+                            {/* Right Column */}
+                            <div className="space-y-10">
+                                <FormSection title="Taxas e Custos">
+                                    <div className="grid grid-cols-1 gap-6">
                                         <Input
                                             label="Taxa Administrativa (%)"
                                             type="number"
@@ -509,20 +512,18 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                                             onChange={(e) => setFormData({ ...formData, discount_percent: Number(e.target.value) })}
                                             suffix="%"
                                         />
-                                        <div className="pt-2">
-                                            <p className="text-[11px] text-brand-inactive-text leading-relaxed">
-                                                Essas taxas são usadas para calcular automaticamente o valor líquido a receber em cada venda.
-                                            </p>
-                                        </div>
+                                        <p className="text-[11px] text-brand-inactive-text leading-relaxed bg-brand-gray/20 dark:bg-dark-border/20 p-3 rounded-xl">
+                                            Essas taxas são usadas para calcular automaticamente o valor líquido a receber em cada venda efetuada por este método.
+                                        </p>
                                     </div>
-                                </SidebarCard>
+                                </FormSection>
 
-                                <SidebarCard title="Preferências">
+                                <FormSection title="Preferências e Visibilidade">
                                     <div className="space-y-4">
-                                        <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray/10 dark:bg-dark-background/40 border border-brand-border dark:border-dark-border">
+                                        <div className="flex items-center justify-between p-4 rounded-xl bg-brand-gray/10 dark:bg-dark-background/40 border border-brand-border dark:border-dark-border">
                                             <div>
                                                 <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Ativo</p>
-                                                <p className="text-[11px] text-brand-inactive-text">Visível para seleção</p>
+                                                <p className="text-[11px] text-brand-inactive-text">Disponível para seleção nas vendas</p>
                                             </div>
                                             <Checkbox
                                                 checked={formData.is_active}
@@ -530,10 +531,10 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                                             />
                                         </div>
 
-                                        <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray/10 dark:bg-dark-background/40 border border-brand-border dark:border-dark-border">
+                                        <div className="flex items-center justify-between p-4 rounded-xl bg-brand-gray/10 dark:bg-dark-background/40 border border-brand-border dark:border-dark-border">
                                             <div>
                                                 <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Padrão Online</p>
-                                                <p className="text-[11px] text-brand-inactive-text">Selecionado na vitrine</p>
+                                                <p className="text-[11px] text-brand-inactive-text">Pré-selecionado na vitrine do marketplace</p>
                                             </div>
                                             <Checkbox
                                                 checked={formData.is_online_default}
@@ -541,12 +542,12 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                                             />
                                         </div>
                                     </div>
-                                </SidebarCard>
-                                
-                                <div className="hidden lg:block">
+                                </FormSection>
+
+                                <div className="hidden md:block pt-6">
                                     <Button onClick={handleSubmit} className="w-full h-12" disabled={isLoading}>
                                         <SaveIcon className="w-5 h-5 mr-2" />
-                                        {isLoading ? "Salvando..." : "Salvar Alterações"}
+                                        {isLoading ? "Salvando..." : editingMethod ? "Salvar Alterações" : "Criar Método"}
                                     </Button>
                                 </div>
                             </div>

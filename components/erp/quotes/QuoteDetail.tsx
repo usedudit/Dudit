@@ -90,6 +90,8 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
     const debouncedRefresh = useDebouncedRefresh();
     const { setHeaderOverride } = useSidebar();
 
+    const handleBack = useCallback(() => onBack(), [onBack]);
+
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) {
             setIsScrolled(scrollContainerRef.current.scrollTop > 5);
@@ -98,11 +100,11 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
 
     useEffect(() => {
         if (initialQuote && initialQuote.items) {
-             setQuote(initialQuote);
-             setPendingStatus(initialQuote.status || 'draft');
-             setLoading(false);
-             setIsLoadingQuoteItems(false);
-             return;
+            setQuote(initialQuote);
+            setPendingStatus(initialQuote.status || 'draft');
+            setLoading(false);
+            setIsLoadingQuoteItems(false);
+            return;
         }
         async function load() {
             setIsLoadingQuoteItems(true);
@@ -304,7 +306,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                         <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
                             {/* Back button - desktop only */}
                             <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                     <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                 </Button>
                             </div>

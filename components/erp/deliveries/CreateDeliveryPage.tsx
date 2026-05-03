@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useMemo, useRef, useState, useCallback } from "react"
 import { AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
 
@@ -102,6 +102,8 @@ export default function CreateDeliveryPage({
     const [notes, setNotes] = useState("")
     const [isSaving, setIsSaving] = useState(false)
     const [isOrderSearchOpen, setIsOrderSearchOpen] = useState(false)
+
+    const handleBack = useCallback(() => onBack(), [onBack])
     const searchRef = useRef<HTMLDivElement>(null)
     const [deliveryPeople, setDeliveryPeople] = useState<DeliveryPerson[]>([])
 
@@ -167,7 +169,7 @@ export default function CreateDeliveryPage({
                     <div className="relative mx-auto max-w-[1300px] px-4 md:px-6 md:pt-4">
                         <div className="hidden items-start justify-between md:flex">
                             <div className="flex items-start gap-3">
-                                <Button variant="filled" onClick={onBack} className="h-10 w-10 p-0">
+                                <Button variant="filled" onClick={handleBack} className="h-10 w-10 p-0">
                                     <ChevronLeftIcon className="h-5 w-5" />
                                 </Button>
                                 <div>
@@ -181,7 +183,7 @@ export default function CreateDeliveryPage({
                             </div>
 
                             <div className="hidden items-center gap-3 md:flex">
-                                <Button variant="outline" onClick={onBack} disabled={isSaving}>
+                                <Button variant="outline" onClick={handleBack} disabled={isSaving}>
                                     Cancelar
                                 </Button>
                                 <Button onClick={handleSave} disabled={isSaving || !selectedOrder || !date || !time}>
@@ -531,7 +533,7 @@ export default function CreateDeliveryPage({
             </Tabs>
 
             <div className="fixed bottom-0 left-0 right-0 z-40 flex gap-3 border-t border-gray-200 bg-white px-4 py-3 dark:border-dark-border dark:bg-dark-surface md:hidden">
-                <Button variant="outline" onClick={onBack} disabled={isSaving} className="h-[48px] flex-1">
+                <Button variant="outline" onClick={handleBack} disabled={isSaving} className="h-[48px] flex-1">
                     Cancelar
                 </Button>
                 <Button onClick={handleSave} disabled={isSaving || !selectedOrder || !date || !time} className="h-[48px] flex-1">

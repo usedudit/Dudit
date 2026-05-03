@@ -35,7 +35,6 @@ import {
     type AppointmentInput
 } from '@/app/actions/erp/appointments';
 import { getUnavailableTypesAction } from '@/app/actions/erp/unavailable-types';
-import { fetchPartnerCustomersBucket, fetchPartnerTeamMembersBucket, fetchPartnerServicesBucket } from '@/app/actions/erp/client-loaders';
 import { FadeIn } from '@/components/animations/FadeIn';
 import FilterSheet from '@/components/reusable/FilterSheet';
 import AppointmentsPageControls from './AppointmentsPageControls';
@@ -68,7 +67,19 @@ function computeVisibleDateRange(date: Date, view: ViewType): { startDate: strin
     return { startDate: formatDateStr(gridStart), endDate: formatDateStr(gridEnd) };
 }
 
-const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }) => {
+const AppointmentsPage = ({
+    partnerId: initialPartnerId,
+    initialTeam = [],
+    initialCustomers = [],
+    initialServices = [],
+    initialUnavailableTypes = [],
+}: {
+    partnerId: string;
+    initialTeam?: Array<{ id: string; name: string; role: string }>;
+    initialCustomers?: Array<{ id: string; name: string; email?: string }>;
+    initialServices?: Array<{ id: string; name: string; price: number; duration: string; bufferMinutes: number; category: string; billingUnit: string }>;
+    initialUnavailableTypes?: any[];
+}) => {
     const APPOINTMENT_COLUMNS = useMemo<Array<{
         id: string;
         label: string;
@@ -91,10 +102,16 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
     const itemsPerPage = 8;
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
-    const [realStaffMembers, setRealStaffMembers] = useState<StaffMember[]>([]);
-    const [realClients, setRealClients] = useState<any[]>([]);
-    const [realServices, setRealServices] = useState<any[]>([]);
-    const [realUnavailableTypes, setRealUnavailableTypes] = useState<any[]>([]);
+    const [realStaffMembers, setRealStaffMembers] = useState<StaffMember[]>(() =>
+        initialTeam.map(m => ({ id: m.id, name: m.name, role: m.role }))
+    );
+    const [realClients, setRealClients] = useState<any[]>(() =>
+        initialCustomers.map(c => ({ id: c.id, name: c.name, email: c.email }))
+    );
+    const [realServices, setRealServices] = useState<any[]>(() =>
+        initialServices.map(s => ({ id: s.id, name: s.name, price: s.price, duration: s.duration, category: s.category, bufferMinutes: s.bufferMinutes, billingUnit: s.billingUnit }))
+    );
+    const [realUnavailableTypes, setRealUnavailableTypes] = useState<any[]>(initialUnavailableTypes);
     const [partnerId, setPartnerId] = useState<string>(initialPartnerId || '');
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [appointmentFilters, setAppointmentFilters] = useState<{ teamIds: string[] }>({ teamIds: [] });
@@ -143,53 +160,13 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
         recurrence: (row.recurrence as any) || 'none'
     }), []);
 
-    // -- Load staff + clients + services on mount (once) --
-    const loadCatalogs = useCallback(async () => {
-        const [teamRes, clientsRes, servicesRes, unavailRes] = await Promise.all([
-            fetchPartnerTeamMembersBucket(),
-            fetchPartnerCustomersBucket(),
-            fetchPartnerServicesBucket(),
-            getUnavailableTypesAction(partnerId),
-        ]);
-
-
-
-        if (teamRes?.length) {
-            setRealStaffMembers(teamRes.map((member) => ({
-                id: String(member.id),
-                name: member.fullName || member.email || 'Sem nome',
-                role: member.role
-            })));
-        }
-
-        if (clientsRes?.length) {
-            setRealClients(clientsRes.map((client) => ({
-                id: client.id,
-                name: client.name,
-                email: client.email || undefined,
-            })));
-        }
-
-        if (servicesRes?.length) {
-            setRealServices(servicesRes.map((svc) => ({
-                id: svc.id,
-                name: svc.name,
-                price: svc.price,
-                duration: String(svc.duration),
-                category: svc.category || 'Serviços',
-                bufferMinutes: svc.bufferMinutes,
-                billingUnit: svc.billingUnit,
-            })));
-        }
-
+    // Catalogs come from SSR props — only refresh unavailable types when needed
+    const refreshUnavailableTypes = useCallback(async () => {
+        const unavailRes = await getUnavailableTypesAction(partnerId);
         if (unavailRes?.success) {
             setRealUnavailableTypes(unavailRes.data || []);
         }
     }, [partnerId]);
-
-    useEffect(() => {
-        loadCatalogs();
-    }, [loadCatalogs]);
 
     // -- Group services by category for AppointmentSheet --
     const groupedServices = useMemo(() => {
@@ -307,10 +284,20 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
             }
             setIsLoadingAppointments(false);
 
-            // 3. Prefetch adjacent ranges (fire-and-forget)
-            const { prev, next } = getAdjacentRanges(currentDate, calendarView);
-            fetchRange(prev.startDate, prev.endDate);
-            fetchRange(next.startDate, next.endDate);
+            // 3. Prefetch adjacent ranges with delay (don't compete with initial load)
+            if (typeof window !== 'undefined') {
+                const prefetchFn = () => {
+                    if (fetchAbortRef.current !== fetchId) return;
+                    const { prev, next } = getAdjacentRanges(currentDate, calendarView);
+                    fetchRange(prev.startDate, prev.endDate);
+                    fetchRange(next.startDate, next.endDate);
+                };
+                if ('requestIdleCallback' in window) {
+                    (window as any).requestIdleCallback(prefetchFn, { timeout: 3000 });
+                } else {
+                    setTimeout(prefetchFn, 2000);
+                }
+            }
         };
 
         revalidate();
@@ -338,7 +325,7 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
         }
     };
 
-    const handleOpenView = async (appointment: Appointment) => {
+    const handleOpenView = (appointment: Appointment) => {
         if (isSelectionMode) return;
 
         // Redirect to Unavailable Sheet if it's an unavailable slot
@@ -348,13 +335,21 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
             return;
         }
 
-        const historyRes = await getAppointmentHistoryAction(appointment.id);
-        const enrichedAppointment = historyRes.success
-            ? { ...appointment, activityLog: historyRes.history }
-            : appointment;
+        // Open sheet INSTANTLY — never block the UI
         setSheetMode('view');
-        setSelectedAppointment(enrichedAppointment);
+        setSelectedAppointment(appointment);
         setIsSheetOpen(true);
+
+        // Load history in background (enriches the sheet after it's already visible)
+        getAppointmentHistoryAction(appointment.id).then((historyRes) => {
+            if (historyRes.success) {
+                setSelectedAppointment(prev =>
+                    prev && prev.id === appointment.id
+                        ? { ...prev, activityLog: historyRes.history }
+                        : prev
+                );
+            }
+        });
     };
 
     const handleDeleteUnavailable = async (appointmentId: string, deleteAll: boolean, category: string) => {
@@ -956,15 +951,24 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
                                 defaultDate={currentDate}
                                 unavailableTypes={unavailableTypes}
                                 partnerId={partnerId}
-                                onRefreshServices={loadCatalogs}
+                                onRefreshServices={refreshUnavailableTypes}
                                 onSave={async (item) => {
                                     setIsSaving(true);
                                     try {
-                                        const staff = realStaffMembers.find((s) => s.id === item.staffId) || realStaffMembers[0];
-                                        if (!staff) return;
+                                        // Resolve ALL selected staff members (fixes bug: was only using staffIds[0])
+                                        const staffIds: string[] = item.staffIds?.length ? item.staffIds : (item.staffId ? [item.staffId] : []);
+                                        const resolvedStaff = staffIds
+                                            .map((id: string) => realStaffMembers.find((s) => s.id === id))
+                                            .filter(Boolean) as typeof realStaffMembers;
 
-                                        // If editing, update instead of create (for simplicity, only single update for now or series logic)
+                                        if (resolvedStaff.length === 0 && realStaffMembers[0]) {
+                                            resolvedStaff.push(realStaffMembers[0]);
+                                        }
+                                        if (resolvedStaff.length === 0) return;
+
+                                        // If editing, update the single existing appointment
                                         if (selectedAppointment && selectedAppointment.id) {
+                                            const staff = resolvedStaff[0];
                                             const updateRes = await updateAppointmentAction(selectedAppointment.id, {
                                                 serviceName: item.title || item.type || 'Indisponível',
                                                 date: item.date,
@@ -984,42 +988,61 @@ const AppointmentsPage = ({ partnerId: initialPartnerId }: { partnerId: string }
                                                 setAppointments((prev) => prev.map((a) => a.id === mapped.id ? mapped : a));
                                             }
                                         } else {
-                                            const payloads: AppointmentInput[] = [];
-                                            const baseDate = new Date(item.date + 'T12:00:00'); 
-                                            const recurrenceGroupId = item.recurrence !== 'none' ? crypto.randomUUID() : null;
-
+                                            // --- Compute repeat count from recurrenceEnd options ---
                                             let repeatCount = 1;
-                                            if (item.recurrence === 'daily') repeatCount = 30; 
-                                            if (item.recurrence === 'weekly') repeatCount = 12; 
-
-                                            for (let i = 0; i < repeatCount; i++) {
-                                                const currentDate = new Date(baseDate);
-                                                if (item.recurrence === 'daily') {
-                                                    currentDate.setDate(baseDate.getDate() + i);
-                                                } else if (item.recurrence === 'weekly') {
-                                                    currentDate.setDate(baseDate.getDate() + (i * 7));
+                                            if (item.recurrence !== 'none') {
+                                                const endOpts = item.recurrenceEnd;
+                                                if (endOpts?.type === 'count' && endOpts.count) {
+                                                    repeatCount = Math.max(1, Math.min(365, Number(endOpts.count)));
+                                                } else if (endOpts?.type === 'date' && endOpts.date) {
+                                                    // Calculate occurrences until end date
+                                                    const startD = new Date(item.date + 'T12:00:00');
+                                                    const endD = new Date(endOpts.date + 'T12:00:00');
+                                                    const stepDays = item.recurrence === 'daily' ? 1 : 7;
+                                                    const diffMs = endD.getTime() - startD.getTime();
+                                                    const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+                                                    repeatCount = Math.min(365, Math.floor(diffDays / stepDays) + 1);
+                                                } else {
+                                                    // 'never' — use sensible defaults
+                                                    repeatCount = item.recurrence === 'daily' ? 30 : 12;
                                                 }
+                                            }
 
-                                                const dateStr = currentDate.toISOString().split('T')[0];
+                                            const baseDate = new Date(item.date + 'T12:00:00');
+                                            const recurrenceGroupId = item.recurrence !== 'none' ? crypto.randomUUID() : null;
+                                            const payloads: AppointmentInput[] = [];
 
-                                                payloads.push({
-                                                    customerName: 'Horário Indisponível',
-                                                    serviceName: item.title || item.type || 'Indisponível',
-                                                    date: dateStr,
-                                                    time: item.startTime,
-                                                    endDate: dateStr,
-                                                    endTime: item.endTime,
-                                                    duration: item.duration,
-                                                    staffId: staff.id,
-                                                    staffName: staff.name,
-                                                    price: 0,
-                                                    pricingUnit: 'Por Serviço',
-                                                    notes: item.description || null,
-                                                    status: 'Indisponível',
-                                                    source: 'unavailable',
-                                                    recurrenceGroupId: recurrenceGroupId,
-                                                    recurrenceRule: item.recurrence !== 'none' ? item.recurrence : null
-                                                });
+                                            // Generate payloads for EACH staff member × EACH recurrence date
+                                            for (const staff of resolvedStaff) {
+                                                for (let i = 0; i < repeatCount; i++) {
+                                                    const currentDate = new Date(baseDate);
+                                                    if (item.recurrence === 'daily') {
+                                                        currentDate.setDate(baseDate.getDate() + i);
+                                                    } else if (item.recurrence === 'weekly') {
+                                                        currentDate.setDate(baseDate.getDate() + (i * 7));
+                                                    }
+
+                                                    const dateStr = currentDate.toISOString().split('T')[0];
+
+                                                    payloads.push({
+                                                        customerName: 'Horário Indisponível',
+                                                        serviceName: item.title || item.type || 'Indisponível',
+                                                        date: dateStr,
+                                                        time: item.startTime,
+                                                        endDate: dateStr,
+                                                        endTime: item.endTime,
+                                                        duration: item.duration,
+                                                        staffId: staff.id,
+                                                        staffName: staff.name,
+                                                        price: 0,
+                                                        pricingUnit: 'Por Serviço',
+                                                        notes: item.description || null,
+                                                        status: 'Indisponível',
+                                                        source: 'unavailable',
+                                                        recurrenceGroupId: recurrenceGroupId,
+                                                        recurrenceRule: item.recurrence !== 'none' ? item.recurrence : null
+                                                    });
+                                                }
                                             }
 
                                             const createRes = await createAppointmentsAction(payloads);
