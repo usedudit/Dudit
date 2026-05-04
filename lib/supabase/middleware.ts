@@ -170,9 +170,13 @@ export async function middleware(request: NextRequest) {
         https://static.cloudflareinsights.com 
         https://*.cloudflare.com 
         https://accounts.google.com 
-        https://apis.google.com;
+        https://apis.google.com
+        https://dudit.com.br
+        https://www.dudit.com.br;
     connect-src 'self' data: blob: 
         https://*.supabase.co ${process.env.NEXT_PUBLIC_SUPABASE_URL || ''} 
+        https://dudit.com.br
+        https://www.dudit.com.br
         https://api.mercadopago.com 
         https://checkout.mercadopago.com
         https://*.mercadopago.com 

@@ -28,7 +28,9 @@ export const ListItem: React.FC<ListItemProps> = ({
     descriptionClassName = "",
     className = "",
 }) => {
-    const isComponent = typeof icon === "function"
+    const isComponent =
+        typeof icon === "function" ||
+        (typeof icon === "object" && icon !== null && !React.isValidElement(icon))
 
     return (
         <div
