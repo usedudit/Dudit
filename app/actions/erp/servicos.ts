@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireUser, requirePartnerAccessWithPermission, requireMinimumPlan } from "@/lib/auth/authorization"
+import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -35,7 +35,7 @@ export async function getERPServicesPageAction(
     | { success: false; error: string }
 > {
     try {
-        await requireMinimumPlan(partnerId, "crescer")
+        // await requireMinimumPlan(partnerId, "crescer")
         await requirePartnerAccessWithPermission(partnerId, "services", "view")
         const supabase = await getSupabaseServerClient()
 
@@ -85,7 +85,7 @@ export async function getServiceWithDetailsAction(serviceId: string) {
             .single()
 
         if (error || !service) throw new Error("Serviço não encontrado")
-        await requireMinimumPlan(service.partner_id, "crescer")
+        // await requireMinimumPlan(service.partner_id, "crescer")
         await requirePartnerAccessWithPermission(service.partner_id, "services", "view", user)
 
         return { success: true, product: service } // Returned as product to match products form logic
@@ -107,7 +107,7 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             else throw new Error("Acesso negado: ID do Parceiro não pôde ser resolvido.")
         }
 
-        await requireMinimumPlan(finalPartnerId, "crescer")
+        // await requireMinimumPlan(finalPartnerId, "crescer")
         await requirePartnerAccessWithPermission(finalPartnerId, "services", "create", user)
 
         let finalStoreId = data.storeId

@@ -3,7 +3,7 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { unstable_cache } from "next/cache"
 import { cache } from "react"
-import { requireUser, requirePartnerAccessWithPermission, requireMinimumPlan } from "@/lib/auth/authorization"
+import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generators"
 import {
@@ -63,8 +63,6 @@ const fetchProductAndVerifyOwnership = async (productId: string, requiredAction?
 
     if (error || !product) throw new Error("Produto não encontrado")
 
-    await requireMinimumPlan(product.partner_id, "crescer")
-
     if (requiredAction) {
         await requirePartnerAccessWithPermission(product.partner_id, "products", requiredAction, user)
     } else {
@@ -96,7 +94,7 @@ const verifyBatchOwnership = async (productIds: string[], resolvedUser?: any) =>
     const partnerId = data[0]?.partner_id
     if (!partnerId || data.some((p: any) => p.partner_id !== partnerId)) throw new Error("Produtos de parceiros diferentes")
 
-    await requireMinimumPlan(partnerId, "crescer")
+    // await requireMinimumPlan(partnerId, "crescer")
     await requirePartnerAccessWithPermission(partnerId, "products", "view", user)
 
     return { sanitized, partnerId, user }
@@ -1396,7 +1394,7 @@ export async function getERPProductsPageAction(
     | { success: false; error: string }
 > {
     try {
-        await requireMinimumPlan(partnerId, "crescer")
+        // await requireMinimumPlan(partnerId, "crescer")
         await requirePartnerAccessWithPermission(partnerId, "products", "view")
         const supabase = await getSupabaseServerClient()
 

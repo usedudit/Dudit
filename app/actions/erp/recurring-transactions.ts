@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccessWithPermission, requireMinimumPlan } from "@/lib/auth/authorization"
+import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -83,7 +83,7 @@ async function rpcFinancialNextRunDate(
 
 export async function getRecurringTransactionsAction(partnerId: string) {
   try {
-    await requireMinimumPlan(partnerId, "escalar")
+    // await requireMinimumPlan(partnerId, "escalar")
     await requirePartnerAccessWithPermission(partnerId, "financial", "view")
     const supabase = await getSupabaseServerClient()
     const { data, error } = await supabase
@@ -125,7 +125,7 @@ export async function createRecurringTransactionAction(input: {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-    await requireMinimumPlan(input.partnerId, "escalar")
+    // await requireMinimumPlan(input.partnerId, "escalar")
     await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
     const supabase = await getSupabaseServerClient()
 
