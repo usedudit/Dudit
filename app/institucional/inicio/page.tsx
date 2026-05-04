@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/reusable/Button';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
    ArrowRight,
