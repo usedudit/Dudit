@@ -45,7 +45,7 @@ export default function DeliveriesPage({
     deliveries: any[]
     initialNextCursor: ERPDeliveryListCursor | null
     initialHasMore: boolean
-    planGate?: { requiredPlanSlug: "vendedor"; message: string }
+    planGate?: { requiredPlanSlug: "crescer" | "escalar"; message: string }
 }) {
     const { openPlanUpgrade } = usePlanUpgrade()
     const [search, setSearch] = useState("")
@@ -246,8 +246,8 @@ export default function DeliveriesPage({
                                             }
                                             itemButton={
                                                 planGate ? {
-                                                    text: "Ver Plano Vender",
-                                                    action: () => openPlanUpgrade("vendedor"),
+                                                    text: "Ver Plano Crescer",
+                                                    action: () => openPlanUpgrade("crescer"),
                                                 } : undefined
                                             }
                                         />

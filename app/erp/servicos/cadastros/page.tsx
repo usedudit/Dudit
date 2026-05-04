@@ -32,8 +32,8 @@ export default async function Page() {
 
   const isFreePlan = plan.slug.toLowerCase() === "free"
   const planGate = isFreePlan ? {
-    requiredPlanSlug: "vendedor" as const,
-    message: "O acesso aos cadastros de categorias requer o plano Vendedor ou superior."
+    requiredPlanSlug: "crescer" as const,
+    message: "O acesso aos cadastros de categorias requer o plano Crescer ou superior."
   } : undefined
 
   return (

@@ -49,45 +49,42 @@ const PricingCards = () => {
          objective: "Pra testar e começar a aparecer",
          features: [
             "Vitrine digital pública",
-            "Produtos e serviços",
-            "Agendamentos",
-            "Orçamentos",
+            "Orçamentos e Agendamentos",
             "Pedidos via whatsapp",
-            "PDV",
+            "PDV básico",
             "Clientes",
          ],
          limits: [
-            "Até 15 itens",
+            "Até 15 itens no catálogo",
             "Até 2 imagens por item",
-            "Até 25 pedidos e agendamentos/mês",
-            "Até 5 orçamentos/mês",
+            "Até 25 pedidos/mês",
+            "Até 30 agendamentos/mês",
+            "Até 15 ordens de serviço/mês",
             "1 usuário"
          ],
          variant: "outline" as const,
          popular: false
       },
       {
-         name: "Vender",
+         name: "Crescer",
          price: "19,90",
          objective: "Pra vender de verdade",
          popular: true,
          features: [
-            "Tudo do Grátis +",
-            "Pagamento online (Mercado Pago)",
-            "Pedidos pelo sistema",
-            "Variantes de produtos",
-            "Cupons",
-            "Frete local configurável",
-            "Fornecedores",
-            "Importação XML",
+            "Tudo do Começar +",
+            "Pagamento online (MP)",
+            "Gestão de Produtos e Serviços",
             "Financeiro básico",
-            "Relatórios básicos"
+            "Taxa de entrega base",
+            "Variantes de produtos",
+            "Fornecedores e XML",
          ],
          limits: [
-            "Até 100 itens",
+            "Até 100 itens no catálogo",
             "Até 5 imagens por item",
-            "Até 150 pedidos e agendamentos/mês",
-            "Até 30 orçamentos/mês",
+            "Até 150 pedidos/mês",
+            "Até 150 agendamentos/mês",
+            "Até 100 ordens de serviço/mês",
             "Até 3 usuários"
          ],
          variant: "default" as const
@@ -97,20 +94,19 @@ const PricingCards = () => {
          price: "49,90",
          objective: "Pra organizar e escalar",
          features: [
-            "Tudo do Vendedor +",
-            "Gestão de entregas",
-            "Financeiro completo",
-            "Relatórios avançados",
-            "Ordem de serviço",
+            "Tudo do Crescer +",
+            "Logística avançada",
+            "Financeiro completo (DRE/Fluxo)",
+            "Recorrência de transações",
             "Kits de produtos",
-            "Campanhas promocionais"
+            "Relatórios avançados",
+            "Suporte prioritário"
          ],
          limits: [
-            "Itens ilimitados",
-            "Até 8 imagens por item",
-            "Pedidos ilimitados",
+            "Itens e Pedidos ilimitados",
+            "Até 15 imagens por item",
+            "Ordens de serviço ilimitadas",
             "Agendamentos ilimitados",
-            "Orçamentos ilimitados",
             "Até 10 usuários"
          ],
          variant: "outline" as const,
@@ -225,35 +221,38 @@ const ComparisonTable = () => {
       {
          title: "Produtos & Estoque",
          items: [
-            { name: "Cadastro de produtos", g: "check", v: "check", c: "check" },
-            { name: "Controle de estoque", g: "check", v: "check", c: "check" },
+            { name: "Catálogo de itens", g: "check", v: "check", c: "check" },
+            { name: "Gestão avançada", g: "x", v: "check", c: "check" },
             { name: "Variantes de produtos", g: "x", v: "check", c: "check" },
             { name: "Importação XML", g: "x", v: "check", c: "check" },
             { name: "Kits de produtos", g: "x", v: "x", c: "check" },
             { name: "Itens (produtos + serviços)", g: "15", v: "100", c: "Ilimitado" },
-            { name: "Imagens por item", g: "2", v: "5", c: "8" },
+            { name: "Imagens por item", g: "2", v: "5", c: "15" },
          ]
       },
       {
          title: "Serviços & Operações",
          items: [
-            { name: "Cadastro de serviços", g: "check", v: "check", c: "check" },
+            { name: "Catálogo de serviços", g: "check", v: "check", c: "check" },
             { name: "Agendamentos online", g: "check", v: "check", c: "check" },
-            { name: "Ordem de serviço", g: "x", v: "x", c: "check" },
-            { name: "Agendamentos/mês", g: "25", v: "150", c: "Ilimitado" },
+            { name: "Ordem de serviço", g: "check", v: "check", c: "check" },
+            { name: "Agendamentos/mês", g: "30", v: "150", c: "Ilimitado" },
+            { name: "Ordens de serviço/mês", g: "15", v: "100", c: "Ilimitado" },
          ]
       },
       {
          title: "Entrega & Logística",
          items: [
-            { name: "Frete local", g: "Manual", v: "Configurável", c: "Completo" },
-            { name: "Expedição e entregas", g: "x", v: "x", c: "check" },
+            { name: "Taxa fixa de entrega", g: "x", v: "check", c: "check" },
+            { name: "Cálculo por distância", g: "x", v: "x", c: "check" },
+            { name: "Regras por horário", g: "x", v: "x", c: "check" },
+            { name: "Expedição e logística", g: "x", v: "check", c: "check" },
          ]
       },
       {
          title: "Clientes & Comunicação",
          items: [
-            { name: "Clientes", g: "check", v: "check", c: "check" },
+            { name: "Gestão de Clientes", g: "check", v: "check", c: "check" },
             { name: "WhatsApp integrado", g: "check", v: "check", c: "check" },
             { name: "Vitrine pública", g: "check", v: "check", c: "check" },
          ]
@@ -269,9 +268,8 @@ const ComparisonTable = () => {
          title: "Financeiro & Gestão",
          items: [
             { name: "Financeiro básico", g: "x", v: "check", c: "check" },
-            { name: "Financeiro completo", g: "x", v: "x", c: "check" },
-            { name: "Fluxo de caixa", g: "x", v: "x", c: "check" },
-            { name: "DRE Simples", g: "x", v: "x", c: "check" },
+            { name: "DRE e Fluxo de caixa", g: "x", v: "x", c: "check" },
+            { name: "Recorrência de contas", g: "x", v: "x", c: "check" },
             { name: "Fornecedores", g: "x", v: "check", c: "check" },
          ]
       },
@@ -285,7 +283,7 @@ const ComparisonTable = () => {
       {
          title: "Equipe & Acessos",
          items: [
-            { name: "Usuários", g: "1", v: "3", c: "5" },
+            { name: "Usuários", g: "1", v: "3", c: "10" },
             { name: "Permissões de acesso", g: "x", v: "check", c: "check" },
          ]
       },
@@ -293,7 +291,7 @@ const ComparisonTable = () => {
          title: "Orçamentos",
          items: [
             { name: "Criação de orçamentos", g: "check", v: "check", c: "check" },
-            { name: "Orçamentos/mês", g: "5", v: "30", c: "Ilimitado" },
+            { name: "Orçamentos/mês", g: "10", v: "30", c: "Ilimitado" },
          ]
       }
    ];
@@ -327,15 +325,15 @@ const ComparisonTable = () => {
             {/* Mobile Header Row */}
             <div className="md:hidden grid grid-cols-3 gap-2 mb-6 bg-white sticky top-[80px] z-20 py-4 border-b border-brand-border">
                <div className="text-center px-1">
-                  <div className="font-bold text-[10px] text-brand-dark mb-1">Grátis</div>
-                  <button className="bg-brand-dark text-white text-[8px] w-full py-1.5 rounded-full font-medium">Começar</button>
+                  <div className="font-bold text-[10px] text-brand-dark mb-1">Começar</div>
+                  <button className="bg-brand-dark text-white text-[8px] w-full py-1.5 rounded-full font-medium">Grátis</button>
                </div>
                <div className="text-center px-1 bg-brand-green/5 rounded-t-lg">
-                  <div className="font-bold text-[10px] text-brand-green mb-1">Vendedor</div>
+                  <div className="font-bold text-[10px] text-brand-green mb-1">Crescer</div>
                   <button className="bg-brand-green text-white text-[8px] w-full py-1.5 rounded-full font-medium">Assinar</button>
                </div>
                <div className="text-center px-1">
-                  <div className="font-bold text-[10px] text-brand-dark mb-1">Comerciante</div>
+                  <div className="font-bold text-[10px] text-brand-dark mb-1">Escalar</div>
                   <button className="bg-white border border-brand-border text-brand-dark text-[8px] w-full py-1.5 rounded-full font-medium">Assinar</button>
                </div>
             </div>
@@ -344,18 +342,18 @@ const ComparisonTable = () => {
             <div className="hidden md:grid grid-cols-4 gap-4 mb-8 px-4">
                <div className="col-span-1"></div>
                <div className="bg-white p-6 border border-brand-border rounded-2xl text-left flex flex-col h-full">
-                  <h4 className="font-bold text-brand-dark mb-1">Grátis</h4>
+                  <h4 className="font-bold text-brand-dark mb-1">Começar</h4>
                   <p className="text-xs text-brand-inactive-text mb-4 flex-1">Ideal para começar</p>
                   <Button variant="outline" className="w-full py-2 text-sm mt-auto h-10">Começar Grátis</Button>
                </div>
                <div className="bg-white p-6 border border-brand-green/20 rounded-2xl text-left flex flex-col h-full relative overflow-hidden ring-1 ring-brand-green/10">
                   <div className="absolute top-0 right-0 bg-brand-green text-white text-[10px] px-2 py-0.5 rounded-bl">Popular</div>
-                  <h4 className="font-bold text-brand-dark mb-1">Vendedor</h4>
+                  <h4 className="font-bold text-brand-dark mb-1">Crescer</h4>
                   <p className="text-xs text-brand-inactive-text mb-4 flex-1">Para quem quer vender</p>
                   <Button variant="default" className="w-full py-2 text-sm mt-auto h-10 bg-brand-green text-white">Assinar Agora</Button>
                </div>
                <div className="bg-white p-6 border border-brand-border rounded-2xl text-left flex flex-col h-full">
-                  <h4 className="font-bold text-brand-dark mb-1">Comerciante</h4>
+                  <h4 className="font-bold text-brand-dark mb-1">Escalar</h4>
                   <p className="text-xs text-brand-inactive-text mb-4 flex-1">Operação estruturada</p>
                   <Button variant="outline" className="w-full py-2 text-sm mt-auto h-10">Assinar Agora</Button>
                </div>

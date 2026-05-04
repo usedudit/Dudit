@@ -4,6 +4,7 @@ import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { getPartnerPlan } from "@/lib/services/subscription.service"
 import {
   getTransactionsData,
   getCategoriesData,
@@ -23,13 +24,14 @@ export default async function FinancialTransactionsRoute() {
   const { allowed } = await checkPartnerPermission(partnerId, "financial", "view")
   if (!allowed) return <AccessDenied />
 
-  const [txResult, categoriesResult, accountsResult, recurringResult, recurringTemplatesResult, paymentMethodsResult] = await Promise.all([
+  const [txResult, categoriesResult, accountsResult, recurringResult, recurringTemplatesResult, paymentMethodsResult, plan] = await Promise.all([
     getTransactionsData(partnerId),
     getCategoriesData(partnerId),
     getAccountsData(partnerId),
     getRecurringOccurrencesData(partnerId),
     getRecurringTemplatesData(partnerId),
     getPaymentMethodsData(partnerId),
+    getPartnerPlan(partnerId),
   ])
 
   if (!txResult.success) {
@@ -41,6 +43,12 @@ export default async function FinancialTransactionsRoute() {
   const recurringOccurrences = recurringResult.success ? recurringResult.data : []
   const recurringTemplates = recurringTemplatesResult?.success ? recurringTemplatesResult.data : []
   const paymentMethods = paymentMethodsResult?.methods || []
+
+  const isFreePlan = plan.slug.toLowerCase() === "free"
+  const planGate = isFreePlan ? { 
+    requiredPlanSlug: "crescer" as const, 
+    message: "O acesso ao módulo financeiro completo requer o plano Crescer ou superior." 
+  } : undefined
 
   return (
     <>
@@ -56,6 +64,7 @@ export default async function FinancialTransactionsRoute() {
           recurringOccurrences={recurringOccurrences}
           recurringTemplates={recurringTemplates as any}
           paymentMethods={paymentMethods as any}
+          planGate={planGate}
         />
       </FadeIn>
     </>

@@ -54,6 +54,8 @@ export interface UsageCounters {
   orders_month_reset: string | null
   appointments_month_count: number
   appointments_month_reset: string | null
+  service_orders_month_count: number
+  service_orders_month_reset: string | null
 }
 
 export interface LimitCheckResult {
@@ -122,11 +124,11 @@ async function getFreePlan(): Promise<Plan> {
     console.error("[SUBSCRIPTION] Free plan not found in database, using emergency fallback")
     return {
       id: "00000000-0000-0000-0000-000000000000",
-      name: "Free",
+      name: "Começar",
       slug: "free",
       price: 0,
-      limits_json: { products: 5, images_per_product: 2, total_images: 10, users: 1, quotes_per_month: 3 },
-      features_json: ["public_storefront", "technical_specs", "qr_code_profile", "whatsapp_orders", "whatsapp_bookings"],
+      limits_json: { products: 15, images_per_product: 2, total_images: 30, users: 1, quotes_per_month: 10, orders_per_month: 25, appointments_per_month: 30, service_orders: 15 },
+      features_json: ["public_storefront", "technical_specs", "pdv_basic", "whatsapp_orders", "whatsapp_bookings", "qr_code_profile"],
       sort_order: 0,
       is_active: true,
     }
@@ -362,6 +364,7 @@ const LIMIT_TO_COUNTER_MAP: Record<string, keyof UsageCounters> = {
   quotes_per_month: "quotes_month_count",
   orders_per_month: "orders_month_count",
   appointments_per_month: "appointments_month_count",
+  service_orders: "service_orders_month_count",
 }
 
 /**

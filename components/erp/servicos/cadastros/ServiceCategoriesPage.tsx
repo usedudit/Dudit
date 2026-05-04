@@ -31,7 +31,7 @@ interface ServiceCategoriesPageProps {
         categories: any[]
     }
     partnerId: string
-    planGate?: { requiredPlanSlug: "vendedor"; message: string }
+    planGate?: { requiredPlanSlug: "crescer" | "escalar"; message: string }
 }
 
 export default function ServiceCategoriesPage({ initialMetadata, partnerId, planGate }: ServiceCategoriesPageProps) {
@@ -290,8 +290,8 @@ export default function ServiceCategoriesPage({ initialMetadata, partnerId, plan
                                     }
                                     itemButton={
                                         planGate ? {
-                                            text: "Ver Plano Vender",
-                                            action: () => openPlanUpgrade("vendedor"),
+                                            text: "Ver Plano Crescer",
+                                            action: () => openPlanUpgrade("crescer"),
                                         } : undefined
                                     }
                                 />

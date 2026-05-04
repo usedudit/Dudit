@@ -134,11 +134,17 @@ const navItems: NavItem[] = [
     },
 ]
 
-const PLAN_GATED_MINIMUM: Record<string, "vendedor"> = {
-    "/erp/logistics": "vendedor",
-    "/erp/products/cadastros": "vendedor",
-    "/erp/servicos/categorias": "vendedor",
-    "/erp/financial/cadastros-financeiro": "vendedor",
+const PLAN_GATED_MINIMUM: Record<string, "crescer" | "escalar"> = {
+    "/erp/logistics": "crescer",
+    "/erp/products": "crescer",
+    "/erp/products/cadastros": "crescer",
+    "/erp/stock-movements": "crescer",
+    "/erp/financial/transactions": "crescer",
+    "/erp/financial/cadastros-financeiro": "crescer",
+    "/erp/cash-register": "crescer",
+    "/erp/servicos": "crescer",
+    "/erp/servicos/cadastros": "crescer",
+    "/erp/agendamentos": "crescer",
 }
 
 function ErpPlanGatedNavItem({

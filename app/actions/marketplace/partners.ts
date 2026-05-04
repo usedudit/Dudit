@@ -648,7 +648,7 @@ export async function registerPartner(data: any) {
       )
     }
 
-    revalidateTag(TAGS.userAccess(userId))
+    revalidateTag(TAGS.userAccess(userId), "max")
     revalidatePath("/erp")
 
     return { success: true, partnerId: newPartner.id }

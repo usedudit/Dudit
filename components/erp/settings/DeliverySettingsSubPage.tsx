@@ -29,7 +29,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
   const handleBack = useCallback(() => onBack(), [onBack])
 
   const isFree = planSlug === "free"
-  const isVendedor = planSlug === "vendedor"
+  const isCrescer = planSlug === "crescer"
 
   async function reload() {
     setLoading(true)
@@ -52,8 +52,8 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
   useEffect(() => { void reload() }, [partnerId])
 
   const upgradeHint = useMemo(
-    () => isVendedor ? "Desbloqueie cálculo por distância e horários com o plano Crescer" : null,
-    [isVendedor]
+    () => isCrescer ? "Desbloqueie cálculo por distância e horários com o plano Escalar" : null,
+    [isCrescer]
   )
 
   if (loading) return <FadeIn className="p-6">Carregando configurações de entrega...</FadeIn>
@@ -93,8 +93,8 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
       </div>
 
       <div className="max-w-[1300px] mx-auto w-full px-4 md:px-6 py-6 overflow-y-auto space-y-6">
-        {isFree && <InfoCard color="yellow" title="Plano Free" message="O recurso de entrega está indisponível neste plano." />}
-        {upgradeHint && <InfoCard color="blue" title="Disponível no plano Crescer" message={`${upgradeHint} - Faça upgrade em Assinatura.`} />}
+        {isFree && <InfoCard color="yellow" title="Plano Começar" message="O recurso de entrega está indisponível neste plano." />}
+        {upgradeHint && <InfoCard color="blue" title="Disponível no plano Escalar" message={`${upgradeHint} - Faça upgrade em Assinatura.`} />}
 
         <div className="rounded-2xl border border-brand-border p-5 dark:border-dark-border">
           <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-3">Taxa base</h3>
@@ -103,7 +103,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
 
         <div className="rounded-2xl border border-brand-border p-5 dark:border-dark-border">
           <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-3">Distância</h3>
-          {!advancedEnabled && <p className="text-sm text-brand-inactive-text mb-3">Disponível no plano Crescer</p>}
+          {!advancedEnabled && <p className="text-sm text-brand-inactive-text mb-3">Disponível no plano Escalar</p>}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Input disabled={!advancedEnabled} label="KM incluído" value={settings.includedKm} onChange={(e) => setSettings((s) => ({ ...s, includedKm: e.target.value }))} />
             <Input disabled={!advancedEnabled} label="Preço por KM extra" value={settings.extraKmPrice} onChange={(e) => setSettings((s) => ({ ...s, extraKmPrice: e.target.value }))} />
@@ -113,7 +113,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
 
         <div className="rounded-2xl border border-brand-border p-5 dark:border-dark-border">
           <h3 className="font-bold text-brand-dark dark:text-dark-heading mb-3">Regras por horário</h3>
-          {!advancedEnabled && <p className="text-sm text-brand-inactive-text">Disponível no plano Crescer</p>}
+          {!advancedEnabled && <p className="text-sm text-brand-inactive-text">Disponível no plano Escalar</p>}
           {advancedEnabled && (
             <div className="space-y-3">
               {rules.map((rule) => (

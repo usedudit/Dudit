@@ -41,6 +41,7 @@ import { settleInstallmentGroupAction } from "@/app/actions/erp/transactions"
 import { getFinancialTransactionsAction, getTransactionDetailsAction, type TransactionDetailPayload } from "@/app/actions/erp/transactions"
 import { cancelPendingTransactionAction } from "@/app/actions/erp/transactions"
 import { getPaymentMethodsAction } from "@/app/actions/erp/payment-methods"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 
 import { useNotification } from "@/hooks/use-notification"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
@@ -141,6 +142,7 @@ export default function TransactionsPage({
     recurringOccurrences = [],
     recurringTemplates = [],
     paymentMethods = [],
+    planGate,
 }: {
     initialItems: ERPTransaction[]
     initialNextCursor: FinancialTransactionCursor | null
@@ -151,7 +153,9 @@ export default function TransactionsPage({
     recurringOccurrences?: RecurringOccurrence[]
     recurringTemplates?: any[]
     paymentMethods?: any[]
+    planGate?: { requiredPlanSlug: "crescer" | "escalar"; message: string }
 }) {
+    const { openPlanUpgrade } = usePlanUpgrade()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
@@ -1213,7 +1217,7 @@ export default function TransactionsPage({
                             <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
                         </Button>
 
-                        <Button onClick={() => openEntity("create")}>
+                        <Button onClick={() => openEntity("create")} disabled={!!planGate}>
                             <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
                             Nova Transação
                         </Button>
@@ -1226,12 +1230,13 @@ export default function TransactionsPage({
                     search={search}
                     onSearchChange={setSearch}
                     onOpenFilter={() => setModals((prev) => ({ ...prev, filter: true }))}
-                    onAddTransaction={() => openEntity("create")}
+                    onAddTransaction={!planGate ? () => openEntity("create") : undefined}
                     filters={filters}
                     setFilters={setFilters}
                     viewMode={viewMode}
                     onViewModeChange={setViewModeState}
                     hasActiveFilters={hasActiveFilters}
+                    addDisabled={!!planGate}
                 />
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
@@ -1243,11 +1248,14 @@ export default function TransactionsPage({
                             >
                                 <IconPlaceholder
                                     placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/Transacoes.png"
-                                    imageAlt="Sem transações"
-                                    title="Você ainda não tem transações"
-                                    subtitle="As movimentações financeiras vão aparecer aqui assim que forem cadastradas."
-                                    itemButton={{
+                                    imageSrc={planGate ? "https://img.dudit.com.br/static/mascots/PlanoVender.png" : "https://img.dudit.com.br/static/mascots/Transacoes.png"}
+                                    imageAlt={planGate ? "Plano necessário" : "Sem transações"}
+                                    title={planGate ? "Plano necessário" : "Você ainda não tem transações"}
+                                    subtitle={planGate ? planGate.message : "As movimentações financeiras vão aparecer aqui assim que forem cadastradas."}
+                                    itemButton={planGate ? {
+                                        text: "Ver Plano Crescer",
+                                        action: () => openPlanUpgrade("crescer")
+                                    } : {
                                         text: "Adicionar Primeira Transação",
                                         action: () => openEntity("create")
                                     }}

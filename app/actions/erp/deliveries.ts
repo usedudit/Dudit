@@ -94,7 +94,7 @@ async function getPartnerUserNameByIdMap(
 function resolveDeliveryLimitByPlanSlug(slug: string) {
   const normalized = String(slug || "").toLowerCase()
   if (normalized === "free") return { blocked: true, maxOrders: 0 as const }
-  if (normalized === "vendedor") return { blocked: false, maxOrders: 1 as const }
+  if (normalized === "crescer") return { blocked: false, maxOrders: 1 as const }
   return { blocked: false, maxOrders: Number.MAX_SAFE_INTEGER }
 }
 
@@ -416,7 +416,7 @@ export async function getERPDeliveriesPageAction(
     items: any[]
     nextCursor: ERPDeliveryListCursor | null
     hasMore: boolean
-    planGate?: { requiredPlanSlug: "vendedor"; message: string }
+    planGate?: { requiredPlanSlug: "crescer" | "escalar"; message: string }
   }
   | { success: false; error: string }
 > {
@@ -433,7 +433,7 @@ export async function getERPDeliveriesPageAction(
           items: [],
           nextCursor: null,
           hasMore: false,
-          planGate: { requiredPlanSlug: "vendedor", message: planCheck.error },
+          planGate: { requiredPlanSlug: "crescer", message: planCheck.error },
         }
       }
       return { success: false, error: planCheck.error }

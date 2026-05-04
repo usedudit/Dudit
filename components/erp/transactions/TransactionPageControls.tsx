@@ -42,12 +42,13 @@ interface TransactionPageControlsProps {
     search: string
     onSearchChange: (value: string) => void
     onOpenFilter: () => void
-    onAddTransaction: () => void
+    onAddTransaction?: () => void
     filters: TransactionFilterState
     setFilters: React.Dispatch<React.SetStateAction<TransactionFilterState>>
     viewMode: "list" | "grid"
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
+    addDisabled?: boolean
 }
 
 const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
@@ -62,6 +63,7 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
     viewMode,
     onViewModeChange,
     hasActiveFilters,
+    addDisabled = false,
 }) => {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
@@ -174,7 +176,8 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
                         </Button>
                         <Button
                             onClick={onAddTransaction}
-                            className="w-[42px] h-[42px] p-0 flex items-center justify-center rounded-full bg-brand-green text-white shadow-sm shadow-brand-green/20"
+                            disabled={addDisabled}
+                            className={`w-[42px] h-[42px] p-0 flex items-center justify-center rounded-full bg-brand-green text-white shadow-sm shadow-brand-green/20 ${addDisabled ? "opacity-50 grayscale cursor-not-allowed" : ""}`}
                         >
                             <PlusIcon className="w-5 h-5" strokeWidth={3} />
                         </Button>

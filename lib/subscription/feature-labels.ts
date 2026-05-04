@@ -42,7 +42,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   invoice_integration: "Integração com NF-e",
 }
 
-export const TIER_SLUGS_ORDERED = ["free", "vendedor", "crescer", "profissional"] as const
+export const TIER_SLUGS_ORDERED = ["free", "crescer", "escalar", "profissional"] as const
 
 export function buildFeaturesDisplay(features: string[], tierSlug: string, allPlans: { slug: string; name: string; features_json?: string[] }[]): string[] {
   const tierIndex = TIER_SLUGS_ORDERED.indexOf(tierSlug as (typeof TIER_SLUGS_ORDERED)[number])
@@ -79,10 +79,10 @@ export const HARDCODED_PLANS: Record<string, { name: string; features: string[];
       "1 usuário",
     ],
   },
-  vendedor: {
-    name: "Vender",
+  crescer: {
+    name: "Crescer",
     features: [
-      "Tudo do Grátis +",
+      "Tudo do Começar +",
       "Pagamento online (Mercado Pago)",
       "Pedidos pelo sistema",
       "Variantes de produtos",
@@ -101,10 +101,10 @@ export const HARDCODED_PLANS: Record<string, { name: string; features: string[];
       "Até 3 usuários",
     ],
   },
-  crescer: {
+  escalar: {
     name: "Escalar",
     features: [
-      "Tudo do Vendedor +",
+      "Tudo do Crescer +",
       "Gestão de entregas",
       "Financeiro completo",
       "Relatórios avançados",

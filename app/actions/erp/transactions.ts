@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requirePartnerAccessWithPermission, requireMinimumPlan } from "@/lib/auth/authorization"
 import { createAdminClient } from "@/lib/supabase/server"
 import type { ERPTransaction, FinancialTransactionCursor, FinancialTransactionsPageSuccess } from "@/lib/services/transactions.types"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
@@ -643,6 +643,7 @@ export async function createManualTransactionAction(input: CreateManualTransacti
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
+        await requireMinimumPlan(input.partnerId, "crescer")
         const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
         const supabase = createAdminClient()
 
@@ -766,6 +767,7 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
+        await requireMinimumPlan(input.partnerId, "crescer")
         const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
         const supabase = createAdminClient()
 
@@ -1060,6 +1062,7 @@ export async function cancelPendingTransactionAction(input: {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
+        await requireMinimumPlan(input.partnerId, "crescer")
         const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
         const supabase = createAdminClient()
 

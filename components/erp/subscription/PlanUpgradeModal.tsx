@@ -28,17 +28,13 @@ const PlanUpgradeContext = createContext<PlanUpgradeContextValue | null>(null)
 
 const HERO_COPY: Record<UpgradeTarget, { title: string; kicker: string }> = {
   free: { title: "", kicker: "" },
-  vendedor: {
-    title: "Desbloqueie o Vendedor",
-    kicker: "Leve sua operação para o próximo nível",
-  },
   crescer: {
     title: "Desbloqueie o Crescer",
-    kicker: "Escala, logística e finanças avançadas",
+    kicker: "Leve sua operação para o próximo nível",
   },
-  profissional: {
-    title: "Desbloqueie o Profissional",
-    kicker: "Tudo que sua loja precisa para crescer sem teto",
+  escalar: {
+    title: "Desbloqueie o Escalar",
+    kicker: "Escala, logística e finanças avançadas",
   },
 }
 
@@ -134,8 +130,8 @@ function PlanUpgradeModalInner({
   if (!visible || !target || target === "free") return null
 
   const hero = HERO_COPY[target]
-  const mascot = PLAN_UPGRADE_MASCOTS[target as "vendedor" | "crescer"] || PLAN_UPGRADE_MASCOTS.vendedor
-  const isVendedorOrCrescer = target === "vendedor" || target === "crescer"
+  const mascot = PLAN_UPGRADE_MASCOTS[target as "crescer" | "escalar"] || PLAN_UPGRADE_MASCOTS.crescer
+  const isCrescerOrEscalar = target === "crescer" || target === "escalar"
 
   const leftPanel = (
     <div className="flex flex-col h-full bg-white dark:bg-dark-surface p-8 md:p-10 overflow-y-auto">
@@ -210,7 +206,7 @@ function PlanUpgradeModalInner({
         <p className="text-xs uppercase tracking-wider text-white/60 mb-2">{hero.kicker}</p>
         <h3 className="text-xl md:text-2xl font-bold leading-tight">{hero.title}</h3>
       </div>
-      {isVendedorOrCrescer && (
+      {isCrescerOrEscalar && (
         <div className="flex-1 flex items-center justify-center py-6 w-full max-w-[220px] md:max-w-[280px]">
           <img src={mascot} alt="" className="w-full h-auto object-contain drop-shadow-lg" />
         </div>
@@ -229,7 +225,7 @@ function PlanUpgradeModalInner({
               </button>
               <p className="text-[11px] uppercase tracking-wider text-white/60 mb-1">{hero.kicker}</p>
               <h3 className="text-lg font-bold text-center text-white">{hero.title}</h3>
-              {isVendedorOrCrescer && (
+              {isCrescerOrEscalar && (
                 <img src={mascot} alt="" className="w-40 h-auto object-contain mt-3" />
               )}
             </div>
@@ -320,9 +316,9 @@ export function usePlanUpgrade(): PlanUpgradeContextValue {
   return ctx
 }
 
-/** Star icon URL for sidebar / tabs (vendedor vs crescer). */
+/** Star icon URL for sidebar / tabs (crescer vs escalar). */
 export function planStarIconForTarget(target: UpgradeTarget): string | null {
-  if (target === "vendedor") return PLAN_UPGRADE_ICONS.vendedor
   if (target === "crescer") return PLAN_UPGRADE_ICONS.crescer
+  if (target === "escalar") return PLAN_UPGRADE_ICONS.escalar
   return null
 }

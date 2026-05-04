@@ -78,7 +78,7 @@ export default function CouponsPage({
     partnerId: string
     initialCoupons: CouponRow[]
     initialTotal: number
-    planGate?: { requiredPlanSlug: "vendedor"; message: string }
+    planGate?: { requiredPlanSlug: "crescer" | "escalar"; message: string }
 }) {
     const { toast } = useToast()
     const { openPlanUpgrade } = usePlanUpgrade()
@@ -670,8 +670,8 @@ export default function CouponsPage({
                                                     }
                                                     itemButton={
                                                         planGate ? {
-                                                            text: "Ver Plano Vender",
-                                                            action: () => openPlanUpgrade("vendedor"),
+                                                            text: "Ver Plano Crescer",
+                                                            action: () => openPlanUpgrade("crescer"),
                                                         } : (canCreateCoupons ? { text: "Criar cupom", action: openCreate } : undefined)
                                                     }
                                                 />

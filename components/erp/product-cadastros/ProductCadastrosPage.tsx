@@ -33,7 +33,7 @@ interface ProductCadastrosPageProps {
         locations: any[]
     }
     partnerId: string
-    planGate?: { requiredPlanSlug: "vendedor"; message: string }
+    planGate?: { requiredPlanSlug: "crescer" | "escalar"; message: string }
 }
 
 export default function ProductCadastrosPage({ initialMetadata, partnerId, planGate }: ProductCadastrosPageProps) {
@@ -312,8 +312,8 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId, planG
                                     }
                                     itemButton={
                                         planGate ? {
-                                            text: "Ver Plano Vender",
-                                            action: () => openPlanUpgrade("vendedor"),
+                                            text: "Ver Plano Crescer",
+                                            action: () => openPlanUpgrade("crescer"),
                                         } : undefined
                                     }
                                 />

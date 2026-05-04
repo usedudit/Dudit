@@ -512,7 +512,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                                 plans.map((plan) => {
                                     const isCurrent = subData?.plan?.id === plan.id
                                     const isDowngrade = plan.price < currentPlanPrice && currentPlanSlug !== "free"
-                                    const isPopular = plan.slug === "vendedor"
+                                    const isPopular = plan.slug === "crescer"
 
                                     return (
                                         <PlanCard

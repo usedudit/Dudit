@@ -51,7 +51,7 @@ interface FinancialCategoriesPageProps {
     }[]
     initialAccounts: FinanceAccountRow[]
     partnerId: string
-    planGate?: { requiredPlanSlug: "vendedor"; message: string }
+    planGate?: { requiredPlanSlug: "crescer" | "escalar"; message: string }
 }
 
 const ACCOUNT_TYPE_OPTIONS: { value: FinanceAccountType; label: string }[] = [
@@ -588,8 +588,8 @@ export default function FinancialCategoriesPage({
                                     }
                                     itemButton={
                                         planGate ? {
-                                            text: "Ver Plano Vender",
-                                            action: () => openPlanUpgrade("vendedor"),
+                                            text: "Ver Plano Crescer",
+                                            action: () => openPlanUpgrade("crescer"),
                                         } : undefined
                                     }
                                 />

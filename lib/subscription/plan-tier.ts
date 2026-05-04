@@ -1,5 +1,5 @@
 /** Ordered subscription tiers (lowest → highest). Keep aligned with `plans.slug` in DB. */
-export const PLAN_TIER_ORDER = ["free", "vendedor", "crescer", "profissional"] as const
+export const PLAN_TIER_ORDER = ["free", "crescer", "escalar"] as const
 
 export type PlanTierSlug = (typeof PLAN_TIER_ORDER)[number]
 
@@ -14,11 +14,11 @@ export function hasMinimumPlan(currentSlug: string, minimumSlug: PlanTierSlug): 
 }
 
 export const PLAN_UPGRADE_ICONS = {
-  vendedor: "https://img.dudit.com.br/static/icons/StarVender.png",
-  crescer: "https://img.dudit.com.br/static/icons/StarEscalar.png",
+  crescer: "https://img.dudit.com.br/static/icons/StarVender.png",
+  escalar: "https://img.dudit.com.br/static/icons/StarEscalar.png",
 } as const
 
 export const PLAN_UPGRADE_MASCOTS = {
-  vendedor: "https://img.dudit.com.br/static/mascots/PlanoVender.png",
-  crescer: "https://img.dudit.com.br/static/mascots/PlanoEscalar.png",
+  crescer: "https://img.dudit.com.br/static/mascots/PlanoVender.png",
+  escalar: "https://img.dudit.com.br/static/mascots/PlanoEscalar.png",
 } as const

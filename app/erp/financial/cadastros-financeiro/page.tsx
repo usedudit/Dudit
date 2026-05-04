@@ -33,8 +33,8 @@ export default async function FinancialCategoriesRoute() {
 
   const isFreePlan = plan.slug.toLowerCase() === "free"
   const planGate = isFreePlan ? { 
-    requiredPlanSlug: "vendedor" as const, 
-    message: "O acesso aos cadastros financeiros de categorias, contas e contatos requer o plano Vendedor ou superior." 
+    requiredPlanSlug: "crescer" as const, 
+    message: "O acesso aos cadastros financeiros de categorias, contas e contatos requer o plano Crescer ou superior." 
   } : undefined
 
   return (

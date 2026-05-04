@@ -32,8 +32,8 @@ export default async function CouponsRoute() {
 
   const isFreePlan = plan.slug.toLowerCase() === "free"
   const planGate = isFreePlan ? { 
-    requiredPlanSlug: "vendedor" as const, 
-    message: "O acesso aos cupons promocionais requer o plano Vendedor ou superior." 
+    requiredPlanSlug: "crescer" as const, 
+    message: "O acesso aos cupons promocionais requer o plano Crescer ou superior." 
   } : undefined
 
   return (

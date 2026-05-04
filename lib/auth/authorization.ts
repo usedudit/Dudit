@@ -759,3 +759,17 @@ export async function requirePartnerRouteAccess(
     permissions: access.permissions as PartnerPermissions,
   }
 }
+
+import { getPartnerPlan } from "@/lib/services/subscription.service"
+import { hasMinimumPlan, type PlanTierSlug } from "@/lib/subscription/plan-tier"
+
+/**
+ * Requires the partner to have a specific minimum plan.
+ * THROWS ForbiddenError if they are on a lower plan.
+ */
+export async function requireMinimumPlan(partnerId: string, minimumSlug: PlanTierSlug): Promise<void> {
+  const plan = await getPartnerPlan(partnerId)
+  if (!hasMinimumPlan(plan.slug, minimumSlug)) {
+    throw new ForbiddenError(`Esta funcionalidade requer o plano ${minimumSlug === "crescer" ? "Crescer" : "Escalar"}.`)
+  }
+}

@@ -101,7 +101,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
     const { setHeaderOverride } = useSidebar()
     const { businessInfo: contextBusinessInfo, planSlug } = usePermissions()
     const { openPlanUpgrade } = usePlanUpgrade()
-    const variantsPlanBlocked = !hasMinimumPlan(planSlug, "vendedor")
+    const variantsPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
 
     const businessInfo = useMemo(() => {
         let info = contextBusinessInfo
@@ -650,7 +650,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
     return (
         <FadeIn>
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
-                <Tabs value={activeTab} onValueChange={(v) => { if (v === "variations" && variantsPlanBlocked) { openPlanUpgrade("vendedor"); return } setActiveTab(v) }}
+                <Tabs value={activeTab} onValueChange={(v) => { if (v === "variations" && variantsPlanBlocked) { openPlanUpgrade("crescer"); return } setActiveTab(v) }}
                     className="flex flex-col h-full w-full">
                     <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
@@ -729,7 +729,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             <span className="inline-flex items-center gap-2">
                                                 Variações
                                                 {variantsPlanBlocked ? (
-                                                    <img src={planStarIconForTarget("vendedor")!} alt="" className="w-4 h-4 object-contain" />
+                                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
                                                 ) : null}
                                                 {getTabErrorCount("variations") > 0 && <span className="w-2 h-2 bg-red-500 rounded-full inline-block" />}
                                             </span>

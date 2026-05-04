@@ -299,14 +299,13 @@ const QuotePreview = ({
                                 )}
 
                                 {!page.hasTotals && <div className="mt-auto"></div>}
-
                             </div>
 
                             <div
                                 className="text-white/80 px-8 py-2 text-[10px] flex justify-end items-center absolute bottom-0 w-full h-[40px]"
                                 style={{ backgroundColor: primaryColor }}
                             >
-                                <span>Criado via Dudit - www.dudit.com.br</span>
+                                <span>Criado via Dudit - dudit.com.br</span>
                             </div>
                         </div>
                     ))}

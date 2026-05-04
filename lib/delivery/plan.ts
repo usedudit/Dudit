@@ -9,8 +9,12 @@ export function resolveDeliveryPlanCapability(planSlug: string): DeliveryPlanCap
   if (normalized === "free") {
     return { planSlug: normalized, deliveryEnabled: false, advancedEnabled: false }
   }
-  if (normalized === "vendedor") {
+  if (normalized === "crescer") {
     return { planSlug: normalized, deliveryEnabled: true, advancedEnabled: false }
   }
-  return { planSlug: normalized, deliveryEnabled: true, advancedEnabled: true }
+  if (normalized === "escalar") {
+    return { planSlug: normalized, deliveryEnabled: true, advancedEnabled: true }
+  }
+  // Default to free if unknown
+  return { planSlug: "free", deliveryEnabled: false, advancedEnabled: false }
 }
