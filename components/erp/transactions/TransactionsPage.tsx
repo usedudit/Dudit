@@ -1243,10 +1243,14 @@ export default function TransactionsPage({
                             >
                                 <IconPlaceholder
                                     placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
+                                    imageSrc="https://img.dudit.com.br/static/mascots/Transacoes.png"
                                     imageAlt="Sem transações"
                                     title="Você ainda não tem transações"
                                     subtitle="As movimentações financeiras vão aparecer aqui assim que forem cadastradas."
+                                    itemButton={{
+                                        text: "Adicionar Primeira Transação",
+                                        action: () => openEntity("create")
+                                    }}
                                 />
                             </FadeIn>
                         ) : paginatedTransactions.length === 0 ? (

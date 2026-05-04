@@ -95,7 +95,7 @@ export async function createPartnerAction(data: CreatePartnerData) {
       store_description: data.storeDescription || "",
       business_type: data.businessType,
       cnpj: cnpjClean,
-      cpf_encrypted: cpfEncrypted,
+      cpf: cpfEncrypted,
       opening_hours: data.openingHours || defaultOpeningHours,
       store_image_url: data.storeImageUrl,
       offering_type: data.offeringType,
@@ -260,13 +260,13 @@ export async function updatePartnerAction(
     if (data.cpf) {
       const { encryptCPF } = await import("@/lib/crypto")
       try {
-        updateData.cpf_encrypted = await encryptCPF(data.cpf)
+        updateData.cpf = await encryptCPF(data.cpf)
       } catch (error) {
         console.error("Error encrypting CPF:", error)
         return { error: "Erro ao criptografar CPF" }
       }
     } else {
-      updateData.cpf_encrypted = null
+      updateData.cpf = null
     }
   }
   if (data.openingHours !== undefined) updateData.opening_hours = normalizeOpeningHours(data.openingHours)

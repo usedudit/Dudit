@@ -720,6 +720,10 @@ export default function OrdersPage({
                                                 imageAlt="Sem pedidos"
                                                 title="Você ainda não tem pedidos"
                                                 subtitle="Seus pedidos aparecerão aqui assim que seus clientes começarem a comprar."
+                                                itemButton={{
+                                                    text: "Adicionar Primeiro Pedido",
+                                                    action: handleAddOrder,
+                                                }}
                                             />
                                         </FadeIn>
                                     ) : paginated.length === 0 ? (

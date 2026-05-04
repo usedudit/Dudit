@@ -31,9 +31,9 @@ function isPublicPath(pathname: string): boolean {
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
-  request.headers.set("host", "dudit.com.br")
-  request.headers.set("x-forwarded-host", "dudit.com.br")
+  // Remove hardcoded host overrides to prevent routing inconsistencies
+  // request.headers.set("host", "dudit.com.br")
+  // request.headers.set("x-forwarded-host", "dudit.com.br")
 
   // 🚀 EARLY EXIT pra HEAD requests
   if (request.method === "HEAD") {
@@ -248,7 +248,7 @@ export async function middleware(request: NextRequest) {
   response.headers.set("X-Frame-Options", "DENY")
   response.headers.set("X-XSS-Protection", "1; mode=block")
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
-  response.headers.set("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=()")
+  response.headers.set("Permissions-Policy", "geolocation=(self), microphone=(), camera=(), payment=()")
   response.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
   response.headers.set("X-Permitted-Cross-Domain-Policies", "none")
 
@@ -295,7 +295,7 @@ export async function middleware(request: NextRequest) {
             response.headers.set("X-Frame-Options", "DENY")
             response.headers.set("X-XSS-Protection", "1; mode=block")
             response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
-            response.headers.set("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=()")
+            response.headers.set("Permissions-Policy", "geolocation=(self), microphone=(), camera=(), payment=()")
             response.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
             // Re-apply Cache-Control for private pages
             response.headers.set("Cache-Control", "private, no-store")
@@ -317,8 +317,7 @@ export async function middleware(request: NextRequest) {
         if (isProtected) {
           const hasAuthCookie = request.cookies.getAll().some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
           if (!hasAuthCookie) {
-            const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
-            const loginUrl = new URL("/auth/login", baseUrl)
+            const loginUrl = new URL("/auth/login", request.url)
             return NextResponse.redirect(loginUrl)
           }
         }
@@ -344,8 +343,7 @@ export async function middleware(request: NextRequest) {
 
         // Se não estiver logado e tentar acessar rotas protegidas -> Manda pro Login
         if (!user && isProtected) {
-          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
-          const loginUrl = new URL("/auth/login", baseUrl)
+          const loginUrl = new URL("/auth/login", request.url)
           return NextResponse.redirect(loginUrl)
         }
 
@@ -358,10 +356,8 @@ export async function middleware(request: NextRequest) {
 
         if (user && !hasNextParam && !hasModePartner && authBlockedPaths.some(p => pathname === p || pathname.startsWith(p + "/"))) {
           // Define a base usando a sua variável de ambiente ou o domínio fixo
-          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
-
-          // Cria uma URL nova do zero baseada no seu domínio real, não no request interno
-          const url = new URL("/", baseUrl)
+          // Cria uma URL nova do zero baseada no domínio atual do request
+          const url = new URL("/", request.url)
 
           // Se você quiser manter os parâmetros da busca original (exceto os deletados), 
           // você pode copiá-los assim:

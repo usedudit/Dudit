@@ -2,7 +2,8 @@
 
 // Removed createSupabaseAdmin
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { unstable_cache, revalidatePath } from "next/cache"
+import { unstable_cache, revalidatePath, revalidateTag } from "next/cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 import { cache } from "react"
 import { revalidatePartnerProfile } from "@/lib/utils/revalidation"
 import { requireUser } from "@/lib/auth/authorization"
@@ -48,9 +49,9 @@ async function _getPartnerProfile(partnerId: string) {
     }
   }
 
-  if (data && data.cpf_encrypted) {
+  if (data && data.cpf) {
     try {
-      data.cpf = await decryptCPF(data.cpf_encrypted)
+      data.cpf = await decryptCPF(data.cpf)
     } catch (e) {
       console.error("[Partner] CPF decryption error:", e)
     }
@@ -181,9 +182,9 @@ export const getCachedPartnerProfile = async (partnerId: string) => {
           data.business_info = { sells: ["products"], channels: ["online"] }
         }
       }
-      if (data && data.cpf_encrypted) {
+      if (data && data.cpf) {
         try {
-          data.cpf = await decryptCPF(data.cpf_encrypted)
+          data.cpf = await decryptCPF(data.cpf)
         } catch (e) {
           console.error("[Partner] CPF decryption error:", e)
         }
@@ -364,13 +365,11 @@ export async function updatePartnerAction(partnerId: string, data: any) {
     if (cleanCPF) {
       try {
         const { encryptCPF } = await import("@/lib/crypto")
-        updateData.cpf_encrypted = await encryptCPF(cleanCPF)
-        updateData.cpf = null // Ensure plain text CPF is cleared
+        updateData.cpf = await encryptCPF(cleanCPF)
       } catch (error) {
         console.error("Erro ao criptografar CPF:", error)
       }
     } else {
-      updateData.cpf_encrypted = null
       updateData.cpf = null
     }
   }
@@ -527,7 +526,7 @@ export async function registerPartner(data: any) {
       phone: normalizePhoneToE164(sanitizedPhone),
       business_type: data.businessType,
       cnpj: data.cnpj?.replace(/\D/g, "") || null,
-      cpf_encrypted: cpfEncrypted,
+      cpf: cpfEncrypted,
       business_info: data.businessInfo,
       opening_hours: data.businessHours || null,
       is_active: true
@@ -649,6 +648,7 @@ export async function registerPartner(data: any) {
       )
     }
 
+    revalidateTag(TAGS.userAccess(userId))
     revalidatePath("/erp")
 
     return { success: true, partnerId: newPartner.id }

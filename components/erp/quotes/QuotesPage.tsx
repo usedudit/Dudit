@@ -558,6 +558,10 @@ export default function QuotesPage({
                                                 imageAlt="Sem orçamentos"
                                                 title="Você ainda não tem orçamentos"
                                                 subtitle="Seus orçamentos aparecerão aqui assim que você criá-los."
+                                                itemButton={{
+                                                    text: "Adicionar Primeiro Orçamento",
+                                                    action: handleAddQuote,
+                                                }}
                                             />
                                         </FadeIn>
                                     ) : paginated.length === 0 ? (
