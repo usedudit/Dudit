@@ -169,7 +169,7 @@ const SegmentMockup = ({ type }: { type: string }) => {
   }
 };
 
-const SegmentsHero = () => (
+const SegmentsHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
   <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
     <GridLines />
     <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-6 max-w-[1300px] w-full relative z-10">
@@ -189,8 +189,8 @@ const SegmentsHero = () => (
             Não importa o que você vende ou qual serviço presta, nós temos as ferramentas certas para organizar seu dia a dia.
           </p>
           <div className="flex flex-wrap gap-4">
-            <Button variant="default" className="bg-brand-green text-white">Começar agora</Button>
-            <Button variant="outline">Ver planos</Button>
+            <Button variant="default" className="bg-brand-green text-white" onClick={() => onNavigate('start-selling')}>Começar agora</Button>
+            <Button variant="outline" onClick={() => onNavigate('pricing')}>Ver planos</Button>
           </div>
         </motion.div>
 
@@ -262,6 +262,7 @@ export default function SegmentsPage() {
     else if (page === 'pricing') router.push('/institucional/planos');
     else if (page === 'terms') router.push('/institucional/termos');
     else if (page === 'privacidade') router.push('/institucional/privacidade');
+    else if (page === 'start-selling') router.push('/erp/switch');
     else console.log('Navigating to:', page);
   };
 
@@ -269,9 +270,9 @@ export default function SegmentsPage() {
     <div className="min-h-screen bg-white">
       <Navbar onNavigate={onNavigate} />
       <main>
-        <SegmentsHero />
+        <SegmentsHero onNavigate={onNavigate} />
         <SegmentsGrid />
-        <CTA />
+        <CTA onNavigate={onNavigate} />
       </main>
       <Footer onNavigate={onNavigate} />
     </div>

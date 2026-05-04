@@ -3,13 +3,13 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-   Menu,
-   X,
-   Flower,
-   Facebook,
-   Twitter,
-   Linkedin
-} from 'lucide-react';
+   MenuIcon,
+   XIcon,
+   SparklesIcon,
+   FacebookIcon,
+   TwitterIcon,
+   LinkedinIcon
+} from '@/lib/icons';
 import { Button } from '@/components/reusable/Button';
 import Link from 'next/link';
 
@@ -80,7 +80,7 @@ export const Navbar = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                         exit={{ rotate: 90, opacity: 0 }}
                         transition={{ duration: 0.2 }}
                      >
-                        <X />
+                        <XIcon />
                      </motion.div>
                   ) : (
                      <motion.div
@@ -90,7 +90,7 @@ export const Navbar = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                         exit={{ rotate: -90, opacity: 0 }}
                         transition={{ duration: 0.2 }}
                      >
-                        <Menu />
+                        <MenuIcon />
                      </motion.div>
                   )}
                </AnimatePresence>
@@ -132,7 +132,7 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
             <div className="flex flex-col md:flex-row justify-between gap-12 mb-16">
                <div className="md:w-1/3">
                   <div className="flex items-center gap-2 text-white font-bold text-2xl mb-6 cursor-pointer" onClick={() => handleNav('home')}>
-                     <Flower className="w-8 h-8 text-white" fill="white" />
+                     <SparklesIcon className="w-8 h-8 text-white" />
                      <span>Dudit</span>
                   </div>
                   <p className="text-brand-inactive-text text-sm leading-relaxed max-w-xs">
@@ -174,13 +174,13 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
 
                <div className="flex gap-4 order-2 md:order-2">
                   <div className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 hover:border-white/30 transition-all cursor-pointer group">
-                     <Linkedin className="w-4 h-4 text-brand-inactive-text group-hover:text-white" />
+                     <LinkedinIcon className="w-4 h-4 text-brand-inactive-text group-hover:text-white" />
                   </div>
                   <div className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 hover:border-white/30 transition-all cursor-pointer group">
-                     <Twitter className="w-4 h-4 text-brand-inactive-text group-hover:text-white" />
+                     <TwitterIcon className="w-4 h-4 text-brand-inactive-text group-hover:text-white" />
                   </div>
                   <div className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 hover:border-white/30 transition-all cursor-pointer group">
-                     <Facebook className="w-4 h-4 text-brand-inactive-text group-hover:text-white" />
+                     <FacebookIcon className="w-4 h-4 text-brand-inactive-text group-hover:text-white" />
                   </div>
                </div>
             </div>
@@ -189,7 +189,7 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
    )
 }
 
-export const CTA = () => {
+export const CTA = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
    return (
       <section className="py-24 px-4 bg-white relative">
          <GridLines />
@@ -201,15 +201,15 @@ export const CTA = () => {
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] border border-white rounded-full"></div>
                </div>
 
-               <h2 className="text-5xl font-bold text-white mb-6">
-                  Pare de pagar comissão <br />para vender o que é seu
+               <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+                  Tem algo pra vender, <br />fazer ou divulgar?
                </h2>
-               <h3 className="text-2xl text-gray-300 mb-10 max-w-xl mx-auto">
-                  Organize seu negócio. Venda online. Mantenha sua margem.
+               <h3 className="text-xl md:text-2xl text-gray-300 mb-10 max-w-xl mx-auto">
+                  Crie um anúncio em minutos e comece a aparecer pra gente da sua cidade.
                </h3>
 
                <div className="flex flex-col sm:flex-row justify-center gap-4">
-                  <Button className="bg-brand-green text-white hover:bg-brand-green">Começar grátis agora</Button>
+                  <Button className="bg-brand-green text-white hover:bg-brand-green font-bold h-12 px-8" onClick={() => onNavigate('start-selling')}>Criar anúncio agora</Button>
                </div>
             </div>
          </div>

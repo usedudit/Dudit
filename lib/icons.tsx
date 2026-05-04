@@ -26,6 +26,7 @@ import {
     Chart03Icon,
     ViewIcon,
     ViewOffSlashIcon,
+    AnalyticsUpIcon,
     Mail01Icon,
     DiceFaces03Icon,
     StarAward01Icon,
@@ -164,6 +165,7 @@ export const ChevronsUpDown = CreateIcon(MenuSquare01)
 
 export const AdjustIcon = CreateIcon(PlusMinus01Icon)
 export const ReturnIcon = CreateIcon(ArrowTurnBackwardIcon01)
+export const AnalyticsIcon = CreateIcon(AnalyticsUpIcon)
 
 
 // ============================
@@ -182,7 +184,7 @@ export const SaveIcon = CreateIcon(FloppyDiskIcon)
 
 export const UploadIcon = CreateIcon(ImageUploadIcon)
 export const ExportFileIcon = CreateIcon(FileUploadIcon)
-
+export const TrendingUpIcon = CreateIcon(AnalyticsIcon)
 
 // ============================
 // STATUS / FEEDBACK
