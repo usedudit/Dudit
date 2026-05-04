@@ -45,7 +45,6 @@ export const getPartnerByUserIdCached = cache(async (userId: string) => {
         .eq("user_id", userId)
         .maybeSingle()
 
-    // attach address to partner root for backward compatibility with components
     if (data && data.addresses && data.addresses.length > 0) {
         const defaultAddress = data.addresses.find((a: any) => a.is_default) || data.addresses[0];
         data.zip_code = defaultAddress.zip_code;
@@ -55,6 +54,15 @@ export const getPartnerByUserIdCached = cache(async (userId: string) => {
         data.neighborhood = defaultAddress.neighborhood;
         data.city = defaultAddress.city;
         data.state = defaultAddress.state;
+    }
+
+    if (data && data.cpf) {
+        try {
+            const { decryptCPF } = await import("@/lib/crypto")
+            data.cpf = await decryptCPF(data.cpf)
+        } catch (e) {
+            console.error("[PartnerData] CPF decryption error:", e)
+        }
     }
 
     return data

@@ -513,8 +513,11 @@ export async function registerPartner(data: any) {
 
     let cpfEncrypted = null
     if (data.cpf) {
-      const { encryptCPF } = await import("@/lib/crypto")
-      cpfEncrypted = await encryptCPF(data.cpf)
+      const cleanCPF = String(data.cpf).replace(/\D/g, "")
+      if (cleanCPF) {
+        const { encryptCPF } = await import("@/lib/crypto")
+        cpfEncrypted = await encryptCPF(cleanCPF)
+      }
     }
 
     // DADOS APENAS DA TABELA PARTNERS (Sem endereço aqui!)

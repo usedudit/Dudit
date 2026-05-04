@@ -573,6 +573,18 @@ export async function getPartnerCustomersAction(partnerId: string, currentStoreI
     }
 
     let result = customers || []
+    
+    // Decrypt CPFs for display
+    const { decryptCPF } = await import("@/lib/crypto")
+    for (const c of result) {
+      if (c.cpf) {
+        try {
+          c.cpf = await decryptCPF(c.cpf)
+        } catch (e) {
+          // Keep encrypted if decryption fails
+        }
+      }
+    }
 
     // Prioritize: current store customers first, then others
     if (currentStoreId) {
@@ -667,7 +679,7 @@ export async function getERPCustomersPageAction(
 
     let q = supabase
       .from("customers")
-      .select("id, name, email, phone, status, store_credit, created_at, store_id")
+      .select("id, name, email, phone, status, store_credit, created_at, store_id, cpf")
       .eq("partner_id", partnerId)
 
     if (options?.storeId) {
@@ -688,6 +700,18 @@ export async function getERPCustomersPageAction(
     const rows = data || []
     const hasMore = rows.length > limit
     const items = hasMore ? rows.slice(0, limit) : rows
+
+    // Decrypt CPFs for display
+    const { decryptCPF } = await import("@/lib/crypto")
+    for (const item of items) {
+      if (item.cpf) {
+        try {
+          item.cpf = await decryptCPF(item.cpf)
+        } catch (e) {
+          // Keep encrypted if decryption fails
+        }
+      }
+    }
     const last = items[items.length - 1]
     const nextCursor: ERPCustomerListCursor | null =
       hasMore && last?.created_at && last?.id ? { createdAt: String(last.created_at), id: String(last.id) } : null

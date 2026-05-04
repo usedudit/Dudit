@@ -9,6 +9,7 @@ import { AccessDenied } from "@/components/erp/access-denied"
 import { createAdminClient } from "@/lib/supabase/server"
 import { ROLE_HIERARCHY } from "@/lib/permissions/partner-roles"
 import type { PartnerRole } from "@/lib/permissions/types"
+import { decryptCPF } from "@/lib/crypto"
 
 export default async function SettingsPage() {
   await requireUser()
@@ -27,10 +28,18 @@ export default async function SettingsPage() {
   const { data: partner } = await supabase
     .from("partners")
     .select("*, addresses(*)")
-    .eq("id", context.partnerId)
     .maybeSingle()
 
   if (!partner) return <AccessDenied />
+
+  // Decrypt CPF for display
+  if (partner.cpf) {
+    try {
+      partner.cpf = await decryptCPF(partner.cpf)
+    } catch (e) {
+      console.error("[Settings] Error decrypting partner CPF:", e)
+    }
+  }
 
   if (partner.addresses && partner.addresses.length > 0) {
     const defaultAddress = partner.addresses.find((a: any) => a.is_default) || partner.addresses[0]

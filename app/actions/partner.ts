@@ -78,12 +78,15 @@ export async function createPartnerAction(data: CreatePartnerData) {
 
     let cpfEncrypted = null
     if (data.cpf) {
-      const { encryptCPF } = await import("@/lib/crypto")
-      try {
-        cpfEncrypted = await encryptCPF(data.cpf)
-      } catch (error) {
-        console.error("Error encrypting CPF:", error)
-        return { success: false, error: "Erro ao criptografar CPF" }
+      const cleanCPF = String(data.cpf).replace(/\D/g, "")
+      if (cleanCPF) {
+        const { encryptCPF } = await import("@/lib/crypto")
+        try {
+          cpfEncrypted = await encryptCPF(cleanCPF)
+        } catch (error) {
+          console.error("Error encrypting CPF:", error)
+          return { success: false, error: "Erro ao criptografar CPF" }
+        }
       }
     }
 
@@ -257,10 +260,11 @@ export async function updatePartnerAction(
   if (data.businessType) updateData.business_type = data.businessType
   if (data.cnpj !== undefined) updateData.cnpj = data.cnpj
   if (data.cpf !== undefined) {
-    if (data.cpf) {
+    const cleanCPF = data.cpf ? String(data.cpf).replace(/\D/g, "") : null
+    if (cleanCPF) {
       const { encryptCPF } = await import("@/lib/crypto")
       try {
-        updateData.cpf = await encryptCPF(data.cpf)
+        updateData.cpf = await encryptCPF(cleanCPF)
       } catch (error) {
         console.error("Error encrypting CPF:", error)
         return { error: "Erro ao criptografar CPF" }
