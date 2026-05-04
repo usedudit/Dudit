@@ -248,7 +248,10 @@ export default function DeliveriesPage({
                                                 planGate ? {
                                                     text: "Ver Plano Crescer",
                                                     action: () => openPlanUpgrade("crescer"),
-                                                } : undefined
+                                                } : {
+                                                    text: "Adicionar primeira entrega",
+                                                    action: () => setWrapper("create"),
+                                                }
                                             }
                                         />
                                     </FadeIn>
