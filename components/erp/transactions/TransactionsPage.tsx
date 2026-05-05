@@ -1217,7 +1217,7 @@ export default function TransactionsPage({
                             <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
                         </Button>
 
-                        <Button onClick={() => openEntity("create")} disabled={!!planGate}>
+                        <Button onClick={() => openEntity("create")}>
                             <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
                             Nova Transação
                         </Button>
@@ -1230,13 +1230,13 @@ export default function TransactionsPage({
                     search={search}
                     onSearchChange={setSearch}
                     onOpenFilter={() => setModals((prev) => ({ ...prev, filter: true }))}
-                    onAddTransaction={!planGate ? () => openEntity("create") : undefined}
+                    onAddTransaction={() => openEntity("create")}
                     filters={filters}
                     setFilters={setFilters}
                     viewMode={viewMode}
                     onViewModeChange={setViewModeState}
                     hasActiveFilters={hasActiveFilters}
-                    addDisabled={!!planGate}
+                    addDisabled={false}
                 />
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
@@ -1248,14 +1248,11 @@ export default function TransactionsPage({
                             >
                                 <IconPlaceholder
                                     placeholderType="image"
-                                    imageSrc={planGate ? "https://img.dudit.com.br/static/mascots/PlanoVender.png" : "https://img.dudit.com.br/static/mascots/Transacoes.png"}
-                                    imageAlt={planGate ? "Plano necessário" : "Sem transações"}
-                                    title={planGate ? "Plano necessário" : "Você ainda não tem transações"}
-                                    subtitle={planGate ? planGate.message : "As movimentações financeiras vão aparecer aqui assim que forem cadastradas."}
-                                    itemButton={planGate ? {
-                                        text: "Ver Plano Crescer",
-                                        action: () => openPlanUpgrade("crescer")
-                                    } : {
+                                    imageSrc="https://img.dudit.com.br/static/mascots/Transacoes.png"
+                                    imageAlt="Sem transações"
+                                    title="Você ainda não tem transações"
+                                    subtitle="As movimentações financeiras vão aparecer aqui assim que forem cadastradas."
+                                    itemButton={{
                                         text: "Adicionar Primeira Transação",
                                         action: () => openEntity("create")
                                     }}

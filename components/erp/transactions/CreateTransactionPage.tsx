@@ -39,6 +39,8 @@ import {
     ReturnIcon,
 } from "@/lib/icons"
 import { useNotification } from "@/hooks/use-notification"
+import { usePermissions } from "@/lib/permission-context"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { formatCurrency } from "@/lib/utils"
 import {
     createManualTransactionAction,
@@ -191,6 +193,9 @@ export default function CreateTransactionPage({
     const router = useRouter()
     const debouncedRefresh = useDebouncedRefresh()
     const { success, error } = useNotification()
+    const { planSlug } = usePermissions()
+    const { openPlanUpgrade } = usePlanUpgrade()
+    const isFreePlan = planSlug === "free"
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [isScrolled, setIsScrolled] = useState(false)
     const [activeTab, setActiveTab] = useState("general")
@@ -1524,10 +1529,16 @@ export default function CreateTransactionPage({
                             options={[
                                 { value: "single", label: "Única" },
                                 { value: "installment", label: "Parcelada" },
-                                { value: "recurring", label: "Recorrente" },
+                                { value: "recurring", label: isFreePlan ? "Recorrente ⭐" : "Recorrente" },
                             ]}
                             value={transactionMode}
-                            setValue={(v) => setTransactionMode(v as TransactionMode)}
+                            setValue={(v) => {
+                                if (v === "recurring" && isFreePlan) {
+                                    openPlanUpgrade("crescer")
+                                    return
+                                }
+                                setTransactionMode(v as TransactionMode)
+                            }}
                         />
                     )}
                     {txKind === "adjustment" || txKind === "transfer" ? (

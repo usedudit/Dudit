@@ -376,15 +376,15 @@ export async function getUsageCounters(partnerId: string): Promise<UsageCounters
 
   if (quotesReset < monthStartUtc) {
     updates.quotes_month_count = 0
-    ;(updates as any).quotes_month_reset = now.toISOString()
+      ; (updates as any).quotes_month_reset = now.toISOString()
   }
   if (ordersReset < monthStartUtc) {
     updates.orders_month_count = 0
-    ;(updates as any).orders_month_reset = now.toISOString()
+      ; (updates as any).orders_month_reset = now.toISOString()
   }
   if (appointmentsReset < monthStartUtc) {
     updates.appointments_month_count = 0
-    ;(updates as any).appointments_month_reset = now.toISOString()
+      ; (updates as any).appointments_month_reset = now.toISOString()
   }
 
   if (Object.keys(updates).length > 0) {
@@ -518,7 +518,8 @@ export async function increment_usage_counter(partnerId: string, counterName: st
   const admin = getAdminClient()
   const { error } = await admin.rpc("increment_usage_counter", {
     p_partner_id: partnerId,
-    p_counter_name: counterName,
+    // DB migration 20260504 uses `p_column_name` (not `p_counter_name`)
+    p_column_name: counterName,
     p_amount: amount,
   })
   if (error) console.error(`[SUBSCRIPTION] Error incrementing counter ${counterName}:`, error.message)
@@ -531,7 +532,8 @@ export async function decrement_usage_counter(partnerId: string, counterName: st
   const admin = getAdminClient()
   const { error } = await admin.rpc("decrement_usage_counter", {
     p_partner_id: partnerId,
-    p_counter_name: counterName,
+    // DB migration 20260504 uses `p_column_name` (not `p_counter_name`)
+    p_column_name: counterName,
     p_amount: amount,
   })
   if (error) console.error(`[SUBSCRIPTION] Error decrementing counter ${counterName}:`, error.message)

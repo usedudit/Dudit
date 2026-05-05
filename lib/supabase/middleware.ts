@@ -196,7 +196,8 @@ export async function middleware(request: NextRequest) {
         https://www.google-analytics.com 
         https://stats.g.doubleclick.net 
         https://cloudflareinsights.com 
-        https://*.cloudflare.com;
+        https://*.cloudflare.com
+        https://nominatim.openstreetmap.org;
     frame-src 'self' 
         https://sdk.mercadopago.com 
         https://www.mercadopago.com 

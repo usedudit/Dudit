@@ -44,11 +44,6 @@ export default async function FinancialTransactionsRoute() {
   const recurringTemplates = recurringTemplatesResult?.success ? recurringTemplatesResult.data : []
   const paymentMethods = paymentMethodsResult?.methods || []
 
-  const isFreePlan = plan.slug.toLowerCase() === "free"
-  const planGate = isFreePlan ? { 
-    requiredPlanSlug: "crescer" as const, 
-    message: "O acesso ao módulo financeiro completo requer o plano Crescer ou superior." 
-  } : undefined
 
   return (
     <>
@@ -64,7 +59,6 @@ export default async function FinancialTransactionsRoute() {
           recurringOccurrences={recurringOccurrences}
           recurringTemplates={recurringTemplates as any}
           paymentMethods={paymentMethods as any}
-          planGate={planGate}
         />
       </FadeIn>
     </>

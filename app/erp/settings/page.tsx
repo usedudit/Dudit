@@ -26,6 +26,7 @@ export default async function SettingsPage() {
   const { data: partner } = await supabase
     .from("partners")
     .select("*, addresses(*)")
+    .eq("id", context.partnerId)
     .maybeSingle()
 
   if (!partner) return <AccessDenied />
