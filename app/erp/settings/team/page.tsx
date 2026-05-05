@@ -4,6 +4,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getTeamMembers } from "@/app/actions/erp/team"
 import type { PartnerRole } from "@/lib/permissions/types"
+import type { RoleId } from "@/lib/permissions/rbac-types"
 
 const ROLE_LABELS: Record<PartnerRole, string> = {
     OWNER: "Proprietário",
@@ -52,6 +53,10 @@ function canModifyUser(inviterRole: PartnerRole, targetRole: PartnerRole): boole
     return ROLE_HIERARCHY[inviterRole] > ROLE_HIERARCHY[targetRole]
 }
 
+function roleToRoleId(role: PartnerRole): RoleId {
+    return String(role || "DELIVERY").toLowerCase() as RoleId
+}
+
 async function TeamList() {
     const { members, error, currentUserRole } = await getTeamMembers()
 
@@ -78,15 +83,15 @@ async function TeamList() {
                     <p className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body mt-1 uppercase tracking-wider">Total de membros</p>
                 </div>
                 <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-5 shadow-sm transition-all duration-300">
-                    <p className="text-3xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">{members.filter(m => m.role === "ADMIN" || m.role === "OWNER").length}</p>
+                    <p className="text-3xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">{members.filter(m => roleToRoleId(m.role) === "admin" || roleToRoleId(m.role) === "owner").length}</p>
                     <p className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body mt-1 uppercase tracking-wider">Administradores</p>
                 </div>
                 <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-5 shadow-sm transition-all duration-300">
-                    <p className="text-3xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">{members.filter(m => m.role === "MANAGER").length}</p>
+                    <p className="text-3xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">{members.filter(m => roleToRoleId(m.role) === "manager").length}</p>
                     <p className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body mt-1 uppercase tracking-wider">Gestores</p>
                 </div>
                 <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-5 shadow-sm transition-all duration-300">
-                    <p className="text-3xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">{members.filter(m => m.role === "OPERATOR" || m.role === "DELIVERY").length}</p>
+                    <p className="text-3xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">{members.filter(m => roleToRoleId(m.role) === "operator" || roleToRoleId(m.role) === "delivery").length}</p>
                     <p className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body mt-1 uppercase tracking-wider">Operadores / Entregadores</p>
                 </div>
             </div>

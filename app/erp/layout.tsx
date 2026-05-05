@@ -29,6 +29,7 @@ import {
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { normalizeToRoutePermissions } from "@/lib/permissions/route-permissions"
 import type { PartnerRole, PartnerRoutePermissions } from "@/lib/permissions/types"
+import type { RoleId } from "@/lib/permissions/rbac-types"
 
 export default async function ERPLayout({
   children,
@@ -47,7 +48,7 @@ export default async function ERPLayout({
 
   // Single call to get all partner access (cached for child pages via React cache)
   const allAccess = await getAllUserPartnerAccess()
-  const hasOwnPartner = allAccess.some((a: typeof allAccess[number]) => a.role === "OWNER")
+  const hasOwnPartner = allAccess.some((a: typeof allAccess[number]) => a.roleId === "owner")
 
   // No ERP access at all → redirect to partner login/registration
   if (allAccess.length === 0) {
@@ -62,20 +63,22 @@ export default async function ERPLayout({
     redirect("/select-erp")
   }
 
-  let context: { partnerId: string; role: PartnerRole; permissions: any; businessInfo: any } | null = null
+  let context: { partnerId: string; roleId: RoleId; role: PartnerRole; permissions: any; businessInfo: any } | null = null
 
   if (activePartnerId) {
     // Validate cookie against actual access
     const match = allAccess.find((a: typeof allAccess[number]) => a.partnerId === activePartnerId)
     if (match) {
-      context = { partnerId: match.partnerId, role: match.role, permissions: match.permissions, businessInfo: match.businessInfo }
+      const role = String(match.roleId || "delivery").toUpperCase() as PartnerRole
+      context = { partnerId: match.partnerId, roleId: match.roleId as RoleId, role, permissions: match.permissions, businessInfo: match.businessInfo }
     }
   }
 
   // If no valid cookie, auto-resolve if exactly 1 ERP (only for users with own ERP).
   if (!context && (allAccess.length === 1) && hasOwnPartner) {
     const match = allAccess[0]
-    context = { partnerId: match.partnerId, role: match.role, permissions: match.permissions, businessInfo: match.businessInfo }
+    const role = String(match.roleId || "delivery").toUpperCase() as PartnerRole
+    context = { partnerId: match.partnerId, roleId: match.roleId as RoleId, role, permissions: match.permissions, businessInfo: match.businessInfo }
   }
 
   if (!context) {
@@ -84,7 +87,7 @@ export default async function ERPLayout({
   }
 
   // ── Resolve route permissions ──
-  const role = (context.role || "OWNER") as PartnerRole
+  const role = (context.role || "DELIVERY") as PartnerRole
   const routePermissions: PartnerRoutePermissions = normalizeToRoutePermissions(role, context.permissions)
 
   // Read sidebar cookie

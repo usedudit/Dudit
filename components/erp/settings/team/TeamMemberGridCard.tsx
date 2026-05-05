@@ -4,8 +4,15 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Badge, ActionsDropdown } from "@/components/reusable"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
-import { ROLE_LABELS } from "@/lib/permissions/partner-roles"
 import type { PartnerRole } from "@/lib/permissions/types"
+
+const ROLE_LABELS: Record<PartnerRole, string> = {
+    OWNER: "Proprietário",
+    ADMIN: "Administrador",
+    MANAGER: "Gestor",
+    OPERATOR: "Operador",
+    DELIVERY: "Entregador",
+}
 
 interface TeamMemberGridCardProps {
     member: {

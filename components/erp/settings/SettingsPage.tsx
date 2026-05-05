@@ -26,6 +26,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { DeliverySettingsSubPage } from "./DeliverySettingsSubPage"
 import { CommissionsSubPage } from "./CommissionsSubPage"
 import type { PartnerRole } from "@/lib/permissions/types"
+import type { RoleId } from "@/lib/permissions/rbac-types"
 
 interface SettingsTabsProps {
   partner: any
@@ -117,9 +118,10 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     ? JSON.parse(partner.business_info)
     : (partner.business_info || { sells: ["products"], channels: ["online"] })
 
-  const isOwner = role === "OWNER"
-  const isAdmin = role === "ADMIN"
-  const isManager = role === "MANAGER"
+  const roleId = String(role || "DELIVERY").toLowerCase() as RoleId
+  const isOwner = roleId === "owner"
+  const isAdmin = roleId === "admin"
+  const isManager = roleId === "manager"
   const isOwnerOrAdmin = isOwner || isAdmin
   const isOwnerAdminOrManager = isOwner || isAdmin || isManager
 

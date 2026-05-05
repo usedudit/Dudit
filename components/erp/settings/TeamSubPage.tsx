@@ -7,12 +7,50 @@ import { MailIcon, CheckCircleIcon, ChevronLeftIcon, PlusIcon, CalendarIcon, Use
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { getTeamMembers, removeTeamMember, updateTeamMemberRole } from "@/app/actions/erp/team"
 import type { TeamMember } from "@/app/actions/erp/team"
-import { ROLE_LABELS, ROLE_DESCRIPTIONS, getAllowedInviteRoles, canModifyUser } from "@/lib/permissions/partner-roles"
 import type { PartnerRole } from "@/lib/permissions/types"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { formatDate } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
+
+const ROLE_LABELS: Record<PartnerRole, string> = {
+    OWNER: "Proprietário",
+    ADMIN: "Administrador",
+    MANAGER: "Gestor",
+    OPERATOR: "Operador",
+    DELIVERY: "Entregador",
+}
+
+const ROLE_DESCRIPTIONS: Record<PartnerRole, string> = {
+    OWNER: "Controle absoluto do sistema. Pode excluir loja, transferir propriedade e alterar assinatura.",
+    ADMIN: "Acesso operacional completo, exceto plano/assinatura e integrações.",
+    MANAGER: "Controla operação. Pode gerir equipe abaixo do próprio cargo.",
+    OPERATOR: "Executa o dia a dia: pedidos, agenda e atendimento.",
+    DELIVERY: "Atualiza entregas e acompanha rotas/pedidos atribuídos.",
+}
+
+const ROLE_HIERARCHY: Record<PartnerRole, number> = {
+    OWNER: 5,
+    ADMIN: 4,
+    MANAGER: 3,
+    OPERATOR: 2,
+    DELIVERY: 1,
+}
+
+function canModifyUser(actorRole: PartnerRole, targetRole: PartnerRole): boolean {
+    return ROLE_HIERARCHY[actorRole] > ROLE_HIERARCHY[targetRole]
+}
+
+function getAllowedInviteRoles(inviterRole: PartnerRole): PartnerRole[] {
+    const all: PartnerRole[] = ["OWNER", "ADMIN", "MANAGER", "OPERATOR", "DELIVERY"]
+    return all.filter((target) => {
+        if (target === "OWNER") return false
+        if (inviterRole === "OWNER") return true
+        if (inviterRole === "ADMIN") return true
+        if (inviterRole === "MANAGER") return target === "OPERATOR" || target === "DELIVERY"
+        return false
+    })
+}
 
 export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: () => void }) => {
     const [showInviteModal, setShowInviteModal] = useState(false)

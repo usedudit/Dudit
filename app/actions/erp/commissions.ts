@@ -3,6 +3,7 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
 import { calculateCommission, partnerRoleToCommissionRole, type CommissionRole, type CommissionType } from "@/lib/services/commission.service"
+import type { RoleId } from "@/lib/permissions/rbac-types"
 
 export type CommissionSettingsRow = {
   partnerUserId: string
@@ -20,22 +21,18 @@ const DEFAULT_TYPE_BY_ROLE: Record<CommissionRole, CommissionType> = {
   delivery: "fixed_per_delivery",
 }
 
-function canManageCommissions(role: string | null | undefined) {
-  const normalized = String(role || "").toUpperCase()
-  return normalized === "OWNER" || normalized === "ADMIN"
+function roleIdToPartnerRole(roleId: RoleId | string | null | undefined) {
+  return String(roleId || "delivery").toUpperCase()
 }
 
 export async function listEmployeeCommissionsAction(partnerId: string) {
   await requireUser()
-  const access = await requirePartnerAccessWithPermission(partnerId, "settings", "settings_comissions")
-  if (!canManageCommissions(access.role)) {
-    return { success: false as const, error: "Acesso restrito para este módulo." }
-  }
+  await requirePartnerAccessWithPermission(partnerId, "settings", "settings_comissions")
   const supabase = await getSupabaseServerClient()
 
   const { data: partnerUsers, error: partnerUsersError } = await supabase
     .from("partner_users")
-    .select("id, user_id, role")
+    .select("id, user_id, role_id")
     .eq("partner_id", partnerId)
     .order("created_at", { ascending: true })
 
@@ -77,14 +74,15 @@ export async function listEmployeeCommissionsAction(partnerId: string) {
   }
 
   const items: CommissionSettingsRow[] = partnerUsers.map((row: any) => {
-    const commissionRole = partnerRoleToCommissionRole(row.role)
+    const partnerRole = roleIdToPartnerRole(row.role_id)
+    const commissionRole = partnerRoleToCommissionRole(partnerRole)
     const key = `${row.id}:${commissionRole}`
     const saved = commissionByKey.get(key)
     return {
       partnerUserId: String(row.id),
       userId: String(row.user_id),
       name: nameByUserId.get(String(row.user_id)) || "Usuário",
-      roleLabel: roleLabelMap[String(row.role)] || String(row.role),
+      roleLabel: roleLabelMap[String(partnerRole)] || String(partnerRole),
       commissionRole,
       commissionType: (saved?.commission_type || DEFAULT_TYPE_BY_ROLE[commissionRole]) as CommissionType,
       value: Number(saved?.value || 0),
@@ -104,10 +102,7 @@ export async function upsertEmployeeCommissionAction(input: {
   metadata?: Record<string, unknown>
 }) {
   await requireUser()
-  const access = await requirePartnerAccessWithPermission(input.partnerId, "settings", "settings_comissions")
-  if (!canManageCommissions(access.role)) {
-    return { success: false as const, error: "Acesso restrito para este módulo." }
-  }
+  await requirePartnerAccessWithPermission(input.partnerId, "settings", "settings_comissions")
   const supabase = await getSupabaseServerClient()
 
   const normalizedValue = Math.max(0, Number(input.value || 0))
@@ -137,10 +132,7 @@ export async function calculateCommissionAction(input: {
   deliveryFee?: number
 }) {
   await requireUser()
-  const access = await requirePartnerAccessWithPermission(input.partnerId, "settings", "settings_comissions")
-  if (!canManageCommissions(access.role)) {
-    return { success: false as const, error: "Acesso restrito para este módulo." }
-  }
+  await requirePartnerAccessWithPermission(input.partnerId, "settings", "settings_comissions")
   const supabase = await getSupabaseServerClient()
 
   const { data } = await supabase

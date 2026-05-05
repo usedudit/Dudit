@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { requireUser } from "@/lib/auth/authorization"
 import { getAllUserPartnerAccess } from "@/lib/auth/partner-context"
 import type { PartnerRole } from "@/lib/permissions/types"
+import type { RoleId } from "@/lib/permissions/rbac-types"
 import { selectErpAction } from "./actions"
 import { getPartnerStatus } from "@/lib/data/partner"
 import Link from "next/link"
@@ -12,6 +13,13 @@ const ROLE_LABELS: Record<PartnerRole, string> = {
     MANAGER: "Gestor",
     OPERATOR: "Operador",
     DELIVERY: "Entregador",
+}
+
+function roleIdToPartnerRole(roleId: RoleId | string | null | undefined): PartnerRole {
+    const upper = String(roleId || "delivery").toUpperCase()
+    return (upper === "OWNER" || upper === "ADMIN" || upper === "MANAGER" || upper === "OPERATOR" || upper === "DELIVERY")
+        ? (upper as PartnerRole)
+        : ("DELIVERY" as PartnerRole)
 }
 
 export default async function SelectErpPage() {
@@ -86,7 +94,7 @@ export default async function SelectErpPage() {
                                     </h3>
                                     <div className="flex items-center gap-2 mt-1">
                                         <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
-                                            {ROLE_LABELS[access.role as PartnerRole] || access.role}
+                                            {ROLE_LABELS[roleIdToPartnerRole(access.roleId)] || access.roleId}
                                         </span>
                                         {access.ownerName && (
                                             <span className="text-xs text-gray-400 dark:text-gray-500 truncate">

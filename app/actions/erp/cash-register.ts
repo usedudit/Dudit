@@ -8,6 +8,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { revalidateEntityTimeline } from "@/lib/utils/revalidation"
 import { revalidatePath } from "next/cache"
+import type { RoleId } from "@/lib/permissions/rbac-types"
 
 export type CountedPaymentMethodEntry = {
   paymentMethodId?: string | null
@@ -22,6 +23,11 @@ type CashMovementFallbackInput = {
   amount: number
   cashFinanceAccountId?: string | null
   userId: string
+}
+
+function isManagementRole(roleId: RoleId | string | null | undefined) {
+  const v = String(roleId || "").toLowerCase()
+  return v === "owner" || v === "admin" || v === "manager"
 }
 
 function money(value: number) {
@@ -811,8 +817,7 @@ export async function closeCashSessionAction(input: {
     return { success: false as const, error: "Este caixa já foi fechado." }
   }
 
-  const role = String(access.role || "").toUpperCase()
-  const isAdminRole = role === "OWNER" || role === "ADMIN"
+  const isAdminRole = isManagementRole(access.roleId)
   const openedBy = session.opened_by_user_id || session.user_id
   if (openedBy !== user.id && !isAdminRole) {
     return { success: false as const, error: "Apenas o operador que abriu o caixa ou um administrador podem fechar." }
