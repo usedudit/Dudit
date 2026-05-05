@@ -3,26 +3,25 @@
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/reusable/Button';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-   ArrowRightIcon,
-   ChartIcon,
-   MoneyIcon,
-   BoxIcon,
-   GridIcon,
-   UserIcon,
-   ShoppingBagIcon,
-   StoreIcon,
-   CheckCircleIcon,
-   WhatsappIcon,
-   CalendarIcon,
-   WrenchIcon,
-   TrendingUpIcon
-} from '@/lib/icons';
+   ArrowRight,
+   PieChart,
+   TrendingUp,
+   Box,
+   Layout,
+   User,
+   ShoppingBag,
+   Store,
+   CheckCircle2,
+   MessageCircle,
+   Calendar,
+   Wrench
+} from 'lucide-react';
 import { GridLines, SectionHeader, Navbar, Footer, CTA } from '../../../components/InstitucionalShared';
 
-const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
+const Hero = () => {
    return (
       <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
          <GridLines />
@@ -35,16 +34,15 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   transition={{ duration: 0.6 }}
                >
                   <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-brand-dark leading-[1.1] mb-6">
-                     Descubra o que tem por aqui
+                     Venda produtos, agende serviços e gerencie tudo em um só lugar.
                   </h1>
                   <p className="text-brand-dark text-lg md:text-xl font-medium mb-8 max-w-lg leading-tight">
-                     Produtos, serviços e oportunidades na sua cidade. <br className="hidden md:block" />
-                     E se quiser, mostre o que você faz também.
+                     Sua vitrine digital com <span className="text-brand-green">0% de comissão</span>. Publique online em minutos e mantenha 100% da sua venda com você.
                   </p>
 
                   <div className="flex flex-wrap gap-4">
-                     <Button onClick={() => onNavigate('explore')}>Ver o que tem por aqui</Button>
-                     <Button variant="outline" onClick={() => onNavigate('start-selling')}>Criar anúncio</Button>
+                     <Button>Começar grátis</Button>
+                     <Button variant="outline">Ver como funciona</Button>
                   </div>
 
                </motion.div>
@@ -68,21 +66,21 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                      </div>
                      <div className="p-6 flex gap-6">
                         <div className="w-16 hidden sm:flex flex-col gap-6 text-brand-inactive-text">
-                           <BoxIcon className="w-5 h-5 text-brand-dark" />
-                           <GridIcon className="w-5 h-5" />
-                           <ChartIcon className="w-5 h-5" />
-                           <UserIcon className="w-5 h-5" />
+                           <Box className="w-5 h-5 text-brand-dark" />
+                           <Layout className="w-5 h-5" />
+                           <PieChart className="w-5 h-5" />
+                           <User className="w-5 h-5" />
                         </div>
                         <div className="flex-1">
                            <div className="flex justify-between items-end mb-8">
                               <div>
-                                 <p className="text-sm text-brand-inactive-text mb-1">O que tem por aqui</p>
-                                 <h3 className="text-3xl font-bold text-brand-dark">Sua Cidade</h3>
+                                 <p className="text-sm text-brand-inactive-text mb-1">Total de Vendas (Sem Taxas)</p>
+                                 <h3 className="text-3xl font-bold text-brand-dark">R$ 54.897,00</h3>
                                  <p className="text-xs text-green-600 font-medium flex items-center gap-1 mt-1">
-                                    <TrendingUpIcon className="w-3 h-3" /> Descubra novas oportunidades
+                                    <TrendingUp className="w-3 h-3" /> +100% de lucro para você
                                  </p>
                               </div>
-                              <div className="text-xs text-brand-inactive-text">Agora</div>
+                              <div className="text-xs text-brand-inactive-text">Hoje, 15:30</div>
                            </div>
                            {/* Chart Mockup */}
                            <div className="h-40 flex items-end justify-between gap-2 mb-8">
@@ -104,21 +102,21 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
                            {/* List Mockup - Showing "Qualquer coisa" (Product, Service, Rental) */}
                            <div className="space-y-4">
-                              <p className="text-sm font-semibold text-brand-dark mb-2">Destaques da Região</p>
+                              <p className="text-sm font-semibold text-brand-dark mb-2">Últimos Pedidos</p>
 
                               {/* Product */}
                               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                                  <div className="flex items-center gap-3">
                                     <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
-                                       <BoxIcon className="w-4 h-4 text-blue-600" />
+                                       <Box className="w-4 h-4 text-blue-600" />
                                     </div>
                                     <div>
-                                       <div className="text-xs font-bold text-brand-dark">Produtos de Qualidade</div>
-                                       <div className="text-[10px] text-brand-inactive-text">Perto de você</div>
+                                       <div className="text-xs font-bold text-brand-dark">Tênis Esportivo</div>
+                                       <div className="text-[10px] text-brand-inactive-text">Produto • Envio Correios</div>
                                     </div>
                                  </div>
                                  <div className="text-right">
-                                    <div className="text-xs font-bold text-brand-dark">Veja agora</div>
+                                    <div className="text-xs font-bold text-brand-dark">R$ 299,90</div>
                                  </div>
                               </div>
 
@@ -126,15 +124,15 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                                  <div className="flex items-center gap-3">
                                     <div className="w-8 h-8 bg-purple-100 rounded flex items-center justify-center">
-                                       <CalendarIcon className="w-4 h-4 text-purple-600" />
+                                       <Calendar className="w-4 h-4 text-purple-600" />
                                     </div>
                                     <div>
-                                       <div className="text-xs font-bold text-brand-dark">Serviços Locais</div>
-                                       <div className="text-[10px] text-brand-inactive-text">Encontre quem faz</div>
+                                       <div className="text-xs font-bold text-brand-dark">Corte de Cabelo</div>
+                                       <div className="text-[10px] text-brand-inactive-text">Serviço • Hoje, 16:00</div>
                                     </div>
                                  </div>
                                  <div className="text-right">
-                                    <div className="text-xs font-bold text-brand-dark">Descubra</div>
+                                    <div className="text-xs font-bold text-brand-dark">R$ 65,00</div>
                                  </div>
                               </div>
 
@@ -142,15 +140,15 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                                  <div className="flex items-center gap-3">
                                     <div className="w-8 h-8 bg-orange-100 rounded flex items-center justify-center">
-                                       <ShoppingBagIcon className="w-4 h-4 text-orange-600" />
+                                       <ShoppingBag className="w-4 h-4 text-orange-600" />
                                     </div>
                                     <div>
-                                       <div className="text-xs font-bold text-brand-dark">Tudo que você precisa</div>
-                                       <div className="text-[10px] text-brand-inactive-text">Simples e direto</div>
+                                       <div className="text-xs font-bold text-brand-dark">Furadeira Impacto</div>
+                                       <div className="text-[10px] text-brand-inactive-text">Aluguel • 2 dias</div>
                                     </div>
                                  </div>
                                  <div className="text-right">
-                                    <div className="text-xs font-bold text-brand-dark">Confira</div>
+                                    <div className="text-xs font-bold text-brand-dark">R$ 45,00</div>
                                  </div>
                               </div>
 
@@ -167,21 +165,21 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   >
                      <div className="flex items-center gap-3 mb-3">
                         <div className="w-10 h-10 bg-brand-green/20 rounded-full flex items-center justify-center">
-                           <TrendingUpIcon className="w-5 h-5 text-brand-dark" />
+                           <TrendingUp className="w-5 h-5 text-brand-dark" />
                         </div>
                         <div>
-                           <div className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider">Nova Descoberta</div>
-                           <div className="text-sm font-bold text-brand-dark">Perto de você</div>
+                           <div className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider">Nova Venda</div>
+                           <div className="text-sm font-bold text-brand-dark">R$ 150,00</div>
                         </div>
                      </div>
                      <div className="bg-gray-50 rounded-lg p-2 text-xs">
                         <div className="flex justify-between text-brand-inactive-text mb-1">
-                           <span>Anúncio</span>
-                           <span>Grátis</span>
+                           <span>Taxa Dudit</span>
+                           <span className="line-through">R$ 15,00</span>
                         </div>
                         <div className="flex justify-between font-bold text-brand-dark">
-                           <span>Visibilidade</span>
-                           <span className="text-brand-green">Máxima</span>
+                           <span>Você recebe</span>
+                           <span className="text-brand-green">R$ 150,00</span>
                         </div>
                      </div>
                   </motion.div>
@@ -192,19 +190,18 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
    );
 };
 
-const Solutions = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
+const Solutions = () => {
    return (
       <section id="solutions" className="relative py-24 bg-white overflow-hidden">
          <GridLines />
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <SectionHeader
-               subtitle="SIMPLES E DIRETO"
-               title="Um lugar simples pra resolver o dia a dia"
+               subtitle="TUDO EM UM SÓ LUGAR"
+               title="A Dudit organiza seu negócio de forma simples e direta"
             />
 
             <p className="text-brand-inactive-text max-w-3xl mb-20 text-lg">
-               Encontre quem vende, quem faz ou o que você precisa na sua cidade. <br />
-               E se quiser, anuncie também — simples, rápido e direto.
+               Você não precisa mais anotar vendas no caderno, se perder em conversas de WhatsApp, usar planilhas que nunca batem ou pagar comissões altas para marketplaces.
             </p>
 
             {/* Feature 1: Vitrine Online */}
@@ -274,12 +271,12 @@ const Solutions = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   viewport={{ once: true }}
                >
                   <span className="text-brand-inactive-text uppercase tracking-wider text-sm font-semibold mb-2 block">CATÁLOGO AUTOMÁTICO</span>
-                  <h3 className="text-4xl font-bold text-brand-dark mb-6">Tudo ao seu alcance</h3>
+                  <h3 className="text-4xl font-bold text-brand-dark mb-6">Sua vitrine digital pronta em minutos</h3>
                   <p className="text-brand-inactive-text mb-8 leading-relaxed">
-                     Produtos, serviços e achados na sua região. Tudo organizado para você encontrar o que precisa em poucos cliques.
+                     Cadastrou produto ou serviço? Já aparece na sua página pública. Use o link na bio do Instagram ou o QR Code no seu balcão. Venda localmente para o bairro ou nacionalmente para todo o Brasil.
                   </p>
-                  <Button onClick={() => onNavigate('explore')}>
-                     Ver o que tem por aqui <ArrowRightIcon className="w-4 h-4 ml-2" />
+                  <Button>
+                     Começar agora <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                </motion.div>
             </div>
@@ -293,12 +290,12 @@ const Solutions = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                   className="order-2 md:order-1"
                >
                   <span className="text-brand-inactive-text uppercase tracking-wider text-sm font-semibold mb-2 block">PARA QUEM FAZ ACONTECER</span>
-                  <h3 className="text-4xl font-bold text-brand-dark mb-6">Mostre o que você faz</h3>
+                  <h3 className="text-4xl font-bold text-brand-dark mb-6">Feita para o seu estilo de negócio</h3>
                   <p className="text-brand-inactive-text mb-8 leading-relaxed">
-                     Se você vende, faz artesanato ou presta serviços, a Dudit é o lugar certo para você aparecer para quem está por perto. Sem complicação técnica.
+                     Se você vende na loja física, pelo WhatsApp, de casa, faz artesanato ou presta serviços. A Dudit foi feita para quem quer organizar o dia a dia e vender mais sem complicação técnica.
                   </p>
-                  <Button onClick={() => onNavigate('start-selling')}>
-                     Criar meu anúncio <ArrowRightIcon className="w-4 h-4 ml-2" />
+                  <Button>
+                     Organizar meu negócio <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                </motion.div>
 
@@ -315,17 +312,17 @@ const Solutions = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         whileHover={{ y: -5 }}
                      >
                         <div className="flex items-center gap-2 mb-2">
-                           <GridIcon className="w-4 h-4 text-brand-dark" />
-                           <span className="text-sm font-bold text-brand-dark">Novidades</span>
+                           <Layout className="w-4 h-4 text-brand-dark" />
+                           <span className="text-sm font-bold text-brand-dark">Resumo do Dia</span>
                         </div>
 
                         {/* WhatsApp Sale */}
                         <div className="flex items-center gap-3 bg-green-50 p-2.5 rounded-lg border border-green-100">
                            <div className="bg-green-500 p-1.5 rounded-full text-white">
-                              <WhatsappIcon size={14} />
+                              <MessageCircle size={14} />
                            </div>
                            <div className="flex-1">
-                              <div className="text-xs font-bold text-brand-dark">Interesse via WhatsApp</div>
+                              <div className="text-xs font-bold text-brand-dark">Venda pelo WhatsApp</div>
                               <div className="text-[10px] text-brand-inactive-text">Bolo de Pote • Cliente: Ana</div>
                            </div>
                            <div className="text-xs font-bold text-green-700">R$ 25</div>
@@ -334,10 +331,10 @@ const Solutions = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         {/* Service Scheduled */}
                         <div className="flex items-center gap-3 bg-blue-50 p-2.5 rounded-lg border border-blue-100">
                            <div className="bg-blue-500 p-1.5 rounded-full text-white">
-                              <CalendarIcon size={14} />
+                              <Calendar size={14} />
                            </div>
                            <div className="flex-1">
-                              <div className="text-xs font-bold text-brand-dark">Agendado</div>
+                              <div className="text-xs font-bold text-brand-dark">Serviço Agendado</div>
                               <div className="text-[10px] text-brand-inactive-text">Manutenção • Hoje, 14h</div>
                            </div>
                         </div>
@@ -345,10 +342,10 @@ const Solutions = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         {/* Physical Store Sale */}
                         <div className="flex items-center gap-3 bg-gray-50 p-2.5 rounded-lg border border-gray-200">
                            <div className="bg-gray-700 p-1.5 rounded-full text-white">
-                              <StoreIcon size={14} />
+                              <Store size={14} />
                            </div>
                            <div className="flex-1">
-                              <div className="text-xs font-bold text-brand-dark">Na sua cidade</div>
+                              <div className="text-xs font-bold text-brand-dark">Venda no Balcão</div>
                               <div className="text-[10px] text-brand-inactive-text">Camiseta Básica</div>
                            </div>
                            <div className="text-xs font-bold text-brand-dark">R$ 50</div>
@@ -364,10 +361,10 @@ const Solutions = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         transition={{ delay: 0.3 }}
                      >
                         <div className="bg-white p-2 rounded-full">
-                           <CheckCircleIcon size={20} className="text-brand-green" />
+                           <CheckCircle2 size={20} className="text-brand-green" />
                         </div>
                         <div>
-                           <div className="text-sm font-bold">Simples e rápido</div>
+                           <div className="text-sm font-bold">Tudo Organizado</div>
                            <div className="text-[10px] font-medium opacity-80">Em um só lugar</div>
                         </div>
                      </motion.div>
@@ -379,23 +376,23 @@ const Solutions = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
    );
 };
 
-const BentoFeatures = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
+const BentoFeatures = () => {
    const cards = [
       {
-         title: "Resolva rápido",
-         description: "Ache produtos e serviços perto de você, sem perder tempo.",
+         title: "Vendas e pedidos",
+         description: "Vendas, pedidos, orçamentos e locações. Tudo registrado e organizado em um só lugar.",
          type: "sales",
          colSpan: "col-span-1"
       },
       {
-         title: "Sem complicação",
-         description: "Nada de cadastro difícil ou sistema pesado. Só o que você precisa.",
+         title: "Estoque e aluguéis",
+         description: "Estoque atualizado automaticamente e controle de itens alugados para você não se perder.",
          type: "stock",
          colSpan: "col-span-1"
       },
       {
-         title: "Pra todo mundo",
-         description: "Negócios ou pessoas — qualquer um pode usar para anunciar ou encontrar.",
+         title: "Financeiro simples",
+         description: "Contas a pagar e receber, fluxo de caixa e lucro líquido por categoria de venda.",
          type: "finance",
          colSpan: "col-span-1"
       }
@@ -406,11 +403,11 @@ const BentoFeatures = ({ onNavigate }: { onNavigate: (page: string) => void }) =
          <GridLines />
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <SectionHeader
-               subtitle="BENEFÍCIOS"
-               title="Um lugar simples pra resolver o dia a dia"
+               subtitle="SEM TELAS COMPLICADAS"
+               title="Organize o que realmente traz lucro"
             />
             <p className="text-brand-inactive-text max-w-2xl mb-16 text-lg -mt-8">
-               A Dudit funciona para todo mundo, de forma rápida e sem complicação.
+               O essencial para o seu negócio rodar liso, sem precisar de cursos para entender o sistema.
             </p>
 
             <div className="grid md:grid-cols-3 gap-8">
@@ -442,18 +439,18 @@ const BentoFeatures = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                            <div className="relative w-full h-full flex justify-center items-center p-4">
                               <div className="w-full max-w-[240px] bg-white rounded-lg border border-gray-100 p-3 flex flex-col gap-3">
                                  <div className="flex justify-between items-center border-b border-gray-50 pb-2">
-                                    <div className="text-[10px] font-bold text-brand-inactive-text uppercase">O que tem por aqui</div>
-                                    <CalendarIcon size={12} className="text-brand-inactive-text" />
+                                    <div className="text-[10px] font-bold text-brand-inactive-text uppercase">Estoque & Agenda</div>
+                                    <Calendar size={12} className="text-brand-inactive-text" />
                                  </div>
 
                                  <div className="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-100">
                                     <div className="flex items-center gap-2">
                                        <div className="w-6 h-6 bg-brand-green/20 rounded flex items-center justify-center">
-                                          <BoxIcon size={10} className="text-brand-dark" />
+                                          <Box size={10} className="text-brand-dark" />
                                        </div>
                                        <div>
-                                          <div className="text-[10px] font-bold text-brand-dark">Encontre Produtos</div>
-                                          <div className="text-[8px] text-brand-inactive-text">Perto de você</div>
+                                          <div className="text-[10px] font-bold text-brand-dark">Produto A</div>
+                                          <div className="text-[8px] text-brand-inactive-text">12 unidades</div>
                                        </div>
                                     </div>
                                     <div className="text-[10px] font-bold text-green-600 bg-green-100 px-1.5 py-0.5 rounded">Em alta</div>
@@ -462,11 +459,11 @@ const BentoFeatures = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                                  <div className="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-100">
                                     <div className="flex items-center gap-2">
                                        <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
-                                          <CalendarIcon size={10} className="text-blue-600" />
+                                          <Calendar size={10} className="text-blue-600" />
                                        </div>
                                        <div>
-                                          <div className="text-[10px] font-bold text-brand-dark">Ache Serviços</div>
-                                          <div className="text-[8px] text-brand-inactive-text">Quem faz o que você precisa</div>
+                                          <div className="text-[10px] font-bold text-brand-dark">Aluguel Equip.</div>
+                                          <div className="text-[8px] text-brand-inactive-text">Devolução: Hoje</div>
                                        </div>
                                     </div>
                                     <div className="text-[10px] font-bold text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">14:00</div>
@@ -477,8 +474,8 @@ const BentoFeatures = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                         {card.type === 'finance' && (
                            <div className="bg-white w-full max-w-[240px] rounded-lg p-4 border border-gray-100">
                               <div className="flex justify-between items-center mb-4">
-                                 <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Fácil de achar</span>
-                                 <ChartIcon size={14} className="text-brand-inactive-text" />
+                                 <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Seu Lucro</span>
+                                 <PieChart size={14} className="text-brand-inactive-text" />
                               </div>
                               <div className="flex gap-2 items-end mb-2">
                                  <div className="w-3 bg-brand-green h-8 rounded-sm"></div>
@@ -503,26 +500,26 @@ const BentoFeatures = ({ onNavigate }: { onNavigate: (page: string) => void }) =
    );
 };
 
-const PaymentSuite = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
+const PaymentSuite = () => {
    const differentials = [
       {
-         title: "Para quem quer comprar",
-         description: "Encontre tudo o que você precisa na sua cidade, de produtos a serviços, de forma rápida.",
+         title: "Para quem vende produtos",
+         description: "Sua loja organizada e online em minutos. Controle o estoque automaticamente e receba pedidos pela vitrine.",
          type: "commission"
       },
       {
-         title: "Para quem quer vender",
-         description: "Anuncie seus produtos ou serviços em minutos e apareça para quem está por perto.",
+         title: "Para quem presta serviços",
+         description: "Ficha técnica personalizada, agendamentos simples, ordens de serviço e histórico completo de clientes.",
          type: "easy"
       },
       {
-         title: "Tudo em um só lugar",
-         description: "Uma plataforma simples para conectar quem faz e quem precisa na sua região.",
+         title: "Produtos + Serviços",
+         description: "Venda peças e mão de obra no mesmo lugar. Baixa de estoque e agendamento integrados.",
          type: "page"
       },
       {
-         title: "Sem burocracia",
-         description: "Nada de sistemas pesados. Foco no que realmente importa: resolver o seu dia.",
+         title: "Para quem aluga itens",
+         description: "Controle locações sem planilhas. Defina valores por período e bloqueie o estoque automaticamente.",
          type: "market"
       }
    ];
@@ -532,11 +529,11 @@ const PaymentSuite = ({ onNavigate }: { onNavigate: (page: string) => void }) =>
          <GridLines />
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <SectionHeader
-               subtitle="PARA TODOS"
-               title="O que você precisa hoje?"
+               subtitle="SOLUÇÕES PARA TODOS"
+               title="Qual é o seu negócio? A Dudit resolve."
             />
             <p className="text-brand-inactive-text max-w-3xl mb-16 text-lg -mt-8">
-               A Dudit conecta você com o que tem de melhor na sua cidade. Simples, rápido e direto.
+               Não é apenas um sistema de gestão ou apenas uma vitrine. É a união de tudo o que você precisa.
             </p>
 
             <div className="grid md:grid-cols-2 gap-8">
@@ -574,7 +571,7 @@ const PaymentSuite = ({ onNavigate }: { onNavigate: (page: string) => void }) =>
                            <div className="bg-white p-4 rounded-xl border border-gray-100 w-56">
                               <div className="flex items-center gap-3 mb-3 border-b border-gray-50 pb-3">
                                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                    <UserIcon size={14} className="text-blue-600" />
+                                    <User size={14} className="text-blue-600" />
                                  </div>
                                  <div>
                                     <div className="text-[10px] font-bold text-brand-dark">João Silva</div>
@@ -610,7 +607,7 @@ const PaymentSuite = ({ onNavigate }: { onNavigate: (page: string) => void }) =>
                               <div className="p-3 space-y-3">
                                  <div className="flex gap-2">
                                     <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                                       <BoxIcon size={14} className="text-brand-inactive-text" />
+                                       <Box size={14} className="text-brand-inactive-text" />
                                     </div>
                                     <div className="flex-1">
                                        <div className="h-2 w-16 bg-gray-200 rounded mb-1"></div>
@@ -620,7 +617,7 @@ const PaymentSuite = ({ onNavigate }: { onNavigate: (page: string) => void }) =>
                                  </div>
                                  <div className="flex gap-2">
                                     <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                                       <CalendarIcon size={14} className="text-blue-400" />
+                                       <Calendar size={14} className="text-blue-400" />
                                     </div>
                                     <div className="flex-1">
                                        <div className="h-2 w-20 bg-gray-200 rounded mb-1"></div>
@@ -671,7 +668,7 @@ const PaymentSuite = ({ onNavigate }: { onNavigate: (page: string) => void }) =>
    )
 }
 
-const GlobalScale = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
+const GlobalScale = () => {
    return (
       <section className="py-24 bg-white relative">
          <GridLines />
@@ -726,7 +723,7 @@ const GlobalScale = ({ onNavigate }: { onNavigate: (page: string) => void }) => 
                         className="absolute top-[10%] left-0 lg:left-[5%] bg-white rounded-2xl p-4 pr-8 flex items-center gap-4 max-w-[280px]"
                      >
                         <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
-                           <StoreIcon size={20} className="text-brand-inactive-text" />
+                           <Store size={20} className="text-brand-inactive-text" />
                         </div>
                         <div className="flex-1">
                            <p className="text-xs text-brand-inactive-text"><span className="font-bold text-brand-dark">Oficina do Seu Manoel</span> vendeu</p>
@@ -744,7 +741,7 @@ const GlobalScale = ({ onNavigate }: { onNavigate: (page: string) => void }) => 
                         className="absolute top-[40%] right-0 lg:right-[5%] bg-white rounded-2xl p-4 pr-8 flex items-center gap-4 max-w-[320px]"
                      >
                         <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
-                           <UserIcon size={20} className="text-brand-inactive-text" />
+                           <User size={20} className="text-brand-inactive-text" />
                         </div>
                         <div className="flex-1">
                            <p className="text-xs text-brand-inactive-text"><span className="font-bold text-brand-dark">Ana Bolos</span> agendou</p>
@@ -762,7 +759,7 @@ const GlobalScale = ({ onNavigate }: { onNavigate: (page: string) => void }) => 
                         className="absolute bottom-[10%] left-0 lg:left-[10%] bg-white rounded-2xl p-4 pr-8 flex items-center gap-4 max-w-[280px]"
                      >
                         <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
-                           <ShoppingBagIcon size={20} className="text-brand-inactive-text" />
+                           <ShoppingBag size={20} className="text-brand-inactive-text" />
                         </div>
                         <div className="flex-1">
                            <p className="text-xs text-brand-inactive-text"><span className="font-bold text-brand-dark">Loja de Roupas</span> vendeu</p>
@@ -782,19 +779,19 @@ const GlobalScale = ({ onNavigate }: { onNavigate: (page: string) => void }) => 
 const UseCases = () => {
    const cases = [
       {
-         text: "Pessoas encontrando produtos únicos da sua região em poucos segundos.",
-         type: "Achados Locais",
-         icon: ShoppingBagIcon
+         text: "Uma loja de roupas que vendia pelo WhatsApp organizou o estoque e ganhou uma vitrine online no mesmo dia.",
+         type: "Loja de Roupas",
+         icon: ShoppingBag
       },
       {
-         text: "Serviços de confiança agendados diretamente, sem complicação.",
-         type: "Serviços Rápidos",
-         icon: WrenchIcon
+         text: "Uma oficina mecânica substituiu os orçamentos de papel por ordens de serviço digitais, com links de pagamento direto.",
+         type: "Oficina Mecânica",
+         icon: Wrench
       },
       {
-         text: "Negócios locais aparecendo para toda a cidade de forma gratuita.",
-         type: "Divulgação Grátis",
-         icon: StoreIcon
+         text: "Uma confeitaria local parou de perder pedidos no chat e agora recebe encomendas direto pela sua página.",
+         type: "Confeitaria Local",
+         icon: Store
       }
    ];
 
@@ -837,12 +834,10 @@ export const HomePage = () => {
          setActivePage('home');
          window.scrollTo(0, 0);
       }
-      else if (page === 'explore') router.push('/explorar');
       else if (page === 'segments') router.push('/institucional/segmentos');
       else if (page === 'pricing') router.push('/institucional/planos');
       else if (page === 'terms') router.push('/institucional/termos');
       else if (page === 'privacidade') router.push('/institucional/privacidade');
-      else if (page === 'start-selling') router.push('/erp/switch');
       else {
          setActivePage(page);
          window.scrollTo(0, 0);
@@ -855,11 +850,11 @@ export const HomePage = () => {
          <main>
             {activePage === 'home' && (
                <>
-                  <Hero onNavigate={onNavigate} />
-                  <Solutions onNavigate={onNavigate} />
-                  <BentoFeatures onNavigate={onNavigate} />
-                  <PaymentSuite onNavigate={onNavigate} />
-                  <GlobalScale onNavigate={onNavigate} />
+                  <Hero />
+                  <Solutions />
+                  <BentoFeatures />
+                  <PaymentSuite />
+                  <GlobalScale />
                   <UseCases />
                   <CTA onNavigate={onNavigate} />
                </>
