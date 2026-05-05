@@ -3,7 +3,7 @@
 import React, { useState, useRef, useCallback, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { Button, InfoCard, DefaultModal } from "@/components/reusable"
-import { CheckCircleIcon, ChevronLeftIcon, ArrowRightIcon, XIcon, Info } from "@/lib/icons"
+import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, XIcon, Info } from "@/lib/icons"
 import { disconnectMercadoPagoAction } from "@/app/actions/mercadopago"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
@@ -29,7 +29,7 @@ export const IntegrationCard = ({
   icon: any
   children: React.ReactNode
 }) => (
-  <div className="border border-brand-border dark:border-dark-border rounded-xl p-5 flex flex-col h-full bg-white dark:bg-dark-surface hover:shadow-sm transition-all">
+  <div className="border border-brand-border dark:border-dark-border rounded-xl p-5 flex flex-col h-full bg-white dark:bg-dark-surface transition-all">
     <div className="flex justify-between items-start mb-4">
       <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white ${colorClass}`}>
         <Icon size={24} />
@@ -155,7 +155,6 @@ export const IntegrationsSubPage = ({
     {
       title: "Funcionalidades do Mercado Pago",
       list: [
-        "Checkout Pro e Transparente",
         "Pagamento com cartão, Pix, boleto e débito",
         "Parcelamento em até 12x",
         "Parcelamento sem cartão (pra quem tem conta Mercado Pago)",
@@ -264,18 +263,18 @@ export const IntegrationsSubPage = ({
               >
                 <XIcon size={18} />
               </button>
-              
-              <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl shadow-sm p-4 flex items-center justify-center transform transition-transform group-hover:-rotate-3">
+
+              <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:-rotate-3">
                 <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-full h-full object-contain" />
               </div>
-              
+
               <div className="flex flex-col items-center gap-1">
-                <div className="w-12 h-6 bg-white dark:bg-dark-surface rounded-full flex items-center justify-center shadow-sm border border-brand-border/50 dark:border-dark-border/50">
-                  <ArrowRightIcon size={14} className="text-brand-green" />
+                <div className="w-12 h-6 bg-white dark:bg-dark-surface rounded-full flex items-center justify-center border border-brand-border/50 dark:border-dark-border/50">
+                  <ArrowLeftRightIcon size={14} className="text-brand-green" />
                 </div>
               </div>
 
-              <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl shadow-sm p-4 flex items-center justify-center transform transition-transform group-hover:rotate-3">
+              <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:rotate-3">
                 <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-full h-full object-contain" />
               </div>
             </div>
@@ -297,14 +296,14 @@ export const IntegrationsSubPage = ({
                   <Info size={16} />
                 </span>
                 Saber mais sobre essa integração
-                <ArrowRightIcon size={14} className="ml-1" />
+                <ArrowLeftRightIcon size={14} className="ml-1" />
               </button>
 
               <div className="flex flex-col md:flex-row gap-3">
-                <Button variant="outline" className="flex-1 h-12 rounded-xl" onClick={() => setActiveModal(null)}>
+                <Button variant="outline" className="flex-1 h-12" onClick={() => setActiveModal(null)}>
                   Cancelar
                 </Button>
-                <Button className="flex-1 h-12 rounded-xl bg-brand-primary hover:bg-brand-primary/90 text-white" onClick={() => setActiveModal("permissions")}>
+                <Button className="flex-1 h-12" onClick={() => setActiveModal("permissions")}>
                   Conectar agora
                 </Button>
               </div>
@@ -332,15 +331,14 @@ export const IntegrationsSubPage = ({
             </div>
 
             <div className="p-8 flex-1 flex flex-col">
-              <div className="mb-4">
-                <span className="text-[13px] font-bold uppercase tracking-wider text-brand-green mb-1 block">
-                  Passo {knowMoreStep + 1} de {KNOW_MORE_STEPS.length}
-                </span>
-                <div className="flex gap-1.5 mt-2">
+              <div className="mb-8">
+                <div className="flex gap-2">
                   {KNOW_MORE_STEPS.map((_, i) => (
-                    <div
+                    <motion.div
                       key={i}
-                      className={`h-1.5 rounded-full transition-all duration-300 ${i === knowMoreStep ? "w-8 bg-brand-green" : "w-1.5 bg-brand-border dark:bg-dark-border"}`}
+                      layout
+                      className={`h-1.5 flex-1 rounded-full transition-colors duration-500 ${i <= knowMoreStep ? "bg-brand-green" : "bg-gray-100 dark:bg-dark-border"
+                        }`}
                     />
                   ))}
                 </div>
@@ -358,7 +356,7 @@ export const IntegrationsSubPage = ({
                   <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-4 leading-tight">
                     {KNOW_MORE_STEPS[knowMoreStep].title}
                   </h3>
-                  
+
                   {KNOW_MORE_STEPS[knowMoreStep].description && (
                     <p className="text-[16px] text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-wrap">
                       {KNOW_MORE_STEPS[knowMoreStep].description}
@@ -369,8 +367,8 @@ export const IntegrationsSubPage = ({
                     <ul className="space-y-4 mt-6">
                       {KNOW_MORE_STEPS[knowMoreStep].list.map((item, i) => (
                         <li key={i} className="flex items-start gap-3 text-[15px] text-brand-dark dark:text-dark-heading font-medium">
-                          <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-green/10 text-brand-green text-[10px] font-bold">
-                            ✓
+                          <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-green/10 text-brand-green text-[8px]">
+                            ●
                           </span>
                           {item}
                         </li>
@@ -380,26 +378,26 @@ export const IntegrationsSubPage = ({
                 </motion.div>
               </AnimatePresence>
 
-              <div className="mt-10 flex items-center justify-between border-t border-brand-border dark:border-dark-border pt-6">
+              <div className="mt-10 flex items-center justify-end gap-3 border-t border-brand-border dark:border-dark-border pt-6">
                 <Button
                   variant="outline"
                   disabled={knowMoreStep === 0}
                   onClick={() => setKnowMoreStep(prev => prev - 1)}
-                  className="rounded-xl px-6 h-11"
+                  className="flex-1 md:flex-none md:min-w-[140px] h-11"
                 >
                   Anterior
                 </Button>
 
                 {knowMoreStep === KNOW_MORE_STEPS.length - 1 ? (
                   <Button
-                    className="bg-brand-primary hover:bg-brand-primary/90 text-white rounded-xl px-8 h-11"
+                    className="flex-1 md:flex-none md:min-w-[140px] h-11"
                     onClick={() => setActiveModal("info")}
                   >
                     Entendido
                   </Button>
                 ) : (
                   <Button
-                    className="bg-brand-primary hover:bg-brand-primary/90 text-white rounded-xl px-8 h-11"
+                    className="flex-1 md:flex-none md:min-w-[140px] h-11"
                     onClick={() => setKnowMoreStep(prev => prev + 1)}
                   >
                     Próximo
@@ -430,15 +428,15 @@ export const IntegrationsSubPage = ({
 
             <div className="p-8">
               <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-6">Permissões do Aplicativo</h3>
-              
-              <div className="space-y-6 mb-8">
-                <p className="text-[15px] text-brand-dark dark:text-dark-heading font-medium bg-brand-gray dark:bg-dark-border/20 p-4 rounded-xl border-l-4 border-brand-green">
-                  Antes de instalar, é importante dar uma olhada nas permissões do aplicativo e concordar com elas para ativar na sua loja.
-                </p>
 
+              <div className="space-y-6 mb-8">
+                <InfoCard
+                  message="Antes de instalar, é importante dar uma olhada nas permissões do aplicativo e concordar com elas para ativar na sua loja."
+                  color="green"
+                />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <h4 className="text-sm font-bold text-brand-green uppercase tracking-wide">Sobre os dados da sua loja</h4>
+                    <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Sobre os dados da sua loja</h4>
                     <p className="text-[14px] text-brand-inactive-text dark:text-dark-body leading-relaxed">
                       O aplicativo terá acesso apenas para leitura dos seus produtos e categorias (ou seja, não poderá alterar essas informações).
                     </p>
@@ -448,7 +446,7 @@ export const IntegrationsSubPage = ({
                   </div>
 
                   <div className="space-y-2">
-                    <h4 className="text-sm font-bold text-brand-green uppercase tracking-wide">Sobre os dados dos seus clientes</h4>
+                    <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Sobre os dados dos seus clientes</h4>
                     <p className="text-[14px] text-brand-inactive-text dark:text-dark-body leading-relaxed">
                       O app poderá criar, editar e excluir informações de vendas na sua loja.
                     </p>
@@ -465,9 +463,9 @@ export const IntegrationsSubPage = ({
                 <div className="pt-6 border-t border-brand-border dark:border-dark-border">
                   <p className="text-[13px] text-brand-inactive-text dark:text-dark-body leading-relaxed">
                     Ao conectar, você concorda com a{" "}
-                    <a 
-                      href="https://www.mercadopago.com.br/privacidade" 
-                      target="_blank" 
+                    <a
+                      href="https://www.mercadopago.com.br/privacidade"
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="text-brand-green font-bold hover:underline"
                     >
@@ -481,11 +479,11 @@ export const IntegrationsSubPage = ({
               </div>
 
               <div className="flex flex-col-reverse md:flex-row gap-3">
-                <Button variant="outline" className="flex-1 h-12 rounded-xl" onClick={() => setActiveModal("info")}>
+                <Button variant="outline" className="flex-1 h-12" onClick={() => setActiveModal("info")}>
                   Cancelar
                 </Button>
-                <Button 
-                  className="flex-1 h-12 rounded-xl bg-brand-primary hover:bg-brand-primary/90 text-white font-bold" 
+                <Button
+                  className="flex-1 h-12"
                   onClick={handleStartOAuth}
                   isLoading={isLoading}
                 >

@@ -33,6 +33,7 @@ import {
     RankingIcon as RankingIcon01,
     WhatsappIcon as WhatsappIcon01,
     HelpCircleIcon as HelpCircle,
+    ArrowLeftRightIcon as ArrowLeftRightIcon01,
     Archive03Icon,
     Location01Icon,
     InstagramIcon as InstagramIcon01,
@@ -159,6 +160,7 @@ export const ArrowRightIcon = CreateIcon(ArrowRight02Icon)
 export const ArrowUpDownIcon = CreateIcon(ArrowUpDown)
 export const ArrowLeftDoubleIcon = CreateIcon(ArrowLeftDoubleIcon01)
 export const ArrowRightDoubleIcon = CreateIcon(ArrowRightDoubleIcon01)
+export const ArrowLeftRightIcon = CreateIcon(ArrowLeftRightIcon01)
 
 export const UnfoldMoreIcon = CreateIcon(UnfoldMore01Icon)
 export const ChevronsUpDown = CreateIcon(MenuSquare01)
