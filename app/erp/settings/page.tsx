@@ -7,7 +7,7 @@ import { getPartnerPaymentMethodsCached } from "@/lib/data/partner"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { createAdminClient } from "@/lib/supabase/server"
-import { can } from "@/lib/permissions/can"
+import { canAccessRoute, normalizeToRoutePermissions } from "@/lib/permissions/route-permissions"
 import { decryptCPF } from "@/lib/crypto"
 
 export default async function SettingsPage() {
@@ -18,7 +18,9 @@ export default async function SettingsPage() {
   if (!context) {
     redirect("/select-erp")
   }
-  if (!can({ role_id: context.roleId, permissions: context.permissions }, "settings.view")) {
+  
+  const routePermissions = normalizeToRoutePermissions(context.role, context.permissions)
+  if (!canAccessRoute(routePermissions, "settings")) {
     return <AccessDenied />
   }
 

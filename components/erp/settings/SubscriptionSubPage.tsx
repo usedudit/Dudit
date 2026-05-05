@@ -80,6 +80,7 @@ function buildLimitsDisplay(limits: Record<string, any>): string[] {
 
 interface PlanCardProps {
     name: string
+    objective: string
     price: number
     features: string[]
     limits: string[]
@@ -92,6 +93,7 @@ interface PlanCardProps {
 
 const PlanCard: React.FC<PlanCardProps> = ({
     name,
+    objective,
     price,
     features,
     limits,
@@ -106,7 +108,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         className={`rounded-3xl p-8 flex flex-col h-full relative border overflow-hidden ${popular
-            ? "bg-brand-dark border-brand-dark"
+            ? "bg-brand-dark border-brand-dark md:-translate-y-4 shadow-xl"
             : "bg-white dark:bg-dark-surface border-brand-border dark:border-dark-border hover:border-brand-green/30 transition-all duration-300"
             }`}
     >
@@ -121,9 +123,13 @@ const PlanCard: React.FC<PlanCardProps> = ({
             <h3 className={`text-xl font-bold mb-1 ${popular ? "text-white" : "text-brand-dark dark:text-dark-heading"}`}>
                 {name}
             </h3>
-            <div className="flex items-baseline gap-1 mt-4">
-                <span className={`text-4xl font-bold ${popular ? "text-white" : "text-brand-dark dark:text-dark-heading"}`}>
-                    {formatCurrency(price)}
+            <p className={`text-[10px] font-bold mb-6 ${popular ? "text-brand-green" : "text-brand-green"}`}>
+                {objective}
+            </p>
+            <div className="flex items-baseline gap-1">
+                <span className={`text-sm ${popular ? "text-brand-inactive-text/80" : "text-brand-inactive-text"}`}>R$</span>
+                <span className={`text-5xl font-bold ${popular ? "text-white" : "text-brand-dark dark:text-dark-heading"}`}>
+                    {price.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                 </span>
                 <span className={`text-sm ${popular ? "text-brand-inactive-text/80" : "text-brand-inactive-text"}`}>/mês</span>
             </div>
@@ -522,6 +528,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                                         <PlanCard
                                             key={plan.id}
                                             name={getHardcodedPlan(plan.slug).name}
+                                            objective={getHardcodedPlan(plan.slug).objective}
                                             price={plan.price}
                                             features={getHardcodedPlan(plan.slug).features}
                                             limits={getHardcodedPlan(plan.slug).limits}

@@ -12,9 +12,9 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-    title: "Dudit | Descubra o que tem por aqui",
+    title: "Dudit | Encontre produtos e serviços na sua cidade",
     description:
-        "Encontre produtos e serviços na sua cidade ou anuncie o que você oferece. Venda sem taxas e organize seus pedidos, clientes e vendas em um só lugar.",
+        "Crie sua vitrine digital e venda produtos, serviços ou aluguel na sua cidade. Receba pedidos, organize seu negócio e não pague comissão.",
     keywords: [
         "vender online sem taxa",
         "vitrine digital",
@@ -26,9 +26,9 @@ export const metadata: Metadata = {
         "divulgar serviços locais",
     ],
     openGraph: {
-        title: "Dudit | Descubra o que tem por aqui",
+        title: "Dudit | Encontre produtos e serviços na sua cidade",
         description:
-            "Encontre produtos e serviços na sua cidade ou anuncie o que você oferece. Simples, direto e sem taxas.",
+            "Venda produtos, serviços e até aluguel na sua cidade com 0% de comissão. Crie sua vitrine online e comece hoje.",
         url: "https://dudit.com.br",
         siteName: "Dudit",
         images: [
@@ -125,6 +125,16 @@ export default async function RootLayout({
                                         "name": "Brasil"
                                     },
                                     "description": "Plataforma online que conecta pessoas a produtos e serviços disponíveis na sua cidade."
+                                },
+                                {
+                                    "@type": "SoftwareApplication",
+                                    "name": "Dudit",
+                                    "applicationCategory": "BusinessApplication",
+                                    "offers": {
+                                        "@type": "Offer",
+                                        "price": "0",
+                                        "priceCurrency": "BRL"
+                                    }
                                 }
                             ]
                         })

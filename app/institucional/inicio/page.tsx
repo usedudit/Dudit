@@ -34,15 +34,15 @@ const Hero = () => {
                   transition={{ duration: 0.6 }}
                >
                   <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-brand-dark leading-[1.1] mb-6">
-                     Venda produtos, agende serviços e gerencie tudo em um só lugar.
+                     Descubra, venda e alugue localmente. Sem comissão.
                   </h1>
                   <p className="text-brand-dark text-lg md:text-xl font-medium mb-8 max-w-lg leading-tight">
-                     Sua vitrine digital com <span className="text-brand-green">0% de comissão</span>. Publique online em minutos e mantenha 100% da sua venda com você.
+                     Crie sua vitrine online em minutos e receba pedidos direto no celular. Sem taxas por venda, sem intermediários e focado no seu bairro.
                   </p>
 
                   <div className="flex flex-wrap gap-4">
-                     <Button>Começar grátis</Button>
-                     <Button variant="outline">Ver como funciona</Button>
+                     <Button>Criar minha vitrine</Button>
+                     <Button variant="outline">Explorar Dudit</Button>
                   </div>
 
                </motion.div>
@@ -62,7 +62,7 @@ const Hero = () => {
                            <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
                            <div className="w-3 h-3 rounded-full bg-brand-green"></div>
                         </div>
-                        <div className="bg-white px-3 py-1 rounded text-xs text-brand-inactive-text flex-1 text-center font-mono">vitrine.dudit.com.br/seu-negocio</div>
+                        <div className="bg-white px-3 py-1 rounded text-xs text-brand-inactive-text flex-1 text-center font-mono">dudit.com.br/sua-vitrine</div>
                      </div>
                      <div className="p-6 flex gap-6">
                         <div className="w-16 hidden sm:flex flex-col gap-6 text-brand-inactive-text">
@@ -74,10 +74,10 @@ const Hero = () => {
                         <div className="flex-1">
                            <div className="flex justify-between items-end mb-8">
                               <div>
-                                 <p className="text-sm text-brand-inactive-text mb-1">Total de Vendas (Sem Taxas)</p>
+                                 <p className="text-sm text-brand-inactive-text mb-1">Vendas (Comissão Zero)</p>
                                  <h3 className="text-3xl font-bold text-brand-dark">R$ 54.897,00</h3>
                                  <p className="text-xs text-green-600 font-medium flex items-center gap-1 mt-1">
-                                    <TrendingUp className="w-3 h-3" /> +100% de lucro para você
+                                    <TrendingUp className="w-3 h-3" /> 100% do lucro é seu
                                  </p>
                               </div>
                               <div className="text-xs text-brand-inactive-text">Hoje, 15:30</div>
@@ -196,12 +196,12 @@ const Solutions = () => {
          <GridLines />
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <SectionHeader
-               subtitle="TUDO EM UM SÓ LUGAR"
-               title="A Dudit organiza seu negócio de forma simples e direta"
+               subtitle="SIMPLES E DIRETO"
+               title="Organize seu negócio sem a bagunça do WhatsApp"
             />
 
             <p className="text-brand-inactive-text max-w-3xl mb-20 text-lg">
-               Você não precisa mais anotar vendas no caderno, se perder em conversas de WhatsApp, usar planilhas que nunca batem ou pagar comissões altas para marketplaces.
+               Abandone os cadernos e planilhas. Centralize pedidos, agendamentos e orçamentos em um só lugar, sem pagar comissões abusivas.
             </p>
 
             {/* Feature 1: Vitrine Online */}
@@ -270,13 +270,13 @@ const Solutions = () => {
                   whileInView={{ opacity: 1 }}
                   viewport={{ once: true }}
                >
-                  <span className="text-brand-inactive-text uppercase tracking-wider text-sm font-semibold mb-2 block">CATÁLOGO AUTOMÁTICO</span>
-                  <h3 className="text-4xl font-bold text-brand-dark mb-6">Sua vitrine digital pronta em minutos</h3>
+                  <span className="text-brand-inactive-text uppercase tracking-wider text-sm font-semibold mb-2 block">CATÁLOGO DIGITAL</span>
+                  <h3 className="text-4xl font-bold text-brand-dark mb-6">Sua vitrine online em 60 segundos</h3>
                   <p className="text-brand-inactive-text mb-8 leading-relaxed">
-                     Cadastrou produto ou serviço? Já aparece na sua página pública. Use o link na bio do Instagram ou o QR Code no seu balcão. Venda localmente para o bairro ou nacionalmente para todo o Brasil.
+                     Cadastre seus produtos ou serviços e receba um link exclusivo para compartilhar no Instagram ou WhatsApp. Venda para o seu bairro ou para todo o Brasil, com controle total.
                   </p>
                   <Button>
-                     Começar agora <ArrowRight className="w-4 h-4 ml-2" />
+                     Começar grátis <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                </motion.div>
             </div>
@@ -289,10 +289,10 @@ const Solutions = () => {
                   viewport={{ once: true }}
                   className="order-2 md:order-1"
                >
-                  <span className="text-brand-inactive-text uppercase tracking-wider text-sm font-semibold mb-2 block">PARA QUEM FAZ ACONTECER</span>
-                  <h3 className="text-4xl font-bold text-brand-dark mb-6">Feita para o seu estilo de negócio</h3>
+                  <span className="text-brand-inactive-text uppercase tracking-wider text-sm font-semibold mb-2 block">SISTEMA TUDO-EM-UM</span>
+                  <h3 className="text-4xl font-bold text-brand-dark mb-6">Feito para quem vende, atende ou aluga</h3>
                   <p className="text-brand-inactive-text mb-8 leading-relaxed">
-                     Se você vende na loja física, pelo WhatsApp, de casa, faz artesanato ou presta serviços. A Dudit foi feita para quem quer organizar o dia a dia e vender mais sem complicação técnica.
+                     Seja você um artesão, prestador de serviços ou lojista, a Dudit foi feita para quem quer profissionalizar as vendas e organizar o dia a dia sem complicação técnica.
                   </p>
                   <Button>
                      Organizar meu negócio <ArrowRight className="w-4 h-4 ml-2" />
@@ -379,20 +379,20 @@ const Solutions = () => {
 const BentoFeatures = () => {
    const cards = [
       {
-         title: "Vendas e pedidos",
-         description: "Vendas, pedidos, orçamentos e locações. Tudo registrado e organizado em um só lugar.",
+         title: "Pedidos e Vendas",
+         description: "Receba pedidos, envie orçamentos e organize locações em um só lugar. Tudo automático.",
          type: "sales",
          colSpan: "col-span-1"
       },
       {
-         title: "Estoque e aluguéis",
-         description: "Estoque atualizado automaticamente e controle de itens alugados para você não se perder.",
+         title: "Estoque e Agenda",
+         description: "Controle o que entra, o que sai e quem agendou, sem surpresas no fim do dia.",
          type: "stock",
          colSpan: "col-span-1"
       },
       {
-         title: "Financeiro simples",
-         description: "Contas a pagar e receber, fluxo de caixa e lucro líquido por categoria de venda.",
+         title: "Lucro Integral",
+         description: "Acompanhe seu financeiro com clareza. Na Dudit, 100% do valor da venda fica com você.",
          type: "finance",
          colSpan: "col-span-1"
       }
@@ -403,11 +403,11 @@ const BentoFeatures = () => {
          <GridLines />
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <SectionHeader
-               subtitle="SEM TELAS COMPLICADAS"
-               title="Organize o que realmente traz lucro"
+               subtitle="CONTROLE TOTAL"
+               title="Tudo o que você precisa, sem complicação"
             />
             <p className="text-brand-inactive-text max-w-2xl mb-16 text-lg -mt-8">
-               O essencial para o seu negócio rodar liso, sem precisar de cursos para entender o sistema.
+               O essencial para o seu negócio crescer, sem precisar de cursos para entender o sistema.
             </p>
 
             <div className="grid md:grid-cols-3 gap-8">
@@ -503,23 +503,23 @@ const BentoFeatures = () => {
 const PaymentSuite = () => {
    const differentials = [
       {
-         title: "Para quem vende produtos",
-         description: "Sua loja organizada e online em minutos. Controle o estoque automaticamente e receba pedidos pela vitrine.",
+         title: "Venda de Produtos",
+         description: "Sua vitrine online organizada em minutos. Controle o estoque automaticamente e receba pedidos de forma profissional.",
          type: "commission"
       },
       {
-         title: "Para quem presta serviços",
-         description: "Ficha técnica personalizada, agendamentos simples, ordens de serviço e histórico completo de clientes.",
+         title: "Prestação de Serviços",
+         description: "Agendamentos simples, ordens de serviço digitais e histórico completo de clientes sem papelada.",
          type: "easy"
       },
       {
          title: "Produtos + Serviços",
-         description: "Venda peças e mão de obra no mesmo lugar. Baixa de estoque e agendamento integrados.",
+         description: "Venda peças e mão de obra no mesmo lugar. Gestão integrada para quem faz de tudo um pouco.",
          type: "page"
       },
       {
-         title: "Para quem aluga itens",
-         description: "Controle locações sem planilhas. Defina valores por período e bloqueie o estoque automaticamente.",
+         title: "Aluguel de Itens",
+         description: "Controle locações por período, bloqueie estoque automaticamente e evite conflitos de datas.",
          type: "market"
       }
    ];
@@ -529,11 +529,11 @@ const PaymentSuite = () => {
          <GridLines />
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <SectionHeader
-               subtitle="SOLUÇÕES PARA TODOS"
-               title="Qual é o seu negócio? A Dudit resolve."
+               subtitle="PARA TODOS OS NEGÓCIOS"
+               title="Uma plataforma, infinitas possibilidades"
             />
             <p className="text-brand-inactive-text max-w-3xl mb-16 text-lg -mt-8">
-               Não é apenas um sistema de gestão ou apenas uma vitrine. É a união de tudo o que você precisa.
+               Não importa o que você oferece, temos as ferramentas certas para você profissionalizar sua operação e vender mais.
             </p>
 
             <div className="grid md:grid-cols-2 gap-8">
@@ -687,9 +687,9 @@ const GlobalScale = () => {
 
                   <div className="relative z-10 text-white">
                      <span className="text-brand-green text-xs uppercase tracking-widest font-bold mb-4 block">SUA VENDA, SEU LUCRO.</span>
-                     <h2 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">Você vende. <br />Você recebe. <br />100% seu.</h2>
+                     <h2 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">Você vende. <br />Você recebe. <br />O lucro é 100% seu.</h2>
                      <p className="text-brand-inactive-text text-lg mb-12 max-w-md leading-relaxed">
-                        Enquanto outros marketplaces ficam com uma fatia da sua venda, na Dudit você recebe o valor integral. Você escolhe como quer receber e como enviar. A venda é 100% sua.
+                        Chega de perder 10%, 20% ou mais em comissões. Na Dudit, o valor integral da venda vai direto para você. Você escolhe como receber e como entregar.
                      </p>
 
                      <div className="flex gap-12 pt-8">
@@ -699,7 +699,7 @@ const GlobalScale = () => {
                         </div>
                         <div>
                            <div className="text-3xl font-bold text-brand-green mb-1">100%</div>
-                           <div className="text-brand-inactive-text text-xs">do lucro fica com você</div>
+                           <div className="text-brand-inactive-text text-xs">de autonomia para você</div>
                         </div>
                      </div>
                   </div>

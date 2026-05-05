@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/reusable/Button';
 import {
@@ -29,11 +29,11 @@ const PricingHero = () => {
                </Badge>
 
                <h1 className="text-5xl md:text-6xl font-bold text-brand-dark leading-tight mb-6">
-                  Comece a vender na sua cidade hoje
+                  Venda localmente com 0% de comissão
                </h1>
 
                <p className="text-brand-inactive-text text-lg max-w-2xl mx-auto">
-                  Use a Dudit pra divulgar, vender e organizar seu negócio — sem complicação
+                  Crie sua vitrine online, gerencie pedidos e organize seu negócio sem taxas abusivas.
                </p>
             </motion.div>
          </div>
@@ -47,13 +47,17 @@ const PricingCards = () => {
          name: "Começar",
          price: "0",
          highlight: false,
-         objective: "Pra quem quer testar e começar a vender",
+         objective: "O básico para começar sua vitrine online.",
          features: [
-            "Vitrine digital pública",
-            "Orçamentos e Agendamentos",
-            "Pedidos via whatsapp",
-            "PDV básico",
-            "Clientes",
+            "Crie sua vitrine online e compartilhe com clientes",
+            "Cadastre produtos e serviços em poucos passos",
+            "Controle seu estoque básico sem planilhas",
+            "Receba agendamentos e organize sua agenda",
+            "Envie orçamentos de forma simples e rápida",
+            "Registre pedidos e vendas no sistema",
+            "Use um PDV básico para vendas presenciais",
+            "Organize seus clientes em um só lugar",
+            "Receba pedidos e agendamentos direto pelo WhatsApp"
          ],
          limits: [
             "Até 15 itens no catálogo",
@@ -71,15 +75,18 @@ const PricingCards = () => {
          price: "19,90",
          highlight: true,
          popular: true,
-         objective: "Pra quem já vende e quer crescer na cidade",
+         objective: "Para quem quer profissionalizar as vendas.",
          features: [
             "Tudo do Começar +",
-            "Pagamento online (MP)",
-            "Gestão de Produtos e Serviços",
-            "Financeiro básico",
-            "Taxa de entrega base",
-            "Variantes de produtos",
-            "Fornecedores e XML",
+            "Receba pedidos direto pelo sistema",
+            "Aceite pagamentos online automáticos (Mercado Pago)",
+            "Ofereça variações de produtos (tamanho, cor, etc.)",
+            "Crie cupons e promoções para aumentar suas vendas",
+            "Configure entrega local de forma simples",
+            "Gerencie fornecedores com mais organização",
+            "Crie e gerencie ordens de serviço",
+            "Controle seu financeiro sem complicação",
+            "Acompanhe relatórios básicos do seu negócio",
          ],
          limits: [
             "Até 100 itens no catálogo",
@@ -95,15 +102,15 @@ const PricingCards = () => {
          name: "Escalar",
          price: "49,90",
          highlight: false,
-         objective: "Pra quem quer mais controle e organização",
+         objective: "Ferramentas avançadas para o seu negócio escalar.",
          features: [
             "Tudo do Crescer +",
-            "Logística avançada",
-            "Financeiro completo (DRE/Fluxo)",
-            "Recorrência de transações",
-            "Kits de produtos",
-            "Relatórios avançados",
-            "Suporte prioritário"
+            "Gerencie expedição e entregas com mais controle",
+            "Tenha um financeiro completo (fluxo de caixa + DRE)",
+            "Acompanhe relatórios avançados para tomar decisões",
+            "Controle devoluções e trocas com facilidade",
+            "Monte kits e combos de produtos",
+            "Crie campanhas promocionais mais estratégicas",
          ],
          limits: [
             "Itens e Pedidos ilimitados",
@@ -172,7 +179,7 @@ const PricingCards = () => {
                            </ul>
                         </div>
 
-                        {/* Seção de Limites */}
+                        {/* Seção de Limites
                         <div className={`pt-6 border-t ${plan.popular ? 'border-white/10' : 'border-brand-border'}`}>
                            <p className={`text-xs font-bold uppercase mb-3 ${plan.popular ? 'text-gray-400' : 'text-brand-inactive-text'}`}>
                               Limites do plano:
@@ -187,7 +194,7 @@ const PricingCards = () => {
                                  </li>
                               ))}
                            </ul>
-                        </div>
+                        </div>*/}
                      </div>
 
                      <Button
@@ -207,224 +214,137 @@ const PricingCards = () => {
 const ComparisonTable = () => {
    const categories = [
       {
-         title: "Vendas & Atendimento",
+         title: "Vendas",
          items: [
             { name: "Pedidos pelo sistema", g: "check", v: "check", c: "check" },
-            { name: "PDV (frente de caixa)", g: "Básico", v: "Completo", c: "Completo" },
-            { name: "Checkout na vitrine", g: "x", v: "check", c: "check" },
+            { name: "Checkout online", g: "x", v: "check", c: "check" },
+            { name: "PDV (caixa)", g: "Básico", v: "Completo", c: "Completo" },
             { name: "Pedidos/mês", g: "25", v: "150", c: "Ilimitado" },
          ]
       },
       {
          title: "Pagamentos",
          items: [
-            { name: "Pagamento online (Mercado Pago)", g: "x", v: "check", c: "check" },
+            { name: "Pagamento online", g: "x", v: "check", c: "check" },
          ]
       },
       {
-         title: "Produtos & Estoque",
+         title: "Produtos",
          items: [
-            { name: "Catálogo de itens", g: "check", v: "check", c: "check" },
-            { name: "Gestão avançada", g: "x", v: "check", c: "check" },
-            { name: "Variantes de produtos", g: "x", v: "check", c: "check" },
-            { name: "Importação XML", g: "x", v: "check", c: "check" },
-            { name: "Kits de produtos", g: "x", v: "x", c: "check" },
-            { name: "Itens (produtos + serviços)", g: "15", v: "100", c: "Ilimitado" },
+            { name: "Cadastro de produtos", g: "check", v: "check", c: "check" },
+            { name: "Variações (tamanho, etc.)", g: "x", v: "check", c: "check" },
+            { name: "Kits / combos", g: "x", v: "x", c: "check" },
+            { name: "Itens no catálogo", g: "15", v: "100", c: "Ilimitado" },
             { name: "Imagens por item", g: "2", v: "5", c: "15" },
          ]
       },
       {
-         title: "Serviços & Operações",
+         title: "Serviços",
          items: [
-            { name: "Catálogo de serviços", g: "check", v: "check", c: "check" },
-            { name: "Agendamentos online", g: "check", v: "check", c: "check" },
-            { name: "Ordem de serviço", g: "check", v: "check", c: "check" },
+            { name: "Agendamentos", g: "check", v: "check", c: "check" },
+            { name: "Ordens de serviço", g: "check", v: "check", c: "check" },
             { name: "Agendamentos/mês", g: "30", v: "150", c: "Ilimitado" },
-            { name: "Ordens de serviço/mês", g: "15", v: "100", c: "Ilimitado" },
          ]
       },
       {
-         title: "Entrega & Logística",
+         title: "Entrega",
          items: [
-            { name: "Taxa fixa de entrega", g: "x", v: "check", c: "check" },
-            { name: "Cálculo por distância", g: "x", v: "x", c: "check" },
-            { name: "Regras por horário", g: "x", v: "x", c: "check" },
-            { name: "Expedição e logística", g: "x", v: "check", c: "check" },
+            { name: "Frete local", g: "x", v: "check", c: "check" },
+            { name: "Logística avançada", g: "x", v: "x", c: "check" },
          ]
       },
       {
-         title: "Clientes & Comunicação",
+         title: "Marketing",
          items: [
-            { name: "Gestão de Clientes", g: "check", v: "check", c: "check" },
-            { name: "WhatsApp integrado", g: "check", v: "check", c: "check" },
-            { name: "Vitrine pública", g: "check", v: "check", c: "check" },
+            { name: "Cupons", g: "x", v: "check", c: "check" },
+            { name: "Campanhas", g: "x", v: "x", c: "check" },
          ]
       },
       {
-         title: "Marketing & Promoções",
+         title: "Financeiro",
          items: [
-            { name: "Cupons de desconto", g: "x", v: "check", c: "check" },
-            { name: "Campanhas promocionais", g: "x", v: "x", c: "check" },
+            { name: "Controle financeiro", g: "x", v: "check", c: "check" },
+            { name: "Fluxo de caixa + DRE", g: "x", v: "x", c: "check" },
          ]
       },
       {
-         title: "Financeiro & Gestão",
-         items: [
-            { name: "Financeiro básico", g: "x", v: "check", c: "check" },
-            { name: "DRE e Fluxo de caixa", g: "x", v: "x", c: "check" },
-            { name: "Recorrência de contas", g: "x", v: "x", c: "check" },
-            { name: "Fornecedores", g: "x", v: "check", c: "check" },
-         ]
-      },
-      {
-         title: "Relatórios & Análises",
-         items: [
-            { name: "Relatórios básicos", g: "x", v: "check", c: "check" },
-            { name: "Relatórios avançados", g: "x", v: "x", c: "check" },
-         ]
-      },
-      {
-         title: "Equipe & Acessos",
+         title: "Equipe",
          items: [
             { name: "Usuários", g: "1", v: "3", c: "10" },
-            { name: "Permissões de acesso", g: "x", v: "check", c: "check" },
-         ]
-      },
-      {
-         title: "Orçamentos",
-         items: [
-            { name: "Criação de orçamentos", g: "check", v: "check", c: "check" },
-            { name: "Orçamentos/mês", g: "10", v: "30", c: "Ilimitado" },
          ]
       }
    ];
 
-   const [openCategory, setOpenCategory] = useState<string | null>("Vendas & Pedidos");
-
-   const toggle = (cat: string) => {
-      setOpenCategory(openCategory === cat ? null : cat);
-   };
-
    const renderValue = (val: string) => {
-      if (val === "check") return <div className="bg-brand-green p-1 rounded-full"><CheckCircleIcon size={12} className="text-white" /></div>;
-      if (val === "x") return <div className="bg-brand-gray p-1 rounded-full"><XIcon size={12} className="text-brand-inactive-text" /></div>;
-      return <span className="text-sm font-medium text-brand-dark">{val}</span>;
+      if (val === "check") return <CheckCircleIcon size={20} className="text-brand-green mx-auto" />;
+      if (val === "x") return <XIcon size={20} className="text-brand-inactive-text/30 mx-auto" />;
+      return <span className="text-sm font-semibold text-brand-dark">{val}</span>;
    };
 
    return (
-      <section className="bg-white py-24 relative border-t border-brand-border">
-         <GridLines />
-         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <section className="py-24 bg-brand-gray/30 relative">
+         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <motion.div
-               initial={{ opacity: 0 }}
-               whileInView={{ opacity: 1 }}
+               initial={{ opacity: 0, y: 20 }}
+               whileInView={{ opacity: 1, y: 0 }}
                viewport={{ once: true }}
                className="text-center mb-16"
             >
-               <h2 className="text-4xl font-bold text-brand-dark mb-4">Comparação Detalhada</h2>
-               <p className="text-brand-inactive-text">Veja tudo o que cada plano oferece e escolha o melhor para você.</p>
+               <h2 className="text-4xl font-bold text-brand-dark mb-4">Compare os Planos</h2>
+               <p className="text-brand-inactive-text">Escolha o nível de controle que seu negócio precisa hoje.</p>
             </motion.div>
 
-            {/* Mobile Header Row */}
-            <div className="md:hidden grid grid-cols-3 gap-2 mb-6 bg-white sticky top-[80px] z-20 py-4 border-b border-brand-border">
-               <div className="text-center px-1">
-                  <div className="font-bold text-[10px] text-brand-dark mb-1">Começar</div>
-                  <button className="bg-brand-dark text-white text-[8px] w-full py-1.5 rounded-full font-medium">Grátis</button>
-               </div>
-               <div className="text-center px-1 bg-brand-green/5 rounded-t-lg">
-                  <div className="font-bold text-[10px] text-brand-green mb-1">Crescer</div>
-                  <button className="bg-brand-green text-white text-[8px] w-full py-1.5 rounded-full font-medium">Assinar</button>
-               </div>
-               <div className="text-center px-1">
-                  <div className="font-bold text-[10px] text-brand-dark mb-1">Escalar</div>
-                  <button className="bg-white border border-brand-border text-brand-dark text-[8px] w-full py-1.5 rounded-full font-medium">Assinar</button>
-               </div>
+            <div className="overflow-x-auto">
+               <table className="w-full border-collapse">
+                  <thead>
+                     <tr className="border-b border-brand-border">
+                        <th className="py-6 px-4 text-left bg-transparent w-1/3">
+                           <span className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text">Recurso</span>
+                        </th>
+                        <th className="py-6 px-4 text-center bg-white/50 rounded-t-2xl">
+                           <span className="text-base font-bold text-brand-dark">Começar</span>
+                        </th>
+                        <th className="py-6 px-4 text-center bg-brand-dark rounded-t-2xl">
+                           <span className="text-base font-bold text-white">Crescer</span>
+                        </th>
+                        <th className="py-6 px-4 text-center bg-white/50 rounded-t-2xl">
+                           <span className="text-base font-bold text-brand-dark">Escalar</span>
+                        </th>
+                     </tr>
+                  </thead>
+                  <tbody>
+                     {categories.map((cat, idx) => (
+                        <React.Fragment key={idx}>
+                           <tr className="bg-brand-gray/50">
+                              <td colSpan={4} className="py-3 px-4 text-xs font-bold text-brand-green uppercase tracking-widest">
+                                 {cat.title}
+                              </td>
+                           </tr>
+                           {cat.items.map((item, i) => (
+                              <tr key={i} className="border-b border-brand-border hover:bg-white/40 transition-colors">
+                                 <td className="py-4 px-4 text-sm font-medium text-gray-600">
+                                    {item.name}
+                                 </td>
+                                 <td className="py-4 px-4 text-center">
+                                    {renderValue(item.g)}
+                                 </td>
+                                 <td className="py-4 px-4 text-center bg-brand-dark/5">
+                                    {renderValue(item.v)}
+                                 </td>
+                                 <td className="py-4 px-4 text-center">
+                                    {renderValue(item.c)}
+                                 </td>
+                              </tr>
+                           ))}
+                        </React.Fragment>
+                     ))}
+                  </tbody>
+               </table>
             </div>
-
-            {/* Desktop Header Row */}
-            <div className="hidden md:grid grid-cols-4 gap-4 mb-8 px-4">
-               <div className="col-span-1"></div>
-               <div className="bg-white p-6 border border-brand-border rounded-2xl text-left flex flex-col h-full">
-                  <h4 className="font-bold text-brand-dark mb-1">Começar</h4>
-                  <p className="text-xs text-brand-inactive-text mb-4 flex-1">Ideal para começar</p>
-                  <Button variant="outline" className="w-full py-2 text-sm mt-auto h-10">Começar Grátis</Button>
-               </div>
-               <div className="bg-white p-6 border border-brand-green/20 rounded-2xl text-left flex flex-col h-full relative overflow-hidden ring-1 ring-brand-green/10">
-                  <div className="absolute top-0 right-0 bg-brand-green text-white text-[10px] px-2 py-0.5 rounded-bl">Popular</div>
-                  <h4 className="font-bold text-brand-dark mb-1">Crescer</h4>
-                  <p className="text-xs text-brand-inactive-text mb-4 flex-1">Para quem quer vender</p>
-                  <Button variant="default" className="w-full py-2 text-sm mt-auto h-10 bg-brand-green text-white">Assinar Agora</Button>
-               </div>
-               <div className="bg-white p-6 border border-brand-border rounded-2xl text-left flex flex-col h-full">
-                  <h4 className="font-bold text-brand-dark mb-1">Escalar</h4>
-                  <p className="text-xs text-brand-inactive-text mb-4 flex-1">Operação estruturada</p>
-                  <Button variant="outline" className="w-full py-2 text-sm mt-auto h-10">Assinar Agora</Button>
-               </div>
-            </div>
-
-            {/* Comparison Items */}
-            <div className="space-y-4">
-               {categories.map((cat) => (
-                  <motion.div
-                     key={cat.title}
-                     initial={{ opacity: 0, y: 10 }}
-                     whileInView={{ opacity: 1, y: 0 }}
-                     viewport={{ once: true }}
-                     className="border-b border-brand-border last:border-0"
-                  >
-                     <button
-                        onClick={() => toggle(cat.title)}
-                        className="w-full flex items-center justify-between py-6 px-4 hover:bg-brand-gray transition-colors rounded-xl"
-                     >
-                        <span className="text-lg font-bold text-brand-dark">{cat.title}</span>
-                        <motion.div
-                           animate={{ rotate: openCategory === cat.title ? 180 : 0 }}
-                        >
-                           <ChevronDownIcon size={20} className="text-brand-inactive-text" />
-                        </motion.div>
-                     </button>
-
-                     <AnimatePresence>
-                        {openCategory === cat.title && (
-                           <motion.div
-                              initial={{ height: 0, opacity: 0 }}
-                              animate={{ height: "auto", opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
-                              className="overflow-hidden"
-                           >
-                              <div className="pb-6">
-                                 {cat.items.map((item, idx) => (
-                                    <div key={idx} className="flex flex-col md:grid md:grid-cols-4 gap-2 md:gap-4 py-4 px-4 border-t border-brand-gray first:border-0 md:items-center">
-
-                                       <div className="col-span-1 text-sm text-brand-dark/80 font-medium md:mb-0 mb-2">
-                                          {item.name}
-                                       </div>
-
-                                       <div className="grid grid-cols-3 md:contents gap-2">
-                                          <div className="flex justify-center items-center">
-                                             {renderValue(item.g)}
-                                          </div>
-                                          <div className="flex justify-center items-center bg-brand-green/5 md:bg-transparent py-2 md:py-0 rounded-lg">
-                                             {renderValue(item.v)}
-                                          </div>
-                                          <div className="flex justify-center items-center">
-                                             {renderValue(item.c)}
-                                          </div>
-                                       </div>
-                                    </div>
-                                 ))}
-                              </div>
-                           </motion.div>
-                        )}
-                     </AnimatePresence>
-                  </motion.div>
-               ))}
-            </div>
-
          </div>
       </section>
-   )
-}
+   );
+};
 
 const FAQ = () => {
    const [openIndex, setOpenIndex] = useState<number | null>(0);

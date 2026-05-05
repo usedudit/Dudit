@@ -9,23 +9,30 @@ import { ThreeDotsLoader } from "@/components/reusable"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-    title: "Dudit | Descubra o que tem por aqui",
-    description: "Cansado do caos no WhatsApp? Na Dudit você organiza pedidos, não paga taxas abusivas e encontra produtos ou serviços na sua cidade em um só lugar.",
-    openGraph: {
-        title: "Dudit | Descubra o que tem por aqui",
-        description: "Cansado do caos no WhatsApp? Na Dudit você organiza pedidos, não paga taxas abusivas e encontra produtos ou serviços na sua cidade em um só lugar.",
-        url: "https://dudit.com.br",
-        siteName: "Dudit",
-        images: [
-            {
-                url: "https://img.dudit.com.br/static/Icon.png",
-                width: 512,
-                height: 512,
-            },
-        ],
-        locale: "pt_BR",
-        type: "website",
-    }
+  title: "Dudit | Encontre produtos e serviços na sua cidade",
+  description: "Descubra produtos, serviços e até itens para aluguel perto de você. Explore negócios locais, fale direto com vendedores e encontre tudo na sua cidade em um só lugar.",
+  openGraph: {
+    title: "Dudit | Encontre produtos e serviços na sua cidade",
+    description: "Encontre produtos e serviços na sua cidade. Explore negócios locais e fale direto com quem vende.",
+    url: "https://dudit.com.br",
+    siteName: "Dudit",
+    images: [
+      {
+        url: "https://img.dudit.com.br/static/Icon.png",
+        width: 512,
+        height: 512,
+      },
+    ],
+    locale: "pt_BR",
+    type: "website",
+  },
+  keywords: [
+    "produtos perto de mim",
+    "serviços na minha cidade",
+    "comprar local",
+    "negócios locais",
+    "marketplace local brasil"
+  ]
 }
 
 async function ProductFeedWrapper({ user, userProfile, cartCount }: any) {

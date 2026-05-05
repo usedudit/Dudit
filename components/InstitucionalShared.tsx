@@ -136,7 +136,7 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                      <span>Dudit</span>
                   </div>
                   <p className="text-brand-inactive-text text-sm leading-relaxed max-w-xs">
-                     A plataforma completa para quem vende produtos ou serviços. Simples, justa e sem taxas por venda.
+                     A plataforma para descobrir e vender localmente. Crie sua vitrine em minutos, gerencie pedidos e organize seu negócio com 0% de comissão.
                   </p>
                </div>
 
@@ -202,14 +202,14 @@ export const CTA = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                </div>
 
                <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-                  Tem algo pra vender, <br />fazer ou divulgar?
+                  Pronto para vender <br />na sua cidade?
                </h2>
                <h3 className="text-xl md:text-2xl text-gray-300 mb-10 max-w-xl mx-auto">
-                  Crie um anúncio em minutos e comece a aparecer pra gente da sua cidade.
+                  Crie sua vitrine em minutos, receba pedidos direto no celular e mantenha 100% do seu lucro.
                </h3>
 
                <div className="flex flex-col sm:flex-row justify-center gap-4">
-                  <Button className="bg-brand-green text-white hover:bg-brand-green font-bold h-12 px-8" onClick={() => onNavigate('start-selling')}>Criar anúncio agora</Button>
+                  <Button className="bg-brand-green text-white hover:bg-brand-green font-bold h-12 px-8" onClick={() => onNavigate('start-selling')}>Começar grátis</Button>
                </div>
             </div>
          </div>

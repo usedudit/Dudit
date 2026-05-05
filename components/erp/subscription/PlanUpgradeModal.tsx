@@ -135,9 +135,12 @@ function PlanUpgradeModalInner({
 
   const leftPanel = (
     <div className="flex flex-col h-full bg-white dark:bg-dark-surface p-8 md:p-10 overflow-y-auto">
-      <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">
+      <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-1">
         {target ? `Plano ${getHardcodedPlan(target).name}` : "Upgrade de plano"}
       </h2>
+      <p className="text-[10px] font-bold mb-4 text-brand-green uppercase tracking-wider">
+        {target ? getHardcodedPlan(target).objective : ""}
+      </p>
       <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-6">
         Para usar este recurso, ative o plano <strong className="text-brand-dark dark:text-dark-heading">{target ? getHardcodedPlan(target).name : target}</strong>.
         {targetPlan?.price != null && (
