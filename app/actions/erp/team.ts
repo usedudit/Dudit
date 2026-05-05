@@ -4,6 +4,8 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import type { PartnerRole } from "@/lib/permissions/types"
+import { can } from "@/lib/permissions/can"
+import type { RoleId } from "@/lib/permissions/rbac-types"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -34,7 +36,10 @@ export async function getTeamMembers(): Promise<{ members: TeamMember[]; current
         // SECURITY: Verify the user actually has access to this partner.
         // getCurrentPartnerContext reads from a client-settable cookie,
         // so we must validate against partner_users to prevent enumeration.
-        await requirePartnerAccessWithPermission(context.partnerId, "settings", "settings_team")
+        const access = await requirePartnerAccessWithPermission(context.partnerId, "settings", "settings_team")
+        if (!can({ role_id: access.roleId, permissions: access.permissions }, "settings.settings_team")) {
+            return { members: [], error: "Sem permissão para visualizar equipe." }
+        }
 
         const admin = getAdminClient()
         const partnerId = context.partnerId
@@ -51,7 +56,7 @@ export async function getTeamMembers(): Promise<{ members: TeamMember[]; current
         // Get all partner_users entries
         const { data: partnerUsers, error } = await admin
             .from("partner_users")
-            .select("id, user_id, role, permissions, created_at")
+            .select("id, user_id, role_id, created_at")
             .eq("partner_id", partnerId)
             .order("created_at", { ascending: true })
 
@@ -105,8 +110,8 @@ export async function getTeamMembers(): Promise<{ members: TeamMember[]; current
             email: emailMap[pu.user_id] || "",
             fullName: profileMap[pu.user_id]?.full_name || null,
             avatarUrl: null,
-            role: pu.role as PartnerRole,
-            permissions: pu.permissions,
+            role: String(pu.role_id || "delivery").toUpperCase() as PartnerRole,
+            permissions: null,
             createdAt: pu.created_at,
             isOwner: pu.user_id === ownerUserId,
         }))
@@ -119,7 +124,7 @@ export async function getTeamMembers(): Promise<{ members: TeamMember[]; current
             return (roleOrder[a.role] ?? 4) - (roleOrder[b.role] ?? 4)
         })
 
-        return { members, currentUserRole: context.role, currentUserId: context.userId }
+        return { members, currentUserRole: context.role as PartnerRole, currentUserId: context.userId }
     } catch (error: any) {
         return { members: [], error: error.message }
     }
@@ -145,34 +150,15 @@ export async function updateTeamMemberRole(
         const admin = getAdminClient()
         const partnerId = context.partnerId
 
-        // Get actor's role
-        const { data: actorRecord } = await admin
-            .from("partner_users")
-            .select("role")
-            .eq("partner_id", partnerId)
-            .eq("user_id", user.id)
-            .single()
-
-        // Allow if not found in partner_users but is the actual OWNER in the partners table
-        let actorRole = actorRecord?.role as PartnerRole | undefined
-        if (!actorRole) {
-            const { data: ownerRecord } = await admin
-                .from("partners")
-                .select("id")
-                .eq("id", partnerId)
-                .eq("user_id", user.id)
-                .single()
-            if (ownerRecord) {
-                actorRole = "OWNER"
-            } else {
-                return { success: false, error: "Acesso negado." }
-            }
+        const access = await requirePartnerAccessWithPermission(partnerId, "settings", "settings_team", user)
+        if (!can({ role_id: access.roleId, permissions: access.permissions }, "settings.settings_team")) {
+            return { success: false, error: "Acesso negado." }
         }
 
         // Get target member
         const { data: targetRecord } = await admin
             .from("partner_users")
-            .select("id, role")
+            .select("id, role_id")
             .eq("partner_id", partnerId)
             .eq("user_id", memberUserId)
             .single()
@@ -181,32 +167,16 @@ export async function updateTeamMemberRole(
             return { success: false, error: "Membro não encontrado na equipe." }
         }
 
-        const targetRole = targetRecord.role as PartnerRole
-
-        // Check permissions dynamically using lib/permissions/partner-roles
-        const { ROLE_HIERARCHY, canModifyUser, PERMISSION_PRESETS } = await import("@/lib/permissions/partner-roles")
-
-        // Cannot change roles of users with equal or higher privilege unless YOU are OWNER modifying a non-OWNER
-        if (!canModifyUser(actorRole, targetRole) && actorRole !== "OWNER") {
-            return { success: false, error: "Você não tem permissão para alterar o cargo deste usuário." }
-        }
-
-        // Only OWNER can grant or revoke OWNER or ADMIN roles freely, but MANAGER cannot promote to ADMIN
-        if (!canModifyUser(actorRole, newRole) && actorRole !== "OWNER") {
-            return { success: false, error: "Você não pode promover para este cargo." }
-        }
-
-        // Cannot set someone else to OWNER unless you are OWNER
-        if (newRole === "OWNER" && actorRole !== "OWNER") {
-            return { success: false, error: "Apenas o Proprietário pode transferir posse." }
+        const targetRoleId = String(targetRecord.role_id || "delivery").toLowerCase() as RoleId
+        if (targetRoleId === "owner" && access.roleId !== "owner") {
+            return { success: false, error: "O proprietário da loja não pode ser alterado." }
         }
 
         // Update
         const { error } = await admin
             .from("partner_users")
             .update({
-                role: newRole,
-                permissions: PERMISSION_PRESETS[newRole]
+                role_id: String(newRole || "").toLowerCase()
             })
             .eq("id", targetRecord.id)
 
@@ -219,7 +189,7 @@ export async function updateTeamMemberRole(
             actorUserId: user.id,
             partnerId,
             targetUserId: memberUserId,
-            metadata: { oldRole: targetRole, newRole }
+            metadata: { oldRole: targetRoleId, newRole: String(newRole || "").toLowerCase() }
         }))
 
         const { revalidatePath } = await import("next/cache")
@@ -259,38 +229,24 @@ export async function removeTeamMember(memberUserId: string): Promise<{ success:
             return { success: false, error: "O proprietário da loja não pode ser removido." }
         }
 
-        // Get actor role
-        const { data: actorRecord } = await admin
-            .from("partner_users")
-            .select("role")
-            .eq("partner_id", partnerId)
-            .eq("user_id", user.id)
-            .single()
-
-        let actorRole = actorRecord?.role as PartnerRole | undefined
-        if (!actorRole && partnerRecord?.user_id === user.id) {
-            actorRole = "OWNER"
+        const access = await requirePartnerAccessWithPermission(partnerId, "settings", "settings_team", user)
+        if (!can({ role_id: access.roleId, permissions: access.permissions }, "settings.settings_team")) {
+            return { success: false, error: "Acesso negado." }
         }
-
-        if (!actorRole) return { success: false, error: "Acesso negado." }
 
         // Get target role
         const { data: targetRecord } = await admin
             .from("partner_users")
-            .select("id, role")
+            .select("id, role_id")
             .eq("partner_id", partnerId)
             .eq("user_id", memberUserId)
             .single()
 
         if (!targetRecord) return { success: false, error: "Membro não encontrado." }
 
-        const targetRole = targetRecord.role as PartnerRole
-
-        const { canModifyUser } = await import("@/lib/permissions/partner-roles")
-
-        // Can only remove someone with lower privilege, unless OWNER
-        if (!canModifyUser(actorRole, targetRole) && actorRole !== "OWNER") {
-            return { success: false, error: "Sem permissão para remover este membro." }
+        const targetRoleId = String(targetRecord.role_id || "delivery").toLowerCase() as RoleId
+        if (targetRoleId === "owner") {
+            return { success: false, error: "O proprietário da loja não pode ser removido." }
         }
 
         const { error } = await admin

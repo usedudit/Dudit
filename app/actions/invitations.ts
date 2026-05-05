@@ -2,17 +2,13 @@
 
 import crypto from "crypto"
 import { createAdminClient } from "@/lib/supabase/server"
-import { requireUser, getCurrentUser } from "@/lib/auth/authorization"
+import { requirePartnerAccess, requirePartnerAccessWithPermission, requireUser, getCurrentUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { auditLog } from "@/lib/security/audit-logger"
-import {
-    canUserInviteRole,
-    canModifyUser,
-    PERMISSION_PRESETS,
-    ROLE_HIERARCHY,
-} from "@/lib/permissions/partner-roles"
+import { can } from "@/lib/permissions/can"
 import type { PartnerRole, PartnerPermissions } from "@/lib/permissions/types"
+import type { RoleId } from "@/lib/permissions/rbac-types"
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -69,49 +65,11 @@ export async function createInvitation(input: {
         const user = await requireUser()
         const admin = createAdminClient()
 
-        // 1. Load inviter's partner_users record
-        let { data: inviterRecord } = await admin
-            .from("partner_users")
-            .select("role")
-            .eq("partner_id", input.partnerId)
-            .eq("user_id", user.id)
-            .single()
-
-        // Fallback: if no partner_users record, check if user is the legacy owner
-        // and auto-create their OWNER record (self-healing migration)
-        if (!inviterRecord) {
-            const { data: legacyPartner } = await admin
-                .from("partners")
-                .select("id, user_id")
-                .eq("id", input.partnerId)
-                .eq("user_id", user.id)
-                .single()
-
-            if (!legacyPartner) {
-                return { success: false, error: "Você não pertence a este parceiro." }
-            }
-
-            // Auto-create OWNER record in partner_users
-            const { error: autoInsertError } = await admin
-                .from("partner_users")
-                .insert({
-                    partner_id: input.partnerId,
-                    user_id: user.id,
-                    role: "OWNER",
-                    permissions: PERMISSION_PRESETS.OWNER,
-                    created_by_user_id: null,
-                })
-
-            if (autoInsertError) {
-                console.error("[Invitations] Auto-insert OWNER error:", autoInsertError)
-                return { success: false, error: "Erro ao configurar acesso." }
-            }
-
-            inviterRecord = { role: "OWNER" }
-            console.log("[Invitations] Auto-created OWNER record for partner:", input.partnerId)
+        // Canonical guard: must be able to manage team/settings to invite.
+        const access = await requirePartnerAccess(input.partnerId, user)
+        if (!can({ role_id: access.roleId, permissions: access.permissions }, "settings.settings_team")) {
+            return { success: false, error: "Sem permissão para convidar membros." }
         }
-
-        const inviterRole = inviterRecord.role as PartnerRole
 
         // Prevent inviting self
         const normalizedEmail = input.email.trim().toLowerCase()
@@ -157,14 +115,6 @@ export async function createInvitation(input: {
             return { success: false, error: "Já existe um convite pendente para este e-mail nesta equipe." }
         }
 
-        // 2. Validate role authority (GENERIC error - don't leak inviterRole)
-        if (!canUserInviteRole(inviterRole, input.role)) {
-            return {
-                success: false,
-                error: "Seu cargo não permite convidar para este nível de acesso.",
-            }
-        }
-
         // 2.5 Subscription limit check - enforce user limits before inviting
         const { checkLimit } = await import("@/lib/services/subscription.service")
         const limitCheck = await checkLimit(input.partnerId, "users")
@@ -176,8 +126,7 @@ export async function createInvitation(input: {
         const rawToken = generateToken()
         const tokenHash = hashToken(rawToken)
 
-        // 4. Determine permissions (use preset if not provided)
-        const permissions = input.permissions || PERMISSION_PRESETS[input.role]
+        const roleId = String(input.role || "").toLowerCase() as RoleId
 
         // 5. Calculate expiration (7 days)
         const expiresAt = new Date()
@@ -188,10 +137,11 @@ export async function createInvitation(input: {
             partner_id: input.partnerId,
             email: normalizedEmail,
             token_hash: tokenHash,
-            role: input.role,
-            permissions,
+            role_id: roleId,
+            role: input.role, // legacy column (kept for backward compatibility)
+            permissions: input.permissions || {}, // legacy column (not authoritative anymore)
             created_by_user_id: user.id,
-            created_by_role: inviterRole,
+            created_by_role: String(access.roleId || "").toUpperCase(),
             expires_at: expiresAt.toISOString(),
         })
 
@@ -364,19 +314,10 @@ export async function revokeInvitation(input: {
         const user = await requireUser()
         const admin = createAdminClient()
 
-        // 1. Load revoker's role
-        const { data: revokerRecord } = await admin
-            .from("partner_users")
-            .select("role")
-            .eq("partner_id", input.partnerId)
-            .eq("user_id", user.id)
-            .single()
-
-        if (!revokerRecord) {
-            return { success: false, error: "Acesso negado." }
+        const access = await requirePartnerAccess(input.partnerId, user)
+        if (!can({ role_id: access.roleId, permissions: access.permissions }, "settings.settings_team")) {
+            return { success: false, error: "Sem permissão para revogar este convite." }
         }
-
-        const revokerRole = revokerRecord.role as PartnerRole
 
         // 2. Load the invitation
         const { data: invitation } = await admin
@@ -396,12 +337,6 @@ export async function revokeInvitation(input: {
 
         if (invitation.revoked_at) {
             return { success: false, error: "Convite já foi revogado." }
-        }
-
-        // 3. Role authority check: revoker must have >= privilege to the invite's role
-        const inviteRole = invitation.role as PartnerRole
-        if (!canModifyUser(revokerRole, inviteRole) && revokerRole !== "OWNER") {
-            return { success: false, error: "Sem permissão para revogar este convite." }
         }
 
         // 4. Mark as revoked
@@ -425,7 +360,7 @@ export async function revokeInvitation(input: {
             partnerId: input.partnerId,
             metadata: {
                 invitationId: invitation.id,
-                revokedRole: inviteRole,
+                revokedRole: invitation.role,
             },
         })
 
@@ -447,21 +382,8 @@ export async function listPartnerInvitations(partnerId: string): Promise<{
         const user = await requireUser()
         const admin = createAdminClient()
 
-        // Verify caller belongs to this partner AND has MANAGER+ role
-        const { data: membership } = await admin
-            .from("partner_users")
-            .select("role")
-            .eq("partner_id", partnerId)
-            .eq("user_id", user.id)
-            .single()
-
-        if (!membership) {
-            return { success: false, error: "Acesso negado." }
-        }
-
-        // SECURITY: Only MANAGER+ can list invitations.
-        const memberRole = membership.role as PartnerRole
-        if (ROLE_HIERARCHY[memberRole] < ROLE_HIERARCHY.MANAGER) {
+        const access = await requirePartnerAccess(partnerId, user)
+        if (!can({ role_id: access.roleId, permissions: access.permissions }, "settings.settings_team")) {
             return { success: false, error: "Sem permissão para visualizar convites." }
         }
 

@@ -4,8 +4,11 @@ import { redirect } from "next/navigation"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import type { User } from "@supabase/supabase-js"
-import type { PartnerPermissions, PartnerRole, ResourcePermissions, RouteKey } from "@/lib/permissions/types"
-import { canAccessRoute, canPerformAction, hasSpecificPermission, normalizeToRoutePermissions } from "@/lib/permissions/route-permissions"
+import type { PartnerPermissions } from "@/lib/permissions/types"
+import type { RoleId } from "@/lib/permissions/rbac-types"
+import { can } from "@/lib/permissions/can"
+import { getPermissionTemplate } from "@/lib/permissions/rbac-template-loader"
+import { normalizePermissions } from "@/lib/permissions/rbac-normalize"
 
 // ─── Auth Errors ────────────────────────────────────────────────────────────
 
@@ -103,8 +106,6 @@ export async function requirePartner(resolvedUser?: User | any): Promise<{ id: s
 }
 
 import { getAllUserPartnerAccess } from "@/lib/auth/partner-context"
-import { mergePartnerPermissions } from "@/lib/permissions/merge-partner-permissions"
-import { PERMISSION_PRESETS } from "@/lib/permissions/partner-roles"
 
 /**
  * Check if a user has access to a partner via partner_users OR as the legacy owner.
@@ -117,13 +118,13 @@ import { PERMISSION_PRESETS } from "@/lib/permissions/partner-roles"
 const checkPartnerAccess = async (
   partnerId: string,
   userId: string
-): Promise<{ role: string; permissions: any } | null> => {
+): Promise<{ roleId: RoleId; permissions: any } | null> => {
   // 1. FAST PATH: Check the active partner context in the current request memory.
   try {
     const context = await getPartnerContextHelper({ id: userId });
     if (context && context.partnerId === partnerId) {
-      if (context.role && context.permissions) {
-        return { role: context.role, permissions: context.permissions };
+      if (context.roleId && context.permissions) {
+        return { roleId: context.roleId, permissions: context.permissions };
       }
     }
   } catch (err) {
@@ -134,14 +135,15 @@ const checkPartnerAccess = async (
   const allAccess = await getAllUserPartnerAccess({ id: userId });
   const match = allAccess.find(a => a.partnerId === partnerId);
 
-  if (match && match.role && match.permissions) {
-    return { role: match.role, permissions: match.permissions };
+  if (match && match.roleId && match.permissions) {
+    return { roleId: match.roleId, permissions: match.permissions };
   }
 
   // 3. AUTHORITATIVE DB FALLBACK
   const admin = getAdminClient()
+  const template = await getPermissionTemplate()
   const [invitedAccessRes, ownedPartnerRes] = await Promise.all([
-    admin.from("partner_users").select("role, permissions").eq("partner_id", partnerId).eq("user_id", userId).maybeSingle(),
+    admin.from("partner_users").select("role_id, roles:roles!inner(permissions)").eq("partner_id", partnerId).eq("user_id", userId).maybeSingle(),
     admin.from("partners").select("user_id").eq("id", partnerId).single()
   ]);
 
@@ -161,16 +163,16 @@ const checkPartnerAccess = async (
   }
 
   // Explicitly validate returned truthy data
-  if (invitedAccessRes.data && invitedAccessRes.data.role) {
-    const role = String(invitedAccessRes.data.role) as PartnerRole
-    const permissions = mergePartnerPermissions(role, invitedAccessRes.data.permissions)
-    return { role: invitedAccessRes.data.role, permissions }
+  if (invitedAccessRes.data && invitedAccessRes.data.role_id) {
+    const roleId = String(invitedAccessRes.data.role_id || "delivery").toLowerCase() as RoleId
+    const permissions = normalizePermissions(template, (invitedAccessRes.data as any).roles?.permissions)
+    return { roleId, permissions }
   }
 
   if (ownedPartnerRes.data && ownedPartnerRes.data.user_id === userId) {
     return {
-      role: "OWNER",
-      permissions: PERMISSION_PRESETS.OWNER
+      roleId: "owner",
+      permissions: normalizePermissions(template, {})
     }
   }
 
@@ -451,12 +453,12 @@ import { getCurrentPartnerContext as getPartnerContextHelper } from "@/lib/auth/
 export const getCurrentPartnerAccess = cache(async (): Promise<{
   partnerId: string
   userId: string
-  role: string
+  roleId: RoleId
   permissions: any
 } | null> => {
   const context = await getPartnerContextHelper()
   if (!context) return null
-  return { ...context, role: String(context.role) }
+  return { ...context, roleId: context.roleId as RoleId }
 })
 
 /**
@@ -472,8 +474,8 @@ export async function requirePartnerAccessWithPermission(
 ): Promise<{
   partnerId: string
   userId: string
-  role: string
-  permissions: PartnerPermissions
+  roleId: RoleId
+  permissions: any
 }> {
   const user = await requireUser(resolvedUser)
 
@@ -482,14 +484,13 @@ export async function requirePartnerAccessWithPermission(
     throw new ForbiddenError("Você não tem acesso a este ERP")
   }
 
-  const permissions = access.permissions as PartnerPermissions
-  const role = String(access.role) as PartnerRole
+  const permissions = access.permissions
+  const roleId = access.roleId
 
-  // Check granular permission if resource and action are specified.
-  // IMPORTANT: always normalize DB JSON and evaluate server-side route/action guards.
+  // Canonical RBAC enforcement: resource.action => permissions[resource][action] === true
   if (resource && action) {
-    const normalizedRoute = normalizeToRoutePermissions(role, permissions)
-    if (!hasPermissionForResourceAction(normalizedRoute, resource, action)) {
+    const permissionKey = `${String(resource)}.${String(action)}`
+    if (!can({ role_id: roleId, permissions }, permissionKey)) {
       throw new ForbiddenError("Sem permissão para esta ação")
     }
   }
@@ -497,7 +498,7 @@ export async function requirePartnerAccessWithPermission(
   return {
     partnerId,
     userId: user.id,
-    role: String(access.role),
+    roleId,
     permissions,
   }
 }
@@ -554,162 +555,11 @@ export async function checkPartnerPermission(
     const access = await checkPartnerAccess(partnerId, user.id)
     if (!access) return { allowed: false }
 
-    const role = String(access.role) as PartnerRole
-    const routePermissions = normalizeToRoutePermissions(role, access.permissions)
-    return { allowed: hasPermissionForResourceAction(routePermissions, resource, action) }
+    const permissionKey = `${String(resource)}.${String(action)}`
+    return { allowed: can({ role_id: access.roleId, permissions: access.permissions }, permissionKey) }
   } catch {
     return { allowed: false }
   }
-}
-
-function hasPermissionForResourceAction(
-  routePermissions: ReturnType<typeof normalizeToRoutePermissions>,
-  resource: keyof PartnerPermissions,
-  action: string,
-): boolean {
-  const checks = RESOURCE_ACTION_ROUTE_CHECKS[resource]
-  if (!checks) return false
-  const checker = checks[action]
-  if (!checker) return false
-  return checker(routePermissions)
-}
-
-type RoutePermissionSet = ReturnType<typeof normalizeToRoutePermissions>
-
-const canRouteAccess = (routeKey: RouteKey) => (perms: RoutePermissionSet) => canAccessRoute(perms, routeKey)
-const canRouteAction = (routeKey: RouteKey, action: "create" | "edit" | "delete") => (perms: RoutePermissionSet) => canPerformAction(perms, routeKey, action)
-const canRouteSpecific = (routeKey: RouteKey, specificPermission: string) => (perms: RoutePermissionSet) => hasSpecificPermission(perms, routeKey, specificPermission)
-
-const RESOURCE_ACTION_ROUTE_CHECKS: Partial<
-  Record<keyof PartnerPermissions, Record<string, (perms: RoutePermissionSet) => boolean>>
-> = {
-  orders: {
-    view: canRouteAccess("orders"),
-    create: canRouteAction("orders", "create"),
-    edit: canRouteAction("orders", "edit"),
-    delete: canRouteAction("orders", "delete"),
-    cancel: canRouteSpecific("orders", "can_cancel_order"),
-    can_apply_discount: canRouteSpecific("pos", "can_discount"),
-    can_add_delivery: canRouteSpecific("orders", "can_assign_delivery"),
-  },
-  appointments: {
-    view: canRouteAccess("appointments"),
-    create: canRouteAction("appointments", "create"),
-    edit: canRouteAction("appointments", "edit"),
-    delete: canRouteAction("appointments", "delete"),
-    can_apply_discount: (perms) => canRouteSpecific("pos", "can_discount")(perms) || canRouteSpecific("orders", "can_view_values")(perms),
-  },
-  customers: {
-    view: canRouteAccess("customers"),
-    create: canRouteAction("customers", "create"),
-    edit: canRouteAction("customers", "edit"),
-    delete: canRouteAction("customers", "delete"),
-  },
-  products: {
-    view: canRouteAccess("products"),
-    create: canRouteAction("products", "create"),
-    edit: canRouteAction("products", "edit"),
-    delete: canRouteAction("products", "delete"),
-  },
-  suppliers: {
-    view: canRouteAccess("suppliers"),
-    create: canRouteAction("suppliers", "create"),
-    edit: canRouteAction("suppliers", "edit"),
-    delete: canRouteAction("suppliers", "delete"),
-  },
-  stock_movements: {
-    view: canRouteAccess("stock_movements"),
-    create: canRouteAction("stock_movements", "create"),
-    undo: canRouteAction("stock_movements", "delete"),
-  },
-  pdv: {
-    view: canRouteAccess("pos"),
-    sell: canRouteSpecific("pos", "can_sell"),
-    can_apply_discount: canRouteSpecific("pos", "can_discount"),
-    can_add_delivery: canRouteSpecific("pos", "can_add_delivery"),
-    open_pdv: canRouteSpecific("cash_register", "can_open_cash"),
-    close_pdv: canRouteSpecific("cash_register", "can_close_cash"),
-    sangria: canRouteSpecific("cash_register", "can_manage_cash"),
-    reforco: canRouteSpecific("cash_register", "can_manage_cash"),
-  },
-  services: {
-    view: canRouteAccess("services"),
-    create: canRouteAction("services", "create"),
-    edit: canRouteAction("services", "edit"),
-    delete: canRouteAction("services", "delete"),
-  },
-  quotes: {
-    view: canRouteAccess("quotes"),
-    create: canRouteAction("quotes", "create"),
-    edit: canRouteAction("quotes", "edit"),
-    delete: canRouteAction("quotes", "delete"),
-  },
-  financial: {
-    view: canRouteAccess("financial_transactions"),
-    create: canRouteAction("financial_transactions", "create"),
-    edit: canRouteAction("financial_transactions", "edit"),
-    delete: canRouteAction("financial_transactions", "delete"),
-    cancel: canRouteSpecific("financial_transactions", "can_cancel"),
-  },
-  categories: {
-    view: canRouteAccess("cadastros_produtos"),
-    create: canRouteAction("cadastros_produtos", "create"),
-    edit: canRouteAction("cadastros_produtos", "edit"),
-    delete: canRouteAction("cadastros_produtos", "delete"),
-  },
-  coupons: {
-    view: canRouteAccess("marketing_coupons"),
-    create: canRouteAction("marketing_coupons", "create"),
-    edit: canRouteAction("marketing_coupons", "edit"),
-    delete: canRouteAction("marketing_coupons", "delete"),
-  },
-  goals: {
-    view: canRouteAccess("goals"),
-    create: canRouteAction("goals", "create"),
-    edit: canRouteAction("goals", "edit"),
-    delete: canRouteAction("goals", "delete"),
-  },
-  delivery: {
-    view: canRouteAccess("logistics"),
-    create: canRouteAction("logistics", "create"),
-    edit: canRouteAction("logistics", "edit"),
-    update_status: canRouteSpecific("logistics", "can_update_delivery_status"),
-  },
-  settings: {
-    view: canRouteAccess("settings"),
-    settings_negocio: canRouteAccess("settings_business"),
-    settings_team: canRouteAccess("settings_team"),
-    settings_plan: canRouteAccess("settings_subscription"),
-    settings_payments: canRouteAccess("settings"),
-    settings_comissions: canRouteAccess("settings"),
-    settings_returns: canRouteAccess("returns"),
-    settings_vitrine: canRouteAccess("store_customize"),
-    settings_os: canRouteAccess("appointments"),
-    settings_messages: canRouteAccess("settings"),
-    settings_delivery: canRouteAccess("logistics"),
-    settings_integrations: canRouteAccess("settings_integrations"),
-  },
-  settings_negocio: {
-    edit: canRouteSpecific("settings_business", "can_edit_business_data"),
-  },
-  settings_team: {
-    invite: canRouteSpecific("settings_team", "can_invite"),
-    edit: canRouteSpecific("settings_team", "can_manage_team"),
-    remove: canRouteSpecific("settings_team", "can_remove_member"),
-    revoke_invite: canRouteSpecific("settings_team", "can_revoke_invite"),
-  },
-  settings_plans: {
-    change_plan: canRouteSpecific("settings_subscription", "can_change_subscription"),
-  },
-  payment_methods: {
-    view: () => true,
-    create: canRouteAction("settings", "create"),
-    edit: canRouteAction("settings", "edit"),
-    delete: canRouteAction("settings", "delete"),
-  },
-  settings_comissions: {
-    edit: canRouteAction("settings", "edit"),
-  },
 }
 
 /**
@@ -720,15 +570,17 @@ const RESOURCE_ACTION_ROUTE_CHECKS: Partial<
 export const requirePartnerAccess = cache(async (partnerId: string, resolvedUser?: User | any): Promise<{
   partnerId: string
   userId: string
-  role: string
+  roleId: RoleId
   permissions: any
 }> => {
   return requirePartnerAccessWithPermission(partnerId, undefined, undefined, resolvedUser)
 })
 
 /**
- * Route-aware authorization sourced from DB permissions.
- * This is the canonical backend guard for ERP route-level checks.
+ * Route-aware authorization sourced from DB RBAC permissions.
+ *
+ * NOTE: This maps ERP routes to canonical RBAC permission keys (module.view)
+ * and (optionally) a small set of supported specificPermission -> permission keys.
  */
 export async function requirePartnerRouteAccess(
   partnerId: string,
@@ -737,26 +589,65 @@ export async function requirePartnerRouteAccess(
 ): Promise<{
   partnerId: string
   userId: string
-  role: PartnerRole
-  permissions: PartnerPermissions
+  roleId: RoleId
+  permissions: any
 }> {
   const access = await requirePartnerAccessWithPermission(partnerId, undefined, undefined, options?.resolvedUser)
-  const role = String(access.role) as PartnerRole
-  const routePermissions = normalizeToRoutePermissions(role, access.permissions)
 
-  if (!canAccessRoute(routePermissions, routeKey)) {
+  const routePermissionKey = routeKeyToPermissionKey(routeKey)
+  if (!routePermissionKey || !can({ role_id: access.roleId, permissions: access.permissions }, routePermissionKey)) {
     throw new ForbiddenError("Sem permissão para acessar este módulo")
   }
 
-  if (options?.specificPermission && !hasSpecificPermission(routePermissions, routeKey, options.specificPermission)) {
-    throw new ForbiddenError("Sem permissão para esta ação")
+  if (options?.specificPermission) {
+    const specificKey = specificPermissionToPermissionKey(options.specificPermission)
+    if (!specificKey || !can({ role_id: access.roleId, permissions: access.permissions }, specificKey)) {
+      throw new ForbiddenError("Sem permissão para esta ação")
+    }
   }
 
   return {
     partnerId: access.partnerId,
     userId: access.userId,
-    role,
-    permissions: access.permissions as PartnerPermissions,
+    roleId: access.roleId,
+    permissions: access.permissions,
+  }
+}
+
+function routeKeyToPermissionKey(routeKey: string): string | null {
+  switch (routeKey) {
+    case "dashboard": return "dashboard.view"
+    case "orders": return "orders.view"
+    case "quotes": return "quotes.view"
+    case "appointments": return "appointments.view"
+    case "customers": return "customers.view"
+    case "products": return "products.view"
+    case "stock_movements": return "stock_movements.view"
+    case "pos": return "pdv.view"
+    case "financial_transactions": return "financial.view"
+    case "settings": return "settings.view"
+    case "settings_business": return "settings.settings_negocio"
+    case "settings_team": return "settings.settings_team"
+    case "settings_subscription": return "settings.settings_plan"
+    case "settings_integrations": return "settings.settings_integrations"
+    case "logistics": return "delivery.view"
+    case "goals": return "goals.view"
+    case "marketing_coupons": return "coupons.view"
+    case "cadastros_produtos": return "categories.view"
+    case "cadastros_financeiro": return "financial.view"
+    case "services": return "services.view"
+    case "store_customize": return "settings.settings_vitrine"
+    default: return null
+  }
+}
+
+function specificPermissionToPermissionKey(specificPermission: string): string | null {
+  switch (specificPermission) {
+    case "can_cancel_order": return "orders.cancel"
+    case "can_assign_delivery": return "orders.can_add_delivery"
+    case "can_discount": return "pdv.can_apply_discount"
+    case "can_add_delivery": return "pdv.can_add_delivery"
+    default: return null
   }
 }
 

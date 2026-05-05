@@ -3,8 +3,15 @@ import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getTeamMembers } from "@/app/actions/erp/team"
-import { ROLE_LABELS } from "@/lib/permissions/partner-roles"
 import type { PartnerRole } from "@/lib/permissions/types"
+
+const ROLE_LABELS: Record<PartnerRole, string> = {
+    OWNER: "Proprietário",
+    ADMIN: "Administrador",
+    MANAGER: "Gestor",
+    OPERATOR: "Operador",
+    DELIVERY: "Entregador",
+}
 
 const ROLE_COLORS: Record<PartnerRole, string> = {
     OWNER: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
@@ -32,7 +39,18 @@ export default async function TeamPage() {
 
 import { InfoCard } from "@/components/reusable"
 import TeamMemberGridCard from "@/components/erp/settings/team/TeamMemberGridCard"
-import { canModifyUser } from "@/lib/permissions/partner-roles"
+
+const ROLE_HIERARCHY: Record<PartnerRole, number> = {
+    OWNER: 5,
+    ADMIN: 4,
+    MANAGER: 3,
+    OPERATOR: 2,
+    DELIVERY: 1,
+}
+
+function canModifyUser(inviterRole: PartnerRole, targetRole: PartnerRole): boolean {
+    return ROLE_HIERARCHY[inviterRole] > ROLE_HIERARCHY[targetRole]
+}
 
 async function TeamList() {
     const { members, error, currentUserRole } = await getTeamMembers()

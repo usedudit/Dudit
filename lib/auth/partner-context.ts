@@ -4,7 +4,7 @@ import { unstable_cache } from "next/cache"
 import { cookies } from "next/headers"
 import { createAdminClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/auth/server-user"
-import type { PartnerRole, PartnerPermissions } from "@/lib/permissions/types"
+import type { RoleId, RbacPermissions } from "@/lib/permissions/rbac-types"
 import { TAGS } from "@/lib/utils/revalidation-tags"// ─── Constants ──────────────────────────────────────────────────────────────
 
 const ACTIVE_PARTNER_COOKIE = "active_partner_id"
@@ -23,16 +23,20 @@ const COOKIE_OPTIONS = {
 export interface PartnerContext {
     userId: string
     partnerId: string
-    role: PartnerRole
-    permissions: PartnerPermissions
+    /** @deprecated Use roleId (lowercase DB id). */
+    role: string
+    roleId: RoleId
+    permissions: RbacPermissions
     businessInfo: any // Added for feature flags
 }
 
 export interface PartnerAccessRecord {
     partnerId: string
     userId: string
-    role: PartnerRole
-    permissions: PartnerPermissions
+    /** @deprecated Use roleId (lowercase DB id). */
+    role: string
+    roleId: RoleId
+    permissions: RbacPermissions
     storeName: string
     ownerName: string | null
     businessInfo: any // Added for feature flags
@@ -104,8 +108,8 @@ export async function getPendingInviteToken(): Promise<string | null> {
 
 // ─── Partner Context Resolution ─────────────────────────────────────────────
 
-import { PERMISSION_PRESETS } from "@/lib/permissions/partner-roles"
-import { mergePartnerPermissions } from "@/lib/permissions/merge-partner-permissions"
+import { getPermissionTemplate } from "@/lib/permissions/rbac-template-loader"
+import { normalizePermissions } from "@/lib/permissions/rbac-normalize"
 
 // ─── Extracted Cache Factory for stability and strict keying ────────────────
 //
@@ -116,10 +120,12 @@ import { mergePartnerPermissions } from "@/lib/permissions/merge-partner-permiss
 const getCachedUserAccess = (userId: string) => unstable_cache(
     async () => {
         const admin = createAdminClient()
+        const template = await getPermissionTemplate()
 
         const [invitedDataRes, ownedDataRes] = await Promise.all([
             admin.from("partner_users").select(`
-                    partner_id, user_id, role, permissions,
+                    partner_id, user_id, role_id,
+                    roles:roles!inner (id, permissions),
                     partners!inner (store_name, user_id, business_info)
                 `).eq("user_id", userId),
             admin.from("partners").select(`
@@ -138,8 +144,9 @@ const getCachedUserAccess = (userId: string) => unstable_cache(
                 accessRecords[store.id] = {
                     partnerId: store.id,
                     userId: userId,
-                    role: "OWNER" as PartnerRole,
-                    permissions: PERMISSION_PRESETS.OWNER,
+                    role: "OWNER",
+                    roleId: "owner",
+                    permissions: normalizePermissions(template, {}),
                     storeName: store.store_name || "Loja sem nome",
                     ownerName: "Você",
                     businessInfo: typeof store.business_info === "string" ? JSON.parse(store.business_info) : (store.business_info || { sells: ["products"], channels: ["online"] }),
@@ -153,11 +160,15 @@ const getCachedUserAccess = (userId: string) => unstable_cache(
                     const ownerId = record.partners.user_id
                     if (ownerId) ownerUserIds.add(ownerId)
 
+                    const roleId = (String(record.role_id || "delivery").toLowerCase() as RoleId)
+                    const dbPerms = record.roles?.permissions
+
                     accessRecords[record.partner_id] = {
                         partnerId: record.partner_id,
                         userId: record.user_id,
-                        role: record.role as PartnerRole,
-                        permissions: mergePartnerPermissions(record.role as PartnerRole, record.permissions),
+                        role: String(roleId).toUpperCase(),
+                        roleId,
+                        permissions: normalizePermissions(template, dbPerms),
                         storeName: record.partners.store_name || "Loja sem nome",
                         ownerName: ownerId, // temporary
                         businessInfo: typeof record.partners.business_info === "string" ? JSON.parse(record.partners.business_info) : (record.partners.business_info || { sells: ["products"], channels: ["online"] }),
@@ -173,9 +184,9 @@ const getCachedUserAccess = (userId: string) => unstable_cache(
             if (profiles) {
                 const names = Object.fromEntries(profiles.map((p: any) => [p.user_id, p.full_name]))
                 records = records.map(record => {
-                    if (record.role !== "OWNER" && record.ownerName && names[record.ownerName]) {
+                    if (record.roleId !== "owner" && record.ownerName && names[record.ownerName]) {
                         record.ownerName = names[record.ownerName]
-                    } else if (record.role !== "OWNER") {
+                    } else if (record.roleId !== "owner") {
                         record.ownerName = "Desconhecido"
                     }
                     return record
@@ -237,6 +248,7 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
                 userId: match.userId,
                 partnerId: match.partnerId,
                 role: match.role,
+                roleId: match.roleId,
                 permissions: match.permissions,
                 businessInfo: match.businessInfo,
             }
@@ -250,6 +262,7 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
             userId: match.userId,
             partnerId: match.partnerId,
             role: match.role,
+            roleId: match.roleId,
             permissions: match.permissions,
             businessInfo: match.businessInfo,
         }

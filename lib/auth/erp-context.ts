@@ -11,7 +11,7 @@ export const getERPContext = cache(async (userId: string) => {
     const supabase = await getSupabaseServerClient()
 
     const [partnerUsersRes, partnersRes] = await Promise.all([
-        supabase.from("partner_users").select("partner_id, role, permissions")
+        supabase.from("partner_users").select("partner_id, role_id")
             .eq("user_id", userId),
         supabase.from("partners").select("id, user_id, store_name")
             .eq("user_id", userId),

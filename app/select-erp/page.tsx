@@ -1,11 +1,18 @@
 import { redirect } from "next/navigation"
 import { requireUser } from "@/lib/auth/authorization"
 import { getAllUserPartnerAccess } from "@/lib/auth/partner-context"
-import { ROLE_LABELS } from "@/lib/permissions/partner-roles"
 import type { PartnerRole } from "@/lib/permissions/types"
 import { selectErpAction } from "./actions"
 import { getPartnerStatus } from "@/lib/data/partner"
 import Link from "next/link"
+
+const ROLE_LABELS: Record<PartnerRole, string> = {
+    OWNER: "Proprietário",
+    ADMIN: "Administrador",
+    MANAGER: "Gestor",
+    OPERATOR: "Operador",
+    DELIVERY: "Entregador",
+}
 
 export default async function SelectErpPage() {
     const user = await requireUser()

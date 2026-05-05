@@ -7,8 +7,7 @@ import { getPartnerPaymentMethodsCached } from "@/lib/data/partner"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { createAdminClient } from "@/lib/supabase/server"
-import { ROLE_HIERARCHY } from "@/lib/permissions/partner-roles"
-import type { PartnerRole } from "@/lib/permissions/types"
+import { can } from "@/lib/permissions/can"
 import { decryptCPF } from "@/lib/crypto"
 
 export default async function SettingsPage() {
@@ -19,8 +18,7 @@ export default async function SettingsPage() {
   if (!context) {
     redirect("/select-erp")
   }
-  const userRole = context.role as PartnerRole
-  if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.MANAGER) {
+  if (!can({ role_id: context.roleId, permissions: context.permissions }, "settings.view")) {
     return <AccessDenied />
   }
 

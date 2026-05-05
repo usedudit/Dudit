@@ -3,7 +3,8 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { revalidatePath } from "next/cache"
 import { encrypt, decrypt } from "@/lib/cryptoService"
-import { requireUser } from "@/lib/auth/authorization"
+import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
+import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 
@@ -13,7 +14,12 @@ export async function disconnectMercadoPagoAction() {
   const user = await requireUser()
   const supabase = await getSupabaseServerClient()
 
-  const { data: partner } = await supabase.from("partners").select("id").eq("user_id", user.id).single()
+  const ctx = await getCurrentPartnerContext()
+  if (!ctx) return { error: "Contexto de ERP não encontrado" }
+
+  await requirePartnerAccessWithPermission(ctx.partnerId, "settings", "settings_integrations", user)
+
+  const { data: partner } = await supabase.from("partners").select("id").eq("id", ctx.partnerId).single()
 
   if (!partner) {
     return { error: "Parceiro não encontrado" }
@@ -54,10 +60,14 @@ export async function getMercadoPagoStatusAction() {
   const user = await requireUser()
   const supabase = await getSupabaseServerClient()
 
+  const ctx = await getCurrentPartnerContext()
+  if (!ctx) return { error: "Contexto de ERP não encontrado" }
+  await requirePartnerAccessWithPermission(ctx.partnerId, "settings", "settings_integrations", user)
+
   const { data: partner } = await supabase
     .from("partners")
     .select("mp_user_id, mp_connected_at, mp_public_key")
-    .eq("user_id", user.id)
+    .eq("id", ctx.partnerId)
     .single()
 
   if (!partner) {
@@ -77,7 +87,11 @@ export async function refreshMercadoPagoTokenAction() {
   const user = await requireUser()
   const supabase = await getSupabaseServerClient()
 
-  const { data: partner } = await supabase.from("partners").select("*").eq("user_id", user.id).single()
+  const ctx = await getCurrentPartnerContext()
+  if (!ctx) return { error: "Contexto de ERP não encontrado" }
+  await requirePartnerAccessWithPermission(ctx.partnerId, "settings", "settings_integrations", user)
+
+  const { data: partner } = await supabase.from("partners").select("*").eq("id", ctx.partnerId).single()
 
   if (!partner || !partner.mp_refresh_token_encrypted) {
     return { error: "Mercado Pago não conectado" }

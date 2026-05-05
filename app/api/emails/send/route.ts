@@ -11,7 +11,8 @@
 
 import { type NextRequest, NextResponse } from "next/server"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { getCurrentUser } from "@/lib/auth/authorization"
+import { getCurrentUser, requirePartnerAccess } from "@/lib/auth/authorization"
+import { can } from "@/lib/permissions/can"
 import { SecureLogger } from "@/lib/secure-logger"
 import { withCSRFProtection } from "@/lib/security/csrf-middleware"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -116,17 +117,11 @@ async function handler(request: NextRequest) {
     }
 
     // ====================================================================
-    // SECURITY: Verify partner ownership if provided
+    // SECURITY: Verify partner access + permission if provided
     // ====================================================================
     if (body.partnerId) {
-      const { data: partner } = await supabase
-        .from("partners")
-        .select("id")
-        .eq("id", body.partnerId)
-        .eq("user_id", userId)
-        .single()
-
-      if (!partner) {
+      const access = await requirePartnerAccess(body.partnerId)
+      if (!can({ role_id: access.roleId, permissions: access.permissions }, "settings.settings_messages")) {
         SecureLogger.warn("[Email API] Unauthorized partner access", {
           userId,
           partnerId: body.partnerId,
