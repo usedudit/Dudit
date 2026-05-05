@@ -5,6 +5,7 @@ import { cookies } from "next/headers"
 import { createAdminClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import type { RoleId, RbacPermissions } from "@/lib/permissions/rbac-types"
+import type { PartnerRole } from "@/lib/permissions/types"
 import { TAGS } from "@/lib/utils/revalidation-tags"// ─── Constants ──────────────────────────────────────────────────────────────
 
 const ACTIVE_PARTNER_COOKIE = "active_partner_id"
@@ -24,7 +25,7 @@ export interface PartnerContext {
     userId: string
     partnerId: string
     /** @deprecated Use roleId (lowercase DB id). */
-    role: string
+    role: PartnerRole
     roleId: RoleId
     permissions: RbacPermissions
     businessInfo: any // Added for feature flags
@@ -34,7 +35,7 @@ export interface PartnerAccessRecord {
     partnerId: string
     userId: string
     /** @deprecated Use roleId (lowercase DB id). */
-    role: string
+    role: PartnerRole
     roleId: RoleId
     permissions: RbacPermissions
     storeName: string
@@ -144,7 +145,7 @@ const getCachedUserAccess = (userId: string) => unstable_cache(
                 accessRecords[store.id] = {
                     partnerId: store.id,
                     userId: userId,
-                    role: "OWNER",
+                    role: "OWNER" as PartnerRole,
                     roleId: "owner",
                     permissions: normalizePermissions(template, {}),
                     storeName: store.store_name || "Loja sem nome",
@@ -166,7 +167,7 @@ const getCachedUserAccess = (userId: string) => unstable_cache(
                     accessRecords[record.partner_id] = {
                         partnerId: record.partner_id,
                         userId: record.user_id,
-                        role: String(roleId).toUpperCase(),
+                        role: String(roleId).toUpperCase() as PartnerRole,
                         roleId,
                         permissions: normalizePermissions(template, dbPerms),
                         storeName: record.partners.store_name || "Loja sem nome",
