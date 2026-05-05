@@ -18,6 +18,7 @@ import { mapProductToFormData } from "@/lib/utils/product-mappers"
 import { useNotification } from "@/hooks/use-notification"
 import { usePermissions } from "@/lib/permission-context"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
+import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { fetchJSONWithCSRF, fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -599,7 +600,13 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 setPendingImages([])
                 onClose?.()
             } else {
-                notifyError(result.error || "Erro ao salvar")
+                const errorMsg = result.error || "Erro ao salvar"
+                if (isPlanLimitReachedError(errorMsg)) {
+                    const target = getNextPlanTarget(planSlug)
+                    if (target) openPlanUpgrade(target)
+                    return
+                }
+                notifyError(errorMsg)
             }
         } catch (err) { console.error(err); notifyError("Erro ao salvar produto") }
         finally {

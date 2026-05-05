@@ -127,7 +127,16 @@ async function getFreePlan(): Promise<Plan> {
       name: "Começar",
       slug: "free",
       price: 0,
-      limits_json: { products: 15, images_per_product: 2, total_images: 30, users: 1, quotes_per_month: 10, orders_per_month: 25, appointments_per_month: 30, service_orders: 15 },
+      // Keep aligned with DB migration 20260504 (Começar/Crescer/Escalar "limits_json").
+      limits_json: {
+        items: 15,
+        images_per_item: 2,
+        monthly_orders: 25,
+        monthly_appointments: 30,
+        monthly_quotes: 10,
+        monthly_service_orders: 15,
+        users: 1,
+      },
       features_json: ["public_storefront", "technical_specs", "pdv_basic", "whatsapp_orders", "whatsapp_bookings", "qr_code_profile"],
       sort_order: 0,
       is_active: true,
@@ -351,20 +360,85 @@ export async function getUsageCounters(partnerId: string): Promise<UsageCounters
     return null
   }
 
-  return data as UsageCounters | null
+  if (!data) return null
+
+  // Safety net: if for any reason DB-side cron reset isn't running,
+  // reset monthly counters lazily on-demand (based on *_month_reset timestamps).
+  // This ensures quotes_month_count is correctly incremented & rolled over.
+  const counters = data as UsageCounters
+  const now = new Date()
+  const monthStartUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).getTime()
+
+  const updates: Partial<UsageCounters> = {}
+  const quotesReset = counters.quotes_month_reset ? new Date(counters.quotes_month_reset).getTime() : 0
+  const ordersReset = counters.orders_month_reset ? new Date(counters.orders_month_reset).getTime() : 0
+  const appointmentsReset = counters.appointments_month_reset ? new Date(counters.appointments_month_reset).getTime() : 0
+
+  if (quotesReset < monthStartUtc) {
+    updates.quotes_month_count = 0
+    ;(updates as any).quotes_month_reset = now.toISOString()
+  }
+  if (ordersReset < monthStartUtc) {
+    updates.orders_month_count = 0
+    ;(updates as any).orders_month_reset = now.toISOString()
+  }
+  if (appointmentsReset < monthStartUtc) {
+    updates.appointments_month_count = 0
+    ;(updates as any).appointments_month_reset = now.toISOString()
+  }
+
+  if (Object.keys(updates).length > 0) {
+    const { error: updateError } = await admin.from("usage_counters").update(updates).eq("partner_id", partnerId)
+    if (updateError) {
+      console.error("[SUBSCRIPTION] Error resetting monthly counters:", updateError.message)
+      // Still return stale counters; limit enforcement will be conservative (deny).
+    } else {
+      const { data: refreshed } = await admin.from("usage_counters").select("*").eq("partner_id", partnerId).maybeSingle()
+      if (refreshed) return refreshed as UsageCounters
+    }
+  }
+
+  return counters
 }
 
 // ─── Counter name → usage_counters column mapping ───────────────────────────
 
 const LIMIT_TO_COUNTER_MAP: Record<string, keyof UsageCounters> = {
-  products: "products_count",
+  // New structure (20260504+)
+  items: "products_count",
+  images_per_item: "images_count",
+  monthly_orders: "orders_month_count",
+  monthly_quotes: "quotes_month_count",
+  monthly_appointments: "appointments_month_count",
+  monthly_service_orders: "service_orders_month_count",
   users: "users_count",
+
+  // Back-compat aliases (older code/DB rows)
+  products: "products_count",
+  images_per_product: "images_count",
   total_images: "images_count",
   services: "services_count",
   quotes_per_month: "quotes_month_count",
   orders_per_month: "orders_month_count",
   appointments_per_month: "appointments_month_count",
   service_orders: "service_orders_month_count",
+}
+
+const LIMIT_NAME_TO_RESOURCE_LABEL: Record<string, string> = {
+  items: "itens",
+  images_per_item: "imagens por item",
+  monthly_orders: "pedidos/mês",
+  monthly_quotes: "orçamentos/mês",
+  monthly_appointments: "agendamentos/mês",
+  monthly_service_orders: "ordens de serviço/mês",
+  users: "usuários",
+  // Aliases
+  products: "itens",
+  total_images: "imagens",
+  quotes_per_month: "orçamentos/mês",
+  orders_per_month: "pedidos/mês",
+  appointments_per_month: "agendamentos/mês",
+  service_orders: "ordens de serviço/mês",
 }
 
 /**
@@ -401,13 +475,18 @@ export async function checkLimit(
     }
   }
 
-  if (current >= limit) {
+  // If caller passes `currentValue`, it usually represents the *proposed* amount
+  // (e.g. images_per_item for a new product), not "already consumed" usage.
+  // In that case, allow exactly `limit` and deny only when current > limit.
+  const shouldDeny = currentValue !== undefined ? current > limit : current >= limit
+
+  if (shouldDeny) {
     const plan = await getPartnerPlan(partnerId)
     return {
       allowed: false,
       limit,
       current,
-      message: `Limite do plano ${plan.name} atingido: máximo de ${limit} ${limitName}. Faça upgrade para continuar.`,
+      message: `Limite do plano ${plan.name} atingido: máximo de ${limit} ${LIMIT_NAME_TO_RESOURCE_LABEL[limitName] || limitName}. Faça upgrade para continuar.`,
     }
   }
 

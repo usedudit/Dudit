@@ -88,7 +88,10 @@ export default async function ERPLayout({
 
   // ── Resolve route permissions ──
   const role = (context.role || "DELIVERY") as PartnerRole
-  const routePermissions: PartnerRoutePermissions = normalizeToRoutePermissions(role, context.permissions)
+  // Owner is a code-side override: do not let "all-false stored JSON"
+  // from RBAC template hide the OWNER preset in the UI.
+  const routePermissions: PartnerRoutePermissions =
+    context.roleId === "owner" ? normalizeToRoutePermissions(role, null) : normalizeToRoutePermissions(role, context.permissions)
 
   // Read sidebar cookie
   const cookieStore = await cookies()

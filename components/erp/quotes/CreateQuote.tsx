@@ -11,6 +11,9 @@ import SelectCustomerSheet from '../clientes/SelectCustomerSheet';
 import SelectVariantSheet from './SelectVariantSheet';
 import { useNotification } from '@/hooks/use-notification';
 import { useStore } from '@/lib/store-context';
+import { usePermissions } from "@/lib/permission-context";
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal";
+import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade";
 import {
     createQuoteAction,
     getQuoteDetailsAction,
@@ -51,6 +54,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const debouncedRefresh = useDebouncedRefresh();
     const { selectedStore } = useStore();
     const { setHeaderOverride } = useSidebar();
+    const { planSlug } = usePermissions()
+    const { openPlanUpgrade } = usePlanUpgrade()
     const [isSaving, setIsSaving] = useState(false);
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
     const [realQuoteNumber, setRealQuoteNumber] = useState(existingQuote?.quote_number || '');
@@ -804,7 +809,14 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                 debouncedRefresh();
                 onBack();
             } else {
-                notifyError("Erro ao salvar", (result as any).error || "Ocorreu um erro inesperado.");
+                const errorMsg = (result as any).error || "Ocorreu um erro inesperado."
+                if (isPlanLimitReachedError(errorMsg)) {
+                    const target = getNextPlanTarget(planSlug)
+                    if (target) openPlanUpgrade(target)
+                    else notifyError("Limite atingido", "Você já está no plano máximo.")
+                    return
+                }
+                notifyError("Erro ao salvar", errorMsg);
             }
         } catch (error) {
             console.error(error);
@@ -838,7 +850,13 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
             debouncedRefresh();
             onBack();
         } else {
-            notifyError("Erro", (dup as { error?: string }).error || "Não foi possível duplicar.");
+            const errorMsg = (dup as { error?: string }).error || "Não foi possível duplicar."
+            if (isPlanLimitReachedError(errorMsg)) {
+                const target = getNextPlanTarget(planSlug)
+                if (target) openPlanUpgrade(target)
+                return
+            }
+            notifyError("Erro", errorMsg);
         }
     }, [existingQuote?.id, notifySuccess, notifyError, debouncedRefresh, onBack]);
 

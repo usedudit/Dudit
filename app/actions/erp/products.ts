@@ -278,8 +278,8 @@ export async function createProductComprehensiveAction(data: {
 
         // 3.5 Subscription limit check - enforce product and image limits before creating
         const [limitCheck, imagesLimitCheck] = await Promise.all([
-            checkLimit(finalPartnerId, "products"),
-            checkLimit(finalPartnerId, "total_images", (data.images?.length || 0)),
+            checkLimit(finalPartnerId, "items"),
+            checkLimit(finalPartnerId, "images_per_item", (data.images?.length || 0)),
         ])
         if (!limitCheck.allowed) {
             return errorResponse(limitCheck.message || "Limite de produtos atingido.")

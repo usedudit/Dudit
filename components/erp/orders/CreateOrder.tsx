@@ -6,6 +6,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent, Button, AlertModal, ThreeDots
 import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
 import { useToast } from "@/components/ui/use-toast"
 import { useNotification } from "@/hooks/use-notification"
+import { usePermissions } from "@/lib/permission-context"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade"
 import { createERPOrderAction, getOrderDetailsAction, updateERPOrderAction } from "@/app/actions/erp/orders"
 import { validateCouponAction } from "@/app/actions/shared/coupons"
 import { getPOSCustomerDetailsAction, createPOSCustomerAddressAction } from "@/app/actions/erp/pdv"
@@ -125,6 +128,8 @@ function normalizeCustomerForCard(customer: any) {
 export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOrderProps) {
     const { toast } = useToast()
     const { success: notifySuccess, error: notifyError } = useNotification()
+    const { planSlug } = usePermissions()
+    const { openPlanUpgrade } = usePlanUpgrade()
     const router = useRouter()
     const debouncedRefresh = useDebouncedRefresh()
     const csrfToken = useCSRFToken()
@@ -933,7 +938,13 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 return { success: true, orderNumber: returnedOrderNumber }
             }
 
-            notifyError(result.error || (editOrderId ? "Erro ao atualizar pedido" : "Erro ao criar pedido"))
+            const errorMsg = result.error || (editOrderId ? "Erro ao atualizar pedido" : "Erro ao criar pedido")
+            if (isPlanLimitReachedError(errorMsg)) {
+                const target = getNextPlanTarget(planSlug)
+                if (target) openPlanUpgrade(target)
+                return { error: errorMsg }
+            }
+            notifyError(errorMsg)
             return { error: result.error }
         } catch (error) {
             notifyError("Erro ao processar pedido")

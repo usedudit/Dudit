@@ -44,24 +44,28 @@ function formatLimitValue(val: number | string): string {
 
 function buildLimitsDisplay(limits: Record<string, any>): string[] {
     const lines: string[] = []
-    if (limits.products != null) {
-        const v = formatLimitValue(limits.products)
+    if (limits.items != null) {
+        const v = formatLimitValue(limits.items)
         lines.push(v === "Ilimitado" ? "Itens ilimitados" : `Até ${v} itens`)
     }
-    if (limits.images_per_product != null) {
-        lines.push(`Até ${limits.images_per_product} imagens por item`)
+    if (limits.images_per_item != null) {
+        lines.push(`Até ${limits.images_per_item} imagens por item`)
     }
-    if (limits.orders_per_month != null) {
-        const v = formatLimitValue(limits.orders_per_month)
+    if (limits.monthly_orders != null) {
+        const v = formatLimitValue(limits.monthly_orders)
         lines.push(v === "Ilimitado" ? "Pedidos ilimitados" : `Até ${v} pedidos/mês`)
     }
-    if (limits.appointments_per_month != null) {
-        const v = formatLimitValue(limits.appointments_per_month)
+    if (limits.monthly_appointments != null) {
+        const v = formatLimitValue(limits.monthly_appointments)
         lines.push(v === "Ilimitado" ? "Agendamentos ilimitados" : `Até ${v} agendamentos/mês`)
     }
-    if (limits.quotes_per_month != null) {
-        const v = formatLimitValue(limits.quotes_per_month)
+    if (limits.monthly_quotes != null) {
+        const v = formatLimitValue(limits.monthly_quotes)
         lines.push(v === "Ilimitado" ? "Orçamentos ilimitados" : `Até ${v} orçamentos/mês`)
+    }
+    if (limits.monthly_service_orders != null) {
+        const v = formatLimitValue(limits.monthly_service_orders)
+        lines.push(v === "Ilimitado" ? "Ordens de serviço ilimitadas" : `Até ${v} ordens de serviço/mês`)
     }
     if (limits.users != null) {
         const v = formatLimitValue(limits.users)

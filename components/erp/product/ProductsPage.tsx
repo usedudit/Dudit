@@ -16,6 +16,9 @@ import { getERPProductsPageAction, type ERPProductListCursor } from "@/app/actio
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import type { EntityAction } from "@/hooks/use-entity-state"
+import { usePermissions } from "@/lib/permission-context"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade"
 
 // Actions
 import {
@@ -185,6 +188,8 @@ export default function ProductsPage({
     const { toast } = useToast()
     const { selectedStore } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
+    const { planSlug } = usePermissions()
+    const { openPlanUpgrade } = usePlanUpgrade()
 
     const productsQueryKey = useMemo(() => ['erp', 'products', partnerId] as const, [partnerId])
 
@@ -478,7 +483,13 @@ export default function ProductsPage({
                 closeEntity()
                 return
             } else {
-                toast({ title: "Erro", description: res.error, variant: "destructive" })
+                const errorMsg = res.error || "Erro ao salvar produto"
+                if (isPlanLimitReachedError(errorMsg)) {
+                    const target = getNextPlanTarget(planSlug)
+                    if (target) openPlanUpgrade(target)
+                    return
+                }
+                toast({ title: "Erro", description: errorMsg, variant: "destructive" })
             }
         } catch {
             toast({ title: "Erro", variant: "destructive" })

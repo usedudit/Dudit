@@ -430,7 +430,7 @@ export async function checkoutCartAction(
   const partnerIdForLimit = firstProduct?.partner_id
 
   if (partnerIdForLimit) {
-    const limitCheck = await checkLimit(partnerIdForLimit, "orders_per_month")
+    const limitCheck = await checkLimit(partnerIdForLimit, "monthly_orders")
     if (!limitCheck.allowed) {
       return { error: limitCheck.message || "A loja atingiu o limite mensal de pedidos." }
     }

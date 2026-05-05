@@ -21,6 +21,9 @@ import { QuoteHistoryTab, type QuoteHistoryEntryRow } from "./QuoteHistoryTab"
 import { useNotification } from "@/hooks/use-notification";
 import CustomerCard from '@/components/reusable/CustomerCard';
 import { useSidebar } from "@/lib/sidebar-context";
+import { usePermissions } from "@/lib/permission-context";
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal";
+import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade";
 import { useRouter } from "next/navigation";
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
@@ -86,6 +89,8 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
     const [historyLoading, setHistoryLoading] = useState(false);
     const csrfToken = useCSRFToken();
     const { success: notifySuccess, error: notifyError } = useNotification();
+    const { planSlug } = usePermissions();
+    const { openPlanUpgrade } = usePlanUpgrade();
     const router = useRouter();
     const debouncedRefresh = useDebouncedRefresh();
     const { setHeaderOverride } = useSidebar();
@@ -154,7 +159,13 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                 acknowledgeUnapprovedConversion,
             });
             if (!res.success) {
-                notifyError("Não foi possível converter", res.error || "Erro desconhecido");
+                const errorMsg = res.error || "Erro desconhecido";
+                if (isPlanLimitReachedError(errorMsg)) {
+                    const target = getNextPlanTarget(planSlug)
+                    if (target) openPlanUpgrade(target)
+                    return;
+                }
+                notifyError("Não foi possível converter", errorMsg);
                 return;
             }
             const d = res.data as { orderId: string; orderNumber?: string | null; alreadyConverted?: boolean };

@@ -40,7 +40,7 @@ export async function createOrderAction(data: {
   await requireRateLimit(RateLimitCategory.ORDER_CREATE)
 
   // 0. Check subscription limits
-  const limitName = data.itemType === "product" ? "orders_per_month" : "appointments_per_month"
+  const limitName = data.itemType === "product" ? "monthly_orders" : "monthly_appointments"
   const limitCheck = await checkLimit(data.partnerId, limitName)
   if (!limitCheck.allowed) {
     return { error: limitCheck.message || "Limite mensal atingido para este plano." }

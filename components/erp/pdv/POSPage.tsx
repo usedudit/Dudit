@@ -12,6 +12,9 @@ import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useNotification } from "@/hooks/use-notification"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
+import { usePermissions } from "@/lib/permission-context"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade"
 import {
     deletePreSaleDraftAction,
     finalizePreSaleAction,
@@ -108,6 +111,8 @@ function DesktopPOSSheet({
 
 export default function POSPage({ partnerId, initialData, initialActiveSession }: Props) {
     const { success: notifySuccess, error: notifyError } = useNotification()
+    const { planSlug } = usePermissions()
+    const { openPlanUpgrade } = usePlanUpgrade()
     const isMobile = useMediaQuery("(max-width: 1024px)")
     const csrfToken = useCSRFToken()
 
@@ -435,7 +440,13 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             })
 
             if (!result?.success || !result.data) {
-                notifyError((result as any)?.error || "Não foi possível criar o produto.")
+                const errorMsg = (result as any)?.error || "Não foi possível criar o produto."
+                if (isPlanLimitReachedError(errorMsg)) {
+                    const target = getNextPlanTarget(planSlug)
+                    if (target) openPlanUpgrade(target)
+                    return
+                }
+                notifyError(errorMsg)
                 return
             }
 

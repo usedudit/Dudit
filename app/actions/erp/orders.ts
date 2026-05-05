@@ -1226,7 +1226,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const csrfValidation = await requireCSRF(data.csrf_token)
     if (!csrfValidation.valid) return { error: csrfValidation.error || "Token CSRF inválido" }
 
-    const limitCheck = await checkLimit(partnerId, "orders_per_month")
+    const limitCheck = await checkLimit(partnerId, "monthly_orders")
     if (!limitCheck.allowed) return { error: limitCheck.message || "Limite mensal atingido." }
 
     const supabase = createAdminClient()

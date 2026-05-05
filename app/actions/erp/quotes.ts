@@ -366,7 +366,7 @@ export async function createQuoteAction(data: {
             const user = await requireUser()
             await requirePartnerAccessWithPermission(data.partnerId, "quotes", "create", user)
 
-            const limitCheck = await checkLimit(data.partnerId, "quotes_per_month")
+            const limitCheck = await checkLimit(data.partnerId, "monthly_quotes")
             if (!limitCheck.allowed) {
                 return errorResponse(limitCheck.message || "Limite mensal de orçamentos atingido para este plano.")
             }
@@ -735,7 +735,7 @@ export async function duplicateQuoteAction(quoteId: string) {
             const user = await requireUser()
             await requirePartnerAccessWithPermission(ctx.partnerId, "quotes", "create", user)
 
-            const limitCheck = await checkLimit(ctx.partnerId, "quotes_per_month")
+            const limitCheck = await checkLimit(ctx.partnerId, "monthly_quotes")
             if (!limitCheck.allowed) {
                 return errorResponse(limitCheck.message || "Limite mensal de orçamentos atingido para este plano.")
             }
