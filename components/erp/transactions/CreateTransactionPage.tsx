@@ -1391,11 +1391,13 @@ export default function CreateTransactionPage({
                             )}
                             {(recurringModeEnabled && (enableRecurrence || isRecurringTemplateEdit)) && (
                                 <>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                                        {isRecurringTemplateEdit
+                                    <InfoCard
+                                        color="gray"
+                                        message={isRecurringTemplateEdit
                                             ? "Alterações passam a valer para ocorrências futuras. Pagamentos já confirmados não são alterados."
                                             : "A data de vencimento acima é a primeira ocorrência. As próximas datas aparecem em A pagar/A receber e seguem a frequência abaixo."}
-                                    </p>
+                                        className="mb-6"
+                                    />
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <FormDropdown
                                             label="Frequência"
@@ -1449,6 +1451,7 @@ export default function CreateTransactionPage({
                                                     Sempre no último dia do mês
                                                 </span>
                                             }
+                                            className="mt-6"
                                         />
                                     )}
                                     {isRecurringTemplateEdit && (
@@ -1467,8 +1470,9 @@ export default function CreateTransactionPage({
                             {!isRecurringTemplateEdit && installmentModeEnabled && (
                                 <>
                                     <InfoCard
-                                        message={`Todas as parcelas serão geradas na hora (${installmentsCount}x, a cada ${installmentFrequencyLabel(installmentFrequency, installmentInterval)}).`}
+                                        message={`Todas as parcelas serão geradas na hora (Total de ${installmentsCount}x, a cada ${installmentFrequencyLabel(installmentFrequency, installmentInterval)}).`}
                                         color="gray"
+                                        className="mb-6"
                                     />
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                         <Input

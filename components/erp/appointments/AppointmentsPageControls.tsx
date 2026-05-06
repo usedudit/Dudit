@@ -198,7 +198,7 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
                             className={`px-3 h-full flex items-center justify-center rounded-full text-sm font-medium transition-colors ${calendarView === "month" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
                         >
                             <CalendarIcon className="w-[16px] h-[16px] mr-1.5" />
-                            Mes
+                            Mês
                         </button>
                     </div>
                 </div>

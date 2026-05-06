@@ -54,13 +54,30 @@ export async function getTeamMembers(): Promise<{ members: TeamMember[]; current
         const ownerUserId = partner?.user_id
 
         // Get all partner_users entries
-        const { data: partnerUsers, error } = await admin
+        let { data: partnerUsers, error } = await admin
             .from("partner_users")
             .select("id, user_id, role_id, created_at")
             .eq("partner_id", partnerId)
             .order("created_at", { ascending: true })
 
         if (error) return { members: [], error: error.message }
+
+        // Fix: Ensure owner is in partner_users so they appear in the team list and are assignable.
+        if (ownerUserId && !partnerUsers?.some((pu: any) => pu.user_id === ownerUserId)) {
+            const { data: newPu } = await admin
+                .from("partner_users")
+                .insert({
+                    partner_id: partnerId,
+                    user_id: ownerUserId,
+                    role_id: "owner"
+                })
+                .select("id, user_id, role_id, created_at")
+                .single()
+
+            if (newPu) {
+                partnerUsers = partnerUsers ? [newPu, ...partnerUsers] : [newPu]
+            }
+        }
 
         if (!partnerUsers || partnerUsers.length === 0) {
             return { members: [] }

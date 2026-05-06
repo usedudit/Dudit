@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
     PlusIcon,
 } from '@/lib/icons';
-import { Button, Checkbox, Pagination } from '@/components/reusable';
+import { Button, Checkbox, IconPlaceholder, Pagination } from '@/components/reusable';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import {
@@ -810,7 +810,7 @@ const AppointmentsPage = ({
                                                                 {APPOINTMENT_COLUMNS.map((column) => (
                                                                     <th
                                                                         key={column.id}
-                                                                        className={`py-3 px-3 text-[11px] font-bold text-brand-inactive-text dark:text-dark-body whitespace-nowrap bg-brand-gray dark:bg-dark-border/50 ${column.align === "center" ? "text-center" : column.align === "right" ? "text-right" : "text-left"}`}
+                                                                        className={`py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${column.align === "right" ? "text-right" : column.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${column.id === "actions" ? "rounded-r-lg" : ""}`}
                                                                         style={{ width: column.width, minWidth: column.minWidth }}
                                                                     >
                                                                         {column.label}
@@ -833,6 +833,17 @@ const AppointmentsPage = ({
                                                             ) : (
                                                                 <tr>
                                                                     <td colSpan={APPOINTMENT_COLUMNS.length + 1}>
+                                                                        <IconPlaceholder
+                                                                            placeholderType="image"
+                                                                            imageSrc="https://img.dudit.com.br/static/mascots/Agendamentos.png"
+                                                                            imageAlt="Nenhum agendamento encontrado"
+                                                                            title="Nenhum agendamento encontrado"
+                                                                            subtitle=""
+                                                                            itemButton={{
+                                                                                text: "Novo Agendamento",
+                                                                                action: () => handleOpenCreate(),
+                                                                            }}
+                                                                        />
                                                                         <div className="p-20 text-center">
                                                                             <h3 className="text-brand-dark dark:text-dark-heading font-bold mb-1">
                                                                                 Nenhum agendamento encontrado

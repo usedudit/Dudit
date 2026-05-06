@@ -5,6 +5,7 @@ import AppointmentsPage from "@/components/erp/appointments/AppointmentsPage"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { getAdminClient } from "@/lib/supabase/admin"
 
 export const dynamic = "force-dynamic"
 
@@ -16,13 +17,18 @@ export const dynamic = "force-dynamic"
 async function loadCatalogs(partnerId: string) {
   const supabase = await getSupabaseServerClient()
 
-  const [partnerUsersRes, customersRes, servicesRes, unavailableRes] = await Promise.all([
+  const [partnerUsersRes, partnerRes, customersRes, servicesRes, unavailableRes] = await Promise.all([
     supabase
       .from("partner_users")
-      .select("id, user_id, role")
+      .select("id, user_id, role_id, role")
       .eq("partner_id", partnerId)
       .order("created_at", { ascending: true })
       .limit(100),
+    supabase
+      .from("partners")
+      .select("user_id")
+      .eq("id", partnerId)
+      .single(),
     supabase
       .from("customers")
       .select("id, name, email")
@@ -46,7 +52,30 @@ async function loadCatalogs(partnerId: string) {
   ])
 
   // Resolve team member display names from user_profiles
-  const partnerUsers = partnerUsersRes.data || []
+  let partnerUsers = partnerUsersRes.data || []
+  const partner = partnerRes.data
+  const ownerUserId = partner?.user_id
+
+  // Fix: Ensure owner is in partner_users so they appear in the scheduler.
+  // This satisfies the database foreign key constraint for appointments.
+  if (ownerUserId && !partnerUsers.some((pu: any) => pu.user_id === ownerUserId)) {
+    const admin = getAdminClient()
+    const { data: newPu, error: insertErr } = await admin
+      .from("partner_users")
+      .insert({
+        partner_id: partnerId,
+        user_id: ownerUserId,
+        role_id: "owner",
+        role: "OWNER" // Legacy field support
+      })
+      .select("id, user_id, role_id, role")
+      .single()
+
+    if (!insertErr && newPu) {
+      partnerUsers = [newPu, ...partnerUsers]
+    }
+  }
+
   const userIds = partnerUsers.map((pu: any) => pu.user_id)
 
   let profileMap: Record<string, string> = {}
@@ -64,7 +93,7 @@ async function loadCatalogs(partnerId: string) {
     team: partnerUsers.map((pu: any) => ({
       id: String(pu.id),
       name: profileMap[pu.user_id] || "Sem nome",
-      role: pu.role as string,
+      role: String(pu.role_id || pu.role || "staff").toUpperCase(),
     })),
     customers: (customersRes.data || []).map((c: any) => ({
       id: c.id,
