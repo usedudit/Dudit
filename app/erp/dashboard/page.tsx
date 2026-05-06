@@ -1,10 +1,16 @@
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getAllUserPartnerAccess, getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { redirect } from "next/navigation"
 
 export default async function ERPDashboardPage() {
   // Layout already guarantees auth + valid context - just read cached data
   const context = await getCurrentPartnerContext()
+  
+  if (context?.businessInfo?.mode === "quick") {
+    redirect("/erp/inicio")
+  }
+
   const allAccess = await getAllUserPartnerAccess()
   const activeStore = allAccess.find((s: typeof allAccess[number]) => s.partnerId === context!.partnerId)
 
