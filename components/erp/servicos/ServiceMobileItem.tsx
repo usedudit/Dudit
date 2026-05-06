@@ -10,10 +10,14 @@ interface ServiceMobileItemProps {
     onClick: (service: any) => void
     isSelected?: boolean
     onSelect?: (id: string) => void
+    /** Prefetch handlers for hover/touch-based entity preloading */
+    onPrefetchMouseEnter?: () => void
+    onPrefetchMouseLeave?: () => void
+    onPrefetchTouchStart?: () => void
 }
 
 const ServiceMobileItem = React.memo(
-    ({ service, onClick, isSelected, onSelect }: ServiceMobileItemProps) => {
+    ({ service, onClick, isSelected, onSelect, onPrefetchMouseEnter, onPrefetchMouseLeave, onPrefetchTouchStart }: ServiceMobileItemProps) => {
         const formatCurrency = (value: number) => {
             return new Intl.NumberFormat("pt-BR", {
                 style: "currency",
@@ -29,6 +33,9 @@ const ServiceMobileItem = React.memo(
                 transition={{ duration: 0.2 }}
                 className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer"
                 onClick={() => onClick(service)}
+                onMouseEnter={onPrefetchMouseEnter}
+                onMouseLeave={onPrefetchMouseLeave}
+                onTouchStart={onPrefetchTouchStart}
             >
                 <div className="flex items-start gap-4 h-auto">
                     <div className="w-20 h-20 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border shrink-0 overflow-hidden">

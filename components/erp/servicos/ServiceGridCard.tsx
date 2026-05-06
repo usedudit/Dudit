@@ -14,6 +14,10 @@ interface ServiceGridCardProps {
     onDelete: () => void
     onDuplicate: () => void
     onDetails: () => void
+    /** Prefetch handlers for hover/touch-based entity preloading */
+    onPrefetchMouseEnter?: () => void
+    onPrefetchMouseLeave?: () => void
+    onPrefetchTouchStart?: () => void
 }
 
 const ServiceGridCard = React.memo(
@@ -24,7 +28,10 @@ const ServiceGridCard = React.memo(
         onEdit,
         onDelete,
         onDuplicate,
-        onDetails
+        onDetails,
+        onPrefetchMouseEnter,
+        onPrefetchMouseLeave,
+        onPrefetchTouchStart,
     }: ServiceGridCardProps) => {
 
         const hasImage = service.images && service.images.length > 0 && service.images[0] && service.images[0].trim() !== ''
@@ -45,6 +52,9 @@ const ServiceGridCard = React.memo(
                 transition={{ duration: 0.2 }}
                 className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
                 onClick={onDetails}
+                onMouseEnter={onPrefetchMouseEnter}
+                onMouseLeave={onPrefetchMouseLeave}
+                onTouchStart={onPrefetchTouchStart}
             >
                 <div className="flex gap-4 mb-2">
                     {/* Imagem do Serviço */}
