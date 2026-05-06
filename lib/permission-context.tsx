@@ -9,6 +9,7 @@ import {
     canAccessPath,
     permissionDeniedMessage,
 } from "@/lib/permissions/route-permissions"
+import { DEFAULT_BUSINESS_INFO, normalizeBusinessInfo } from "@/lib/business-info"
 
 // ─── Context Types ──────────────────────────────────────────────────────────
 
@@ -81,7 +82,7 @@ export function usePermissions(): PermissionContextValue {
             role: "DELIVERY" as PartnerRole,
             routePermissions: null,
             partnerId: "",
-            businessInfo: { sells: ["products"], channels: ["online"] },
+            businessInfo: normalizeBusinessInfo(DEFAULT_BUSINESS_INFO),
             planSlug: "free",
             canAccess: () => false,
             canCreate: () => false,

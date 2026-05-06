@@ -83,9 +83,9 @@ const PricingCards = () => {
             "Ofereça variações de produtos (tamanho, cor, etc.)",
             "Crie cupons e promoções para aumentar suas vendas",
             "Configure entrega local de forma simples",
-            "Gerencie fornecedores com mais organização",
+            "Veja seu financeiro e saiba seu ganho real",
             "Crie e gerencie ordens de serviço",
-            "Controle seu financeiro sem complicação",
+            "Veja seu financeiro e saiba quanto você tá ganhando de verdade",
             "Acompanhe relatórios básicos do seu negócio",
          ],
          limits: [

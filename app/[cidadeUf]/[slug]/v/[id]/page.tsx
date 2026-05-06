@@ -6,6 +6,7 @@ import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import { getPartnerUrl } from "@/lib/utils/url-generator"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
+import { normalizeBusinessInfo } from "@/lib/business-info"
 
 import {
   getPartnerProfile,
@@ -80,11 +81,8 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     return notFound()
   }
 
-  // Proteção: não exibe a vitrine online se o parceiro desativou essa opção
-  const sellsOnline = partner.business_info?.channels?.includes("online") ?? true
-  if (!sellsOnline) {
-    return notFound()
-  }
+  // business_info no longer uses channels; keep vitrine accessible by default
+  normalizeBusinessInfo(partner.business_info)
 
   // Extrai categorias únicas
   const productCategories = Array.from(new Set(products?.map((p: any) => p.category).filter(Boolean))) as string[]

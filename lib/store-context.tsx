@@ -13,7 +13,7 @@ interface Store {
   created_at: string
   business_info?: {
     sells?: string[]
-    channels?: string[]
+    mode?: "quick" | "erp"
   }
 }
 

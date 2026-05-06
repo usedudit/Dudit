@@ -27,6 +27,7 @@ import { DeliverySettingsSubPage } from "./DeliverySettingsSubPage"
 import { CommissionsSubPage } from "./CommissionsSubPage"
 import type { PartnerRole } from "@/lib/permissions/types"
 import type { RoleId } from "@/lib/permissions/rbac-types"
+import { normalizeBusinessInfo } from "@/lib/business-info"
 
 interface SettingsTabsProps {
   partner: any
@@ -114,9 +115,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     }
   }, [activePage, activeTab, searchParams])
 
-  const businessInfo = typeof partner.business_info === "string"
-    ? JSON.parse(partner.business_info)
-    : (partner.business_info || { sells: ["products"], channels: ["online"] })
+  const businessInfo = normalizeBusinessInfo(partner.business_info)
 
   const roleId = String(role || "DELIVERY").toLowerCase() as RoleId
   const isOwner = roleId === "owner"
@@ -127,7 +126,8 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
 
   const canAccessOS = businessInfo?.sells?.includes("services") && isOwnerAdminOrManager
   const showOS = canAccessOS
-  const showVitrine = businessInfo?.channels?.includes("online") && isOwnerOrAdmin
+  const showVitrine = isOwnerOrAdmin
+  const isQuick = businessInfo.mode === "quick"
   const canAccessSubscription = isOwner
   const canAccessIntegrations = isOwner
   const canAccessCommissions = isOwnerOrAdmin
@@ -172,12 +172,16 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                   <TabsTrigger value="empresa">
                     Configurações da empresa
                   </TabsTrigger>
-                  <TabsTrigger value="vendas">
-                    Configurações de vendas
-                  </TabsTrigger>
-                  <TabsTrigger value="adicionais">
-                    Configurações adicionais
-                  </TabsTrigger>
+                  {!isQuick && (
+                    <TabsTrigger value="vendas">
+                      Configurações de vendas
+                    </TabsTrigger>
+                  )}
+                  {!isQuick && (
+                    <TabsTrigger value="adicionais">
+                      Configurações adicionais
+                    </TabsTrigger>
+                  )}
                 </TabsList>
 
                 <div className="flex-1 overflow-y-auto no-scrollbar pb-10">
@@ -195,7 +199,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               className="px-4 py-3 gap-4"
                             />
                           )}
-                          {canAccessTeam && (
+                          {!isQuick && canAccessTeam && (
                             <ListItem
                               icon={Users}
                               title="Equipe e Acessos"
@@ -219,107 +223,111 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                       )}
                     </TabsContent>
 
-                    <TabsContent value="vendas" key="vendas" className="mt-0 focus-visible:outline-none">
-                      {activeTab === "vendas" && (
-                        <FadeIn className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                          {canAccessPayments && (
+                    {!isQuick && (
+                      <TabsContent value="vendas" key="vendas" className="mt-0 focus-visible:outline-none">
+                        {activeTab === "vendas" && (
+                          <FadeIn className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            {canAccessPayments && (
+                              <ListItem
+                                icon={MoneyIcon}
+                                title="Formas de Pagamentos"
+                                description="Configure os métodos de pagamento aceitos e as taxas de operadoras."
+                                onClick={() => setActivePage("payment-methods")}
+                                showChevron
+                                className="px-4 py-3 gap-4"
+                              />
+                            )}
                             <ListItem
-                              icon={MoneyIcon}
-                              title="Formas de Pagamentos"
-                              description="Configure os métodos de pagamento aceitos e as taxas de operadoras."
-                              onClick={() => setActivePage("payment-methods")}
+                              icon={CreditCardIcon}
+                              title="Crediário"
+                              description="Gerencie as regras de parcelamento e limites para vendas no fiado."
+                              onClick={() => setActivePage("crediario")}
                               showChevron
                               className="px-4 py-3 gap-4"
                             />
-                          )}
-                          <ListItem
-                            icon={CreditCardIcon}
-                            title="Crediário"
-                            description="Gerencie as regras de parcelamento e limites para vendas no fiado."
-                            onClick={() => setActivePage("crediario")}
-                            showChevron
-                            className="px-4 py-3 gap-4"
-                          />
-                          {canAccessCommissions && (
-                            <ListItem
-                              icon={TagIcon}
-                              title="Comissão"
-                              description="Defina regras de comissão para vendedores e entregadores."
-                              onClick={() => setActivePage("comissao")}
-                              showChevron
-                              className="px-4 py-3 gap-4"
-                            />
-                          )}
-                          {canAccessReturns && (
-                            <ListItem
-                              icon={PackageReceiveIcon}
-                              title="Recibo/Devolução"
-                              description="Personalize o cabeçalho do recibo e políticas de trocas."
-                              onClick={() => setActivePage("recibo")}
-                              showChevron
-                              className="px-4 py-3 gap-4"
-                            />
-                          )}
-                        </FadeIn>
-                      )}
-                    </TabsContent>
+                            {canAccessCommissions && (
+                              <ListItem
+                                icon={TagIcon}
+                                title="Comissão"
+                                description="Defina regras de comissão para vendedores e entregadores."
+                                onClick={() => setActivePage("comissao")}
+                                showChevron
+                                className="px-4 py-3 gap-4"
+                              />
+                            )}
+                            {canAccessReturns && (
+                              <ListItem
+                                icon={PackageReceiveIcon}
+                                title="Recibo/Devolução"
+                                description="Personalize o cabeçalho do recibo e políticas de trocas."
+                                onClick={() => setActivePage("recibo")}
+                                showChevron
+                                className="px-4 py-3 gap-4"
+                              />
+                            )}
+                          </FadeIn>
+                        )}
+                      </TabsContent>
+                    )}
 
-                    <TabsContent value="adicionais" key="adicionais" className="mt-0 focus-visible:outline-none">
-                      {activeTab === "adicionais" && (
-                        <FadeIn className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                          {showVitrine && (
-                            <ListItem
-                              icon={Store}
-                              title="Minha Vitrine"
-                              description="Configure o link, cores e produtos visíveis no seu catálogo online."
-                              onClick={() => setActivePage("vitrine")}
-                              showChevron
-                              className="px-4 py-3 gap-4"
-                            />
-                          )}
-                          {showOS && (
-                            <ListItem
-                              icon={WrenchIcon}
-                              title="Configurar O.S"
-                              description="Personalize campos, status e o layout das ordens de serviço."
-                              onClick={() => setActivePage("os")}
-                              showChevron
-                              className="px-4 py-3 gap-4"
-                            />
-                          )}
-                          {canAccessMessages && (
-                            <ListItem
-                              icon={MailIcon}
-                              title="Mensagens e Alertas"
-                              description="Configure mensagens automáticas de WhatsApp e e-mail."
-                              onClick={() => setActivePage("mensagens")}
-                              showChevron
-                              className="px-4 py-3 gap-4"
-                            />
-                          )}
-                          {canAccessDelivery && (
-                            <ListItem
-                              icon={PackageReceiveIcon}
-                              title="Logística e Entrega"
-                              description="Configure taxas de entrega, raios de atendimento e horários."
-                              onClick={() => setActivePage("delivery")}
-                              showChevron
-                              className="px-4 py-3 gap-4"
-                            />
-                          )}
-                          {canAccessIntegrations && (
-                            <ListItem
-                              icon={LinkIcon}
-                              title="Integrações"
-                              description="Conecte-se com plataformas externas e APIs de terceiros."
-                              onClick={() => setActivePage("integrations")}
-                              showChevron
-                              className="px-4 py-3 gap-4"
-                            />
-                          )}
-                        </FadeIn>
-                      )}
-                    </TabsContent>
+                    {!isQuick && (
+                      <TabsContent value="adicionais" key="adicionais" className="mt-0 focus-visible:outline-none">
+                        {activeTab === "adicionais" && (
+                          <FadeIn className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            {showVitrine && (
+                              <ListItem
+                                icon={Store}
+                                title="Minha Vitrine"
+                                description="Configure o link, cores e produtos visíveis no seu catálogo online."
+                                onClick={() => setActivePage("vitrine")}
+                                showChevron
+                                className="px-4 py-3 gap-4"
+                              />
+                            )}
+                            {showOS && (
+                              <ListItem
+                                icon={WrenchIcon}
+                                title="Configurar O.S"
+                                description="Personalize campos, status e o layout das ordens de serviço."
+                                onClick={() => setActivePage("os")}
+                                showChevron
+                                className="px-4 py-3 gap-4"
+                              />
+                            )}
+                            {canAccessMessages && (
+                              <ListItem
+                                icon={MailIcon}
+                                title="Mensagens e Alertas"
+                                description="Configure mensagens automáticas de WhatsApp e e-mail."
+                                onClick={() => setActivePage("mensagens")}
+                                showChevron
+                                className="px-4 py-3 gap-4"
+                              />
+                            )}
+                            {canAccessDelivery && (
+                              <ListItem
+                                icon={PackageReceiveIcon}
+                                title="Logística e Entrega"
+                                description="Configure taxas de entrega, raios de atendimento e horários."
+                                onClick={() => setActivePage("delivery")}
+                                showChevron
+                                className="px-4 py-3 gap-4"
+                              />
+                            )}
+                            {canAccessIntegrations && (
+                              <ListItem
+                                icon={LinkIcon}
+                                title="Integrações"
+                                description="Conecte-se com plataformas externas e APIs de terceiros."
+                                onClick={() => setActivePage("integrations")}
+                                showChevron
+                                className="px-4 py-3 gap-4"
+                              />
+                            )}
+                          </FadeIn>
+                        )}
+                      </TabsContent>
+                    )}
                   </AnimatePresence>
                 </div>
               </Tabs>

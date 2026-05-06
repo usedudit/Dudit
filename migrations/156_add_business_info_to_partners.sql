@@ -4,7 +4,7 @@
 BEGIN;
 
 -- 1. Add the new JSONB column
-ALTER TABLE partners ADD COLUMN IF NOT EXISTS business_info JSONB DEFAULT '{"sells": ["products"], "channels": ["online", "pdv"]}'::jsonb;
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS business_info JSONB DEFAULT '{"sells": ["products"], "mode": "erp"}'::jsonb;
 
 -- 2. Migrate existing data
 UPDATE partners
@@ -15,7 +15,7 @@ SET business_info = jsonb_build_object(
         WHEN provides_services = true AND sells_products = false THEN '["services"]'::jsonb
         ELSE '["products"]'::jsonb
     END,
-    'channels', '["online", "pdv"]'::jsonb
+    'mode', '"erp"'::jsonb
 );
 
 -- 3. Drop legacy columns

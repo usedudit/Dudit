@@ -27,6 +27,7 @@ import { useSidebar } from "@/lib/sidebar-context"
 import { Drawer } from "vaul"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import { normalizeBusinessInfo } from "@/lib/business-info"
 
 interface SubMenuItem {
     label: string
@@ -208,22 +209,11 @@ export function ERPSidebar() {
     const isCollapsed = !isExpanded
     const { canAccessPath: canAccess, businessInfo: contextBusinessInfo, planSlug } = usePermissions()
 
-    const businessInfo = useMemo(() => {
-        let info = contextBusinessInfo
-        if (typeof info === "string") {
-            try {
-                info = JSON.parse(info)
-            } catch (e) {
-                console.error("Error parsing business_info in sidebar:", e)
-                info = null
-            }
-        }
-        return info || { sells: ["products"], channels: ["online"] }
-    }, [contextBusinessInfo])
+    const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
 
     const sellsProducts = businessInfo.sells?.includes("products") ?? true
     const sellsServices = businessInfo.sells?.includes("services") ?? false
-    const sellsOnline = businessInfo.channels?.includes("online") ?? true
+    const isQuick = businessInfo.mode === "quick"
 
     const [isMounted, setIsMounted] = useState(false)
     const [openSubmenu, setOpenSubmenu] = useState<string | null>(null)
@@ -255,7 +245,20 @@ export function ERPSidebar() {
                 if (item.label === "Produtos" && !sellsProducts && !sellsServices) return null; // Only show if they sell anything at all (but usually products. The label is Produtos for the catalogue.)
                 if (item.label === "Produtos" && !sellsProducts && sellsServices) return null; // Don't show products if they only sell services
                 if (item.label === "Serviços" && !sellsServices) return null;
-                if (item.label === "Minha Vitrine" && !sellsOnline) return null;
+                if (isQuick) {
+                    // Quick mode navigation: simplified, no advanced modules
+                    const allowed = new Set(["Dashboard", "Vendas", "Produtos", "Serviços", "Configurações"])
+                    if (!allowed.has(item.label)) return null
+                    // Strip submenus in quick mode to avoid exposing deep routes
+                    if (item.submenu) {
+                        return {
+                            ...item,
+                            submenu: undefined,
+                            href: item.href || (item.label === "Vendas" ? "/erp/orders" : item.href),
+                            directAccess: true,
+                        }
+                    }
+                }
 
                 // Clone item to avoid mutating the original navItems
                 const newItem = { ...item };
@@ -279,7 +282,7 @@ export function ERPSidebar() {
                 return newItem
             })
             .filter((item): item is NavItem => item !== null)
-    }, [canAccess, sellsProducts, sellsServices, sellsOnline])
+    }, [canAccess, sellsProducts, sellsServices, isQuick])
 
     useEffect(() => {
         setIsMounted(true)

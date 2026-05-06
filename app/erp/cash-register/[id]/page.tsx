@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic"
 export default async function CashSessionDetailsServer({ params }: { params: { id: string } }) {
   const context = await getCurrentPartnerContext()
   if (!context) return <AccessDenied />
+  if (context.businessInfo?.mode === "quick") return <AccessDenied />
 
   const partnerId = context.partnerId
   const [detailsResult] = await Promise.all([

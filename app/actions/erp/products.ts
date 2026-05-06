@@ -21,6 +21,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { checkLimit, canUseFeature, increment_usage_counter, decrement_usage_counter } from "@/lib/services/subscription.service"
+import { normalizeBusinessInfo } from "@/lib/business-info"
 
 const _deleteFromR2 = async (url: string) => {
     if (!url || !url.trim()) return;
@@ -290,11 +291,11 @@ export async function createProductComprehensiveAction(data: {
 
         const adminForBusinessInfo = getAdminClient()
         const { data: partnerData } = await adminForBusinessInfo.from('partners').select('business_info').eq('id', finalPartnerId).single()
-        const businessInfo = partnerData?.business_info || { sells: ["products"], channels: ["online"] }
-        const sellsOnline = businessInfo.channels?.includes("online") ?? true
+        const businessInfo = normalizeBusinessInfo(partnerData?.business_info)
+        const isQuick = businessInfo.mode === "quick"
 
-        // If not selling online, enforce marketplace options off
-        if (!sellsOnline) {
+        // Quick mode: enforce marketplace options off (server-side)
+        if (isQuick) {
             data.showInMarketplace = false
             data.subcategoryId = null
             data.featured = false
@@ -566,10 +567,10 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         if (hasMarketplaceFields) {
             const adminForBusinessInfo = getAdminClient()
             const { data: partnerData } = await adminForBusinessInfo.from('partners').select('business_info').eq('id', product.partner_id).single()
-            const businessInfo = partnerData?.business_info || { sells: ["products"], channels: ["online"] }
-            const sellsOnline = businessInfo.channels?.includes("online") ?? true
+            const businessInfo = normalizeBusinessInfo(partnerData?.business_info)
+            const isQuick = businessInfo.mode === "quick"
 
-            if (!sellsOnline) {
+            if (isQuick) {
                 data.showInMarketplace = false
                 data.subcategoryId = undefined
                 data.featured = false

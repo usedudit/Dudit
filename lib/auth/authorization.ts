@@ -9,6 +9,7 @@ import type { RoleId } from "@/lib/permissions/rbac-types"
 import { can } from "@/lib/permissions/can"
 import { getPermissionTemplate } from "@/lib/permissions/rbac-template-loader"
 import { normalizePermissions } from "@/lib/permissions/rbac-normalize"
+import { normalizeBusinessInfo } from "@/lib/business-info"
 
 // ─── Auth Errors ────────────────────────────────────────────────────────────
 
@@ -509,7 +510,7 @@ export async function requirePartnerAccessWithPermission(
  */
 export const hasBusinessCapability = cache(async (
   partnerId: string,
-  capability: "products" | "services" | "online" | "pdv"
+  capability: "products" | "services"
 ): Promise<boolean> => {
   // Try to get business_info from cached partner context first (avoids extra DB query)
   const { getCurrentPartnerContext: getCtx } = await import("@/lib/auth/partner-context")
@@ -521,18 +522,13 @@ export const hasBusinessCapability = cache(async (
   } else {
     const admin = getAdminClient()
     const { data: partner } = await admin.from("partners").select("business_info").eq("id", partnerId).single()
-    info = typeof partner?.business_info === "string"
-      ? JSON.parse(partner.business_info)
-      : (partner?.business_info || { sells: ["products"], channels: ["online"] })
+    info = normalizeBusinessInfo(partner?.business_info)
   }
 
-  const sells = info.sells || []
-  const channels = info.channels || []
+  const sells = normalizeBusinessInfo(info).sells || []
 
   if (capability === "products" && !sells.includes("products")) return false
   if (capability === "services" && !sells.includes("services")) return false
-  if (capability === "online" && !channels.includes("online")) return false
-  if (capability === "pdv" && !channels.includes("pdv")) return false
 
   return true
 })

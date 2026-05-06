@@ -10,6 +10,7 @@ export default async function StockMovementsLayout({ children }: { children: Rea
     if (!context) {
         return <AccessDenied />
     }
+    if (context.businessInfo?.mode === "quick") return <AccessDenied />
     const hasAccess = await hasBusinessCapability(context.partnerId, "products")
 
     if (!hasAccess) {

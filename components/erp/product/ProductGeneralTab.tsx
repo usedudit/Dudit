@@ -1,13 +1,15 @@
 "use client"
 
 import type React from "react"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
 import { PlusIcon, ShoppingBagIcon, DiceIcon } from "@/lib/icons"
 import ProductImagesSection from "./ProductImagesSection"
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from "recharts"
 import { Combobox } from "@/components/reusable"
+import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
+import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
 
 const FormCombobox = ({
     label,
@@ -75,11 +77,11 @@ interface ProductGeneralTabProps {
     blockedImages?: Set<number>
     isSaving?: boolean
     mode?: "add" | "edit" | "details"
-    sellsOnline?: boolean
+    isQuickMode?: boolean
 }
 
 export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
-    productData, handleInputChange, generateRandomCode, categories, subCategories, brands, locations, unidadesMedida, openAddItemModal, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", sellsOnline = true
+    productData, handleInputChange, generateRandomCode, categories, subCategories, brands, locations, unidadesMedida, openAddItemModal, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false
 }) => {
     const handleFieldChange = (e: any) => { if (onFieldChange && e.target.name) onFieldChange(e.target.name); handleInputChange(e) }
     const { salesPrice, profit, margin } = useMemo(() => {
@@ -90,6 +92,23 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
     const showPrice = productData.show_price_in_store ?? true
 
     const showInMarketplaceValue = productData.show_in_marketplace === undefined ? "true" : String(productData.show_in_marketplace)
+
+    const [isOfficialCategoryModalOpen, setIsOfficialCategoryModalOpen] = useState(false)
+    const [officialCategoryPath, setOfficialCategoryPath] = useState("")
+
+    useEffect(() => {
+        let alive = true
+        const id = productData?.marketplace_category_id
+        if (!id) {
+            setOfficialCategoryPath("")
+            return
+        }
+        getCategoryPathClient(id).then((path) => {
+            if (!alive) return
+            setOfficialCategoryPath(path || "")
+        })
+        return () => { alive = false }
+    }, [productData?.marketplace_category_id])
 
     return (
         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
@@ -129,7 +148,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             />
                         </div>
 
-                        {sellsOnline && (
+                        {!isQuickMode && (
                             <div className="col-span-12 sm:col-span-6">
                                 <FormDropdown
                                     label="Exibir na Vitrine"
@@ -150,7 +169,9 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Preço</h3>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6">
-                        <MoneyInput label="Preço de Custo" name="costPrice" value={productData.costPrice || ""} onChange={(val) => handleFieldChange({ target: { name: "costPrice", value: val } })} disabled={!isEditing || !showPrice} />
+                        {!isQuickMode && (
+                            <MoneyInput label="Preço de Custo" name="costPrice" value={productData.costPrice || ""} onChange={(val) => handleFieldChange({ target: { name: "costPrice", value: val } })} disabled={!isEditing || !showPrice} />
+                        )}
                         <MoneyInput
                             label="Preço de Venda"
                             name="price"
@@ -202,7 +223,8 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                 </div>
 
                 {/* ESTOQUE */}
-                <div className="mt-8">
+                {!isQuickMode && (
+                    <div className="mt-8">
                     <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Estoque</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8">
@@ -233,10 +255,12 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             label="Permitir vender sem estoque"
                         />
                     </div>
-                </div>
+                    </div>
+                )}
 
                 {/* ENVIO - Agora com estilo corrigido */}
-                <div className="mt-8">
+                {!isQuickMode && (
+                    <div className="mt-8">
                     <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
 
                     <Accordion title="Envio e Dimensões" defaultOpen={false} triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 text-left">
@@ -278,7 +302,8 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             </div>
                         </div>
                     </Accordion>
-                </div>
+                    </div>
+                )}
             </div>
 
             {/* DIREITA (Widgets) */}
@@ -302,48 +327,92 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             }
                         />
 
-                        <Input label="Código de Barras (EAN/GTIN)" name="gtin" value={productData.gtin} onChange={handleFieldChange} disabled={!isEditing} />
+                        {!isQuickMode && (
+                            <>
+                                <Input label="Código de Barras (EAN/GTIN)" name="gtin" value={productData.gtin} onChange={handleFieldChange} disabled={!isEditing} />
 
-                        <FormCombobox
-                            label="Categoria"
-                            options={categories}
-                            value={productData.category_id}
-                            onChange={(v) => handleFieldChange({ target: { name: "category_id", value: v } })}
-                            disabled={!isEditing}
-                            width="w-full"
-                            actionItem={{ label: "Criar nova categoria", icon: <PlusIcon className="w-4 h-4" />, onClick: () => openAddItemModal("category") }}
-                        />
+                                <FormCombobox
+                                    label="Categoria"
+                                    options={categories}
+                                    value={productData.category_id}
+                                    onChange={(v) => handleFieldChange({ target: { name: "category_id", value: v } })}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                    actionItem={{ label: "Criar nova categoria", icon: <PlusIcon className="w-4 h-4" />, onClick: () => openAddItemModal("category") }}
+                                />
 
-                        <FormCombobox
-                            label="Subcategoria"
-                            options={subCategories}
-                            value={productData.subcategory_id}
-                            onChange={(v) => handleFieldChange({ target: { name: "subcategory_id", value: v } })}
-                            disabled={!isEditing}
-                            width="w-full"
-                            actionItem={{ label: "Criar nova subcategoria", icon: <PlusIcon className="w-4 h-4" />, onClick: () => openAddItemModal("subcategory") }}
-                        />
+                                <FormCombobox
+                                    label="Subcategoria"
+                                    options={subCategories}
+                                    value={productData.subcategory_id}
+                                    onChange={(v) => handleFieldChange({ target: { name: "subcategory_id", value: v } })}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                    actionItem={{ label: "Criar nova subcategoria", icon: <PlusIcon className="w-4 h-4" />, onClick: () => openAddItemModal("subcategory") }}
+                                />
 
-                        <FormCombobox
-                            label="Marca"
-                            options={brands}
-                            value={productData.brand_id}
-                            onChange={(v) => handleFieldChange({ target: { name: "brand_id", value: v } })}
-                            disabled={!isEditing}
-                            width="w-full"
-                            actionItem={{ label: "Criar nova marca", icon: <PlusIcon className="w-4 h-4" />, onClick: () => openAddItemModal("brand") }}
-                        />
+                                <FormCombobox
+                                    label="Marca"
+                                    options={brands}
+                                    value={productData.brand_id}
+                                    onChange={(v) => handleFieldChange({ target: { name: "brand_id", value: v } })}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                    actionItem={{ label: "Criar nova marca", icon: <PlusIcon className="w-4 h-4" />, onClick: () => openAddItemModal("brand") }}
+                                />
 
-                        <FormCombobox
-                            label="Unidade"
-                            options={unidadesMedida.map(c => ({ value: c.codigo, label: c.codigo }))}
-                            value={productData.unidade}
-                            onChange={(v) => handleFieldChange({ target: { name: "unidade", value: v } })}
-                            disabled={!isEditing}
-                            width="w-full"
-                        />
+                                <FormCombobox
+                                    label="Unidade"
+                                    options={unidadesMedida.map(c => ({ value: c.codigo, label: c.codigo }))}
+                                    value={productData.unidade}
+                                    onChange={(v) => handleFieldChange({ target: { name: "unidade", value: v } })}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                />
+                            </>
+                        )}
                     </div>
                 </SidebarCard>
+
+                {isQuickMode && (
+                    <SidebarCard>
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-3 mt-1">Categoria oficial</h3>
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
+                            Selecione a categoria oficial do seu produto.
+                        </p>
+                        <button
+                            type="button"
+                            disabled={!isEditing}
+                            onClick={() => setIsOfficialCategoryModalOpen(true)}
+                            className="w-full text-left p-4 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-gray/40 dark:hover:bg-dark-border/40 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
+                                        {officialCategoryPath || "Selecionar categoria..."}
+                                    </div>
+                                    {officialCategoryPath ? (
+                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 truncate">
+                                            Clique para alterar
+                                        </div>
+                                    ) : null}
+                                </div>
+                                <div className="shrink-0 text-brand-inactive-text">
+                                    <PlusIcon className="w-4 h-4" />
+                                </div>
+                            </div>
+                        </button>
+
+                        <MarketplaceCategoryModal
+                            isOpen={isOfficialCategoryModalOpen}
+                            onClose={() => setIsOfficialCategoryModalOpen(false)}
+                            onSelect={(category) => {
+                                handleFieldChange({ target: { name: "marketplace_category_id", value: category.id } })
+                                setOfficialCategoryPath(category.path)
+                            }}
+                        />
+                    </SidebarCard>
+                )}
 
                 {mode !== "add" && (
                     <SidebarCard>

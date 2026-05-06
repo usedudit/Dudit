@@ -23,6 +23,7 @@ import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscrip
 import { fetchJSONWithCSRF, fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { Spinner } from "@/components/reusable/Spinner"
+import { normalizeBusinessInfo } from "@/lib/business-info"
 
 import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
@@ -104,20 +105,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
     const { openPlanUpgrade } = usePlanUpgrade()
     const variantsPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
 
-    const businessInfo = useMemo(() => {
-        let info = contextBusinessInfo
-        if (typeof info === "string") {
-            try {
-                info = JSON.parse(info)
-            } catch (e) {
-                console.error("Error parsing business_info in AddProductPage:", e)
-                info = null
-            }
-        }
-        return info || { sells: ["products"], channels: ["online"] }
-    }, [contextBusinessInfo])
-
-    const sellsOnline = businessInfo?.channels?.includes("online") ?? true
+    const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
+    const isQuick = businessInfo.mode === "quick"
 
     const partnerId = propPartnerId || selectedStore?.partner_id || ""
     const storeId = propStoreId || selectedStore?.id || ""
@@ -143,9 +132,23 @@ const AddProductPage: FC<AddProductPageProps> = ({
         return { ...base, ...mapped, images: realImages.length > 0 ? realImages : base.images }
     }, [initialProduct, initialData, internalMode])
 
-    const [productData, setProductData] = useState<any>(initialProductState)
-    const [originalProductData, setOriginalProductData] = useState(initialProductState)
+    const quickAdjustedInitial = useMemo(() => {
+        if (!isQuick) return initialProductState
+        return {
+            ...initialProductState,
+            show_in_marketplace: false,
+            is_highlighted: false,
+        }
+    }, [initialProductState, isQuick])
+
+    const [productData, setProductData] = useState<any>(quickAdjustedInitial)
+    const [originalProductData, setOriginalProductData] = useState(quickAdjustedInitial)
     const [originalNameForDuplicate, setOriginalNameForDuplicate] = useState("")
+
+    useEffect(() => {
+        setProductData(quickAdjustedInitial)
+        setOriginalProductData(quickAdjustedInitial)
+    }, [quickAdjustedInitial])
 
     const lastNcmSearchRef = useRef<string>("")
     const csrfTokenCache = useRef<{ token: string; timestamp: number } | null>(null)
@@ -519,7 +522,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 isActive: d.is_active,
                 isOnPromotion: !!d.promotional_price,
                 showPriceInStore: !!d.show_price_in_store,
-                showInMarketplace: !!d.show_in_marketplace, // Ensure boolean
+                showInMarketplace: isQuick ? false : !!d.show_in_marketplace, // Ensure boolean
                 requiresManualModeration: needsManualModeration,
                 images: cleanedFinalImages,
                 primaryImageIndex: 0,
@@ -558,10 +561,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 tags: d.tags || [],
             }
 
-            // Optional marketplace category if selected
-            if (d.marketplace_category_id) {
-                payload.marketplace_category_id = d.marketplace_category_id
-            }
+            // Optional official category (allowed in all modes)
+            if (d.marketplace_category_id) payload.marketplace_category_id = d.marketplace_category_id
 
             if (onSave) {
                 await onSave({
@@ -613,7 +614,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
             setIsSavingProduct(false)
             isSubmittingRef.current = false
         }
-    }, [validateProductData, productData, partnerId, storeId, internalMode, initialProduct, productId, notifySuccess, notifyError, onClose, onSave, blockedImages])
+    }, [validateProductData, productData, partnerId, storeId, internalMode, initialProduct, productId, notifySuccess, notifyError, onClose, onSave, blockedImages, isQuick])
 
     const handleGenerateRandomCode = useCallback(() => {
         const randomCode = generateSKUBase(productData.name)
@@ -770,7 +771,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             fieldErrors={fieldErrors} onFieldChange={handleFieldChange}
                                             uploadingImages={uploadingImages} mode={internalMode === "duplicate" ? "add" : internalMode}
                                             blockedImages={blockedImages} isSaving={isSavingProduct}
-                                            sellsOnline={sellsOnline}
+                                            isQuickMode={isQuick}
                                             generateRandomCode={handleGenerateRandomCode}
                                             openAddItemModal={handleOpenMetadataModal}
                                         />

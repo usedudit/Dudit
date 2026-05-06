@@ -31,6 +31,8 @@ import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { formatE164ToDisplay } from "@/lib/utils/phone-utils"
+import type { BusinessMode } from "@/lib/business-info"
+import { normalizeBusinessInfo } from "@/lib/business-info"
 
 const SELLS_OPTIONS = [
     {
@@ -47,20 +49,25 @@ const SELLS_OPTIONS = [
     },
 ]
 
-const CHANNEL_OPTIONS = [
-    {
-        value: "online",
-        icon: Store,
-        title: "Vitrine da Dudit",
-        description: "Apareça na internet e venda para todos pelo nosso catálogo online."
-    },
-    {
-        value: "pdv",
-        icon: HomeIcon,
-        title: "Venda no Balcão",
-        description: "Organize suas vendas presenciais e o estoque da sua loja física."
-    },
-]
+const MODE_OPTIONS: Array<{
+    value: BusinessMode
+    icon: any
+    title: string
+    description: string
+}> = [
+        {
+            value: "quick",
+            icon: Store,
+            title: "Anunciar rápido",
+            description: "Só quero divulgar e vender meus produtos ou serviços na minha cidade",
+        },
+        {
+            value: "erp",
+            icon: HomeIcon,
+            title: "Gerenciar meu negócio",
+            description: "Quero organizar pedidos, clientes e tudo do meu negócio",
+        },
+    ]
 
 export const BusinessDataSubPage = ({
     partner,
@@ -84,9 +91,7 @@ export const BusinessDataSubPage = ({
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
     }, [])
 
-    const businessInfo = typeof partner.business_info === "string"
-        ? JSON.parse(partner.business_info)
-        : (partner.business_info || { sells: ["products"], channels: ["online"] })
+    const businessInfo = normalizeBusinessInfo(partner.business_info)
 
     const [generalInfo, setGeneralInfo] = useState({
         storeName: partner.store_name || "",
@@ -95,7 +100,7 @@ export const BusinessDataSubPage = ({
         businessType: partner.business_type || "pf",
         cnpj: partner.cpf || partner.cnpj || "",
         sells: businessInfo?.sells || ["products"],
-        channels: businessInfo?.channels || ["online"],
+        mode: (businessInfo?.mode || "erp") as BusinessMode,
         phone: formatE164ToDisplay(partner.phone) || "",
     })
 
@@ -147,7 +152,7 @@ export const BusinessDataSubPage = ({
     const [imageUploading, setImageUploading] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    const toggleArrayItem = (key: "sells" | "channels", value: string) =>
+    const toggleArrayItem = (key: "sells", value: string) =>
         setGeneralInfo((prev: any) => {
             const arr = prev[key]
             return {
@@ -155,6 +160,9 @@ export const BusinessDataSubPage = ({
                 [key]: arr.includes(value) ? arr.filter((i: string) => i !== value) : [...arr, value],
             }
         })
+
+    const setMode = (mode: BusinessMode) =>
+        setGeneralInfo((prev: any) => ({ ...prev, mode }))
 
     const validate = useCallback(() => {
         const errors = new Set<string>()
@@ -196,7 +204,7 @@ export const BusinessDataSubPage = ({
             try {
                 const businessInfoData = {
                     sells: generalInfo.sells,
-                    channels: generalInfo.channels,
+                    mode: generalInfo.mode,
                 }
 
                 const result = await updatePartnerAction(partner.id, {
@@ -481,19 +489,19 @@ export const BusinessDataSubPage = ({
 
                                             <div className="mt-8">
                                                 <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Por onde você vai atender?</h3>
+                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Como você quer usar a Dudit?</h3>
                                                 <div className="grid gap-3">
-                                                    {CHANNEL_OPTIONS.map(opt => (
+                                                    {MODE_OPTIONS.map(opt => (
                                                         <ListItem
                                                             key={opt.value}
                                                             icon={opt.icon}
                                                             title={opt.title}
                                                             description={opt.description}
-                                                            onClick={() => toggleArrayItem("channels", opt.value)}
+                                                            onClick={() => setMode(opt.value)}
                                                             right={
                                                                 <Checkbox
-                                                                    checked={generalInfo.channels.includes(opt.value)}
-                                                                    onChange={() => toggleArrayItem("channels", opt.value)}
+                                                                    checked={generalInfo.mode === opt.value}
+                                                                    onChange={() => setMode(opt.value)}
                                                                 />
                                                             }
                                                             className="py-4 px-6 gap-4"

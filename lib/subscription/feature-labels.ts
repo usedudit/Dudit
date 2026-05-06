@@ -95,7 +95,7 @@ export const HARDCODED_PLANS: Record<string, { name: string; objective: string; 
       "Configure entrega local de forma simples",
       "Gerencie fornecedores com mais organização",
       "Crie e gerencie ordens de serviço",
-      "Controle seu financeiro sem complicação",
+      "Veja seu financeiro e saiba seu ganho real",
       "Acompanhe relatórios básicos do seu negócio",
     ],
     limits: [

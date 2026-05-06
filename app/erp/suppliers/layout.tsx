@@ -10,6 +10,7 @@ export default async function SuppliersLayout({ children }: { children: React.Re
     if (!context) {
         return <AccessDenied />
     }
+    if (context.businessInfo?.mode === "quick") return <AccessDenied />
     const hasAccess = await hasBusinessCapability(context.partnerId, "products")
 
     if (!hasAccess) {

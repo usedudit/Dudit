@@ -13,6 +13,7 @@ import { sanitizeInput, validatePhoneBR } from "@/lib/input-validator"
 import { normalizePhoneToE164 } from "@/lib/utils/phone-utils"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { decryptCPF } from "@/lib/crypto"
+import { normalizeBusinessInfo } from "@/lib/business-info"
 
 // --- CLIENTES ---
 
@@ -45,7 +46,7 @@ async function _getPartnerProfile(partnerId: string) {
     try {
       data.business_info = JSON.parse(data.business_info)
     } catch (e) {
-      data.business_info = { sells: ["products"], channels: ["online"] }
+      data.business_info = normalizeBusinessInfo(null)
     }
   }
 
@@ -179,7 +180,7 @@ export const getCachedPartnerProfile = async (partnerId: string) => {
         try {
           data.business_info = JSON.parse(data.business_info)
         } catch (e) {
-          data.business_info = { sells: ["products"], channels: ["online"] }
+          data.business_info = normalizeBusinessInfo(null)
         }
       }
       if (data && data.cpf) {
@@ -333,7 +334,7 @@ export async function updatePartnerAction(partnerId: string, data: any) {
     updateData.cnpj = data.cnpj ? data.cnpj.replace(/\D/g, "") : null
     if (updateData.cnpj === "") updateData.cnpj = null
   }
-  if (data.businessInfo !== undefined) updateData.business_info = data.businessInfo
+  if (data.businessInfo !== undefined) updateData.business_info = normalizeBusinessInfo(data.businessInfo)
   if (data.openingHours !== undefined) updateData.opening_hours = normalizeOpeningHours(data.openingHours)
   if (sanitizedPhone !== undefined) {
     if (sanitizedPhone) {
@@ -530,7 +531,7 @@ export async function registerPartner(data: any) {
       business_type: data.businessType,
       cnpj: data.cnpj?.replace(/\D/g, "") || null,
       cpf: cpfEncrypted,
-      business_info: data.businessInfo,
+      business_info: normalizeBusinessInfo(data.businessInfo),
       opening_hours: data.businessHours || null,
       is_active: true
     }

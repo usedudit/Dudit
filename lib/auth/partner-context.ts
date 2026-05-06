@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth/server-user"
 import type { RoleId, RbacPermissions } from "@/lib/permissions/rbac-types"
 import type { PartnerRole } from "@/lib/permissions/types"
 import { TAGS } from "@/lib/utils/revalidation-tags"// ─── Constants ──────────────────────────────────────────────────────────────
+import { normalizeBusinessInfo } from "@/lib/business-info"
 
 const ACTIVE_PARTNER_COOKIE = "active_partner_id"
 const PENDING_INVITE_COOKIE = "pending_invite_token"
@@ -150,7 +151,7 @@ const getCachedUserAccess = (userId: string) => unstable_cache(
                     permissions: normalizePermissions(template, {}),
                     storeName: store.store_name || "Loja sem nome",
                     ownerName: "Você",
-                    businessInfo: typeof store.business_info === "string" ? JSON.parse(store.business_info) : (store.business_info || { sells: ["products"], channels: ["online"] }),
+                    businessInfo: normalizeBusinessInfo(store.business_info),
                 }
             }
         }
@@ -172,7 +173,7 @@ const getCachedUserAccess = (userId: string) => unstable_cache(
                         permissions: normalizePermissions(template, dbPerms),
                         storeName: record.partners.store_name || "Loja sem nome",
                         ownerName: ownerId, // temporary
-                        businessInfo: typeof record.partners.business_info === "string" ? JSON.parse(record.partners.business_info) : (record.partners.business_info || { sells: ["products"], channels: ["online"] }),
+                        businessInfo: normalizeBusinessInfo(record.partners.business_info),
                     }
                 }
             }

@@ -16,9 +16,10 @@ import ImageCropperModal from "@/components/ImageCropperModal"
 import { CepInput, PasswordInput, StateComboBox, PasswordStrengthMeter } from "@/components/reusable"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { useSupabase } from "@/providers/supabase-provider"
+import type { BusinessMode } from "@/lib/business-info"
 
 const initialPartnerData = {
-    businessInfo: { sells: [] as string[], channels: [] as string[] },
+    businessInfo: { sells: [] as string[], mode: "" as BusinessMode | "" },
     storeName: "",
     phone: "",
     address: {
@@ -44,20 +45,25 @@ const SELLS_OPTIONS = [
     },
 ]
 
-const CHANNEL_OPTIONS = [
-    {
-        value: "online",
-        icon: Store,
-        title: "Vitrine da Dudit",
-        description: "Apareça na internet e venda para todos pelo nosso catálogo online."
-    },
-    {
-        value: "pdv",
-        icon: Home,
-        title: "Venda no Balcão",
-        description: "Organize suas vendas presenciais e o estoque da sua loja física."
-    },
-]
+const MODE_OPTIONS: Array<{
+    value: BusinessMode
+    icon: any
+    title: string
+    description: string
+}> = [
+        {
+            value: "quick",
+            icon: Store,
+            title: "Anunciar rápido",
+            description: "Só quero divulgar e vender meus produtos ou serviços na minha cidade",
+        },
+        {
+            value: "erp",
+            icon: Briefcase,
+            title: "Gerenciar meu negócio",
+            description: "Quero organizar pedidos, clientes e tudo do meu negócio",
+        },
+    ]
 
 const STEP_TITLES: Record<number, string> = {
     1: "Crie sua conta",
@@ -101,7 +107,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
     const actualStep = isUserLoggedIn ? step - 1 : step
     const totalSteps = isUserLoggedIn ? 3 : 4
 
-    const toggleArrayItem = (key: "sells" | "channels", value: string) =>
+    const toggleArrayItem = (key: "sells", value: string) =>
         setPartnerData(prev => {
             const arr = prev.businessInfo[key]
             return {
@@ -112,6 +118,15 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                 },
             }
         })
+
+    const setMode = (mode: BusinessMode) =>
+        setPartnerData(prev => ({
+            ...prev,
+            businessInfo: {
+                ...prev.businessInfo,
+                mode,
+            },
+        }))
 
     const patchAddress = (patch: Partial<typeof partnerData.address>) =>
         setPartnerData(prev => ({ ...prev, address: { ...prev.address, ...patch } }))
@@ -187,8 +202,8 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
             if (calculatePasswordScore(password) < 2) return "A senha deve ser média ou forte."
         }
         if (step === 2 && (!partnerData.storeName || !partnerData.phone)) return "Preencha os dados do negócio"
-        if (step === 3 && (!partnerData.businessInfo.sells.length || !partnerData.businessInfo.channels.length))
-            return "Selecione pelo menos uma opção em cada categoria."
+        if (step === 3 && (!partnerData.businessInfo.sells.length || !partnerData.businessInfo.mode))
+            return "Selecione pelo menos uma opção e como quer usar a Dudit."
         if (step === 4) {
             if (imageUploading) return "Aguarde o upload da imagem"
             const { cep, street, number, noNumber, neighborhood, city, state } = partnerData.address
@@ -343,19 +358,19 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                     </div>
                                 </div>
                                 <div>
-                                    <h3 className="text-sm font-semibold text-brand-dark mb-3">Por onde você vai atender?</h3>
+                                    <h3 className="text-sm font-semibold text-brand-dark mb-3">Como você quer usar a Dudit?</h3>
                                     <div className="grid gap-3">
-                                        {CHANNEL_OPTIONS.map(opt => (
+                                        {MODE_OPTIONS.map(opt => (
                                             <ListItem
                                                 key={opt.value}
                                                 icon={opt.icon}
                                                 title={opt.title}
                                                 description={opt.description}
-                                                onClick={() => toggleArrayItem("channels", opt.value)}
+                                                onClick={() => setMode(opt.value)}
                                                 left={
                                                     <Checkbox
-                                                        checked={partnerData.businessInfo.channels.includes(opt.value)}
-                                                        onChange={() => toggleArrayItem("channels", opt.value)}
+                                                        checked={partnerData.businessInfo.mode === opt.value}
+                                                        onChange={() => setMode(opt.value)}
                                                     />
                                                 }
                                             />

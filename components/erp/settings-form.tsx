@@ -16,6 +16,8 @@ import { useNotification } from "@/hooks/use-notification"
 import { uploadImageToR2Action } from "@/app/actions/shared/r2"
 import { CSRFTokenInput } from "@/components/security/csrf-token-input"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import type { BusinessMode } from "@/lib/business-info"
+import { normalizeBusinessInfo } from "@/lib/business-info"
 
 interface SettingsFormProps {
   partner: any
@@ -30,9 +32,7 @@ export function SettingsForm({ partner, paymentMethods: initialPaymentMethods }:
   const [imageUploading, setImageUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const businessInfo = typeof partner.business_info === "string" 
-    ? JSON.parse(partner.business_info) 
-    : (partner.business_info || { sells: ["products"], channels: ["online"] })
+  const businessInfo = normalizeBusinessInfo(partner.business_info)
 
   const [formData, setFormData] = useState({
     storeName: partner.store_name || "",
@@ -44,7 +44,7 @@ export function SettingsForm({ partner, paymentMethods: initialPaymentMethods }:
     storeImageUrl: partner.store_image_url || "",
     businessInfo: {
       sells: Array.isArray(businessInfo.sells) ? businessInfo.sells : ["products"],
-      channels: Array.isArray(businessInfo.channels) ? businessInfo.channels : ["online"],
+      mode: (businessInfo.mode || "erp") as BusinessMode,
     },
     paymentMethods: initialPaymentMethods || [],
   })
@@ -59,7 +59,7 @@ export function SettingsForm({ partner, paymentMethods: initialPaymentMethods }:
     storeImageUrl: partner.store_image_url || "",
     businessInfo: {
       sells: Array.isArray(businessInfo.sells) ? businessInfo.sells : ["products"],
-      channels: Array.isArray(businessInfo.channels) ? businessInfo.channels : ["online"],
+      mode: (businessInfo.mode || "erp") as BusinessMode,
     },
     paymentMethods: initialPaymentMethods || [],
   }), [partner, businessInfo, initialPaymentMethods])
@@ -74,8 +74,8 @@ export function SettingsForm({ partner, paymentMethods: initialPaymentMethods }:
     setError(null)
 
     try {
-      if (formData.businessInfo.sells.length === 0 || formData.businessInfo.channels.length === 0) {
-        setError("Selecione pelo menos um tipo de oferta e um canal de venda.")
+      if (formData.businessInfo.sells.length === 0 || !formData.businessInfo.mode) {
+        setError("Selecione pelo menos um tipo de oferta e como quer usar a Dudit.")
         setIsLoading(false)
         return
       }
@@ -115,7 +115,7 @@ export function SettingsForm({ partner, paymentMethods: initialPaymentMethods }:
     }))
   }
 
-  const toggleBusinessInfo = (type: "sells" | "channels", value: string) => {
+  const toggleBusinessInfo = (type: "sells", value: string) => {
     setFormData((prev) => {
       const current = prev.businessInfo[type]
       const updated = current.includes(value)
@@ -130,6 +130,16 @@ export function SettingsForm({ partner, paymentMethods: initialPaymentMethods }:
         }
       }
     })
+  }
+
+  const setMode = (mode: BusinessMode) => {
+    setFormData((prev) => ({
+      ...prev,
+      businessInfo: {
+        ...prev.businessInfo,
+        mode,
+      },
+    }))
   }
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -328,27 +338,27 @@ export function SettingsForm({ partner, paymentMethods: initialPaymentMethods }:
 
         <Card>
           <CardHeader>
-            <CardTitle>Canais de venda</CardTitle>
+            <CardTitle>Como você quer usar a Dudit?</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center space-x-2">
               <Checkbox
-                id="channelOnline"
-                name="channelOnline"
-                checked={formData.businessInfo.channels.includes("online")}
-                onChange={() => toggleBusinessInfo("channels", "online")}
+                id="modeQuick"
+                name="modeQuick"
+                checked={formData.businessInfo.mode === "quick"}
+                onChange={() => setMode("quick")}
               />
-              <Label htmlFor="channelOnline">Vitrine Online (Marketplace)</Label>
+              <Label htmlFor="modeQuick">Anunciar rápido</Label>
             </div>
 
             <div className="flex items-center space-x-2">
               <Checkbox
-                id="channelPdv"
-                name="channelPdv"
-                checked={formData.businessInfo.channels.includes("pdv")}
-                onChange={() => toggleBusinessInfo("channels", "pdv")}
+                id="modeErp"
+                name="modeErp"
+                checked={formData.businessInfo.mode === "erp"}
+                onChange={() => setMode("erp")}
               />
-              <Label htmlFor="channelPdv">Ponto de Venda (PDV)</Label>
+              <Label htmlFor="modeErp">Gerenciar meu negócio</Label>
             </div>
           </CardContent>
         </Card>
