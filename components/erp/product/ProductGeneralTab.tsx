@@ -10,6 +10,7 @@ import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from "recharts"
 import { Combobox } from "@/components/reusable"
 import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
+import { RichTextEditor } from "@/components/reusable"
 
 const FormCombobox = ({
     label,
@@ -148,18 +149,16 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             />
                         </div>
 
-                        {!isQuickMode && (
-                            <div className="col-span-12 sm:col-span-6">
-                                <FormDropdown
-                                    label="Exibir na Vitrine"
-                                    options={[{ value: "true", label: "Sim" }, { value: "false", label: "Não" }]}
-                                    value={showInMarketplaceValue}
-                                    setValue={(v) => handleFieldChange({ target: { name: "show_in_marketplace", value: v === "true" } })}
-                                    disabled={!isEditing}
-                                    width="w-full"
-                                />
-                            </div>
-                        )}
+                        <div className="col-span-12 sm:col-span-6">
+                            <FormDropdown
+                                label="Exibir na Vitrine"
+                                options={[{ value: "true", label: "Sim" }, { value: "false", label: "Não" }]}
+                                value={showInMarketplaceValue}
+                                setValue={(v) => handleFieldChange({ target: { name: "show_in_marketplace", value: v === "true" } })}
+                                disabled={!isEditing}
+                                width="w-full"
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -194,13 +193,24 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                         </div>
                     )}
 
-                    {showPrice && (
+                    {showPrice && !isQuickMode && (
                         <div className="border border-brand-border dark:border-dark-border rounded-xl p-4 md:p-6 mb-6 bg-white dark:bg-dark-surface">
                             <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-brand-border dark:divide-dark-border gap-6 sm:gap-0">
                                 <div className="flex-1 px-4 first:pl-0"><span className="block text-sm text-brand-inactive-text mb-1">Preço final</span><span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(salesPrice)}</span></div>
                                 <div className="flex-1 px-4"><span className="block text-sm text-brand-inactive-text mb-1">Lucro estimado</span><span className="text-xl font-bold text-emerald-600">{formatCurrency(profit)}</span></div>
                                 <div className="flex-1 px-4 last:pr-0"><span className="block text-sm text-brand-inactive-text mb-1">Margem bruta</span><span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{margin}%</span></div>
                             </div>
+                        </div>
+                    )}
+
+                    {isQuickMode && (
+                        <div className="mt-8">
+                            <RichTextEditor
+                                label="Descrição Detalhada"
+                                value={productData?.description || ""}
+                                onChange={(val) => handleInputChange({ target: { name: "description", value: val } })}
+                                disabled={!isEditing}
+                            />
                         </div>
                     )}
 

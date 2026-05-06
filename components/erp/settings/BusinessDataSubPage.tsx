@@ -487,28 +487,6 @@ export const BusinessDataSubPage = ({
                                                 </div>
                                             </div>
 
-                                            <div className="mt-8">
-                                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Como você quer usar a Dudit?</h3>
-                                                <div className="grid gap-3">
-                                                    {MODE_OPTIONS.map(opt => (
-                                                        <ListItem
-                                                            key={opt.value}
-                                                            icon={opt.icon}
-                                                            title={opt.title}
-                                                            description={opt.description}
-                                                            onClick={() => setMode(opt.value)}
-                                                            right={
-                                                                <Checkbox
-                                                                    checked={generalInfo.mode === opt.value}
-                                                                    onChange={() => setMode(opt.value)}
-                                                                />
-                                                            }
-                                                            className="py-4 px-6 gap-4"
-                                                        />
-                                                    ))}
-                                                </div>
-                                            </div>
                                         </div>
 
                                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">

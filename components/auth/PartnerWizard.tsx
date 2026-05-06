@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import Input from "@/components/reusable/Input"
 import NumberInputWithCheckbox from "@/components/ui/number-input-with-checkbox"
 import { Checkbox } from "@/components/reusable/Checkbox"
-import { Button, PhoneInput, EmailInput, Spinner, InfoCard, ListItem } from "@/components/reusable"
+import { Button, PhoneInput, EmailInput, Spinner, InfoCard, ListItem, RadioButton } from "@/components/reusable"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { CepInput, PasswordInput, StateComboBox, PasswordStrengthMeter } from "@/components/reusable"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
@@ -368,7 +368,9 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                                 description={opt.description}
                                                 onClick={() => setMode(opt.value)}
                                                 left={
-                                                    <Checkbox
+                                                    <RadioButton
+                                                        name="businessMode"
+                                                        value={opt.value}
                                                         checked={partnerData.businessInfo.mode === opt.value}
                                                         onChange={() => setMode(opt.value)}
                                                     />

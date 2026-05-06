@@ -136,7 +136,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
         if (!isQuick) return initialProductState
         return {
             ...initialProductState,
-            show_in_marketplace: false,
+            show_in_marketplace: true,
             is_highlighted: false,
         }
     }, [initialProductState, isQuick])
@@ -742,10 +742,12 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                 {getTabErrorCount("variations") > 0 && <span className="w-2 h-2 bg-red-500 rounded-full inline-block" />}
                                             </span>
                                         </TabsTrigger>
-                                        <TabsTrigger value="suppliers" disabled={isLoadingDetails}>
-                                            Fornecedores
-                                            {getTabErrorCount("suppliers") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
-                                        </TabsTrigger>
+                                        {!isQuick && (
+                                            <TabsTrigger value="suppliers" disabled={isLoadingDetails}>
+                                                Fornecedores
+                                                {getTabErrorCount("suppliers") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                            </TabsTrigger>
+                                        )}
                                         {productData.show_in_marketplace && (
                                             <TabsTrigger value="marketplace" disabled={isLoadingDetails}>
                                                 Marketplace
