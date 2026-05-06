@@ -125,7 +125,7 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                 <motion.div
                     whileHover={{ y: -4 }}
                     className="bg-brand-green/10 border-2 border-brand-green/20 rounded-3xl p-6 cursor-pointer flex items-center gap-6 group transition-all"
-                    onClick={() => router.push('/erp/products?add=true')}
+                    onClick={() => router.push('/erp/products?create=true')}
                 >
                     <div className="w-16 h-16 rounded-2xl bg-brand-green flex items-center justify-center text-white shadow-lg shadow-brand-green/20">
                         <PlusIcon size={32} />
@@ -144,7 +144,7 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                 <motion.div
                     whileHover={{ y: -4 }}
                     className="bg-brand-primary/10 border-2 border-brand-primary/20 rounded-3xl p-6 cursor-pointer flex items-center gap-6 group transition-all"
-                    onClick={() => router.push('/erp/servicos?add=true')}
+                    onClick={() => router.push('/erp/servicos?create=true')}
                 >
                     <div className="w-16 h-16 rounded-2xl bg-brand-primary flex items-center justify-center text-white shadow-lg shadow-brand-primary/20">
                         <WrenchIcon size={32} />
