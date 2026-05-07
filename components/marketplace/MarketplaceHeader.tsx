@@ -16,7 +16,6 @@ import {
   HeartIcon,
   ShareIcon,
 } from "@/lib/icons"
-import { motion, AnimatePresence } from "framer-motion"
 import { useSupabase } from "@/providers/supabase-provider"
 import { Button } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
@@ -200,11 +199,11 @@ const Header: React.FC<HeaderProps> = ({
   }, [searchValue, router])
 
   const handleSignOut = useCallback(async () => {
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
     setIsUserMenuOpen(false)
     setIsMobileUserMenuOpen(false)
-    router.push("/")
-  }, [supabase, router])
+    window.location.href = "/"
+  }, [supabase])
 
   const handleGoBack = useCallback(() => {
     setDirection("back")

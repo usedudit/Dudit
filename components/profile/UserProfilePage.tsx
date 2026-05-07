@@ -241,6 +241,9 @@ export function UserProfilePage({ userId, profile, initialFullName, email, hasPa
                     password: passwordData.newPassword
                 })
 
+                // Sign out all OTHER devices/sessions (keeps current session active)
+                await supabase.auth.signOut({ scope: 'others' })
+
                 // Give a moment for the toast to be visible before reloading
                 setTimeout(() => {
                     window.location.reload()

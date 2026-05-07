@@ -447,7 +447,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                             <div className="mt-4 pt-4 border-t border-brand-border md:hidden space-y-3">
                                                                 <div className="flex justify-between items-center text-sm">
                                                                     <span className="text-brand-inactive-text">Total dos itens</span>
-                                                                    <span className="font-semibold">{formatCurrency(partnerSelectedTotal)}</span>
+                                                                    <span className="font-semibold">{formatCurrency(partnerItemsTotal)}</span>
                                                                 </div>
                                                                  <div className="flex justify-between items-center text-sm">
                                                                     <span className="text-brand-inactive-text">Entrega</span>

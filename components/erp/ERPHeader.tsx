@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
 import { MenuIcon, MoonIcon, LogoutIcon, NotificationIcon, ChevronDownIcon, ChevronLeftIcon, UserIcon, CreditCardIcon, HelpCircleIcon } from "@/lib/icons"
 import { Button } from "@/components/reusable"
@@ -14,7 +14,6 @@ import { StoreSwitcher } from "../store-switcher"
 import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { useSidebar } from "@/lib/sidebar-context"
 import { useUserProfile } from "@/hooks/use-user-profile"
-import { cn } from "@/lib/utils"
 import BottomSheet from "../BottomSheet"
 
 // Ícone selector (duas setas)
@@ -163,8 +162,8 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
   }
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push("/")
+    await supabase.auth.signOut({ scope: 'local' })
+    window.location.href = "/"
   }
 
   const segments = pathname.split("/").filter(Boolean)
