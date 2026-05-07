@@ -38,6 +38,12 @@ export enum AdminActionType {
     MODERATION_REJECT = "moderation.reject",
     MODERATION_REPROCESS = "moderation.reprocess",
 
+    // Reports / Denúncias
+    REPORT_VALIDATE = "report.validate",
+    REPORT_DISMISS = "report.dismiss",
+    REPORT_SPAM = "report.spam",
+    REPORT_REVERT = "report.revert",
+
     // User enforcement
     USER_BAN = "user.ban",
     USER_UNBAN = "user.unban",
@@ -58,7 +64,14 @@ export enum AdminActionType {
 
 // ─── Audit Log Types ────────────────────────────────────────────────────────
 
-export type AuditTargetType = "user" | "partner" | "product" | "service" | "subscription" | "system"
+export type AuditTargetType =
+    | "user"
+    | "partner"
+    | "product"
+    | "service"
+    | "subscription"
+    | "system"
+    | "review"
 
 export interface AdminAuditLogEntry {
     adminUserId: string

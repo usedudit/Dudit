@@ -143,10 +143,12 @@ export const RATE_LIMIT_CONFIGS: Record<RateLimitCategory, RateLimitConfig> = {
     failClosed: false,
   },
   [RateLimitCategory.REPORT_CREATE]: {
+    // Reports are abuse-sensitive: combine user+IP and fail-closed to block
+    // automated abuse rings even on Redis hiccups.
     maxRequests: 5,
     window: "1 h",
-    identifierType: IdentifierType.USER,
-    failClosed: false,
+    identifierType: IdentifierType.USER_PLUS_IP,
+    failClosed: true,
   },
   [RateLimitCategory.ORDER_CREATE]: {
     maxRequests: 30,

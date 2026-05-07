@@ -853,7 +853,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                     : 'Logradouro não informado'}
                                                             </p>
 
-                                                            <p className="text-brand-inactive-text dark:text-dark-body text-[13px]truncate">
+                                                            <p className="text-brand-inactive-text dark:text-dark-body text-[13px] truncate">
                                                                 {city && uf
                                                                     ? `${city} - ${uf}`
                                                                     : 'Cidade/Estado não informados'}
