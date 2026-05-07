@@ -505,20 +505,24 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                         </h2>
 
                         <div className="grid grid-cols-1 gap-3">
-                            <ListItem
-                                icon={TagIcon}
-                                title="Aplicar desconto"
-                                description={hasCoupon ? "Desconto e/ou cupom aplicado" : "Escolha o tipo e aplique no pedido"}
-                                onClick={onOpenDiscount}
-                                className="px-4 py-3 gap-4"
-                            />
-                            <ListItem
-                                icon={TruckIcon}
-                                title="Adicionar frete"
-                                description="Define o valor do frete do pedido"
-                                onClick={onOpenShipping}
-                                className="px-4 py-3 gap-4"
-                            />
+                            {!isQuickMode && (
+                                <>
+                                    <ListItem
+                                        icon={TagIcon}
+                                        title="Aplicar desconto"
+                                        description={hasCoupon ? "Desconto e/ou cupom aplicado" : "Escolha o tipo e aplique no pedido"}
+                                        onClick={onOpenDiscount}
+                                        className="px-4 py-3 gap-4"
+                                    />
+                                    <ListItem
+                                        icon={TruckIcon}
+                                        title="Adicionar frete"
+                                        description="Define o valor do frete do pedido"
+                                        onClick={onOpenShipping}
+                                        className="px-4 py-3 gap-4"
+                                    />
+                                </>
+                            )}
                             <MoneyInput
                                 label="Outros Custos"
                                 value={parseFloat(otherCosts || "0")}
@@ -603,35 +607,37 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                     )}
 
                     {/* --- 1. CUSTOMER CARD --- */}
-                    <div>
-                        {selectedCustomer ? (
-                            <CustomerCard
-                                customer={selectedCustomer}
-                                address={selectedCustomer.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || selectedCustomer.addresses?.[0]}
-                                billingAddress={selectedCustomer.addresses?.find((a: any) => a.address_type === "billing")}
-                                onRemove={() => setSelectedCustomer(null)}
-                            />
-                        ) : (
-                            <div
-                                className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-8 flex flex-col items-center justify-center text-center relative overflow-hidden mb-6"
-                                onClick={() => setIsCustomerSheetOpen(true)}
-                            >
-                                <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
-
-                                <IconPlaceholder
-                                    icon={UserIcon}
-                                    title="Nenhum cliente selecionado"
-                                    subtitle="Selecione um cliente para vincular ao pedido."
-                                    itemButton={{
-                                        text: "Selecionar Cliente",
-                                        action: () => setIsCustomerSheetOpen(true),
-                                        variant: "outline",
-                                        className: "rounded-full px-8"
-                                    }}
+                    {!isQuickMode && (
+                        <div>
+                            {selectedCustomer ? (
+                                <CustomerCard
+                                    customer={selectedCustomer}
+                                    address={selectedCustomer.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || selectedCustomer.addresses?.[0]}
+                                    billingAddress={selectedCustomer.addresses?.find((a: any) => a.address_type === "billing")}
+                                    onRemove={() => setSelectedCustomer(null)}
                                 />
-                            </div>
-                        )}
-                    </div>
+                            ) : (
+                                <div
+                                    className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-8 flex flex-col items-center justify-center text-center relative overflow-hidden mb-6"
+                                    onClick={() => setIsCustomerSheetOpen(true)}
+                                >
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
+
+                                    <IconPlaceholder
+                                        icon={UserIcon}
+                                        title="Nenhum cliente selecionado"
+                                        subtitle="Selecione um cliente para vincular ao pedido."
+                                        itemButton={{
+                                            text: "Selecionar Cliente",
+                                            action: () => setIsCustomerSheetOpen(true),
+                                            variant: "outline",
+                                            className: "rounded-full px-8"
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* --- 2. ORDER SETTINGS --- */}
                     <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 flex flex-col gap-6 mt-6">
@@ -664,23 +670,25 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 options={deliveryMethodOptions}
                             />
 
-                            <Combobox
-                                label="Conta de recebimento"
-                                value={financeAccountId || undefined}
-                                onChange={(val) => {
-                                    setFinanceAccountId(val)
-                                    if (setFieldErrors) {
-                                        setFieldErrors((prev) => {
-                                            const next = new Set(prev)
-                                            next.delete("financeAccountId")
-                                            return next
-                                        })
-                                    }
-                                }}
-                                options={accountOptions}
-                                actionItem={{ label: "Criar conta", onClick: onCreateAccount }}
-                                error={fieldErrors?.has("financeAccountId")}
-                            />
+                            {!isQuickMode && (
+                                <Combobox
+                                    label="Conta de recebimento"
+                                    value={financeAccountId || undefined}
+                                    onChange={(val) => {
+                                        setFinanceAccountId(val)
+                                        if (setFieldErrors) {
+                                            setFieldErrors((prev) => {
+                                                const next = new Set(prev)
+                                                next.delete("financeAccountId")
+                                                return next
+                                            })
+                                        }
+                                    }}
+                                    options={accountOptions}
+                                    actionItem={{ label: "Criar conta", onClick: onCreateAccount }}
+                                    error={fieldErrors?.has("financeAccountId")}
+                                />
+                            )}
 
                             {/* Status de entrega foi movido para a aba de Entrega */}
                         </div>

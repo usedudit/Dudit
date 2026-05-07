@@ -31,7 +31,7 @@ export async function pickBestPaymentMethod(
         .eq("is_active", true)
 
     if (error) throw new Error(error.message)
-    const rows = (data || []).filter((row: any) => row.default_finance_account_id)
+    const rows = data || []
     if (rows.length === 0) return null
 
     rows.sort((a: any, b: any) => {

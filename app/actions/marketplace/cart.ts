@@ -97,6 +97,24 @@ export const getCachedCart = async (userId: string) => {
     console.error("Erro ao buscar endereços dos parceiros (não-crítico):", e)
   }
 
+  // 2c. Busca Configurações de Entrega (novo)
+  let partnerDeliverySettings: Record<string, any> = {}
+  try {
+    const { data: delSettings } = await supabase
+      .from("delivery_settings")
+      .select("partner_id, base_fee, is_delivery_enabled")
+      .in("partner_id", partnerIds)
+
+    if (delSettings) {
+      partnerDeliverySettings = delSettings.reduce((acc: any, ds: any) => {
+        acc[ds.partner_id] = ds
+        return acc
+      }, {})
+    }
+  } catch (e) {
+    console.error("Erro ao buscar configs de entrega (não-crítico):", e)
+  }
+
   // 3. Agrupa os itens por Loja (Parceiro)
   const itemsByPartner = cartItems.reduce((acc: any, item: any) => {
     const partnerId = item.partner_id
@@ -116,6 +134,7 @@ export const getCachedCart = async (userId: string) => {
               .map((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type))
           )
         ),
+        deliverySettings: partnerDeliverySettings[partnerId] || null,
       }
     }
     acc[partnerId].items.push(item)
@@ -598,7 +617,7 @@ export async function checkoutCartAction(
     paymentAwareTotal = Number(calc.finalAmount || totalAmount)
   }
 
-  const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(
+  const financeAccountId = (bestMethod as any)?.default_finance_account_id || await resolveMarketplaceOrderFinanceAccountId(
     adminClient,
     partnerId,
     Boolean(useMercadoPago),

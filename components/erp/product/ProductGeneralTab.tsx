@@ -165,7 +165,9 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                 {/* PREÇO */}
                 <div className="mt-8">
                     <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Preço</h3>
+                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">
+                        {isQuickMode ? "Preço e Estoque" : "Preço"}
+                    </h3>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6">
                         {!isQuickMode && (
@@ -181,7 +183,24 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             error={fieldErrors?.has("price")}
                             errorMessage={fieldErrors?.has("price") ? "Preço de venda é obrigatório" : undefined}
                         />
-                        <MoneyInput label="Preço Promocional" name="promotional_price" value={productData.promotional_price || ""} onChange={(val) => handleFieldChange({ target: { name: "promotional_price", value: val } })} disabled={!isEditing || !showPrice} />
+                        <MoneyInput
+                            label="Preço Promocional"
+                            name="promotional_price"
+                            value={productData.promotional_price || ""}
+                            onChange={(val) => handleFieldChange({ target: { name: "promotional_price", value: val } })}
+                            disabled={!isEditing || !showPrice}
+                        />
+
+                        {isQuickMode && (
+                            <Input
+                                label="Estoque Atual"
+                                name="stock"
+                                type="number"
+                                value={productData.stock || ""}
+                                onChange={handleFieldChange}
+                                disabled={!isEditing}
+                            />
+                        )}
                     </div>
 
                     {!showPrice && (
@@ -203,16 +222,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                         </div>
                     )}
 
-                    {isQuickMode && (
-                        <div className="mt-8">
-                            <RichTextEditor
-                                label="Descrição Detalhada"
-                                value={productData?.description || ""}
-                                onChange={(val) => handleInputChange({ target: { name: "description", value: val } })}
-                                disabled={!isEditing}
-                            />
-                        </div>
-                    )}
+
 
                     <div className="flex items-center gap-2 cursor-pointer w-fit mt-2">
                         <Checkbox
@@ -230,6 +240,19 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             disabled={!isEditing}
                         />
                     </div>
+
+                    {isQuickMode && (
+                        <div className="mt-10">
+                            <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Descrição</h3>
+                            <RichTextEditor
+                                label="Descrição Detalhada"
+                                value={productData?.description || ""}
+                                onChange={(val) => handleInputChange({ target: { name: "description", value: val } })}
+                                disabled={!isEditing}
+                            />
+                        </div>
+                    )}
                 </div>
 
                 {/* ESTOQUE */}

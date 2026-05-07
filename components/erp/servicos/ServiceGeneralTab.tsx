@@ -214,16 +214,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                         </div>
                     )}
 
-                    {isQuickMode && (
-                        <div className="mt-8">
-                            <RichTextEditor
-                                label="Descrição Detalhada"
-                                value={serviceData?.description || ""}
-                                onChange={(val) => manualChange("description", val)}
-                                disabled={!isEditing}
-                            />
-                        </div>
-                    )}
+
                 </div>
 
                 {/* TEMPO */}
@@ -254,6 +245,18 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                             />
                         )}
                     </div>
+                    {isQuickMode && (
+                        <div className="mt-10">
+                            <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Descrição</h3>
+                            <RichTextEditor
+                                label="Descrição Detalhada"
+                                value={serviceData?.description || ""}
+                                onChange={(val) => manualChange("description", val)}
+                                disabled={!isEditing}
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
 

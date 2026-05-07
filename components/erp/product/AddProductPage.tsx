@@ -522,7 +522,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 isActive: d.is_active,
                 isOnPromotion: !!d.promotional_price,
                 showPriceInStore: !!d.show_price_in_store,
-                showInMarketplace: isQuick ? false : !!d.show_in_marketplace, // Ensure boolean
+                showInMarketplace: !!d.show_in_marketplace, // Ensure boolean
                 requiresManualModeration: needsManualModeration,
                 images: cleanedFinalImages,
                 primaryImageIndex: 0,
@@ -748,7 +748,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                 {getTabErrorCount("suppliers") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
                                             </TabsTrigger>
                                         )}
-                                        {productData.show_in_marketplace && (
+                                        {!isQuick && productData.show_in_marketplace && (
                                             <TabsTrigger value="marketplace" disabled={isLoadingDetails}>
                                                 Marketplace
                                                 {getTabErrorCount("marketplace") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
