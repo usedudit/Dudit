@@ -191,7 +191,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                 productId: item.product_id,
                 variantId: item.variant_id || undefined,
                 quantity: getItemQuantity(item),
-            }))
+            })),
+            deliverySettings: partnerData.deliverySettings
         }
 
         sessionStorage.setItem("checkout_session", JSON.stringify(checkoutData))
@@ -200,11 +201,19 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
     const { success: notifySuccess, error: notifyError } = useNotification()
 
+    const getPartnerDeliveryFee = (partnerData: any) => {
+        const settings = partnerData.deliverySettings
+        if (!settings || settings.is_delivery_enabled === false) return 0
+        return Number(settings.base_fee || 0)
+    }
+
     // Total only counts selected items (with optimistic overrides)
-    const globalTotal = Object.values(itemsByPartner).reduce((acc: number, partner: any) =>
-        acc + partner.items
-            .filter((item: any) => getItemSelected(item))
-            .reduce((sum: number, item: any) => sum + getItemPrice(item) * getItemQuantity(item), 0), 0)
+    const globalTotal = Object.values(itemsByPartner).reduce((acc: number, partner: any) => {
+        const items = partner.items.filter((item: any) => getItemSelected(item))
+        if (items.length === 0) return acc
+        const itemsTotal = items.reduce((sum: number, item: any) => sum + getItemPrice(item) * getItemQuantity(item), 0)
+        return acc + itemsTotal + getPartnerDeliveryFee(partner)
+    }, 0)
 
     const getPartnerSelectedTotal = (items: any[]) =>
         items
@@ -265,7 +274,9 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                         <div className="lg:col-span-12 space-y-8">
                             {Object.entries(itemsByPartner).map(([partnerId, data]: [string, any], index: number, array: any[]) => {
-                                const partnerSelectedTotal = getPartnerSelectedTotal(data.items)
+                                const partnerItemsTotal = getPartnerSelectedTotal(data.items)
+                                const partnerDeliveryFee = getPartnerDeliveryFee(data)
+                                const partnerTotalWithDelivery = partnerItemsTotal > 0 ? partnerItemsTotal + partnerDeliveryFee : 0
                                 const expanded = isExpanded(partnerId)
                                 const allSelected = data.items.every((item: any) => getItemSelected(item))
                                 const sellerImage = data.partner?.store_image_url
@@ -445,12 +456,12 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                 <div className="h-[1px] bg-gray-100 w-full" />
                                                                 <div className="flex justify-between items-center text-base font-bold text-brand-dark">
                                                                     <span>Total</span>
-                                                                    <span>{formatCurrency(partnerSelectedTotal)}</span>
+                                                                    <span>{formatCurrency(partnerTotalWithDelivery)}</span>
                                                                 </div>
                                                                 <Button
                                                                     onClick={() => handleOpenCheckout(partnerId)}
                                                                     className="w-full"
-                                                                    disabled={partnerSelectedTotal === 0}
+                                                                    disabled={partnerItemsTotal === 0}
                                                                 >
                                                                     Finalizar Pedido desta Loja
                                                                 </Button>
@@ -477,8 +488,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                         <div className="hidden lg:block lg:col-span-4 self-start">
                                             <div className="border border-brand-border rounded-[12px] overflow-hidden bg-white dark:bg-dark-surface sticky top-[100px]">
                                                 <div className="bg-brand-gray px-6 py-4 border-b border-brand-border font-bold text-brand-dark">
-                                                    Resumo do Pedido{!expanded && partnerSelectedTotal > 0 && (
-                                                        <span className="text-brand-green font-semibold ml-1">({formatCurrency(partnerSelectedTotal)})</span>
+                                                    Resumo do Pedido{!expanded && partnerTotalWithDelivery > 0 && (
+                                                        <span className="text-brand-green font-semibold ml-1">({formatCurrency(partnerTotalWithDelivery)})</span>
                                                     )}
                                                 </div>
 
@@ -495,7 +506,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                             <div className="p-6 space-y-4">
                                                                 <div className="flex justify-between items-center text-sm font-medium">
                                                                     <span className="text-brand-inactive-text">Total dos itens</span>
-                                                                    <span className="text-brand-dark">{formatCurrency(partnerSelectedTotal)}</span>
+                                                                    <span className="text-brand-dark">{formatCurrency(partnerItemsTotal)}</span>
                                                                 </div>
                                                                 <div className="flex justify-between items-center text-sm font-medium">
                                                                     <span className="text-brand-inactive-text">Entrega</span>
@@ -504,12 +515,12 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                 <div className="h-[1px] bg-gray-100 w-full" />
                                                                 <div className="flex justify-between items-center font-bold text-xl text-brand-dark dark:text-dark-heading">
                                                                     <span>Total Geral</span>
-                                                                    <span>{formatCurrency(partnerSelectedTotal)}</span>
+                                                                    <span>{formatCurrency(partnerTotalWithDelivery)}</span>
                                                                 </div>
                                                                 <Button
                                                                     onClick={() => handleOpenCheckout(partnerId)}
                                                                     className="w-full h-[46px]"
-                                                                    disabled={partnerSelectedTotal === 0}
+                                                                    disabled={partnerItemsTotal === 0}
                                                                 >
                                                                     Finalizar Pedido
                                                                 </Button>

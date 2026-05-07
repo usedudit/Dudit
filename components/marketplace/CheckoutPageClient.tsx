@@ -58,6 +58,10 @@ export interface CheckoutSessionData {
     cartItems?: { cartItemId: string, productId: string, variantId?: string, quantity: number }[]
     itemId?: string
     itemType?: "product" | "service"
+    deliverySettings?: {
+        base_fee: number | string
+        is_delivery_enabled: boolean
+    }
 }
 
 interface UserAddress {
@@ -227,6 +231,11 @@ export function CheckoutPageClient() {
         if (sessionData) {
             setFormData(prev => ({ ...prev, paymentMethod: partnerInfo.paymentMethods?.[0] || "cash" }))
             setPaymentOption(partnerInfo.mpConnected ? "mercadopago" : "traditional")
+            
+            // Inicializa taxa de entrega com o que veio do carrinho (base fee)
+            if (sessionData.deliverySettings) {
+                setDeliveryFee(Number(sessionData.deliverySettings.base_fee || 0))
+            }
         }
     }, [sessionData])
 
@@ -404,7 +413,9 @@ export function CheckoutPageClient() {
     useEffect(() => {
         let active = true
         if (!partnerId || isPickup || !formData.deliveryAddress || !canUseDelivery) {
-            setDeliveryFee(0)
+            // Se não for entrega ou não tiver endereço, volta para o base_fee ou 0
+            const baseFee = Number(sessionData?.deliverySettings?.base_fee || 0)
+            setDeliveryFee(isPickup ? 0 : baseFee)
             setDeliveryDistanceKm(null)
             setDeliveryBreakdown(null)
             setDeliveryQuoteLoading(false)
@@ -429,7 +440,8 @@ export function CheckoutPageClient() {
                 })
             } else {
                 setDeliveryError(quote.error)
-                setDeliveryFee(0)
+                // Mantém o base_fee como fallback em caso de erro na cotação detalhada
+                setDeliveryFee(Number(sessionData?.deliverySettings?.base_fee || 0))
                 setDeliveryDistanceKm(null)
                 setDeliveryBreakdown(null)
             }
@@ -1243,7 +1255,7 @@ export function CheckoutPageClient() {
                                         <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
                                             <span>Entrega</span>
                                             <span className={(isPickup || (deliveryFee === 0 && hasFreeDeliveryCoupon)) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
-                                                {isPickup ? "Grátis" : deliveryQuoteLoading ? "Calculando..." : (deliveryFee > 0 ? formatCurrency(deliveryFee) : (hasFreeDeliveryCoupon ? "Grátis" : "A combinar"))}
+                                                {isPickup ? "Grátis" : deliveryQuoteLoading ? "Calculando..." : (deliveryFee > 0 ? formatCurrency(deliveryFee) : (hasFreeDeliveryCoupon ? "Grátis" : (deliveryError || !formData.deliveryAddress ? "A combinar" : "Grátis")))}
                                             </span>
                                         </div>
                                         {!isPickup && deliveryBreakdown && (
