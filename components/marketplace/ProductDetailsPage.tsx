@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from "framer-motion"
 import { useSupabase } from "@/providers/supabase-provider"
-import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, CheckCircleIcon, XIcon, ShoppingCartIcon, MoneyIcon, TruckIcon } from "@/lib/icons"
+import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, CheckCircleIcon, XIcon, ShoppingCartIcon, MoneyIcon, TruckIcon, FlagIcon } from "@/lib/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
@@ -13,6 +13,7 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { Button, Input, FormDropdown, IconPlaceholder, DefaultModal, Separator } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
 import { ShareModal } from "./ShareModal"
+import { ReportModal } from "./ReportModal"
 import dynamic from "next/dynamic"
 import { addToCartAction } from "@/app/actions/marketplace/cart"
 import { createOrderAction } from "@/app/actions/marketplace/orders"
@@ -113,6 +114,7 @@ export function ProductDetailsPageClient({
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [showResponsibilityModal, setShowResponsibilityModal] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
+  const [showReportModal, setShowReportModal] = useState(false)
   const [isFavorite, setIsFavorite] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const [showQuantityModal, setShowQuantityModal] = useState(false)
@@ -697,6 +699,16 @@ export function ProductDetailsPageClient({
           </Link>
         </div>
       </div>
+
+      {!isProductOwner && (
+        <button
+          onClick={() => setShowReportModal(true)}
+          className="w-full mt-4 flex items-center justify-center gap-2 py-2 text-xs font-medium text-brand-inactive-text hover:text-[#d32f2f] transition-colors"
+        >
+          <FlagIcon size={14} />
+          Denunciar este produto
+        </button>
+      )}
     </div>
   )
 
@@ -860,6 +872,14 @@ export function ProductDetailsPageClient({
         title={product.name}
         shareMessage={shareMessage}
         label="Link do produto"
+      />
+
+      <ReportModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        targetType="product"
+        targetId={product.id}
+        targetName={product.name}
       />
 
       <DefaultModal

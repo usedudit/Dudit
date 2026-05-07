@@ -8,7 +8,9 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getProductUrl } from "@/lib/utils/url-generator"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
 import { ShareModal } from "./ShareModal"
+import { ReportModal } from "./ReportModal"
 import { MarketplaceHeader } from "./MarketplaceHeader"
+import { useSupabase } from "@/providers/supabase-provider"
 import { formatCurrency, formatDate, formatMonth, formatYear, formatNumber } from "@/lib/utils"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
@@ -588,10 +590,13 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
     const [isDesktopSortOpen, setIsDesktopSortOpen] = useState(false)
     const [selectedSort, setSelectedSort] = useState("Mais recentes")
     const [showShareModal, setShowShareModal] = useState(false)
+    const [showReportModal, setShowReportModal] = useState(false)
     const [isMounted, setIsMounted] = useState(false)
     const [isScrolled, setIsScrolled] = useState(false)
     const sortRef = useRef<HTMLDivElement>(null)
     const { setDirection } = useTransitionDirection()
+    const { user } = useSupabase()
+    const isStoreOwner = user?.id === partner.userId || user?.id === partner.user_id
 
     useEffect(() => { setIsMounted(true) }, [])
 
@@ -741,6 +746,15 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                             <button className="w-[42px] h-[42px] rounded-full border border-brand-border flex items-center justify-center text-brand-inactive-text hover:text-[#ef4444] hover:border-[#ef4444] transition-colors">
                                 <HeartIcon size={20} />
                             </button>
+                            {!isStoreOwner && (
+                                <button
+                                    onClick={() => setShowReportModal(true)}
+                                    className="w-[42px] h-[42px] rounded-full border border-brand-border flex items-center justify-center text-brand-inactive-text hover:text-[#d32f2f] hover:border-[#d32f2f] transition-colors"
+                                    title="Denunciar vendedor"
+                                >
+                                    <FlagIcon size={20} />
+                                </button>
+                            )}
                             <button
                                 onClick={handleWhatsApp}
                                 className="h-[42px] px-6 bg-brand-green text-white rounded-full flex items-center gap-2 font-semibold text-[14px] hover:bg-[#047857] transition-colors shadow-sm"
@@ -751,9 +765,19 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
 
                         {/* Ações mobile */}
                         <div className="lg:hidden flex flex-col items-end gap-3">
-                            <button onClick={() => setIsAboutPageOpen(true)} className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-brand-dark active:bg-gray-200 transition-colors">
-                                <ChevronRightIcon size={20} />
-                            </button>
+                            <div className="flex items-center gap-3">
+                                {!isStoreOwner && (
+                                    <button
+                                        onClick={() => setShowReportModal(true)}
+                                        className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-brand-dark active:bg-gray-200 transition-colors"
+                                    >
+                                        <FlagIcon size={18} />
+                                    </button>
+                                )}
+                                <button onClick={() => setIsAboutPageOpen(true)} className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-brand-dark active:bg-gray-200 transition-colors">
+                                    <ChevronRightIcon size={20} />
+                                </button>
+                            </div>
                             <button onClick={handleWhatsApp} className="w-9 h-9 rounded-full bg-brand-green flex items-center justify-center text-white active:bg-[#047857] transition-colors shadow-sm">
                                 <WhatsappIcon size={18} />
                             </button>
@@ -887,6 +911,14 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                 title={partner.storeName}
                 shareMessage={shareMessage}
                 label="Link da vitrine"
+            />
+
+            <ReportModal
+                isOpen={showReportModal}
+                onClose={() => setShowReportModal(false)}
+                targetType="partner"
+                targetId={partner.id}
+                targetName={partner.storeName}
             />
 
             {/* Bottom-sheet modals mobile */}
