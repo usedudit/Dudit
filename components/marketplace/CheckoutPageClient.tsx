@@ -226,12 +226,14 @@ export function CheckoutPageClient() {
         distanceFee: number
         timeAdjustmentTotal: number
     } | null>(null)
+    const [deliverySettings, setDeliverySettings] = useState<any>(null)
+
 
     useEffect(() => {
         if (sessionData) {
             setFormData(prev => ({ ...prev, paymentMethod: partnerInfo.paymentMethods?.[0] || "cash" }))
             setPaymentOption(partnerInfo.mpConnected ? "mercadopago" : "traditional")
-            
+
             // Inicializa taxa de entrega com o que veio do carrinho (base fee)
             if (sessionData.deliverySettings) {
                 setDeliveryFee(Number(sessionData.deliverySettings.base_fee || 0))
@@ -247,6 +249,7 @@ export function CheckoutPageClient() {
                 if (!active || !config.success) return
                 setDeliveryPlanEnabled(config.capability.deliveryEnabled)
                 setDeliveryEnabled(Boolean(config.settings.isDeliveryEnabled))
+                setDeliverySettings(config.settings)
                 if (!config.capability.deliveryEnabled || !config.settings.isDeliveryEnabled) {
                     setFormData((prev) => ({ ...prev, deliveryType: "pickup" }))
                 } else if (selectedAddressId) {
@@ -373,8 +376,12 @@ export function CheckoutPageClient() {
         setIsLoading(false)
     }
 
+    const isPickup = formData.deliveryType === "pickup"
+    const canUseDelivery = deliveryPlanEnabled && deliveryEnabled
+
     const totalAmount = products.reduce((sum, p) => sum + p.price * (quantities[p.id] || p.quantity), 0)
     const checkoutBaseTotal = Math.max(0, totalAmount - couponDiscount)
+    const checkoutTotalWithDelivery = checkoutBaseTotal + (isPickup ? 0 : deliveryFee)
     const paymentTypeLabelMap: Record<string, string> = {
         pix: "Pix",
         credit_card: "Cartão de crédito",
@@ -387,8 +394,6 @@ export function CheckoutPageClient() {
             value: method,
             label: paymentTypeLabelMap[method] || method,
         }))
-    const isPickup = formData.deliveryType === "pickup"
-    const canUseDelivery = deliveryPlanEnabled && deliveryEnabled
     const traditionalPaymentLabel = isPickup ? "Pagar na Retirada" : "Pagar na Entrega"
     const shouldPreviewTraditionalPayment = Boolean(
         partnerId &&
@@ -414,7 +419,7 @@ export function CheckoutPageClient() {
         let active = true
         if (!partnerId || isPickup || !formData.deliveryAddress || !canUseDelivery) {
             // Se não for entrega ou não tiver endereço, volta para o base_fee ou 0
-            const baseFee = Number(sessionData?.deliverySettings?.base_fee || 0)
+            const baseFee = Number(sessionData?.deliverySettings?.base_fee || deliverySettings?.baseFee || 0)
             setDeliveryFee(isPickup ? 0 : baseFee)
             setDeliveryDistanceKm(null)
             setDeliveryBreakdown(null)
@@ -441,7 +446,8 @@ export function CheckoutPageClient() {
             } else {
                 setDeliveryError(quote.error)
                 // Mantém o base_fee como fallback em caso de erro na cotação detalhada
-                setDeliveryFee(Number(sessionData?.deliverySettings?.base_fee || 0))
+                const baseFee = Number(sessionData?.deliverySettings?.base_fee || deliverySettings?.baseFee || 0)
+                setDeliveryFee(baseFee)
                 setDeliveryDistanceKm(null)
                 setDeliveryBreakdown(null)
             }
@@ -472,7 +478,7 @@ export function CheckoutPageClient() {
             const result = await previewMarketplacePaymentAction({
                 partnerId,
                 paymentMethod: formData.paymentMethod,
-                originalAmount: checkoutBaseTotal + (isPickup ? 0 : deliveryFee),
+                originalAmount: checkoutTotalWithDelivery,
                 installmentNumber: Math.max(1, Number(formData.installments || 1)),
             })
 
@@ -499,7 +505,7 @@ export function CheckoutPageClient() {
         paymentOption,
         formData.paymentMethod,
         formData.installments,
-        checkoutBaseTotal,
+        checkoutTotalWithDelivery,
         isPickup,
         deliveryFee,
     ])
@@ -514,8 +520,8 @@ export function CheckoutPageClient() {
     }, [paymentPreview, formData.installments])
 
     const checkoutTotalToCharge = paymentOption === "traditional" && paymentPreview?.success
-        ? Number(paymentPreview.finalAmount || (checkoutBaseTotal + (isPickup ? 0 : deliveryFee)))
-        : (checkoutBaseTotal + (isPickup ? 0 : deliveryFee))
+        ? Number(paymentPreview.finalAmount || checkoutTotalWithDelivery)
+        : checkoutTotalWithDelivery
     const preparationEstimate = useMemo(() => computeOrderPreparationEstimate({
         products: products.map((product) => ({
             availability_value: Number(product.availabilityValue || 0),
@@ -710,32 +716,28 @@ export function CheckoutPageClient() {
 
         try {
             if (paymentOption === "mercadopago") {
-                const amount = checkoutBaseTotal
+                const amount = checkoutTotalWithDelivery
                 setPixPaymentData({
                     orderId: "temp-" + Date.now(),
                     amount,
                     orderDetails: {
                         items: products.map(p => ({
                             id: p.id,
-                            variant_id: p.variant, // variant maps to variant_id here if needed
                             name: p.name,
                             price: p.price,
                             quantity: quantities[p.id] || p.quantity,
-                            image: p.image
+                            image: p.image || "",
+                            variant_id: p.variant || ""
                         })),
                         deliveryType: formData.deliveryType,
                         deliveryAddress: formData.deliveryAddress,
                         notes: formData.notes,
-                        cartItemIds: sessionData?.cartItems?.map(c => c.cartItemId),
-                        itemId: sessionData?.itemId,
-                        itemType: sessionData?.itemType,
-                        couponCode: couponCode || null
+                        couponCode: couponCode || null,
+                        couponDiscount: couponDiscount,
+                        deliveryFee: isPickup ? 0 : deliveryFee,
                     },
-                    useMercadoPago: true,
-                    partnerId: partnerId,
-                    mpPublicKey: partnerInfo.mpPublicKey,
-                    userEmail: userEmail,
-                    userName: userName,
+                    sellerName: sessionData?.partnerInfo?.store_name || "Loja",
+                    mpPublicKey: sessionData?.partnerInfo?.mpPublicKey || ""
                 })
                 setShowPixModal(true)
                 setIsLoading(false)
@@ -774,13 +776,13 @@ export function CheckoutPageClient() {
                     invalidateCartCache()
                     sessionStorage.removeItem("checkout_session")
                     notifySuccess("Pedido realizado", "Seu pedido foi criado com sucesso!")
-                    router.push("/my-orders")
+                    router.push("/pedidos")
                 } else {
                     const result = await createOrderAction({
-                        itemId: sessionData?.itemId || products[0]?.id,
+                        itemId: sessionData?.itemId || products[0]?.id || "",
                         itemType: sessionData?.itemType || "product",
                         quantity: quantities[products[0]?.id] || products[0]?.quantity || 1,
-                        totalAmount: checkoutBaseTotal,
+                        totalAmount: checkoutTotalWithDelivery,
                         deliveryType: formData.deliveryType,
                         deliveryAddress: formData.deliveryAddress,
                         paymentMethod: formData.paymentMethod,
@@ -793,7 +795,7 @@ export function CheckoutPageClient() {
                     if (result.error) throw new Error(result.error)
                     sessionStorage.removeItem("checkout_session")
                     notifySuccess("Pedido realizado", `Número: ${result.orderNumber}`)
-                    router.push("/my-orders")
+                    router.push("/pedidos")
                 }
             }
         } catch (err: any) {

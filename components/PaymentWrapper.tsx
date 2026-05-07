@@ -41,6 +41,7 @@ interface PixPaymentWrapperProps {
         cartItemIds?: string[]
         couponCode?: string | null
         couponDiscount?: number
+        deliveryFee?: number
     }
     orderNumber?: string
     sellerName?: string
@@ -188,6 +189,7 @@ export function PaymentWrapper({
                         })),
                         partnerId,
                         couponCode: orderDetails.couponCode,
+                        deliveryFee: orderDetails.deliveryFee,
                     },
                 })
             } catch (err: any) {
@@ -290,7 +292,8 @@ export function PaymentWrapper({
                     deliveryAddress: orderDetails.deliveryAddress,
                     notes: orderDetails.notes,
                     cartItemIds: orderDetails.cartItemIds,
-                    couponCode: orderDetails.couponCode
+                    couponCode: orderDetails.couponCode,
+                    deliveryFee: orderDetails.deliveryFee
                 },
             })
 

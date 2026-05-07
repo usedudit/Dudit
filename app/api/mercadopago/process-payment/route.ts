@@ -25,6 +25,7 @@ interface ProcessPaymentRequest {
   notes?: string
   cartItemIds?: string[]
   couponCode?: string | null
+  deliveryFee?: number
 }
 
 /**
@@ -220,6 +221,13 @@ async function handler(request: NextRequest) {
         totalAmount = Math.max(0, totalAmount - couponDiscountAmount)
         if (isDev) console.log("[v0] Coupon applied:", couponCode, "Discount:", couponDiscountAmount, "New total:", totalAmount)
       }
+    }
+
+    // DELIVERY FEE
+    const deliveryFee = Number(body.deliveryFee || 0)
+    if (deliveryFee > 0) {
+      totalAmount += deliveryFee
+      if (isDev) console.log("[v0] Delivery fee applied:", deliveryFee, "New total:", totalAmount)
     }
 
     // SEGURANÃ‡A: Validar que o total é positivo e razoável
@@ -446,6 +454,8 @@ async function handler(request: NextRequest) {
         mp_payment_id: mpPaymentId.toString(),
         coupon_id: couponIdToSave,
         discount_amount: couponDiscountAmount,
+        delivery_fee: deliveryFee,
+        shipping_cost: deliveryFee,
       })
       .select()
       .single()

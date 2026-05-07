@@ -25,6 +25,7 @@ interface PreferenceRequest {
   partnerId?: string
   buyerId?: string
   couponCode?: string | null
+  deliveryFee?: number
 }
 
 async function handler(request: NextRequest) {
@@ -180,6 +181,18 @@ async function handler(request: NextRequest) {
         description: `Produto: ${resolvedName}`,
         unit_price: resolvedPrice,
         quantity: item.quantity,
+        currency_id: "BRL",
+      })
+    }
+    
+    // DELIVERY FEE
+    const deliveryFee = Number(body.deliveryFee || 0)
+    if (deliveryFee > 0) {
+      totalAmount += deliveryFee
+      preferenceItems.push({
+        title: "Taxa de entrega",
+        unit_price: deliveryFee,
+        quantity: 1,
         currency_id: "BRL",
       })
     }

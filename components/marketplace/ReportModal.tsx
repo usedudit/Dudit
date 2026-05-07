@@ -2,10 +2,12 @@
 
 import { useState } from "react"
 import { FlagIcon } from "@/lib/icons"
-import { Button, FormDropdown, FormTextarea, DefaultModal, IconPlaceholder } from "@/components/reusable"
+import { Button, FormDropdown, FormTextarea, DefaultModal } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { createReport, type ReportTargetType } from "@/app/actions/admin/reports"
 import { REPORT_REASON_CODES, REPORT_REASON_LABELS, type ReportReasonCode } from "@/lib/admin/report-reasons"
+import { getCSRFToken } from "@/lib/utils/fetch-with-csrf"
+import { ArrowLeftRightIcon } from "@/lib/icons"
 
 interface ReportModalProps {
   isOpen: boolean
@@ -35,11 +37,13 @@ export function ReportModal({
 
     setIsSubmitting(true)
     try {
+      const csrf_token = await getCSRFToken()
       const res = await createReport({
         targetType,
         targetId,
         reasonCode,
-        description: description.trim() || undefined
+        description: description.trim() || undefined,
+        csrf_token
       })
 
       if (res.success) {
@@ -66,14 +70,17 @@ export function ReportModal({
       maxWidth="md"
     >
       <div className="flex flex-col">
-        <div className="flex justify-center w-full mb-4">
-          <IconPlaceholder icon={FlagIcon} />
+        {/* Header with Icon Square */}
+        <div className="bg-brand-gray dark:bg-dark-border/50 rounded-2xl p-10 flex items-center justify-center mb-8 relative group">
+          <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:scale-105">
+            <FlagIcon size={32} className="text-[#d32f2f]" />
+          </div>
         </div>
 
         <h4 className="text-brand-dark dark:text-dark-heading text-xl font-bold mb-2 text-center">
           Denunciar {targetType === "partner" ? "vendedor" : "produto"}
         </h4>
-        <p className="text-brand-inactive-text dark:text-dark-body text-sm mb-6 text-center">
+        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] mb-8 text-center leading-relaxed">
           Você está denunciando <strong>{targetName}</strong>. Sua denúncia é anônima e ajuda a manter nossa comunidade segura.
         </p>
 

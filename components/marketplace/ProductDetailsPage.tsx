@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from "framer-motion"
 import { useSupabase } from "@/providers/supabase-provider"
-import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, CheckCircleIcon, XIcon, ShoppingCartIcon, MoneyIcon, TruckIcon, FlagIcon } from "@/lib/icons"
+import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, CheckCircleIcon, XIcon, ShoppingCartIcon, MoneyIcon, TruckIcon, FlagIcon, ArrowLeftRightIcon } from "@/lib/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
@@ -249,6 +249,8 @@ export function ProductDetailsPageClient({
     }
   }, [userId, partner.id, partner.user_id, supabase])
 
+  const partnerProfileImageUrl = getR2ImageUrl(partner.profile_image_url)
+
   // Fetch Delivery Config
   useEffect(() => {
     if (partner.id) {
@@ -394,7 +396,11 @@ export function ProductDetailsPageClient({
         openingHours: partner.openingHours || null,
       },
       itemId: selectedVariant?.id || product.id,
-      itemType: "product"
+      itemType: "product",
+      deliverySettings: deliveryConfig?.settings ? {
+        base_fee: deliveryConfig.settings.baseFee,
+        is_delivery_enabled: deliveryConfig.settings.isDeliveryEnabled,
+      } : undefined,
     }
 
     sessionStorage.setItem("checkout_session", JSON.stringify(checkoutData))
@@ -822,14 +828,26 @@ export function ProductDetailsPageClient({
         onClose={() => setShowPaymentModal(false)}
         maxWidth="md"
       >
-        <div className="flex flex-col items-center">
-          <div className="mb-6 flex justify-center w-full">
-            <IconPlaceholder
-              icon={MoneyIcon}
-            />
+        <div className="flex flex-col">
+          {/* Header with Dual Squares */}
+          <div className="bg-brand-gray dark:bg-dark-border/50 rounded-2xl p-10 flex items-center justify-center gap-8 mb-8 relative group">
+            <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:-rotate-3">
+              <MoneyIcon size={32} className="text-brand-green" />
+            </div>
+
+            <div className="flex flex-col items-center gap-1">
+              <div className="w-12 h-6 bg-white dark:bg-dark-surface rounded-full flex items-center justify-center border border-brand-border/50 dark:border-dark-border/50">
+                <ArrowLeftRightIcon size={14} className="text-brand-dark dark:text-dark-heading" />
+              </div>
+            </div>
+
+            <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:rotate-3 overflow-hidden">
+              <img src={partnerProfileImageUrl || "https://img.dudit.com.br/static/Placeholder.png"} alt={partner.store_name} className="w-full h-full object-cover rounded-lg" />
+            </div>
           </div>
-          <h4 className="text-xl font-bold text-brand-dark mb-4 text-center">Onde vai o seu dinheiro?</h4>
-          <div className="space-y-4 text-brand-inactive-text text-sm sm:text-base text-center">
+
+          <h4 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-4 text-center">Onde vai o seu dinheiro?</h4>
+          <div className="space-y-4 text-brand-inactive-text dark:text-dark-body text-[15px] text-center leading-relaxed">
             <p>
               Na Dudit, a transparência é total. Nós não processamos pagamentos diretamente e não ficamos com nenhuma comissão sobre a sua compra.
             </p>
@@ -837,7 +855,7 @@ export function ProductDetailsPageClient({
               Isso significa que o seu dinheiro vai direto para o vendedor, seja através de facilitadores seguros (como o Mercado Pago) ou por meio do acerto que você fizer direto no balcão ou no WhatsApp. É mais lucro para quem vende e mais agilidade para quem compra!
             </p>
           </div>
-          <Button onClick={() => setShowPaymentModal(false)} className="w-full mt-8">Entendi</Button>
+          <Button onClick={() => setShowPaymentModal(false)} className="w-full mt-8 h-12">Entendi</Button>
         </div>
       </DefaultModal>
 
@@ -846,14 +864,26 @@ export function ProductDetailsPageClient({
         onClose={() => setShowResponsibilityModal(false)}
         maxWidth="md"
       >
-        <div className="flex flex-col items-center">
-          <div className="mb-6 flex justify-center w-full">
-            <IconPlaceholder
-              icon={TruckIcon}
-            />
+        <div className="flex flex-col">
+          {/* Header with Dual Squares */}
+          <div className="bg-brand-gray dark:bg-dark-border/50 rounded-2xl p-10 flex items-center justify-center gap-8 mb-8 relative group">
+            <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:-rotate-3 overflow-hidden">
+              <img src={partnerProfileImageUrl || "https://img.dudit.com.br/static/Placeholder.png"} alt={partner.store_name} className="w-full h-full object-cover rounded-lg" />
+            </div>
+
+            <div className="flex flex-col items-center gap-1">
+              <div className="w-12 h-6 bg-white dark:bg-dark-surface rounded-full flex items-center justify-center border border-brand-border/50 dark:border-dark-border/50">
+                <ArrowLeftRightIcon size={14} className="text-brand-dark dark:text-dark-heading" />
+              </div>
+            </div>
+
+            <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:rotate-3">
+              <TruckIcon size={32} className="text-brand-green" />
+            </div>
           </div>
-          <h4 className="text-xl font-bold text-brand-dark mb-4 text-center">Quem cuida do seu pedido?</h4>
-          <div className="space-y-4 text-brand-inactive-text text-sm sm:text-base text-center">
+
+          <h4 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-4 text-center">Quem cuida do seu pedido?</h4>
+          <div className="space-y-4 text-brand-inactive-text dark:text-dark-body text-[15px] text-center leading-relaxed">
             <p>
               A Dudit é a ponte que conecta você ao vendedor. Nós cuidamos da vitrine, da organização e do registro do seu pedido, mas a execução da venda é por conta do vendedor.
             </p>
@@ -861,7 +891,7 @@ export function ProductDetailsPageClient({
               A responsabilidade por separar o produto, realizar a entrega, oferecer garantia e resolver trocas ou devoluções é exclusivamente do vendedor. Se tiver qualquer dúvida sobre o seu item, o melhor caminho é chamar o vendedor no WhatsApp para alinhar tudo, beleza?
             </p>
           </div>
-          <Button onClick={() => setShowResponsibilityModal(false)} className="w-full mt-8">Entendi</Button>
+          <Button onClick={() => setShowResponsibilityModal(false)} className="w-full mt-8 h-12">Entendi</Button>
         </div>
       </DefaultModal>
 
